@@ -73,10 +73,7 @@
             <column name="sample_sequencing_id" type="INT">
                 <constraints nullable="false" />
             </column>
-            <column
-                name="status"
-                type="sequencing_status"
-            >
+            <column name="status" type="sequencing_status">
                 <constraints nullable="false" />
             </column>
             <column name="timestamp" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
