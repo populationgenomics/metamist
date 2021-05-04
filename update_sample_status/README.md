@@ -14,19 +14,7 @@ through a service account key.
 ## Set up the Cloud Function
 
 1. Create a GCP project named `sample-metadata`.
-1. Add a service account for _running_ the Cloud Function and grant it 
-   the _Secret Manager Secret Accessor_ role.
-1. Deploy the Cloud Function, replacing `$PROJECT`, `$REGION`, and
-   `$SERVICE_ACCOUNT` accordingly. Do _not_ allow unauthenticated
-   invocations.
-   ```
-   gcloud config set project $PROJECT
-   gcloud functions deploy update_sample_status --runtime python37 \
-     --region=$REGION --trigger-http --service-account $SERVICE_ACCOUNT
-   ```
-1. Create a service account for _invoking_ the Cloud Function. 
-1. Under the newly created Cloud Function, grant the invoker service account
-   the _Cloud Functions Invoker_ role.
+1. Add a service account for _running_ the Cloud Function.
 1. In the Secret Manager, create a secret `update-sample-status-config`, with
    a JSON config as follows, where `apiKey` corresponds to the Airtable account
    that should be used for the updates. The corresponding tables must have
@@ -45,6 +33,18 @@ through a service account key.
        }
    }
    ```
+1. Grant the Cloud Function service account the _Secret Manager Secret Accessor_ role for the secret.
+1. Deploy the Cloud Function, replacing `$PROJECT`, `$REGION`, and
+   `$SERVICE_ACCOUNT` accordingly. Do _not_ allow unauthenticated
+   invocations.
+   ```
+   gcloud config set project $PROJECT
+   gcloud functions deploy update_sample_status --runtime python37 \
+     --region=$REGION --trigger-http --service-account $SERVICE_ACCOUNT
+   ```
+1. Create a service account for _invoking_ the Cloud Function. 
+1. Under the newly created Cloud Function, grant the invoker service account
+   the _Cloud Functions Invoker_ role.
 
 ## Invoking the Cloud Function
 
