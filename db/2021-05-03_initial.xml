@@ -8,9 +8,17 @@
         <sql>CREATE TYPE analysis_type as ENUM('qc', 'joint-calling', 'custom')</sql>
         <sql>CREATE TYPE analysis_status as ENUM('queued', 'in-progress', 'failed', 'completed')</sql>
 
+        <!-- Project settings -->
+        <createTable tableName="project">
+            <column name="key" type="VARCHAR">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="value" type="VARCHAR" />
+        </createTable>
+
         <!-- Participants -->
         <createTable tableName="participant">
-            <column name="id" type="VARCHAR">
+            <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR">
@@ -19,13 +27,13 @@
         </createTable>
         <!-- Samples -->
         <createTable tableName="sample">
-            <column name="id" type="VARCHAR">
+            <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR">
                 <constraints nullable="false" />
             </column>
-            <column name="participant_id" type="VARCHAR">
+            <column name="participant_id" type="INT">
                 <constraints nullable="true" foreignKeyName="fk_participant_sample" references="participant(id)"/>
             </column>
             <column name="active" type="BOOLEAN" />
@@ -34,7 +42,7 @@
         </createTable>
         <!-- Sample updates -->
         <createTable tableName="sample_update">
-            <column name="sample_id" type="VARCHAR">
+            <column name="sample_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_sample_update" references="sample(id)"/>
             </column>
             <column name="type" type="sample_update_type">
@@ -54,7 +62,7 @@
             <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
-            <column name="sample_id" type="VARCHAR">
+            <column name="sample_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_sample_sequencing" references="sample(id)"/>
             </column>
             <column name="type" type="sequencing_type">
@@ -65,8 +73,8 @@
             <column name="sample_sequencing_id" type="INT">
                 <constraints nullable="false" />
             </column>
-            <column 
-                name="status" 
+            <column
+                name="status"
                 type="sequencing_status"
             >
                 <constraints nullable="false" />
@@ -78,7 +86,7 @@
         </createTable>
         <!-- Participant Phenotype -->
         <createTable tableName="participant_phenotypes">
-            <column name="participant_id" type="VARCHAR">
+            <column name="participant_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_participant_phenotype" references="participant(id)"/>
             </column>
             <column name="hpo_term" type="VARCHAR">
@@ -120,10 +128,10 @@
             <column name="analysis_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_analysis_sample" references="analysis(id)"/>
             </column>
-            <column name="sample_id" type="VARCHAR">
+            <column name="sample_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_analysis_sample_sample" references="sample(id)"/>
             </column>
-            
+
 
         </createTable>
 
@@ -146,13 +154,13 @@
             <column name="family_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_family_participant" references="family(id)"/>
             </column>
-            <column name="participant_id" type="VARCHAR">
+            <column name="participant_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_family_participant_participant" references="participant(id)"/>
             </column>
-            <column name="paternal_participant_id" type="VARCHAR">
+            <column name="paternal_participant_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_family_participant_paternal" references="participant(id)"/>
             </column>
-            <column name="maternal_participant_id" type="VARCHAR">
+            <column name="maternal_participant_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_family_participant_maternal" references="participant(id)"/>
             </column>
             <column name="affected" type="BOOLEAN">
@@ -164,7 +172,7 @@
             <column name="notes" type="VARCHAR">
                 <constraints nullable="true" />
             </column>
-            
+
         </createTable>
     </changeSet>
 </databaseChangeLog>
