@@ -5,3 +5,4 @@ marshmallow-enum==1.5.1
 flasgger==0.9.5
 requests==2.25.1
 psycopg2-binary==2.8.6
+apispec==4.4.0
