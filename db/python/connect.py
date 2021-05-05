@@ -23,6 +23,10 @@ class ProjectDoesNotExist(Exception):
         )
 
 
+class NotFoundError(Exception):
+    """Custom error when you can't find something"""
+
+
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
@@ -40,7 +44,8 @@ class SMConnections:
         return SMConnections._connections
 
     @staticmethod
-    def _get_connection_for_project(project, user):
+    def get_connection_for_project(project, user):
+        """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate the connection with "{user}"')
 
@@ -49,34 +54,44 @@ class SMConnections:
             raise ProjectDoesNotExist(project)
         return conn
 
-    @staticmethod
-    @contextmanager
-    def get_cursor(project, user, auto_commit=False):
-        """
-        Use like:
-
-            with SMConnections.get_cursor('project_id', user) as cursor:
-                cursor.execute('<query>')
-                records = cursor.fetch_all()
-        """
-        conn = SMConnections._get_connection_for_project(project, user)
-        cur = conn.cursor()
-
-        def commit():
-            return conn.commit()
-
-        yield cur, commit
-
-        if auto_commit:
-            cur.commit()
-
 
 class DbBase:
     """Base class for table subclasses"""
 
-    def __init__(self, cursor):
+    @classmethod
+    def from_project(cls, project, user):
+        """Create the Db object from a project with user details"""
+        return cls(connection=SMConnections.get_connection_for_project(project, user))
 
-        self._cursor = cursor
+    def __init__(self, connection=None):
+        self._connection = connection
 
-        if cursor is None:
-            raise Exception('No cursor was provided to the DbBase')
+        if connection is None:
+            raise Exception(
+                f'No connection was provided to the table "{self.__class__.__name__}"'
+            )
+
+    @contextmanager
+    def get_cursor(self, auto_commit=False):
+        """
+        Use like:
+
+            with self.get_cursor() as cursor:
+                cursor.execute('<query>')
+                records = cursor.fetch_all()
+        """
+        with self._connection.cursor() as cur:
+            yield cur
+
+            if auto_commit:
+                self.commit()
+
+    @contextmanager
+    def transaction(self):
+        """Create a transaction by yielding a connection"""
+        with self._connection as c:
+            yield c
+
+    def commit(self):
+        """Commit a set of changes"""
+        self._connection.commit()
