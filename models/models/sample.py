@@ -20,7 +20,7 @@ class Sample:
         self.participant_id = participant_id
         self.active = active
         self.sample_meta = sample_meta
-        self.sample_type = sample_type
+        self.sample_type = SampleType(sample_type)
 
     @staticmethod
     def from_db(**kwargs):

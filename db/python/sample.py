@@ -52,7 +52,14 @@ VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
 
     def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
         """Get a Sample by its external_id"""
-        keys = ['id', 'external_id', 'participant_id', 'sample_meta']
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'sample_meta',
+            'active',
+            'sample_type',
+        ]
         if check_active:
             _query = f"""\
 SELECT {", ".join(keys)} from sample
