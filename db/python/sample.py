@@ -28,7 +28,7 @@ class SampleTable(DbBase):
 
         _query = """\
 INSERT INTO sample
-    (external_id, participant_id, sample_meta, sample_type, active)
+    (external_id, participant_id, meta, type, active)
 VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
 
         with self.get_cursor() as cursor:
@@ -56,9 +56,9 @@ VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
             'id',
             'external_id',
             'participant_id',
-            'sample_meta',
+            'meta',
             'active',
-            'sample_type',
+            'type',
         ]
         if check_active:
             _query = f"""\

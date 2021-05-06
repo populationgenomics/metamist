@@ -37,8 +37,8 @@
                 <constraints nullable="true" foreignKeyName="fk_participant_sample" references="participant(id)"/>
             </column>
             <column name="active" type="BOOLEAN" />
-            <column name="sample_meta" type="JSON" />
-            <column name="sample_type" type="sample_type" />
+            <column name="meta" type="JSON" />
+            <column name="type" type="sample_type" />
         </createTable>
         <!-- Sample updates -->
         <createTable tableName="sample_update">
@@ -68,8 +68,9 @@
             <column name="type" type="sequencing_type">
                 <constraints nullable="true" />
             </column>
+            <column name="meta" type="json" />
         </createTable>
-        <createTable tableName="sample_sequencing_status_update">
+        <createTable tableName="sample_sequencing_status">
             <column name="sample_sequencing_id" type="INT">
                 <constraints nullable="false" />
             </column>
