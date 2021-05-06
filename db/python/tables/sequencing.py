@@ -5,7 +5,7 @@ from psycopg2.extras import Json
 # from models.models.sequence import SampleSequencing
 from models.enums import SequencingType
 
-from .connect import DbBase
+from db.python.connect import DbBase
 
 
 class SampleSequencingTable(DbBase):

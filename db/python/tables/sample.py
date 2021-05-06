@@ -3,7 +3,7 @@ from psycopg2.extras import Json
 from models.models.sample import Sample
 from models.enums import SampleType
 
-from .connect import DbBase, NotFoundError
+from db.python.connect import DbBase, NotFoundError
 
 
 class SampleTable(DbBase):
@@ -18,7 +18,7 @@ class SampleTable(DbBase):
         external_id,
         sample_type: SampleType,
         active,
-        sample_meta=None,
+        meta=None,
         participant_id=None,
         commit=True,
     ) -> int:
@@ -38,7 +38,7 @@ VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
                 (
                     external_id,
                     participant_id,
-                    Json(sample_meta),
+                    Json(meta),
                     sample_type.value,
                     active,
                 ),

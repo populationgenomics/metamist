@@ -5,7 +5,7 @@ from flasgger import swag_from
 
 from api.utils.request import JsonBlueprint
 from api.schema.sample import SampleSchema
-from db.python.sample import SampleTable
+from db.python.tables.sample import SampleTable
 
 
 def get_sample_blueprint(prefix):

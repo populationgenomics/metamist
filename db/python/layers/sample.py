@@ -1,5 +1,5 @@
-from db.python.sample import SampleTable
-from db.python.sequencingstatus import SampleSequencingStatusTable
+from db.python.tables.sample import SampleTable
+from db.python.tables.sequencingstatus import SampleSequencingStatusTable
 
 from models.enums import SequencingStatus
 

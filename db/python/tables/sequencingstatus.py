@@ -1,7 +1,7 @@
 # from models.models.sequence import SampleSequencingStatus
 from models.enums import SequencingStatus
 
-from .connect import DbBase, NotFoundError
+from db.python.connect import DbBase, NotFoundError
 
 
 class SampleSequencingStatusTable(DbBase):

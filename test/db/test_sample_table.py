@@ -2,7 +2,7 @@
 import unittest
 
 from models.models.sample import Sample
-from db.python.sample import SampleTable
+from db.python.tables.sample import SampleTable
 
 
 class TestSampleTable(unittest.TestCase):

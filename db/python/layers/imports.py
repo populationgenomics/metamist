@@ -1,8 +1,8 @@
 from typing import List, Dict, Iterable
 
-from db.python.sample import SampleTable
-from db.python.sequencing import SampleSequencingTable
-from db.python.sequencingstatus import SampleSequencingStatusTable
+from db.python.tables.sample import SampleTable
+from db.python.tables.sequencing import SampleSequencingTable
+from db.python.tables.sequencingstatus import SampleSequencingStatusTable
 
 from models.enums import SampleType, SequencingType, SequencingStatus
 
@@ -53,7 +53,7 @@ class ImportLayer:
                 internal_sample_id = sample_table.insert_sample(
                     external_id=external_sample_id,
                     active=True,
-                    sample_meta=sample_meta,
+                    meta=sample_meta,
                     sample_type=sample_type,
                     commit=False,
                 )
