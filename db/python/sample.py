@@ -13,7 +13,7 @@ class SampleTable(DbBase):
 
     table_name = 'sample'
 
-    def new(
+    def insert_sample(
         self,
         external_id,
         sample_type: SampleType,

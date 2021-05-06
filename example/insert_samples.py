@@ -21,7 +21,7 @@ if __name__ == '__main__':
     with sdb.transaction():
         for sample in sample_data:
             new_ids.append(
-                sdb.new(
+                sdb.insert_sample(
                     external_id=sample.external_id,
                     sample_type=sample.sample_type,
                     active=sample.active,

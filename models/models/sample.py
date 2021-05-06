@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Optional, Dict
 
 from models.enums.sample import SampleType
 
@@ -8,12 +8,13 @@ class Sample:
 
     def __init__(
         self,
-        id_: int,
+        id_: Optional[int],
+        *,
         external_id: str,
         participant_id: str = None,
+        sample_type: SampleType = None,
         active: bool = None,
         sample_meta: Dict = None,
-        sample_type: SampleType = None,
     ):
         self.id = id_
         self.external_id = external_id
