@@ -46,7 +46,7 @@ LIMIT 1;
 """
 
         with self.get_cursor() as cursor:
-            cursor.execute(_query, (sample_id))
+            cursor.execute(_query, (sample_id,))
             row = cursor.fetchone()
             if not row:
                 raise NotFoundError(f'sequence with sample ID {sample_id}')
