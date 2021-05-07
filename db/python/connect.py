@@ -63,8 +63,9 @@ class DbBase:
         """Create the Db object from a project with user details"""
         return cls(connection=SMConnections.get_connection_for_project(project, user))
 
-    def __init__(self, connection=None):
+    def __init__(self, connection=None, author=None):
         self._connection = connection
+        self.author = author
 
         if connection is None:
             raise Exception(

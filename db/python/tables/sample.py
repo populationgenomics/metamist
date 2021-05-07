@@ -1,7 +1,9 @@
+from typing import Dict
+
 from psycopg2.extras import Json
 
 from models.models.sample import Sample
-from models.enums import SampleType
+from models.enums import SampleType, SampleUpdateType
 
 from db.python.connect import DbBase, NotFoundError
 
@@ -12,6 +14,35 @@ class SampleTable(DbBase):
     """
 
     table_name = 'sample'
+
+    def _log_update(
+        self,
+        sample_id: int,
+        type_: SampleUpdateType,
+        update: Dict[str, any],
+        author: str = None,
+        commit=True,
+        cursor=None,
+    ):
+        _query = """\
+INSERT INTO sample_update
+    (sample_id, type, update, author)
+VALUES (%s, %s, %s, %s)
+        """
+
+        def execute_with(cursor):
+            cursor.execute(
+                _query, (sample_id, type_.value, Json(update), author or self.author)
+            )
+
+        if cursor:
+            execute_with(cursor)
+        else:
+            with self.get_cursor() as crs:
+                execute_with(crs)
+
+        if commit:
+            self.commit()
 
     def insert_sample(
         self,
@@ -44,6 +75,17 @@ VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
                 ),
             )
             id_of_new_sample = cursor.fetchone()[0]
+            self._log_update(
+                sample_id=id_of_new_sample,
+                type_=SampleUpdateType.created,
+                update={
+                    'external_id': external_id,
+                    'participant_id': participant_id,
+                    'meta': meta,
+                    'type': sample_type.value,
+                    'active': active,
+                },
+            )
 
             if commit:
                 self.commit()
