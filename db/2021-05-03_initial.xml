@@ -48,7 +48,7 @@
             <column name="type" type="sample_update_type">
                 <constraints nullable="false" />
             </column>
-            <column name="new_value" type="varchar">
+            <column name="update" type="json">
                 <constraints nullable="false" />
             </column>
             <column name="timestamp" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
