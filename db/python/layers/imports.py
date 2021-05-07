@@ -122,5 +122,7 @@ class ImportLayer:
             return SequencingStatus.uploaded
         if row_status_lower == 'failed':
             return SequencingStatus.failed_qc
+        if row_status_lower == '':
+            return SequencingStatus.unknown
 
         raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
