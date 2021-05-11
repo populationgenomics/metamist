@@ -15,7 +15,9 @@ if __name__ == '__main__':
         )
         for i in range(1, 6)
     ]
-    sdb = SampleTable.from_project('sm_dev', None)
+    sdb = SampleTable.from_project(
+        'sm_dev', 'michael.franklin@populationgenomics.org.au'
+    )
 
     new_ids = []
     with sdb.transaction():

@@ -6,10 +6,18 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, Optional
 
-import psycopg2
+# import psycopg2
+import json
+import mysql.connector as mysql
 
 
 logger = logging.getLogger(__name__)
+
+
+def to_db_json(val):
+    """Convert val to json for DB"""
+    # return psycopg2.extras.Json(val)
+    return json.dumps(val)
 
 
 class ProjectDoesNotExist(Exception):
@@ -36,8 +44,17 @@ class SMConnections:
     @staticmethod
     def _get_connections(force_reconnect=False):
         if SMConnections._connections is None or force_reconnect:
+            # SMConnections._connections = {
+            #     dbname: psycopg2.connect(f'dbname={dbname}')
+            #     for dbname in SMConnections._databases
+            # }
             SMConnections._connections = {
-                dbname: psycopg2.connect(f'dbname={dbname}')
+                dbname: mysql.connect(
+                    host='localhost',
+                    user='liquibase',
+                    password='CPG_pass123',
+                    database=dbname,
+                )
                 for dbname in SMConnections._databases
             }
 
@@ -59,11 +76,14 @@ class DbBase:
     """Base class for table subclasses"""
 
     @classmethod
-    def from_project(cls, project, user):
+    def from_project(cls, project, author):
         """Create the Db object from a project with user details"""
-        return cls(connection=SMConnections.get_connection_for_project(project, user))
+        return cls(
+            connection=SMConnections.get_connection_for_project(project, author),
+            author=author,
+        )
 
-    def __init__(self, connection=None, author=None):
+    def __init__(self, connection, author):
         self._connection = connection
         self.author = author
 
@@ -71,6 +91,9 @@ class DbBase:
             raise Exception(
                 f'No connection was provided to the table "{self.__class__.__name__}"'
             )
+
+        if author is None:
+            raise Exception('Must provide author to {self.__class__.__name__}')
 
     @contextmanager
     def get_cursor(self, auto_commit=False):

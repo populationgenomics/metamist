@@ -1,8 +1,9 @@
+import csv
+
 from typing import List, Dict, Iterable
 
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing import SampleSequencingTable
-from db.python.tables.sequencingstatus import SampleSequencingStatusTable
 
 from models.enums import SampleType, SequencingType, SequencingStatus
 
@@ -10,8 +11,9 @@ from models.enums import SampleType, SequencingType, SequencingStatus
 class ImportLayer:
     """Layer for import logic"""
 
-    def __init__(self, connection):
+    def __init__(self, connection, author):
         self.connection = connection
+        self.author = author
 
     def import_airtable_manifest(self, rows: Iterable[Dict[str, any]]):
         """
@@ -33,9 +35,10 @@ class ImportLayer:
         )
         with self.connection:
             # open a transaction
-            sample_table = SampleTable(connection=self.connection)
-            seq_table = SampleSequencingTable(connection=self.connection)
-            seq_status_table = SampleSequencingStatusTable(connection=self.connection)
+            sample_table = SampleTable(connection=self.connection, author=self.author)
+            seq_table = SampleSequencingTable(
+                connection=self.connection, author=self.author
+            )
 
             for obj in rows:
                 external_sample_id = obj.pop('Sample ID')
@@ -62,12 +65,10 @@ class ImportLayer:
                     sample_id=internal_sample_id,
                     sequence_type=SequencingType.wgs,
                     sequence_meta=sequence_meta,
+                    status=sequence_status,
                     commit=False,
                 )
 
-                seq_status_table.insert_sequencing_status(
-                    sequence_id=sequence_id, status=sequence_status, commit=False
-                )
                 print(f'Inserting sequencing with internal ID: {internal_sample_id}')
 
             self.connection.commit()
@@ -126,3 +127,16 @@ class ImportLayer:
             return SequencingStatus.unknown
 
         raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
+
+
+if __name__ == "__main__":
+    from db.python.connect import SMConnections
+
+    author = "michael.franklin@populationgenomics.org.au"
+    connection = SMConnections.get_connection_for_project("sm_dev", author)
+    csv_path = '/Users/michael.franklin/Downloads/Manifest-Master.csv'
+    with open(csv_path, encoding='utf-8-sig') as csvfile:
+        csvreader = csv.reader(csvfile)
+        headers = next(csvreader)
+
+        ImportLayer(connection, author).import_airtable_manifest_csv(headers, csvreader)

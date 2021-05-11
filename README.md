@@ -9,6 +9,7 @@ Add the postgres jar into the db folder:
 ```bash
 pushd db/
 curl https://jdbc.postgresql.org/download/postgresql-42.2.20.jar
+wget https://cdn.mysql.com//Downloads/Connector-J/mysql-connector-java-8.0.24.zip
 
 # ensure you have the database created
 psql -U postgres -c "CREATE DATABASE sm_dev;"

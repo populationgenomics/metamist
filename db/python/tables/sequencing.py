@@ -1,11 +1,9 @@
 from typing import Dict
 
-from psycopg2.extras import Json
-
 # from models.models.sequence import SampleSequencing
-from models.enums import SequencingType
+from models.enums import SequencingType, SequencingStatus
 
-from db.python.connect import DbBase
+from db.python.connect import DbBase, to_db_json
 
 
 class SampleSequencingTable(DbBase):
@@ -19,7 +17,9 @@ class SampleSequencingTable(DbBase):
         self,
         sample_id,
         sequence_type: SequencingType,
+        status: SequencingStatus,
         sequence_meta: Dict[str, any] = None,
+        author=None,
         commit=True,
     ) -> int:
         """
@@ -28,13 +28,20 @@ class SampleSequencingTable(DbBase):
 
         _query = """\
 INSERT INTO sample_sequencing
-    (sample_id, type, meta)
-VALUES (%s, %s, %s) RETURNING id;"""
+    (sample_id, type, meta, status, author)
+VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
 
         with self.get_cursor() as cursor:
 
             cursor.execute(
-                _query, (sample_id, sequence_type.value, Json(sequence_meta))
+                _query,
+                (
+                    sample_id,
+                    sequence_type.value,
+                    to_db_json(sequence_meta),
+                    status.value,
+                    author or self.author,
+                ),
             )
             id_of_new_sample = cursor.fetchone()[0]
 
@@ -42,3 +49,41 @@ VALUES (%s, %s, %s) RETURNING id;"""
                 self.commit()
 
         return id_of_new_sample
+
+    def get_latest_sequence_id_by_sample_id(self, sample_id):
+        """
+        Get latest added sequence ID from internal sample_id
+        """
+        _query = """\
+SELECT id from sample_sequencing
+WHERE sample_id = %s
+ORDER by id
+LIMIT 1
+"""
+        with self.get_cursor() as cursor:
+            cursor.execute(_query, (sample_id,))
+            return cursor.fetchone()[0]
+
+    def get_latest_sequence_id_by_external_sample_id(self, external_sample_id):
+        """
+        Get latest added sequence ID from external sample_id
+        """
+        _query = """\
+SELECT sq.id from sample_sequencing sq
+INNER JOIN sample s ON s.id = sq.sample_id
+WHERE s.external_id = %s
+ORDER by s.id
+LIMIT 1
+"""
+        with self.get_cursor() as cursor:
+            cursor.execute(_query, (external_sample_id,))
+            return cursor.fetchone()[0]
+
+    def update_status(
+        self, sequencing_id, status: SequencingStatus, author=None, commit=True
+    ):
+        _query = "UPDATE sample_sequencing SET status = %s, author=%s WHERE id = %s"
+        with self.get_cursor() as cursor:
+            cursor.execute(_query, (status.value, author or self.author, sequencing_id))
+            if commit:
+                self.commit()

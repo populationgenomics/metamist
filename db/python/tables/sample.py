@@ -1,11 +1,9 @@
 from typing import Dict
 
-from psycopg2.extras import Json
-
 from models.models.sample import Sample
 from models.enums import SampleType, SampleUpdateType
 
-from db.python.connect import DbBase, NotFoundError
+from db.python.connect import DbBase, NotFoundError, to_db_json
 
 
 class SampleTable(DbBase):
@@ -32,7 +30,8 @@ VALUES (%s, %s, %s, %s)
 
         def execute_with(cursor):
             cursor.execute(
-                _query, (sample_id, type_.value, Json(update), author or self.author)
+                _query,
+                (sample_id, type_.value, to_db_json(update), author or self.author),
             )
 
         if cursor:
@@ -51,6 +50,7 @@ VALUES (%s, %s, %s, %s)
         active,
         meta=None,
         participant_id=None,
+        author=None,
         commit=True,
     ) -> int:
         """
@@ -59,8 +59,8 @@ VALUES (%s, %s, %s, %s)
 
         _query = """\
 INSERT INTO sample
-    (external_id, participant_id, meta, type, active)
-VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
+    (external_id, participant_id, meta, type, active, author)
+VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;"""
 
         with self.get_cursor() as cursor:
 
@@ -69,23 +69,24 @@ VALUES (%s, %s, %s, %s, %s) RETURNING id;"""
                 (
                     external_id,
                     participant_id,
-                    Json(meta),
+                    to_db_json(meta),
                     sample_type.value,
                     active,
+                    author or self.author,
                 ),
             )
             id_of_new_sample = cursor.fetchone()[0]
-            self._log_update(
-                sample_id=id_of_new_sample,
-                type_=SampleUpdateType.created,
-                update={
-                    'external_id': external_id,
-                    'participant_id': participant_id,
-                    'meta': meta,
-                    'type': sample_type.value,
-                    'active': active,
-                },
-            )
+            # self._log_update(
+            #     sample_id=id_of_new_sample,
+            #     type_=SampleUpdateType.created,
+            #     update={
+            #         'external_id': external_id,
+            #         'participant_id': participant_id,
+            #         'meta': meta,
+            #         'type': sample_type.value,
+            #         'active': active,
+            #     },
+            # )
 
             if commit:
                 self.commit()
