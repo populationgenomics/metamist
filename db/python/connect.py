@@ -4,7 +4,7 @@ Code for connecting to Postgres database
 import logging
 
 from contextlib import contextmanager
-from typing import Dict, Optional
+from typing import Dict
 
 # import psycopg2
 import json
@@ -38,27 +38,31 @@ class NotFoundError(Exception):
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
-    _connections: Optional[Dict] = None
+    _connections: Dict = {}
     _databases = ['sm_dev']
 
     @staticmethod
     def _get_connections(force_reconnect=False):
-        if SMConnections._connections is None or force_reconnect:
-            # SMConnections._connections = {
-            #     dbname: psycopg2.connect(f'dbname={dbname}')
-            #     for dbname in SMConnections._databases
-            # }
+        if not SMConnections._connections or force_reconnect:
             SMConnections._connections = {
-                dbname: mysql.connect(
-                    host='localhost',
-                    user='liquibase',
-                    password='CPG_pass123',
-                    database=dbname,
-                )
+                dbname: SMConnections.make_connection(dbname)
                 for dbname in SMConnections._databases
             }
 
         return SMConnections._connections
+
+    @staticmethod
+    def make_connection(dbname):
+        """Create connection from dbname"""
+        return mysql.connect(
+            host='localhost',
+            user='liquibase',
+            password='CPG_pass123',
+            database=dbname,
+            autocommit=True,
+        )
+
+        # return psycopg2.connect(f'dbname={dbname}')
 
     @staticmethod
     def get_connection_for_project(project, user):
@@ -67,8 +71,17 @@ class SMConnections:
         logger.debug(f'Authenticate the connection with "{user}"')
 
         conn = SMConnections._get_connections().get(project)
+
         if conn is None:
             raise ProjectDoesNotExist(project)
+
+        if isinstance(conn.autocommit, str) and conn.autocommit.startswith('Traceback'):
+            logger.warning('Reconnecting to mariadb')
+            if SMConnections._connections:
+                SMConnections._connections[project] = SMConnections.make_connection(
+                    project
+                )
+
         return conn
 
 
