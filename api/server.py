@@ -1,7 +1,7 @@
-from flask import Flask
+from flask import Flask, request, g
 from flasgger import Swagger
 
-
+from db.python.connect import SMConnections
 from api.routes import all_blueprints
 from api.utils.handleexception import handle_exception
 
@@ -20,6 +20,14 @@ def create_app():
         Source: https://flask.palletsprojects.com/en/1.1.x/errorhandling/#generic-exception-handlers
         """
         return handle_exception(e)
+
+    @app.before_request
+    def before_request():
+        print(request)
+        g.author = 'michael.franklin@localhost'
+        if request.view_args and request.view_args.get('project'):
+            project = request.view_args.get('project')
+            g.connection = SMConnections.get_connection_for_project(project, g.author)
 
     # add routes (before swagger)
     for bp in all_blueprints:
