@@ -1,5 +1,3 @@
-import csv
-
 from typing import List, Dict, Iterable
 
 from db.python.tables.sample import SampleTable
@@ -33,6 +31,8 @@ class ImportLayer:
                 'OneK1K Data?',
             ]
         )
+        inserted_sample_ids = []
+
         with self.connection:
             # open a transaction
             sample_table = SampleTable(connection=self.connection, author=self.author)
@@ -60,6 +60,7 @@ class ImportLayer:
                     sample_type=sample_type,
                     commit=False,
                 )
+                inserted_sample_ids.append(internal_sample_id)
 
                 sequence_id = seq_table.insert_sequencing(
                     sample_id=internal_sample_id,
@@ -69,9 +70,13 @@ class ImportLayer:
                     commit=False,
                 )
 
-                print(f'Inserting sequencing with internal ID: {internal_sample_id}')
+                print(
+                    f'Inserting sequencing, (internal sample_id {internal_sample_id}, internal sequencing id {sequence_id})'
+                )
 
             self.connection.commit()
+
+        return inserted_sample_ids
 
     def import_airtable_manifest_csv(
         self, headers: List[str], rows: Iterable[List[str]]
@@ -129,14 +134,15 @@ class ImportLayer:
         raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
 
 
-if __name__ == "__main__":
-    from db.python.connect import SMConnections
+# if __name__ == '__main__':
+#     import csv
+#     from db.python.connect import SMConnections
 
-    author = "michael.franklin@populationgenomics.org.au"
-    connection = SMConnections.get_connection_for_project("sm_dev", author)
-    csv_path = '/Users/michael.franklin/Downloads/Manifest-Master.csv'
-    with open(csv_path, encoding='utf-8-sig') as csvfile:
-        csvreader = csv.reader(csvfile)
-        headers = next(csvreader)
+#     author = 'michael.franklin@populationgenomics.org.au'
+#     con = SMConnections.get_connection_for_project('sm_dev', author)
+#     csv_path = '/Users/michael.franklin/Downloads/Manifest-Master (1).csv'
+#     with open(csv_path, encoding='utf-8-sig') as csvfile:
+#         csvreader = csv.reader(csvfile)
+#         headers = next(csvreader)
 
-        ImportLayer(connection, author).import_airtable_manifest_csv(headers, csvreader)
+#         ImportLayer(con, author).import_airtable_manifest_csv(headers, csvreader)
