@@ -6,7 +6,7 @@ from api.routes import all_blueprints
 from api.utils.handleexception import handle_exception
 
 
-API_PREFIX = '/api'
+API_PREFIX = '/api/v1/'
 
 
 def create_app():

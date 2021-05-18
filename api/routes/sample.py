@@ -1,4 +1,4 @@
-# pylint: disable=unused-variable
+# pylint: disable=unused-variable,unused-argument
 
 from http import HTTPStatus
 
@@ -13,7 +13,7 @@ from db.python.tables.sample import SampleTable
 def get_sample_blueprint(prefix):
     """Build blueprint / routes for sample API"""
     sample_api = JsonBlueprint('sample_api', __name__)
-    project_prefix = prefix + '/<project>/sample'
+    project_prefix = prefix + '<project>/sample'
 
     @sample_api.route(project_prefix + '/<id_>', methods=['GET'])
     @swag_from(
@@ -30,7 +30,7 @@ def get_sample_blueprint(prefix):
             ],
         }
     )
-    def get_by_external_id(_, id_):
+    def get_by_external_id(project, id_):
         """
         Get a sample by its external ID
         ---

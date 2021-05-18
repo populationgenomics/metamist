@@ -1,4 +1,4 @@
-# pylint: disable=unused-variable
+# pylint: disable=unused-variable,unused-argument
 
 import csv
 import codecs
@@ -14,7 +14,7 @@ from db.python.layers.imports import ImportLayer
 def get_import_blueprint(prefix):
     """Build blueprint / routes for imports API"""
     import_api = JsonBlueprint('import_api', __name__)
-    project_prefix = prefix + '/<project>/imports'
+    project_prefix = prefix + '<project>/imports'
 
     @import_api.route(project_prefix + '/airtable-manifest', methods=['POST'])
     @swag_from(
@@ -38,7 +38,7 @@ def get_import_blueprint(prefix):
             ],
         }
     )
-    def import_airtable_manifest(_):
+    def import_airtable_manifest(project):
         if 'file' not in request.files:
             raise ValueError('No file was provided')
         file = request.files['file']
