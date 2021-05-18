@@ -36,7 +36,7 @@
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
-                <constraints nullable="false" />
+                <constraints nullable="false" unique="true" />
             </column>
             <column name="participant_id" type="INT">
                 <constraints nullable="true" foreignKeyName="fk_participant_sample" references="participant(id)"/>
