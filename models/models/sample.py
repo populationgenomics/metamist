@@ -1,3 +1,4 @@
+import json
 from typing import Optional, Dict
 
 from models.enums.sample import SampleType, SampleUpdateType
@@ -30,8 +31,14 @@ class Sample:
         """
         _id = kwargs.pop('id', None)
         type_ = kwargs.pop('type', None)
+        meta = kwargs.pop('meta', None)
+        if meta:
+            if isinstance(meta, bytes):
+                meta = meta.decode()
+            if isinstance(meta, str):
+                meta = json.loads(meta)
 
-        return Sample(id_=_id, type_=type_, **kwargs)
+        return Sample(id_=_id, type_=type_, meta=meta, **kwargs)
 
 
 class SampleUpdate:

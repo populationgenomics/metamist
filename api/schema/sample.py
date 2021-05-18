@@ -1,5 +1,5 @@
 from flask_marshmallow import Schema
-from marshmallow.fields import Str, Number, Bool, Dict
+from marshmallow.fields import Str, Bool, Dict, Int
 from marshmallow_enum import EnumField
 
 from models.enums.sample import SampleType
@@ -12,17 +12,17 @@ class SampleSchema(Schema):
         """marshmallow schema"""
 
         fields = [
-            'id_',
+            'id',
             'external_id',
             'participant_id',
             'active',
-            'sample_meta',
-            'sample_type',
+            'meta',
+            'type',
         ]
 
-    id_ = Number()
+    id = Int()
     external_id = Str()
-    participant_id = Number()
+    participant_id = Int()
     active = Bool()
-    sample_meta = Dict()
-    sample_type = EnumField(SampleType)
+    meta = Dict()
+    type = EnumField(SampleType)
