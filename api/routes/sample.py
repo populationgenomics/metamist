@@ -1,6 +1,8 @@
 # pylint: disable=unused-variable
 
 from http import HTTPStatus
+
+from flask import g
 from flasgger import swag_from
 
 from api.utils.request import JsonBlueprint
@@ -10,7 +12,7 @@ from db.python.tables.sample import SampleTable
 
 def get_sample_blueprint(prefix):
     """Build blueprint / routes for sample API"""
-    sample_api = JsonBlueprint('api', __name__)
+    sample_api = JsonBlueprint('sample_api', __name__)
     project_prefix = prefix + '/<project>/sample'
 
     @sample_api.route(project_prefix + '/<id_>', methods=['GET'])
@@ -28,13 +30,13 @@ def get_sample_blueprint(prefix):
             ],
         }
     )
-    def get_by_external_id(project, id_):
+    def get_by_external_id(_, id_):
         """
         Get a sample by its external ID
         ---
         """
 
-        st = SampleTable.from_project(project, None)
+        st = SampleTable(g.connection, g.author)
         result = st.get_single_by_external_id(id_)
         return SampleSchema().dump(result), 200
 
