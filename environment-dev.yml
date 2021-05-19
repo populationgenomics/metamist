@@ -1,0 +1,29 @@
+name: sample-metadata-dev
+
+channels:
+  - cpg
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.7
+  - black
+  - cpg-utils
+  - flake8
+  - flake8-bugbear
+  - flask
+  - hail
+  - pre-commit
+  - pylint
+  - python=3.7
+  - bump2version
+  - google-auth
+  - requests
+  - pip
+  - pip:
+    - flask-marshmallow==0.14.0
+    - marshmallow==3.12.1
+    - marshmallow-enum==1.5.1
+    - flasgger==0.9.5
+    - requests==2.25.1
+    - apispec==4.4.1
+    - mysql-connector-python==mysql-connector-python-8.0.25

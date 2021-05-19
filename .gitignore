@@ -1,3 +1,6 @@
 db/postgres*.jar
 .vscode/
 env/
+__pycache__/
+*.pyc
+.DS_Store
