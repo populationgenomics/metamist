@@ -1,7 +1,22 @@
 from json import loads
 import requests
 
+from aiohttp import web
 from flask import Blueprint, request, jsonify
+from cpg_utils.cloud import email_from_id_token
+
+
+def get_email_from_request_headers_or_raise_auth_error(headers) -> str:
+    """Get email from google auth header"""
+    auth_header = headers.get('Authorization')
+    if auth_header is None:
+        raise web.HTTPUnauthorized(reason='Missing authorization header')
+
+    try:
+        id_token = auth_header[7:]  # Strip the 'bearer' / 'Bearer' prefix.
+        return email_from_id_token(id_token)
+    except ValueError as e:
+        raise web.HTTPForbidden(reason='Invalid authorization header') from e
 
 
 class JsonBlueprint(Blueprint):
