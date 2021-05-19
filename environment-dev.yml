@@ -11,10 +11,8 @@ dependencies:
   - flake8
   - flake8-bugbear
   - flask
-  - hail
   - pre-commit
   - pylint
-  - python=3.7
   - bump2version
   - google-auth
   - requests
@@ -26,4 +24,4 @@ dependencies:
     - flasgger==0.9.5
     - requests==2.25.1
     - apispec==4.4.1
-    - mysql-connector-python==mysql-connector-python-8.0.25
+    - mysql-connector-python==8.0.25
