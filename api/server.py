@@ -30,21 +30,38 @@ def create_app():
         Before request, check that the request is authenticated,
         and get the email associated with the google account.
         """
-        g.author = get_email_from_request_headers_or_raise_auth_error(request.headers)
 
         if request.view_args and request.view_args.get('project'):
             project = request.view_args.get('project')
             # could check project permissions here
+            g.author = get_email_from_request_headers_or_raise_auth_error(
+                request.headers
+            )
             g.connection = SMConnections.get_connection_for_project(project, g.author)
 
     # add routes (before swagger)
     for bp in all_blueprints:
         app.register_blueprint(bp(API_PREFIX))
 
-        # add swagger
-        app.config['SWAGGER'] = {'title': 'Sample level metadata REST API'}
-
-    _ = Swagger(app)
+    app.config['SWAGGER'] = {'openapi': '3.0.2', 'uiversion': '3'}
+    _ = Swagger(
+        app,
+        template={
+            'info': {
+                'title': 'Sample metadata API',
+                'version': '1.0.0',
+            },
+            'servers': [
+                {
+                    'url': 'http://localhost:5000',
+                }
+            ],
+            'components': {
+                'securitySchemes': {'bearerAuth': {'type': 'http', 'scheme': 'bearer'}}
+            },
+            'security': [{'bearerAuth': []}],
+        },
+    )
 
     return app
 

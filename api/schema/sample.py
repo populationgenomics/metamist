@@ -11,6 +11,7 @@ class SampleSchema(Schema):
     class Meta:
         """marshmallow schema"""
 
+        strict = False
         fields = [
             'id',
             'external_id',
@@ -20,9 +21,9 @@ class SampleSchema(Schema):
             'type',
         ]
 
-    id = Int()
-    external_id = Str()
-    participant_id = Int()
-    active = Bool()
-    meta = Dict()
-    type = EnumField(SampleType)
+    id = Int(nullable=True, required=False, allow_none=True)
+    external_id = Str(nullable=True, required=False, allow_none=True)
+    participant_id = Int(nullable=True, required=False, allow_none=True)
+    active = Bool(nullable=True, required=False, allow_none=True)
+    meta = Dict(nullable=True, required=False, allow_none=True)
+    type = EnumField(SampleType, nullable=True, required=False, allow_none=True)
