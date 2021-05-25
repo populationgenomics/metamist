@@ -1,15 +1,37 @@
+from os import getenv
 from json import loads
 from functools import wraps
 
 import requests
+from google.auth.exceptions import DefaultCredentialsError
 
 from aiohttp import web
 from flask import Blueprint, request, jsonify
-from cpg_utils.cloud import email_from_id_token
+
+# 2021-05-25 mfranklin:
+#   Sometimes it's useful to start the server without a GCP context,
+#   and we don't want to run the import everytime we make a request.
+#   So if the import and receive the DefaultCredentialsError, we'll
+#   alias the 'email_from_id_token' function, and return the error then.
+try:
+    # pylint: disable=import-outside-toplevel
+    from cpg_utils.cloud import email_from_id_token
+
+except DefaultCredentialsError as e:
+    if bool(getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR')):
+        exception_args = e.args
+
+        # pylint: disable=missing-function-docstring
+        def email_from_id_token(*args, **kwargs):
+            raise DefaultCredentialsError(*exception_args)
+
+    else:
+        raise e
 
 
 def get_email_from_request_headers_or_raise_auth_error(headers) -> str:
     """Get email from google auth header"""
+
     auth_header = headers.get('Authorization')
     if auth_header is None:
         raise web.HTTPUnauthorized(reason='Missing authorization header')
