@@ -1,4 +1,5 @@
 # pylint: disable=assigning-non-slot,disable=unused-variable
+import os
 from enum import Enum
 from inspect import isclass
 
@@ -100,7 +101,10 @@ def create_app():
 def start_app():
     """Start web app"""
     app = create_app()
-    app.run(host='0.0.0.0', debug=True)
+
+    host = os.getenv('SM_HOST', 'localhost')
+    port = int(os.getenv('SM_PORT', '5000'))
+    app.run(host=host, port=port, debug=True)
 
 
 if __name__ == '__main__':
