@@ -4,7 +4,6 @@ import csv
 import codecs
 
 from flask import request, g, jsonify
-from flasgger import swag_from
 
 from api.utils.request import JsonBlueprint
 from db.python.layers.imports import ImportLayer
@@ -14,46 +13,46 @@ def get_import_blueprint(prefix):
     """Build blueprint / routes for imports API"""
     import_api = JsonBlueprint('import_api', __name__)
     # just a convenience helper
-    docs = lambda opt: swag_from({'tags': ['imports'], **opt})  # noqa: E731
     project_prefix = prefix + '<project>/imports'
 
     @import_api.route(project_prefix + '/airtable-manifest', methods=['POST'])
-    @docs
     def import_airtable_manifest(project):
         """
         Import the manifest from Airtable
         ---
-        operationId: importAirtableManifest
-        parameters:
-        - name: project
-          schema:
-            type: string
-          required: true
-          in: path
-        requestBody:
-          required: true
-          content:
-            'multipart/form-data:':
-              schema:
-                type: object
-                properties:
-                  file:
-                    type: string
-                    format: binary
-        responses:
-          '200':
-            description: The manifest was imported successfully
+        post:
+          operationId: importAirtableManifest
+          tags: [imports]
+          parameters:
+          - name: project
+            schema:
+              type: string
+            required: true
+            in: path
+          requestBody:
+            required: true
             content:
-              application/json:
+              'multipart/form-data:':
                 schema:
                   type: object
                   properties:
-                    success:
-                      type: boolean
-                    sample_ids:
-                      type: array
-                      items:
-                        type: integer
+                    file:
+                      type: string
+                      format: binary
+          responses:
+            '200':
+              description: The manifest was imported successfully
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      sample_ids:
+                        type: array
+                        items:
+                          type: integer
         """
 
         if 'file' not in request.files:

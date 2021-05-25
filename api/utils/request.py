@@ -1,4 +1,6 @@
 from json import loads
+from functools import wraps
+
 import requests
 
 from aiohttp import web
@@ -32,6 +34,7 @@ class JsonBlueprint(Blueprint):
             # similar to
             endpoint = options.pop('endpoint', f.__name__)
 
+            @wraps(f)
             def jsonified_f(*args, **kwargs):
                 if decode_json:
                     if not request.data:
