@@ -4,6 +4,11 @@ FROM debian:buster-slim
 
 ENV MAMBA_ROOT_PREFIX /root/micromamba
 ENV PATH $MAMBA_ROOT_PREFIX/bin:$PATH
+ENV SM_PORT 5000
+# Allow statements and log messages to immediately appear in the Knative logs.
+ENV PYTHONUNBUFFERED 1
+
+EXPOSE $SM_PORT
 
 WORKDIR /app/sample_metadata/
 COPY requirements.txt requirements.txt
@@ -15,10 +20,12 @@ RUN apt-get update && \
     mkdir $MAMBA_ROOT_PREFIX && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX \
         -c cpg -c bioconda -c conda-forge \
-        python=3.7 cpg-utils pip && \
+        python=3.7 cpg-utils gunicorn pip && \
     pip install -r requirements.txt && \
     rm -r /root/micromamba/pkgs
 
 COPY api api
 COPY db db/
 COPY models models/
+
+CMD gunicorn --bind :$SM_PORT --worker-class aiohttp.GunicornWebWorker api.main:start_app

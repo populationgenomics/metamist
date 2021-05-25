@@ -20,6 +20,16 @@ liquibase --changeLogFile 2021-05-03_initial.xml update
 
 ## Debugging
 
+### Start the server
+
+```bash
+python3 -m api.server
+# or
+gunicorn --bind :$PORT --worker-class aiohttp.GunicornWebWorker api.main:start_app
+```
+
+### Running a file directly
+
 Due to the way python imports work, you're unable to run files directly. To run files, you must run them as a module, for example, to run the `db/python/layers/sample.py` file directly (in case you put an `if __name__ == "__main__"` block in there), you could use the following:
 
 ```bash
