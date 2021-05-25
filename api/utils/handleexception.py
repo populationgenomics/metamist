@@ -47,5 +47,7 @@ def determine_code_from_error(e):
     if isinstance(e, ValueError):
         # HTTP Bad Request
         return 400
+    if isinstance(e, NotImplementedError):
+        return 501
 
     return 500
