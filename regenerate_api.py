@@ -7,6 +7,7 @@ import logging
 import subprocess
 from typing import Optional
 
+DOCKER_IMAGE = os.getenv('SM_DOCKER', 'docker.io/michaelfranklin/sample-meta:dev')
 
 logging.basicConfig(level='DEBUG')
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ def start_server(with_docker=False) -> Optional[subprocess.Popen]:
             'run',
             '-eSM_HOST=0.0.0.0',
             '-p5000:5000',
-            'docker.io/michaelfranklin/sample-meta:dev',
+            DOCKER_IMAGE,
             *command,
         ]
 
