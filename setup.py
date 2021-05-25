@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 PKG = 'sample_metadata'
 
 all_packages = []
-for hl_package in 'sample_metadata', 'models':
+for hl_package in 'sample_metadata':
     all_packages.extend(
         f'{hl_package}.' + p for p in sorted(find_packages(f'./{hl_package}'))
     )

@@ -4,3 +4,5 @@ env/
 __pycache__/
 *.pyc
 .DS_Store
+.idea/
+db/mariadb-java-client-2.7.2.jar
