@@ -1,25 +1,37 @@
+#!/usr/bin/env python3
 # pylint: disable=logging-not-lazy
+import logging
+from typing import Optional
+
 import os
 import tempfile
 import shutil
 import time
-import logging
 import subprocess
-from typing import Optional
 
-DOCKER_IMAGE = os.getenv('SM_DOCKER', 'docker.io/michaelfranklin/sample-meta:dev')
+import requests
+
+DOCKER_IMAGE = os.getenv('SM_DOCKER')
+SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:5000/api/schema.json')
+OUTPUT_DIR = 'sample_metadata'  # in cwd
+
 PACKAGE_NAME = 'sample_metadata'
 
 logging.basicConfig(level='DEBUG')
 logger = logging.getLogger(__name__)
 
 
-def start_server(with_docker=False) -> Optional[subprocess.Popen]:
+def check_if_server_is_accessible() -> bool:
+    """Check if request to 'SCHEMA_URL' returns OK"""
+    return requests.get(SCHEMA_URL).ok
+
+
+def start_server() -> Optional[subprocess.Popen]:
     """Start the API server, and return a process when it's started"""
 
     command = ['python', '-m', 'api.server']
 
-    if with_docker:
+    if DOCKER_IMAGE is not None:
         command = [
             'docker',
             'run',
@@ -52,7 +64,7 @@ def start_server(with_docker=False) -> Optional[subprocess.Popen]:
         if rc is not None:
             # the process exited early
             logger.error(f'Server exited with rc={rc}')
-            if with_docker:
+            if DOCKER_IMAGE is not None:
                 logger.warning(
                     "If you're receiving a 'port is already allocated' message, "
                     "run 'docker ps' and make sure the container isn't already running."
@@ -69,7 +81,7 @@ def generate_api_and_copy():
         'openapi-generator',
         'generate',
         '-i',
-        'http://localhost:5000/api/schema.json',
+        SCHEMA_URL,
         '-g',
         'python',
         '-o',
@@ -112,7 +124,7 @@ def copy_files_from(tmpdir):
 
     files_to_ignore = {'configuration.py'}
 
-    dir_to_copy_to = 'sample_metadata'  # should be relative to this script
+    dir_to_copy_to = OUTPUT_DIR  # should be relative to this script
     dir_to_copy_from = os.path.join(tmpdir, 'sample_metadata')
 
     if not os.path.exists(dir_to_copy_to):
@@ -149,13 +161,33 @@ def copy_files_from(tmpdir):
             shutil.copy(path_to_copy, output_path)
 
 
-if __name__ == '__main__':
-    process = start_server(with_docker=bool(os.getenv('SM_USE_DOCKER')))
+def main():
+    """
+    Generates installable python API using:
+        - Start API server (if applicable);
+        - Call openapi-generator to generate python API to temp folder;
+        - Empty the 'sample_metadata' folder (except for some files);
+        - Copy relevant files to 'sample_metadata' in CWD;
+        - Stop the server (if applicable)
+
+    """
+    if check_if_server_is_accessible():
+        logger.info(f'Using already existing server {SCHEMA_URL}')
+        process = None
+    else:
+        process = start_server()
+
     try:
         generate_api_and_copy()
     # pylint: disable=broad-except
     except Exception as e:
         logger.error(str(e))
 
-    logger.info('Killing docker container')
-    process.kill()
+    if process:
+        pid = process.pid
+        logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
+        process.kill()
+
+
+if __name__ == '__main__':
+    main()
