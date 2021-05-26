@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 
 def check_if_server_is_accessible() -> bool:
     """Check if request to 'SCHEMA_URL' returns OK"""
-    return requests.get(SCHEMA_URL).ok
+    try:
+        return requests.get(SCHEMA_URL).ok
+    except requests.ConnectionError:
+        return False
 
 
 def start_server() -> Optional[subprocess.Popen]:
