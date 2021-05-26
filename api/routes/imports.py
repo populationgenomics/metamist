@@ -32,13 +32,15 @@ def get_import_blueprint(prefix):
           requestBody:
             required: true
             content:
-              'multipart/form-data:':
+              'multipart/form-data':
                 schema:
                   type: object
                   properties:
                     file:
                       type: string
                       format: binary
+                  required:
+                    - file
           responses:
             '200':
               description: The manifest was imported successfully
