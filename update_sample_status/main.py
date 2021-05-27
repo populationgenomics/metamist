@@ -1,4 +1,4 @@
-'''A Cloud Function to update the status of genomic samples.'''
+"""A Cloud Function to update the status of genomic samples."""
 
 import json
 import os
@@ -13,7 +13,7 @@ secret_manager = secretmanager.SecretManagerServiceClient()
 
 
 def update_sample_status(request):
-    '''Main entry point for the Cloud Function.'''
+    """Main entry point for the Cloud Function."""
 
     if request.method != 'PUT':
         return abort(405)
@@ -30,10 +30,13 @@ def update_sample_status(request):
 
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
-    secret_name = (f'projects/{gcp_project}/secrets/' +
-                   f'update-sample-status-config/versions/latest')
+    secret_name = (
+        f'projects/{gcp_project}/secrets'
+        '/update-sample-status-config/versions/latest'
+    )
     config_str = secret_manager.access_secret_version(
-        request={'name': secret_name}).payload.data.decode('UTF-8')
+        request={'name': secret_name}
+    ).payload.data.decode('UTF-8')
     config = json.loads(config_str)
 
     project_config = config.get(project)
@@ -51,7 +54,8 @@ def update_sample_status(request):
     airtable = Airtable(base_key, table_name, api_key)
     try:
         response = airtable.update_by_field(
-            'Sample ID', sample, {'Status': status})
+            'Sample ID', sample, {'Status': status}
+        )
     except HTTPError as err:  # Invalid status enum.
         logging.error(err)
         return abort(400)
