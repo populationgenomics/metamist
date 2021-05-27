@@ -103,7 +103,7 @@ def start_app():
     app = create_app()
 
     host = os.getenv('SM_HOST', 'localhost')
-    port = int(os.getenv('SM_PORT', '5000'))
+    port = int(os.getenv('PORT', '5000'))
     app.run(host=host, port=port, debug=True)
 
 
