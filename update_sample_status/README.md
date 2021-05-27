@@ -1,3 +1,5 @@
+# Update sample status
+
 This repository contains a Cloud Function that lets you update the processing
 status for a genomic sample in Airtable.
 
@@ -19,6 +21,7 @@ through a service account key.
    a JSON config as follows, where `apiKey` corresponds to the Airtable account
    that should be used for the updates. The corresponding tables must have
    "Sample ID" and "Status" columns.
+
    ```json
    {
        "project1": {
@@ -33,22 +36,26 @@ through a service account key.
        }
    }
    ```
+
 1. Grant the Cloud Function service account the _Secret Manager Secret Accessor_ role for the secret.
 1. Deploy the Cloud Function, replacing `$PROJECT`, `$REGION`, and
    `$SERVICE_ACCOUNT` accordingly. Do _not_ allow unauthenticated
    invocations.
-   ```
+
+   ```shell
    gcloud config set project $PROJECT
    gcloud functions deploy update_sample_status --runtime python37 \
      --region=$REGION --trigger-http --service-account $SERVICE_ACCOUNT
    ```
-1. Create a service account for _invoking_ the Cloud Function. 
+
+1. Create a service account for _invoking_ the Cloud Function.
 1. Under the newly created Cloud Function, grant the invoker service account
    the _Cloud Functions Invoker_ role.
 
 ## Invoking the Cloud Function
 
 Download a JSON key for the invoker service account. Then run:
+
 ```shell
 gcloud auth activate-service-account --key-file=invoker-service-account.json
 
