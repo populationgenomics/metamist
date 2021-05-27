@@ -31,8 +31,7 @@ def update_sample_status(request):
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
     secret_name = (
-        f'projects/{gcp_project}/secrets'
-        '/update-sample-status-config/versions/latest'
+        f'projects/{gcp_project}/secrets' '/update-sample-status-config/versions/latest'
     )
     config_str = secret_manager.access_secret_version(
         request={'name': secret_name}
@@ -53,9 +52,7 @@ def update_sample_status(request):
     # Update the entry.
     airtable = Airtable(base_key, table_name, api_key)
     try:
-        response = airtable.update_by_field(
-            'Sample ID', sample, {'Status': status}
-        )
+        response = airtable.update_by_field('Sample ID', sample, {'Status': status})
     except HTTPError as err:  # Invalid status enum.
         logging.error(err)
         return abort(400)
