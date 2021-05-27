@@ -13,7 +13,7 @@ jobs:
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       # used for generating API
-      SM_DOCKER: cpg/sample-metadata/images/server:${{ github.sha }}
+      SM_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/server:${{ github.sha }}
 
     defaults:
       run:
@@ -59,12 +59,12 @@ jobs:
         run: |
           docker push $DOCKER_IMAGE
 
-      - name: "deploy to Cloud Run"
-        run: |
-          gcloud run deploy web --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $DOCKER_IMAGE
+      # - name: "deploy to Cloud Run"
+      #   run: |
+      #     gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $DOCKER_IMAGE
 
 
-      - name: Upload to anaconda package repository
-        run: |
-          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+      # - name: Upload to anaconda package repository
+      #   run: |
+      #     anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+      #     upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
