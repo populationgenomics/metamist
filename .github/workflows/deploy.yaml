@@ -58,7 +58,7 @@ jobs:
 
       - name: "push image"
         run: |
-          docker push $DOCKER_IMAGE
+          docker push $SM_DOCKER
 
       # - name: "deploy to Cloud Run"
       #   run: |
