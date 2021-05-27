@@ -3,11 +3,10 @@ on:
   push:
     branches:
       - main
-      - add-foundations # for testing
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    # if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -21,6 +20,16 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@main
+
+      - name: "gcloud setup"
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: analysis-runner
+          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+
+      - name: "gcloud docker auth"
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -46,7 +55,16 @@ jobs:
       - name: Build package
         run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
-      # - name: Upload to anaconda package repository
-      #   run: |
-      #     anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-      #     upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+      - name: "push image"
+        run: |
+          docker push $DOCKER_IMAGE
+
+      - name: "deploy to Cloud Run"
+        run: |
+          gcloud run deploy web --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $DOCKER_IMAGE
+
+
+      - name: Upload to anaconda package repository
+        run: |
+          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
