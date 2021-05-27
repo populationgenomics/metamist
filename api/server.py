@@ -98,13 +98,15 @@ def create_app():
     return app
 
 
+api_app = create_app()
+
+
 def start_app():
     """Start web app"""
-    app = create_app()
 
     host = os.getenv('SM_HOST', 'localhost')
     port = int(os.getenv('PORT', '5000'))
-    app.run(host=host, port=port, debug=True)
+    api_app.run(host=host, port=port, debug=True)
 
 
 if __name__ == '__main__':

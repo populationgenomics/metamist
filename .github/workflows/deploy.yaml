@@ -60,10 +60,9 @@ jobs:
         run: |
           docker push $SM_DOCKER
 
-      # - name: "deploy to Cloud Run"
-      #   run: |
-      #     gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $DOCKER_IMAGE
-
+      - name: "deploy to Cloud Run"
+        run: |
+          gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
 
       - name: Upload to anaconda package repository
         run: |
