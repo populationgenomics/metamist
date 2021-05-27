@@ -1,13 +1,12 @@
 """
 Code for connecting to Postgres database
 """
-import logging
-
-from contextlib import contextmanager
-from typing import Dict
-
-# import psycopg2
+import os
 import json
+import logging
+from typing import Dict, List
+from contextlib import contextmanager
+
 import mysql.connector as mysql
 
 
@@ -35,34 +34,57 @@ class NotFoundError(Exception):
     """Custom error when you can't find something"""
 
 
+class DatabaseConfiguration:
+    """Class to hold information about a MySqlConfiguration"""
+
+    def __init__(self, dbname, host=None, port=None, username=None, password=None):
+        self.dbname = dbname
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+
+    @staticmethod
+    def dev_config():
+        """Dev config for local database with name 'sm_dev'"""
+        # consider pulling from env variables
+        return DatabaseConfiguration(dbname='sm_dev', username='root')
+
+
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
     _connections: Dict = {}
-    _databases = ['sm_dev']
 
     @staticmethod
     def _get_connections(force_reconnect=False):
         if not SMConnections._connections or force_reconnect:
+            configs = [DatabaseConfiguration.dev_config()]
+            if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
+                logger.info('Using production mysql configurations')
+                configs = (
+                    SMConnections._load_database_configurations_from_secret_manager()
+                )
+
             SMConnections._connections = {
-                dbname: SMConnections.make_connection(dbname)
-                for dbname in SMConnections._databases
+                config.dbname: SMConnections.make_connection(config)
+                for config in configs
             }
 
         return SMConnections._connections
 
     @staticmethod
-    def make_connection(dbname):
+    def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
-        return mysql.connect(
-            host='localhost',
-            user='liquibase',
-            password='CPG_pass123',
-            database=dbname,
-            autocommit=True,
-        )
-
-        # return psycopg2.connect(f'dbname={dbname}')
+        d = {
+            'host': config.host,
+            'user': config.user,
+            'password': config.password,
+            'database': config.dbname,
+        }
+        # filter empty keys
+        d = {k: v for k, v in d.items() if v is not None}
+        return mysql.connect(**d, autocommit=True)
 
     @staticmethod
     def get_connection_for_project(project, user):
@@ -83,6 +105,26 @@ class SMConnections:
                 )
 
         return conn
+
+    @staticmethod
+    def _read_secret(name: str) -> str:
+        """Reads the latest version of the given secret from Google's Secret Manager."""
+        # pylint: disable=import-outside-toplevel,no-name-in-module
+        from google.cloud import secretmanager
+
+        secret_manager = secretmanager.SecretManagerServiceClient()
+
+        secret_name = f'projects/sample_metadata/secrets/{name}/versions/latest'
+        response = secret_manager.access_secret_version(request={'name': secret_name})
+        return response.payload.data.decode('UTF-8')
+
+    @staticmethod
+    def _load_database_configurations_from_secret_manager() -> List[
+        DatabaseConfiguration
+    ]:
+        configs_dicts = SMConnections._read_secret('databases')
+        configs = [DatabaseConfiguration(**config) for config in configs_dicts]
+        return configs
 
 
 class DbBase:
