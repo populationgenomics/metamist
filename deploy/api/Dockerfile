@@ -1,14 +1,13 @@
 FROM debian:buster-slim
 
-# needs some credentials here
-
 ENV MAMBA_ROOT_PREFIX /root/micromamba
 ENV PATH $MAMBA_ROOT_PREFIX/bin:$PATH
-ENV SM_PORT 5000
+ENV PORT 5000
+ENV SM_ENVIRONMENT "production"
 # Allow statements and log messages to immediately appear in the Knative logs.
 ENV PYTHONUNBUFFERED 1
 
-EXPOSE $SM_PORT
+EXPOSE $PORT
 
 WORKDIR /app/sample_metadata/
 COPY requirements.txt requirements.txt
@@ -28,4 +27,4 @@ COPY api api
 COPY db db/
 COPY models models/
 
-CMD gunicorn --bind :$SM_PORT --worker-class aiohttp.GunicornWebWorker api.main:start_app
+CMD gunicorn --bind :$PORT --worker-class aiohttp.GunicornWebWorker api.server:start_app
