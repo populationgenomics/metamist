@@ -1,0 +1,23 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: conda-incubator/setup-miniconda@v2
+
+    - name: Install packages
+      run: |
+        conda env create --name test-env -f environment-dev.yml
+
+    - name: pre-commit
+      run: |
+        conda activate test-env
+        pre-commit run --all-files
