@@ -25,7 +25,7 @@ jobs:
       - name: "gcloud setup"
         uses: google-github-actions/setup-gcloud@master
         with:
-          project_id: analysis-runner
+          project_id: sample-metadata
           service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
 
       - name: "gcloud docker auth"
