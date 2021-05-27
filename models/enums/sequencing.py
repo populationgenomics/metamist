@@ -4,17 +4,17 @@ from enum import Enum
 class SequencingType(Enum):
     """Type of sequencing"""
 
-    wgs = 'wgs'
-    single_cell = 'single-cell'
+    WGS = 'wgs'
+    SINGLE_CELL = 'single-cell'
 
 
 class SequencingStatus(Enum):
     """Status of sequencing"""
 
-    unknown = 'unknown'
-    received = 'received'
-    sent_to_sequencing = 'sent-to-sequencing'
-    completed_sequencing = 'completed-sequencing'
-    completed_qc = 'completed-qc'
-    failed_qc = 'failed-qc'
-    uploaded = 'uploaded'
+    UNKNOWN = 'unknown'
+    RECEIVED = 'received'
+    SENT_TO_SEQUENCING = 'sent-to-sequencing'
+    COMPLETED_SEQUENCING = 'completed-sequencing'
+    COMPLETED_QC = 'completed-qc'
+    FAILED_QC = 'failed-qc'
+    UPLOADED = 'uploaded'

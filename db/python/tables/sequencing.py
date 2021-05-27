@@ -82,7 +82,8 @@ LIMIT 1
     def update_status(
         self, sequencing_id, status: SequencingStatus, author=None, commit=True
     ):
-        _query = "UPDATE sample_sequencing SET status = %s, author=%s WHERE id = %s"
+        """Update status of sequencing with sequencing_id"""
+        _query = 'UPDATE sample_sequencing SET status = %s, author=%s WHERE id = %s'
         with self.get_cursor() as cursor:
             cursor.execute(_query, (status.value, author or self.author, sequencing_id))
             if commit:

@@ -114,7 +114,7 @@ class SMConnections:
 
         secret_manager = secretmanager.SecretManagerServiceClient()
 
-        secret_name = f'projects/sample_metadata/secrets/{name}/versions/latest'
+        secret_name = f'projects/sample-metadata/secrets/{name}/versions/latest'
         response = secret_manager.access_secret_version(request={'name': secret_name})
         return response.payload.data.decode('UTF-8')
 

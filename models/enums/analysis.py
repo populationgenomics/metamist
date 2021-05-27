@@ -4,15 +4,15 @@ from enum import Enum
 class AnalysisType(Enum):
     """Types of analysis"""
 
-    qc = 'qc'
-    joint_calling = 'joint-calling'
-    custom = 'custom'
+    QC = 'qc'
+    JOINT_CALLING = 'joint-calling'
+    CUSTOM = 'custom'
 
 
 class AnalysisStatus(Enum):
     """Status that an analysis can be run"""
 
-    queued = 'queued'
-    in_progress = 'in-progress'
-    failed = 'failed'
-    completed = 'completed'
+    QUEUED = 'queued'
+    IN_PROGRESS = 'in-progress'
+    FAILED = 'failed'
+    COMPLETED = 'completed'

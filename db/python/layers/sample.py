@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from db.python.tables.sample import SampleTable
+# from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing import SampleSequencingTable
 
 from models.enums import SequencingStatus

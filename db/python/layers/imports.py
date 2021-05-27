@@ -64,7 +64,7 @@ class ImportLayer:
 
                 sequence_id = seq_table.insert_sequencing(
                     sample_id=internal_sample_id,
-                    sequence_type=SequencingType.wgs,
+                    sequence_type=SequencingType.WGS,
                     sequence_meta=sequence_meta,
                     status=sequence_status,
                     commit=False,
@@ -109,10 +109,10 @@ class ImportLayer:
     def parse_specimen_type_to_sample_type(specimen_type: str) -> SampleType:
         """Take the airtable 'Specimen Type' and return a SampleType"""
         if 'blood' in specimen_type.lower():
-            return SampleType.blood
+            return SampleType.BLOOD
 
         if 'saliva' in specimen_type.lower():
-            return SampleType.saliva
+            return SampleType.SALIVA
 
         raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
 
@@ -121,15 +121,15 @@ class ImportLayer:
         """Take the airtable 'Status' and return a SequencingStatus"""
         row_status_lower = row_status.lower()
         if row_status_lower == 'sequencing complete':
-            return SequencingStatus.completed_sequencing
+            return SequencingStatus.COMPLETED_SEQUENCING
         if row_status_lower == 'qc complete':
-            return SequencingStatus.completed_qc
+            return SequencingStatus.COMPLETED_QC
         if row_status_lower == 'upload successful':
-            return SequencingStatus.uploaded
+            return SequencingStatus.UPLOADED
         if row_status_lower == 'failed':
-            return SequencingStatus.failed_qc
+            return SequencingStatus.FAILED_QC
         if row_status_lower == '':
-            return SequencingStatus.unknown
+            return SequencingStatus.UNKNOWN
 
         raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
 
