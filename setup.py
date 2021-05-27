@@ -25,7 +25,11 @@ setup(
     url=f'https://github.com/populationgenomics/{PKG}',
     license='MIT',
     packages=all_packages,
-    requirements=['google-auth'],
+    requirements=[
+        'google-auth',
+        'urllib3 >= 1.25.3',
+        'python-dateutil',
+    ],
     include_package_data=True,
     zip_safe=False,
     entry_points={
