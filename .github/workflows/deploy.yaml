@@ -3,10 +3,11 @@ on:
   push:
     branches:
       - main
+      - add-foundations # test the deploy
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+    # if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -64,7 +65,7 @@ jobs:
       #     gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $DOCKER_IMAGE
 
 
-      # - name: Upload to anaconda package repository
-      #   run: |
-      #     anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-      #     upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+      - name: Upload to anaconda package repository
+        run: |
+          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
