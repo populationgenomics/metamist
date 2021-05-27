@@ -15,7 +15,9 @@ def handle_exception(e):
     """Catch general flask exception, and prepare json response"""
     base_params = {}
     if IS_DEBUG:
+        st = traceback.format_exc()
         logger.error(traceback.format_exc())
+        base_params['stacktrace'] = st
 
     if isinstance(e, HTTPException):
         code = e.code

@@ -78,7 +78,7 @@ class SMConnections:
         """Create connection from dbname"""
         d = {
             'host': config.host,
-            'user': config.user,
+            'user': config.username,
             'password': config.password,
             'database': config.dbname,
         }
@@ -122,7 +122,7 @@ class SMConnections:
     def _load_database_configurations_from_secret_manager() -> List[
         DatabaseConfiguration
     ]:
-        configs_dicts = SMConnections._read_secret('databases')
+        configs_dicts = json.loads(SMConnections._read_secret('databases'))
         configs = [DatabaseConfiguration(**config) for config in configs_dicts]
         return configs
 
