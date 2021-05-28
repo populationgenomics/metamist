@@ -18,7 +18,7 @@ OUTPUT_DIR = 'sample_metadata'  # in cwd
 PACKAGE_NAME = 'sample_metadata'
 
 logging.basicConfig(level='DEBUG')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gunicorn.error')
 
 
 def check_if_server_is_accessible() -> bool:

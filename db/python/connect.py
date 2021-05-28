@@ -10,7 +10,7 @@ from contextlib import contextmanager
 import mysql.connector as mysql
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gunicorn.error')
 
 
 def to_db_json(val):
