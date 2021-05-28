@@ -37,7 +37,10 @@ class NotFoundError(Exception):
 class DatabaseConfiguration:
     """Class to hold information about a MySqlConfiguration"""
 
-    def __init__(self, dbname, host=None, port=None, username=None, password=None):
+    def __init__(
+        self, project, dbname, host=None, port=None, username=None, password=None
+    ):
+        self.project = project
         self.dbname = dbname
         self.host = host
         self.port = port
@@ -48,7 +51,7 @@ class DatabaseConfiguration:
     def dev_config():
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
-        return DatabaseConfiguration(dbname='sm_dev', username='root')
+        return DatabaseConfiguration(project='dev', dbname='sm_dev', username='root')
 
 
 class SMConnections:
@@ -67,7 +70,7 @@ class SMConnections:
                 )
 
             SMConnections._connections = {
-                config.dbname: SMConnections.make_connection(config)
+                config.project: SMConnections.make_connection(config)
                 for config in configs
             }
 
@@ -77,6 +80,7 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         d = {
+            'project': 'dev',
             'host': config.host,
             'user': config.username,
             'password': config.password,
