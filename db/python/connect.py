@@ -69,10 +69,15 @@ class SMConnections:
                     SMConnections._load_database_configurations_from_secret_manager()
                 )
 
-            SMConnections._connections = {
-                config.project: SMConnections.make_connection(config)
-                for config in configs
-            }
+            try:
+                SMConnections._connections = {
+                    config.project: SMConnections.make_connection(config)
+                    for config in configs
+                }
+                logger.info('Created connections to databases')
+            except Exception as exp:
+                logger.error(f"Couldn't create mysql connection: {exp}")
+                raise exp
 
         return SMConnections._connections
 
