@@ -44,9 +44,9 @@ jobs:
           conda install pip conda-build anaconda-client requests
           pip install openapi-generator-cli
 
-      # - name: "build image"
-      #   run: |
-      #     docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+      - name: "build image"
+        run: |
+          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
       - name: "build deployable API"
         run: |
