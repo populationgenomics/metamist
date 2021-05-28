@@ -11,6 +11,9 @@ from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec_webframeworks.flask import FlaskPlugin
 from flask_swagger_ui import get_swaggerui_blueprint
 
+# Imports the Cloud Logging client library
+import google.cloud.logging
+
 from db.python.connect import SMConnections
 import models.enums as sm_enums
 
@@ -18,6 +21,14 @@ from api.routes import all_blueprints
 from api.utils.handleexception import handle_exception
 from api.utils.request import get_email_from_request_headers_or_raise_auth_error
 
+
+# Retrieves a Cloud Logging handler based on the environment
+# you're running in and integrates the handler with the
+# Python logging module. By default this captures all logs
+# at INFO level and higher
+client = google.cloud.logging.Client()
+client.get_default_handler()
+client.setup_logging()
 
 API_PREFIX = '/api/v1/'
 
