@@ -80,7 +80,6 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         d = {
-            'project': 'dev',
             'host': config.host,
             'user': config.username,
             'password': config.password,
