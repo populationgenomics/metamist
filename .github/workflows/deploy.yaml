@@ -44,17 +44,17 @@ jobs:
           conda install pip conda-build anaconda-client requests
           pip install openapi-generator-cli
 
-      - name: "build image"
-        run: |
-          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+      # - name: "build image"
+      #   run: |
+      #     docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
       - name: "build deployable API"
         run: |
           python regenerate_api.py
           ls -lGh sample_metadata
 
-      - name: Build package
-        run: conda build conda/$(basename $GITHUB_REPOSITORY)
+      # - name: Build package
+      #   run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
       - name: "push image"
         run: |
@@ -64,7 +64,7 @@ jobs:
         run: |
           gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
 
-      - name: Upload to anaconda package repository
-        run: |
-          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+      # - name: Upload to anaconda package repository
+      #   run: |
+      #     anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+      #     upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
