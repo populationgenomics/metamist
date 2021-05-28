@@ -90,6 +90,7 @@ class SMConnections:
             'password': config.password,
             'database': config.dbname,
         }
+        logger.info(f'Creating database connection "{config.dbname}@{config.host}"')
         # filter empty keys
         d = {k: v for k, v in d.items() if v is not None}
         return mysql.connect(**d, autocommit=True)
