@@ -4,15 +4,13 @@ from enum import Enum
 from inspect import isclass
 
 from flask import Flask, request, g, jsonify
+from google.auth.exceptions import DefaultCredentialsError
 
 # openapi3 and swagger
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec_webframeworks.flask import FlaskPlugin
 from flask_swagger_ui import get_swaggerui_blueprint
-
-# Imports the Cloud Logging client library
-import google.cloud.logging
 
 from db.python.connect import SMConnections
 import models.enums as sm_enums
@@ -26,9 +24,17 @@ from api.utils.request import get_email_from_request_headers_or_raise_auth_error
 # you're running in and integrates the handler with the
 # Python logging module. By default this captures all logs
 # at INFO level and higher
-client = google.cloud.logging.Client()
-client.get_default_handler()
-client.setup_logging()
+try:
+    # pylint: disable=import-outside-toplevel,c-extension-no-member
+    import google.cloud.logging
+
+    client = google.cloud.logging.Client()
+    client.get_default_handler()
+    client.setup_logging()
+
+except DefaultCredentialsError as exp:
+    if not bool(os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR')):
+        raise exp
 
 API_PREFIX = '/api/v1/'
 
