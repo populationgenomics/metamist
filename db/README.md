@@ -2,17 +2,17 @@
 ## Set Up & Configuring the VM 
 1. Create a new VM instance in the [GCP Console](https://console.cloud.google.com/compute/instancesAdd). 
 2. Enable storage write permissions. On the create instance page, scroll down to `Access Scopes`. Select `Set access for each API`. Set `Storage` to `Read/Write`.
-    
-    If you forget to enable storage write permissions while creating your instance, you can update these settings retrospectively.
+3. Select a service account. The Compute Engine default service account will be selected by default. 
+
+4. Connect to your VM 
+`gcloud compute ssh --project=<PROJECT-NAME> --zone=<ZONE> <VM-NAME>` 
+    1. If you enabled storage write permissions **retrospectively**, you may encounter `AccessDeniedException: 403 Insufficient Permission` while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache `rm -r ~/.gsutil`
+
+5. If you forget to enable storage write permissions or change your service account while creating your instance, you can update these settings retrospectively.
     1. View your instance in the [GCP Console](https://console.cloud.google.com/compute/instances)
     2. Stop your instance 
     3. Click Edit 
-    4. Repeat step 2  
-
-
-3. Connect to your VM 
-`gcloud compute ssh --project=<PROJECT-NAME> --zone=<ZONE> <VM-NAME>` 
-    1. If you enabled storage write permissions **retrospectively**, you may encounter `AccessDeniedException: 403 Insufficient Permission` while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache `rm -r ~/.gsutil`
+    4. Repeat step 2 or 3.   
 
 ## Installing and Configuring the MariaDB 
 1. Install MariaDB 10.5. Upon writing this, MariaDB 10.3 is included in the APT package repositories by default, on Debian 10 and Ubuntu 20.4. [The following guide](https://mariadb.com/docs/deploy/upgrade-community-server-cs105-debian9/#install-via-apt-debian-ubuntu) describes the steps involved with configuring the APT package to install 10.5. 
