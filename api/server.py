@@ -46,12 +46,18 @@ def create_app():
     """Create an return flask app"""
     app = Flask('cpg_sample_metadata')
 
+    servers = []
+    if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
+        servers.append({'url': 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'})
+    else:
+        servers.append({'url': 'http://localhost:5000'})
+
     spec = APISpec(
         title='Sample metadata API',
         version=_VERSION,
         openapi_version='3.0.2',
         plugins=[FlaskPlugin(), MarshmallowPlugin()],
-        servers=[{'url': 'http://localhost:5000'}],
+        servers=servers,
         security=[{'bearerAuth': []}],
     )
 
