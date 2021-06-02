@@ -93,7 +93,7 @@ VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;"""
 
         return id_of_new_sample
 
-    def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
+    async def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
         """Get a Sample by its external_id"""
         keys = [
             'id',
@@ -106,15 +106,12 @@ VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;"""
         if check_active:
             _query = f"""\
 SELECT {", ".join(keys)} from sample
-    where external_id = %s AND active
+    where external_id = :eid AND active
     LIMIT 1;"""
         else:
-            _query = (
-                f'SELECT {", ".join(keys)} from sample where external_id = %s LIMIT 1;'
-            )
-        with self.get_cursor() as cursor:
-            cursor.execute(_query, (external_id,))
-            sample_row = cursor.fetchone()
+            _query = f'SELECT {", ".join(keys)} from sample where external_id = :eid LIMIT 1;'
+
+        sample_row = await self._connection.fetch_one(_query, {'eid': external_id})
 
         if sample_row is None:
             raise NotFoundError(

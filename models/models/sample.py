@@ -1,28 +1,36 @@
 import json
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 
 from models.enums.sample import SampleType, SampleUpdateType
+from pydantic import BaseModel
 
 
-class Sample:
+class Sample(BaseModel):
     """Model for a Sample"""
 
-    def __init__(
-        self,
-        id_: Optional[int],
-        *,
-        external_id: str,
-        participant_id: str = None,
-        type_: SampleType = None,
-        active: bool = None,
-        meta: Dict = None,
-    ):
-        self.id = id_
-        self.external_id = external_id
-        self.participant_id = participant_id
-        self.active = active
-        self.meta = meta
-        self.type = SampleType(type_)
+    id_: Union[int, str] = None
+    external_id: str = None
+    participant_id: Optional[str] = None
+    active: Optional[bool] = None
+    meta: Optional[Dict] = None
+    type: Optional[SampleType] = None
+
+    # def __init__(
+    #     self,
+    #     id_: Optional[int],
+    #     *,
+    #     external_id: str,
+    #     participant_id: str = None,
+    #     type_: SampleType = None,
+    #     active: bool = None,
+    #     meta: Dict = None,
+    # ):
+    #     self.id = id_
+    #     self.external_id = external_id
+    #     self.participant_id = participant_id
+    #     self.active = active
+    #     self.meta = meta
+    #     self.type = SampleType(type_)
 
     @staticmethod
     def from_db(**kwargs):
@@ -32,13 +40,18 @@ class Sample:
         _id = kwargs.pop('id', None)
         type_ = kwargs.pop('type', None)
         meta = kwargs.pop('meta', None)
+        active = kwargs.pop('active', None)
+        if active is not None:
+            active = bool(active)
         if meta:
             if isinstance(meta, bytes):
                 meta = meta.decode()
             if isinstance(meta, str):
                 meta = json.loads(meta)
 
-        return Sample(id_=_id, type_=type_, meta=meta, **kwargs)
+        return Sample(
+            id_=_id, type_=SampleType(type_), meta=meta, active=active, **kwargs
+        )
 
 
 class SampleUpdate:
