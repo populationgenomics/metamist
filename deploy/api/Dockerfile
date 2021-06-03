@@ -19,7 +19,7 @@ RUN apt-get update && \
     mkdir $MAMBA_ROOT_PREFIX && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX \
     -c cpg -c bioconda -c conda-forge \
-    python=3.7 cpg-utils gunicorn pip && \
+    python=3.7 cpg-utils pip && \
     pip install -r requirements.txt && \
     rm -r /root/micromamba/pkgs
 
@@ -27,4 +27,4 @@ COPY api api
 COPY db db/
 COPY models models/
 
-CMD gunicorn --bind :$PORT api.server:api_app
+CMD uvicorn api.server:app
