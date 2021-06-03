@@ -1,21 +1,21 @@
-from typing import Optional
 import time
 
-from fastapi import (
-    FastAPI,
-    HTTPException,
-    Request,
-    Depends,
-)
-from databases import Database
+from fastapi import FastAPI, Request
 
-from api2.routes.sample import router as sample_router
 from db.python.connect import SMConnections
 
-from .utils.db_dependency import authenticate
+from api2.routes.sample import router as sample_router
+from api2.routes.imports import router as import_router
+from api2.utils import IS_PRODUCTION, get_openapi_schema_func
+from api2.utils.gcp import setup_gcp_logging
+
+# This tag is automatically updated by bump2version
+_VERSION = '1.0.0'
+
+setup_gcp_logging(IS_PRODUCTION)
 
 
-app = FastAPI(dependencies=[Depends(authenticate)])
+app = FastAPI()
 
 
 @app.on_event('startup')
@@ -30,44 +30,23 @@ async def shutdown():
     await SMConnections.disconnect()
 
 
-@app.middleware("http")
+@app.middleware('http')
 async def add_process_time_header(request: Request, call_next):
     """Add X-Process-Time to all requests for logging"""
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
+    response.headers['X-Process-Time'] = str(round(process_time * 1000, 1))
     return response
 
 
-# @app.middleware("http")
-# async def set_connection(request: Request, call_next):
-#     print(request)
-#     project = request.path_params.get('project')
-#     if 'Authorization' in request.headers:
-#         token = HTTPAuthorizationCredentials(
-#             scheme="Bearer",
-#             credentials=request.headers['Authorization'][7:],
-#         )
-#         author = authenticate(token)
+app.include_router(sample_router, prefix='/api/v1/{project}')
+app.include_router(import_router, prefix='/api/v1/{project}')
 
-#     if project is not None and author is not None:
-#         request.state.author = author
-#         request.state.db = SMConnections.get_connection_for_project(project, author)
-
-#     response = await call_next(request)
-#     return response
+app.openapi = get_openapi_schema_func(app, _VERSION, is_production=IS_PRODUCTION)
 
 
-@app.get("/")
-async def root():
-
-    return {"message": "Hello World"}
-
-
-app.include_router(sample_router, prefix="/api/v1/{project}")
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=8000)
