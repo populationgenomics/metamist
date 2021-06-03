@@ -18,7 +18,7 @@ for hl_package in 'sample_metadata':
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='1.0.0',
+    version='1.0.1',
     description='Python API for interacting with the Sample API system',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
