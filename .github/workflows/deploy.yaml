@@ -60,6 +60,16 @@ jobs:
         run: |
           docker push $SM_DOCKER
 
+      # TODO: implement test deploy to check whether everything is in order
+      # - name: "deploy test-web"
+      #   run: |
+      #     gcloud run deploy test-web \
+      #       --region australia-southeast1 \
+      #       --no-allow-unauthenticated \
+      #       --platform managed \
+      #       --set-env-vars=BUCKET_SUFFIX=test-web \
+      #       --image $DOCKER_IMAGE
+
       - name: "deploy to Cloud Run"
         run: |
           gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
