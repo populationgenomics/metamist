@@ -12,13 +12,13 @@ import subprocess
 import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
-SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:5000/api/schema.json')
+SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
 OUTPUT_DIR = 'sample_metadata'  # in cwd
 
 PACKAGE_NAME = 'sample_metadata'
 
-logging.basicConfig(level='DEBUG')
-logger = logging.getLogger('gunicorn.error')
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def check_if_server_is_accessible() -> bool:
