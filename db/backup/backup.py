@@ -4,11 +4,9 @@
 MariaDB instance """
 
 from datetime import datetime
-from typing import List
 import subprocess
 from google.cloud import storage
 from google.cloud import logging
-import mysql.connector
 import pytz
 
 
@@ -25,12 +23,10 @@ def perform_backup():
     utc_now = pytz.utc.localize(datetime.utcnow())
     timestamp_str = utc_now.strftime('%d_%m_%Y_%H-%M-%S')
 
-    databases = get_dbs()
-
     # Export SQL Data
     try:
         backup_sql = subprocess.check_output(
-            ['sudo', 'mysqldump', '--lock-tables', '--databases'] + databases
+            ['sudo', 'mysqldump', '--lock-tables', '--all-databases']
         )
         text = f'Performed mysqldump to pull data {timestamp_str} UTC.'
         logger.log_text(text, severity='INFO')
@@ -62,23 +58,6 @@ def perform_backup():
         text = f'Failed to upload backup to GCS. {timestamp_str} UTC. \
 Could not find the file within {bucket.name}'
         logger.log_text(text, severity='ERROR')
-
-
-def get_dbs():
-    """ Obtain a list of databases that exist on a local mariadb instance """
-    conn = mysql.connector.connect(user='root', host='localhost')
-    cursor = conn.cursor()
-    cursor.execute('show databases')
-
-    databases: List[str] = []
-    for db in cursor:
-        databases.append(db[0])
-
-    databases.remove('information_schema')
-    databases.remove('mysql')
-    databases.remove('performance_schema')
-
-    return databases
 
 
 if __name__ == '__main__':
