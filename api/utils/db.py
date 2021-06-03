@@ -4,7 +4,7 @@ from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from db.python.connect import SMConnections, Connection
-from api2.utils.gcp import email_from_id_token
+from api.utils.gcp import email_from_id_token
 
 
 auth = HTTPBearer()

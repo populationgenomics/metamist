@@ -1,5 +1,6 @@
 # pylint: disable=unused-import
 import os
+import logging
 
 from google.auth.exceptions import DefaultCredentialsError
 
@@ -16,6 +17,10 @@ def setup_gcp_logging(
     Python logging module. By default this captures all logs
     at INFO level and higher
     """
+    level = logging.INFO if is_production else logging.DEBUG
+    logging.basicConfig(level=level)
+    logger = logging.getLogger('sample-metadata-api')
+
     if is_production:
         try:
             # pylint: disable=import-outside-toplevel,c-extension-no-member
@@ -28,6 +33,8 @@ def setup_gcp_logging(
         except DefaultCredentialsError as exp:
             if not ignore_gcp_credentials_error:
                 raise exp
+
+    return logger
 
 
 # 2021-06-02 mfranklin:

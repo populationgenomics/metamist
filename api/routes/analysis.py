@@ -1,61 +1,31 @@
-# pylint: disable=unused-variable,unused-argument
+from typing import List
 
-# from flask import request, g, jsonify
+from fastapi import APIRouter
+from pydantic import BaseModel
 
-from api.utils.request import JsonBlueprint
+from models.enums import AnalysisType, AnalysisStatus
 
-# from models.enums import AnalysisType, AnalysisStatus
+from api.utils.db import get_db_connection, Connection
 
 
-def get_analysis_blueprint(prefix):
-    """Build blueprint / routes for analysis API"""
-    analysis_api = JsonBlueprint('analysis_api', __name__)
-    # just a convenience helper
-    project_prefix = prefix + '<project>/analysis'
+router = APIRouter(prefix='/analysis', tags=['analysis'])
 
-    @analysis_api.json_route(project_prefix, methods=['POST'], decode_json=True)
-    def create_new_analysis(
-        _,
-        sample_ids,
-    ):
-        """
-        Create a new analysis
-        ---
-        post:
-          operationId: createNewAnalysis
-          tags: [analysis]
-          parameters:
-          - name: project
-            schema:
-              type: string
-            required: true
-            in: path
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  properties:
-                    sample_ids:
-                      type: array
-                      items:
-                        type: integer
-                    type_: AnalysisType
-          responses:
-            '200':
-              description: The analysis was created successfully
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    properties:
-                      success:
-                        type: boolean
-                      analysisId:
-                        type: integer
-        """
 
-        raise NotImplementedError(f'Not implemented for sampleIds={sample_ids}')
+class NewAnalysisModel(BaseModel):
+    """Model for 'createNewAnalysis'"""
 
-    return analysis_api
+    sample_ids: List[int]
+    type: AnalysisType
+    status: AnalysisStatus = AnalysisStatus.QUEUED
+
+
+@router.post('/', operation_id='createNewAnalysis')
+async def create_new_analysis(
+    analysis: NewAnalysisModel, connection: Connection = get_db_connection
+):
+    """Create a new analysis"""
+
+    # success: bool
+    # analysisId: int
+
+    raise NotImplementedError(f'Not implemented for sampleIds={analysis.sample_ids}')
