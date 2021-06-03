@@ -25,10 +25,6 @@ def perform_backup():
     utc_now = pytz.utc.localize(datetime.utcnow())
     timestamp_str = utc_now.strftime('%d_%m_%Y_%H-%M-%S')
 
-    # For now we will take in a list of databases defined manually.
-    # Later, we will do this by pulling the list from the DB
-    # databases = ['tob_wgs_sm']
-
     databases = get_dbs()
 
     # Export SQL Data
