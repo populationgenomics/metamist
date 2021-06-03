@@ -1,8 +1,9 @@
 import json
 from typing import Optional, Dict, Union
 
-from models.enums.sample import SampleType, SampleUpdateType
 from pydantic import BaseModel
+
+from models.enums.sample import SampleType, SampleUpdateType
 
 
 class Sample(BaseModel):
@@ -14,23 +15,6 @@ class Sample(BaseModel):
     active: Optional[bool] = None
     meta: Optional[Dict] = None
     type: Optional[SampleType] = None
-
-    # def __init__(
-    #     self,
-    #     id_: Optional[int],
-    #     *,
-    #     external_id: str,
-    #     participant_id: str = None,
-    #     type_: SampleType = None,
-    #     active: bool = None,
-    #     meta: Dict = None,
-    # ):
-    #     self.id = id_
-    #     self.external_id = external_id
-    #     self.participant_id = participant_id
-    #     self.active = active
-    #     self.meta = meta
-    #     self.type = SampleType(type_)
 
     @staticmethod
     def from_db(**kwargs):
@@ -50,7 +34,7 @@ class Sample(BaseModel):
                 meta = json.loads(meta)
 
         return Sample(
-            id_=_id, type_=SampleType(type_), meta=meta, active=active, **kwargs
+            id_=_id, type=SampleType(type_), meta=meta, active=active, **kwargs
         )
 
 
