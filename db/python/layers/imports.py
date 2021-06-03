@@ -1,19 +1,18 @@
 from typing import List, Dict, Iterable
 
+from models.enums import SampleType, SequencingType, SequencingStatus
+from models.models.sequence import SampleSequencing
+
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing import SampleSequencingTable
 
-from models.enums import SampleType, SequencingType, SequencingStatus
+from db.python.layers.base import BaseLayer
 
 
-class ImportLayer:
+class ImportLayer(BaseLayer):
     """Layer for import logic"""
 
-    def __init__(self, connection, author):
-        self.connection = connection
-        self.author = author
-
-    def import_airtable_manifest(self, rows: Iterable[Dict[str, any]]):
+    async def import_airtable_manifest(self, rows: Iterable[Dict[str, any]]):
         """
         Import airtable manifest from formed row objects,
         where the key is the header. Imports to a combination
@@ -33,12 +32,12 @@ class ImportLayer:
         )
         inserted_sample_ids = []
 
-        with self.connection:
+        async with self.connection.connection.transaction():
             # open a transaction
-            sample_table = SampleTable(connection=self.connection, author=self.author)
-            seq_table = SampleSequencingTable(
-                connection=self.connection, author=self.author
-            )
+            sample_table = SampleTable(self.connection)
+            seq_table = SampleSequencingTable(self.connection)
+
+            sequences: List[SampleSequencing] = []
 
             for obj in rows:
                 external_sample_id = obj.pop('Sample ID')
@@ -53,32 +52,27 @@ class ImportLayer:
                 sample_meta = {k: obj[k] for k in sample_meta_keys if obj.get(k)}
                 sequence_meta = {k: obj[k] for k in sequence_meta_keys if obj.get(k)}
 
-                internal_sample_id = sample_table.insert_sample(
+                internal_sample_id = await sample_table.insert_sample(
                     external_id=external_sample_id,
                     active=True,
                     meta=sample_meta,
                     sample_type=sample_type,
-                    commit=False,
                 )
                 inserted_sample_ids.append(internal_sample_id)
-
-                sequence_id = seq_table.insert_sequencing(
+                sequence = SampleSequencing(
+                    id_=None,
                     sample_id=internal_sample_id,
-                    sequence_type=SequencingType.WGS,
-                    sequence_meta=sequence_meta,
+                    type=SequencingType.WGS,
+                    meta=sequence_meta,
                     status=sequence_status,
-                    commit=False,
                 )
+                sequences.append(sequence)
 
-                print(
-                    f'Inserting sequencing, (internal sample_id {internal_sample_id}, internal sequencing id {sequence_id})'
-                )
-
-            self.connection.commit()
+            await seq_table.insert_many_sequencing(sequences)
 
         return inserted_sample_ids
 
-    def import_airtable_manifest_csv(
+    async def import_airtable_manifest_csv(
         self, headers: List[str], rows: Iterable[List[str]]
     ):
         """
@@ -86,6 +80,8 @@ class ImportLayer:
         well formed objects, keyed by the corresponding header.
         """
 
+        # TODO: work out how this could be async as well,
+        # probably won't be a performance bottleneck for a while though
         class RowToDictIterator:
             """Build object from headers and rows, but as an iterator"""
 
@@ -103,7 +99,7 @@ class ImportLayer:
                 # suggests this as the better way:
                 return dict(zip(self.headers, next(rows)))
 
-        return self.import_airtable_manifest(RowToDictIterator(headers, rows))
+        return await self.import_airtable_manifest(RowToDictIterator(headers, rows))
 
     @staticmethod
     def parse_specimen_type_to_sample_type(specimen_type: str) -> SampleType:

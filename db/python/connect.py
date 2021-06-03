@@ -5,7 +5,6 @@ import os
 import json
 import logging
 from typing import Dict, List
-from contextlib import contextmanager
 
 import asyncio
 import databases
@@ -23,6 +22,8 @@ def to_db_json(val):
 
 
 class Connection:
+    """Stores a DB connection, project and author"""
+
     def __init__(self, connection: databases.Database, project: str, author: str):
         self.connection: databases.Database = connection
         self.project: str = project
@@ -108,9 +109,6 @@ class SMConnections:
                 port=config.port,
             )
         )
-        # return mysql.pooling.MySQLConnectionPool(
-        #     pool_name=config.project, pool_size=3, **d, autocommit=True
-        # )
 
     @staticmethod
     def prepare_connection_string(
@@ -122,13 +120,18 @@ class SMConnections:
         min_pool_size=5,
         max_pool_size=20,
     ):
+        """Prepares the connection string for mysql / mariadb"""
+
         _host = host or 'localhost'
-        _password = None
         u_p = username
+
         if password:
             u_p += f':{password}'
-        options = {"min_size": min_pool_size, "max_size": max_pool_size}
-        _options = "&".join(f'{k}={v}' for k, v in options.items())
+        if port:
+            _host += f':{host}'
+
+        options = {'min_size': min_pool_size, 'max_size': max_pool_size}
+        _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'mysql://{u_p}@{_host}/{database}?{_options}'
 
@@ -207,35 +210,17 @@ class DbBase:
             raise Exception(
                 f'No connection was provided to the table "{self.__class__.__name__}"'
             )
+        if not isinstance(connection, Connection):
+            raise Exception(
+                f'Expected connection type Connection, received {type(connection)}, did you mean to call self._connection?'
+            )
 
-        self._connection = connection.connection
+        self._connection = connection
+        self.connection: databases.Database = connection.connection
         self.author = connection.author
         self.project = connection.project
 
         if self.author is None:
             raise Exception('Must provide author to {self.__class__.__name__}')
 
-    @contextmanager
-    def get_cursor(self, auto_commit=False):
-        """
-        Use like:
-
-            with self.get_cursor() as cursor:
-                cursor.execute('<query>')
-                records = cursor.fetch_all()
-        """
-        with self._connection.cursor() as cur:
-            yield cur
-
-            if auto_commit:
-                self.commit()
-
-    @contextmanager
-    def transaction(self):
-        """Create a transaction by yielding a connection"""
-        with self._connection as c:
-            yield c
-
-    def commit(self):
-        """Commit a set of changes"""
-        self._connection.commit()
+    # piped from the connection
