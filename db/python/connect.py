@@ -9,10 +9,9 @@ from typing import Dict, List
 import asyncio
 import databases
 
-# import mysql.connector as mysql
 
-
-logger = logging.getLogger('gunicorn.error')
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def to_db_json(val):
