@@ -10,7 +10,7 @@ router = APIRouter(prefix='/sample', tags=['user'])
 # project_prefix = prefix + '<project>/sample'
 
 
-@router.get('/{id_}', response_model=Sample)
+@router.get('/{id_}', response_model=Sample, operation_id='getSampleByExternalId')
 async def get_sample_by_external_id(
     id_: str, connection: Connection = get_db_connection
 ):

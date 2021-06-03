@@ -11,7 +11,7 @@ from api2.utils.db import get_db_connection, Connection
 router = APIRouter(prefix='/import', tags=['import'])
 
 
-@router.post('/airtable-manifest')
+@router.post('/airtable-manifest', operation_id='importAirtableManifest')
 async def import_airtable_manifest(
     file: UploadFile = File(...), connection: Connection = get_db_connection
 ):
