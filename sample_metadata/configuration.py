@@ -10,6 +10,7 @@
 """
 
 
+from os import getenv
 import copy
 import logging
 import multiprocessing
@@ -111,7 +112,13 @@ class Configuration(object):
         ssl_ca_cert=None,
     ):
         """Constructor"""
-        self._base_path = "http://localhost:5000" if host is None else host
+        if host is not None:
+            self._base_path = host
+        elif 'dev' in getenv('SM_ENVIRONMENT').lower():
+            self._base_path = "http://localhost:5000"
+        else:
+            self._base_path = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
+
         """Default Base url
         """
         self.server_index = 0 if server_index is None and host is None else server_index
