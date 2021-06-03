@@ -54,8 +54,8 @@ def perform_backup():
     blob.upload_from_filename(filepath)
 
     # Validates file exists and was uploaded to GCS
-    stats = storage.Blob(bucket=bucket, name=filepath).exists(client)
-    if stats:
+    file_exists = storage.Blob(bucket=bucket, name=filepath).exists(client)
+    if file_exists:
         text = f'Successful backup {timestamp_str} UTC'
         logger.log_text(text, severity='INFO')
     else:
