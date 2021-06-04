@@ -1,3 +1,4 @@
+from os import getenv
 import time
 import traceback
 
@@ -17,20 +18,22 @@ _VERSION = '1.0.1'
 
 logger = setup_gcp_logging(IS_PRODUCTION)
 
-
+SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATBASE_CONNECTION', 'true'))
 app = FastAPI()
 
 
 @app.on_event('startup')
 async def startup():
     """Server is starting up, connect dbs"""
-    await SMConnections.connect()
+    if not SKIP_DATABASE_CONNECTION:
+        await SMConnections.connect()
 
 
 @app.on_event('shutdown')
 async def shutdown():
     """Shutdown server, disconnect dbs"""
-    await SMConnections.disconnect()
+    if not SKIP_DATABASE_CONNECTION:
+        await SMConnections.disconnect()
 
 
 @app.middleware('http')
@@ -56,7 +59,7 @@ async def exception_handler(_: Request, e: Exception):
 
     if isinstance(e, HTTPException):
         code = e.status_code
-        name = e.name
+        name = e.detail
 
     else:
         code = determine_code_from_error(e)
