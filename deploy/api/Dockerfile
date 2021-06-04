@@ -27,4 +27,4 @@ COPY api api
 COPY db db/
 COPY models models/
 
-CMD uvicorn api.server:app
+CMD uvicorn --port ${PORT} api.server:app

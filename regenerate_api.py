@@ -40,7 +40,7 @@ def start_server() -> Optional[subprocess.Popen]:
             'run',
             '-eSM_HOST=0.0.0.0',
             '-eSM_IGNORE_GCP_CREDENTIALS_ERROR=1',
-            '-eSM_SKIP_DATBASE_CONNECTION=1',
+            '-eSM_SKIP_DATABASE_CONNECTION=1',
             '-p8000:8000',
             DOCKER_IMAGE,
             *command,

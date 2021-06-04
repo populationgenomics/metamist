@@ -18,7 +18,7 @@ _VERSION = '1.0.1'
 
 logger = setup_gcp_logging(IS_PRODUCTION)
 
-SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATBASE_CONNECTION'))
+SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()
 
 
