@@ -84,10 +84,10 @@ Some handy links:
 
 The web API exposes this schema in two ways:
 
-- Swagger UI: `http://localhost:5000/api/docs`
+- Swagger UI: `http://localhost:8000/docs`
     - You can use this to construct requests to the server
     - Make sure you fill in the Bearer token (at the top right )
-- OpenAPI schema: `http://localhost:5000/api/schema.json`
+- OpenAPI schema: `http://localhost:8000/schema.json`
     - Returns a JSON with the full OpenAPI 3 compliant schema.
     - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
     - We generate the sample_metadata installable Python API based on this schema.

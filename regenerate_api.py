@@ -41,7 +41,7 @@ def start_server() -> Optional[subprocess.Popen]:
             '-eSM_HOST=0.0.0.0',
             '-eSM_IGNORE_GCP_CREDENTIALS_ERROR=1',
             '-eSM_SKIP_DATBASE_CONNECTION=1',
-            '-p5000:5000',
+            '-p8000:8000',
             DOCKER_IMAGE,
             *command,
         ]
@@ -60,7 +60,7 @@ def start_server() -> Optional[subprocess.Popen]:
             line = c.decode('utf-8').rstrip()
             if line is not None:
                 logger.info('API: ' + line)
-                if 'Running on http' in line:
+                if 'running on http' in line.lower():
                     # server has been started
                     return _process
 

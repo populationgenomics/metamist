@@ -115,7 +115,7 @@ class Configuration(object):
         if host is not None:
             self._base_path = host
         elif 'dev' in getenv('SM_ENVIRONMENT').lower():
-            self._base_path = "http://localhost:5000"
+            self._base_path = "http://localhost:8000"
         else:
             self._base_path = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
 
@@ -424,9 +424,12 @@ class Configuration(object):
 
         :return: An array of host settings
         """
+        url = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
+        if 'dev' in getenv('SM_ENVIRONMENT').lower():
+            url = "http://localhost:8000"
         return [
             {
-                'url': "http://localhost:5000",
+                'url': url,
                 'description': "No description provided",
             }
         ]
