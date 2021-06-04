@@ -126,7 +126,7 @@ def copy_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'configuration.py'}
+    files_to_ignore = {'configuration.py', 'README.md'}
 
     dir_to_copy_to = OUTPUT_DIR  # should be relative to this script
     dir_to_copy_from = os.path.join(tmpdir, 'sample_metadata')
@@ -184,13 +184,13 @@ def main():
     try:
         generate_api_and_copy()
     # pylint: disable=broad-except
-    except Exception as e:
+    except BaseException as e:
         logger.error(str(e))
-
-    if process:
-        pid = process.pid
-        logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-        process.kill()
+        if process:
+            pid = process.pid
+            logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
+            process.kill()
+        raise e
 
 
 if __name__ == '__main__':
