@@ -5,6 +5,7 @@ MariaDB instance """
 
 from datetime import datetime
 import subprocess
+import tempfile
 from google.cloud import storage
 from google.cloud import logging
 import pytz
@@ -36,27 +37,27 @@ def perform_backup():
         logger.log_text(text, severity='ERROR')
         return
 
+    gcs_filepath = f'backups/backup_{timestamp_str}.sql'
     # Write backup to file
-    filepath = f'backups/backup_{timestamp_str}.sql'
-    with open(filepath, 'xb') as f:
-        f.write(backup_sql)
+    with tempfile.NamedTemporaryFile() as fp:
+        fp.write(backup_sql)
 
-    # Connect to the GCS client
-    client = storage.Client()
-    bucket = client.get_bucket('sm-dev-sm')
+        # Connect to the GCS client
+        client = storage.Client()
+        bucket = client.get_bucket('sm-dev-sm')
 
-    # Upload file to GCS
-    blob = bucket.blob(filepath)
-    blob.upload_from_filename(filepath)
+        # Upload file to GCS
+        blob = bucket.blob(gcs_filepath)
+        blob.upload_from_filename(fp.name)
 
     # Validates file exists and was uploaded to GCS
-    file_exists = storage.Blob(bucket=bucket, name=filepath).exists(client)
+    file_exists = storage.Blob(bucket=bucket, name=gcs_filepath).exists(client)
     if file_exists:
         text = f'Successful backup {timestamp_str} UTC'
         logger.log_text(text, severity='INFO')
     else:
         text = f'Failed to upload backup to GCS. {timestamp_str} UTC. \
-Could not find the file within {bucket.name}'
+        Could not find the file within {bucket.name}'
         logger.log_text(text, severity='ERROR')
 
 
