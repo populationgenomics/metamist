@@ -5,7 +5,6 @@ MariaDB instance """
 
 from datetime import datetime
 import subprocess
-import tempfile
 from google.cloud import storage
 from google.cloud import logging
 import pytz
@@ -25,9 +24,17 @@ def perform_backup():
     timestamp_str = utc_now.strftime('%d_%m_%Y_%H-%M-%S')
 
     # Export SQL Data
+    tmp_dir = f'backup_{timestamp_str}'
     try:
-        backup_sql = subprocess.check_output(
-            ['sudo', 'mysqldump', '--lock-tables', '--all-databases']
+        subprocess.run(
+            [
+                'sudo',
+                'mariabackup',
+                '--backup',
+                f'--target-dir={tmp_dir}/',
+                '--user=root',
+            ],
+            check=True,
         )
         text = f'Performed mysqldump to pull data {timestamp_str} UTC.'
         logger.log_text(text, severity='INFO')
@@ -37,22 +44,20 @@ def perform_backup():
         logger.log_text(text, severity='ERROR')
         return
 
-    gcs_filepath = f'backups/backup_{timestamp_str}.sql'
-    # Write backup to file
-    with tempfile.NamedTemporaryFile() as fp:
-        fp.write(backup_sql)
-
-        # Connect to the GCS client
-        client = storage.Client()
-        bucket = client.get_bucket('sm-dev-sm')
-
-        # Upload file to GCS
-        blob = bucket.blob(gcs_filepath)
-        blob.upload_from_filename(fp.name)
+    # Upload file to GCS
+    # GCS Client Library does not support moving directories
+    subprocess.run(
+        ['sudo', 'gsutil', '-m', 'mv', tmp_dir, 'gs://cpg-sm-backups'], check=True
+    )
+    # Clean up after the move
+    subprocess.run(['sudo', 'rm', '-r', tmp_dir], check=True)
 
     # Validates file exists and was uploaded to GCS
-    file_exists = storage.Blob(bucket=bucket, name=gcs_filepath).exists(client)
-    if file_exists:
+    client = storage.Client()
+    bucket = client.get_bucket('cpg-sm-backups')
+    files_in_gcs = list(client.list_blobs(bucket, prefix=tmp_dir))
+
+    if len(files_in_gcs) > 0:
         text = f'Successful backup {timestamp_str} UTC'
         logger.log_text(text, severity='INFO')
     else:
