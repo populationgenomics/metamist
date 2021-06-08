@@ -28,7 +28,6 @@ def perform_backup():
     try:
         subprocess.run(
             [
-                'sudo',
                 'mariabackup',
                 '--backup',
                 f'--target-dir={tmp_dir}/',
@@ -44,13 +43,22 @@ def perform_backup():
         logger.log_text(text, severity='ERROR')
         return
 
+    # Grant appropraite permissions for tmp_dir
+    subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
+
     # Upload file to GCS
     # GCS Client Library does not support moving directories
-    subprocess.run(
-        ['sudo', 'gsutil', '-m', 'mv', tmp_dir, 'gs://cpg-sm-backups'], check=True
-    )
-    # Clean up after the move
-    subprocess.run(['sudo', 'rm', '-r', tmp_dir], check=True)
+    try:
+        subprocess.run(
+            ['gsutil', '-m', 'mv', tmp_dir, 'gs://cpg-sm-backups'], check=True
+        )
+    except subprocess.CalledProcessError:
+        text = f'Failed to upload backup to GCS. {timestamp_str} UTC. \
+        gsutil failed'
+        logger.log_text(text, severity='ERROR')
+
+    # Cleans up empty directories after the move
+    subprocess.run(['rm', '-r', tmp_dir], check=True)
 
     # Validates file exists and was uploaded to GCS
     client = storage.Client()
