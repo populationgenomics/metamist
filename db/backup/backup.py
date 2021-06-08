@@ -35,7 +35,7 @@ def perform_backup():
             ],
             check=True,
         )
-        text = f'Performed mysqldump to pull data {timestamp_str} UTC.'
+        text = f'Performed mariabackup to pull data {timestamp_str} UTC.'
         logger.log_text(text, severity='INFO')
 
     except subprocess.SubprocessError:
