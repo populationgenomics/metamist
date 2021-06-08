@@ -14,7 +14,7 @@ def perform_backup():
     """Completes a backup of the databases within a local mariadb instance
     and uploads this backup to GCS."""
 
-    # Logging
+    # Logging: Any log with `severity >= ERROR` get's logged to #software-alerts
     logging_client = logging.Client()
     log_name = 'backup_log'
     logger = logging_client.logger(log_name)
@@ -43,7 +43,8 @@ def perform_backup():
         logger.log_text(text, severity='ERROR')
         return
 
-    # Grant appropraite permissions for tmp_dir
+    # mariabackup creates awkward permissions for the output files,
+    # so we'll grant appropriate permissions for tmp_dir to later remove it
     subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
 
     # Upload file to GCS
