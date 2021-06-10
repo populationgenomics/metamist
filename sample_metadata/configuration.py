@@ -112,9 +112,10 @@ class Configuration(object):
         ssl_ca_cert=None,
     ):
         """Constructor"""
+        env = getenv('SM_ENVIRONMENT', 'PRODUCTION')
         if host is not None:
             self._base_path = host
-        elif 'dev' in getenv('SM_ENVIRONMENT').lower():
+        elif 'dev' in env.lower():
             self._base_path = "http://localhost:8000"
         else:
             self._base_path = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
@@ -132,9 +133,6 @@ class Configuration(object):
         self.temp_folder_path = None
         """Temp file folder for downloading files
         """
-        # Authentication Settings
-        if not access_token:
-            access_token = _get_google_auth_token()
 
         self.access_token = access_token
 
@@ -396,14 +394,14 @@ class Configuration(object):
 
         :return: The Auth Settings information dict.
         """
-        auth = {}
-        if self.access_token is not None:
-            auth['bearerAuth'] = {
+        auth = {
+            'HTTPBearer': {
                 'type': 'bearer',
                 'in': 'header',
                 'key': 'Authorization',
-                'value': 'Bearer ' + self.access_token,
+                'value': 'Bearer ' + (self.access_token or _get_google_auth_token()),
             }
+        }
         return auth
 
     def to_debug_report(self):
@@ -425,7 +423,8 @@ class Configuration(object):
         :return: An array of host settings
         """
         url = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
-        if 'dev' in getenv('SM_ENVIRONMENT').lower():
+        environment = getenv('SM_ENVIRONMENT', 'PRODUCTION')
+        if 'dev' in environment.lower():
             url = "http://localhost:8000"
         return [
             {
