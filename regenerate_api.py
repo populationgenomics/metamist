@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 import os
+import signal
 import tempfile
 import shutil
 import time
@@ -52,6 +53,9 @@ def start_server() -> Optional[subprocess.Popen]:
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
+        # The os.setsid() is passed in the argument preexec_fn so
+        # it's run after the fork() and before  exec() to run the shell.
+        preexec_fn=os.setsid
     )
 
     for c in iter(_process.stdout.readline, 'b'):
@@ -62,6 +66,7 @@ def start_server() -> Optional[subprocess.Popen]:
                 logger.info('API: ' + line)
                 if 'running on http' in line.lower():
                     # server has been started
+                    logger.info('Started process')
                     return _process
 
         rc = _process.poll()
@@ -126,7 +131,7 @@ def copy_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'configuration.py', 'README.md'}
+    files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py'}
 
     dir_to_copy_to = OUTPUT_DIR  # should be relative to this script
     dir_to_copy_from = os.path.join(tmpdir, 'sample_metadata')
@@ -189,8 +194,14 @@ def main():
         if process:
             pid = process.pid
             logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-            process.kill()
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)  # Send the signal to all the process groups
+
         raise e
+
+    if process:
+        pid = process.pid
+        logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)  # Send the signal to all the process groups
 
 
 if __name__ == '__main__':
