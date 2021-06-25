@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=logging-not-lazy
+# pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn
 import logging
 from typing import Optional
 
