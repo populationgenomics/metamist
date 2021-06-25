@@ -23,6 +23,9 @@ repos:
   rev: 20.8b1
   hooks:
   - id: black
+    args: [.]
+    pass_filenames: false
+    always_run: true
 
 - repo: https://gitlab.com/pycqa/flake8
   rev: '3.8.4'
