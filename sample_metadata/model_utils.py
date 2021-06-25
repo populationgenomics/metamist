@@ -1,3 +1,5 @@
+# flake8: noqa
+# pylint: disable-all
 """
     Sample metadata API
 
