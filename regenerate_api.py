@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn
+# pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
 from typing import Optional
 
@@ -55,7 +55,7 @@ def start_server() -> Optional[subprocess.Popen]:
         stderr=subprocess.STDOUT,
         # The os.setsid() is passed in the argument preexec_fn so
         # it's run after the fork() and before  exec() to run the shell.
-        preexec_fn=os.setsid
+        preexec_fn=os.setsid,
     )
 
     for c in iter(_process.stdout.readline, 'b'):
@@ -194,14 +194,18 @@ def main():
         if process:
             pid = process.pid
             logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)  # Send the signal to all the process groups
+            os.killpg(
+                os.getpgid(process.pid), signal.SIGTERM
+            )  # Send the signal to all the process groups
 
         raise e
 
     if process:
         pid = process.pid
         logger.info(f'Stopping self-managed server by sending sigkill to {pid}')
-        os.killpg(os.getpgid(process.pid), signal.SIGTERM)  # Send the signal to all the process groups
+        os.killpg(
+            os.getpgid(process.pid), signal.SIGTERM
+        )  # Send the signal to all the process groups
 
 
 if __name__ == '__main__':
