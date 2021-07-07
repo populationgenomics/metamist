@@ -47,3 +47,29 @@ async def update_analysis_status(
     atable = AnalysisTable(connection)
     await atable.update_status_of_analysis(analysis_id, status)
     return True
+
+
+@router.get(
+    '/sample_ids_without_analysis_type',
+    operation_id='getAllSampleIdsWithoutAnalysisType',
+)
+async def get_all_sample_ids_without_analysis_type(
+    connection: Connection = get_db_connection,
+):
+    """get_all_sample_ids_without_analysis_type"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_all_sample_ids_without_analysis_type()
+    return {'sample_ids': result}
+
+
+@router.get(
+    '/new_gvcfs_since_last_successful_joint_call',
+    operation_id='getAllNewGvcfsSinceLastSuccessfulJointCall',
+)
+async def get_all_new_gvcfs_since_last_successful_joint_call(
+    connection: Connection = get_db_connection,
+):
+    """get_all_new_gvcfs_since_last_successful_joint_call"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_all_new_gvcfs_since_last_successful_joint_call()
+    return {'analysis_ids': result}
