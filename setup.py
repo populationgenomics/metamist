@@ -15,12 +15,16 @@ for hl_package in 'sample_metadata':
         f'{hl_package}.' + p for p in sorted(find_packages(f'./{hl_package}'))
     )
 
+with open('README.md') as f:
+    readme = f.read()
+
+
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
     version='1.0.1',
     description='Python API for interacting with the Sample API system',
-    long_description=open('README.md').read(),
+    long_description=readme,
     long_description_content_type='text/markdown',
     url=f'https://github.com/populationgenomics/{PKG}',
     license='MIT',
