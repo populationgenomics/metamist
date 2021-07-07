@@ -7,7 +7,7 @@
             <column name="name" type="VARCHAR(255)">
                 <constraints primaryKey="true" nullable="false" />
             </column>
-            <column name="value" type="TEX T" />
+            <column name="value" type="TEXT" />
 
         </createTable>
 
@@ -89,7 +89,7 @@
             <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
-            <column name="type" type="ENUM('qc', 'joint-calling', 'custom')">
+            <column name="type" type="ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram')">
                 <constraints nullable="false" />
             </column>
             <column name="output" type="TEXT">
@@ -98,6 +98,7 @@
             <column name="status" type="ENUM('queued', 'in-progress', 'failed', 'completed')">
                 <constraints nullable="false" />
             </column>
+            <column name="timestamp_completed" type="timestamp" />
 
             <column name="author" type="VARCHAR(255)">
                 <constraints nullable="false" />

@@ -6,6 +6,8 @@ class AnalysisType(Enum):
 
     QC = 'qc'
     JOINT_CALLING = 'joint-calling'
+    GVCF = 'gvcf'
+    CRAM = 'cram'
     CUSTOM = 'custom'
 
 

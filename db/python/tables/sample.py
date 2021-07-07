@@ -1,3 +1,5 @@
+from typing import List, Dict
+
 from models.models.sample import Sample
 from models.enums import SampleType
 
@@ -79,3 +81,21 @@ SELECT {", ".join(keys)} from sample
         kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
         sample = Sample.from_db(**kwargs)
         return sample
+
+    async def get_sample_id_map(self, external_ids: List[str]) -> Dict[str, int]:
+        """Get map of external sample id to internal id"""
+        _query = 'SELECT id, external_id FROM sample WHERE external_id in :external_ids'
+        rows = await self.connection.fetch_all(_query, {'external_ids': external_ids})
+        sample_id_map = {el[1]: el[0] for el in rows}
+        if len(sample_id_map) != len(external_ids):
+            provided_external_ids = set(external_ids)
+            # do the check again, but use the set this time
+            # (in case we're provided a list with duplicates)
+            if len(sample_id_map) != len(provided_external_ids):
+                # we have samples missing from the map, so we'll 404 the whole thing
+                missing_sample_ids = provided_external_ids - set(sample_id_map.keys())
+                raise NotFoundError(
+                    f"Couldn't find samples with IDS: {', '.join(missing_sample_ids)}"
+                )
+
+        return sample_id_map

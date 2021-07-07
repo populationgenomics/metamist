@@ -3,7 +3,7 @@ from typing import Optional, Dict, Union
 
 from pydantic import BaseModel
 
-from models.enums.sample import SampleType, SampleUpdateType
+from models.enums.sample import SampleType
 
 
 class Sample(BaseModel):
@@ -36,29 +36,3 @@ class Sample(BaseModel):
         return Sample(
             id_=_id, type=SampleType(type_), meta=meta, active=active, **kwargs
         )
-
-
-class SampleUpdate:
-    """Model to represent an update to a sample"""
-
-    def __init__(
-        self,
-        sample_id,
-        type_: SampleUpdateType,
-        update: Dict,
-        author=None,
-        timestamp=None,
-    ):
-        super().__init__()
-
-        self.sample_id = sample_id
-        self.type = type_
-        self.update = update
-        self.timestamp = timestamp
-        self.author = author
-
-    @staticmethod
-    def from_db(obj: Dict[str, any]):
-        """Parse from db keys"""
-        type_ = obj.pop('type')
-        return SampleUpdate(type_=type_, **obj)

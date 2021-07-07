@@ -1,3 +1,4 @@
+from os import getenv
 from fastapi.openapi.utils import get_openapi
 
 
@@ -20,7 +21,8 @@ def get_openapi_schema_func(app, version, is_production):
                 {'url': 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'}
             )
         else:
-            servers.append({'url': 'http://localhost:8000'})
+            port = getenv('PORT', '8000')
+            servers.append({'url': f'http://localhost:{port}'})
 
         openapi_schema['servers'] = servers
 
