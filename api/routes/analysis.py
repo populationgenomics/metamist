@@ -50,15 +50,16 @@ async def update_analysis_status(
 
 
 @router.get(
-    '/sample_ids_without_analysis_type',
+    '/type/{analysis_type}/not-included-sample-ids',
     operation_id='getAllSampleIdsWithoutAnalysisType',
 )
 async def get_all_sample_ids_without_analysis_type(
+    analysis_type: AnalysisType,
     connection: Connection = get_db_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisTable(connection)
-    result = await atable.get_all_sample_ids_without_analysis_type()
+    result = await atable.get_all_sample_ids_without_analysis_type(analysis_type)
     return {'sample_ids': result}
 
 
