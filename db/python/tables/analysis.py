@@ -43,9 +43,9 @@ class AnalysisTable(DbBase):
             cs_keys = ', '.join(keys)
             cs_id_keys = ', '.join(f':{k}' for k in keys)
             _query = f"""\
-    INSERT INTO analysis
-        ({cs_keys})
-    VALUES ({cs_id_keys});"""
+INSERT INTO analysis
+    ({cs_keys})
+VALUES ({cs_id_keys});"""
 
             await self.connection.execute(
                 _query,
@@ -83,3 +83,41 @@ class AnalysisTable(DbBase):
         _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
 
         await self.connection.execute(_query, {**fields, 'analysis_id': analysis_id})
+
+    async def get_all_sample_ids_without_analysis_type(
+        self, analysis_type: AnalysisType
+    ):
+        """
+        Find all the samples in the sample_id list that a
+        """
+        _query = """
+SELECT id FROM sample s
+LEFT JOIN analysis_sample a_s ON s.id = a_s.sample_id
+INNER JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.type = :analysis_type
+AND a_s.sample_id IS NULL;"""
+
+        rows = await self.connection.execute(
+            _query, {'analysis_type': analysis_type.value}
+        )
+        return [row[0] for row in rows]
+
+    async def get_all_new_gvcfs_since_last_successful_joint_call(self) -> List[int]:
+        """
+        Get list of analysis ids for new GVCFs since the last successful joint-calling
+        """
+
+        _query = """
+SELECT a.id
+FROM analysis
+WHERE type='gvcf'
+AND a.timestamp_completed > (
+    SELECT timestamp_completed FROM analysis
+    WHERE type = 'joint-calling'
+    ORDER BY timestamp_completed DESC
+    LIMIT 1
+)"""
+        ids = [r[0] for r in await self.connection.execute(_query)]
+
+        # analysis IDs
+        return ids
