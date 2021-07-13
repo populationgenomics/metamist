@@ -68,8 +68,8 @@ VALUES ({cs_id_keys});"""
         values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sample_ids)
         await self.connection.execute_many(_query, values)
 
-    async def update_status_of_analysis(
-        self, analysis_id: int, status: AnalysisStatus, author: str = None
+    async def update_analysis(
+        self, analysis_id: int, status: AnalysisStatus, output: str, author: str = None
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -77,6 +77,8 @@ VALUES ({cs_id_keys});"""
         fields = {'status': status.value, 'author': self.author or author}
         if status == AnalysisStatus.COMPLETED:
             fields['timestamp_completed'] = datetime.utcnow()
+        if output:
+            fields['output'] = output
 
         fields_str = ', '.join(f'{key} = :{key}' for key in fields)
 

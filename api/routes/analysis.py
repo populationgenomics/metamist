@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -12,18 +12,25 @@ from db.python.tables.analysis import AnalysisTable
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
 
-class NewAnalysisModel(BaseModel):
+class AnalysisModel(BaseModel):
     """Model for 'createNewAnalysis'"""
 
     sample_ids: List[int]
     type: AnalysisType
-    status: AnalysisStatus = AnalysisStatus.QUEUED
+    status: AnalysisStatus
     output: str = None
 
 
-@router.post('/', operation_id='createNewAnalysis')
+class AnalysisUpdateModel(BaseModel):
+    """Update analysis model"""
+
+    status: AnalysisStatus
+    output: Optional[str] = None
+
+
+@router.post('/', operation_id='createNewAnalysis', response_model=int)
 async def create_new_analysis(
-    analysis: NewAnalysisModel, connection: Connection = get_db_connection
+    analysis: AnalysisModel, connection: Connection = get_db_connection
 ):
     """Create a new analysis"""
 
@@ -39,13 +46,17 @@ async def create_new_analysis(
     return analysis_id
 
 
-@router.patch('/{analysis_id}/status/{status}', operation_id='updateAnalysisStatus')
+@router.patch('/{analysis_id}/', operation_id='updateAnalysisStatus')
 async def update_analysis_status(
-    analysis_id: int, status: AnalysisStatus, connection: Connection = get_db_connection
+    analysis_id: int,
+    analysis: AnalysisUpdateModel,
+    connection: Connection = get_db_connection,
 ):
     """Update status of analysis"""
     atable = AnalysisTable(connection)
-    await atable.update_status_of_analysis(analysis_id, status)
+    await atable.update_analysis(
+        analysis_id, status=analysis.status, output=analysis.output
+    )
     return True
 
 

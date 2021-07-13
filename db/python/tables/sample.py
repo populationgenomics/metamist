@@ -53,6 +53,27 @@ VALUES ({cs_id_keys});"""
 
         return id_of_new_sample
 
+    async def get_single_by_id(self, internal_id) -> Sample:
+        """Get a Sample by its external_id"""
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active',
+            'type',
+        ]
+        _query = f'SELECT {", ".join(keys)} from sample where id = :id LIMIT 1;'
+
+        sample_row = await self.connection.fetch_one(_query, {'id': internal_id})
+
+        if sample_row is None:
+            raise NotFoundError(f'Couldn\'t find sample with internal id {internal_id}')
+
+        kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
+        sample = Sample.from_db(**kwargs)
+        return sample
+
     async def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
         """Get a Sample by its external_id"""
         keys = [

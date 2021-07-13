@@ -1,13 +1,41 @@
-from typing import List
+from typing import Optional, List, Dict
 
 from fastapi import APIRouter, Body
+from pydantic import BaseModel
 
+from models.enums import SampleType
 from db.python.tables.sample import SampleTable, Sample
 
 from api.utils.db import get_db_connection, Connection
 
 
+class NewSample(BaseModel):
+    """Model for creating new sample"""
+
+    external_id: str
+    type: SampleType
+    meta: Dict = {}
+    participant_id: Optional[int] = None
+
+
 router = APIRouter(prefix='/sample', tags=['sample'])
+
+
+@router.post('/', response_model=int, operation_id='createNewSample')
+async def create_new_sample(
+    sample: NewSample, connection: Connection = get_db_connection
+) -> int:
+    """Creates a new sample, and returns the internal sample ID"""
+    st = SampleTable(connection)
+    async with connection.connection.transaction():
+        internal_id = await st.insert_sample(
+            external_id=sample.external_id,
+            sample_type=sample.type,
+            active=True,
+            meta=sample.meta,
+            participant_id=sample.participant_id,
+        )
+        return internal_id
 
 
 @router.post('/id-map', operation_id='getSampleIdMap')
