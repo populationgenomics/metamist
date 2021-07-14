@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,logging-fstring-interpolation
 """
 Creates a project, by:
@@ -139,7 +139,7 @@ def _create_user(cursor: pymysql.cursors.Cursor, dbname, username, password) -> 
 
     logging.info(f"Creating user '{dbname}'@'%' with password")
 
-    _create_user_query = "CREATE USER %s@'%' IDENTIFIED BY %s;"
+    _create_user_query = "CREATE USER %s@'%%' IDENTIFIED BY %s;"
 
     try:
         cursor.execute(_create_user_query, (username, password))
@@ -155,10 +155,10 @@ def _grant_privileges_to_database(
 ):
 
     logging.debug(f"Granting {username} privileges on DB {databasename}")
-    _query = "GRANT CREATE, DROP, DELETE, INSERT, SELECT, UPDATE, ALTER, INDEX ON %s.* TO %s@'%';"
+    _query = f"GRANT CREATE, DROP, DELETE, INSERT, SELECT, UPDATE, ALTER, INDEX ON {databasename}.* TO %s@'%%';"
 
     try:
-        cursor.execute(_query, (databasename, username))
+        cursor.execute(_query, (username,))
         if flush_privileges:
             cursor.execute("FLUSH privileges;")
     except Exception as exp:
