@@ -183,4 +183,4 @@ def from_args(args=None):
 
 
 if __name__ == "__main__":
-    from_args(["seqr"])
+    from_args()
