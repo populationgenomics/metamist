@@ -93,13 +93,13 @@ VALUES ({cs_id_keys});"""
         Find all the samples in the sample_id list that a
         """
         _query = """
-SELECT id FROM sample s
-LEFT JOIN analysis_sample a_s ON s.id = a_s.sample_id
-INNER JOIN analysis a ON a_s.analysis_id = a.id
-WHERE a.type = :analysis_type
-AND a_s.sample_id IS NULL;"""
+SELECT id FROM sample WHERE id NOT IN (
+    SELECT a_s.sample_id FROM analysis_sample a_s
+    LEFT JOIN analysis a ON a_s.analysis_id = a.id
+    WHERE a.type = 'gvcf'
+);"""
 
-        rows = await self.connection.execute(
+        rows = await self.connection.fetch_all(
             _query, {'analysis_type': analysis_type.value}
         )
         return [row[0] for row in rows]
