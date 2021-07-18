@@ -5,6 +5,11 @@ Creates a project, by:
 - creating a database in mariadb
 - creating a user w/ generated password
 - update credentials in secret
+
+Requires:
+- pymsql
+- google-cloud-secret-manager==2.2.0
+    - Ensure you have the latest version of pip, as it installs significantly quicker
 """
 import logging
 import json
