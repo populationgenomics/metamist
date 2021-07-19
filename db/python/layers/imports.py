@@ -131,14 +131,20 @@ class ImportLayer(BaseLayer):
 
 
 # if __name__ == '__main__':
+
+# async def import_csv():
+
 #     import csv
 #     from db.python.connect import SMConnections
 
 #     author = 'michael.franklin@populationgenomics.org.au'
-#     con = SMConnections.get_connection_for_project('sm_dev', author)
-#     csv_path = '/Users/michael.franklin/Downloads/Manifest-Master (1).csv'
+#     con = SMConnections.get_connection_for_project('dev', author)
+#     csv_path = '<manifest-file>.csv'
 #     with open(csv_path, encoding='utf-8-sig') as csvfile:
 #         csvreader = csv.reader(csvfile)
 #         headers = next(csvreader)
 
-#         ImportLayer(con, author).import_airtable_manifest_csv(headers, csvreader)
+#         await ImportLayer(con).import_airtable_manifest_csv(headers, csvreader)
+
+# import asyncio
+# asyncio.run(import_csv())
