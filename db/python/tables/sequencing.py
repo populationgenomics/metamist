@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Optional, Dict, List
 
 from models.models.sequence import SampleSequencing
 from models.enums import SequencingType, SequencingStatus
@@ -121,3 +121,33 @@ WHERE id = :sequencing_id
                 'sequencing_id': sequencing_id,
             },
         )
+
+    async def update_sequence(
+        self,
+        sequence_id,
+        status: Optional[SequencingStatus] = None,
+        meta: Optional[Dict] = None,
+        author=None,
+    ):
+        """
+        Can't update type
+        """
+
+        fields = {'sequencing_id': sequence_id, 'author': author or self.author}
+
+        updaters = ['author = :author']
+        if status is not None:
+            updaters.append('status = :status')
+            fields['status'] = status.value
+        if meta is not None:
+
+            updaters.append('meta = JSON_MERGE_PATCH(meta, :meta)')
+            fields['meta'] = to_db_json(meta)
+
+        _query = f"""
+UPDATE sample_sequencing
+    SET {", ".join(updaters)}
+    WHERE id = :sequencing_id
+"""
+        await self.connection.execute(_query, fields)
+        return True
