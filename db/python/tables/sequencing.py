@@ -67,11 +67,11 @@ RETURNING id;"""
                 'author': author or self.author,
             },
         )
-        id_of_new_sample = await self.connection.fetch_one()[0]
+        id_of_new_sample = await self.connection.fetch_val()
 
         return id_of_new_sample
 
-    async def get_latest_sequence_id_by_sample_id(self, sample_id):
+    async def get_latest_sequence_id_by_sample_id(self, sample_id: int):
         """
         Get latest added sequence ID from internal sample_id
         """

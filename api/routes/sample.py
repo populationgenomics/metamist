@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from models.enums import SampleType
+from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.tables.sample import SampleTable, Sample
 
 from api.utils.db import get_db_connection, Connection
@@ -35,18 +36,30 @@ async def create_new_sample(
             meta=sample.meta,
             participant_id=sample.participant_id,
         )
-        return internal_id
+        return sample_id_format(internal_id)
 
 
-@router.post('/id-map', operation_id='getSampleIdMap')
-async def get_sample_id_map(
+@router.post('/id-map/external', operation_id='getSampleIdMapByExternal')
+async def get_sample_id_map_by_external(
     external_ids: List[str] = Body(..., embed=True),
     connection: Connection = get_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
     st = SampleTable(connection)
-    result = await st.get_sample_id_map(external_ids)
-    return result
+    result = await st.get_sample_id_map_by_external_ids(external_ids)
+    return {k: sample_id_format(v) for k, v in result.items()}
+
+
+@router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
+async def get_sample_id_map_by_internal(
+    internal_ids: List[str] = Body(..., embed=True),
+    connection: Connection = get_db_connection,
+):
+    """Get map of sample IDs, { [externalId]: internal_sample_id }"""
+    st = SampleTable(connection)
+    internal_ids_raw = sample_id_transform_to_raw(internal_ids)
+    result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
+    return {sample_id_format(k): v for k, v in result.items()}
 
 
 @router.get(

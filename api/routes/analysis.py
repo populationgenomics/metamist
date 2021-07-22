@@ -4,10 +4,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from models.enums import AnalysisType, AnalysisStatus
-
-from api.utils.db import get_db_connection, Connection
+from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.tables.analysis import AnalysisTable
 
+from api.utils.db import get_db_connection, Connection
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -36,10 +36,12 @@ async def create_new_analysis(
 
     atable = AnalysisTable(connection)
 
+    sample_ids = sample_id_transform_to_raw(analysis.sample_ids)
+
     analysis_id = await atable.insert_analysis(
         analysis_type=analysis.type,
         status=analysis.status,
-        sample_ids=analysis.sample_ids,
+        sample_ids=sample_ids,
         output=analysis.output,
     )
 
@@ -71,7 +73,7 @@ async def get_all_sample_ids_without_analysis_type(
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisTable(connection)
     result = await atable.get_all_sample_ids_without_analysis_type(analysis_type)
-    return {'sample_ids': result}
+    return {'sample_ids': sample_id_format(result)}
 
 
 @router.get(

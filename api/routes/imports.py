@@ -6,7 +6,7 @@ from fastapi import APIRouter, UploadFile, File
 from db.python.layers.imports import ImportLayer
 
 from api.utils.db import get_db_connection, Connection
-
+from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/import', tags=['import'])
 
@@ -21,4 +21,4 @@ async def import_airtable_manifest(
     headers = next(csvreader)
 
     sample_ids = await import_layer.import_airtable_manifest_csv(headers, csvreader)
-    return {'success': True, 'sample_ids': sample_ids}
+    return {'success': True, 'sample_ids': sample_id_format(sample_ids)}

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from db.python.tables.sequencing import SequencingStatus, SampleSequencingTable
 
 from api.utils.db import get_db_connection, Connection
-
+from models.models.sample import sample_id_transform_to_raw
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
 
@@ -41,6 +41,9 @@ async def get_sequence_id_from_sample_id(
 ):
     """Get sample by external ID"""
     sequence_layer = SampleSequencingTable(connection)
-    sequence_id = await sequence_layer.get_latest_sequence_id_by_sample_id(sample_id)
+    sample_id_raw = sample_id_transform_to_raw(sample_id)
+    sequence_id = await sequence_layer.get_latest_sequence_id_by_sample_id(
+        sample_id_raw
+    )
 
     return sequence_id
