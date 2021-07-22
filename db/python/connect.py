@@ -23,7 +23,12 @@ def to_db_json(val):
 class Connection:
     """Stores a DB connection, project and author"""
 
-    def __init__(self, connection: databases.Database, project: str, author: str):
+    def __init__(
+        self,
+        connection: databases.Database,
+        project: str,
+        author: str,
+    ):
         self.connection: databases.Database = connection
         self.project: str = project
         self.author: str = author
@@ -48,7 +53,14 @@ class DatabaseConfiguration:
     """Class to hold information about a MySqlConfiguration"""
 
     def __init__(
-        self, project, dbname, host=None, port=None, username=None, password=None
+        self,
+        project,
+        dbname,
+        host=None,
+        port=None,
+        username=None,
+        password=None,
+        is_admin=False,
     ):
         self.project = project
         self.dbname = dbname
@@ -56,36 +68,59 @@ class DatabaseConfiguration:
         self.port = port
         self.username = username
         self.password = password
+        self.is_admin = is_admin
 
     @staticmethod
     def dev_config():
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
-        return DatabaseConfiguration(
-            project='dev', dbname='sm_dev', username='liquibase', password='liquibase'
-        )
+        return [
+            DatabaseConfiguration(
+                project='dev',
+                dbname='sm_dev',
+                username='root',
+                password='',
+            ),
+            DatabaseConfiguration(
+                project=None,
+                dbname='sm_admin',
+                username='root',
+                password='',
+                is_admin=True,
+            ),
+        ]
 
 
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
     _connected = False
-    _connections: Dict = {}
+    _connections: Dict[str, databases.Database] = {}
+    _admin_db: databases.Database = None
+
+    @staticmethod
+    def get_admin_db():
+        """Get administrator database, most likely for getting sample-map"""
+        return SMConnections._admin_db
 
     @staticmethod
     def _get_connections(force_reconnect=False):
         if not SMConnections._connections or force_reconnect:
-            configs = [DatabaseConfiguration.dev_config()]
+            configs = DatabaseConfiguration.dev_config()
             if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
                 logger.info('Using production mysql configurations')
                 configs = (
                     SMConnections._load_database_configurations_from_secret_manager()
                 )
 
+            project_configs = [c for c in configs if not c.is_admin]
+            admin_config = [c for c in configs if c.is_admin][0]
+            SMConnections._admin_db = SMConnections.make_connection(admin_config)
+
             try:
                 SMConnections._connections = {
                     config.project: SMConnections.make_connection(config)
-                    for config in configs
+                    for config in project_configs
                 }
                 logger.info('Created connections to databases')
             except Exception as exp:
@@ -143,6 +178,7 @@ class SMConnections:
             return False
 
         connections = SMConnections._get_connections()
+        await SMConnections._admin_db.connect()
         for dbname, db in connections.items():
             logger.info(f'Connecting to {dbname}')
             await db.connect()

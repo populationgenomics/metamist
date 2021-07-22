@@ -26,4 +26,5 @@ def dependable_get_connection(
     return SMConnections.get_connection_for_project(project, author)
 
 
+get_author = Depends(authenticate)
 get_db_connection = Depends(dependable_get_connection)
