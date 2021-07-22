@@ -10,7 +10,7 @@ There are no docs at the moment, but as a rough guide, you could do the followin
 ```python
 from sample_metadata.api.samples_api import SamplesApi
 sapi = SamplesApi()
-sample = sapi.get_sample_by_external_id('sm_dev', 'CPG0001')
+sample = sapi.get_sample_by_external_id('dev', 'CPG0001')
 print(sample)
 # {'active': True,
 #  'external_id': 'CPG0001',
