@@ -18,12 +18,17 @@ class SampleMapTable:
             raise Exception('Must provide author to {self.__class__.__name__}')
 
     async def generate_sample_id(self, project: str) -> int:
+        """
+        Generate global sample ID, RAW (not transformed)
+        Please make sure you call 'sample_id_format(new_id)'
+        before returning to client.
+
+        """
         _query = 'INSERT INTO sample_map (project) VALUES (:project) RETURNING id'
         async with self.connection.transaction():
             identifier = await self.connection.fetch_val(_query, {'project': project})
 
             return identifier
-
 
     async def get_project_map(self, raw_sample_ids: List[int]):
         """Get {internal_id: project} map from raw_sample_ids"""
@@ -38,7 +43,9 @@ class SampleMapTable:
             # (in case we're provided a list with duplicates)
             if len(sample_id_project_map) != len(provided_internal_ids):
                 # we have samples missing from the map, so we'll 404 the whole thing
-                missing_sample_ids = provided_internal_ids - set(sample_id_project_map.keys())
+                missing_sample_ids = provided_internal_ids - set(
+                    sample_id_project_map.keys()
+                )
 
                 raise NotFoundError(
                     f"Couldn't find samples with IDS: {', '.join(sample_id_format(list(missing_sample_ids)))}"
@@ -51,7 +58,7 @@ if __name__ == '__main__':
     import asyncio
 
     async def generate_new_sample_id():
-
+        """Test function"""
         author = 'michael.franklin@populationgenomics.org.au'
         await SMConnections.connect()
         st = SampleMapTable(author=author)

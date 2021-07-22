@@ -13,7 +13,7 @@
 
         <!-- Participants -->
         <createTable tableName="participant">
-            <column name="id" type="INT" autoIncrement="true">
+            <column name="id" type="INT">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
