@@ -7,7 +7,13 @@ from fastapi.responses import JSONResponse
 
 from db.python.connect import SMConnections
 
-from api.routes import sample_router, import_router, analysis_router, sequence_router
+from api.routes import (
+    sample_router,
+    import_router,
+    analysis_router,
+    sequence_router,
+    sample_map_router,
+)
 from api.utils import IS_PRODUCTION, get_openapi_schema_func
 from api.utils.gcp import setup_gcp_logging
 from api.utils.exceptions import determine_code_from_error
@@ -71,6 +77,7 @@ async def exception_handler(_: Request, e: Exception):
     )
 
 
+app.include_router(sample_map_router, prefix='/api/v1')
 app.include_router(sample_router, prefix='/api/v1/{project}')
 app.include_router(import_router, prefix='/api/v1/{project}')
 app.include_router(analysis_router, prefix='/api/v1/{project}')
