@@ -80,7 +80,7 @@ def create_database(
             project=project_name,
             databasename=databasename,
             username=_username,
-            password=password,
+            password=_password,
             secret_manager=secret_manager,
         )
 

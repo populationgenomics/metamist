@@ -6,11 +6,17 @@ from db.python.tables.sample import SampleTable
 
 
 class SampleMapLayer:
+    """
+    Methods for interacting with global sample to project map
+    """
+
     def __init__(self, author: str):
         self.author = author
 
     async def get_internal_id_map(self, internal_ids: List[int]) -> Dict[int, str]:
-
+        """
+        Get map of <internal_id>: project
+        """
         st = SampleMapTable(author=self.author)
 
         id_to_external_id = {}
