@@ -23,8 +23,19 @@ def update_sample_status(request):
     project = request_json.get("project")
     sample = request_json.get("sample")
     status = request_json.get("status")
+    batch = request_json.get("batch")
+    metadata = request_json.get("metadata")
+    """
+    Example of metadata dictionary 
+    {
+        "sample.flowcell_lane": "HVTVGDSXY.1-2-3-4",
+        "sample.library_id": "LP9000039-NTP_A06",
+        "raw_data.FREEMIX": "0.001"
+        "raw_data.PCT_CHIMERAS":"0.01"
+    }
+    """
 
-    if not project or not sample or not status:
+    if not project or not sample or not status or not batch or not metadata:
         return abort(400)
 
     logging.info(f"Processing request: {request_json}")
@@ -43,20 +54,22 @@ def update_sample_status(request):
     if not project_config:
         return abort(404)
 
-    # Get the Airtable credentials.
-    base_key = project_config.get("baseKey")
-    table_name = project_config.get("tableName")
-    api_key = project_config.get("apiKey")
-    if not base_key or not table_name or not api_key:
-        return abort(500)
+    # Update the SM DB
 
-    # Update the entry.
-    airtable = Airtable(base_key, table_name, api_key)
-    try:
-        response = airtable.update_by_field("Sample ID", sample, {"Status": status})
-    except HTTPError as err:  # Invalid status enum.
-        logging.error(err)
-        return abort(400)
+    # # Get the Airtable credentials.
+    # base_key = project_config.get("baseKey")
+    # table_name = project_config.get("tableName")
+    # api_key = project_config.get("apiKey")
+    # if not base_key or not table_name or not api_key:
+    #     return abort(500)
+
+    # # Update the entry.
+    # airtable = Airtable(base_key, table_name, api_key)
+    # try:
+    #     response = airtable.update_by_field("Sample ID", sample, {"Status": status})
+    # except HTTPError as err:  # Invalid status enum.
+    #     logging.error(err)
+    #     return abort(400)
 
     if not response:  # Sample not found.
         return abort(404)
