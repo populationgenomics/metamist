@@ -18,6 +18,8 @@ import hailtop.batch as hb
 
 # Import SampleAPI
 from sample_metadata.api.sample_api import SampleApi
+from sample_metadata.api.sequence_api import SequenceApi
+from sample_metadata.model.sequence_update_model import SequenceUpdateModel
 
 
 class SampleGroup(NamedTuple):
@@ -114,3 +116,55 @@ def batch_move_files(
         jobs.append(j)
 
     return jobs
+
+
+def setup_python_job(
+    batch: hb.batch,
+    name: str,
+    docker_image: Optional[str],
+    dependent_jobs=List[hb.batch.job],
+) -> hb.batch.job:
+    """ Returns a new Hail Batch job that activates the Google service account. """
+
+    job = batch.new_python_job(name=name)
+
+    if docker_image is not None:
+        job.image(docker_image)
+
+    job.command("gcloud -q auth activate-service-account --key-file=/gsa-key/key.json")
+
+    job.depends_on(*dependent_jobs)
+
+    return job
+
+
+def create_analysis(sample_group: SampleGroup, proj, file_path: str, a_type: str):
+    """ Creates a new analysis object"""
+    sapi = SampleApi()
+    aapi = AnalysisApi()
+    external_id = {"external_ids": [sample_group.sample_id_external]}
+    internal_id_map = sapi.get_sample_id_map(proj, external_id)
+    internal_id = list(internal_id_map.values())[0]
+
+    full_path = os.path.join("gs://", file_path, internal_id)
+
+    new_gvcf = AnalysisModel(
+        sample_ids=[internal_id],
+        type=AnalysisType(a_type),
+        status=AnalysisStatus("completed"),
+        output=full_path,
+    )
+
+    aapi.create_new_analysis(proj, new_gvcf)
+
+
+def update_sequence_meta(external_id: str, project: str):
+    # Determine sequencing ID
+    sequence_id = seqapi.get_sequence_id_from_sample_id(external_id, project)
+
+    # Update Sequence Meta
+    sequence_metadata = SequenceUpdateModel(
+        status=SequencingStatus(status), meta=metadata
+    )
+
+    seqapi.update_sequence(sequence_id, sequence_metadata)
