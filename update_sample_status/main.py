@@ -80,6 +80,7 @@ def update_sample_status(request):
         bucket=os.getenv('HAIL_BUCKET'),
     )
 
+
     batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
 
     # Move gVCFs

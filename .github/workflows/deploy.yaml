@@ -1,0 +1,80 @@
+name: Deploy
+on:
+  push:
+    branches:
+      - main
+      - add-foundations # test the deploy
+jobs:
+  build-publish:
+    # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
+    # if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      # used for generating API
+      SM_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/server:${{ github.sha }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@main
+
+      - name: "gcloud setup"
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: sample-metadata
+          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+
+      - name: "gcloud docker auth"
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: buildenv
+          channels: conda-forge,bioconda,defaults
+          channel-priority: true
+          python-version: 3.7
+
+      - name: Setup build env
+        run: |
+          conda install pip conda-build anaconda-client requests
+          pip install openapi-generator-cli
+
+      - name: "build image"
+        run: |
+          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+
+      - name: "build deployable API"
+        run: |
+          python regenerate_api.py
+          ls -lGh sample_metadata
+
+      - name: Build package
+        run: conda build conda/$(basename $GITHUB_REPOSITORY)
+
+      - name: "push image"
+        run: |
+          docker push $SM_DOCKER
+
+      # TODO: implement test deploy to check whether everything is in order
+      # - name: "deploy test-web"
+      #   run: |
+      #     gcloud run deploy test-web \
+      #       --region australia-southeast1 \
+      #       --no-allow-unauthenticated \
+      #       --platform managed \
+      #       --set-env-vars=BUCKET_SUFFIX=test-web \
+      #       --image $DOCKER_IMAGE
+
+      - name: "deploy to Cloud Run"
+        run: |
+          gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
+
+      - name: Upload to anaconda package repository
+        run: |
+          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
