@@ -17,10 +17,12 @@ import multiprocessing
 import sys
 import urllib3
 
-import google.auth
+import google.oauth2.id_token
+import google.auth.exceptions
 import google.auth.transport.requests
 
 from http import client as http_client
+
 from sample_metadata.exceptions import ApiValueError
 
 
@@ -399,7 +401,8 @@ class Configuration(object):
                 'type': 'bearer',
                 'in': 'header',
                 'key': 'Authorization',
-                'value': 'Bearer ' + (self.access_token or _get_google_auth_token()),
+                'value': 'Bearer '
+                + (self.access_token or _get_google_auth_token(self._base_path)),
             }
         }
         return auth
@@ -486,12 +489,23 @@ class Configuration(object):
         self.server_index = None
 
 
-def _get_google_auth_token() -> str:
+def _get_google_auth_token(url) -> str:
     # https://stackoverflow.com/a/55804230
     # command = ['gcloud', 'auth', 'print-identity-token']
 
-    creds, _ = google.auth.default()
+    # ie: use service account identity token by default, then fallback otherwise
+    use_default_credentials = str(getenv('SM_USE_SERVICE_ACCOUNT')).lower() in ('true', '1')
+    if not use_default_credentials:
+        try:
+            auth_req = google.auth.transport.requests.Request()
+            id_token = google.oauth2.id_token.fetch_id_token(auth_req, url)
 
-    auth_req = google.auth.transport.requests.Request()
-    creds.refresh(auth_req)
-    return creds.id_token
+            return id_token
+        except google.auth.exceptions.DefaultCredentialsError as e:
+            raise google.auth.exceptions.DefaultCredentialsError(f'P') from e
+    else:
+        creds, _ = google.auth.default()
+
+        auth_req = google.auth.transport.requests.Request()
+        creds.refresh(auth_req)
+        return creds.id_token
