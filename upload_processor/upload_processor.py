@@ -19,7 +19,10 @@ import hailtop.batch as hb
 # Import SampleAPI
 from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.api.sequence_api import SequenceApi
-from sample_metadata.model.sequence_update_model import SequenceUpdateModel
+from sample_metadata.api.analysis_api import AnalysisApi
+from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.models.sequence_update_model import SequenceUpdateModel
+from sample_metadata.models import AnalysisType, AnalysisStatus, SequencingStatus
 
 
 class SampleGroup(NamedTuple):
@@ -76,22 +79,22 @@ def batch_move_files(
     jobs = []
 
     # Get internal sample ID
-    external_id = {"external_ids": [sample_group.sample_id_external]}
+    external_id = {'external_ids': [sample_group.sample_id_external]}
     sapi = SampleApi()
     internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
     internal_id = str(list(internal_id_map.values())[0])
 
     for tuple_key in sample_group._fields:
-        if tuple_key == "sample_id_external":
+        if tuple_key == 'sample_id_external':
             continue
 
         file_name = getattr(sample_group, tuple_key)
-        previous_location = os.path.join("gs://", source_prefix, file_name)
+        previous_location = os.path.join('gs://', source_prefix, file_name)
         file_extension = file_name[len(sample_group.sample_id_external) :]
         new_file_name = internal_id + file_extension
-        new_location = os.path.join("gs://", destination_prefix, new_file_name)
+        new_location = os.path.join('gs://', destination_prefix, new_file_name)
 
-        j = batch.new_job(name=f"move {file_name} -> {new_file_name}")
+        j = batch.new_job(name=f'move {file_name} -> {new_file_name}')
 
         if docker_image is not None:
             j.image(docker_image)
@@ -100,12 +103,12 @@ def batch_move_files(
         if key is not None:
             j.command(f"echo '{key}' > /tmp/key.json")
             j.command(
-                f"gcloud -q auth activate-service-account --key-file=/tmp/key.json"
+                f'gcloud -q auth activate-service-account --key-file=/tmp/key.json'
             )
         # Handles service backend, or a key in the same default location.
         else:
             j.command(
-                "gcloud -q auth activate-service-account --key-file=/gsa-key/key.json"
+                'gcloud -q auth activate-service-account --key-file=/gsa-key/key.json'
             )
 
         # Checks file doesn't already exist at the destination, then performs move.
@@ -131,7 +134,7 @@ def setup_python_job(
     if docker_image is not None:
         job.image(docker_image)
 
-    job.command("gcloud -q auth activate-service-account --key-file=/gsa-key/key.json")
+    job.command('gcloud -q auth activate-service-account --key-file=/gsa-key/key.json')
 
     job.depends_on(*dependent_jobs)
 
@@ -142,29 +145,36 @@ def create_analysis(sample_group: SampleGroup, proj, file_path: str, a_type: str
     """ Creates a new analysis object"""
     sapi = SampleApi()
     aapi = AnalysisApi()
-    external_id = {"external_ids": [sample_group.sample_id_external]}
-    internal_id_map = sapi.get_sample_id_map(proj, external_id)
+    external_id = {'external_ids': [sample_group.sample_id_external]}
+    internal_id_map = sapi.get_sample_id_map_by_external(proj, external_id)
     internal_id = list(internal_id_map.values())[0]
 
-    full_path = os.path.join("gs://", file_path, internal_id)
+    full_path = os.path.join('gs://', file_path, internal_id)
 
     new_gvcf = AnalysisModel(
         sample_ids=[internal_id],
         type=AnalysisType(a_type),
-        status=AnalysisStatus("completed"),
+        status=AnalysisStatus('completed'),
         output=full_path,
     )
 
     aapi.create_new_analysis(proj, new_gvcf)
 
 
-def update_sequence_meta(external_id: str, project: str):
+def update_sequence_meta(external_id: str, project: str, status: str, metadata: str):
+    """ Updates sequence metadata in SM DB"""
+    seqapi = SequenceApi()
     # Determine sequencing ID
-    sequence_id = seqapi.get_sequence_id_from_sample_id(external_id, project)
 
-    # Update Sequence Meta
+    # TODO: Fix internal ID
+    internal_id = external_id
+    # TODO: Fix get_sequence_id_from_sample_id
+    sequence_id = seqapi.get_sequence_from_sample_id(internal_id, project)
+
+    # Update Sequence Meta #TODO: Fix
+
     sequence_metadata = SequenceUpdateModel(
         status=SequencingStatus(status), meta=metadata
-    )
+    )  # pylint: disable=E1120
 
     seqapi.update_sequence(sequence_id, sequence_metadata)
