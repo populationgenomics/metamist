@@ -15,6 +15,7 @@ requirements:
   host:
     - python
   run:
+    - requests
     - google-auth ==1.24.0
     - urllib3 >=1.25.3
     - python-dateutil
