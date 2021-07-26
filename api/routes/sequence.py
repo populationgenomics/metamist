@@ -34,7 +34,7 @@ async def update_sequence(
 
 
 @router.get(
-    '/latest-from-sample-id/{sample_id}', operation_id='getSequenceFromSampleId'
+    '/latest-from-sample-id/{sample_id}', operation_id='getSequenceIdFromSampleId'
 )
 async def get_sequence_id_from_sample_id(
     sample_id: str, connection: Connection = get_db_connection
