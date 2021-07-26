@@ -494,8 +494,8 @@ def _get_google_auth_token(url) -> str:
     # command = ['gcloud', 'auth', 'print-identity-token']
 
     # ie: use service account identity token by default, then fallback otherwise
-    use_default_credentials = str(getenv('SM_USE_SERVICE_ACCOUNT')).lower() in ('true', '1')
-    if not use_default_credentials:
+    use_service_account = str(getenv('SM_USE_SERVICE_ACCOUNT', 'true')).lower() in ('true', '1')
+    if use_service_account:
         try:
             auth_req = google.auth.transport.requests.Request()
             id_token = google.oauth2.id_token.fetch_id_token(auth_req, url)
