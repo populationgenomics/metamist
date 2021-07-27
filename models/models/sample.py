@@ -42,7 +42,7 @@ def sample_id_transform_to_raw(
     identifier: Union[List[Union[str, int]], Union[str, int]], strict=True
 ):
     """
-    Transform STRING sample identifier (CPGXXXH) to XXX by:
+    Transform STRING sample identifier (CPG-XX-XXXH) to XXXXX by:
         - validating prefix
         - validating checksum
     """
@@ -61,7 +61,7 @@ def sample_id_transform_to_raw(
             f'Invalid prefix found for CPG sample identifier "{identifier}"'
         )
 
-    stripped_identifier = identifier.lstrip('CPG')
+    stripped_identifier = identifier.lstrip('CPG-').replace('-', '')
     if not stripped_identifier.isdigit():
         raise ValueError(f'Invalid sample identifier "{identifier}"')
 
@@ -72,30 +72,32 @@ def sample_id_transform_to_raw(
     return int(stripped_identifier[:-1])
 
 
-def sample_id_format(sample_id: Union[int, List[int]]):
+def sample_id_format(sample_id: Union[int, List[int], str, List[str]]) -> str:
     """
-    Transform raw (int) sample identifier to format (CPGXXXH) where:
-        - CPG is the prefix
+    Transform raw (int) sample identifier to format (CPG-XX-XXXH) where:
+        - CPG- is the prefix
         - H is the Luhn checksum
-        - XXX is the original identifier
+        - XXXXX is the original identifier
+        - XXXXXH is additionally formatted with hyphens for readability
+          (see format_numeric_id)
 
     >>> sample_id_format(10)
-    'CPG109'
+    'CPG-109'
 
     >>> sample_id_format(12345)
-    'CPG123455'
+    'CPG-1234-55'
     """
 
     if isinstance(sample_id, list):
         return [sample_id_format(s) for s in sample_id]
 
-    if isinstance(sample_id, str) and not sample_id.isdigit():
-        if sample_id.startswith('CPG'):
+    if isinstance(sample_id, str) and not sample_id.replace('-', '').isdigit():
+        if sample_id.startswith('CPG-'):
             return sample_id
         raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
-    sample_id = int(sample_id)
 
-    return f'CPG{sample_id}{luhn_compute(sample_id)}'
+    formatted_number = format_numeric_id(f'{sample_id}{luhn_compute(sample_id)}')
+    return f'CPG-{formatted_number}'
 
 
 def luhn_is_valid(n):
@@ -138,3 +140,15 @@ def luhn_compute(n):
     m = [int(d) for d in reversed(str(n))]
     result = sum(m) + sum(d + (d >= 5) for d in m[::2])
     return -result % 10
+
+
+def format_numeric_id(n: Union[int, str], chunk_size=4) -> str:
+    """
+    Formats long integer number as string, using hyphens to break it into shorter
+    "words" for better readability.
+
+    >>> format_numeric_id(123456789, chunk_size=4)
+    1234-5668-9
+    """
+    n = str(n)
+    return '-'.join([n[i : i + 4] for i in range(0, len(n), chunk_size)])
