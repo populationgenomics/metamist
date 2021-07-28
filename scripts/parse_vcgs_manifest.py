@@ -237,7 +237,7 @@ class VcgsManifestParser:
 
         raise ValueError(f'Unrecognised sequencing type {type_}')
 
-    def parse_reads(self, reads: List[str]) -> Union[List[Dict], Dict]:
+    def parse_reads(self, reads: List[str]) -> Union[List[List[Dict]], List[Dict]]:
         if all(r.endswith('.fastq') or r.endswith('.fastq.gz') for r in reads):
             structured_fastqs = self.parse_fastqs_structure(reads)
             files = []
