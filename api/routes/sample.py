@@ -22,10 +22,10 @@ class NewSample(BaseModel):
 router = APIRouter(prefix='/sample', tags=['sample'])
 
 
-@router.post('/', response_model=int, operation_id='createNewSample')
+@router.put('/', response_model=str, operation_id='createNewSample')
 async def create_new_sample(
     sample: NewSample, connection: Connection = get_db_connection
-) -> int:
+) -> str:
     """Creates a new sample, and returns the internal sample ID"""
     st = SampleTable(connection)
     async with connection.connection.transaction():
@@ -41,12 +41,15 @@ async def create_new_sample(
 
 @router.post('/id-map/external', operation_id='getSampleIdMapByExternal')
 async def get_sample_id_map_by_external(
+    allow_missing: bool = False,
     external_ids: List[str] = Body(..., embed=True),
     connection: Connection = get_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
     st = SampleTable(connection)
-    result = await st.get_sample_id_map_by_external_ids(external_ids)
+    result = await st.get_sample_id_map_by_external_ids(
+        external_ids, allow_missing=(allow_missing or False)
+    )
     return {k: sample_id_format(v) for k, v in result.items()}
 
 

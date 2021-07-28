@@ -28,7 +28,7 @@ class AnalysisUpdateModel(BaseModel):
     output: Optional[str] = None
 
 
-@router.post('/', operation_id='createNewAnalysis', response_model=int)
+@router.put('/', operation_id='createNewAnalysis', response_model=int)
 async def create_new_analysis(
     analysis: AnalysisModel, connection: Connection = get_db_connection
 ):

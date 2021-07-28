@@ -1,6 +1,6 @@
 from typing import List, Dict, Iterable
 
-from models.enums import SampleType, SequencingType, SequencingStatus
+from models.enums import SampleType, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 
 from db.python.tables.sample_map import SampleMapTable
@@ -68,7 +68,7 @@ class ImportLayer(BaseLayer):
                 sequence = SampleSequencing(
                     id_=None,
                     sample_id=internal_sample_id,
-                    type=SequencingType.WGS,
+                    type=SequenceType.WGS,
                     meta=sequence_meta,
                     status=sequence_status,
                 )
@@ -119,19 +119,19 @@ class ImportLayer(BaseLayer):
         raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
 
     @staticmethod
-    def parse_row_status(row_status: str) -> SequencingStatus:
+    def parse_row_status(row_status: str) -> SequenceStatus:
         """Take the airtable 'Status' and return a SequencingStatus"""
         row_status_lower = row_status.lower()
         if row_status_lower == 'sequencing complete':
-            return SequencingStatus.COMPLETED_SEQUENCING
+            return SequenceStatus.COMPLETED_SEQUENCING
         if row_status_lower == 'qc complete':
-            return SequencingStatus.COMPLETED_QC
+            return SequenceStatus.COMPLETED_QC
         if row_status_lower == 'upload successful':
-            return SequencingStatus.UPLOADED
+            return SequenceStatus.UPLOADED
         if row_status_lower == 'failed':
-            return SequencingStatus.FAILED_QC
+            return SequenceStatus.FAILED_QC
         if row_status_lower == '':
-            return SequencingStatus.UNKNOWN
+            return SequenceStatus.UNKNOWN
 
         raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
 

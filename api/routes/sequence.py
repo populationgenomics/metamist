@@ -3,19 +3,47 @@ from typing import Optional, Dict
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from db.python.tables.sequencing import SequencingStatus, SampleSequencingTable
+from models.models.sample import sample_id_transform_to_raw
+from db.python.tables.sequencing import (
+    SequenceType,
+    SequenceStatus,
+    SampleSequencingTable,
+)
+
 
 from api.utils.db import get_db_connection, Connection
-from models.models.sample import sample_id_transform_to_raw
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
+
+
+class NewSequence(BaseModel):
+    """Model for creating new sequence"""
+
+    sample_id: str
+    status: SequenceStatus
+    meta: Dict
+    type: SequenceType
 
 
 class SequenceUpdateModel(BaseModel):
     """Update analysis model"""
 
-    status: Optional[SequencingStatus] = None
+    status: Optional[SequenceStatus] = None
     meta: Optional[Dict] = None
+
+
+@router.put('/', operation_id='createNewSequence')
+async def create_sequence(
+    sequence: NewSequence, connection: Connection = get_db_connection
+):
+    """Create new sequence, attached to a sample"""
+    seq_table = SampleSequencingTable(connection)
+    return await seq_table.insert_sequencing(
+        sample_id=sample_id_transform_to_raw(sequence.sample_id),
+        sequence_type=sequence.type,
+        sequence_meta=sequence.meta,
+        status=sequence.status,
+    )
 
 
 @router.patch('/{sequence_id}', operation_id='updateSequence')

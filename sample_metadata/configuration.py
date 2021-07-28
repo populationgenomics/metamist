@@ -495,6 +495,7 @@ def _get_google_auth_token(url) -> str:
 
     # ie: use service account identity token by default, then fallback otherwise
     use_service_account = str(getenv('SM_USE_SERVICE_ACCOUNT', 'true')).lower() in ('true', '1')
+
     if use_service_account:
         try:
             auth_req = google.auth.transport.requests.Request()
@@ -502,7 +503,10 @@ def _get_google_auth_token(url) -> str:
 
             return id_token
         except google.auth.exceptions.DefaultCredentialsError as e:
-            raise google.auth.exceptions.DefaultCredentialsError(f'P') from e
+            raise google.auth.exceptions.DefaultCredentialsError(
+                f"Couldn't find a local service account for GCP, if you mean to use your local credentials,"
+                f"please 'export SM_USE_SERVICE_ACCOUNT=false'. Original error: {str(e)}"
+            ) from e
     else:
         creds, _ = google.auth.default()
 

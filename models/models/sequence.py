@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel
 
-from models.enums import SequencingType, SequencingStatus
+from models.enums import SequenceType, SequenceStatus
 
 
 class SampleSequencing(BaseModel):
@@ -10,9 +10,9 @@ class SampleSequencing(BaseModel):
 
     id_: Optional[int] = None
     sample_id: Optional[int] = None
-    type: Optional[SequencingType] = None
+    type: Optional[SequenceType] = None
     meta: Optional[Dict[str, Any]] = None
-    status: Optional[SequencingStatus] = None
+    status: Optional[SequenceStatus] = None
 
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())

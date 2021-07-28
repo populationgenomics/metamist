@@ -108,13 +108,13 @@ SELECT {", ".join(keys)} from sample
         return sample
 
     async def get_sample_id_map_by_external_ids(
-        self, external_ids: List[str]
+        self, external_ids: List[str], allow_missing=False
     ) -> Dict[str, int]:
         """Get map of external sample id to internal id"""
         _query = 'SELECT id, external_id FROM sample WHERE external_id in :external_ids'
         rows = await self.connection.fetch_all(_query, {'external_ids': external_ids})
         sample_id_map = {el[1]: el[0] for el in rows}
-        if len(sample_id_map) != len(external_ids):
+        if not allow_missing and len(sample_id_map) != len(external_ids):
             provided_external_ids = set(external_ids)
             # do the check again, but use the set this time
             # (in case we're provided a list with duplicates)

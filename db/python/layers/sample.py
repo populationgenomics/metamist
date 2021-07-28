@@ -1,4 +1,4 @@
-from models.enums import SequencingStatus
+from models.enums import SequenceStatus
 
 # from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing import SampleSequencingTable
@@ -9,7 +9,7 @@ class SampleLayer(BaseLayer):
     """Layer for more complex sample logic"""
 
     async def update_sequencing_status_from_internal_sample_id(
-        self, sample_id: int, status: SequencingStatus
+        self, sample_id: int, status: SequenceStatus
     ):
         """Update the sequencing status from the internal sample id"""
         seq_table = SampleSequencingTable(connection=self.connection)
@@ -17,7 +17,7 @@ class SampleLayer(BaseLayer):
         return seq_table.update_status(seq_id, status)
 
     async def update_sequencing_status_from_external_sample_id(
-        self, external_sample_id: str, status: SequencingStatus
+        self, external_sample_id: str, status: SequenceStatus
     ):
         """
         Update the sequencing status from the external sample id,

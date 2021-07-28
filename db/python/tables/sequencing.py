@@ -1,7 +1,7 @@
 from typing import Optional, Dict, List
 
 from models.models.sequence import SampleSequencing
-from models.enums import SequencingType, SequencingStatus
+from models.enums import SequenceType, SequenceStatus
 
 from db.python.connect import DbBase, to_db_json
 
@@ -42,8 +42,8 @@ VALUES (:sample_id, :type, :meta, :status, :author);"""
     async def insert_sequencing(
         self,
         sample_id,
-        sequence_type: SequencingType,
-        status: SequencingStatus,
+        sequence_type: SequenceType,
+        status: SequenceStatus,
         sequence_meta: Dict[str, any] = None,
         author=None,
     ) -> int:
@@ -57,7 +57,7 @@ INSERT INTO sample_sequencing
 VALUES (:sample_id, :type, :meta, :status, :author)
 RETURNING id;"""
 
-        await self.connection.execute(
+        id_of_new_sample = await self.connection.fetch_val(
             _query,
             {
                 'sample_id': sample_id,
@@ -67,7 +67,6 @@ RETURNING id;"""
                 'author': author or self.author,
             },
         )
-        id_of_new_sample = await self.connection.fetch_val()
 
         return id_of_new_sample
 
@@ -103,7 +102,7 @@ LIMIT 1
     async def update_status(
         self,
         sequencing_id,
-        status: SequencingStatus,
+        status: SequenceStatus,
         author=None,
     ):
         """Update status of sequencing with sequencing_id"""
@@ -125,7 +124,7 @@ WHERE id = :sequencing_id
     async def update_sequence(
         self,
         sequence_id,
-        status: Optional[SequencingStatus] = None,
+        status: Optional[SequenceStatus] = None,
         meta: Optional[Dict] = None,
         author=None,
     ):
