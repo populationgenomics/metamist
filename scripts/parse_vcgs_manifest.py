@@ -8,15 +8,16 @@ from io import StringIO
 from itertools import groupby
 from collections import defaultdict
 
-from sample_metadata.model.sequence_type import SequenceType
-
-from sample_metadata.model.sample_type import SampleType
-
-from sample_metadata.model.sequence_status import SequenceStatus
+import click
 
 from sample_metadata.apis import SampleApi, SequenceApi
+from sample_metadata.model.sequence_type import SequenceType
+from sample_metadata.model.sample_type import SampleType
+from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.new_sample import NewSample
 from sample_metadata.model.new_sequence import NewSequence
+from sample_metadata.model.sample_update_model import SampleUpdateModel
+from sample_metadata.model.sequence_update_model import SequenceUpdateModel
 
 
 rmatch = re.compile(r'_[Rr]\d')
@@ -24,6 +25,10 @@ rmatch = re.compile(r'_[Rr]\d')
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
+FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
+BAM_EXTENSIONS = '.bam'
+CRAM_EXTENSIONS = '.cram'
 
 
 class Columns:
@@ -69,13 +74,17 @@ class Columns:
 
 class VcgsManifestParser:
     def __init__(
-        self, path_prefix, sample_metadata_project, default_sequencing_type='wgs'
+        self, path_prefix: str, sample_metadata_project: str, project: str, default_sequencing_type='wgs', default_sample_type='blood'
     ):
         super().__init__()
 
         self.path_prefix = path_prefix
+
+        self.project = project
         self.sample_metadata_project = sample_metadata_project
+
         self.default_sequencing_type = default_sequencing_type
+        self.default_sample_type = default_sample_type
 
         # gs specific
         self.bucket = None
@@ -145,16 +154,21 @@ class VcgsManifestParser:
         seqapi = SequenceApi()
 
         # determine if any samples exist
-        external_id_map = sapi.get_sample_id_map_by_external('dev', {'external_ids': list(sample_map.keys())}, allow_missing=True)
+        external_id_map = sapi.get_sample_id_map_by_external(
+            'dev', {'external_ids': list(sample_map.keys())}, allow_missing=True
+        )
 
-        samples_to_update: Dict[Dict] = {}
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
+        
+        samples_to_update: Dict[str, SampleUpdateModel] = {}
+        sequences_to_update = List[Dict] = []
+
         for sample_name in sample_map:
             logger.info(f'Preparing {sample_name}')
             rows = sample_map[sample_name]
-            reads = self.parse_reads([r[Columns.FILENAME] for r in rows])
+            reads, reads_type = self.parse_reads([r[Columns.FILENAME] for r in rows])
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = {
                 col: ",".join(set(r[col] for r in rows))
@@ -168,26 +182,30 @@ class VcgsManifestParser:
                 for col in Columns.sample_columns()
             }
             collapsed_sample_meta['reads'] = reads
+            collapsed_sample_meta['reads_type'] = reads_type
+            collapsed_sample_meta['project'] = self.project
 
             if sample_name in external_id_map:
                 # it already exists
-                samples_to_update[sample_name] = {
-                    'id': external_id_map[sample_name],
-                    'external_id': sample_name,
-                    'type': 'blood',
-                    'meta': collapsed_sample_meta
-                }
+                cpgid = external_id_map[sample_name]
+                samples_to_update[cpgid] = (SampleUpdateModel(
+                    meta=collapsed_sample_meta,
+                ))
+                sequences_to_update.append(SequenceUpdateModel(
+                    sample_id=cpgid,
+                    meta=collapsed_sequencing_meta
+                ))
             else:
                 samples_to_add.append(
                     NewSample(
                         external_id=sample_name,
-                        type=SampleType('blood'),
+                        type=self.default_sample_type,
                         meta=collapsed_sample_meta,
                     )
                 )
                 sequencing_to_add[sample_name].append(
                     NewSequence(
-                        sample_id='<None>', # keep the type initialise happy
+                        sample_id='<None>',  # keep the type initialise happy
                         meta=collapsed_sequencing_meta,
                         type=SequenceType(collapsed_type),
                         status=SequenceStatus('uploaded'),
@@ -197,7 +215,6 @@ class VcgsManifestParser:
         if not self.sample_metadata_project:
             logger.info('No sample-metadata project set, so skipping add into SM-DB')
             return samples_to_add, sequencing_to_add
-
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
         external_sample_id_to_internal_id = {}
@@ -214,12 +231,20 @@ class VcgsManifestParser:
                     project=self.sample_metadata_project, new_sequence=seq
                 )
 
+        for internal_sample_id, sample_update in samples_to_update.items():
+            sapi.update_sample()
+
         return external_sample_id_to_internal_id
 
     def parse_sequencing_type(self, sample_id: str, types: List[str]):
         # filter false-y values
         types = list(set(t for t in types if t))
         if len(types) <= 0:
+            if self.default_sequencing_type is None or self.default_sequencing_type.lower() == 'none':
+                raise ValueError(
+                    f"Couldn't detect sequence type for sample {sample_id}, and "
+                    "no default was available."
+                )
             return self.default_sequencing_type
         if len(types) > 1:
             raise ValueError(
@@ -237,16 +262,21 @@ class VcgsManifestParser:
 
         raise ValueError(f'Unrecognised sequencing type {type_}')
 
-    def parse_reads(self, reads: List[str]) -> Union[List[List[Dict]], List[Dict]]:
-        if all(r.endswith('.fastq') or r.endswith('.fastq.gz') for r in reads):
+    def parse_reads(
+        self, reads: List[str]
+    ) -> Tuple[Union[List[List[Dict]], List[Dict]], str]:
+        """
+        Returns a CWL file object
+        """
+        if all(r.lower() in FASTQ_EXTENSIONS for r in reads):
             structured_fastqs = self.parse_fastqs_structure(reads)
             files = []
             for fastq_group in structured_fastqs:
                 files.append([self.create_file_object(f) for f in fastq_group])
 
-            return files
+            return files, 'fastq'
 
-        elif all(r.endswith('.cram') for r in reads):
+        elif all(r.lower() in CRAM_EXTENSIONS for r in reads):
             sec_format = ['.crai', '^.crai']
             files = []
             for r in reads:
@@ -255,9 +285,9 @@ class VcgsManifestParser:
                 )
                 files.append(self.create_file_object(r, secondary_files=secondaries))
 
-            return files
+            return files, 'cram'
 
-        elif all(r.endswith('.bam') for r in reads):
+        elif all(r.lower() in BAM_EXTENSIONS for r in reads):
             sec_format = ['.bai', '^.bai']
             files = []
             for r in reads:
@@ -266,16 +296,15 @@ class VcgsManifestParser:
                 )
                 files.append(self.create_file_object(r, secondary_files=secondaries))
 
-            return files
+            return files, 'bam'
 
         extensions = set(os.path.splitext(r)[-1] for r in reads)
-
         joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(reads))
         raise ValueError(
-            f'Mixed, or unrecognised extensions ({", ".join(extensions)}) for reads:{joined_reads}'
+            f'Mixed, or unrecognised extensions ({", ".join(extensions)}) for reads: {joined_reads}'
         )
 
-    def parse_fastqs_structure(self, fastqs):
+    def parse_fastqs_structure(self, fastqs): List[List[Dict]]:
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
         r_matches = {r: rmatch.search(r) for r in sorted_fastqs}
@@ -369,13 +398,15 @@ def run_test():
         'gs://bucket/subdir',
         sample_metadata_project=None,
     )
-    parser.parse_reads(fastqs)
+    print(parser.parse_reads(fastqs))
+    
+
+@click
+def main(manifest, project, sample_metadata_project, default_sample_type='blood', default_sequence_type='wgs'):
 
 
 if __name__ == "__main__":
-    man_path = (
-        'gs://cpg-seqr-upload-<collaborator>/<subdir>/manifest.txt'
-    )
+    man_path = 'gs://cpg-seqr-upload-<collaborator>/<subdir>/manifest.txt'
     parser = VcgsManifestParser.from_manifest_path(
         man_path, sample_metadata_project='dev'
     )
