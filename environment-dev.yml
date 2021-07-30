@@ -16,4 +16,4 @@ dependencies:
   - bump2version
   - pip
   - pip:
-    - '-r file:requirements.txt'
+    - '-r requirements.txt'

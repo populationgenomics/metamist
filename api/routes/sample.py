@@ -20,6 +20,8 @@ class NewSample(BaseModel):
 
 
 class SampleUpdateModel(BaseModel):
+    """Update model for Sample"""
+
     meta: Optional[Dict] = {}
     type: Optional[SampleType] = None
     participant_id: Optional[int] = None
@@ -90,6 +92,9 @@ async def get_samples_by_criteria(
     participant_ids: List[int] = None,
     connection: Connection = get_db_connection,
 ):
+    """
+    Get list of samples (dict) by some mixture of (AND'd) criteria
+    """
     st = SampleTable(connection)
     sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
     result = await st.get_samples_by(
@@ -108,7 +113,7 @@ async def update_sample(
     """Update sample with id"""
     st = SampleTable(connection)
     result = await st.update_sample(
-        id=sample_id_transform_to_raw(id_),
+        id_=sample_id_transform_to_raw(id_),
         meta=model.meta,
         participant_id=model.participant_id,
         type_=model.type,
