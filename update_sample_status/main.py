@@ -248,18 +248,22 @@ async def test_function(request):
 
     id_test = "viviandevtest1"
 
-    data = "{\
-        \"analysis_type\": \"gvcf\",\
-        \"sample_ids\": [\"viviandevtest1\"],\
-        \"status\": \"completed\",\
-        \"output\": \"gs://\",\
-    }"
+    data = {
+        "analysis_type": "gvcf",
+        "sample_ids": ["viviandevtest1"],
+        "status": "completed",
+        "output": "gs://",
+    }
+
+    y = json.dumps(data)
+
+    logging.info(data)
     curl = f"curl -X \'PUT\' \
         \'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/api/v1/viviandev/analysis/\' \
         -H \'accept: application/json\' \
         -H \"Authorization: Bearer $(gcloud auth print-identity-token)\" \
         -H \'Content-Type: application/json\' \
-        -d \'{data}\'"
+        -d \'{y}\'"
 
     j.command(curl)
 
