@@ -212,23 +212,56 @@ async def test_function(request):
 
     batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
 
-    main_jobs = batch_move_files(
-        batch,
-        sample_group_main,
-        upload_path,
-        main_path,
-        project,
-        internal_id,
-        docker_image,
-        key,
-    )
+    # main_jobs = batch_move_files(
+    #     batch,
+    #     sample_group_main,
+    #     upload_path,
+    #     main_path,
+    #     project,
+    #     internal_id,
+    #     docker_image,
+    #     key,
+    # )
 
     # gvcf_analysis_job = setup_python_job(
-    #    batch, f'Create gVCF Analysis viviandevtest1', docker_image, main_jobs
+    #     batch, f'Create gVCF Analysis viviandevtest1', docker_image, main_jobs
     # )
     # gvcf_analysis_job.call(
-    #    create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
+    #     create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
     # )
+
+    # Get the curl URL
+    j = batch.new_job(name=f'Testing curl')
+
+    if docker_image is not None:
+        j.image(docker_image)
+
+    # Authenticate to service account.
+    if key is not None:
+        j.command(f"echo '{key}' > /tmp/key.json")
+        j.command(f'gcloud -q auth activate-service-account --key-file=/tmp/key.json')
+    # Handles service backend, or a key in the same default location.
+    else:
+        j.command(
+            'gcloud -q auth activate-service-account --key-file=/gsa-key/key.json'
+        )
+
+    id_test = "viviandevtest1"
+
+    data = "{\
+        \"analysis_type\": \"gvcf\",\
+        \"sample_ids\": [\"viviandevtest1\"],\
+        \"status\": \"completed\",\
+        \"output\": \"gs://\",\
+    }"
+    curl = f"curl -X \'PUT\' \
+        \'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/api/v1/viviandev/analysis/\' \
+        -H \'accept: application/json\' \
+        -H \"Authorization: Bearer $(gcloud auth print-identity-token)\" \
+        -H \'Content-Type: application/json\' \
+        -d \'{data}\'"
+
+    j.command(curl)
 
     batch.run()
 

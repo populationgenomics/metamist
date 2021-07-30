@@ -147,6 +147,11 @@ def create_analysis(
     sample_group: SampleGroup, proj, internal_id, file_path: str, a_type: str
 ):
     """ Creates a new analysis object"""
+    from sample_metadata.api.analysis_api import AnalysisApi
+    from sample_metadata.models.analysis_model import AnalysisModel
+    from sample_metadata.models.sequence_update_model import SequenceUpdateModel
+    from sample_metadata.models import AnalysisType, AnalysisStatus, SequencingStatus
+
     aapi = AnalysisApi()
 
     full_path = os.path.join('gs://', file_path, internal_id)
