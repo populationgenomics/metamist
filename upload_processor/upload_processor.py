@@ -40,6 +40,7 @@ def batch_move_files(
     source_prefix: str,
     destination_prefix: str,
     project: str,
+    internal_id: str,
     docker_image: Optional[str] = None,
     key: Optional[str] = None,
 ) -> List:
@@ -78,11 +79,11 @@ def batch_move_files(
 
     jobs = []
 
-    # Get internal sample ID
-    external_id = {'external_ids': [sample_group.sample_id_external]}
-    sapi = SampleApi()
-    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
-    internal_id = str(list(internal_id_map.values())[0])
+    # # Get internal sample ID
+    # external_id = {'external_ids': [sample_group.sample_id_external]}
+    # sapi = SampleApi()
+    # internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
+    # internal_id = str(list(internal_id_map.values())[0])
 
     for tuple_key in sample_group._fields:
         if tuple_key == 'sample_id_external':
@@ -125,8 +126,9 @@ def setup_python_job(
     batch: hb.batch,
     name: str,
     docker_image: Optional[str],
-    dependent_jobs=List[hb.batch.job],
+    dependent_jobs,
 ) -> hb.batch.job:
+    # TODO:Removed -> hb.batch.job and List[hb.batch.job]
     """ Returns a new Hail Batch job that activates the Google service account. """
 
     job = batch.new_python_job(name=name)
@@ -134,20 +136,18 @@ def setup_python_job(
     if docker_image is not None:
         job.image(docker_image)
 
-    job.command('gcloud -q auth activate-service-account --key-file=/gsa-key/key.json')
+    # job.command('gcloud -q auth activate-service-account --key-file=/gsa-key/key.json')
 
     job.depends_on(*dependent_jobs)
 
     return job
 
 
-def create_analysis(sample_group: SampleGroup, proj, file_path: str, a_type: str):
+def create_analysis(
+    sample_group: SampleGroup, proj, internal_id, file_path: str, a_type: str
+):
     """ Creates a new analysis object"""
-    sapi = SampleApi()
     aapi = AnalysisApi()
-    external_id = {'external_ids': [sample_group.sample_id_external]}
-    internal_id_map = sapi.get_sample_id_map_by_external(proj, external_id)
-    internal_id = list(internal_id_map.values())[0]
 
     full_path = os.path.join('gs://', file_path, internal_id)
 
@@ -161,13 +161,13 @@ def create_analysis(sample_group: SampleGroup, proj, file_path: str, a_type: str
     aapi.create_new_analysis(proj, new_gvcf)
 
 
-def update_sequence_meta(external_id: str, project: str, status: str, metadata: str):
+def update_sequence_meta(
+    external_id: str, project: str, internal_id: str, status: str, metadata: str
+):
     """ Updates sequence metadata in SM DB"""
     seqapi = SequenceApi()
     # Determine sequencing ID
 
-    # TODO: Fix internal ID
-    internal_id = external_id
     # TODO: Fix get_sequence_id_from_sample_id
     sequence_id = seqapi.get_sequence_from_sample_id(internal_id, project)
 
@@ -178,3 +178,7 @@ def update_sequence_meta(external_id: str, project: str, status: str, metadata: 
     )  # pylint: disable=E1120
 
     seqapi.update_sequence(sequence_id, sequence_metadata)
+
+
+def test_this():
+    print('hello')

@@ -8,7 +8,12 @@ import json
 import os
 import logging
 from os.path import join
-from flask import abort
+from flask import Flask, abort, request
+from sample_metadata.api.sample_api import SampleApi
+
+import hailtop.batch as hb
+import logging
+from aiohttp import web
 
 # disable=E0611
 from google.cloud import secretmanager
@@ -24,18 +29,20 @@ from upload_processor.upload_processor import (
     update_sequence_meta,
 )
 
-
+routes = web.RouteTableDef()
 secret_manager = secretmanager.SecretManagerServiceClient()
 
 
-def update_sample_status(request):
+@routes.put('/update_sample_status')
+async def update_sample_status(request):
     """Main entry point for the Cloud Function."""
+    sapi = SampleApi()
 
     if request.method != 'PUT':
         return abort(405)
 
     # Verify input parameters.
-    request_json = request.get_json()
+    request_json = await request.json()
     project = request_json.get('project')
     external_id = request_json.get('sample')
     status = request_json.get('status')
@@ -46,14 +53,14 @@ def update_sample_status(request):
         return abort(400)
 
     # Set up additional inputs for batch_move
-    upload_path = f'cpg-{project}-upload'
-    # upload_prefix = ''
-    # upload_path = join(upload_bucket, upload_prefix)
-    # main_bucket = f'cpg-{project}-main'
-    # main_prefix = join('gvcf', f'batch{batch}')
-    main_path = join(f'cpg-{project}-main', 'gvcf', f'batch{batch}')
-    # metadata_bucket = f'cpg-{project}-main-metadata' TODO: Add csv move step
-    archive_path = join(f'cpg-{project}-archive', 'cram', f'batch{batch}')
+    # upload_path = f'cpg-{project}-upload'
+    # main_path = join(f'cpg-{project}-main', 'gvcf', f'batch{batch}')
+    # # metadata_bucket = f'cpg-{project}-main-metadata' TODO: Add csv move step
+    # archive_path = join(f'cpg-{project}-archive', 'cram', f'batch{batch}')
+    upload_path = f'vivian-dev-upload'
+    main_path = join(f'vivian-dev-main', 'gvcf', f'batch{batch}')
+    metadata_bucket = f'vivian-dev-main-metadata'  # TODO: Add csv move step
+    archive_path = join(f'vivian-dev-archive', 'cram', f'batch{batch}')
     docker_image = os.environ.get('DRIVER_IMAGE')
     key = os.environ.get('GSA_KEY')
 
@@ -62,24 +69,29 @@ def update_sample_status(request):
     # TODO: Authentication Step?
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
-    secret_name = (
-        f'projects/{gcp_project}/secrets' '/update-sample-status-config/versions/latest'
-    )
-    config_str = secret_manager.access_secret_version(
-        request={'name': secret_name}
-    ).payload.data.decode('UTF-8')
-    config = json.loads(config_str)
 
-    project_config = config.get(project)
-    if not project_config:
-        return abort(404)
+    # Do we still need this?
+    # secret_name = (
+    #    f'projects/{gcp_project}/secrets' '/update-sample-status-config/versions/latest'
+    # )
+    # config_str = secret_manager.access_secret_version(
+    #    request={'name': secret_name}
+    # ).payload.data.decode('UTF-8')
+    # config = json.loads(config_str)
+
+    # project_config = config.get(project)
+    # if not project_config:
+    #    return abort(404)
 
     # Set up batch
+    # service_backend = hb.ServiceBackend(
+    #     billing_project=gcp_project,
+    #     bucket=os.getenv('HAIL_BUCKET'),
+    # )
     service_backend = hb.ServiceBackend(
-        billing_project=gcp_project,
+        billing_project='vivianbakiris-trial',
         bucket=os.getenv('HAIL_BUCKET'),
     )
-
 
     batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
 
@@ -90,6 +102,11 @@ def update_sample_status(request):
         f'{external_id}.g.vcf.gz.tbi',
         f'{external_id}.g.vcf.gz.md5',
     )
+
+    external_id = {'external_ids': [sample_group_main.sample_id_external]}
+    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
+    internal_id = str(list(internal_id_map.values())[0])
+
     main_jobs = []
     main_jobs = batch_move_files(
         batch,
@@ -97,6 +114,7 @@ def update_sample_status(request):
         upload_path,
         main_path,
         project,
+        internal_id,
         docker_image,
         key,
     )
@@ -106,7 +124,7 @@ def update_sample_status(request):
         batch, f'Create gVCF Analysis {external_id}', docker_image, main_jobs
     )
     gvcf_analysis_job.call(
-        create_analysis, sample_group_main, project, main_path, 'gvcf'
+        create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
     )
 
     # Move crams
@@ -124,6 +142,7 @@ def update_sample_status(request):
         upload_path,
         archive_path,
         project,
+        internal_id,
         docker_image,
         key,
     )
@@ -133,7 +152,12 @@ def update_sample_status(request):
         batch, f'Create cram Analysis {external_id}', docker_image, archive_jobs
     )
     cram_analysis_job.call(
-        create_analysis, sample_group_archive, project, archive_path, 'cram'
+        create_analysis,
+        sample_group_archive,
+        project,
+        internal_id,
+        archive_path,
+        'cram',
     )
 
     # Update Sequence Metadata
@@ -146,9 +170,79 @@ def update_sample_status(request):
 
     update_seq_meta.call(update_sequence_meta, external_id, project, status, metadata)
 
+    # Process the CSV afterward.
+
     batch.run()
 
     # if not response:  # Sample not found.
     #    return abort(404)
 
-    return ('', 204)
+    return web.Response(text=f'Done!')
+
+
+@routes.put('/test_function')
+async def test_function(request):
+
+    external_id = 'viviandevtest1'
+    sapi = SampleApi()
+
+    docker_image = os.environ.get('DRIVER_IMAGE')
+    key = os.environ.get('GSA_KEY')
+
+    main_jobs = []
+    project = 'viviandev'
+    upload_path = f'vivian-dev-upload'
+    main_path = join(f'vivian-dev-main', 'gvcf', f'batch0')
+
+    sample_group_main = SampleGroup(
+        external_id,
+        f'{external_id}.cram',
+        f'{external_id}.cram.crai',
+        f'{external_id}.cram.md5',
+    )
+
+    external_id = {'external_ids': [sample_group_main.sample_id_external]}
+    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
+    internal_id = str(list(internal_id_map.values())[0])
+
+    service_backend = hb.ServiceBackend(
+        billing_project='vivianbakiris-trial',
+        bucket=os.getenv('HAIL_BUCKET'),
+    )
+
+    batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
+
+    main_jobs = batch_move_files(
+        batch,
+        sample_group_main,
+        upload_path,
+        main_path,
+        project,
+        internal_id,
+        docker_image,
+        key,
+    )
+
+    # gvcf_analysis_job = setup_python_job(
+    #    batch, f'Create gVCF Analysis viviandevtest1', docker_image, main_jobs
+    # )
+    # gvcf_analysis_job.call(
+    #    create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
+    # )
+
+    batch.run()
+
+    return web.Response(text=f'Done!')
+
+
+async def init_func():
+    """Initializes the app."""
+    app = web.Application()
+    logging.basicConfig(level=logging.DEBUG)
+    logging.info('Initialising Application')
+    app.add_routes(routes)
+    return app
+
+
+if __name__ == '__main__':
+    web.run_app(init_func())
