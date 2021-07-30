@@ -57,6 +57,28 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         return id_of_new_sample
 
+    async def update_sample(
+        self,
+        id_: int,
+        meta: Dict = None,
+        participant_id: int = None,
+        type_: SampleType = None,
+        author: str = None,
+    ):
+        """Update a single sample"""
+        updatedict = {
+            'meta': meta,
+            'participant_id': participant_id,
+            'type': type_,
+            'author': author or self.author,
+        }
+        # means you can't set to null
+        non_null_updatedict = {k: v for k, v in updatedict.items() if v is not None}
+        fields_str = ', '.join(f'{key} = :{key}' for key in non_null_updatedict.keys())
+        _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
+        await self.connection.execute(_query, {**non_null_updatedict, 'id': id_})
+        return True
+
     async def get_single_by_id(self, internal_id: int) -> Sample:
         """Get a Sample by its external_id"""
         keys = [
@@ -147,3 +169,44 @@ SELECT {", ".join(keys)} from sample
                 )
 
         return sample_id_map
+
+    async def get_samples_by(
+        self,
+        sample_ids: List[int] = None,
+        meta: Dict[str, any] = None,
+        participant_ids: List[int] = None,
+    ):
+        """Get samples by some criteria"""
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active',
+            'type',
+        ]
+        keys_str = ', '.join(keys)
+
+        where = []
+        replacements = {}
+
+        if sample_ids:
+            where.append('id in :sample_ids')
+            replacements['id']: sample_ids
+        if meta:
+            for k, v in meta.items():
+                k_replacer = f'meta_{k}'
+                # json_extract(meta, '$.phs_accession') = 'cpg_acute_20210727_185421'
+                where.append(f"json_extract(meta, '$.{k}') = :{k_replacer}")
+                replacements[k_replacer] = v
+
+        if participant_ids:
+            where.append('participant_id in :participant_ids')
+            replacements['participant_ids'] = participant_ids
+
+        _query = f'SELECT {keys_str} FROM sample'
+        if where:
+            _query += f' WHERE {" AND ".join(where)}'
+
+        samples = await self.connection.fetch_all(_query, replacements)
+        return samples

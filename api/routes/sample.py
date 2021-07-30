@@ -19,6 +19,12 @@ class NewSample(BaseModel):
     participant_id: Optional[int] = None
 
 
+class SampleUpdateModel(BaseModel):
+    meta: Optional[Dict] = {}
+    type: Optional[SampleType] = None
+    participant_id: Optional[int] = None
+
+
 router = APIRouter(prefix='/sample', tags=['sample'])
 
 
@@ -74,4 +80,37 @@ async def get_sample_by_external_id(
     """Get sample by external ID"""
     st = SampleTable(connection)
     result = await st.get_single_by_external_id(id_)
+    return result
+
+
+@router.post('/', operation_id='getSamples')
+async def get_samples_by_criteria(
+    sample_ids: List[str] = None,
+    meta: Dict = None,
+    participant_ids: List[int] = None,
+    connection: Connection = get_db_connection,
+):
+    st = SampleTable(connection)
+    sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
+    result = await st.get_samples_by(
+        sample_ids=sample_ids_raw,
+        meta=meta,
+        participant_ids=participant_ids,
+    )
+
+    return [{**d, 'id': sample_id_format(d['id'])} for d in result]
+
+
+@router.patch('/{id_}', operation_id='updateSample')
+async def update_sample(
+    id_: str, model: SampleUpdateModel, connection: Connection = get_db_connection
+):
+    """Update sample with id"""
+    st = SampleTable(connection)
+    result = await st.update_sample(
+        id=sample_id_transform_to_raw(id_),
+        meta=model.meta,
+        participant_id=model.participant_id,
+        type_=model.type,
+    )
     return result

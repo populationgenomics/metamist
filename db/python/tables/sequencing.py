@@ -1,4 +1,5 @@
 from typing import Optional, Dict, List
+from itertools import groupby
 
 from models.models.sequence import SampleSequencing
 from models.enums import SequenceType, SequenceStatus
@@ -98,6 +99,23 @@ LIMIT 1
             _query, {'external_id': external_sample_id}
         )
         return result[0]
+
+    async def get_latest_sequence_ids_by_sample_ids(self, sample_ids: List[int]):
+        """
+        Get the IDs of the latest sequence for a sample, keyed by the internal sample ID
+        """
+        _query = """
+SELECT id, sample_id from sample_sequencing
+WHERE sample_id in :sample_ids
+ORDER by id
+"""
+        # hopefully there aren't too many
+        sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        sample_id_to_seq_id = {}
+        for sample_id, seqs in groupby(sequences, lambda seq: seq[0]):
+            sample_id_to_seq_id[sample_id] = list(seqs)[-1]['id']  # get last one
+
+        return sample_id_to_seq_id
 
     async def update_status(
         self,

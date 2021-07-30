@@ -1,9 +1,9 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from models.models.sample import sample_id_transform_to_raw
+from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.tables.sequencing import (
     SequenceType,
     SequenceStatus,
@@ -67,7 +67,7 @@ async def update_sequence(
 async def get_sequence_id_from_sample_id(
     sample_id: str, connection: Connection = get_db_connection
 ):
-    """Get sample by external ID"""
+    """Get sample by internal ID"""
     sequence_layer = SampleSequencingTable(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)
     sequence_id = await sequence_layer.get_latest_sequence_id_by_sample_id(
@@ -75,3 +75,16 @@ async def get_sequence_id_from_sample_id(
     )
 
     return sequence_id
+
+
+@router.post('/latest-from-sample-ids', operation_id='getSequenceIdsFromSampleIds')
+async def get_sequence_ids_from_sample_ids(
+    sample_ids: List[str], connection: Connection = get_db_connection
+) -> Dict[str, int]:
+    """Get sequence ids from internal sample ids"""
+    sequence_layer = SampleSequencingTable(connection)
+    sample_ids_raw = sample_id_transform_to_raw(sample_ids)
+    sequence_id_map = await sequence_layer.get_latest_sequence_ids_by_sample_ids(
+        sample_ids_raw
+    )
+    return {sample_id_format(k): v for k, v in sequence_id_map.items()}

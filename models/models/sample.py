@@ -49,7 +49,7 @@ def sample_id_transform_to_raw(
     if isinstance(identifier, list):
         return [sample_id_transform_to_raw(s) for s in identifier]
 
-    if strict and not isinstance(identifier, str) and not identifier.startswith('CPG'):
+    if strict and not (isinstance(identifier, str) and identifier.startswith('CPG')):
         raise Exception(
             f'Invalid prefix found for CPG sample identifier "{identifier}"'
         )
