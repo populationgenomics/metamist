@@ -249,8 +249,8 @@ async def test_function(request):
     id_test = "viviandevtest1"
 
     data = {
-        "analysis_type": "gvcf",
-        "sample_ids": ["viviandevtest1"],
+        "sample_ids": [internal_id],
+        "type": "gvcf",
         "status": "completed",
         "output": "gs://",
     }
