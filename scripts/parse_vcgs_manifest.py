@@ -1,24 +1,23 @@
-from typing import List, Dict, Union, Optional
-
-import os
-import re
+# pylint: disable=too-many-instance-attributes
 import csv
 import logging
+import os
+import re
+from collections import defaultdict
 from io import StringIO
 from itertools import groupby
-from collections import defaultdict
+from typing import List, Dict, Union, Optional, Tuple
 
 import click
 
 from sample_metadata.apis import SampleApi, SequenceApi
-from sample_metadata.model.sequence_type import SequenceType
-from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.new_sample import NewSample
 from sample_metadata.model.new_sequence import NewSequence
-from sample_metadata.model.sample_update_model import SampleUpdateModel
+from sample_metadata.model.sequence_status import SequenceStatus
+from sample_metadata.model.sequence_type import SequenceType
+from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_update_model import SequenceUpdateModel
-
+from sample_metadata.model.sample_update_model import SampleUpdateModel
 
 rmatch = re.compile(r'_[Rr]\d')
 
@@ -32,6 +31,8 @@ CRAM_EXTENSIONS = '.cram'
 
 
 class Columns:
+    """Column keys for VCGS manifest"""
+
     PHS_ACCESSION = 'phs_accession'
     SAMPLE_NAME = 'sample_name'
     LIBRARY_ID = 'library_ID'
@@ -52,6 +53,7 @@ class Columns:
 
     @staticmethod
     def sequence_columns():
+        """Columns that will be put into sequence.meta"""
         return [
             Columns.LIBRARY_ID,
             Columns.LIBRARY_STRATEGY,
@@ -67,14 +69,22 @@ class Columns:
 
     @staticmethod
     def sample_columns():
+        """Columns that will be put into sample.meta"""
         return [
             Columns.PHS_ACCESSION,
         ]
 
 
 class VcgsManifestParser:
+    """Parser for VCGS manifest"""
+
     def __init__(
-        self, path_prefix: str, sample_metadata_project: str, project: str, default_sequencing_type='wgs', default_sample_type='blood'
+        self,
+        path_prefix: str,
+        sample_metadata_project: str,
+        project: str,
+        default_sequence_type='wgs',
+        default_sample_type='blood',
     ):
         super().__init__()
 
@@ -83,7 +93,7 @@ class VcgsManifestParser:
         self.project = project
         self.sample_metadata_project = sample_metadata_project
 
-        self.default_sequencing_type = default_sequencing_type
+        self.default_sequencing_type = default_sequence_type
         self.default_sample_type = default_sample_type
 
         # gs specific
@@ -93,6 +103,7 @@ class VcgsManifestParser:
         self.bucket_client = None
 
         if path_prefix.startswith('gs://'):
+            # pylint: disable=import-outside-toplevel
             from google.cloud import storage
 
             self.client = storage.Client()
@@ -102,46 +113,70 @@ class VcgsManifestParser:
             self.path_prefix = '/'.join(path_components[1:])
 
     @staticmethod
-    def from_manifest_path(manifest_path: str, sample_metadata_project):
-        path_prefix = os.path.dirname(manifest_path)
-        manifest_filename = os.path.basename(manifest_path)
-        parser = VcgsManifestParser(path_prefix, sample_metadata_project)
+    def from_manifest_path(
+        manifest: str,
+        project: str,
+        sample_metadata_project: str,
+        default_sequence_type='wgs',
+        default_sample_type='blood',
+    ):
+        """Parse manifest from path, and return result of parsing manifest"""
+        path_prefix = os.path.dirname(manifest)
+        manifest_filename = os.path.basename(manifest)
+        parser = VcgsManifestParser(
+            path_prefix,
+            project=project,
+            sample_metadata_project=sample_metadata_project,
+            default_sequence_type=default_sequence_type,
+            default_sample_type=default_sample_type,
+        )
         file_contents = parser.file_contents(manifest_filename)
         resp = parser.parse_vcgs_manifest(StringIO(file_contents))
 
         return resp
 
-    def file_path(self, filename):
+    def file_path(self, filename) -> str:
+        """
+        Get complete filepath of filename:
+        - Includes gs://{bucket} if relevant
+        - Includes path_prefix decided early on
+        """
         if self.client:
             return os.path.join('gs://', self.bucket, self.path_prefix, filename)
         return os.path.join(self.path_prefix, filename)
 
-    def file_contents(self, filename):
+    def file_contents(self, filename) -> str:
+        """Get contents of file (decoded as utf8)"""
         path = os.path.join(self.path_prefix, filename)
         if self.client:
             blob = self.bucket_client.get_blob(path)
             return blob.download_as_string().decode()
-        else:
-            with open(path) as f:
-                return f.read()
 
-    def file_exists(self, filename):
+        with open(path) as f:
+            return f.read()
+
+    def file_exists(self, filename) -> bool:
+        """Determines whether a file exists"""
         path = os.path.join(self.path_prefix, filename)
         if self.client:
             blob = self.bucket_client.get_blob(path)
             return blob.exists()
-        else:
-            return os.path.exists(path)
+
+        return os.path.exists(path)
 
     def file_size(self, filename):
+        """Get size of file in bytes"""
         path = os.path.join(self.path_prefix, filename)
         if self.client:
             blob = self.bucket_client.get_blob(path)
             return blob.size
-        else:
-            return os.path.getsize(path)
+
+        return os.path.getsize(path)
 
     def parse_vcgs_manifest(self, file_pointer):
+        """
+        Parse VCGS manifest from iterable (file pointer / String.IO)
+        """
         # a sample has many rows
         sample_map = defaultdict(list)
 
@@ -161,9 +196,9 @@ class VcgsManifestParser:
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
-        
+
         samples_to_update: Dict[str, SampleUpdateModel] = {}
-        sequences_to_update = List[Dict] = []
+        sequences_to_update: List[Dict] = []
 
         for sample_name in sample_map:
             logger.info(f'Preparing {sample_name}')
@@ -171,14 +206,14 @@ class VcgsManifestParser:
             reads, reads_type = self.parse_reads([r[Columns.FILENAME] for r in rows])
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = {
-                col: ",".join(set(r[col] for r in rows))
+                col: ','.join(set(r[col] for r in rows))
                 for col in Columns.sequence_columns()
             }
             collapsed_type = self.parse_sequencing_type(
                 sample_name, [r[Columns.LIBRARY_STRATEGY] for r in rows]
             )
             collapsed_sample_meta = {
-                col: ",".join(set(r[col] for r in rows))
+                col: ','.join(set(r[col] for r in rows))
                 for col in Columns.sample_columns()
             }
             collapsed_sample_meta['reads'] = reads
@@ -188,18 +223,17 @@ class VcgsManifestParser:
             if sample_name in external_id_map:
                 # it already exists
                 cpgid = external_id_map[sample_name]
-                samples_to_update[cpgid] = (SampleUpdateModel(
+                samples_to_update[cpgid] = SampleUpdateModel(
                     meta=collapsed_sample_meta,
-                ))
-                sequences_to_update.append(SequenceUpdateModel(
-                    sample_id=cpgid,
-                    meta=collapsed_sequencing_meta
-                ))
+                )
+                sequences_to_update.append(
+                    SequenceUpdateModel(sample_id=cpgid, meta=collapsed_sequencing_meta)
+                )
             else:
                 samples_to_add.append(
                     NewSample(
                         external_id=sample_name,
-                        type=self.default_sample_type,
+                        type=SampleType(self.default_sample_type),
                         meta=collapsed_sample_meta,
                     )
                 )
@@ -217,33 +251,40 @@ class VcgsManifestParser:
             return samples_to_add, sequencing_to_add
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
-        external_sample_id_to_internal_id = {}
+        ext_sample_to_internal_id = {}
         for new_sample in samples_to_add:
             sample_id = sapi.create_new_sample(
                 project=self.sample_metadata_project, new_sample=new_sample
             )
-            external_sample_id_to_internal_id[new_sample.external_id] = sample_id
+            ext_sample_to_internal_id[new_sample.external_id] = sample_id
 
         for sample_id, sequences_to_add in sequencing_to_add.items():
             for seq in sequences_to_add:
-                seq.sample_id = external_sample_id_to_internal_id[sample_id]
+                seq.sample_id = ext_sample_to_internal_id[sample_id]
                 seqapi.create_new_sequence(
                     project=self.sample_metadata_project, new_sequence=seq
                 )
 
-        for internal_sample_id, sample_update in samples_to_update.items():
-            sapi.update_sample()
+        # TODO: implement sample updating properly
+        # for internal_sample_id, sample_update in samples_to_update.items():
+        #     sapi.update_sample()
 
-        return external_sample_id_to_internal_id
+        return ext_sample_to_internal_id
 
     def parse_sequencing_type(self, sample_id: str, types: List[str]):
+        """
+        Parse sequencing type (wgs / single-cell, etc)
+        """
         # filter false-y values
         types = list(set(t for t in types if t))
         if len(types) <= 0:
-            if self.default_sequencing_type is None or self.default_sequencing_type.lower() == 'none':
+            if (
+                self.default_sequencing_type is None
+                or self.default_sequencing_type.lower() == 'none'
+            ):
                 raise ValueError(
                     f"Couldn't detect sequence type for sample {sample_id}, and "
-                    "no default was available."
+                    'no default was available.'
                 )
             return self.default_sequencing_type
         if len(types) > 1:
@@ -266,9 +307,11 @@ class VcgsManifestParser:
         self, reads: List[str]
     ) -> Tuple[Union[List[List[Dict]], List[Dict]], str]:
         """
-        Returns a CWL file object
+        Returns a tuple of:
+        1. single / list-of CWL file object(s), based on the extensions of the reads
+        2. parsed type (fastq, cram, bam)
         """
-        if all(r.lower() in FASTQ_EXTENSIONS for r in reads):
+        if all(any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS) for r in reads):
             structured_fastqs = self.parse_fastqs_structure(reads)
             files = []
             for fastq_group in structured_fastqs:
@@ -276,7 +319,7 @@ class VcgsManifestParser:
 
             return files, 'fastq'
 
-        elif all(r.lower() in CRAM_EXTENSIONS for r in reads):
+        if all(any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS) for r in reads):
             sec_format = ['.crai', '^.crai']
             files = []
             for r in reads:
@@ -287,7 +330,7 @@ class VcgsManifestParser:
 
             return files, 'cram'
 
-        elif all(r.lower() in BAM_EXTENSIONS for r in reads):
+        if all(any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS) for r in reads):
             sec_format = ['.bai', '^.bai']
             files = []
             for r in reads:
@@ -304,7 +347,16 @@ class VcgsManifestParser:
             f'Mixed, or unrecognised extensions ({", ".join(extensions)}) for reads: {joined_reads}'
         )
 
-    def parse_fastqs_structure(self, fastqs): List[List[Dict]]:
+    @staticmethod
+    def parse_fastqs_structure(fastqs) -> List[List[str]]:
+        """
+        Takes a list of fastqs, and a set of nested lists of each R1 + R2 read.
+
+        >>> VcgsManifestParser.parse_fastqs_structure(['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz'])
+        [['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz'], ['20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz']]
+
+
+        """
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
         r_matches = {r: rmatch.search(r) for r in sorted_fastqs}
@@ -325,18 +377,19 @@ class VcgsManifestParser:
         self,
         filename,
         secondary_files: List[Dict[str, any]] = None,
-    ):
+    ) -> Dict[str, any]:
+        """Takes filename, returns formed CWL dictionary"""
         checksum = None
         md5_filename = filename + '.md5'
         if self.file_exists(md5_filename):
             checksum = f'md5:{self.file_contents(md5_filename)}'
 
         d = {
-            "location": self.file_path(filename),
-            "basename": os.path.basename(filename),
-            "class": "File",
-            "checksum": checksum,
-            "size": self.file_size(filename),
+            'location': self.file_path(filename),
+            'basename': os.path.basename(filename),
+            'class': 'File',
+            'checksum': checksum,
+            'size': self.file_size(filename),
         }
 
         if secondary_files:
@@ -346,7 +399,13 @@ class VcgsManifestParser:
 
     def create_secondary_file_objects_by_potential_pattern(
         self, filename, potential_secondary_patterns: List[str]
-    ):
+    ) -> List[Dict[str, any]]:
+        """
+        Take a base filename and potential secondary patterns:
+        - Try each secondary pattern, see if it works
+        - If it works, create a CWL file object
+        - return a list of those secondary file objects that exist
+        """
         secondaries = []
         for sec in potential_secondary_patterns:
             sec_file = apply_secondary_file_format_to_filename(filename, sec)
@@ -367,46 +426,56 @@ def apply_secondary_file_format_to_filename(
     if not filepath:
         return None
 
-    fixed_sec = secondary_file.lstrip("^")
+    fixed_sec = secondary_file.lstrip('^')
     leading = len(secondary_file) - len(fixed_sec)
     if leading <= 0:
         return filepath + fixed_sec
 
-    basepath = ""
+    basepath = ''
     filename = filepath
-    if "/" in filename:
-        idx = len(filepath) - filepath[::-1].index("/")
+    if '/' in filename:
+        idx = len(filepath) - filepath[::-1].index('/')
         basepath = filepath[:idx]
         filename = filepath[idx:]
 
-    split = filename.split(".")
+    split = filename.split('.')
 
     newfname = filename + fixed_sec
     if len(split) > 1:
-        newfname = ".".join(split[: -min(leading, len(split) - 1)]) + fixed_sec
+        newfname = '.'.join(split[: -min(leading, len(split) - 1)]) + fixed_sec
     return basepath + newfname
 
 
-def run_test():
-    fastqs = [
-        '20210727_PROJECT1_L002_R2.fastq.gz',
-        '20210727_PROJECT1_L002_R1.fastq.gz',
-        '20210727_PROJECT1_L001_R2.fastq.gz',
-        '20210727_PROJECT1_L001_R1.fastq.gz',
-    ]
-    parser = VcgsManifestParser(
-        'gs://bucket/subdir',
-        sample_metadata_project=None,
+@click.command(help='GCS path to manifest file')
+@click.option(
+    '--project',
+    help='The CPG based project short-code, tagged as "sample.meta.project"',
+)
+@click.option(
+    '--sample-metadata-project',
+    help='The sample-metadata project to import manifest into (probably "seqr")',
+)
+@click.option('--default-sample-type', default='blood')
+@click.option('--default-sequence-type', default='wgs')
+@click.argument('manifest')
+def main(
+    manifest,
+    project,
+    sample_metadata_project,
+    default_sample_type='blood',
+    default_sequence_type='wgs',
+):
+    """Run script from CLI arguments"""
+    resp = VcgsManifestParser.from_manifest_path(
+        manifest=manifest,
+        project=project,
+        sample_metadata_project=sample_metadata_project,
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
     )
-    print(parser.parse_reads(fastqs))
-    
-
-@click
-def main(manifest, project, sample_metadata_project, default_sample_type='blood', default_sequence_type='wgs'):
+    print(resp)
 
 
-if __name__ == "__main__":
-    man_path = 'gs://cpg-seqr-upload-<collaborator>/<subdir>/manifest.txt'
-    parser = VcgsManifestParser.from_manifest_path(
-        man_path, sample_metadata_project='dev'
-    )
+if __name__ == '__main__':
+    # pylint: disable=no-value-for-parameter
+    main()
