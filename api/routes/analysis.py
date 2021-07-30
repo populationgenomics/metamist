@@ -15,7 +15,7 @@ router = APIRouter(prefix='/analysis', tags=['analysis'])
 class AnalysisModel(BaseModel):
     """Model for 'createNewAnalysis'"""
 
-    sample_ids: List[int]
+    sample_ids: List[str]
     type: AnalysisType
     status: AnalysisStatus
     output: str = None
