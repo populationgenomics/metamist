@@ -13,6 +13,7 @@ from api.routes import (
     analysis_router,
     sequence_router,
     sample_map_router,
+participant_router, family_router
 )
 from api.utils import IS_PRODUCTION, get_openapi_schema_func
 from api.utils.gcp import setup_gcp_logging
@@ -82,6 +83,8 @@ app.include_router(sample_router, prefix='/api/v1/{project}')
 app.include_router(import_router, prefix='/api/v1/{project}')
 app.include_router(analysis_router, prefix='/api/v1/{project}')
 app.include_router(sequence_router, prefix='/api/v1/{project}')
+app.include_router(participant_router, prefix='/api/v1/{project}')
+app.include_router(family_router, prefix='/api/v1/{project}')
 
 app.openapi = get_openapi_schema_func(app, _VERSION, is_production=IS_PRODUCTION)
 

@@ -21,16 +21,14 @@ class ImportLayer(BaseLayer):
         where additional details are placed in the sequencing.meta
         """
 
-        sample_meta_keys = set(
-            [
-                'Specimen Type',
-                'Concentration provided by Linda (ng/ul)*',
-                'Concentration (ng/ul)*',
-                'Volume (ul)*',
-                'Notes',
-                'OneK1K Data?',
-            ]
-        )
+        sample_meta_keys = {
+            'Specimen Type',
+            'Concentration provided by Linda (ng/ul)*',
+            'Concentration (ng/ul)*',
+            'Volume (ul)*',
+            'Notes',
+            'OneK1K Data?',
+        }
         inserted_sample_ids = []
 
         async with self.connection.connection.transaction():

@@ -167,4 +167,26 @@
         <sql>ALTER TABLE family ADD SYSTEM VERSIONING;</sql>
         <sql>ALTER TABLE family_participant ADD SYSTEM VERSIONING;</sql>
     </changeSet>
+    <changeSet author="michael.franklin" id="add-col-family_participant.sex">
+        <sql>SET @@system_versioning_alter_history = 1;</sql>
+        <addColumn tableName="family">
+            <column name="author" type="VARCHAR(255)">
+                <constraints nullable="false" />
+            </column>
+        </addColumn>
+        <addPrimaryKey
+            columnNames="family_id, participant_id"
+            constraintName="pk_family_participant"
+            tableName="family_participant"
+        />
+        <addColumn tableName="family_participant">
+            <column name="sex" type="INT" afterColumn="maternal_participant_id">
+                <constraints nullable="false" />
+            </column>
+            <column name="author" type="VARCHAR(255)">
+                <constraints nullable="false" />
+            </column>
+
+        </addColumn>
+    </changeSet>
 </databaseChangeLog>

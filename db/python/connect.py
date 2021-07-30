@@ -82,6 +82,12 @@ class DatabaseConfiguration:
                 password='',
             ),
             DatabaseConfiguration(
+                project='dev2',
+                dbname='sm_dev2',
+                username='root',
+                password='',
+            ),
+            DatabaseConfiguration(
                 project=None,
                 dbname='sm_admin',
                 username='root',
