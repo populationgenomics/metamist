@@ -7,9 +7,6 @@ from google.cloud import storage
 import requests
 
 
-# CREATE DEV ENVIRONMENT VARIABLES.
-
-
 @click.command()
 @click.argument('bucket_name')
 @click.argument('csv_path')
@@ -45,7 +42,6 @@ def process_csv(bucket_name: str, csv_path: str, batch: int):
             requests.put(url, data=json.dumps(payload), headers=headers)
 
 
-# Send put request for each sample in the CSV.
 if __name__ == '__main__':
 
     process_csv()  # pylint: disable=E1120
