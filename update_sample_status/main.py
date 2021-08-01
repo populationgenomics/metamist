@@ -1,45 +1,33 @@
 """A Cloud Function to update the status of genomic samples.
 Workflow is as follows
-1. gVCFs and CRAMS concurrently moved.
+1. gVCFs and CRAMS moved.
 2. Following successful move, analysis objects are created.
 3. Once analysis objects are successfully created, seqencing metadata is updated."""
 
-import json
 import os
 import logging
+import subprocess
 from os.path import join
-from flask import Flask, abort, request
-from sample_metadata.api.sample_api import SampleApi
-
-import hailtop.batch as hb
-import logging
+from typing import Dict
 from aiohttp import web
+from sample_metadata.api.sample_api import SampleApi
+from sample_metadata.api.sequence_api import SequenceApi
+from sample_metadata.api.analysis_api import AnalysisApi
+from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.models.sequence_update_model import SequenceUpdateModel
+from sample_metadata.models import AnalysisType, AnalysisStatus, SequencingStatus
 
-# disable=E0611
-from google.cloud import secretmanager
-
-# from requests.exceptions import HTTPError
-import hailtop.batch as hb
-
-from upload_processor.upload_processor import (
-    batch_move_files,
-    setup_python_job,
-    create_analysis,
-    SampleGroup,
-    update_sequence_meta,
-)
 
 routes = web.RouteTableDef()
-secret_manager = secretmanager.SecretManagerServiceClient()
 
 
-@routes.put('/update_sample_status')
-async def update_sample_status(request):
-    """Main entry point for the Cloud Function."""
+@routes.put('/upload_sample')
+async def upload_sample(request):
+    """ Upload Sample Workflow """
+
+    # Define inputs
     sapi = SampleApi()
-
-    if request.method != 'PUT':
-        return abort(405)
+    gcp_project = os.getenv('GCP_PROJECT')
 
     # Verify input parameters.
     request_json = await request.json()
@@ -50,226 +38,110 @@ async def update_sample_status(request):
     metadata = request_json.get('metadata')
 
     if not project or not external_id or not status or not batch or not metadata:
-        return abort(400)
-
-    # Set up additional inputs for batch_move
-    # upload_path = f'cpg-{project}-upload'
-    # main_path = join(f'cpg-{project}-main', 'gvcf', f'batch{batch}')
-    # # metadata_bucket = f'cpg-{project}-main-metadata' TODO: Add csv move step
-    # archive_path = join(f'cpg-{project}-archive', 'cram', f'batch{batch}')
-    upload_path = f'vivian-dev-upload'
-    main_path = join(f'vivian-dev-main', 'gvcf', f'batch{batch}')
-    metadata_bucket = f'vivian-dev-main-metadata'  # TODO: Add csv move step
-    archive_path = join(f'vivian-dev-archive', 'cram', f'batch{batch}')
-    docker_image = os.environ.get('DRIVER_IMAGE')
-    key = os.environ.get('GSA_KEY')
-
-    logging.info(f'Processing request: {request_json}')
-
-    # TODO: Authentication Step?
-    # Fetch the per-project configuration from the Secret Manager.
-    gcp_project = os.getenv('GCP_PROJECT')
-
-    # Do we still need this?
-    # secret_name = (
-    #    f'projects/{gcp_project}/secrets' '/update-sample-status-config/versions/latest'
-    # )
-    # config_str = secret_manager.access_secret_version(
-    #    request={'name': secret_name}
-    # ).payload.data.decode('UTF-8')
-    # config = json.loads(config_str)
-
-    # project_config = config.get(project)
-    # if not project_config:
-    #    return abort(404)
-
-    # Set up batch
-    # service_backend = hb.ServiceBackend(
-    #     billing_project=gcp_project,
-    #     bucket=os.getenv('HAIL_BUCKET'),
-    # )
-    service_backend = hb.ServiceBackend(
-        billing_project='vivianbakiris-trial',
-        bucket=os.getenv('HAIL_BUCKET'),
-    )
-
-    batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
-
-    # Move gVCFs
-    sample_group_main = SampleGroup(
-        external_id,
-        f'{external_id}.g.vcf.gz',
-        f'{external_id}.g.vcf.gz.tbi',
-        f'{external_id}.g.vcf.gz.md5',
-    )
-
-    external_id = {'external_ids': [sample_group_main.sample_id_external]}
-    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
-    internal_id = str(list(internal_id_map.values())[0])
-
-    main_jobs = []
-    main_jobs = batch_move_files(
-        batch,
-        sample_group_main,
-        upload_path,
-        main_path,
-        project,
-        internal_id,
-        docker_image,
-        key,
-    )
-
-    # Create Analysis Object
-    gvcf_analysis_job = setup_python_job(
-        batch, f'Create gVCF Analysis {external_id}', docker_image, main_jobs
-    )
-    gvcf_analysis_job.call(
-        create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
-    )
-
-    # Move crams
-    sample_group_archive = SampleGroup(
-        external_id,
-        f'{external_id}.cram',
-        f'{external_id}.cram.crai',
-        f'{external_id}.cram.md5',
-    )
-
-    archive_jobs = []
-    archive_jobs = batch_move_files(
-        batch,
-        sample_group_archive,
-        upload_path,
-        archive_path,
-        project,
-        internal_id,
-        docker_image,
-        key,
-    )
-
-    # Create Analysis Object
-    cram_analysis_job = setup_python_job(
-        batch, f'Create cram Analysis {external_id}', docker_image, archive_jobs
-    )
-    cram_analysis_job.call(
-        create_analysis,
-        sample_group_archive,
-        project,
-        internal_id,
-        archive_path,
-        'cram',
-    )
-
-    # Update Sequence Metadata
-    update_seq_meta = setup_python_job(
-        batch,
-        f'Update Meta {external_id}',
-        docker_image,
-        [gvcf_analysis_job, cram_analysis_job],
-    )
-
-    update_seq_meta.call(update_sequence_meta, external_id, project, status, metadata)
-
-    # Process the CSV afterward.
-
-    batch.run()
-
-    # if not response:  # Sample not found.
-    #    return abort(404)
-
-    return web.Response(text=f'Done!')
-
-
-@routes.put('/test_function')
-async def test_function(request):
-
-    external_id = 'viviandevtest1'
-    sapi = SampleApi()
-
-    docker_image = os.environ.get('DRIVER_IMAGE')
-    key = os.environ.get('GSA_KEY')
-
-    main_jobs = []
-    project = 'viviandev'
-    upload_path = f'vivian-dev-upload'
-    main_path = join(f'vivian-dev-main', 'gvcf', f'batch0')
-
-    sample_group_main = SampleGroup(
-        external_id,
-        f'{external_id}.cram',
-        f'{external_id}.cram.crai',
-        f'{external_id}.cram.md5',
-    )
-
-    external_id = {'external_ids': [sample_group_main.sample_id_external]}
-    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id)
-    internal_id = str(list(internal_id_map.values())[0])
-
-    service_backend = hb.ServiceBackend(
-        billing_project='vivianbakiris-trial',
-        bucket=os.getenv('HAIL_BUCKET'),
-    )
-
-    batch = hb.Batch(name=f'Process {external_id}', backend=service_backend)
-
-    # main_jobs = batch_move_files(
-    #     batch,
-    #     sample_group_main,
-    #     upload_path,
-    #     main_path,
-    #     project,
-    #     internal_id,
-    #     docker_image,
-    #     key,
-    # )
-
-    # gvcf_analysis_job = setup_python_job(
-    #     batch, f'Create gVCF Analysis viviandevtest1', docker_image, main_jobs
-    # )
-    # gvcf_analysis_job.call(
-    #     create_analysis, sample_group_main, project, internal_id, main_path, 'gvcf'
-    # )
-
-    # Get the curl URL
-    j = batch.new_job(name=f'Testing curl')
-
-    if docker_image is not None:
-        j.image(docker_image)
-
-    # Authenticate to service account.
-    if key is not None:
-        j.command(f"echo '{key}' > /tmp/key.json")
-        j.command(f'gcloud -q auth activate-service-account --key-file=/tmp/key.json')
-    # Handles service backend, or a key in the same default location.
-    else:
-        j.command(
-            'gcloud -q auth activate-service-account --key-file=/gsa-key/key.json'
+        raise web.HTTPBadRequest(
+            reason=f'Invalid request. Ensure that the project, sample, status, batch and metadata are provided.'
         )
 
-    id_test = "viviandevtest1"
+    upload_path = f'cpg-{gcp_project}-upload'
+    main_path = join(f'cpg-{gcp_project}-main', 'gvcf', f'batch{batch}')
+    # metadata_bucket = f'cpg-{gcp_project}-main-metadata'
+    archive_path = join(f'cpg-{gcp_project}-archive', 'cram', f'batch{batch}')
 
-    data = {
-        "sample_ids": [internal_id],
-        "type": "gvcf",
-        "status": "completed",
-        "output": "gs://",
-    }
+    # Determine the internal ID
+    external_id_dict = {'external_ids': [external_id]}
+    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id_dict)
+    internal_id = str(list(internal_id_map.values())[0])
 
-    y = json.dumps(data)
+    # Files going to main
+    main_extensions = ['.g.vcf.gz', '.g.vcf.gz.tbi', '.g.vcf.gz.md5']
+    archive_extensions = ['.cram', '.cram.crai', '.cram.md5']
+    all_extensions = main_extensions + archive_extensions
 
-    logging.info(data)
-    curl = f"curl -X \'PUT\' \
-        \'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/api/v1/viviandev/analysis/\' \
-        -H \'accept: application/json\' \
-        -H \"Authorization: Bearer $(gcloud auth print-identity-token)\" \
-        -H \'Content-Type: application/json\' \
-        -d \'{y}\'"
+    # Move the files
+    for file_extension in all_extensions:
+        new_file_name = internal_id + file_extension
+        original_file_name = external_id + file_extension
+        previous_location = join('gs://', upload_path, original_file_name)
 
-    j.command(curl)
+        if file_extension in main_extensions:
+            new_location = join('gs://', main_path, new_file_name)
+        else:
+            new_location = join('gs://', archive_path, new_file_name)
 
-    batch.run()
+        # Check file doesn't exist at destination
+        exists = subprocess.run(['gsutil', '-q', 'stat', new_location], check=True)
 
-    return web.Response(text=f'Done!')
+        if exists.returncode == 1:
+            try:
+                subprocess.check_output(
+                    [
+                        'gsutil',
+                        'mv',
+                        previous_location,
+                        new_location,
+                    ],
+                )
+            except subprocess.CalledProcessError as e:
+                logging.error(e)
+                raise web.HTTPBadRequest(
+                    reason=f'{original_file_name} was not found in {upload_path}'
+                )
+
+            # create_analysis(project, internal_id, new_location, file_extension)
+
+        else:
+            logging.info(f'File already exists at destination. Move skipped.')
+
+    # Update the sequencing metadata.
+    # update_sequence_meta(project, internal_id, status, metadata)
+
+    return web.Response(text=f'Processed {external_id} -> {internal_id}')
+
+
+@routes.put('/update_status')
+async def update_status(request):
+    """ Handles status update, e.g. QC Complete, Sequenced """
+    logging.info(request)
+    # TODO
+
+
+def create_analysis(proj, internal_id, file_path: str, file_extension: str):
+    """ Create analysis object in SM DB"""
+    aapi = AnalysisApi()
+
+    if file_extension == '.g.vcf.gz':
+        a_type = 'gvcf'
+    elif file_extension == '.cram':
+        a_type = 'cram'
+    else:
+        logging.info(f'Analysis object not required for {file_extension} file')
+        return
+
+    new_analysis = AnalysisModel(
+        sample_ids=[internal_id],
+        type=AnalysisType(a_type),
+        status=AnalysisStatus('completed'),
+        output=file_path,
+    )
+
+    aapi.create_new_analysis(proj, new_analysis)
+    logging.info(f'Analysis object created for {internal_id}.{file_extension}')
+
+
+def update_sequence_meta(project: str, internal_id: str, status: str, metadata: Dict):
+    """ Updates sequence metadata in SM DB"""
+    seqapi = SequenceApi()
+
+    # Determine sequencing ID
+    sequence_id = seqapi.get_sequence_id_from_sample_id(internal_id, project)
+
+    # Create sequence metadata object
+    sequence_metadata = SequenceUpdateModel(
+        status=SequencingStatus(status), meta=metadata
+    )  # pylint: disable=E1120
+
+    # Update db
+    seqapi.update_sequence(sequence_id, sequence_metadata)
 
 
 async def init_func():
