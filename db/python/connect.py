@@ -76,16 +76,20 @@ class DatabaseConfiguration:
         # consider pulling from env variables
         return [
             DatabaseConfiguration(
-                project='dev',
-                dbname='sm_dev',
-                username='root',
-                password='',
+                project=os.environ.get('SM_DEV_DB_PROJECT', 'dev'),
+                dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
+                username=os.environ.get('SM_DEV_DB_USER', 'root'),
+                password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
+                host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
+                port=os.environ.get('SM_DEV_DB_PORT', '3306'),
             ),
             DatabaseConfiguration(
                 project=None,
                 dbname='sm_admin',
-                username='root',
-                password='',
+                username=os.environ.get('SM_DEV_DB_USER', 'root'),
+                password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
+                host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
+                port=os.environ.get('SM_DEV_DB_PORT', '3306'),
                 is_admin=True,
             ),
         ]
@@ -132,7 +136,6 @@ class SMConnections:
     @staticmethod
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
-
         # the connection string will prepare pooling automatically
         return databases.Database(
             SMConnections.prepare_connection_string(
@@ -162,7 +165,7 @@ class SMConnections:
         if password:
             u_p += f':{password}'
         if port:
-            _host += f':{host}'
+            _host += f':{port}'
 
         options = {'min_size': min_pool_size, 'max_size': max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
