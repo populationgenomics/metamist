@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from models.models.sample import Sample, sample_id_format
 from models.enums import SampleType
@@ -82,6 +82,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int]
     ):
+        """
+        Update participant IDs for many samples
+        Expected len(ids) == len(participant_ids)
+        """
         if len(ids) != len(participant_ids):
             raise ValueError(
                 f'Number of sampleIDs ({len(ids)}) and ParticipantIds ({len(participant_ids)}) did not match'
@@ -225,6 +229,8 @@ SELECT {", ".join(keys)} from sample
         samples = await self.connection.fetch_all(_query, replacements)
         return samples
 
-    async def samples_with_missing_participants(self):
+    async def samples_with_missing_participants(self) -> List[Tuple[str, int]]:
+        """Get ["""
         _query = 'SELECT id, external_id FROM sample WHERE participant_id IS NULL'
-        return await self.connection.fetch_all(_query)
+        rows = await self.connection.fetch_all(_query)
+        return [(row['external_id'], row['id']) for row in rows]

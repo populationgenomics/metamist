@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from db.python.connect import DbBase, NotFoundError, to_db_json
+from db.python.connect import DbBase, NotFoundError
 
 
 class FamilyTable(DbBase):
@@ -42,6 +42,7 @@ RETURNING id
     async def get_id_map_by_external_ids(
         self, family_ids: List[str], allow_missing=False
     ):
+        """Get map of {external_id: internal_id} for a family"""
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids'
         results = await self.connection.fetch_all(_query, {'external_ids': family_ids})
         id_map = {r['external_id']: r for r in results}

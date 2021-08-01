@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-from db.python.connect import DbBase, NotFoundError, to_db_json
+from db.python.connect import DbBase, NotFoundError
 
 
 class ParticipantTable(DbBase):
@@ -19,7 +19,7 @@ class ParticipantTable(DbBase):
         Create a new sample, and add it to database
         """
         _query = f"""
-INSERT INTO family (external_id, author)
+INSERT INTO participant (external_id, author)
 VALUES (:external_id, :author)
 RETURNING id
         """
@@ -35,11 +35,14 @@ RETURNING id
     async def get_id_map_by_external_ids(
         self, external_participant_ids: List[str], allow_missing=False
     ) -> Dict[str, int]:
+        """Get map of {external_id: internal_participant_id}"""
         _query = (
             'SELECT external_id, id FROM participant WHERE external_id in :external_ids'
         )
-        results = await self.connection.fetch_all(_query, {'external_ids': family_ids})
-        id_map = {r['external_id']: r for r in results}
+        results = await self.connection.fetch_all(
+            _query, {'external_ids': external_participant_ids}
+        )
+        id_map = {r['external_id']: r['id'] for r in results}
 
         if not allow_missing and len(id_map) != len(external_participant_ids):
             provided_external_ids = set(external_participant_ids)
@@ -47,10 +50,10 @@ RETURNING id
             # (in case we're provided a list with duplicates)
             if len(id_map) != len(provided_external_ids):
                 # we have families missing from the map, so we'll 404 the whole thing
-                missing_family_ids = provided_external_ids - set(id_map.keys())
+                missing_participant_ids = provided_external_ids - set(id_map.keys())
 
                 raise NotFoundError(
-                    f"Couldn't find families with IDS: {', '.join(missing_family_ids)}"
+                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
                 )
 
         return id_map
