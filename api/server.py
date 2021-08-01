@@ -13,7 +13,8 @@ from api.routes import (
     analysis_router,
     sequence_router,
     sample_map_router,
-participant_router, family_router
+    participant_router,
+    family_router,
 )
 from api.utils import IS_PRODUCTION, get_openapi_schema_func
 from api.utils.gcp import setup_gcp_logging
