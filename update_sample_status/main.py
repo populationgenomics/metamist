@@ -34,7 +34,7 @@ async def upload_sample(request):
     project = request_json.get('project')
     external_id = request_json.get('sample')
     status = request_json.get('status')
-    batch = request_json.get('batch')
+    batch = str(request_json.get('batch'))
     metadata = request_json.get('metadata')
 
     if not project or not external_id or not status or not batch or not metadata:
