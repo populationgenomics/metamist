@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from models.models.sample import Sample, sample_id_format
 from models.enums import SampleType
@@ -78,6 +78,24 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
         await self.connection.execute(_query, {**non_null_updatedict, 'id': id_})
         return True
+
+    async def update_many_participant_ids(
+        self, ids: List[int], participant_ids: List[int]
+    ):
+        """
+        Update participant IDs for many samples
+        Expected len(ids) == len(participant_ids)
+        """
+        if len(ids) != len(participant_ids):
+            raise ValueError(
+                f'Number of sampleIDs ({len(ids)}) and ParticipantIds ({len(participant_ids)}) did not match'
+            )
+
+        _query = 'UPDATE sample SET participant_id=:participant_id WHERE id = :id'
+        values = [
+            {'id': i, 'participant_id': pid} for i, pid in zip(ids, participant_ids)
+        ]
+        await self.connection.execute_many(_query, values)
 
     async def get_single_by_id(self, internal_id: int) -> Sample:
         """Get a Sample by its external_id"""
@@ -233,3 +251,9 @@ SELECT {", ".join(keys)} from sample
 
         samples = await self.connection.fetch_all(_query, replacements)
         return samples
+
+    async def samples_with_missing_participants(self) -> List[Tuple[str, int]]:
+        """Get ["""
+        _query = 'SELECT id, external_id FROM sample WHERE participant_id IS NULL'
+        rows = await self.connection.fetch_all(_query)
+        return [(row['external_id'], row['id']) for row in rows]

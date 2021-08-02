@@ -13,7 +13,7 @@
 
         <!-- Participants -->
         <createTable tableName="participant">
-            <column name="id" type="INT">
+            <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
@@ -67,7 +67,7 @@
 
         <!-- Participant Phenotype -->
         <createTable tableName="participant_phenotypes">
-            <column name="participant_id" type="INT">
+            <column name="participant_id" type="INT" autoIncrement="true">
                 <constraints nullable="false" foreignKeyName="fk_participant_phenotype" references="participant(id)"/>
             </column>
             <column name="hpo_term" type="VARCHAR(255)">
@@ -119,17 +119,20 @@
 
         <!-- Family -->
         <createTable tableName="family">
-            <column name="id" type="INT">
+            <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
-                <constraints nullable="true" />
+                <constraints nullable="false" unique="true" />
             </column>
             <column name="description" type="TEXT">
                 <constraints nullable="true" />
             </column>
             <column name="coded_phenotype" type="VARCHAR(255)">
                 <constraints nullable="true" />
+            </column>
+            <column name="author" type="VARCHAR(255)">
+                <constraints nullable="false" />
             </column>
         </createTable>
         <createTable tableName="family_participant">
@@ -140,19 +143,22 @@
                 <constraints nullable="false" foreignKeyName="fk_family_participant_participant" references="participant(id)"/>
             </column>
             <column name="paternal_participant_id" type="INT">
-                <constraints nullable="false" foreignKeyName="fk_family_participant_paternal" references="participant(id)"/>
+                <constraints nullable="true" foreignKeyName="fk_family_participant_paternal" references="participant(id)"/>
             </column>
             <column name="maternal_participant_id" type="INT">
-                <constraints nullable="false" foreignKeyName="fk_family_participant_maternal" references="participant(id)"/>
+                <constraints nullable="true" foreignKeyName="fk_family_participant_maternal" references="participant(id)"/>
             </column>
-            <column name="affected" type="BOOLEAN">
+            <column name="sex" type="INT">
                 <constraints nullable="true" />
             </column>
-            <column name="status" type="VARCHAR(255)">
+            <column name="affected" type="INT">
                 <constraints nullable="true" />
             </column>
             <column name="notes" type="TEXT">
                 <constraints nullable="true" />
+            </column>
+            <column name="author" type="VARCHAR(255)">
+                <constraints nullable="false" />
             </column>
 
         </createTable>
@@ -167,4 +173,98 @@
         <sql>ALTER TABLE family ADD SYSTEM VERSIONING;</sql>
         <sql>ALTER TABLE family_participant ADD SYSTEM VERSIONING;</sql>
     </changeSet>
+<!--    <changeSet author="michael.franklin" id="add-col-family_participant.sex">-->
+<!--        <sql>SET @@system_versioning_alter_history = 1;</sql>-->
+<!--        <addColumn tableName="family">-->
+<!--            <column name="author" type="VARCHAR(255)">-->
+<!--                <constraints nullable="false" />-->
+<!--            </column>-->
+<!--        </addColumn>-->
+<!--        <addPrimaryKey-->
+<!--            columnNames="family_id, participant_id"-->
+<!--            constraintName="pk_family_participant"-->
+<!--            tableName="family_participant"-->
+<!--        />-->
+<!--        <addColumn tableName="family_participant">-->
+<!--            <column name="sex" type="INT" afterColumn="maternal_participant_id">-->
+<!--                <constraints nullable="false" />-->
+<!--            </column>-->
+<!--            <column name="author" type="VARCHAR(255)">-->
+<!--                <constraints nullable="false" />-->
+<!--            </column>-->
+
+<!--        </addColumn>-->
+<!--    </changeSet>-->
+<!--    <changeSet author="michael.franklin" id="add-autoincrementing-participant-id">-->
+<!--        <sql>SET @@system_versioning_alter_history = 1;</sql>-->
+<!--&lt;!&ndash;        <sql>LOCK TABLES participant WRITE, family_participant WRITE;</sql>&ndash;&gt;-->
+<!--        <dropForeignKeyConstraint-->
+<!--            baseTableName="sample"-->
+<!--            constraintName="fk_participant_sample"-->
+<!--        />-->
+<!--        <dropForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            constraintName="fk_family_participant_participant"-->
+<!--        />-->
+<!--        <dropForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            constraintName="fk_family_participant_paternal"-->
+<!--        />-->
+<!--        <dropForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            constraintName="fk_family_participant_maternal"-->
+<!--        />-->
+<!--        <dropForeignKeyConstraint-->
+<!--            baseTableName="participant_phenotypes"-->
+<!--            constraintName="fk_participant_phenotype"-->
+<!--        />-->
+<!--        <addNotNullConstraint-->
+<!--            columnName="id"-->
+<!--            tableName="participant"-->
+<!--            columnDataType="int"-->
+<!--        />-->
+<!--        <addAutoIncrement-->
+<!--            columnName="id"-->
+<!--            columnDataType="int"-->
+<!--            tableName="participant"-->
+<!--        />-->
+<!--        <addForeignKeyConstraint-->
+<!--            baseTableName="sample"-->
+<!--            baseColumnNames="participant_id"-->
+<!--            referencedTableName="participant"-->
+<!--            referencedColumnNames="id"-->
+<!--            constraintName="fk_participant_sample"-->
+<!--        />-->
+<!--        <addForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            baseColumnNames="participant_id"-->
+<!--            referencedTableName="participant"-->
+<!--            referencedColumnNames="id"-->
+<!--            constraintName="fk_family_participant_participant"-->
+<!--        />-->
+<!--        <addForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            baseColumnNames="paternal_participant_id"-->
+<!--            referencedTableName="participant"-->
+<!--            referencedColumnNames="id"-->
+<!--            constraintName="fk_family_participant_paternal"-->
+<!--        />-->
+<!--        <addForeignKeyConstraint-->
+<!--            baseTableName="family_participant"-->
+<!--            baseColumnNames="maternal_participant_id"-->
+<!--            referencedTableName="participant"-->
+<!--            referencedColumnNames="id"-->
+<!--            constraintName="fk_family_participant_maternal"-->
+<!--        />-->
+<!--        <addForeignKeyConstraint-->
+<!--            baseTableName="participant_phenotypes"-->
+<!--            baseColumnNames="participant_id"-->
+<!--            referencedTableName="participant"-->
+<!--            referencedColumnNames="id"-->
+<!--            constraintName="fk_participant_phenotype"-->
+<!--        />-->
+<!--        <sql>UNLOCK TABLES;</sql>-->
+
+
+<!--    </changeSet>-->
 </databaseChangeLog>
