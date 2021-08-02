@@ -119,3 +119,13 @@ async def update_sample(
         type_=model.type,
     )
     return result
+
+
+@router.get(
+    '/all_samples_details', response_model=List[Sample], operation_id='getAllSamples'
+)
+async def get_all_sample_details(connection: Connection = get_db_connection):
+    """Get details for all samples in a project"""
+    st = SampleTable(connection)
+    result = await st.get_all()
+    return result

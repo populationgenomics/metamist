@@ -36,3 +36,4 @@ max-locals=25
 max-args=10
 # Maximum number of statements in function / method body
 max-statements=100
+max-branches=20
