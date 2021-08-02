@@ -92,8 +92,8 @@ Then create the database schemas.
 
 ```bash
 pushd db/
-liquibase update --url jdbc:mariadb://127.0.0.1:3307/sm_admin --username=root --password=root --classpath mariadb-java-client-2.7.3.jar --changelog-file=global.xml
-liquibase update --url jdbc:mariadb://127.0.0.1:3307/sm_dev --username=root --password=root --classpath mariadb-java-client-2.7.3.jar --changelog-file=project.xml
+liquibase  --headless=true --url jdbc:mariadb://127.0.0.1:3307/sm_admin --username=root --password=root --classpath mariadb-java-client-2.7.2.jar --changelog-file=global.xml update
+liquibase  --headless=true --url jdbc:mariadb://127.0.0.1:3307/sm_dev --username=root --password=root --classpath mariadb-java-client-2.7.2.jar --changelog-file=project.xml update
 ```
 
 Finally, start the server, making use of the environment variables to point it to your local Maria DB server

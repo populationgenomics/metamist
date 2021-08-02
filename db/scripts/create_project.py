@@ -7,11 +7,11 @@ Creates a project, by:
 - update credentials in secret
 
 Requires:
-- pymsql
+- pymysql
 - google-cloud-secret-manager==2.2.0
     - Ensure you have the latest version of pip, as it installs significantly quicker
 """
-import os.path
+import os
 import logging
 import json
 import random
@@ -22,11 +22,16 @@ import urllib.request
 import pymysql
 from google.cloud import secretmanager
 
+MARIADB_HOST = os.getenv('SM_DB_HOST')
+if not MARIADB_HOST:
+    raise ValueError(
+        'Environment variable "SM_DB_HOST" was not set, you might also want to '
+        'set SM_DB_USER, SM_DB_PASSWORD, SM_DB_PORT to configure the project creation.'
+    )
 
-MARIADB_HOST = 'localhost'
-MARIADB_USER = 'root'
-MARIADB_PASSWORD = None
-MARIADB_PORT = 3306
+MARIADB_USER = os.getenv('SM_DB_USER', 'root')
+MARIADB_PASSWORD = os.getenv('SM_DB_PASSWORD', None)
+MARIADB_PORT = int(os.getenv('SM_DB_PORT', '3306'))
 
 EXTERNAL_HOST = 'sm-db-vm-instance.australia-southeast1-b.c.sample-metadata.internal'
 
@@ -213,7 +218,6 @@ def _grant_privileges_to_database(
 def _apply_schema(databasename):
 
     changelog_file = 'https://raw.githubusercontent.com/populationgenomics/sample-metadata/add-foundations/db/project.xml'
-    defaults_file = 'https://raw.githubusercontent.com/populationgenomics/sample-metadata/add-foundations/db/liquibase-project.properties'
     mariadb_java_client_url = 'https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar'
     mariadb_java_client_file = 'mariadb-java-client-2.7.2.jar'
 
@@ -223,32 +227,32 @@ def _apply_schema(databasename):
         ) as javafile:
             javafile.write(f.read())
 
-    default_filename = 'defaults.properties'
-    changelog_filename = 'changelog.xml'
+    changelog_filename = 'project.xml'
 
-    with open(default_filename, 'w+b') as tmp_defaults, open(
-        changelog_filename, 'w+b'
-    ) as tmp_changelog:
-        with urllib.request.urlopen(defaults_file) as f:
-            tmp_defaults.write(f.read())
+    with open(changelog_filename, 'w+b') as tmp_changelog:
         with urllib.request.urlopen(changelog_file) as f:
             tmp_changelog.write(f.read())
 
     command = [
         'liquibase',
-        '--logLevel=debug',
-        '--defaultsFile',
-        default_filename,
-        '--changeLogFile',
-        changelog_filename,
-        '--url',
-        f'jdbc:mariadb://localhost:3306/{databasename}',
+        '--headless=true',
+        # '--logLevel=debug',
+        *('--changeLogFile', changelog_filename),
+        *('--url', f'jdbc:mariadb://{MARIADB_HOST}:{MARIADB_PORT}/{databasename}'),
+        *('--driver', 'org.mariadb.jdbc.Driver'),
+        *('--classpath', 'mariadb-java-client-2.7.2.jar'),
         'update',
     ]
+
+    if MARIADB_USER != 'root':
+        command.extend(['--username', MARIADB_USER])
+    if MARIADB_PASSWORD:
+        command.extend(['--password', MARIADB_PASSWORD])
+
     jcommand = ' '.join(command)
     print(f'Running "{jcommand}"')
     try:
-        output = subprocess.check_output(command, shell=True)
+        output = subprocess.check_output(jcommand, shell=True)
         print(output.decode())
     except subprocess.CalledProcessError as exp:
         if exp.stderr:
@@ -256,8 +260,7 @@ def _apply_schema(databasename):
         if exp.stdout:
             print(exp.stdout.decode())
 
-    os.remove(default_filename)
-    os.remove(changelog_filename)
+    # os.remove(changelog_filename)
 
     return True
 
