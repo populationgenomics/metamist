@@ -58,7 +58,7 @@ Schema is managed with _liquibase_ with the `project.xml` and `global.xml` chang
 
 ```shell
 pushd db/
-wget https://cdn.mysql.com//Downloads/Connector-J/mysql-connector-java-8.0.24.zip
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
 popd
 ```
 
@@ -86,7 +86,7 @@ mysql --host=127.0.0.1 --port=3307 -u root -p -e 'CREATE DATABASE sm_admin;'
 mysql --host=127.0.0.1 --port=3307 -u root -p -e 'show databases;'
 ```
 
-Download [`mariadb-java-client-2.7.2.jar`](https://downloads.mariadb.org/connector-java/2.7.3) into the `db/` folder.
+Download [`mariadb-java-client-2.7.2.jar`](https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar) into the `db/` folder.
 
 Then create the database schemas.
 
