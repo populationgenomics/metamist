@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from datetime import datetime
 
 from db.python.connect import DbBase  # , to_db_json
@@ -154,7 +154,9 @@ WHERE a.status='queued' OR a.status='in-progress'
                 analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
         return list(analysis_by_id.values())
 
-    async def get_latest_complete_analyses(self) -> List[Analysis]:
+    async def get_latest_complete_analyses(
+        self, analysis_type: Optional[str] = None
+    ) -> Dict[Tuple[str, str], Analysis]:
         """
         Gets details of analysis with status "completed", one per sample with the most
         recent timestamp
@@ -169,10 +171,16 @@ AND a.timestamp_completed = (
     FROM analysis a2
     LEFT JOIN analysis_sample a_s2 ON a_s2.analysis_id = a2.id
     WHERE a_s2.sample_id = a_s.sample_id
+    {'AND a2.type = :analysis_type' if analysis_type else ''}
     ORDER BY timestamp_completed
     DESC LIMIT 1
 );"""
-        rows = await self.connection.fetch_all(_query)
+        if analysis_type:
+            rows = await self.connection.fetch_all(
+                _query, {'analysis_type': analysis_type}
+            )
+        else:
+            rows = await self.connection.fetch_all(_query)
         keys = [
             'id',
             'type',
@@ -188,4 +196,5 @@ AND a.timestamp_completed = (
                 analysis_by_id[aid] = Analysis.from_db(**kwargs)
             else:
                 analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
+
         return list(analysis_by_id.values())

@@ -64,6 +64,9 @@ def _jc_pipeline_submit_analyses():
         print(f'ERROR: found incomplete or queued analysis: {analyses}')
         sys.exit()
 
+    # TODO: for samples with finished joint-calling, latest-completed will return joint-calling.
+    # so on reruns, pipelien will redo haploytype calling. We want to avoid that.
+
     # Get the list of latest complete analyses
     latest_complete_analyses = aapi.get_latest_complete_analyses(project=PROJ)
     print(f'Latest complete analyses: {latest_complete_analyses}')
@@ -72,8 +75,7 @@ def _jc_pipeline_submit_analyses():
         a_s_ids = sample_id_format(a['sample_ids'])
         latest_by_type_and_sids[(a['type'], tuple(set(a_s_ids)))].append(a)
 
-    # Iterate over samples, check latest complete analyses, and
-    # add next-step analyses
+    # Iterate over samples, check latest complete analyses, and add next-step analyses
     sapi = SampleApi()
     samples = sapi.get_all_samples(project=PROJ)
 
@@ -81,8 +83,16 @@ def _jc_pipeline_submit_analyses():
         ('joint-calling', tuple(set(s.id for s in samples)))
     ):
         print(f'All samples went through joint-calling, nothing to submit')
+        return
 
-    if all(latest_by_type_and_sids.get(('gvcf', (s.id,))) for s in samples):
+    latest_complete_gvcf_analyses = aapi.get_latest_complete_analyses_by_type(
+        project=PROJ, analysis_type='gvcf'
+    )
+    sids_with_gvcf = set(
+        sample_id_format(a['sample_ids'])[0] for a in latest_complete_gvcf_analyses
+    )
+    new_sids_with_gvcf = set(s.id for s in samples) - sids_with_gvcf
+    if not new_sids_with_gvcf:
         print('All samples went through variant calling, so can submit joint-calling')
         analysis = AnalysisModel(
             sample_ids=[s.id for s in samples],
@@ -94,7 +104,7 @@ def _jc_pipeline_submit_analyses():
         aapi.create_new_analysis(project=PROJ, analysis_model=analysis)
         return
 
-    for s in samples:
+    for s in [s for s in samples if s.id in new_sids_with_gvcf]:
         print(f'Sample {s.id}')
 
         if latest_by_type_and_sids.get(('gvcf', (s.id,))):
@@ -190,8 +200,8 @@ def test_simulate_joint_calling_pipeline():
     Simulates events of the joint-calling workflow
     """
 
-    # test_run_id = 'XEJE6E'
-    # sample_ids = ['CPG232', 'CPG240', 'CPG257']
+    # test_run_id = 'AFYPXR'
+    # sample_ids = 'CPG620, CPG638, CPG646'.split(', ')
 
     # Unique test run ID to avoid clashing with previous test run samples
     test_run_id = os.environ.get(
@@ -236,9 +246,12 @@ def test_simulate_joint_calling_pipeline():
     analyses = aapi.get_latest_complete_analyses(project=PROJ)
     assert any(
         a['type'] == 'joint-calling'
-        and set(sample_id_format(a['sample_ids'])) == set(sample_ids)
+        and set(sample_ids) & set(sample_id_format(a['sample_ids'])) == set(sample_ids)
         for a in analyses
-    )
+    ), [
+        (a['type'], set(sample_id_format(a['sample_ids'])), set(sample_ids))
+        for a in analyses
+    ]
 
 
 if __name__ == '__main__':

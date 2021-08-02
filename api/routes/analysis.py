@@ -109,3 +109,17 @@ async def get_latest_complete_analyses(connection: Connection = get_db_connectio
     atable = AnalysisTable(connection)
     result = await atable.get_latest_complete_analyses()
     return result
+
+
+@router.get(
+    '/latest_complete/{analysis_type}',
+    operation_id='getLatestCompleteAnalysesByType',
+)
+async def get_latest_complete_analyses_by_type(
+    analysis_type: str,
+    connection: Connection = get_db_connection,
+):
+    """Get "complete" analyses with the latest timestamp_completed"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_latest_complete_analyses(analysis_type)
+    return result
