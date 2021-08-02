@@ -160,13 +160,18 @@ WHERE a.status='queued' OR a.status='in-progress'
         recent timestamp
         """
         _query = f"""
-SELECT a.id, a.type, a.status, a.output, a_s.sample_id
+SELECT a.id, a.type, a.status, a.output, a_s.sample_id, a.timestamp_completed
 FROM analysis_sample a_s
 LEFT JOIN analysis a ON a_s.analysis_id = a.id
-WHERE a.status='completed'
-ORDER BY a.timestamp_completed DESC
-LIMIT 1;
-"""
+WHERE a.status = 'completed'
+AND a.timestamp_completed = (
+    SELECT a2.timestamp_completed
+    FROM analysis a2
+    LEFT JOIN analysis_sample a_s2 ON a_s2.analysis_id = a2.id
+    WHERE a_s2.sample_id = a_s.sample_id
+    ORDER BY timestamp_completed
+    DESC LIMIT 1
+);"""
         rows = await self.connection.fetch_all(_query)
         keys = [
             'id',
