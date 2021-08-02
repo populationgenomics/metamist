@@ -23,7 +23,7 @@ FILES_HANDLED = {
 }
 
 
-def create_file_object(external_id, analysis_type, project):
+def create_file_object(external_id, analysis_type, project, batch):
     """ Creates CWL Dictionary """
 
     upload_bucket = f'cpg-{project}-upload'
@@ -49,6 +49,7 @@ def create_file_object(external_id, analysis_type, project):
             'checksum': md5_blob.download_as_string().decode(),
             'size': primary_blob.size,
             'secondaryFiles': secondary_files,
+            'batch': batch,  # TODO: Check if this is ok here, or if it should be stored elsewhere.
         }
 
         file_objects.append(file_object)
@@ -66,6 +67,13 @@ async def upload_sample(request):
     qc_metadata = request_json.get('metadata')
     external_id = request_json.get('sample')
     project = request_json.get('project')
+    batch = str(request_json.get('batch'))
+    status = request_json.get('status')
+
+    if not project or not external_id or not status or not batch or not qc_metadata:
+        raise web.HTTPBadRequest(
+            reason=f'Invalid request. Ensure that the project, sample, status, batch and metadata are provided.'
+        )
 
     # Determine the internal ID
     external_id_dict = {'external_ids': [external_id]}
@@ -74,17 +82,13 @@ async def upload_sample(request):
 
     reads = []
     for key in FILES_HANDLED:
-        logging.info(key)
-        reads = create_file_object(external_id, key, project)
-        logging.info(reads)
-
+        reads = create_file_object(external_id, key, project, batch)
         # TODO: Added the QC Metadata Here. Should this be moved to sample metadata?
         metadata = {'reads': reads, 'qc_metrics': qc_metadata}
         # Update the sequencing metadata.
-        logging.info(metadata)
-        update_sequence_meta(project, internal_id, 'uploaded', metadata)
+        update_sequence_meta(project, internal_id, status, metadata)
 
-    return web.Response(text=f'Done!')
+    return web.Response(text=f'{external_id} lodged.')
 
 
 # @routes.put('/upload_sample_outdated')
