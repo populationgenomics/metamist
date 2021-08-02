@@ -1,11 +1,9 @@
-from typing import List
-
+from typing import List, Optional
 from datetime import datetime
 
-# from models.models.analysis import Analysis
-from models.enums import AnalysisStatus, AnalysisType
-
 from db.python.connect import DbBase  # , to_db_json
+from models.enums import AnalysisStatus, AnalysisType
+from models.models.analysis import Analysis
 
 
 class AnalysisTable(DbBase):
@@ -69,7 +67,11 @@ VALUES ({cs_id_keys});"""
         await self.connection.execute_many(_query, values)
 
     async def update_analysis(
-        self, analysis_id: int, status: AnalysisStatus, output: str, author: str = None
+        self,
+        analysis_id: int,
+        status: AnalysisStatus,
+        output: Optional[str] = None,
+        author: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -123,3 +125,62 @@ AND a.timestamp_completed > (
 
         # analysis IDs
         return ids
+
+    async def get_incomplete_analyses(self) -> List[Analysis]:
+        """
+        Gets details of analysis with status queued or in-progress
+        """
+        _query = f"""
+SELECT a.id, a.type, a.status, a.output, a_s.sample_id
+FROM analysis_sample a_s
+LEFT JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.status='queued' OR a.status='in-progress'
+"""
+        rows = await self.connection.fetch_all(_query)
+        keys = [
+            'id',
+            'type',
+            'status',
+            'output',
+            'sample_id',
+        ]
+        analysis_by_id = dict()
+        for row in rows:
+            kwargs = {keys[i]: row[i] for i in range(len(keys))}
+            aid = kwargs['id']
+            if aid not in analysis_by_id:
+                analysis_by_id[aid] = Analysis.from_db(**kwargs)
+            else:
+                analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
+        return list(analysis_by_id.values())
+
+    async def get_latest_complete_analyses(self) -> List[Analysis]:
+        """
+        Gets details of analysis with status "completed", one per sample with the most
+        recent timestamp
+        """
+        _query = f"""
+SELECT a.id, a.type, a.status, a.output, a_s.sample_id
+FROM analysis_sample a_s
+LEFT JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.status='completed'
+ORDER BY a.timestamp_completed DESC
+LIMIT 1;
+"""
+        rows = await self.connection.fetch_all(_query)
+        keys = [
+            'id',
+            'type',
+            'status',
+            'output',
+            'sample_id',
+        ]
+        analysis_by_id = dict()
+        for row in rows:
+            kwargs = {keys[i]: row[i] for i in range(len(keys))}
+            aid = kwargs['id']
+            if aid not in analysis_by_id:
+                analysis_by_id[aid] = Analysis.from_db(**kwargs)
+            else:
+                analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
+        return list(analysis_by_id.values())

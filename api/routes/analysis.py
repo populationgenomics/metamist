@@ -87,3 +87,25 @@ async def get_all_new_gvcfs_since_last_successful_joint_call(
     atable = AnalysisTable(connection)
     result = await atable.get_all_new_gvcfs_since_last_successful_joint_call()
     return {'analysis_ids': result}
+
+
+@router.get(
+    '/incomplete',
+    operation_id='getIncompleteAnalyses',
+)
+async def get_incomplete_analyses(connection: Connection = get_db_connection):
+    """Get analyses with status queued or in-progress"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_incomplete_analyses()
+    return result
+
+
+@router.get(
+    '/latest_complete',
+    operation_id='getLatestCompleteAnalyses',
+)
+async def get_latest_complete_analyses(connection: Connection = get_db_connection):
+    """Get "complete" analyses with the latest timestamp_completed"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_latest_complete_analyses()
+    return result

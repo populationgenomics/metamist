@@ -1,13 +1,32 @@
-from typing import Optional
+from typing import Optional, List
+
+from pydantic.main import BaseModel
+
+from models.enums import AnalysisType, AnalysisStatus
 
 
-class Analysis:
+class Analysis(BaseModel):
     """Model for Analysis"""
 
-    def __init__(self) -> None:
-        self.type = None
-        self.status = None
-        self.output = None
-        self.sample_ids = None
-        # very easy to index, simple queries
-        self.timestamp_completed: Optional = None
+    id: str = None
+    type: AnalysisType = None
+    status: AnalysisStatus = None
+    output: Optional[str] = None
+    sample_ids: List[int] = None
+
+    @staticmethod
+    def from_db(**kwargs):
+        """
+        Convert from db keys, mainly converting id to id_
+        """
+        analysis_type = kwargs.pop('type', None)
+        status = kwargs.pop('status', None)
+        sample_ids = [kwargs.pop('sample_id')]
+        output = kwargs.pop('output', [])
+        return Analysis(
+            id=kwargs.pop('id'),
+            type=AnalysisType(analysis_type),
+            status=AnalysisStatus(status),
+            sample_ids=sample_ids,
+            output=output,
+        )

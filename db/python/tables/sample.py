@@ -100,6 +100,29 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         sample = Sample.from_db(**kwargs)
         return sample
 
+    async def get_all(self, check_active: bool = True) -> List[Sample]:
+        """Get all samples"""
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active',
+            'type',
+        ]
+        if check_active:
+            _query = f'SELECT {", ".join(keys)} FROM sample WHERE active;'
+        else:
+            _query = f'SELECT {", ".join(keys)} from sample;'
+
+        sample_rows = await self.connection.fetch_all(_query)
+        samples = []
+        for sample_row in sample_rows:
+            kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
+            sample = Sample.from_db(**kwargs)
+            samples.append(sample)
+        return samples
+
     async def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
         """Get a Sample by its external_id"""
         keys = [
