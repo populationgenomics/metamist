@@ -2,34 +2,112 @@
 
 An API to manage sample + other related metadata.
 
-## First time setup
+## Environment variables
 
-Add the mariadb jar into the db folder:
+Sample-metadata API uses environment variables to manage it's configuration.
+
+### Running the web server
+
+The default behaviour for the web server is to:
+
+- Use a GCP secret for the DB credentials
+
+You can configure this with:
+
+```shell
+# use credentials defined in db/python/connect.py:dev_config
+export SM_ENVIRONMENT=dev
+# use specific mysql settings
+export SM_DEV_DB_PROJECT=sm_dev
+export SM_DEV_DB_USER=root
+export SM_DEV_DB_PORT=3307
+export SM_DEV_DB_HOST=127.0.0.1
+export SM_DEV_DB_PASSWORD=root
+export SM_ENVIRONMENT=dev
+```
+
+### Using the Python API
+
+The default behaviour for the installable Python API is to:
+
+- Use the production server
+- With a service account
+
+You can configure these separately with:
+
+```shell
+# use localhost:8000
+export SM_ENVIRONMENT=dev
+ # use a local account to generate identity-token for auth
+export SM_USE_SERVICE_ACCOUNT=false
+```
+
+
+## Database
+
+Sample-metadata DB uses MariaDB (for the system-versioned-tables) to store metadata.
+
+There are two dbs you'll need to initialise:
+
+- `sm_admin`: Stores project-independent metadata (like the internal_sample_id to project map)
+- `sm_<project>`: Stores project specicic information.
+
+In development, we recommend `sm_dev`, as [there is a default dev_config](https://github.com/populationgenomics/sample-metadata/blob/8b122453d1cd26c09966b8e54909bf712da5263e/db/python/connect.py#L78-L85).
+
+Schema is managed with _liquibase_ with the `project.xml` and `global.xml` changelogs. To use liquibase, you'll need to download the `mariadb` driver:
+
+```shell
+pushd db/
+wget https://cdn.mysql.com//Downloads/Connector-J/mysql-connector-java-8.0.24.zip
+popd
+```
+
+### Using Maria DB docker image
+
+Pull mariadb image
+
+```bash
+docker pull mariadb
+```
+
+Run a mariadb container that will server your database. `-p 3307:3306` remaps the port to 3307 in case if you local MySQL is already using 3306
+
+```bash
+docker stop mysql-p3307  # stop and remove if the container already exists
+docker rm mysql-p3307
+docker run -p 3307:3306 --name mysql-p3307 -e MYSQL_ROOT_PASSWORD=root -d mariadb
+```
+
+Initialize databases (you may need to enter the password on each command).
+
+```bash
+mysql --host=127.0.0.1 --port=3307 -u root -p -e 'CREATE DATABASE sm_dev;'
+mysql --host=127.0.0.1 --port=3307 -u root -p -e 'CREATE DATABASE sm_admin;'
+mysql --host=127.0.0.1 --port=3307 -u root -p -e 'show databases;'
+```
+
+Download [`mariadb-java-client-2.7.2.jar`](https://downloads.mariadb.org/connector-java/2.7.3) into the `db/` folder.
+
+Then create the database schemas.
 
 ```bash
 pushd db/
-wget https://cdn.mysql.com//Downloads/Connector-J/mysql-connector-java-8.0.24.zip
-
-# ensure you have the database created
-mysql -u root -e 'CREATE DATABASE my_dev';
-
-# now you can run liquibase
-liquibase update
+liquibase update --url jdbc:mariadb://127.0.0.1:3307/sm_admin --username=root --password=root --classpath mariadb-java-client-2.7.3.jar --changelog-file=global.xml
+liquibase update --url jdbc:mariadb://127.0.0.1:3307/sm_dev --username=root --password=root --classpath mariadb-java-client-2.7.3.jar --changelog-file=project.xml
 ```
 
-## Deployment
-
-You'll want to complete the following steps:
-
-- Ensure there is a database created for each project (with the database name being the project),
-- Ensure there are secrets in `projects/sample_metadata/secrets/databases/versions/latest`, that's an array of objects with keys `dbname, host, port, username, password`.
-- Ensure `google-cloud` was installed
+Finally, start the server, making use of the environment variables to point it to your local Maria DB server
 
 ```bash
-export SM_ENVIRONMENT='PRODUCTION'
+export SM_DEV_DB_PROJECT=sm_dev
+export SM_DEV_DB_USER=root
+export SM_DEV_DB_PORT=3307
+export SM_DEV_DB_HOST=127.0.0.1
+export SM_DEV_DB_PASSWORD=root
+export SM_ENVIRONMENT=dev
+export SM_USE_SERVICE_ACCOUNT=false
+python3 -m api.server
 ```
-
-
 
 ## Debugging
 
@@ -116,12 +194,17 @@ python regenerate_apy.py
 
 ## Adding a new project
 
-To add a new project, you must:
+Run the `scripts/create_project.py` script on a machine.
 
-- Connect to mysql
-- Create database: `CREATE DATABASE {project}_sm;`
-- Apply schema: _TBD_
-- Create user: `CREATE USER '{project}'@'%' IDENTIFIED BY {generated-password};`
-- Give permissions: ``GRANT ALL PRIVILEGES ON `{project}`.* TO 'tob_wgs'@'%';``
-- Flush privileges: `FLUSH PRIVILEGES;`
-- Update the secrets at `projects/sample_metadata/secrets/databases/versions/latest` to include an extra entry.
+
+## Deployment
+
+You'll want to complete the following steps:
+
+- Ensure there is a database created for each project (with the database name being the project),
+- Ensure there are secrets in `projects/sample_metadata/secrets/databases/versions/latest`, that's an array of objects with keys `dbname, host, port, username, password`.
+- Ensure `google-cloud` was installed
+
+```bash
+export SM_ENVIRONMENT='PRODUCTION'
+```
