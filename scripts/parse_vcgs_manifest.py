@@ -26,8 +26,9 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
-BAM_EXTENSIONS = '.bam'
-CRAM_EXTENSIONS = '.cram'
+BAM_EXTENSIONS = ('.bam',)
+CRAM_EXTENSIONS = ('.cram',)
+VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
 
 class Columns:
@@ -341,6 +342,17 @@ class VcgsManifestParser:
 
             return files, 'bam'
 
+        if all(any(r.lower().endswith(ext) for ext in VCFGZ_EXTENSIONS) for r in reads):
+            sec_format = ['.tbi']
+            files = []
+            for r in reads:
+                secondaries = self.create_secondary_file_objects_by_potential_pattern(
+                    r, sec_format
+                )
+                files.append(self.create_file_object(r, secondary_files=secondaries))
+
+            return files, 'bam'
+
         extensions = set(os.path.splitext(r)[-1] for r in reads)
         joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(reads))
         raise ValueError(
@@ -382,7 +394,7 @@ class VcgsManifestParser:
         checksum = None
         md5_filename = filename + '.md5'
         if self.file_exists(md5_filename):
-            checksum = f'md5:{self.file_contents(md5_filename)}'
+            checksum = f'md5:{self.file_contents(md5_filename).strip()}'
 
         d = {
             'location': self.file_path(filename),
