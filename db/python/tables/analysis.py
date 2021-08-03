@@ -98,7 +98,7 @@ VALUES ({cs_id_keys});"""
 SELECT id FROM sample WHERE id NOT IN (
     SELECT a_s.sample_id FROM analysis_sample a_s
     LEFT JOIN analysis a ON a_s.analysis_id = a.id
-    WHERE a.type = 'gvcf'
+    WHERE a.type = :analysis_type
 );"""
 
         rows = await self.connection.fetch_all(
