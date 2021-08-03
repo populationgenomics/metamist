@@ -66,10 +66,20 @@ async def get_sample_id_map_by_internal(
     internal_ids: List[str] = Body(...),
     connection: Connection = get_db_connection,
 ):
-    """Get map of sample IDs, { [externalId]: internal_sample_id }"""
+    """Get map of sample IDs, { [internal_id]: external_sample_id }"""
     st = SampleTable(connection)
     internal_ids_raw = sample_id_transform_to_raw(internal_ids)
     result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
+    return {sample_id_format(k): v for k, v in result.items()}
+
+
+@router.get('/id-map/internal/all', operation_id='getAllSampleIdMapByInternal')
+async def get_all_sample_id_map_by_internal(
+    connection: Connection = get_db_connection,
+):
+    """Get map of ALL sample IDs, { [internal_id]: external_sample_id }"""
+    st = SampleTable(connection)
+    result = await st.get_all_sample_id_map_by_internal_ids()
     return {sample_id_format(k): v for k, v in result.items()}
 
 

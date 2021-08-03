@@ -211,6 +211,12 @@ SELECT {", ".join(keys)} from sample
 
         return sample_id_map
 
+    async def get_all_sample_id_map_by_internal_ids(self):
+        """Get sample id map for all samples"""
+        _query = 'SELECT id, external_id FROM sample'
+        rows = await self.connection.fetch_all(_query)
+        return {el[0]: el[1] for el in rows}
+
     async def get_samples_by(
         self,
         sample_ids: List[int] = None,
