@@ -50,7 +50,7 @@ async def create_new_sample(
 @router.post('/id-map/external', operation_id='getSampleIdMapByExternal')
 async def get_sample_id_map_by_external(
     allow_missing: bool = False,
-    external_ids: List[str] = Body(..., embed=True),
+    external_ids: List[str] = Body(...),
     connection: Connection = get_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
@@ -63,7 +63,7 @@ async def get_sample_id_map_by_external(
 
 @router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
 async def get_sample_id_map_by_internal(
-    internal_ids: List[str] = Body(..., embed=True),
+    internal_ids: List[str] = Body(...),
     connection: Connection = get_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
