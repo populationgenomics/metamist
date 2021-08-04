@@ -15,7 +15,7 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       # used for generating API
       SM_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/server:${{ github.sha }}
-
+      SM_API_DOCKER: australia-southeast1-docker.pkg.dev/cpg-common/images/sm-api:${{ github.sha }}
     defaults:
       run:
         shell: bash -l {0}
@@ -53,12 +53,16 @@ jobs:
           python regenerate_api.py
           ls -lGh sample_metadata
 
-      - name: Build package
+      - name: Build sample-metadata API conda package
         run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
-      - name: "push image"
+      - name: Build sample-metadata API docker image
+        run: docker build -f images/Dockerfile -t $SM_API_DOCKER .
+
+      - name: "push images"
         run: |
           docker push $SM_DOCKER
+          docker push $SM_API_DOCKER
 
       # TODO: implement test deploy to check whether everything is in order
       # - name: "deploy test-web"
