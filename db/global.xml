@@ -10,5 +10,12 @@
             <column name="project" type="VARCHAR(12)" />
         </createTable>
     </changeSet>
+    <changeSet id="update-project-length" author="michaelfranklin">
+        <modifyDataType
+            tableName="sample_map"
+            columnName="project"
+            newDataType="VARCHAR(64)"
+        />
+    </changeSet>
 </databaseChangeLog>
 <!-- This is only for the project-indene -->
