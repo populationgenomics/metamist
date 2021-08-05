@@ -28,7 +28,7 @@ class SampleMapLayer:
         for project, project_internal_ids_iter in projects:
             project_internal_ids = list(project_internal_ids_iter)
             sample_table = SampleTable(
-                SMConnections.get_connection_for_project(project, self.author)
+                await SMConnections.get_connection_for_project(project, self.author)
             )
             m = await sample_table.get_sample_id_map_by_internal_ids(
                 project_internal_ids

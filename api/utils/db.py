@@ -19,11 +19,11 @@ def authenticate(
     return None
 
 
-def dependable_get_connection(
+async def dependable_get_connection(
     project: str, author: str = Depends(authenticate)
 ) -> Connection:
     """FastAPI handler for getting connection"""
-    return SMConnections.get_connection_for_project(project, author)
+    return await SMConnections.get_connection_for_project(project, author)
 
 
 get_author = Depends(authenticate)

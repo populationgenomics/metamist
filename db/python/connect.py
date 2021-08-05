@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, List
 
-import asyncio
+# import asyncio
 import databases
 
 
@@ -99,39 +99,59 @@ class SMConnections:
     """Contains useful functions for connecting to the database"""
 
     _connected = False
-    _connections: Dict[str, databases.Database] = {}
-    _admin_db: databases.Database = None
+    # _connections: Dict[str, databases.Database] = {}
+    # _admin_db: databases.Database = None
+
+    _credentials: Dict[str, DatabaseConfiguration] = {}
+    _admin_credentials: DatabaseConfiguration = None
 
     @staticmethod
-    def get_admin_db():
+    async def get_admin_db():
         """Get administrator database, most likely for getting sample-map"""
-        return SMConnections._admin_db
+        # return SMConnections._admin_db
+        SMConnections._get_project_configs()
+        conn = SMConnections.make_connection(SMConnections._admin_credentials)
+        await conn.connect()
+        return conn
 
     @staticmethod
-    def _get_connections(force_reconnect=False):
-        if not SMConnections._connections or force_reconnect:
-            configs = DatabaseConfiguration.dev_config()
-            if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
-                logger.info('Using production mysql configurations')
-                configs = (
-                    SMConnections._load_database_configurations_from_secret_manager()
-                )
+    def _get_project_configs():
+        if SMConnections._credentials:
+            return SMConnections._credentials
 
-            project_configs = [c for c in configs if not c.is_admin]
-            admin_config = [c for c in configs if c.is_admin][0]
-            SMConnections._admin_db = SMConnections.make_connection(admin_config)
+        configs = DatabaseConfiguration.dev_config()
+        if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
+            logger.info('Using production mysql configurations')
+            configs = SMConnections._load_database_configurations_from_secret_manager()
 
-            try:
-                SMConnections._connections = {
-                    config.project: SMConnections.make_connection(config)
-                    for config in project_configs
-                }
-                logger.info('Created connections to databases')
-            except Exception as exp:
-                logger.error(f"Couldn't create mysql connection: {exp}")
-                raise exp
+        admin_config = [c for c in configs if c.is_admin][0]
+        project_configs: List[DatabaseConfiguration] = [
+            c for c in configs if not c.is_admin
+        ]
 
-        return SMConnections._connections
+        SMConnections._credentials = {c.project: c for c in project_configs}
+        SMConnections._admin_credentials = admin_config
+
+        return SMConnections._credentials
+
+    # @staticmethod
+    # def _get_connections(force_reconnect=False):
+    #     if not SMConnections._connections or force_reconnect:
+    #
+    #
+    #         # SMConnections._admin_db = SMConnections.make_connection(admin_config)
+    #
+    #         try:
+    #             SMConnections._connections = {
+    #                 config.project: SMConnections.make_connection(config)
+    #                 for config in project_configs
+    #             }
+    #             logger.info('Created connections to databases')
+    #         except Exception as exp:
+    #             logger.error(f"Couldn't create mysql connection: {exp}")
+    #             raise exp
+    #
+    #     return SMConnections._connections
 
     @staticmethod
     def make_connection(config: DatabaseConfiguration):
@@ -154,8 +174,8 @@ class SMConnections:
         username,
         password=None,
         port=None,
-        min_pool_size=5,
-        max_pool_size=20,
+        # min_pool_size=5,
+        # max_pool_size=20,
     ):
         """Prepares the connection string for mysql / mariadb"""
 
@@ -167,7 +187,7 @@ class SMConnections:
         if port:
             _host += f':{port}'
 
-        options = {'min_size': min_pool_size, 'max_size': max_pool_size}
+        options = {}  # {'min_size': min_pool_size, 'max_size': max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'mysql://{u_p}@{_host}/{database}?{_options}'
@@ -177,39 +197,47 @@ class SMConnections:
     @staticmethod
     async def connect():
         """Create connections to database"""
-        if SMConnections._connected:
-            return False
 
-        connections = SMConnections._get_connections()
-        await SMConnections._admin_db.connect()
-        for dbname, db in connections.items():
-            logger.info(f'Connecting to {dbname}')
-            await db.connect()
+        # if SMConnections._connected:
+        #     return False
+        #
+        # connections = SMConnections._get_connections()
+        # await SMConnections._admin_db.connect()
+        # for dbname, db in connections.items():
+        #     logger.info(f'Connecting to {dbname}')
+        #     await db.connect()
+        #
+        # return True
 
-        return True
+        # this will now not connect, new connection will be made on every request
+        return False
 
     @staticmethod
     async def disconnect():
         """Disconnect from database"""
-        if not SMConnections._connected:
-            return False
+        # if not SMConnections._connected:
+        #     return False
+        #
+        # await asyncio.gather(
+        #     [v.disconnect() for v in SMConnections._get_connections().values()]
+        # )
+        # return True
 
-        await asyncio.gather(
-            [v.disconnect() for v in SMConnections._get_connections().values()]
-        )
-        return True
+        return False
 
     @staticmethod
-    def get_connection_for_project(project, author):
+    async def get_connection_for_project(project, author):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate the connection with "{author}"')
 
-        conn = SMConnections._get_connections().get(project)
+        # conn = SMConnections._get_connections().get(project)
+        credentials = SMConnections._get_project_configs().get(project)
 
-        if conn is None:
+        if credentials is None:
             raise ProjectDoesNotExist(project)
-
+        conn = SMConnections.make_connection(credentials)
+        await conn.connect()
         return Connection(connection=conn, author=author, project=project)
 
     @staticmethod
@@ -237,10 +265,10 @@ class DbBase:
     """Base class for table subclasses"""
 
     @classmethod
-    def from_project(cls, project, author):
+    async def from_project(cls, project, author):
         """Create the Db object from a project with user details"""
         return cls(
-            connection=SMConnections.get_connection_for_project(project, author),
+            connection=await SMConnections.get_connection_for_project(project, author),
         )
 
     def __init__(self, connection: Connection):

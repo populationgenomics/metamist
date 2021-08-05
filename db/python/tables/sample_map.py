@@ -11,7 +11,7 @@ class SampleMapTable:
 
     def __init__(self, author):
 
-        self.connection = SMConnections.get_admin_db()
+        # self.connection = SMConnections.get_admin_db()
         self.author = author
 
         if self.author is None:
@@ -24,16 +24,18 @@ class SampleMapTable:
         before returning to client.
 
         """
+        connection = await SMConnections.get_admin_db()
         _query = 'INSERT INTO sample_map (project) VALUES (:project) RETURNING id'
-        async with self.connection.transaction():
-            identifier = await self.connection.fetch_val(_query, {'project': project})
+        async with connection.transaction():
+            identifier = await connection.fetch_val(_query, {'project': project})
 
             return identifier
 
     async def get_project_map(self, raw_sample_ids: List[int]):
         """Get {internal_id: project} map from raw_sample_ids"""
         _query = 'SELECT id, project FROM sample_map WHERE id in :ids'
-        inner_id_and_project = await self.connection.fetch_all(
+        connection = await SMConnections.get_admin_db()
+        inner_id_and_project = await connection.fetch_all(
             _query, {'ids': raw_sample_ids}
         )
         sample_id_project_map = dict(inner_id_and_project)
