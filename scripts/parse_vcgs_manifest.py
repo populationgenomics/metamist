@@ -161,7 +161,7 @@ class VcgsManifestParser:
         path = os.path.join(self.path_prefix, filename)
         if self.client:
             blob = self.bucket_client.get_blob(path)
-            return blob.exists()
+            return blob is not None and blob.exists()
 
         return os.path.exists(path)
 
@@ -191,7 +191,7 @@ class VcgsManifestParser:
 
         # determine if any samples exist
         external_id_map = sapi.get_sample_id_map_by_external(
-            'dev', {'external_ids': list(sample_map.keys())}, allow_missing=True
+            self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
         )
 
         samples_to_add: List[NewSample] = []
