@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-locals
 import csv
 import logging
 import os
@@ -16,7 +16,8 @@ from sample_metadata.model.new_sequence import NewSequence
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_update_model import SequenceUpdateModel
+
+# from sample_metadata.model.sequence_update_model import SequenceUpdateModel
 from sample_metadata.model.sample_update_model import SampleUpdateModel
 
 rmatch = re.compile(r'_[Rr]\d')
@@ -199,7 +200,7 @@ class VcgsManifestParser:
         sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
-        sequences_to_update: List[Dict] = []
+        # sequences_to_update: List[Dict] = []
 
         for sample_name in sample_map:
             logger.info(f'Preparing {sample_name}')
@@ -227,9 +228,9 @@ class VcgsManifestParser:
                 samples_to_update[cpgid] = SampleUpdateModel(
                     meta=collapsed_sample_meta,
                 )
-                sequences_to_update.append(
-                    SequenceUpdateModel(sample_id=cpgid, meta=collapsed_sequencing_meta)
-                )
+                # sequences_to_update.append(
+                #     SequenceUpdateModel(sample_id=cpgid, meta=collapsed_sequencing_meta)
+                # )
             else:
                 samples_to_add.append(
                     NewSample(
@@ -266,9 +267,13 @@ class VcgsManifestParser:
                     project=self.sample_metadata_project, new_sequence=seq
                 )
 
-        # TODO: implement sample updating properly
-        # for internal_sample_id, sample_update in samples_to_update.items():
-        #     sapi.update_sample()
+        print(f'Updating {len(samples_to_update)} samples')
+        for internal_sample_id, sample_update in samples_to_update.items():
+            sapi.update_sample(
+                project=self.sample_metadata_project,
+                id_=internal_sample_id,
+                sample_update_model=sample_update,
+            )
 
         return ext_sample_to_internal_id
 

@@ -67,7 +67,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     ):
         """Update a single sample"""
         updatedict = {
-            'meta': meta,
+            'meta': to_db_json(meta),
             'participant_id': participant_id,
             'type': type_,
             'author': author or self.author,
