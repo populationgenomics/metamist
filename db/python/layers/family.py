@@ -220,3 +220,68 @@ class FamilyLayer(BaseLayer):
             await family_participant_table.create_rows(insertable_rows)
 
         return True
+
+    async def get_pedigree(
+        self,
+        family_ids: List[int] = None,
+        # pylint: disable=invalid-name
+        replace_with_participant_external_ids=False,
+        # pylint: disable=invalid-name
+        replace_with_family_external_ids=False,
+        empty_participant_value='',
+    ) -> List[List[Optional[str]]]:
+        """
+        Generate pedigree file for ALL families in project
+        (unless internal_family_ids is specified).
+
+        Use internal IDs unless specific options are specified.
+        """
+
+        ordered_keys = [
+            'family_id',
+            'participant_id',
+            'paternal_participant_id',
+            'maternal_participant_id',
+            'sex',
+            'affected',
+        ]
+        pid_fields = {
+            'participant_id',
+            'paternal_participant_id',
+            'maternal_participant_id',
+        }
+
+        fptable = FamilyParticipantTable(self.connection)
+        rows = await fptable.get_rows(family_ids=family_ids)
+        pmap, fmap = {}, {}
+        if replace_with_participant_external_ids:
+            participant_ids = set(
+                s
+                for r in rows
+                for s in [r[pfield] for pfield in pid_fields]
+                if s is not None
+            )
+            ptable = ParticipantTable(connection=self.connection)
+            pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
+
+        if replace_with_family_external_ids:
+            family_ids = set(r['family_id'] for r in rows if r['family_id'] is not None)
+            ftable = FamilyTable(connection=self.connection)
+            fmap = await ftable.get_id_map_by_internal_ids(list(family_ids))
+
+        formatted_rows = []
+        for row in rows:
+            formatted_row = []
+            for field in ordered_keys:
+                value = row[field]
+                if field == 'family_id':
+                    formatted_row.append(fmap.get(value, value))
+                elif field in pid_fields:
+                    formatted_row.append(
+                        pmap.get(value, value) or empty_participant_value
+                    )
+                else:
+                    formatted_row.append(value)
+            formatted_rows.append(formatted_row)
+
+        return formatted_rows

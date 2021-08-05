@@ -57,3 +57,27 @@ RETURNING id
                 )
 
         return id_map
+
+    async def get_id_map_by_internal_ids(
+        self, internal_participant_ids: List[int], allow_missing=False
+    ) -> Dict[str, int]:
+        """Get map of {internal_id: external_participant_id}"""
+        _query = 'SELECT id, external_id FROM participant WHERE id in :ids'
+        results = await self.connection.fetch_all(
+            _query, {'ids': internal_participant_ids}
+        )
+        id_map = {r['id']: r['external_id'] for r in results}
+
+        if not allow_missing and len(id_map) != len(internal_participant_ids):
+            provided_internal_ids = set(internal_participant_ids)
+            # do the check again, but use the set this time
+            # (in case we're provided a list with duplicates)
+            if len(id_map) != len(provided_internal_ids):
+                # we have families missing from the map, so we'll 404 the whole thing
+                missing_participant_ids = provided_internal_ids - set(id_map.keys())
+
+                raise NotFoundError(
+                    f"Couldn't find participants with internal IDS: {', '.join(missing_participant_ids)}"
+                )
+
+        return id_map

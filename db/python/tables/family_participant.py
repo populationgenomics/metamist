@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 from db.python.connect import DbBase
 
@@ -89,3 +89,25 @@ VALUES
     ({placeholder_keys})
 """
         return await self.connection.execute_many(_query, remapped_ds)
+
+    async def get_rows(self, family_ids: Optional[int] = None):
+        """
+        Get rows from database, return ALL rows unless family_ids is specified.
+        """
+        keys = [
+            'family_id',
+            'participant_id',
+            'paternal_participant_id',
+            'maternal_participant_id',
+            'sex',
+            'affected',
+        ]
+        keys_str = ', '.join(keys)
+        _query = f'SELECT {keys_str} FROM family_participant'
+        values = {}
+        if family_ids:
+            _query += ' WHERE family_id in :family_ids'
+            values = {'family_ids': family_ids}
+
+        rows = await self.connection.fetch_all(_query, values)
+        return rows
