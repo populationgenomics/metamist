@@ -267,7 +267,7 @@ class VcgsManifestParser:
                     project=self.sample_metadata_project, new_sequence=seq
                 )
 
-        print(f'Updating {len(samples_to_update)} samples')
+        logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
             sapi.update_sample(
                 project=self.sample_metadata_project,
@@ -474,23 +474,26 @@ def apply_secondary_file_format_to_filename(
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
-@click.argument('manifest')
+@click.argument('manifests', nargs=-1)
 def main(
-    manifest,
+    manifests,
     project,
     sample_metadata_project,
     default_sample_type='blood',
     default_sequence_type='wgs',
 ):
     """Run script from CLI arguments"""
-    resp = VcgsManifestParser.from_manifest_path(
-        manifest=manifest,
-        project=project,
-        sample_metadata_project=sample_metadata_project,
-        default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
-    )
-    print(resp)
+
+    for manifest in manifests:
+        logger.info(f'Importing {manifest}')
+        resp = VcgsManifestParser.from_manifest_path(
+            manifest=manifest,
+            project=project,
+            sample_metadata_project=sample_metadata_project,
+            default_sample_type=default_sample_type,
+            default_sequence_type=default_sequence_type,
+        )
+        print(resp)
 
 
 if __name__ == '__main__':
