@@ -34,7 +34,7 @@ jobs:
 
       - name: "deploy create_project"
         run: |
-          gcloud run deploy create_project \
+          gcloud run deploy create-project-service \
             --region australia-southeast1 \
             --no-allow-unauthenticated \
             --platform managed \

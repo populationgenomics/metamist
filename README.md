@@ -193,7 +193,14 @@ python regenerate_apy.py
 
 ## Adding a new project
 
-Run the `scripts/create_project.py` script on a machine.
+```shell
+curl --location --request POST 'https://create-project-service-mnrpw3mdza-ts.a.run.app/project' \
+--header "Authorization: Bearer $(gcloud auth print-identity-token)" \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "project_name": "<project-name>"
+}'
+```
 
 
 ## Deployment
