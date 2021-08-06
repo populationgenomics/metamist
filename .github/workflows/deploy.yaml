@@ -57,7 +57,11 @@ jobs:
         run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
       - name: Build sample-metadata API docker image
-        run: docker build -f images/Dockerfile -t $SM_API_DOCKER .
+        run: |
+          docker build \
+            -t $SM_API_DOCKER \
+            --build-arg SM_VERSION=$(cat deploy/python/version.txt) \
+            deploy/python
 
       - name: "push images"
         run: |
