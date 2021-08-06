@@ -1,0 +1,41 @@
+name: Deploy web server
+on: workflow_dispatch
+jobs:
+  deploy_server:
+    runs-on: ubuntu-latest
+
+    env:
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      DOCKER_IMAGE: australia-southeast1-docker.pkg.dev/sample-metadata/images/create_project:${{ github.sha }}
+
+    steps:
+      - name: "checkout repo"
+        uses: actions/checkout@v2
+
+      - name: "gcloud setup"
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: sample-metadata
+          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+
+      - name: "gcloud docker auth"
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - name: "build image"
+        run: |
+          docker build --tag $DOCKER_IMAGE deploy/create_project
+
+      - name: "push image"
+        run: |
+          docker push $DOCKER_IMAGE
+
+      - name: "deploy create_project"
+        run: |
+          gcloud run deploy create_project \
+            --region australia-southeast1 \
+            --no-allow-unauthenticated \
+            --platform managed \
+            --image $DOCKER_IMAGE
