@@ -404,7 +404,7 @@ class Configuration(object):
                 'in': 'header',
                 'key': 'Authorization',
                 'value': 'Bearer '
-                + (self.access_token or _get_google_auth_token(self._base_path)),
+                + (self.access_token or _get_google_auth_token()),
             }
         }
         return auth
@@ -491,7 +491,7 @@ class Configuration(object):
         self.server_index = None
 
 
-def _get_google_auth_token(url) -> str:
+def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/') -> str:
     """
     Get google auth token in two ways:
     - if GOOGLE_APPLICATION_CREDENTIALS is set, then you
