@@ -32,6 +32,7 @@ setup(
         'google-auth',
         'urllib3 >= 1.25.3',
         'python-dateutil',
+        'requests',
     ],
     include_package_data=True,
     zip_safe=False,
