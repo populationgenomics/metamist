@@ -1,5 +1,5 @@
 import os
-from sample_metadata.api import SampleApi, AnalysisApi
+from sample_metadata.apis import SampleApi, AnalysisApi
 from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.analysis_model import AnalysisModel
 

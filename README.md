@@ -39,7 +39,7 @@ You can configure these separately with:
 # use localhost:8000
 export SM_ENVIRONMENT=dev
  # use a local account to generate identity-token for auth
-export SM_USE_SERVICE_ACCOUNT=false
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
 ```
 
 
@@ -105,7 +105,6 @@ export SM_DEV_DB_PORT=3307
 export SM_DEV_DB_HOST=127.0.0.1
 export SM_DEV_DB_PASSWORD=root
 export SM_ENVIRONMENT=dev
-export SM_USE_SERVICE_ACCOUNT=false
 python3 -m api.server
 ```
 
