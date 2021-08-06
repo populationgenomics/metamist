@@ -15,7 +15,7 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       # used for generating API
       SM_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/server:${{ github.sha }}
-      SM_API_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/sm-api:${{ github.sha }}
+      SM_API_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/sm-api
     defaults:
       run:
         shell: bash -l {0}
@@ -56,17 +56,9 @@ jobs:
       - name: Build sample-metadata API conda package
         run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
-      - name: Build sample-metadata API docker image
-        run: |
-          docker build \
-            -t $SM_API_DOCKER \
-            --build-arg SM_VERSION=$(cat deploy/python/version.txt) \
-            deploy/python
-
-      - name: "push images"
+      - name: "push server image"
         run: |
           docker push $SM_DOCKER
-          docker push $SM_API_DOCKER
 
       # TODO: implement test deploy to check whether everything is in order
       # - name: "deploy test-web"
@@ -86,3 +78,12 @@ jobs:
         run: |
           anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
           upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+
+      - name: Build and push sample-metadata API docker image
+        run: |
+          version=$(cat deploy/python/version.txt)
+          docker build \
+            -t $SM_API_DOCKER:$version \
+            --build-arg SM_VERSION=$version \
+            deploy/python
+          docker push $SM_API_DOCKER:$version
