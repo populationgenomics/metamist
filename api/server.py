@@ -21,7 +21,7 @@ from api.utils.gcp import setup_gcp_logging
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
-_VERSION = '1.0.8'
+_VERSION = '1.0.9'
 
 
 logger = setup_gcp_logging(IS_PRODUCTION)
