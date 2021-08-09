@@ -66,17 +66,28 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         author: str = None,
     ):
         """Update a single sample"""
-        updatedict = {
-            'meta': to_db_json(meta),
-            'participant_id': participant_id,
-            'type': type_,
+        values = {
             'author': author or self.author,
         }
+        fields = [
+            'author = :author',
+        ]
+        if participant_id:
+            values['participant_id'] = participant_id
+            fields.append('participant_id = :participant_id')
+
+        if type_:
+            values['type'] = type_
+            fields.append('type = :type')
+
+        if meta:
+            values['meta']: to_db_json(meta)
+            fields.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+
         # means you can't set to null
-        non_null_updatedict = {k: v for k, v in updatedict.items() if v is not None}
-        fields_str = ', '.join(f'{key} = :{key}' for key in non_null_updatedict.keys())
+        fields_str = ', '.join(fields)
         _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
-        await self.connection.execute(_query, {**non_null_updatedict, 'id': id_})
+        await self.connection.execute(_query, {**values, 'id': id_})
         return True
 
     async def update_many_participant_ids(
