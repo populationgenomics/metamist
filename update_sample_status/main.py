@@ -18,8 +18,8 @@ from sample_metadata.models import SequencingStatus
 routes = web.RouteTableDef()
 
 FILES_HANDLED = {
-    'gvcf': [{'primary': '.g.vcf.gz', 'secondary': ['.g.vcf.gz.tbi', '.g.vcf.gz.md5']}],
-    'cram': [{'primary': '.cram', 'secondary': ['.cram.crai', '.cram.md5']}],
+    'gvcf': [{'primary': '.g.vcf.gz', 'secondary': ['.g.vcf.gz.tbi', '.g.vcf.gz.md5'], 'meta-field': 'gvcf'}],
+    'cram': [{'primary': '.cram', 'secondary': ['.cram.crai', '.cram.md5'], 'meta-field': 'reads'}],
 }
 
 
@@ -76,17 +76,20 @@ async def upload_sample(request):
         )
 
     # Determine the internal ID
-    external_id_dict = {'external_ids': [external_id]}
-    internal_id_map = sapi.get_sample_id_map_by_external(project, external_id_dict)
+    internal_id_map = sapi.get_sample_id_map_by_external(project, [external_id])
     internal_id = str(list(internal_id_map.values())[0])
 
-    reads = []
+    # TODO: Added the QC Metadata Here. Should this be moved to sample metadata?
+    meta = {'qc_metrics': qc_metadata}
     for key in FILES_HANDLED:
         reads = create_file_object(external_id, key, project, batch)
-        # TODO: Added the QC Metadata Here. Should this be moved to sample metadata?
-        metadata = {'reads': reads, 'qc_metrics': qc_metadata}
-        # Update the sequencing metadata.
-        update_sequence_meta(project, internal_id, status, metadata)
+        
+        field_name = FILES_HANDLED[key]['meta-field']
+        meta[field_name] = reads
+        meta[field_name + '_type'] = key
+        
+    # Update the sequencing metadata.
+    update_sequence_meta(project, internal_id, status, metadata)
 
     return web.Response(text=f'{external_id} lodged.')
 
