@@ -61,12 +61,21 @@ async def update_sequence(
     return {'success': True}
 
 
+@router.get('/{sequence_id}/details', operation_id='getSequenceByID')
+async def get_sequence(sequence_id: int, connection: Connection = get_db_connection):
+    """Get sequence by sequence ID"""
+    sequence_layer = SampleSequencingTable(connection)
+    resp = await sequence_layer.get_sequence_by_id(sequence_id)
+    resp.sample_id = sample_id_format(resp.sample_id)
+    return resp
+
+
 @router.get(
     '/latest-from-sample-id/{sample_id}', operation_id='getSequenceIdFromSampleId'
 )
 async def get_sequence_id_from_sample_id(
     sample_id: str, connection: Connection = get_db_connection
-):
+) -> int:
     """Get sample by internal ID"""
     sequence_layer = SampleSequencingTable(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)

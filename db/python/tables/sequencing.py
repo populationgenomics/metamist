@@ -71,6 +71,20 @@ RETURNING id;"""
 
         return id_of_new_sample
 
+    async def get_sequence_by_id(self, sequence_id: int) -> SampleSequencing:
+        """Get sequence by sequence ID"""
+        keys = [
+            'id',
+            'sample_id',
+            'type',
+            'meta',
+            'status',
+        ]
+        keys_str = ', '.join(keys)
+        _query = f'SELECT {keys_str} FROM sample_sequencing WHERE id = :id'
+        d = await self.connection.fetch_one(_query, {'id': sequence_id})
+        return SampleSequencing.from_db(dict(d))
+
     async def get_latest_sequence_id_by_sample_id(self, sample_id: int):
         """
         Get latest added sequence ID from internal sample_id
