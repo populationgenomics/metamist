@@ -172,7 +172,7 @@ WHERE id = :sequencing_id
             fields['status'] = status.value
         if meta is not None:
 
-            updaters.append('meta = JSON_MERGE_PATCH(meta, :meta)')
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
             fields['meta'] = to_db_json(meta)
 
         _query = f"""
