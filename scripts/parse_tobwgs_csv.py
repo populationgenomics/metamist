@@ -70,8 +70,8 @@ class Columns:
         ]
 
 
-class VcgsManifestParser(GenericParser):
-    """Parser for VCGS manifest"""
+class TobWgsParser(GenericParser):
+    """Parser for TOBWgs manifest"""
 
     def get_sample_id(self, row: Dict[str, any]):
         return row[Columns.SAMPLE_NAME]
