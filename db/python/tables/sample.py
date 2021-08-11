@@ -64,6 +64,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         participant_id: int = None,
         type_: SampleType = None,
         author: str = None,
+        active: bool = None,
     ):
         """Update a single sample"""
         values = {
@@ -83,6 +84,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         if meta:
             values['meta']: to_db_json(meta)
             fields.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+
+        if active is not None:
+            values['active'] = 1 if active else 0
+            fields.append('active = :active')
 
         # means you can't set to null
         fields_str = ', '.join(fields)

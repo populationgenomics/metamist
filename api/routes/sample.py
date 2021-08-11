@@ -25,6 +25,7 @@ class SampleUpdateModel(BaseModel):
     meta: Optional[Dict] = {}
     type: Optional[SampleType] = None
     participant_id: Optional[int] = None
+    active: Optional[bool] = None
 
 
 router = APIRouter(prefix='/sample', tags=['sample'])
@@ -127,6 +128,7 @@ async def update_sample(
         meta=model.meta,
         participant_id=model.participant_id,
         type_=model.type,
+        active=model.active,
     )
     return result
 
