@@ -17,11 +17,6 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
-BAM_EXTENSIONS = ('.bam',)
-CRAM_EXTENSIONS = ('.cram',)
-VCFGZ_EXTENSIONS = ('.vcf.gz',)
-
 
 class Columns:
     """Column keys for VCGS manifest"""

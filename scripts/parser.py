@@ -201,9 +201,7 @@ class GenericParser:
         for external_sample_id in sample_map:
             logger.info(f'Preparing {external_sample_id}')
             rows = sample_map[external_sample_id]
-            # TODO: remove this
-            if external_sample_id not in external_id_map:
-                continue
+
             if len(rows) == 1:
                 rows = rows[0]
             # now we have sample / sequencing meta across 4 different rows, so collapse them
@@ -246,18 +244,18 @@ class GenericParser:
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
         ext_sample_to_internal_id = {}
-        # for new_sample in samples_to_add:
-        #     sample_id = sapi.create_new_sample(
-        #         project=self.sample_metadata_project, new_sample=new_sample
-        #     )
-        #     ext_sample_to_internal_id[new_sample.external_id] = sample_id
-        #
-        # for sample_id, sequences_to_add in sequencing_to_add.items():
-        #     for seq in sequences_to_add:
-        #         seq.sample_id = ext_sample_to_internal_id[sample_id]
-        #         seqapi.create_new_sequence(
-        #             project=self.sample_metadata_project, new_sequence=seq
-        #         )
+        for new_sample in samples_to_add:
+            sample_id = sapi.create_new_sample(
+                project=self.sample_metadata_project, new_sample=new_sample
+            )
+            ext_sample_to_internal_id[new_sample.external_id] = sample_id
+
+        for sample_id, sequences_to_add in sequencing_to_add.items():
+            for seq in sequences_to_add:
+                seq.sample_id = ext_sample_to_internal_id[sample_id]
+                seqapi.create_new_sequence(
+                    project=self.sample_metadata_project, new_sequence=seq
+                )
 
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
