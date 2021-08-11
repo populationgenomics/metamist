@@ -131,6 +131,32 @@ ORDER by id
 
         return sample_id_to_seq_id
 
+    async def get_sequences_by_sample_ids(
+        self, sample_ids: List[int], get_latest_sequence_only=True
+    ) -> List[SampleSequencing]:
+        """Get a list of sequence objects by their internal sample IDs"""
+        keys = [
+            'id',
+            'sample_id',
+            'type',
+            'meta',
+            'status',
+        ]
+        keys_str = ', '.join(keys)
+        # there's an implicit ordering by id
+        _query = (
+            f'SELECT {keys_str} FROM sample_sequencing WHERE sample_id in :sample_ids'
+        )
+        sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        if get_latest_sequence_only:
+            # get last one
+            sequences = [
+                list(seqs)[-1]
+                for _, seqs in groupby(sequences, lambda seq: seq['sample_id'])
+            ]
+
+        return [SampleSequencing.from_db(dict(s)) for s in sequences]
+
     async def update_status(
         self,
         sequencing_id,

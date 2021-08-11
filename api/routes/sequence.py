@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
@@ -68,6 +68,21 @@ async def get_sequence(sequence_id: int, connection: Connection = get_db_connect
     resp = await sequence_layer.get_sequence_by_id(sequence_id)
     resp.sample_id = sample_id_format(resp.sample_id)
     return resp
+
+
+@router.get('/', operation_id='getSequencesByIds')
+async def get_sequences_by_internal_sample_ids(
+    sample_ids: List[str] = Query(None), connection: Connection = get_db_connection
+):
+    """Get a list of sequence objects by their internal CPG sample IDs"""
+    sequence_layer = SampleSequencingTable(connection)
+    unwrapped_sample_ids: List[int] = sample_id_transform_to_raw(sample_ids)
+    sequences = await sequence_layer.get_sequences_by_sample_ids(unwrapped_sample_ids)
+
+    for seq in sequences:
+        seq.sample_id = sample_id_format(seq.sample_id)
+
+    return sequences
 
 
 @router.get(
