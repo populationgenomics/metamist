@@ -126,7 +126,7 @@ ORDER by id
         # hopefully there aren't too many
         sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         sample_id_to_seq_id = {}
-        for sample_id, seqs in groupby(sequences, lambda seq: seq[0]):
+        for sample_id, seqs in groupby(sequences, lambda seq: seq['sample_id']):
             sample_id_to_seq_id[sample_id] = list(seqs)[-1]['id']  # get last one
 
         return sample_id_to_seq_id
