@@ -133,6 +133,7 @@ class TobWgsParser(GenericParser):
         collapsed_sequence_meta['gvcf_type'] = variants_type
 
         collapsed_sequence_meta['project'] = self.project
+        collapsed_sequence_meta['batch'] = batch_number
 
         return collapsed_sequence_meta
 
