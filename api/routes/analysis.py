@@ -107,8 +107,11 @@ async def get_incomplete_analyses(connection: Connection = get_db_connection):
 async def get_latest_complete_analyses(connection: Connection = get_db_connection):
     """Get "complete" analyses with the latest timestamp_completed"""
     atable = AnalysisTable(connection)
-    result = await atable.get_latest_complete_analyses()
-    return result
+    results = await atable.get_latest_complete_analyses()
+    for result in results:
+        result.sample_ids = sample_id_format(result.sample_ids)
+
+    return results
 
 
 @router.get(
@@ -121,5 +124,7 @@ async def get_latest_complete_analyses_by_type(
 ):
     """Get "complete" analyses with the latest timestamp_completed"""
     atable = AnalysisTable(connection)
-    result = await atable.get_latest_complete_analyses(analysis_type)
-    return result
+    results = await atable.get_latest_complete_analyses(analysis_type)
+    for result in results:
+        result.sample_ids = sample_id_format(result.sample_ids)
+    return results

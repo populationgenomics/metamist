@@ -1,4 +1,5 @@
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional
+
 from datetime import datetime
 
 from db.python.connect import DbBase  # , to_db_json
@@ -64,7 +65,7 @@ VALUES ({cs_id_keys});"""
         )
 
         values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sample_ids)
-        await self.connection.execute_many(_query, values)
+        await self.connection.execute_many(_query, list(values))
 
     async def update_analysis(
         self,
@@ -156,7 +157,7 @@ WHERE a.status='queued' OR a.status='in-progress'
 
     async def get_latest_complete_analyses(
         self, analysis_type: Optional[str] = None
-    ) -> Dict[Tuple[str, str], Analysis]:
+    ) -> List[Analysis]:
         """
         Gets details of analysis with status "completed", one per sample with the most
         recent timestamp

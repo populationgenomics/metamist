@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from pydantic.main import BaseModel
 
@@ -12,7 +12,7 @@ class Analysis(BaseModel):
     type: AnalysisType = None
     status: AnalysisStatus = None
     output: Optional[str] = None
-    sample_ids: List[int] = None
+    sample_ids: List[Union[str, int]] = None
 
     @staticmethod
     def from_db(**kwargs):
