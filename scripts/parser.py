@@ -393,14 +393,14 @@ class GenericParser:
         """
         secondaries = []
         for sec in potential_secondary_patterns:
-            sec_file = apply_secondary_file_format_to_filename(filename, sec)
+            sec_file = _apply_secondary_file_format_to_filename(filename, sec)
             if self.file_exists(sec_file):
                 secondaries.append(self.create_file_object(sec_file))
 
         return secondaries
 
 
-def apply_secondary_file_format_to_filename(
+def _apply_secondary_file_format_to_filename(
     filepath: Optional[str], secondary_file: str
 ):
     """
