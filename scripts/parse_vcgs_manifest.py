@@ -11,18 +11,13 @@ from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
 
-from .parser import GenericParser, GROUPED_ROW
+from .parser import GenericParser, GroupedRow
 
 rmatch = re.compile(r'_[Rr]\d')
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
-
-FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
-BAM_EXTENSIONS = ('.bam',)
-CRAM_EXTENSIONS = ('.cram',)
-VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
 
 class Columns:
@@ -73,19 +68,37 @@ class Columns:
 class VcgsManifestParser(GenericParser):
     """Parser for VCGS manifest"""
 
+    def __init__(
+        self,
+        path_prefix: str,
+        sample_metadata_project: str,
+        project: str,
+        default_sequence_type='wgs',
+        default_sample_type='blood',
+        delimeter='\t',
+    ):
+        super().__init__(
+            path_prefix=path_prefix,
+            sample_metadata_project=sample_metadata_project,
+            project=project,
+            default_sequence_type=default_sequence_type,
+            default_sample_type=default_sample_type,
+            delimeter=delimeter,
+        )
+
     def get_sample_id(self, row: Dict[str, any]):
         return row[Columns.SAMPLE_NAME]
 
-    def get_sample_meta(self, sample_id: str, row: GROUPED_ROW):
+    def get_sample_meta(self, sample_id: str, row: GroupedRow):
         if isinstance(row, list):
             collapsed_sample_meta = {
                 col: ','.join(set(r[col] for r in row))
                 for col in Columns.sample_columns()
             }
-            reads, reads_type = self.parse_reads([r[Columns.FILENAME] for r in row])
+            reads, reads_type = self.parse_file([r[Columns.FILENAME] for r in row])
         else:
             collapsed_sample_meta = {col: row[col] for col in Columns.sample_columns()}
-            reads, reads_type = self.parse_reads([row[Columns.FILENAME]])
+            reads, reads_type = self.parse_file([row[Columns.FILENAME]])
 
         collapsed_sample_meta['reads'] = reads
         collapsed_sample_meta['reads_type'] = reads_type
@@ -93,57 +106,53 @@ class VcgsManifestParser(GenericParser):
 
         return collapsed_sample_meta
 
-    def get_sequence_meta(self, sample_id: str, row: GROUPED_ROW):
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         return {
             col: ','.join(set(r[col] for r in row))
             for col in Columns.sequence_columns()
         }
 
-    def get_sequence_type(self, sample_id: str, row: GROUPED_ROW) -> SequenceType:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
         # filter false-y values
         if not isinstance(row, list):
             return SequenceType(row[Columns.LIBRARY_STRATEGY])
-        else:
-            types = list(
-                set(
-                    r[Columns.LIBRARY_STRATEGY]
-                    for r in row
-                    if r[Columns.LIBRARY_STRATEGY]
-                )
-            )
-            if len(types) <= 0:
-                if (
-                    self.default_sequencing_type is None
-                    or self.default_sequencing_type.lower() == 'none'
-                ):
-                    raise ValueError(
-                        f"Couldn't detect sequence type for sample {sample_id}, and "
-                        'no default was available.'
-                    )
-                return self.default_sequencing_type
-            if len(types) > 1:
+
+        types = list(
+            set(r[Columns.LIBRARY_STRATEGY] for r in row if r[Columns.LIBRARY_STRATEGY])
+        )
+        if len(types) <= 0:
+            if (
+                self.default_sequence_type is None
+                or self.default_sequence_type.lower() == 'none'
+            ):
                 raise ValueError(
-                    f'Multiple library types for same sample {sample_id}, '
-                    f'maybe there are multiples types of sequencing in the same '
-                    f'manifest? If so, please raise an issue with mfranklin to '
-                    f'change the groupby to include {Columns.LIBRARY_STRATEGY}.'
+                    f"Couldn't detect sequence type for sample {sample_id}, and "
+                    'no default was available.'
                 )
+            return self.default_sequence_type
+        if len(types) > 1:
+            raise ValueError(
+                f'Multiple library types for same sample {sample_id}, '
+                f'maybe there are multiples types of sequencing in the same '
+                f'manifest? If so, please raise an issue with mfranklin to '
+                f'change the groupby to include {Columns.LIBRARY_STRATEGY}.'
+            )
 
-            type_ = types[0].lower()
-            if type_ == 'wgs':
-                return SequenceType('wgs')
-            if type_ in ('single-cell', 'ss'):
-                return SequenceType('single-cell')
+        type_ = types[0].lower()
+        if type_ == 'wgs':
+            return SequenceType('wgs')
+        if type_ in ('single-cell', 'ss'):
+            return SequenceType('single-cell')
 
-            raise ValueError(f'Unrecognised sequencing type {type_}')
+        raise ValueError(f'Unrecognised sequencing type {type_}')
 
-    def get_sample_type(self, sample_id: str, row: GROUPED_ROW) -> SampleType:
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
         return self.default_sample_type
 
-    def get_sequence_status(self, sample_id: str, row: GROUPED_ROW) -> SequenceStatus:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
         return SequenceStatus('uploaded')
 
     @staticmethod

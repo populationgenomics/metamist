@@ -5,11 +5,10 @@ import os
 import re
 from abc import abstractmethod
 from collections import defaultdict
-from io import StringIO
 from itertools import groupby
 from typing import List, Dict, Union, Optional, Tuple
 
-import click
+from google.api_core.exceptions import Forbidden
 
 from sample_metadata.apis import SampleApi, SequenceApi
 from sample_metadata.model.new_sample import NewSample
@@ -17,8 +16,7 @@ from sample_metadata.model.new_sequence import NewSequence
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.model.sample_type import SampleType
-
-# from sample_metadata.model.sequence_update_model import SequenceUpdateModel
+from sample_metadata.model.sequence_update_model import SequenceUpdateModel
 from sample_metadata.model.sample_update_model import SampleUpdateModel
 
 logger = logging.getLogger(__file__)
@@ -30,7 +28,8 @@ BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
-GROUPED_ROW = Union[List[Dict[str, any]], Dict[str, any]]
+rmatch = re.compile(r'_[Rr]\d')
+GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
 
 
 class GenericParser:
@@ -43,22 +42,23 @@ class GenericParser:
         project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
+        delimeter=',',
     ):
-        super().__init__()
 
         self.path_prefix = path_prefix
+        self.delimeter = delimeter
 
         self.project = project
         self.sample_metadata_project = sample_metadata_project
 
-        self.default_sequencing_type = default_sequence_type
+        self.default_sequence_type = default_sequence_type
         self.default_sample_type = default_sample_type
 
         # gs specific
-        self.bucket = None
+        self.default_bucket = None
 
         self.client = None
-        self.bucket_client = None
+        self.bucket_clients = {}
 
         if path_prefix.startswith('gs://'):
             # pylint: disable=import-outside-toplevel
@@ -66,71 +66,105 @@ class GenericParser:
 
             self.client = storage.Client()
             path_components = path_prefix[5:].split('/')
-            self.bucket = path_components[0]
-            self.bucket_client = self.client.get_bucket(self.bucket)
+            self.default_bucket = path_components[0]
             self.path_prefix = '/'.join(path_components[1:])
 
-    def file_path(self, filename) -> str:
+    def get_bucket(self, bucket_name=None):
+        """Get cached bucket client from optional bucket name"""
+        if bucket_name is None:
+            bucket_name = self.default_bucket
+        if bucket_name not in self.bucket_clients:
+            self.bucket_clients[bucket_name] = self.client.get_bucket(bucket_name)
+
+        return self.bucket_clients[bucket_name]
+
+    def file_path(self, filename: str) -> str:
         """
         Get complete filepath of filename:
         - Includes gs://{bucket} if relevant
         - Includes path_prefix decided early on
         """
+        if filename.startswith('gs://'):
+            return filename
+
         if self.client and not filename.startswith('/'):
-            return os.path.join('gs://', self.bucket, self.path_prefix, filename)
+            return os.path.join(
+                'gs://', self.default_bucket, self.path_prefix, filename
+            )
+
         return os.path.join(self.path_prefix, filename)
 
-    def file_contents(self, filename) -> str:
-        """Get contents of file (decoded as utf8)"""
-        path = os.path.join(self.path_prefix, filename)
-        if self.client and not filename.startswith('/'):
-            blob = self.bucket_client.get_blob(path)
-            return blob.download_as_string().decode()
+    def get_blob(self, filename):
+        """Convenience function for getting blob from fully qualified GCS path"""
+        if not filename.startswith('gs://'):
+            raise ValueError('No blob available')
 
-        with open(path) as f:
+        bucket_name, *components = filename[5:].split('/')
+        bucket = self.get_bucket(bucket_name)
+        path = '/'.join(components)
+
+        # the next few lines are equiv to `bucket.get_blob(path)`
+        # but without requiring storage.objects.get permission
+        blobs = list(self.client.list_blobs(bucket, prefix=path))
+        # first where r.name == path (or None)
+        return next((r for r in blobs if r.name == path), None)
+
+    def file_contents(self, filename) -> Optional[str]:
+        """Get contents of file (decoded as utf8)"""
+        path = self.file_path(filename)
+        if path.startswith('gs://'):
+            blob = self.get_blob(filename)
+            try:
+                return blob.download_as_string()
+            except Forbidden:
+                logger.warning(f"FORBIDDEN: Can't download {filename}")
+                return None
+
+        with open(filename) as f:
             return f.read()
 
-    def file_exists(self, filename) -> bool:
+    def file_exists(self, filename: str) -> bool:
         """Determines whether a file exists"""
-        path = os.path.join(self.path_prefix, filename)
-        if self.client and not filename.startswith('/'):
-            blob = self.bucket_client.get_blob(path)
-            return blob is not None and blob.exists()
+        path = self.file_path(filename)
+
+        if path.startswith('gs://'):
+            blob = self.get_blob(filename)
+            return blob is not None
 
         return os.path.exists(path)
 
     def file_size(self, filename):
         """Get size of file in bytes"""
         path = os.path.join(self.path_prefix, filename)
-        if self.client and not filename.startswith('/'):
-            blob = self.bucket_client.get_blob(path)
+        if path.startswith('gs://'):
+            blob = self.get_blob(filename)
             return blob.size
 
         return os.path.getsize(path)
 
     @abstractmethod
     def get_sample_id(self, row: Dict[str, any]):
-        pass
+        """Get external sample ID from row"""
 
     @abstractmethod
-    def get_sample_meta(self, sample_id: str, row: GROUPED_ROW):
-        pass
+    def get_sample_meta(self, sample_id: str, row: GroupedRow):
+        """Get sample-metadata from row"""
 
     @abstractmethod
-    def get_sequence_meta(self, sample_id: str, row: GROUPED_ROW):
-        pass
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+        """Get sequence-metadata from row"""
 
     @abstractmethod
-    def get_sample_type(self, sample_id: str, row: GROUPED_ROW) -> SampleType:
-        pass
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
+        """Get sample type from row"""
 
     @abstractmethod
-    def get_sequence_type(self, sample_id: str, row: GROUPED_ROW) -> SequenceType:
-        pass
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
+        """Get sequence type from row"""
 
     @abstractmethod
-    def get_sequence_status(self, sample_id: str, row: GROUPED_ROW) -> SequenceStatus:
-        pass
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+        """Get sequence status from row"""
 
     def parse_manifest(self, file_pointer):
         """
@@ -139,7 +173,7 @@ class GenericParser:
         # a sample has many rows
         sample_map = defaultdict(list)
 
-        reader = csv.DictReader(file_pointer, delimiter='\t')
+        reader = csv.DictReader(file_pointer, delimiter=self.delimeter)
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
@@ -152,23 +186,30 @@ class GenericParser:
         external_id_map = sapi.get_sample_id_map_by_external(
             self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
         )
+        internal_sample_id_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
+            project=self.sample_metadata_project,
+            request_body=list(external_id_map.values()),
+        )
 
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
-        # sequences_to_update: List[Dict] = []
+        sequences_to_update: Dict[int, SequenceUpdateModel] = {}
 
         for external_sample_id in sample_map:
             logger.info(f'Preparing {external_sample_id}')
             rows = sample_map[external_sample_id]
+            # TODO: remove this
+            if external_sample_id not in external_id_map:
+                continue
             if len(rows) == 1:
                 rows = rows[0]
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
-            sample_type = self.get_sample_type(external_sample_id, rows)
+            sample_type = SampleType(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
             if external_sample_id in external_id_map:
@@ -177,11 +218,16 @@ class GenericParser:
                 samples_to_update[cpgid] = SampleUpdateModel(
                     meta=collapsed_sample_meta,
                 )
+                seq_id = internal_sample_id_to_seq_id[cpgid]
+                sequences_to_update[seq_id] = SequenceUpdateModel(
+                    meta=collapsed_sequencing_meta, status=sequence_status
+                )
+
             else:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
-                        type=SampleType(self.default_sample_type),
+                        type=sample_type,
                         meta=collapsed_sample_meta,
                     )
                 )
@@ -189,7 +235,7 @@ class GenericParser:
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
-                        type=SequenceType(sample_type),
+                        type=SequenceType('wgs'),
                         status=sequence_status,
                     )
                 )
@@ -200,18 +246,18 @@ class GenericParser:
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
         ext_sample_to_internal_id = {}
-        for new_sample in samples_to_add:
-            sample_id = sapi.create_new_sample(
-                project=self.sample_metadata_project, new_sample=new_sample
-            )
-            ext_sample_to_internal_id[new_sample.external_id] = sample_id
-
-        for sample_id, sequences_to_add in sequencing_to_add.items():
-            for seq in sequences_to_add:
-                seq.sample_id = ext_sample_to_internal_id[sample_id]
-                seqapi.create_new_sequence(
-                    project=self.sample_metadata_project, new_sequence=seq
-                )
+        # for new_sample in samples_to_add:
+        #     sample_id = sapi.create_new_sample(
+        #         project=self.sample_metadata_project, new_sample=new_sample
+        #     )
+        #     ext_sample_to_internal_id[new_sample.external_id] = sample_id
+        #
+        # for sample_id, sequences_to_add in sequencing_to_add.items():
+        #     for seq in sequences_to_add:
+        #         seq.sample_id = ext_sample_to_internal_id[sample_id]
+        #         seqapi.create_new_sequence(
+        #             project=self.sample_metadata_project, new_sequence=seq
+        #         )
 
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
@@ -221,41 +267,17 @@ class GenericParser:
                 sample_update_model=sample_update,
             )
 
-        return ext_sample_to_internal_id
-
-    def parse_sequencing_type(self, sample_id: str, types: List[str]):
-        """
-        Parse sequencing type (wgs / single-cell, etc)
-        """
-        # filter false-y values
-        types = list(set(t for t in types if t))
-        if len(types) <= 0:
-            if (
-                self.default_sequencing_type is None
-                or self.default_sequencing_type.lower() == 'none'
-            ):
-                raise ValueError(
-                    f"Couldn't detect sequence type for sample {sample_id}, and "
-                    'no default was available.'
-                )
-            return self.default_sequencing_type
-        if len(types) > 1:
-            raise ValueError(
-                f'Multiple library types for same sample {sample_id}, '
-                f'maybe there are multiples types of sequencing in the same '
-                f'manifest? If so, please raise an issue with mfranklin to '
-                f'change the groupby to include {Columns.LIBRARY_STRATEGY}.'
+        logger.info(f'Updating {len(sequences_to_update)} sequences')
+        for seq_id, seq_update in sequences_to_update.items():
+            seqapi.update_sequence(
+                project=self.sample_metadata_project,
+                sequence_id=seq_id,
+                sequence_update_model=seq_update,
             )
 
-        type_ = types[0].lower()
-        if type_ == 'wgs':
-            return 'wgs'
-        if type_ in ('single-cell', 'ss'):
-            return 'single-cell'
+        return ext_sample_to_internal_id
 
-        raise ValueError(f'Unrecognised sequencing type {type_}')
-
-    def parse_reads(
+    def parse_file(
         self, reads: List[str]
     ) -> Tuple[Union[List[List[Dict]], List[Dict]], str]:
         """
@@ -302,7 +324,7 @@ class GenericParser:
                 )
                 files.append(self.create_file_object(r, secondary_files=secondaries))
 
-            return files, 'bam'
+            return files, 'gvcf'
 
         extensions = set(os.path.splitext(r)[-1] for r in reads)
         joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(reads))
@@ -315,7 +337,7 @@ class GenericParser:
         """
         Takes a list of fastqs, and a set of nested lists of each R1 + R2 read.
 
-        >>> VcgsManifestParser.parse_fastqs_structure(['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz'])
+        >>> GenericParser.parse_fastqs_structure(['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz'])
         [['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz'], ['20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz']]
 
 
@@ -338,14 +360,16 @@ class GenericParser:
 
     def create_file_object(
         self,
-        filename,
+        filename: str,
         secondary_files: List[Dict[str, any]] = None,
     ) -> Dict[str, any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
         md5_filename = filename + '.md5'
         if self.file_exists(md5_filename):
-            checksum = f'md5:{self.file_contents(md5_filename).strip()}'
+            contents = self.file_contents(md5_filename)
+            if contents:
+                checksum = f'md5:{contents.strip()}'
 
         d = {
             'location': self.file_path(filename),
@@ -407,41 +431,3 @@ def apply_secondary_file_format_to_filename(
     if len(split) > 1:
         newfname = '.'.join(split[: -min(leading, len(split) - 1)]) + fixed_sec
     return basepath + newfname
-
-
-@click.command(help='GCS path to manifest file')
-@click.option(
-    '--project',
-    help='The CPG based project short-code, tagged as "sample.meta.project"',
-)
-@click.option(
-    '--sample-metadata-project',
-    help='The sample-metadata project to import manifest into (probably "seqr")',
-)
-@click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='wgs')
-@click.argument('manifests', nargs=-1)
-def main(
-    manifests,
-    project,
-    sample_metadata_project,
-    default_sample_type='blood',
-    default_sequence_type='wgs',
-):
-    """Run script from CLI arguments"""
-
-    for manifest in manifests:
-        logger.info(f'Importing {manifest}')
-        resp = VcgsManifestParser.from_manifest_path(
-            manifest=manifest,
-            project=project,
-            sample_metadata_project=sample_metadata_project,
-            default_sample_type=default_sample_type,
-            default_sequence_type=default_sequence_type,
-        )
-        print(resp)
-
-
-if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
-    main()
