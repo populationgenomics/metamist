@@ -10,7 +10,7 @@ from sample_metadata.models.sample_type import SampleType
 from sample_metadata.models.sequence_status import SequenceStatus
 from sample_metadata.models.sequence_type import SequenceType
 
-from scripts.parser import GenericParser, GroupedRow
+from parser import GenericParser, GroupedRow
 
 
 logger = logging.getLogger(__file__)
