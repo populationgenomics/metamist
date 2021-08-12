@@ -21,7 +21,7 @@ with open('README.md') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='2.0.0',
+    version='2.0.1',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
