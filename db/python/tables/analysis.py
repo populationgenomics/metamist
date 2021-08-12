@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from datetime import datetime
 
-from db.python.connect import DbBase  # , to_db_json
+from db.python.connect import DbBase, NotFoundError  # , to_db_json
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
 
@@ -21,6 +21,7 @@ class AnalysisTable(DbBase):
         sample_ids: List[int],
         output=None,
         author=None,
+        project=None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -32,6 +33,7 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('output', output),
                 ('author', author or self.author),
+                ('project', project or self.project),
             ]
 
             if status == AnalysisStatus.COMPLETED:
@@ -90,83 +92,66 @@ VALUES ({cs_id_keys});"""
         await self.connection.execute(_query, {**fields, 'analysis_id': analysis_id})
 
     async def get_all_sample_ids_without_analysis_type(
-        self, analysis_type: AnalysisType
+        self, analysis_type: AnalysisType, project: int = None
     ):
         """
         Find all the samples in the sample_id list that a
         """
         _query = """
-SELECT id FROM sample WHERE id NOT IN (
-    SELECT a_s.sample_id FROM analysis_sample a_s
-    LEFT JOIN analysis a ON a_s.analysis_id = a.id
-    WHERE a.type = :analysis_type
-);"""
+SELECT s.id FROM sample s
+WHERE s.project = :project AND
+      id NOT IN (
+          SELECT a_s.sample_id FROM analysis_sample a_s
+          LEFT JOIN analysis a ON a_s.analysis_id = a.id
+          WHERE a.type = :analysis_type
+      )
+;"""
 
         rows = await self.connection.fetch_all(
-            _query, {'analysis_type': analysis_type.value}
+            _query,
+            {'analysis_type': analysis_type.value, 'project': project or self.project},
         )
         return [row[0] for row in rows]
 
-    async def get_all_new_gvcfs_since_last_successful_joint_call(self) -> List[int]:
-        """
-        Get list of analysis ids for new GVCFs since the last successful joint-calling
-        """
-
-        _query = """
-SELECT a.id
-FROM analysis
-WHERE type='gvcf'
-AND a.timestamp_completed > (
-    SELECT timestamp_completed FROM analysis
-    WHERE type = 'joint-calling'
-    ORDER BY timestamp_completed DESC
-    LIMIT 1
-)"""
-        ids = [r[0] for r in await self.connection.execute(_query)]
-
-        # analysis IDs
-        return ids
-
-    async def get_incomplete_analyses(self) -> List[Analysis]:
+    async def get_incomplete_analyses(self, project: int = None) -> List[Analysis]:
         """
         Gets details of analysis with status queued or in-progress
         """
         _query = f"""
-SELECT a.id, a.type, a.status, a.output, a_s.sample_id
+SELECT a.id as id, a.type as type, a.status as status,
+        a.output as output, a_s.sample_id as sample_id, a.project as project
 FROM analysis_sample a_s
-LEFT JOIN analysis a ON a_s.analysis_id = a.id
-WHERE a.status='queued' OR a.status='in-progress'
+INNER JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.project = :project AND (a.status='queued' OR a.status='in-progress')
 """
-        rows = await self.connection.fetch_all(_query)
-        keys = [
-            'id',
-            'type',
-            'status',
-            'output',
-            'sample_id',
-        ]
+        rows = await self.connection.fetch_all(
+            _query, {'project': project or self.project}
+        )
         analysis_by_id = dict()
         for row in rows:
-            kwargs = {keys[i]: row[i] for i in range(len(keys))}
-            aid = kwargs['id']
+            aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = Analysis.from_db(**kwargs)
+                analysis_by_id[aid] = Analysis.from_db(**dict(row))
             else:
-                analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
+                analysis_by_id[aid].sample_ids.append(row['sample_id'])
+
         return list(analysis_by_id.values())
 
-    async def get_latest_complete_analyses(
-        self, analysis_type: Optional[str] = None
+    async def get_latest_complete_analyses_per_sample(
+        self, analysis_type: Optional[str] = None, project: int = None
     ) -> List[Analysis]:
         """
-        Gets details of analysis with status "completed", one per sample with the most
-        recent timestamp
+        Gets details of analysis with status "completed", one per
+        sample with the most recent timestamp
         """
         _query = f"""
-SELECT a.id, a.type, a.status, a.output, a_s.sample_id, a.timestamp_completed
+SELECT
+    a.id as id, a.type as type, a.status as status, a.output as output,
+    a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed,
+    a.project as project
 FROM analysis_sample a_s
-LEFT JOIN analysis a ON a_s.analysis_id = a.id
-WHERE a.status = 'completed'
+INNER JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.status = 'completed' AND a.project = :project
 AND a.timestamp_completed = (
     SELECT a2.timestamp_completed
     FROM analysis a2
@@ -176,26 +161,34 @@ AND a.timestamp_completed = (
     ORDER BY timestamp_completed
     DESC LIMIT 1
 );"""
+        values = {'project': project or self.project}
         if analysis_type:
-            rows = await self.connection.fetch_all(
-                _query, {'analysis_type': analysis_type}
-            )
-        else:
-            rows = await self.connection.fetch_all(_query)
-        keys = [
-            'id',
-            'type',
-            'status',
-            'output',
-            'sample_id',
-        ]
+            values['analysis_type'] = analysis_type
+        rows = await self.connection.fetch_all(_query, values)
         analysis_by_id = dict()
         for row in rows:
-            kwargs = {keys[i]: row[i] for i in range(len(keys))}
-            aid = kwargs['id']
+            aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = Analysis.from_db(**kwargs)
+                analysis_by_id[aid] = Analysis.from_db(**dict(row))
             else:
-                analysis_by_id[aid].sample_ids.append(kwargs['sample_id'])
+                analysis_by_id[aid].sample_ids.append(row['sample_id'])
 
         return list(analysis_by_id.values())
+
+    async def get_analysis_by_id(self, analysis_id: int) -> Analysis:
+        """Get analysis object by analysis_id"""
+        _query = """
+SELECT a.id as id, a.type as type, a.status as status, a.output as output, a.project as project, a_s.sample_id as sample_id
+FROM analysis a
+LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+WHERE a.id = :analysis_id
+"""
+        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+        if len(rows) == 0:
+            raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
+
+        a = Analysis.from_db(**dict(rows[0]))
+        for row in rows[1:]:
+            a.sample_ids.append(row['sample_id'])
+
+        return a

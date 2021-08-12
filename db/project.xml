@@ -1,15 +1,41 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-4.1.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
-    <changeSet author="michael.franklin" id="2021-05-03_initial">
+    <changeSet author="michael.franklin" id="2021-08-12-dbrefactor">
 
         <!-- Project settings -->
         <createTable tableName="project">
-            <column name="name" type="VARCHAR(255)">
+            <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
-            <column name="value" type="TEXT" />
+            <column name="name" type="VARCHAR(64)">
+                <constraints unique="true" nullable="false" />
+            </column>
+            <column name="author" type="VARCHAR(255)">
+                <constraints nullable="false" />
+            </column>
 
         </createTable>
+
+<!--        <createTable tableName="project_permissions">-->
+<!--            <column name="id" type="INT">-->
+<!--                <constraints-->
+<!--                    nullable="true"-->
+<!--                    primaryKey="true"-->
+<!--                    primaryKeyName="PK_PROJECT_PERMISSIONS"-->
+<!--                />-->
+<!--            </column>-->
+<!--            <column name="user" type="VARCHAR(255)">-->
+<!--                <constraints-->
+<!--                    nullable="false"-->
+<!--                    primaryKey="true"-->
+<!--                    primaryKeyName="PK_PROJECT_PERMISSIONS"-->
+<!--                />-->
+<!--            </column>-->
+<!--            <column name="permission" type="INT">-->
+<!--                <constraints nullable="false" />-->
+<!--            </column>-->
+<!--        </createTable>-->
+
 
         <!-- Participants -->
         <createTable tableName="participant">
@@ -19,18 +45,30 @@
             <column name="external_id" type="VARCHAR(255)">
                 <constraints nullable="false" />
             </column>
+            <column name="project" type="INT">
+                <constraints nullable="false" foreignKeyName="fk_project_participant" references="project(id)" />
+            </column>
             <!-- Record keeping -->
             <column name="author" type="VARCHAR(255)">
                 <constraints nullable="false" />
             </column>
         </createTable>
+        <addUniqueConstraint
+            columnNames="project,external_id"
+            tableName="participant"
+            constraintName="UK_PARTICIPANT_SAMPLE_EXTERNALID"
+            validate="true"
+        />
         <!-- Samples -->
         <createTable tableName="sample">
             <column name="id" type="INT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
-                <constraints nullable="false" unique="true" />
+                <constraints nullable="false" />
+            </column>
+            <column name="project" type="INT">
+                <constraints nullable="false" foreignKeyName="fk_project_sample" references="project(id)" />
             </column>
             <column name="participant_id" type="INT">
                 <constraints nullable="true" foreignKeyName="fk_participant_sample" references="participant(id)"/>
@@ -44,6 +82,12 @@
                 <constraints nullable="false" />
             </column>
         </createTable>
+        <addUniqueConstraint
+            columnNames="project,external_id"
+            tableName="sample"
+            constraintName="UK_SAMPLE_PROJECT_EXTERNALID"
+            validate="true"
+        />
 
         <!-- Sample Sequencing  -->
         <createTable tableName="sample_sequencing">
@@ -100,6 +144,9 @@
             </column>
             <column name="timestamp_completed" type="timestamp" />
 
+            <column name="project" type="INT">
+                <constraints nullable="false" foreignKeyName="fk_project_analysis" references="project(id)"/>
+            </column>
             <column name="author" type="VARCHAR(255)">
                 <constraints nullable="false" />
             </column>
@@ -114,7 +161,6 @@
                 <constraints nullable="false" foreignKeyName="fk_analysis_sample_sample" references="sample(id)"/>
             </column>
 
-
         </createTable>
 
         <!-- Family -->
@@ -123,7 +169,10 @@
                 <constraints primaryKey="true" nullable="false" />
             </column>
             <column name="external_id" type="VARCHAR(255)">
-                <constraints nullable="false" unique="true" />
+                <constraints nullable="false" />
+            </column>
+            <column name="project" type="INT">
+                <constraints nullable="false"  foreignKeyName="fk_project_family" references="project(id)"/>
             </column>
             <column name="description" type="TEXT">
                 <constraints nullable="true" />
@@ -135,6 +184,12 @@
                 <constraints nullable="false" />
             </column>
         </createTable>
+        <addUniqueConstraint
+            columnNames="project,external_id"
+            tableName="family"
+            constraintName="UK_FAMILY_PROJECT_EXTERNALID"
+            validate="true"
+        />
         <createTable tableName="family_participant">
             <column name="family_id" type="INT">
                 <constraints nullable="false" foreignKeyName="fk_family_participant" references="family(id)"/>

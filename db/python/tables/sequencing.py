@@ -92,7 +92,7 @@ RETURNING id;"""
         _query = """\
 SELECT id from sample_sequencing
 WHERE sample_id = :sample_id
-ORDER by id
+ORDER by id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
@@ -106,7 +106,7 @@ LIMIT 1
 SELECT sq.id from sample_sequencing sq
 INNER JOIN sample s ON s.id = sq.sample_id
 WHERE s.external_id = :external_id
-ORDER by s.id
+ORDER by s.id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(
@@ -121,7 +121,7 @@ LIMIT 1
         _query = """
 SELECT id, sample_id from sample_sequencing
 WHERE sample_id in :sample_ids
-ORDER by id
+ORDER by id DESC
 """
         # hopefully there aren't too many
         sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})

@@ -16,6 +16,7 @@ class FamilyTable(DbBase):
         description: Optional[str],
         coded_phenotype: Optional[str],
         author: str = None,
+        project: int = None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -25,6 +26,7 @@ class FamilyTable(DbBase):
             'description': description,
             'coded_phenotype': coded_phenotype,
             'author': author or self.author,
+            'project': project or self.project,
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
