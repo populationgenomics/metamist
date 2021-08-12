@@ -113,33 +113,6 @@ WHERE s.project = :project AND
         )
         return [row[0] for row in rows]
 
-    async def get_all_new_gvcfs_since_last_successful_joint_call(
-        self, project: int = None
-    ) -> List[int]:
-        """
-        Get list of analysis ids for new GVCFs since the last successful joint-calling
-        """
-
-        _query = """
-SELECT a.id
-FROM analysis a
-WHERE a.type='gvcf' AND a.project = :project
-AND a.timestamp_completed > (
-    SELECT timestamp_completed FROM analysis
-    WHERE type = 'joint-calling' AND timestamp_completed IS NOT NULL
-    ORDER BY timestamp_completed DESC
-    LIMIT 1
-)"""
-        ids = [
-            r[0]
-            for r in await self.connection.fetch_all(
-                _query, {'project': project or self.project}
-            )
-        ]
-
-        # analysis IDs
-        return ids
-
     async def get_incomplete_analyses(self, project: int = None) -> List[Analysis]:
         """
         Gets details of analysis with status queued or in-progress

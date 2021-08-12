@@ -1,5 +1,5 @@
-# from datetime import datetime
-from typing import Optional, Dict
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Union
 
 
 class ProjectTable:
@@ -16,9 +16,23 @@ class ProjectTable:
 
         self.connection = connection
 
+    async def get_project_id_map(self) -> Dict[Optional[str], Optional[int]]:
+        """(CACHED) Get map of project names to project IDs"""
+        if (
+            not ProjectTable.cached_project_names
+            or ProjectTable.cache_expiry < datetime.utcnow()
+        ):
+            ProjectTable.cached_project_names = {
+                **(await self.get_project_name_id_map()),
+                None: None,
+            }
+            ProjectTable.cache_expiry = datetime.utcnow() + timedelta(minutes=1)
+
+        return ProjectTable.cached_project_names
+
     async def get_project_id_from_name_and_user(
         self, user: str, project: Optional[int]
-    ) -> int:
+    ) -> Optional[Union[int, bool]]:
         """
         Get projectId from project name and user (email address)
         TODO: implement project permissions here
@@ -27,16 +41,8 @@ class ProjectTable:
         """
         if not user:
             raise Exception('An internal error occurred during authorization')
-        if (
-            not ProjectTable.cached_project_names
-        ):  # or ProjectTable.cache_expiry < datetime.utcnow():
-            ProjectTable.cached_project_names = {
-                **(await self.get_project_name_id_map()),
-                None: None,
-            }
-            # ProjectTable.cache_expiry = datetime.utcnow() + 5 minutes
-
-        return ProjectTable.cached_project_names.get(project, False)
+        m = await self.get_project_id_map()
+        return m.get(project, False)
 
     async def get_project_name_id_map(self) -> Dict[str, int]:
         """Get {name: id} project map"""

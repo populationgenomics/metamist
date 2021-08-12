@@ -254,7 +254,7 @@ LIMIT 1;"""
         sample_ids: List[int] = None,
         meta: Dict[str, any] = None,
         participant_ids: List[int] = None,
-        project=None,
+        project_ids=None,
     ):
         """Get samples by some criteria"""
         keys = [
@@ -270,9 +270,9 @@ LIMIT 1;"""
         where = []
         replacements = {}
 
-        if project or self.project:
-            where.append('project = :project')
-            replacements['project'] = project or self.project
+        if project_ids:
+            where.append('project in :project_ids')
+            replacements['project_ids'] = project_ids
 
         if sample_ids:
             where.append('id in :sample_ids')
