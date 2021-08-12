@@ -10,14 +10,14 @@ from typing import List, Dict, Union, Optional, Tuple
 
 from google.api_core.exceptions import Forbidden
 
-from sample_metadata.apis import SampleApi, SequenceApi
-from sample_metadata.model.new_sample import NewSample
-from sample_metadata.model.new_sequence import NewSequence
-from sample_metadata.model.sequence_status import SequenceStatus
-from sample_metadata.model.sequence_type import SequenceType
-from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_update_model import SequenceUpdateModel
-from sample_metadata.model.sample_update_model import SampleUpdateModel
+from sample_metadata.api import SampleApi, SequenceApi
+from sample_metadata.models.new_sample import NewSample
+from sample_metadata.models.new_sequence import NewSequence
+from sample_metadata.models.sequence_status import SequenceStatus
+from sample_metadata.models.sequence_type import SequenceType
+from sample_metadata.models.sample_type import SampleType
+from sample_metadata.models.sequence_update_model import SequenceUpdateModel
+from sample_metadata.models.sample_update_model import SampleUpdateModel
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
