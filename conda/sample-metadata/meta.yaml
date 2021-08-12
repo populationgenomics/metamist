@@ -1,0 +1,30 @@
+{% set data=load_setup_py_data() %}
+
+package:
+  name: sample-metadata
+  version: {{ data['version'] }}
+
+source:
+  path: ../../
+
+build:
+  number: 0
+  noarch: python
+
+requirements:
+  host:
+    - python
+  run:
+    - requests
+    - google-auth ==1.24.0
+    - urllib3 >=1.25.3
+    - python-dateutil
+
+# test:
+#   commands:
+#     - sample_metadata --version
+
+about:
+  home: {{ data['url'] }}
+  license: {{ data['license'] }}
+  summary: {{ data['description'] }}

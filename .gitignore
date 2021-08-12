@@ -1,0 +1,10 @@
+db/postgres*.jar
+.vscode/
+env/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+db/mariadb-java-client-*.jar
+sample_metadata
+*.egg-info/

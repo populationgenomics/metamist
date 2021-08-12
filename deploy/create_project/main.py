@@ -18,24 +18,71 @@ import random
 import string
 import subprocess
 import urllib.request
+import time
+import traceback
 
+from fastapi import FastAPI, Request, HTTPException, Body
+from fastapi.responses import JSONResponse
 import pymysql
 from google.cloud import secretmanager
 
-MARIADB_HOST = os.getenv('SM_DB_HOST')
-if not MARIADB_HOST:
-    raise ValueError(
-        'Environment variable "SM_DB_HOST" was not set, you might also want to '
-        'set SM_DB_USER, SM_DB_PASSWORD, SM_DB_PORT to configure the project creation.'
-    )
 
-MARIADB_USER = os.getenv('SM_DB_USER', 'root')
-MARIADB_PASSWORD = os.getenv('SM_DB_PASSWORD', None)
-MARIADB_PORT = int(os.getenv('SM_DB_PORT', '3306'))
+CREDENTIALS = os.getenv('SM_CREDS')
+if CREDENTIALS is None:
+    raise ValueError('SM credentials were not provided')
+creds = json.loads(CREDENTIALS)
+MARIADB_HOST = creds['host']
+MARIADB_USER = creds['username']
+MARIADB_PASSWORD = creds['password']
+MARIADB_PORT = int(creds.get('port', 3306))
 
 EXTERNAL_HOST = 'sm-db-vm-instance.australia-southeast1-b.c.sample-metadata.internal'
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+app = FastAPI()
+
+
+@app.middleware('http')
+async def add_process_time_header(request: Request, call_next):
+    """Add X-Process-Time to all requests for logging"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers['X-Process-Time'] = f'{round(process_time * 1000, 1)}ms'
+    return response
+
+
+@app.exception_handler(Exception)
+async def exception_handler(_: Request, e: Exception):
+    """Generic exception handler"""
+    base_params = {}
+    add_stacktrace = True
+
+    if add_stacktrace:
+        st = traceback.format_exc()
+        base_params['stacktrace'] = st
+
+    if isinstance(e, HTTPException):
+        code = e.status_code
+        name = e.detail
+
+    else:
+        code = 500
+        name = str(type(e).__name__)
+
+    return JSONResponse(
+        status_code=code,
+        content={**base_params, 'name': name, 'description': str(e)},
+    )
+
+
+@app.post('/project')
+async def create_project_request(project_name: str = Body(..., embed=True)):
+    """POST request for creating a project"""
+    create_database(project_name, update_secret=True)
+    return {'success': True}
 
 
 def create_database(
@@ -45,7 +92,7 @@ def create_database(
     update_secret: bool = False,
 ):
     """Driver function to create new database in sample-metadata"""
-    if not project.isalpha():
+    if not project.isidentifier():
         raise ValueError(
             'The project name must only consist of alphabetical characters'
         )
@@ -55,13 +102,6 @@ def create_database(
     databasename = f'sm_{project_name}'
     _username = username or f'sm_{project_name}'
     _password = password or _generate_password()
-    force_recreate_user = True
-    if project_name == 'dev':
-        _username = 'root'
-        _password = None
-
-    if _username == 'root':
-        force_recreate_user = False
 
     connection = _get_connection()
     cursor: pymysql.cursors.Cursor = connection.cursor()
@@ -72,7 +112,7 @@ def create_database(
         dbname=databasename,
         username=_username,
         password=_password,
-        force_recreate_user=force_recreate_user,
+        force_recreate_user=True,
     )
     _grant_privileges_to_database(cursor, databasename, _username)
 
@@ -136,10 +176,13 @@ def _create_mariadb_database(cursor, name):
         raise
 
 
-def _generate_password(length=14):
+def _generate_password(length=-1):
     """Generate random string of letters"""
-    # I don't like '@' / '#' in the password, it always seems to cause problems
-    password_characters = string.ascii_letters + string.digits + '-!&$'
+    # Don't like special characters in the password, it always seems to cause problems
+    # so just make it longer
+    if length <= 0:
+        length = random.randint(24, 30)
+    password_characters = string.ascii_letters + string.digits + '-_'
     return ''.join(random.choice(password_characters) for _ in range(length))
 
 
@@ -250,7 +293,7 @@ def _apply_schema(databasename):
         command.extend(['--password', MARIADB_PASSWORD])
 
     jcommand = ' '.join(command)
-    print(f'Running "{jcommand}"')
+    print(f'Running "{jcommand.replace(MARIADB_PASSWORD, "****")}"')
     try:
         output = subprocess.check_output(jcommand, shell=True)
         print(output.decode())
@@ -265,35 +308,7 @@ def _apply_schema(databasename):
     return True
 
 
-def from_args(args=None):
-    """Run create_database(*)"""
-
-    # pylint: disable=import-outside-toplevel
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--update-gcp-secret', action='store_true')
-
-    parser.add_argument(
-        '--username', help='Override the user with format "sm_{project}"'
-    )
-
-    parser.add_argument(
-        '--password', help='(Default: generate password) override generated password'
-    )
-    parser.add_argument(
-        'project',
-        help='Project name, if the project is "dev", username will default to root, and password to empty',
-    )
-
-    pargs = parser.parse_args(args)
-    create_database(
-        pargs.project,
-        update_secret=pargs.update_gcp_secret,
-        password=pargs.password,
-        username=pargs.username,
-    )
-
-
 if __name__ == '__main__':
-    from_args()
+    import uvicorn
+
+    uvicorn.run(app, host='0.0.0.0', port=int(os.getenv('PORT', '8000')), debug=True)
