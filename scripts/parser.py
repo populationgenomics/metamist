@@ -39,16 +39,16 @@ class GenericParser:
         self,
         path_prefix: str,
         sample_metadata_project: str,
-        project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
         delimeter=',',
+        confirm=False,
     ):
 
         self.path_prefix = path_prefix
         self.delimeter = delimeter
+        self.confirm = confirm
 
-        self.project = project
         self.sample_metadata_project = sample_metadata_project
 
         self.default_sequence_type = default_sequence_type
@@ -115,7 +115,10 @@ class GenericParser:
         if path.startswith('gs://'):
             blob = self.get_blob(filename)
             try:
-                return blob.download_as_string()
+                retval = blob.download_as_string()
+                if isinstance(retval, bytes):
+                    retval = retval.decode()
+                return retval
             except Forbidden:
                 logger.warning(f"FORBIDDEN: Can't download {filename}")
                 return None
@@ -135,7 +138,7 @@ class GenericParser:
 
     def file_size(self, filename):
         """Get size of file in bytes"""
-        path = os.path.join(self.path_prefix, filename)
+        path = self.file_path(filename)
         if path.startswith('gs://'):
             blob = self.get_blob(filename)
             return blob.size
@@ -186,10 +189,12 @@ class GenericParser:
         external_id_map = sapi.get_sample_id_map_by_external(
             self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
         )
-        internal_sample_id_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
-            project=self.sample_metadata_project,
-            request_body=list(external_id_map.values()),
-        )
+        internal_sample_id_to_seq_id = {}
+
+        if len(external_id_map) > 0:
+            internal_sample_id_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
+                request_body=list(external_id_map.values()),
+            )
 
         samples_to_add: List[NewSample] = []
         # by external_sample_id
@@ -242,6 +247,23 @@ class GenericParser:
             logger.info('No sample-metadata project set, so skipping add into SM-DB')
             return samples_to_add, sequencing_to_add
 
+        message = f"""\
+Processing samples: {', '.join(sample_map.keys())}
+
+Adding {len(samples_to_add)} samples
+Adding {len(sequencing_to_add)} sequences
+
+Updating {len(samples_to_update)} sample
+Updating {len(sequences_to_update)} sequences
+
+Confirm (y): """
+        if self.confirm:
+            resp = str(input(message))
+            if resp.lower() != 'y':
+                raise SystemExit()
+        else:
+            logger.info(message)
+
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
         ext_sample_to_internal_id = {}
         for new_sample in samples_to_add:
@@ -253,9 +275,7 @@ class GenericParser:
         for sample_id, sequences_to_add in sequencing_to_add.items():
             for seq in sequences_to_add:
                 seq.sample_id = ext_sample_to_internal_id[sample_id]
-                seqapi.create_new_sequence(
-                    project=self.sample_metadata_project, new_sequence=seq
-                )
+                seqapi.create_new_sequence(new_sequence=seq)
 
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
@@ -268,7 +288,6 @@ class GenericParser:
         logger.info(f'Updating {len(sequences_to_update)} sequences')
         for seq_id, seq_update in sequences_to_update.items():
             seqapi.update_sequence(
-                project=self.sample_metadata_project,
                 sequence_id=seq_id,
                 sequence_update_model=seq_update,
             )
@@ -363,7 +382,7 @@ class GenericParser:
     ) -> Dict[str, any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
-        md5_filename = filename + '.md5'
+        md5_filename = self.file_path(filename + '.md5')
         if self.file_exists(md5_filename):
             contents = self.file_contents(md5_filename)
             if contents:

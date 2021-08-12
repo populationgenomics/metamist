@@ -132,7 +132,6 @@ class TobWgsParser(GenericParser):
         collapsed_sequence_meta['gvcf'] = gvcf
         collapsed_sequence_meta['gvcf_type'] = variants_type
 
-        collapsed_sequence_meta['project'] = self.project
         collapsed_sequence_meta['batch'] = batch_number
 
         return collapsed_sequence_meta
@@ -155,11 +154,11 @@ class TobWgsParser(GenericParser):
     @staticmethod
     def from_manifest_path(
         manifest: str,
-        project: str,
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
         path_prefix=None,
+        confirm=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         if path_prefix is None:
@@ -170,10 +169,10 @@ class TobWgsParser(GenericParser):
 
         parser = TobWgsParser(
             path_prefix,
-            project=project,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            confirm=confirm,
         )
         file_contents = parser.file_contents(manifest_filename)
         resp = parser.parse_manifest(StringIO(file_contents))
@@ -193,14 +192,17 @@ class TobWgsParser(GenericParser):
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
 @click.option('--path-prefix', default=None)
+@click.option(
+    '--confirm', is_flag=True, help='Confirm with user input before updating server'
+)
 @click.argument('manifests', nargs=-1)
 def main(
     manifests,
-    project,
     sample_metadata_project,
     default_sample_type='blood',
     default_sequence_type='wgs',
     path_prefix=None,
+    confirm=False,
 ):
     """Run script from CLI arguments"""
 
@@ -208,11 +210,11 @@ def main(
         logger.info(f'Importing {manifest}')
         resp = TobWgsParser.from_manifest_path(
             manifest=manifest,
-            project=project,
             sample_metadata_project=sample_metadata_project,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
             path_prefix=path_prefix,
+            confirm=confirm,
         )
         print(resp)
 

@@ -118,10 +118,13 @@ LIMIT 1
         """
         Get the IDs of the latest sequence for a sample, keyed by the internal sample ID
         """
+        if not sample_ids:
+            return {}
+
         _query = """
 SELECT id, sample_id from sample_sequencing
 WHERE sample_id in :sample_ids
-ORDER by id DESC
+ORDER by id DESC;
 """
         # hopefully there aren't too many
         sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
