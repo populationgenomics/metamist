@@ -90,7 +90,9 @@ VALUES
 """
         return await self.connection.execute_many(_query, remapped_ds)
 
-    async def get_rows(self, family_ids: Optional[int] = None):
+    async def get_rows(
+        self, family_ids: Optional[int] = None, project: Optional[int] = None
+    ):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
         """
@@ -102,12 +104,21 @@ VALUES
             'sex',
             'affected',
         ]
-        keys_str = ', '.join(keys)
-        _query = f'SELECT {keys_str} FROM family_participant'
-        values = {}
+        keys_str = ', '.join('fp.' + k for k in keys)
+
+        values = {'project': project or self.project}
+        wheres = ['project = :project']
         if family_ids:
-            _query += ' WHERE family_id in :family_ids'
-            values = {'family_ids': family_ids}
+            wheres.append('family_id in :family_ids')
+            values['family_ids'] = family_ids
+
+        conditions = ' AND '.join(wheres)
+
+        _query = f"""
+SELECT {keys_str} FROM family_participant fp
+INNER JOIN family f ON f.id = fp.family_id
+WHERE {conditions}
+        """
 
         rows = await self.connection.fetch_all(_query, values)
         return rows

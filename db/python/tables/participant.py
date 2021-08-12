@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from db.python.connect import DbBase, NotFoundError
 
@@ -32,14 +32,19 @@ RETURNING id
         )
 
     async def get_id_map_by_external_ids(
-        self, external_participant_ids: List[str], allow_missing=False
+        self,
+        external_participant_ids: List[str],
+        allow_missing=False,
+        project: Optional[int] = None,
     ) -> Dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
-        _query = (
-            'SELECT external_id, id FROM participant WHERE external_id in :external_ids'
-        )
+        _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
-            _query, {'external_ids': external_participant_ids}
+            _query,
+            {
+                'external_ids': external_participant_ids,
+                'project': project or self.project,
+            },
         )
         id_map = {r['external_id']: r['id'] for r in results}
 

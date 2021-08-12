@@ -42,12 +42,15 @@ RETURNING id
         return await self.connection.fetch_val(_query, updater)
 
     async def get_id_map_by_external_ids(
-        self, family_ids: List[str], allow_missing=False
+        self, family_ids: List[str], allow_missing=False, project: Optional[int] = None
     ):
         """Get map of {external_id: internal_id} for a family"""
-        _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids'
-        results = await self.connection.fetch_all(_query, {'external_ids': family_ids})
+        _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
+        results = await self.connection.fetch_all(
+            _query, {'external_ids': family_ids, 'project': project or self.project}
+        )
         id_map = {r['external_id']: r['id'] for r in results}
+
         if not allow_missing and len(id_map) != len(family_ids):
             provided_external_ids = set(family_ids)
             # do the check again, but use the set this time

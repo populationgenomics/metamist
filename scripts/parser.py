@@ -254,11 +254,9 @@ Adding {len(samples_to_add)} samples
 Adding {len(sequencing_to_add)} sequences
 
 Updating {len(samples_to_update)} sample
-Updating {len(sequences_to_update)} sequences
-
-Confirm (y): """
+Updating {len(sequences_to_update)} sequences"""
         if self.confirm:
-            resp = str(input(message))
+            resp = str(input(message + '\n\nConfirm (y): '))
             if resp.lower() != 'y':
                 raise SystemExit()
         else:
