@@ -262,7 +262,7 @@ LIMIT 1;"""
             'external_id',
             'participant_id',
             'meta',
-            'active',
+            'active+1 as active',
             'type',
         ]
         keys_str = ', '.join(keys)
@@ -280,7 +280,6 @@ LIMIT 1;"""
         if meta:
             for k, v in meta.items():
                 k_replacer = f'meta_{k}'
-                # json_extract(meta, '$.phs_accession') = 'cpg_acute_20210727_185421'
                 where.append(f"json_extract(meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
@@ -293,7 +292,7 @@ LIMIT 1;"""
             _query += f' WHERE {" AND ".join(where)}'
 
         samples = await self.connection.fetch_all(_query, replacements)
-        return samples
+        return [Sample.from_db(**s) for s in samples]
 
     async def samples_with_missing_participants(
         self, project: Optional[int] = None

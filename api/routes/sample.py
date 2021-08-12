@@ -123,10 +123,12 @@ async def get_samples_by_criteria(
     Get list of samples (dict) by some mixture of (AND'd) criteria
     """
     st = SampleTable(connection)
-    if project_ids:
-        pt = ProjectTable(connection.connection)
-        internal_project_id_map = await pt.get_project_id_map()
-        project_ids = [internal_project_id_map[pid] for pid in project_ids]
+    if not project_ids:
+        raise ValueError('You must specify at least one project id for this method')
+
+    pt = ProjectTable(connection.connection)
+    internal_project_id_map = await pt.get_project_id_map()
+    project_ids = [internal_project_id_map[pid] for pid in project_ids]
 
     sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
 
@@ -137,7 +139,10 @@ async def get_samples_by_criteria(
         project_ids=project_ids,
     )
 
-    return [{**d, 'id': sample_id_format(d['id'])} for d in result]
+    for sample in result:
+        sample.id = sample_id_format(sample.id)
+
+    return result
 
 
 @router.patch('/{id_}', operation_id='updateSample')
