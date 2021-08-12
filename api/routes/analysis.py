@@ -7,7 +7,11 @@ from models.enums import AnalysisType, AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.tables.analysis import AnalysisTable
 
-from api.utils.db import get_db_connection, Connection
+from api.utils.db import (
+    get_projectless_db_connection,
+    get_project_db_connection,
+    Connection,
+)
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -28,9 +32,9 @@ class AnalysisUpdateModel(BaseModel):
     output: Optional[str] = None
 
 
-@router.put('/', operation_id='createNewAnalysis', response_model=int)
+@router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
 async def create_new_analysis(
-    analysis: AnalysisModel, connection: Connection = get_db_connection
+    analysis: AnalysisModel, connection: Connection = get_project_db_connection
 ):
     """Create a new analysis"""
 
@@ -52,7 +56,7 @@ async def create_new_analysis(
 async def update_analysis_status(
     analysis_id: int,
     analysis: AnalysisUpdateModel,
-    connection: Connection = get_db_connection,
+    connection: Connection = get_projectless_db_connection,
 ):
     """Update status of analysis"""
     atable = AnalysisTable(connection)
@@ -63,12 +67,12 @@ async def update_analysis_status(
 
 
 @router.get(
-    '/type/{analysis_type}/not-included-sample-ids',
+    '/{project}/type/{analysis_type}/not-included-sample-ids',
     operation_id='getAllSampleIdsWithoutAnalysisType',
 )
 async def get_all_sample_ids_without_analysis_type(
     analysis_type: AnalysisType,
-    connection: Connection = get_db_connection,
+    connection: Connection = get_project_db_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisTable(connection)
@@ -77,23 +81,10 @@ async def get_all_sample_ids_without_analysis_type(
 
 
 @router.get(
-    '/new_gvcfs_since_last_successful_joint_call',
-    operation_id='getAllNewGvcfsSinceLastSuccessfulJointCall',
-)
-async def get_all_new_gvcfs_since_last_successful_joint_call(
-    connection: Connection = get_db_connection,
-):
-    """get_all_new_gvcfs_since_last_successful_joint_call"""
-    atable = AnalysisTable(connection)
-    result = await atable.get_all_new_gvcfs_since_last_successful_joint_call()
-    return {'analysis_ids': result}
-
-
-@router.get(
-    '/incomplete',
+    '/{project}/incomplete',
     operation_id='getIncompleteAnalyses',
 )
-async def get_incomplete_analyses(connection: Connection = get_db_connection):
+async def get_incomplete_analyses(connection: Connection = get_project_db_connection):
     """Get analyses with status queued or in-progress"""
     atable = AnalysisTable(connection)
     result = await atable.get_incomplete_analyses()
@@ -101,13 +92,15 @@ async def get_incomplete_analyses(connection: Connection = get_db_connection):
 
 
 @router.get(
-    '/latest_complete',
+    '/{project}/latest_complete',
     operation_id='getLatestCompleteAnalyses',
 )
-async def get_latest_complete_analyses(connection: Connection = get_db_connection):
+async def get_latest_complete_analyses(
+    connection: Connection = get_project_db_connection,
+):
     """Get "complete" analyses with the latest timestamp_completed"""
     atable = AnalysisTable(connection)
-    results = await atable.get_latest_complete_analyses()
+    results = await atable.get_latest_complete_analyses_per_sample()
     for result in results:
         result.sample_ids = sample_id_format(result.sample_ids)
 
@@ -115,16 +108,27 @@ async def get_latest_complete_analyses(connection: Connection = get_db_connectio
 
 
 @router.get(
-    '/latest_complete/{analysis_type}',
+    '/{project}/latest_complete/{analysis_type}',
     operation_id='getLatestCompleteAnalysesByType',
 )
 async def get_latest_complete_analyses_by_type(
     analysis_type: str,
-    connection: Connection = get_db_connection,
+    connection: Connection = get_project_db_connection,
 ):
     """Get "complete" analyses with the latest timestamp_completed"""
     atable = AnalysisTable(connection)
-    results = await atable.get_latest_complete_analyses(analysis_type)
+    results = await atable.get_latest_complete_analyses_per_sample(analysis_type)
     for result in results:
         result.sample_ids = sample_id_format(result.sample_ids)
     return results
+
+
+@router.get('/{analysis_id}/details', operation_id='getAnalysisById')
+async def get_analysis_by_id(
+    analysis_id: int, connection: Connection = get_projectless_db_connection
+):
+    """Get analysis by ID"""
+    atable = AnalysisTable(connection)
+    result = await atable.get_analysis_by_id(analysis_id)
+    result.sample_ids = sample_id_format(result.sample_ids)
+    return result

@@ -5,15 +5,15 @@ from fastapi import APIRouter, UploadFile, File
 
 from db.python.layers.imports import ImportLayer
 
-from api.utils.db import get_db_connection, Connection
+from api.utils.db import get_project_db_connection, Connection
 from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/import', tags=['import'])
 
 
-@router.post('/airtable-manifest', operation_id='importAirtableManifest')
+@router.post('/{project}/airtable-manifest', operation_id='importAirtableManifest')
 async def import_airtable_manifest(
-    file: UploadFile = File(...), connection: Connection = get_db_connection
+    file: UploadFile = File(...), connection: Connection = get_project_db_connection
 ):
     """Get sample by external ID"""
     import_layer = ImportLayer(connection)

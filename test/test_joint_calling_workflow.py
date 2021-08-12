@@ -68,7 +68,9 @@ def _jc_pipeline_submit_analyses():
     # so on reruns, pipelien will redo haploytype calling. We want to avoid that.
 
     # Get the list of latest complete analyses
-    latest_complete_analyses = aapi.get_latest_complete_analyses(project=PROJ)
+    latest_complete_analyses = aapi.get_latest_complete_analyses_per_sample(
+        project=PROJ
+    )
     print(f'Latest complete analyses: {latest_complete_analyses}')
     latest_by_type_and_sids = defaultdict(list)
     for a in latest_complete_analyses:
@@ -243,7 +245,7 @@ def test_simulate_joint_calling_pipeline():
     # Checking that after all calls, a 'completed' 'joint-calling' analysis must exist
     # for the initally added samples
     aapi = AnalysisApi()
-    analyses = aapi.get_latest_complete_analyses(project=PROJ)
+    analyses = aapi.get_latest_complete_analyses_per_sample(project=PROJ)
     assert any(
         a['type'] == 'joint-calling'
         and set(sample_ids) & set(sample_id_format(a['sample_ids'])) == set(sample_ids)

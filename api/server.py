@@ -12,7 +12,6 @@ from api.routes import (
     import_router,
     analysis_router,
     sequence_router,
-    sample_map_router,
     participant_router,
     family_router,
 )
@@ -79,13 +78,12 @@ async def exception_handler(_: Request, e: Exception):
     )
 
 
-app.include_router(sample_map_router, prefix='/api/v1')
-app.include_router(sample_router, prefix='/api/v1/{project}')
-app.include_router(import_router, prefix='/api/v1/{project}')
-app.include_router(analysis_router, prefix='/api/v1/{project}')
-app.include_router(sequence_router, prefix='/api/v1/{project}')
-app.include_router(participant_router, prefix='/api/v1/{project}')
-app.include_router(family_router, prefix='/api/v1/{project}')
+app.include_router(sample_router, prefix='/api/v1')
+app.include_router(import_router, prefix='/api/v1')
+app.include_router(analysis_router, prefix='/api/v1')
+app.include_router(sequence_router, prefix='/api/v1')
+app.include_router(participant_router, prefix='/api/v1')
+app.include_router(family_router, prefix='/api/v1')
 
 app.openapi = get_openapi_schema_func(app, _VERSION, is_production=IS_PRODUCTION)
 

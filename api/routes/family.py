@@ -7,17 +7,17 @@ from datetime import date
 from fastapi import APIRouter, UploadFile, File, Query
 from starlette.responses import StreamingResponse
 
-from api.utils.db import get_db_connection, Connection
+from api.utils.db import get_project_db_connection, Connection
 from db.python.layers.family import FamilyLayer
 
 router = APIRouter(prefix='/family', tags=['family'])
 
 
-@router.post('/pedigree', operation_id='importPedigree')
+@router.post('/{project}/pedigree', operation_id='importPedigree')
 async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
-    connection: Connection = get_db_connection,
+    connection: Connection = get_project_db_connection,
 ):
     """Get sample by external ID"""
     family_layer = FamilyLayer(connection)
@@ -35,7 +35,9 @@ async def import_pedigree(
     return {'success': await family_layer.import_pedigree(headers, rows)}
 
 
-@router.get('/pedigree', operation_id='getPedigree', response_class=StreamingResponse)
+@router.get(
+    '/{project}/pedigree', operation_id='getPedigree', response_class=StreamingResponse
+)
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
     # pylint: disable=invalid-name
@@ -43,7 +45,7 @@ async def get_pedigree(
     # pylint: disable=invalid-name
     replace_with_family_external_ids: bool = False,
     empty_participant_value: Optional[str] = '',
-    connection: Connection = get_db_connection,
+    connection: Connection = get_project_db_connection,
 ):
     """
     Generate tab-separated Pedigree file for ALL families

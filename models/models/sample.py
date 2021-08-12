@@ -40,7 +40,7 @@ class Sample(BaseModel):
 
 def sample_id_transform_to_raw(
     identifier: Union[List[Union[str, int]], Union[str, int]], strict=True
-) -> int:
+) -> Union[int, List[int]]:
     """
     Transform STRING sample identifier (CPGXXXH) to XXX by:
         - validating prefix
