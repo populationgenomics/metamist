@@ -6,7 +6,6 @@ from typing import Dict, Optional
 
 import click
 
-from sample_metadata.models.sample_type import SampleType
 from sample_metadata.models.sequence_status import SequenceStatus
 from sample_metadata.models.sequence_type import SequenceType
 
@@ -143,13 +142,13 @@ class TobWgsParser(GenericParser):
         # filter false-y values
         return self.default_sequence_type
 
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get sample type"""
         return self.default_sample_type
 
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
-        return SequenceStatus('uploaded')
+        return SequenceStatus.UPLOADED
 
     @staticmethod
     def from_manifest_path(

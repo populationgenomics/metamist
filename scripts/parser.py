@@ -212,7 +212,7 @@ class GenericParser:
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
-            sample_type = SampleType(self.get_sample_type(external_sample_id, rows))
+            sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
             if external_sample_id in external_id_map:
@@ -238,7 +238,7 @@ class GenericParser:
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
-                        type=SequenceType('wgs'),
+                        type=SequenceType.WGS,
                         status=sequence_status,
                     )
                 )
@@ -278,7 +278,6 @@ Updating {len(sequences_to_update)} sequences"""
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
             sapi.update_sample(
-                project=self.sample_metadata_project,
                 id_=internal_sample_id,
                 sample_update_model=sample_update,
             )
