@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 import logging
 import os
 from io import StringIO
@@ -10,7 +10,7 @@ from sample_metadata.models.sample_type import SampleType
 from sample_metadata.models.sequence_status import SequenceStatus
 from sample_metadata.models.sequence_type import SequenceType
 
-from scripts.parser import GenericParser, GroupedRow
+from parser import GenericParser, GroupedRow
 
 
 logger = logging.getLogger(__file__)
