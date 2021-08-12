@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from models.enums import SampleType
@@ -53,10 +53,10 @@ async def create_new_sample(
         return sample_id_format(internal_id)
 
 
-@router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
+@router.get('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
 async def get_sample_id_map_by_external(
     allow_missing: bool = False,
-    external_ids: List[str] = Body(...),
+    external_ids: List[str] = Query(...),
     connection: Connection = get_project_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
