@@ -3,7 +3,6 @@ from typing import List, Dict, Iterable
 from models.enums import SampleType, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 
-from db.python.tables.sample_map import SampleMapTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing import SampleSequencingTable
 
@@ -35,8 +34,6 @@ class ImportLayer(BaseLayer):
             # open a transaction
             sample_table = SampleTable(self.connection)
             seq_table = SampleSequencingTable(self.connection)
-            project = self.connection.project
-            st = SampleMapTable(self.connection.author)
 
             sequences: List[SampleSequencing] = []
 
@@ -53,10 +50,7 @@ class ImportLayer(BaseLayer):
                 sample_meta = {k: obj[k] for k in sample_meta_keys if obj.get(k)}
                 sequence_meta = {k: obj[k] for k in sequence_meta_keys if obj.get(k)}
 
-                internal_sample_id = await st.generate_sample_id(project=project)
-
-                await sample_table.insert_sample(
-                    sample_id=internal_sample_id,
+                internal_sample_id = await sample_table.insert_sample(
                     external_id=external_sample_id,
                     active=True,
                     meta=sample_meta,

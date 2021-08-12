@@ -11,16 +11,14 @@ class ParticipantTable(DbBase):
     table_name = 'participant'
 
     async def create_participant(
-        self,
-        external_id: str,
-        author: str = None,
+        self, external_id: str, author: str = None, project: int = None
     ) -> int:
         """
         Create a new sample, and add it to database
         """
         _query = f"""
-INSERT INTO participant (external_id, author)
-VALUES (:external_id, :author)
+INSERT INTO participant (external_id, author, project)
+VALUES (:external_id, :author, :project)
 RETURNING id
         """
 
@@ -29,6 +27,7 @@ RETURNING id
             {
                 'external_id': external_id,
                 'author': author or self.author,
+                'project': project or self.project,
             },
         )
 

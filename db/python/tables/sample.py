@@ -1,10 +1,9 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 from models.models.sample import Sample, sample_id_format
 from models.enums import SampleType
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
-from db.python.tables.sample_map import SampleMapTable
 
 
 class SampleTable(DbBase):
@@ -20,26 +19,22 @@ class SampleTable(DbBase):
         sample_type: SampleType,
         active,
         meta=None,
-        sample_id=None,
         participant_id=None,
         author=None,
+        project=None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
 
-        if sample_id is None:
-            st = SampleMapTable(author=self.author)
-            sample_id = await st.generate_sample_id(project=self.project)
-
         kv_pairs = [
-            ('id', sample_id),
             ('external_id', external_id),
             ('participant_id', participant_id),
             ('meta', to_db_json(meta)),
             ('type', sample_type.value),
             ('active', active),
             ('author', author or self.author),
+            ('project', project or self.project),
         ]
 
         keys = [k for k, _ in kv_pairs]
@@ -81,8 +76,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             values['type'] = type_
             fields.append('type = :type')
 
-        if meta:
-            values['meta']: to_db_json(meta)
+        if meta is not None and len(meta) > 0:
+            values['meta'] = to_db_json(meta)
             fields.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
 
         if active is not None:
@@ -157,7 +152,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             samples.append(sample)
         return samples
 
-    async def get_single_by_external_id(self, external_id, check_active=True) -> Sample:
+    async def get_single_by_external_id(
+        self, external_id, check_active=True, project: Optional[int] = None
+    ) -> Sample:
         """Get a Sample by its external_id"""
         keys = [
             'id',
@@ -169,13 +166,18 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         ]
         if check_active:
             _query = f"""\
-SELECT {", ".join(keys)} from sample
-    where external_id = :eid AND active
-    LIMIT 1;"""
+SELECT {", ".join(keys)} FROM sample
+WHERE external_id = :eid AND active AND project = :project
+LIMIT 1;"""
         else:
-            _query = f'SELECT {", ".join(keys)} from sample where external_id = :eid LIMIT 1;'
+            _query = f"""
+SELECT {", ".join(keys)} FROM sample
+WHERE external_id = :eid AND project = :project
+LIMIT 1;"""
 
-        sample_row = await self.connection.fetch_one(_query, {'eid': external_id})
+        sample_row = await self.connection.fetch_one(
+            _query, {'eid': external_id, 'project': project or self.project}
+        )
 
         if sample_row is None:
             raise NotFoundError(
@@ -187,11 +189,16 @@ SELECT {", ".join(keys)} from sample
         return sample
 
     async def get_sample_id_map_by_external_ids(
-        self, external_ids: List[str], allow_missing=False
+        self,
+        external_ids: List[str],
+        allow_missing=False,
+        project: Optional[int] = None,
     ) -> Dict[str, int]:
         """Get map of external sample id to internal id"""
-        _query = 'SELECT id, external_id FROM sample WHERE external_id in :external_ids'
-        rows = await self.connection.fetch_all(_query, {'external_ids': external_ids})
+        _query = 'SELECT id, external_id FROM sample WHERE external_id in :external_ids AND project = :project'
+        rows = await self.connection.fetch_all(
+            _query, {'external_ids': external_ids, 'project': project or self.project}
+        )
         sample_id_map = {el[1]: el[0] for el in rows}
         if not allow_missing and len(sample_id_map) != len(external_ids):
             provided_external_ids = set(external_ids)
@@ -208,11 +215,16 @@ SELECT {", ".join(keys)} from sample
         return sample_id_map
 
     async def get_sample_id_map_by_internal_ids(
-        self, raw_internal_ids: List[int]
+        self, raw_internal_ids: List[int], projects: List[str]
     ) -> Dict[int, str]:
         """Get map of external sample id to internal id"""
         _query = 'SELECT id, external_id FROM sample WHERE id in :ids'
-        rows = await self.connection.fetch_all(_query, {'ids': raw_internal_ids})
+        values = {'ids': raw_internal_ids}
+        if projects:
+            _query += ' project in :projects'
+            values['projects'] = projects
+
+        rows = await self.connection.fetch_all(_query, values)
         sample_id_map = {el[0]: el[1] for el in rows}
         if len(sample_id_map) != len(raw_internal_ids):
             provided_external_ids = set(raw_internal_ids)
@@ -227,10 +239,14 @@ SELECT {", ".join(keys)} from sample
 
         return sample_id_map
 
-    async def get_all_sample_id_map_by_internal_ids(self):
+    async def get_all_sample_id_map_by_internal_ids(
+        self, project: Optional[int] = None
+    ):
         """Get sample id map for all samples"""
-        _query = 'SELECT id, external_id FROM sample'
-        rows = await self.connection.fetch_all(_query)
+        _query = 'SELECT id, external_id FROM sample WHERE project = :project'
+        rows = await self.connection.fetch_all(
+            _query, {'project': project or self.project}
+        )
         return {el[0]: el[1] for el in rows}
 
     async def get_samples_by(
@@ -238,6 +254,7 @@ SELECT {", ".join(keys)} from sample
         sample_ids: List[int] = None,
         meta: Dict[str, any] = None,
         participant_ids: List[int] = None,
+        project=None,
     ):
         """Get samples by some criteria"""
         keys = [
@@ -252,6 +269,10 @@ SELECT {", ".join(keys)} from sample
 
         where = []
         replacements = {}
+
+        if project or self.project:
+            where.append('project = :project')
+            replacements['project'] = project or self.project
 
         if sample_ids:
             where.append('id in :sample_ids')
@@ -274,8 +295,16 @@ SELECT {", ".join(keys)} from sample
         samples = await self.connection.fetch_all(_query, replacements)
         return samples
 
-    async def samples_with_missing_participants(self) -> List[Tuple[str, int]]:
+    async def samples_with_missing_participants(
+        self, project: Optional[int] = None
+    ) -> List[Tuple[str, int]]:
         """Get ["""
-        _query = 'SELECT id, external_id FROM sample WHERE participant_id IS NULL'
-        rows = await self.connection.fetch_all(_query)
+        _query = """
+SELECT id, external_id
+FROM sample
+WHERE participant_id IS NULL AND project = :project
+"""
+        rows = await self.connection.fetch_all(
+            _query, {'project': project or self.project}
+        )
         return [(row['external_id'], row['id']) for row in rows]

@@ -1,14 +1,15 @@
 """
 Code for connecting to Postgres database
 """
-import os
 import json
 import logging
-from typing import Dict, List
+import os
+from typing import Optional
 
 # import asyncio
 import databases
 
+from db.python.tables.project import ProjectTable
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -26,12 +27,20 @@ class Connection:
     def __init__(
         self,
         connection: databases.Database,
-        project: str,
+        project: Optional[int],
         author: str,
     ):
         self.connection: databases.Database = connection
-        self.project: str = project
+        self.project: Optional[int] = project
         self.author: str = author
+
+    def assert_requires_project(self):
+        """Assert the project is set, or return an exception"""
+        if self.project is None:
+            raise Exception(
+                'An internal error has occurred when passing the project context, '
+                'please send this stacktrace to your system administrator'
+            )
 
 
 class ProjectDoesNotExist(Exception):
@@ -45,6 +54,10 @@ class ProjectDoesNotExist(Exception):
         )
 
 
+class Forbidden(Exception):
+    """Not allowed access to a project (or not allowed project-less access)"""
+
+
 class NotFoundError(Exception):
     """Custom error when you can't find something"""
 
@@ -54,83 +67,51 @@ class DatabaseConfiguration:
 
     def __init__(
         self,
-        project,
         dbname,
         host=None,
         port=None,
         username=None,
         password=None,
-        is_admin=False,
     ):
-        self.project = project
         self.dbname = dbname
         self.host = host
         self.port = port
         self.username = username
         self.password = password
-        self.is_admin = is_admin
 
     @staticmethod
-    def dev_config():
+    def dev_config() -> 'DatabaseConfiguration':
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
-        return [
-            DatabaseConfiguration(
-                project=os.environ.get('SM_DEV_DB_PROJECT', 'dev'),
-                dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
-                username=os.environ.get('SM_DEV_DB_USER', 'root'),
-                password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
-                host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-                port=os.environ.get('SM_DEV_DB_PORT', '3306'),
-            ),
-            DatabaseConfiguration(
-                project=None,
-                dbname='sm_admin',
-                username=os.environ.get('SM_DEV_DB_USER', 'root'),
-                password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
-                host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-                port=os.environ.get('SM_DEV_DB_PORT', '3306'),
-                is_admin=True,
-            ),
-        ]
+        return DatabaseConfiguration(
+            dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
+            username=os.environ.get('SM_DEV_DB_USER', 'root'),
+            password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
+            host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
+            port=os.environ.get('SM_DEV_DB_PORT', '3306'),
+        )
 
 
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
-    _connected = False
+    # _connected = False
     # _connections: Dict[str, databases.Database] = {}
     # _admin_db: databases.Database = None
 
-    _credentials: Dict[str, DatabaseConfiguration] = {}
-    _admin_credentials: DatabaseConfiguration = None
+    _credentials: DatabaseConfiguration = None
 
     @staticmethod
-    async def get_admin_db():
-        """Get administrator database, most likely for getting sample-map"""
-        # return SMConnections._admin_db
-        SMConnections._get_project_configs()
-        conn = SMConnections.make_connection(SMConnections._admin_credentials)
-        await conn.connect()
-        return conn
-
-    @staticmethod
-    def _get_project_configs():
+    def _get_config():
         if SMConnections._credentials:
             return SMConnections._credentials
 
-        configs = DatabaseConfiguration.dev_config()
+        config = DatabaseConfiguration.dev_config()
         if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
             logger.info('Using production mysql configurations')
-            configs = SMConnections._load_database_configurations_from_secret_manager()
+            config = SMConnections._load_database_configurations_from_secret_manager()
 
-        admin_config = [c for c in configs if c.is_admin][0]
-        project_configs: List[DatabaseConfiguration] = [
-            c for c in configs if not c.is_admin
-        ]
-
-        SMConnections._credentials = {c.project: c for c in project_configs}
-        SMConnections._admin_credentials = admin_config
+        SMConnections._credentials = config
 
         return SMConnections._credentials
 
@@ -226,19 +207,50 @@ class SMConnections:
         return False
 
     @staticmethod
-    async def get_connection_for_project(project, author):
-        """Get a db connection from a project and user"""
-        # maybe it makes sense to perform permission checks here too
-        logger.debug(f'Authenticate the connection with "{author}"')
-
-        # conn = SMConnections._get_connections().get(project)
-        credentials = SMConnections._get_project_configs().get(project)
+    async def _get_made_connection():
+        credentials = SMConnections._get_config()
 
         if credentials is None:
-            raise ProjectDoesNotExist(project)
+            raise Exception(
+                'The server has been misconfigured, please '
+                'contact your system administrator'
+            )
+
         conn = SMConnections.make_connection(credentials)
         await conn.connect()
-        return Connection(connection=conn, author=author, project=project)
+        return conn
+
+    @staticmethod
+    async def get_connection(*, author: str, project_name: Optional[str]):
+        """Get a db connection from a project and user"""
+        # maybe it makes sense to perform permission checks here too
+        logger.debug(f'Authenticate connection to {project_name} with "{author}"')
+
+        conn = await SMConnections._get_made_connection()
+        pt = ProjectTable(connection=conn)
+
+        project_id = await pt.get_project_id_from_name_and_user(
+            user=author, project=project_name
+        )
+        if project_id is False:
+            raise ProjectDoesNotExist(project_name)
+
+        return Connection(connection=conn, author=author, project=project_id)
+
+    @staticmethod
+    async def get_connection_no_project(author: str):
+        """Get a db connection from a project and user"""
+        # maybe it makes sense to perform permission checks here too
+        logger.debug(f'Authenticate no-project connection with "{author}"')
+
+        conn = await SMConnections._get_made_connection()
+        pt = ProjectTable(connection=conn)
+
+        has_access = pt.get_project_id_from_name_and_user(user=author, project=None)
+        if not has_access:
+            raise Forbidden
+
+        return Connection(connection=conn, author=author, project=None)
 
     @staticmethod
     def _read_secret(name: str) -> str:
@@ -253,12 +265,10 @@ class SMConnections:
         return response.payload.data.decode('UTF-8')
 
     @staticmethod
-    def _load_database_configurations_from_secret_manager() -> List[
-        DatabaseConfiguration
-    ]:
-        configs_dicts = json.loads(SMConnections._read_secret('databases'))
-        configs = [DatabaseConfiguration(**config) for config in configs_dicts]
-        return configs
+    def _load_database_configurations_from_secret_manager() -> DatabaseConfiguration:
+        config_dict = json.loads(SMConnections._read_secret('databases'))
+        config = DatabaseConfiguration(**config_dict)
+        return config
 
 
 class DbBase:
@@ -268,7 +278,9 @@ class DbBase:
     async def from_project(cls, project, author):
         """Create the Db object from a project with user details"""
         return cls(
-            connection=await SMConnections.get_connection_for_project(project, author),
+            connection=await SMConnections.get_connection(
+                project_name=project, author=author
+            ),
         )
 
     def __init__(self, connection: Connection):
@@ -278,7 +290,8 @@ class DbBase:
             )
         if not isinstance(connection, Connection):
             raise Exception(
-                f'Expected connection type Connection, received {type(connection)}, did you mean to call self._connection?'
+                f'Expected connection type Connection, received {type(connection)}, '
+                f'did you mean to call self._connection?'
             )
 
         self._connection = connection
@@ -287,6 +300,6 @@ class DbBase:
         self.project = connection.project
 
         if self.author is None:
-            raise Exception('Must provide author to {self.__class__.__name__}')
+            raise Exception(f'Must provide author to {self.__class__.__name__}')
 
     # piped from the connection
