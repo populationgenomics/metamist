@@ -215,14 +215,11 @@ LIMIT 1;"""
         return sample_id_map
 
     async def get_sample_id_map_by_internal_ids(
-        self, raw_internal_ids: List[int], projects: List[str]
+        self, raw_internal_ids: List[int]
     ) -> Dict[int, str]:
         """Get map of external sample id to internal id"""
         _query = 'SELECT id, external_id FROM sample WHERE id in :ids'
         values = {'ids': raw_internal_ids}
-        if projects:
-            _query += ' project in :projects'
-            values['projects'] = projects
 
         rows = await self.connection.fetch_all(_query, values)
         sample_id_map = {el[0]: el[1] for el in rows}

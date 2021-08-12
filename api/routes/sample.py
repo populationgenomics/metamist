@@ -67,10 +67,9 @@ async def get_sample_id_map_by_external(
     return {k: sample_id_format(v) for k, v in result.items()}
 
 
-@router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
+@router.get('/id-map/internal', operation_id='getSampleIdMapByInternal')
 async def get_sample_id_map_by_internal(
-    internal_ids: List[str] = Body(...),
-    projects: List[str] = Query(...),
+    internal_ids: List[str] = Query(...),
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -79,9 +78,7 @@ async def get_sample_id_map_by_internal(
     """
     st = SampleTable(connection)
     internal_ids_raw = sample_id_transform_to_raw(internal_ids)
-    result = await st.get_sample_id_map_by_internal_ids(
-        internal_ids_raw, projects=projects
-    )
+    result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
     return {sample_id_format(k): v for k, v in result.items()}
 
 
