@@ -182,10 +182,6 @@ class TobWgsParser(GenericParser):
 
 @click.command(help='GCS path to manifest file')
 @click.option(
-    '--project',
-    help='The CPG based project short-code, tagged as "sample.meta.project"',
-)
-@click.option(
     '--sample-metadata-project',
     help='The sample-metadata project to import manifest into (probably "seqr")',
 )
