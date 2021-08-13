@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from models.enums import SampleType
@@ -53,10 +53,10 @@ async def create_new_sample(
         return sample_id_format(internal_id)
 
 
-@router.get('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
+@router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
 async def get_sample_id_map_by_external(
+    external_ids: List[str],
     allow_missing: bool = False,
-    external_ids: List[str] = Query(...),
     connection: Connection = get_project_db_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
@@ -67,9 +67,9 @@ async def get_sample_id_map_by_external(
     return {k: sample_id_format(v) for k, v in result.items()}
 
 
-@router.get('/id-map/internal', operation_id='getSampleIdMapByInternal')
+@router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
 async def get_sample_id_map_by_internal(
-    internal_ids: List[str] = Query(...),
+    internal_ids: List[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -114,6 +114,7 @@ async def get_samples_by_criteria(
     meta: Dict = None,
     participant_ids: List[int] = None,
     project_ids: List[str] = None,
+    active: bool = None,
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -134,6 +135,7 @@ async def get_samples_by_criteria(
         meta=meta,
         participant_ids=participant_ids,
         project_ids=project_ids,
+        active=active,
     )
 
     for sample in result:
