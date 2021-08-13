@@ -1,6 +1,6 @@
 from typing import Optional, Dict, List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
@@ -75,9 +75,9 @@ async def get_sequence(
     return resp
 
 
-@router.get('/', operation_id='getSequencesBySampleIds')
+@router.post('/', operation_id='getSequencesBySampleIds')
 async def get_sequences_by_internal_sample_ids(
-    sample_ids: List[str] = Query(None),
+    sample_ids: List[str],
     get_latest_sequence_only: bool = True,
     connection: Connection = get_projectless_db_connection,
 ):
