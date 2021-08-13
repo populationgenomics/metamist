@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from models.enums import SampleType
@@ -114,7 +114,7 @@ async def get_samples_by_criteria(
     meta: Dict = None,
     participant_ids: List[int] = None,
     project_ids: List[str] = None,
-    active: bool = None,
+    active: bool = Body(...),
     connection: Connection = get_projectless_db_connection,
 ):
     """
