@@ -5,6 +5,7 @@ from datetime import datetime
 from db.python.connect import DbBase, NotFoundError  # , to_db_json
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
+from models.models.sample import sample_id_format
 
 
 class AnalysisTable(DbBase):
@@ -175,10 +176,45 @@ AND a.timestamp_completed = (
 
         return list(analysis_by_id.values())
 
+    async def get_latest_complete_gvcfs_for_samples(
+        self, sample_ids: List[int], allow_missing=True
+    ) -> List[Analysis]:
+        """Get latest complete gvcfs for samples (one per sample)"""
+        _query = """
+SELECT a.id AS id, a.type as type, a.status as status, a.output as output,
+a.project as project, a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed
+FROM analysis a
+LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+WHERE a.type = 'gvcf' AND a.timestamp_completed IS NOT NULL AND a_s.sample_id in :sample_ids
+ORDER BY a.timestamp_completed DESC
+        """
+        values = {'sample_ids': sample_ids}
+        rows = await self.connection.fetch_all(_query, values)
+        seen_sample_ids = set()
+        analyses: List[Analysis] = []
+        for row in rows:
+            if row['sample_id'] in seen_sample_ids:
+                continue
+            seen_sample_ids.add(row['sample_id'])
+            analyses.append(Analysis.from_db(**row))
+
+        if not allow_missing and len(sample_ids) != len(seen_sample_ids):
+            missing_sample_ids = set(sample_ids) - seen_sample_ids
+            sample_ids_str = ', '.join(sample_id_format(list(missing_sample_ids)))
+
+            raise Exception(
+                f'Missing gvcfs for the following sample IDs: {sample_ids_str}'
+            )
+
+        # reverse after timestamp_completed
+        return analyses[::-1]
+
     async def get_analysis_by_id(self, analysis_id: int) -> Analysis:
         """Get analysis object by analysis_id"""
         _query = """
-SELECT a.id as id, a.type as type, a.status as status, a.output as output, a.project as project, a_s.sample_id as sample_id
+SELECT a.id as id, a.type as type, a.status as status,
+a.output as output, a.project as project, a_s.sample_id as sample_id,
+a.timestamp_completed as timestamp_completed
 FROM analysis a
 LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 WHERE a.id = :analysis_id

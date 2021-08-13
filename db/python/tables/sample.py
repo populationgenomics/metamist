@@ -252,6 +252,7 @@ LIMIT 1;"""
         meta: Dict[str, any] = None,
         participant_ids: List[int] = None,
         project_ids=None,
+        active=None,
     ):
         """Get samples by some criteria"""
         keys = [
@@ -283,6 +284,11 @@ LIMIT 1;"""
         if participant_ids:
             where.append('participant_id in :participant_ids')
             replacements['participant_ids'] = participant_ids
+
+        if active is True:
+            where.append('active')
+        elif active is False:
+            where.append('NOT active')
 
         _query = f'SELECT {keys_str} FROM sample'
         if where:
