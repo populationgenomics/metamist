@@ -123,6 +123,26 @@ async def get_latest_complete_analyses_by_type(
     return results
 
 
+@router.post(
+    '/latest_complete/gvcf/for-samples', operation_id='getLatestGvcfsForSamples'
+)
+async def get_latest_complete_gvcfs_for_samples(
+    sample_ids: List[str],
+    allow_missing: bool = True,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Get latest complete gvcfs for sample"""
+    atable = AnalysisTable(connection)
+    results = await atable.get_latest_complete_gvcfs_for_samples(
+        sample_ids=sample_id_transform_to_raw(sample_ids), allow_missing=allow_missing
+    )
+
+    for result in results:
+        result.sample_ids = sample_id_format(result.sample_ids)
+
+    return results
+
+
 @router.get('/{analysis_id}/details', operation_id='getAnalysisById')
 async def get_analysis_by_id(
     analysis_id: int, connection: Connection = get_projectless_db_connection
