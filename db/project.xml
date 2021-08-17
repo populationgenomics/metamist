@@ -16,27 +16,6 @@
 
         </createTable>
 
-<!--        <createTable tableName="project_permissions">-->
-<!--            <column name="id" type="INT">-->
-<!--                <constraints-->
-<!--                    nullable="true"-->
-<!--                    primaryKey="true"-->
-<!--                    primaryKeyName="PK_PROJECT_PERMISSIONS"-->
-<!--                />-->
-<!--            </column>-->
-<!--            <column name="user" type="VARCHAR(255)">-->
-<!--                <constraints-->
-<!--                    nullable="false"-->
-<!--                    primaryKey="true"-->
-<!--                    primaryKeyName="PK_PROJECT_PERMISSIONS"-->
-<!--                />-->
-<!--            </column>-->
-<!--            <column name="permission" type="INT">-->
-<!--                <constraints nullable="false" />-->
-<!--            </column>-->
-<!--        </createTable>-->
-
-
         <!-- Participants -->
         <createTable tableName="participant">
             <column name="id" type="INT" autoIncrement="true">
@@ -227,5 +206,19 @@
         <sql>ALTER TABLE analysis_sample ADD SYSTEM VERSIONING;</sql>
         <sql>ALTER TABLE family ADD SYSTEM VERSIONING;</sql>
         <sql>ALTER TABLE family_participant ADD SYSTEM VERSIONING;</sql>
+    </changeSet>
+    <changeSet author="michael.franklin" id="2021-08-16_add-project-id">
+        <sql>SET @@system_versioning_alter_history = 1;</sql>
+        <addColumn
+            tableName="project">
+            <column
+                name="dataset"
+                type="VARCHAR(255)"
+            />
+            <column
+                name="gcp_id"
+                type="VARCHAR(255)"
+            />
+        </addColumn>
     </changeSet>
 </databaseChangeLog>
