@@ -4,6 +4,7 @@ from models.models.sample import Sample, sample_id_format
 from models.enums import SampleType
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
+from db.python.tables.project import ProjectPermissionsTable
 
 
 class SampleTable(DbBase):
@@ -215,14 +216,19 @@ LIMIT 1;"""
         return sample_id_map
 
     async def get_sample_id_map_by_internal_ids(
-        self, raw_internal_ids: List[int]
+        self, raw_internal_ids: List[int], check_project_ids=True
     ) -> Dict[int, str]:
         """Get map of external sample id to internal id"""
-        _query = 'SELECT id, external_id FROM sample WHERE id in :ids'
+        _query = 'SELECT id, external_id, project FROM sample WHERE id in :ids'
         values = {'ids': raw_internal_ids}
 
         rows = await self.connection.fetch_all(_query, values)
-        sample_id_map = {el[0]: el[1] for el in rows}
+        sample_id_map = {el['id']: el['external_id'] for el in rows}
+        if check_project_ids:
+            project_ids = set(s['project'] for s in rows)
+            ptable = ProjectPermissionsTable(self.connection)
+            await ptable.check_access_to_project_ids(self.author, project_ids)
+
         if len(sample_id_map) != len(raw_internal_ids):
             provided_external_ids = set(raw_internal_ids)
             # do the check again, but use the set this time
@@ -253,6 +259,7 @@ LIMIT 1;"""
         participant_ids: List[int] = None,
         project_ids=None,
         active=None,
+        check_project_ids=True,
     ):
         """Get samples by some criteria"""
         keys = [
@@ -262,6 +269,7 @@ LIMIT 1;"""
             'meta',
             'active+1 as active',
             'type',
+            'project',
         ]
         keys_str = ', '.join(keys)
 
@@ -295,6 +303,12 @@ LIMIT 1;"""
             _query += f' WHERE {" AND ".join(where)}'
 
         samples = await self.connection.fetch_all(_query, replacements)
+
+        if check_project_ids:
+            project_ids = set(s['project'] for s in samples)
+            ptable = ProjectPermissionsTable(self.connection)
+            await ptable.check_access_to_project_ids(self.author, project_ids)
+
         return [Sample.from_db(**s) for s in samples]
 
     async def samples_with_missing_participants(

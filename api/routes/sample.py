@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from models.enums import SampleType
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.tables.sample import SampleTable, Sample
-from db.python.tables.project import ProjectTable
+from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
     get_project_db_connection,
@@ -78,7 +78,9 @@ async def get_sample_id_map_by_internal(
     """
     st = SampleTable(connection)
     internal_ids_raw = sample_id_transform_to_raw(internal_ids)
-    result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
+    result = await st.get_sample_id_map_by_internal_ids(
+        internal_ids_raw, check_project_ids=True
+    )
     return {sample_id_format(k): v for k, v in result.items()}
 
 
@@ -124,9 +126,11 @@ async def get_samples_by_criteria(
     if not project_ids:
         raise ValueError('You must specify at least one project id for this method')
 
-    pt = ProjectTable(connection.connection)
-    internal_project_id_map = await pt.get_project_id_map()
-    project_ids = [internal_project_id_map[pid] for pid in project_ids]
+    pt = ProjectPermissionsTable(connection.connection)
+
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, project_ids
+    )
 
     sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
 
@@ -136,6 +140,7 @@ async def get_samples_by_criteria(
         participant_ids=participant_ids,
         project_ids=project_ids,
         active=active,
+        check_project_ids=True,
     )
 
     for sample in result:
