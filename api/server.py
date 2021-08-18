@@ -14,6 +14,7 @@ from api.routes import (
     sequence_router,
     participant_router,
     family_router,
+    project_router,
 )
 from api.utils import IS_PRODUCTION, get_openapi_schema_func
 from api.utils.gcp import setup_gcp_logging
@@ -56,13 +57,7 @@ async def add_process_time_header(request: Request, call_next):
 @app.exception_handler(Exception)
 async def exception_handler(_: Request, e: Exception):
     """Generic exception handler"""
-    base_params = {}
     add_stacktrace = True
-
-    if add_stacktrace:
-        st = traceback.format_exc()
-        logger.error(traceback.format_exc())
-        base_params['stacktrace'] = st
 
     if isinstance(e, HTTPException):
         code = e.status_code
@@ -72,9 +67,16 @@ async def exception_handler(_: Request, e: Exception):
         code = determine_code_from_error(e)
         name = str(type(e).__name__)
 
+    base_params = {'name': name, 'description': str(e)}
+
+    if add_stacktrace:
+        st = traceback.format_exc()
+        logger.error(traceback.format_exc())
+        base_params['stacktrace'] = st
+
     return JSONResponse(
         status_code=code,
-        content={**base_params, 'name': name, 'description': str(e)},
+        content=base_params,
     )
 
 
@@ -84,6 +86,7 @@ app.include_router(analysis_router, prefix='/api/v1')
 app.include_router(sequence_router, prefix='/api/v1')
 app.include_router(participant_router, prefix='/api/v1')
 app.include_router(family_router, prefix='/api/v1')
+app.include_router(project_router, prefix='/api/v1')
 
 app.openapi = get_openapi_schema_func(app, _VERSION, is_production=IS_PRODUCTION)
 
