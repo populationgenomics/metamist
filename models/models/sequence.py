@@ -10,7 +10,7 @@ from models.enums import SequenceType, SequenceStatus
 class SampleSequencing(BaseModel):
     """Model to hold SampleSequence data"""
 
-    id_: Optional[int] = None
+    id: Optional[int] = None
     sample_id: Optional[Union[str, int]] = None
     type: Optional[SequenceType] = None
     meta: Optional[Dict[str, Any]] = None
@@ -22,7 +22,6 @@ class SampleSequencing(BaseModel):
     @staticmethod
     def from_db(d: Dict):
         """Take DB mapping object, and return SampleSequencing"""
-        id_ = d.pop('id')
         type_ = d.pop('type')
         status = d.pop('status')
         meta = d.pop('meta', None)
@@ -37,4 +36,4 @@ class SampleSequencing(BaseModel):
                 meta = meta.decode()
             if isinstance(meta, str):
                 meta = json.loads(meta)
-        return SampleSequencing(id_=id_, type=type_, status=status, meta=meta, **d)
+        return SampleSequencing(type=type_, status=status, meta=meta, **d)

@@ -70,7 +70,7 @@ async def get_sequence(
 ):
     """Get sequence by sequence ID"""
     sequence_layer = SampleSequencingTable(connection)
-    resp = await sequence_layer.get_sequence_by_id(sequence_id)
+    resp = await sequence_layer.get_sequence_by_id(sequence_id, check_project_id=True)
     resp.sample_id = sample_id_format(resp.sample_id)
     return resp
 
