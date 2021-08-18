@@ -12,6 +12,8 @@ PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
 IS_DEVELOPMENT = 'dev' in os.getenv('SM_ENVIRONMENT', 'development').lower()
 
+ProjectId = int
+
 
 class Forbidden(Exception):
     """Forbidden action"""
@@ -66,15 +68,15 @@ class ProjectPermissionsTable:
     _cached_client = None
 
     _cache_expiry = None
-    _cached_project_names: Dict[str, int] = None
-    _cached_project_by_id: Dict[int, ProjectRow] = None
+    _cached_project_names: Dict[str, ProjectId] = None
+    _cached_project_by_id: Dict[ProjectId, ProjectRow] = None
 
-    _cached_permissions: Dict[int, ProjectPermissionCacheObject] = {}
+    _cached_permissions: Dict[ProjectId, ProjectPermissionCacheObject] = {}
 
-    def __init__(self, connection, allow_full_access=IS_DEVELOPMENT):
+    def __init__(self, connection: Database, allow_full_access=IS_DEVELOPMENT):
 
         self.connection: Database = connection
-        self.allow_full_access = allow_full_access
+        self.allow_full_access = allow_full_access # and False
 
     def _get_secret_manager_client(self):
         if not self._cached_client:
@@ -95,7 +97,7 @@ class ProjectPermissionsTable:
         return response.payload.data.decode('UTF-8')
 
     async def check_access_to_project_ids(
-        self, user: str, project_ids: Iterable[int], raise_exception=True
+        self, user: str, project_ids: Iterable[ProjectId], raise_exception=True
     ) -> bool:
         """Check user has access to list of project_ids"""
         if self.allow_full_access:
@@ -106,17 +108,21 @@ class ProjectPermissionsTable:
                 user, project_id, raise_exception=False
             )
             if not has_access:
-                missing_project_ids.append(user)
+                missing_project_ids.append(project_id)
 
         if missing_project_ids:
             if raise_exception:
-                raise NoProjectAccess(missing_project_ids)
+                project_map = await self.get_project_id_map()
+                missing_project_names = [
+                    project_map[pid].name for pid in missing_project_ids
+                ]
+                raise NoProjectAccess(missing_project_names)
             return False
 
         return True
 
     async def check_access_to_project_id(
-        self, user: str, project_id: int, raise_exception=True
+        self, user: str, project_id: ProjectId, raise_exception=True
     ) -> bool:
         """Check whether a user has access to project_id"""
         if self.allow_full_access:
@@ -175,18 +181,22 @@ class ProjectPermissionsTable:
 
     async def get_project_id_from_name_and_user(
         self, user: str, project_name: str
-    ) -> int:
+    ) -> ProjectId:
         """
         Get projectId from project name and user (email address)
         Returns:
-            - int: if user has access to specific project
+            - int: if user has access to specific project[SampleSequencing.from_db(s) for s in sequence_dicts]
             - None: if user has <no-project> access
             - False if unable to access the specified project
         """
+        project_ids = await self.get_project_ids_from_names_and_user(
+            user, [project_name]
+        )
+        return project_ids[0]
 
     async def get_project_ids_from_names_and_user(
         self, user: str, project_names: List[str]
-    ):
+    ) -> List[ProjectId]:
         """Get project ids from project names and the user"""
         if not user:
             raise Exception('An internal error occurred during authorization')
@@ -209,6 +219,11 @@ class ProjectPermissionsTable:
 
         if invalid_project_names:
             raise NoProjectAccess(invalid_project_names)
+
+        if len(project_ids) != len(project_names):
+            raise Exception(
+                'An internal error occurred when mapping project names to IDs'
+            )
 
         return project_ids
 
