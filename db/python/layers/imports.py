@@ -4,7 +4,7 @@ from models.enums import SampleType, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequencing import SampleSequencingTable
+from db.python.tables.sequence import SampleSequencingTable
 
 from db.python.layers.base import BaseLayer
 

@@ -287,7 +287,7 @@ WHERE external_id in :external_ids AND project = :project
 
     async def get_sample_with_missing_participants_by_internal_id(
         self, project: ProjectId
-    ) -> List[Tuple[int, str]]:
+    ) -> Dict[int, str]:
         """Get samples with missing participants"""
         _query = """
 SELECT id, external_id
@@ -297,10 +297,4 @@ WHERE participant_id IS NULL AND project = :project
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
         )
-        return [
-            (
-                row['id'],
-                row['external_id'],
-            )
-            for row in rows
-        ]
+        return {row['id']: row['external_id'] for row in rows}

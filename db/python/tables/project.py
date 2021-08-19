@@ -76,7 +76,7 @@ class ProjectPermissionsTable:
     def __init__(self, connection: Database, allow_full_access=IS_DEVELOPMENT):
 
         self.connection: Database = connection
-        self.allow_full_access = allow_full_access  # and False
+        self.allow_full_access = allow_full_access and False
 
     def _get_secret_manager_client(self):
         if not self._cached_client:
@@ -100,9 +100,9 @@ class ProjectPermissionsTable:
         self, user: str, project_ids: Iterable[ProjectId], raise_exception=True
     ) -> bool:
         """Check user has access to list of project_ids"""
-        if project_ids:
-            raise NoProjectAccess(
-                "You don't have access to this resources, as the resource you requestsed didn't belong to a project"
+        if not project_ids:
+            raise Forbidden(
+                "You don't have access to this resources, as the resource you requested didn't belong to a project"
             )
         if self.allow_full_access:
             return True
@@ -140,6 +140,10 @@ class ProjectPermissionsTable:
 
     async def get_allowed_users_for_project_id(self, project_id) -> Set[str]:
         """Get allowed users for a project_id"""
+        return {
+            1: {'michael.franklin@populationgenomics.org.au'},
+        }.get(project_id, set())
+
         if (
             project_id not in self._cached_permissions
             or not self._cached_permissions[project_id].is_valid()

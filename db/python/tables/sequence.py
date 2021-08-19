@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Tuple, Iterable
+from typing import Optional, Dict, List, Tuple, Iterable, Set
 from itertools import groupby
 
 from models.models.sequence import SampleSequencing
@@ -13,6 +13,19 @@ class SampleSequencingTable(DbBase):
     """
 
     table_name = 'sample_sequencing'
+
+    async def get_projects_by_sequence_ids(
+        self, sequence_ids: List[int]
+    ) -> Set[ProjectId]:
+        """Get project IDs for sampleIds (mostly for checking auth)"""
+        _query = """
+SELECT s.project FROM sample_sequencing sq 
+INNER JOIN sample s ON s.id = sq.sample_id
+WHERE s.id in :sequence_ids
+GROUP BY s.project
+"""
+        rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
+        return set(r['project'] for r in rows)
 
     async def insert_many_sequencing(
         self,
@@ -72,8 +85,8 @@ RETURNING id;"""
         return id_of_new_sample
 
     async def get_sequence_by_id(
-        self, sequence_id: int, check_project_id=False
-    ) -> SampleSequencing:
+        self, sequence_id: int
+    ) -> Tuple[ProjectId, SampleSequencing]:
         """Get sequence by sequence ID"""
         keys = [
             'id',
@@ -92,28 +105,29 @@ WHERE sq.id = :id
         d = await self.connection.fetch_one(_query, {'id': sequence_id})
         if not d:
             raise NotFoundError(f'sequence with id = {sequence_id}')
+        d = dict(d)
 
-        if check_project_id:
-            ptable = ProjectPermissionsTable(self.connection)
-            await ptable.check_access_to_project_id(self.author, d['project'])
-        return SampleSequencing.from_db(dict(d))
+        return d.pop('project'), SampleSequencing.from_db(d)
 
-    async def get_latest_sequence_id_by_sample_id(self, sample_id: int):
+    async def get_latest_sequence_id_for_sample_id(
+        self, sample_id: int
+    ) -> Tuple[ProjectId, int]:
         """
         Get latest added sequence ID from internal sample_id
         """
         _query = """\
-SELECT id from sample_sequencing
+SELECT sq.id, s.project FROM sample_sequencing sq
+INNER JOIN sample s ON sq.sample_id = s.id
 WHERE sample_id = :sample_id
-ORDER by id DESC
+ORDER by sq.id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
-        return result[0]
+        return result['project'], result['id']
 
-    async def get_latest_sequence_id_by_external_sample_id(
+    async def get_latest_sequence_id_for_external_sample_id(
         self, project: ProjectId, external_sample_id
-    ):
+    ) -> int:
         """
         Get latest added sequence ID from external sample_id
         """
@@ -129,14 +143,14 @@ LIMIT 1
         )
         return result
 
-    async def get_latest_sequence_ids_by_sample_ids(
+    async def get_latest_sequence_ids_for_sample_ids(
         self, sample_ids: List[int]
     ) -> Tuple[Iterable[ProjectId], Dict[int, int]]:
         """
         Get the IDs of the latest sequence for a sample, keyed by the internal sample ID
         """
         if not sample_ids:
-            return {}
+            return [], {}
 
         _query = """
 SELECT sq.id, sq.sample_id, s.project FROM sample_sequencing sq
@@ -154,16 +168,16 @@ ORDER by sq.id DESC;
 
         return projects, sample_id_to_seq_id
 
-    async def get_sequences_by_sample_ids(
+    async def get_latest_sequence_for_sample_ids(
         self, sample_ids: List[int], get_latest_sequence_only=True
     ) -> Tuple[Iterable[ProjectId], List[SampleSequencing]]:
         """Get a list of sequence objects by their internal sample IDs"""
         # there's an implicit ordering by id
         _query = f"""
-SELECT sq.id sq.sample_id, sq.type, sq.meta, sq.status, s.project
+SELECT sq.id, sq.sample_id, sq.type, sq.meta, sq.status, s.project
 FROM sample_sequencing sq
 INNER JOIN sample s ON sq.sample_id = s.id
-WHERE sample_id in :sample_ids
+WHERE sq.sample_id in :sample_ids
 """
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         sequence_dicts = [dict(s) for s in rows]
@@ -187,7 +201,7 @@ WHERE sample_id in :sample_ids
         """Update status of sequencing with sequencing_id"""
         _query = """
 UPDATE sample_sequencing
-    SET status = :status, author=:author
+SET status = :status, author=:author
 WHERE id = :sequencing_id
 """
 

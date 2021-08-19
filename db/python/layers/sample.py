@@ -4,7 +4,7 @@ from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequencing import SampleSequencingTable
+from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SequenceStatus, SampleType
 from models.models.sample import Sample, sample_id_format
 
@@ -179,24 +179,3 @@ class SampleLayer(BaseLayer):
             ids=ids, participant_ids=participant_ids
         )
         return True
-
-    async def update_sequencing_status_from_internal_sample_id(
-        self, sample_id: int, status: SequenceStatus
-    ):
-        """Update the sequencing status from the internal sample id"""
-        seq_table = SampleSequencingTable(connection=self.connection)
-        seq_id = seq_table.get_latest_sequence_id_by_sample_id(sample_id)
-        return seq_table.update_status(seq_id, status)
-
-    async def update_sequencing_status_from_external_sample_id(
-        self, project: ProjectId, external_sample_id: str, status: SequenceStatus
-    ):
-        """
-        Update the sequencing status from the external sample id,
-        by first looking up the internal sample id.
-        """
-        seq_table = SampleSequencingTable(connection=self.connection)
-        seq_id = await seq_table.get_latest_sequence_id_by_external_sample_id(
-            project=project, external_sample_id=external_sample_id
-        )
-        return await seq_table.update_status(seq_id, status)

@@ -42,7 +42,7 @@ class AnalysisLayer(BaseLayer):
             project_ids = await SampleTable(
                 self.connection
             ).get_project_ids_for_sample_ids(sample_ids)
-            await self.ptable.check_access_to_project_ids(project_ids)
+            await self.ptable.check_access_to_project_ids(self.author, project_ids)
 
         analyses = await self.at.get_latest_complete_analysis_for_samples_by_type(
             analysis_type=analysis_type, sample_ids=sample_ids
@@ -100,7 +100,7 @@ class AnalysisLayer(BaseLayer):
         """Add samples to an analysis (through the linked table)"""
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(project_ids)
+            await self.ptable.check_access_to_project_ids(self.author, project_ids)
 
         return await self.at.add_samples_to_analysis(
             analysis_id=analysis_id, sample_ids=sample_ids
@@ -119,7 +119,7 @@ class AnalysisLayer(BaseLayer):
         """
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(project_ids)
+            await self.ptable.check_access_to_project_ids(self.author, project_ids)
 
         return await self.at.update_analysis(
             analysis_id=analysis_id,

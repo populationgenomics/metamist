@@ -14,14 +14,19 @@ class ParticipantLayer(BaseLayer):
         sample_table = SampleTable(connection=self.connection)
         participant_table = ParticipantTable(connection=self.connection)
 
-        samples_with_no_participant_id: Dict[str, int] = dict(
-            await sample_table.samples_with_missing_participants()
+        samples_with_no_pids_by_internal_id: Dict[
+            int, str
+        ] = await sample_table.get_sample_with_missing_participants_by_internal_id(
+            self.connection.project
         )
+        samples_with_no_pid_by_external_id: Dict[str, int] = {
+            v: k for k, v in samples_with_no_pids_by_internal_id.items()
+        }
         ext_sample_id_to_pid = {}
 
         async with self.connection.connection.transaction():
             sample_ids_to_update = {}
-            for external_id, sample_id in samples_with_no_participant_id.items():
+            for external_id, sample_id in samples_with_no_pid_by_external_id.items():
                 participant_id = await participant_table.create_participant(
                     external_id=external_id
                 )
