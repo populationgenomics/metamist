@@ -7,14 +7,15 @@ from pydantic import BaseModel
 
 from models.enums.sample import SampleType
 
-ENV = os.getenv('SM_ENVIRONMENT', 'development').lower()
-DEFAULT_SAMPLE_PREFIX = 'CPG'
+ENV = os.getenv('SM_ENVIRONMENT', 'local').lower()
+SAMPLE_PREFIX = 'CPG'
+CHECKSUM_OFFSET = 0
 if 'dev' in ENV:
-    DEFAULT_SAMPLE_PREFIX = 'CPGDEV'
-elif 'test' in ENV:
-    DEFAULT_SAMPLE_PREFIX = 'CPGTST'
-
-SAMPLE_PREFIX = os.getenv('SM_SAMPLEPREFIX', DEFAULT_SAMPLE_PREFIX)
+    SAMPLE_PREFIX = 'CPGDEV'
+    CHECKSUM_OFFSET = 1
+elif 'local' in ENV:
+    SAMPLE_PREFIX = 'CPGLCL'
+    CHECKSUM_OFFSET = 2
 
 
 class Sample(BaseModel):
@@ -105,7 +106,11 @@ def sample_id_format(sample_id: Union[int, List[int]]):
         raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
     sample_id = int(sample_id)
 
-    return f'{SAMPLE_PREFIX}{sample_id}{luhn_compute(sample_id)}'
+    checksum = luhn_compute(sample_id)
+    if CHECKSUM_OFFSET:
+        checksum = (checksum + CHECKSUM_OFFSET) % 10
+
+    return f'{SAMPLE_PREFIX}{sample_id}{checksum}'
 
 
 def luhn_is_valid(n):
