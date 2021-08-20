@@ -3,7 +3,8 @@ on:
   push:
     branches:
       - main
-      - add-foundations # test the deploy
+      - dev
+      - dev-deploy
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
@@ -39,6 +40,14 @@ jobs:
           channel-priority: true
           python-version: 3.7
 
+      - name: set deployment type
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
+          else
+            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
+          fi
+
       - name: Setup build env
         run: |
           conda install pip conda-build anaconda-client requests
@@ -48,13 +57,13 @@ jobs:
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
-      - name: "build deployable API"
-        run: |
-          python regenerate_api.py
-          ls -lGh sample_metadata
-
-      - name: Build sample-metadata API conda package
-        run: conda build conda/$(basename $GITHUB_REPOSITORY)
+#      - name: "build deployable API"
+#        run: |
+#          python regenerate_api.py
+#          ls -lGh sample_metadata
+#
+#      - name: Build sample-metadata API conda package
+#        run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
       - name: "push server image"
         run: |
@@ -72,18 +81,23 @@ jobs:
 
       - name: "deploy to Cloud Run"
         run: |
-          gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            gcloud_deploy_name=sample-metadata-api
+          else
+            gcloud_deploy_name=sample-metadata-api-dev
+          fi
+          gcloud run deploy $gcloud_deploy_name --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
 
-      - name: Upload to anaconda package repository
-        run: |
-          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
-
-      - name: Build and push sample-metadata API docker image
-        run: |
-          version=$(cat deploy/python/version.txt)
-          docker build \
-            -t $SM_API_DOCKER:$version \
-            --build-arg SM_VERSION=$version \
-            deploy/python
-          docker push $SM_API_DOCKER:$version
+#      - name: Upload to anaconda package repository
+#        run: |
+#          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+#          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+#
+#      - name: Build and push sample-metadata API docker image
+#        run: |
+#          version=$(cat deploy/python/version.txt)
+#          docker build \
+#            -t $SM_API_DOCKER:$version \
+#            --build-arg SM_VERSION=$version \
+#            deploy/python
+#          docker push $SM_API_DOCKER:$version
