@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Set, Iterable
+from typing import Dict, List, Set, Iterable, Optional
 
 from databases import Database
 from google.cloud import secretmanager
@@ -169,7 +169,7 @@ class ProjectPermissionsTable:
             not ProjectPermissionsTable._cached_project_names
             or ProjectPermissionsTable._cache_expiry < datetime.utcnow()
         ):
-            project_rows = await self.get_project_rows()
+            project_rows = await self.get_project_rows(check_permissions=False)
             ProjectPermissionsTable._cached_project_by_id = {
                 p.id: p for p in project_rows
             }
@@ -240,21 +240,40 @@ class ProjectPermissionsTable:
 
         return project_ids
 
-    async def get_project_rows(self) -> List[ProjectRow]:
+    async def check_project_creator_permissions(self, author):
+        """Check author has project_creator permissions"""
+        # check permissions in here
+        if self.allow_full_access:
+            return True
+
+        response = self._read_secret('sample-metadata', 'project-creator-users')
+        if author not in set(response.split(',')):
+            raise Forbidden(f'{author} does not have access to creating project')
+
+        return True
+
+    async def get_project_rows(
+        self, author: Optional[str] = None, check_permissions=True
+    ) -> List[ProjectRow]:
         """Get {name: id} project map"""
+        if check_permissions:
+            await self.check_project_creator_permissions(author)
+
         _query = 'SELECT id, name, gcp_id, dataset FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
 
     async def create_project(
-        self, project_name: str, dataset_name: str, gcp_project_id: str, author: str
+        self,
+        project_name: str,
+        dataset_name: str,
+        gcp_project_id: str,
+        author: str,
+        check_permissions=True,
     ):
         """Create project row"""
-        # check permissions in here
-        if not self.allow_full_access:
-            response = self._read_secret('sample-metadata', 'project-creator-users')
-            if author not in set(response.split(',')):
-                raise Forbidden(f'{author} does not have access to creating project')
+        if check_permissions:
+            await self.check_project_creator_permissions(author)
 
         _query = """\
 INSERT INTO project (name, gcp_id, dataset, author)

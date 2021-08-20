@@ -1,12 +1,11 @@
 import json
 from typing import Optional, Dict, Union, List
 
-from pydantic import BaseModel
-
+from models.base import SMBase
 from models.enums.sample import SampleType
 
 
-class Sample(BaseModel):
+class Sample(SMBase):
     """Model for a Sample"""
 
     id: Union[str] = None

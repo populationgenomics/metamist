@@ -1,9 +1,19 @@
+from typing import List
+
 from fastapi import APIRouter
 
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import ProjectRow
 
 router = APIRouter(prefix='/project', tags=['project'])
+
+
+@router.get('/', operation_id='getProjects', response_model=List[ProjectRow])
+async def get_projects(connection=get_projectless_db_connection):
+    """Get list of projects"""
+    ptable = ProjectPermissionsTable(connection.connection)
+    return await ptable.get_project_rows(author=connection.author)
 
 
 @router.put('/', operation_id='createProject')
