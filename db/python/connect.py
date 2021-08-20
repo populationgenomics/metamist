@@ -109,11 +109,10 @@ class SMConnections:
         config = DatabaseConfiguration.dev_config()
         creds_from_env = os.getenv('SM_DBCREDS')
         if creds_from_env is not None:
-            config = DatabaseConfiguration(json.loads(creds_from_env))
-            logger.info('Using supplied SM DB CREDS: ' + str(config.host))
+            config = DatabaseConfiguration(**json.loads(creds_from_env))
+            logger.info(f'Using supplied SM DB CREDS: {config.host}')
 
         SMConnections._credentials = config
-        logger.info('MariaDB host: ' + str(config.host))
 
         return SMConnections._credentials
 
