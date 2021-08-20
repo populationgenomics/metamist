@@ -1,10 +1,10 @@
-from typing import Optional, Dict, List, Tuple, Iterable, Set
 from itertools import groupby
+from typing import Optional, Dict, List, Tuple, Iterable, Set
 
-from models.models.sequence import SampleSequencing
-from models.enums import SequenceType, SequenceStatus
-from db.python.tables.project import ProjectPermissionsTable, ProjectId
 from db.python.connect import DbBase, to_db_json, NotFoundError
+from db.python.tables.project import ProjectId
+from models.enums import SequenceType, SequenceStatus
+from models.models.sequence import SampleSequencing
 
 
 class SampleSequencingTable(DbBase):
@@ -19,7 +19,7 @@ class SampleSequencingTable(DbBase):
     ) -> Set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
-SELECT s.project FROM sample_sequencing sq 
+SELECT s.project FROM sample_sequencing sq
 INNER JOIN sample s ON s.id = sq.sample_id
 WHERE s.id in :sequence_ids
 GROUP BY s.project
@@ -221,9 +221,7 @@ WHERE id = :sequencing_id
         meta: Optional[Dict] = None,
         author=None,
     ):
-        """
-        Can't update type
-        """
+        """Update a sequence"""
 
         fields = {'sequencing_id': sequence_id, 'author': author or self.author}
 

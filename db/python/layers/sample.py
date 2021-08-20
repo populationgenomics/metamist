@@ -4,8 +4,7 @@ from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequence import SampleSequencingTable
-from models.enums import SequenceStatus, SampleType
+from models.enums import SampleType
 from models.models.sample import Sample, sample_id_format
 
 
@@ -60,7 +59,9 @@ class SampleLayer(BaseLayer):
         )
 
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.author, projects)
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         if len(sample_id_map) == len(sample_ids):
             return sample_id_map
@@ -95,7 +96,9 @@ class SampleLayer(BaseLayer):
             active=active,
         )
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.author, projects)
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         return samples
 
@@ -121,7 +124,7 @@ class SampleLayer(BaseLayer):
         """Insert sample into SM database"""
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                author or self.author, [project]
+                author or self.author, [project], readonly=False
             )
 
         return await self.st.insert_sample(
@@ -148,7 +151,7 @@ class SampleLayer(BaseLayer):
         if check_project_id:
             projects = await self.st.get_project_ids_for_sample_ids([id_])
             await self.ptable.check_access_to_project_ids(
-                user=author or self.author, project_ids=projects
+                user=author or self.author, project_ids=projects, readonly=False
             )
 
         return await self.st.update_sample(
@@ -173,7 +176,9 @@ class SampleLayer(BaseLayer):
             )
         if check_sample_ids:
             project_ids = await self.st.get_project_ids_for_sample_ids(ids)
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         await self.st.update_many_participant_ids(
             ids=ids, participant_ids=participant_ids

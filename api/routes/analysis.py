@@ -96,9 +96,9 @@ async def get_incomplete_analyses(connection: Connection = get_project_db_connec
 
 @router.post(
     '/latest_complete/{analysis_type}/for-samples',
-    operation_id='getLatestGvcfsForSamples',
+    operation_id='getLatestAnalysisForSamplesAndType',
 )
-async def get_latest_complete_gvcfs_for_samples(
+async def get_latest_analysis_for_samples_and_type(
     sample_ids: List[str],
     analysis_type: AnalysisType,
     allow_missing: bool = True,
@@ -106,7 +106,7 @@ async def get_latest_complete_gvcfs_for_samples(
 ):
     """Get latest complete gvcfs for sample"""
     atable = AnalysisLayer(connection)
-    results = await atable.get_latest_complete_analysis_for_samples_by_type(
+    results = await atable.get_latest_complete_analysis_for_samples_and_type(
         analysis_type=analysis_type,
         sample_ids=sample_id_transform_to_raw(sample_ids),
         allow_missing=allow_missing,
@@ -116,6 +116,21 @@ async def get_latest_complete_gvcfs_for_samples(
         result.sample_ids = sample_id_format(result.sample_ids)
 
     return results
+
+
+@router.get(
+    '/{project}/{analysis_type}/latest-complete',
+    operation_id='getLatestCompleteAnalysisForType',
+)
+async def get_latest_complete_analysis_for_type(
+    analysis_type: AnalysisType, connection: Connection = get_project_db_connection
+):
+    """Get latest complete analysis for some analysis type"""
+    alayer = AnalysisLayer(connection)
+    analysis = await alayer.get_latest_complete_analysis_for_type(
+        project=connection.project, analysis_type=analysis_type
+    )
+    return analysis
 
 
 @router.get(

@@ -17,7 +17,7 @@ class Sample(BaseModel):
     type: Optional[SampleType] = None
 
     @staticmethod
-    def from_db(**kwargs):
+    def from_db(kwargs):
         """
         Convert from db keys, mainly converting id to id_
         """

@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name
 import codecs
 import csv
 from typing import List, Optional
@@ -40,9 +41,7 @@ async def import_pedigree(
 )
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
-    # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = False,
-    # pylint: disable=invalid-name
     replace_with_family_external_ids: bool = False,
     empty_participant_value: Optional[str] = '',
     connection: Connection = get_project_db_connection,
@@ -56,6 +55,7 @@ async def get_pedigree(
     """
     family_layer = FamilyLayer(connection)
     pedigree_rows = await family_layer.get_pedigree(
+        project=connection.project,
         family_ids=internal_family_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
         replace_with_family_external_ids=replace_with_family_external_ids,

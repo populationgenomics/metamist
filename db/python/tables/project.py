@@ -76,7 +76,7 @@ class ProjectPermissionsTable:
     def __init__(self, connection: Database, allow_full_access=IS_DEVELOPMENT):
 
         self.connection: Database = connection
-        self.allow_full_access = allow_full_access and False
+        self.allow_full_access = allow_full_access
 
     def _get_secret_manager_client(self):
         if not self._cached_client:
@@ -97,7 +97,11 @@ class ProjectPermissionsTable:
         return response.payload.data.decode('UTF-8')
 
     async def check_access_to_project_ids(
-        self, user: str, project_ids: Iterable[ProjectId], raise_exception=True
+        self,
+        user: str,
+        project_ids: Iterable[ProjectId],
+        readonly: bool,
+        raise_exception=True,
     ) -> bool:
         """Check user has access to list of project_ids"""
         if not project_ids:
@@ -109,7 +113,7 @@ class ProjectPermissionsTable:
         missing_project_ids = []
         for project_id in set(project_ids):
             has_access = await self.check_access_to_project_id(
-                user, project_id, raise_exception=False
+                user, project_id, readonly=readonly, raise_exception=False
             )
             if not has_access:
                 missing_project_ids.append(project_id)
@@ -126,11 +130,14 @@ class ProjectPermissionsTable:
         return True
 
     async def check_access_to_project_id(
-        self, user: str, project_id: ProjectId, raise_exception=True
+        self, user: str, project_id: ProjectId, readonly: bool, raise_exception=True
     ) -> bool:
         """Check whether a user has access to project_id"""
         if self.allow_full_access:
             return True
+        if not readonly:
+            # validate write privileges here connection
+            pass
         users = await self.get_allowed_users_for_project_id(project_id)
         has_access = user in users
         if not has_access and raise_exception:
@@ -140,10 +147,6 @@ class ProjectPermissionsTable:
 
     async def get_allowed_users_for_project_id(self, project_id) -> Set[str]:
         """Get allowed users for a project_id"""
-        return {
-            1: {'michael.franklin@populationgenomics.org.au'},
-        }.get(project_id, set())
-
         if (
             project_id not in self._cached_permissions
             or not self._cached_permissions[project_id].is_valid()
@@ -188,7 +191,7 @@ class ProjectPermissionsTable:
         return ProjectPermissionsTable._cached_project_names
 
     async def get_project_id_from_name_and_user(
-        self, user: str, project_name: str
+        self, user: str, project_name: str, readonly: bool
     ) -> ProjectId:
         """
         Get projectId from project name and user (email address)
@@ -198,12 +201,12 @@ class ProjectPermissionsTable:
             - False if unable to access the specified project
         """
         project_ids = await self.get_project_ids_from_names_and_user(
-            user, [project_name]
+            user, [project_name], readonly=readonly
         )
         return project_ids[0]
 
     async def get_project_ids_from_names_and_user(
-        self, user: str, project_names: List[str]
+        self, user: str, project_names: List[str], readonly: bool
     ) -> List[ProjectId]:
         """Get project ids from project names and the user"""
         if not user:
@@ -218,7 +221,9 @@ class ProjectPermissionsTable:
                 invalid_project_names.append(project_name)
                 continue
 
-            can_use = await self.check_access_to_project_id(user, project_id)
+            can_use = await self.check_access_to_project_id(
+                user, project_id, readonly=readonly
+            )
             if not can_use:
                 invalid_project_names.append(project_name)
                 continue

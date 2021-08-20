@@ -1,12 +1,12 @@
 from typing import List, Optional
 
 from db.python.connect import Connection
+from db.python.layers.base import BaseLayer
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from models.enums import AnalysisStatus, AnalysisType
-
-from db.python.layers.base import BaseLayer
 from db.python.tables.analysis import AnalysisTable
+
+from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
 from models.models.sample import sample_id_format
 
@@ -25,11 +25,21 @@ class AnalysisLayer(BaseLayer):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)
         if check_project_id:
-            await self.ptable.check_access_to_project_id(self.author, project)
+            await self.ptable.check_access_to_project_id(
+                self.author, project, readonly=True
+            )
 
         return analysis
 
-    async def get_latest_complete_analysis_for_samples_by_type(
+    async def get_latest_complete_analysis_for_type(
+        self, project: ProjectId, analysis_type: AnalysisType
+    ) -> Analysis:
+        """Get SINGLE latest complete analysis for some analysis type"""
+        return await self.at.get_latest_complete_analysis_for_type(
+            project=project, analysis_type=analysis_type
+        )
+
+    async def get_latest_complete_analysis_for_samples_and_type(
         self,
         analysis_type: AnalysisType,
         sample_ids: List[int],
@@ -42,7 +52,9 @@ class AnalysisLayer(BaseLayer):
             project_ids = await SampleTable(
                 self.connection
             ).get_project_ids_for_sample_ids(sample_ids)
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=True
+            )
 
         analyses = await self.at.get_latest_complete_analysis_for_samples_by_type(
             analysis_type=analysis_type, sample_ids=sample_ids
@@ -100,7 +112,9 @@ class AnalysisLayer(BaseLayer):
         """Add samples to an analysis (through the linked table)"""
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.at.add_samples_to_analysis(
             analysis_id=analysis_id, sample_ids=sample_ids
@@ -119,7 +133,9 @@ class AnalysisLayer(BaseLayer):
         """
         if check_project_id:
             project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.at.update_analysis(
             analysis_id=analysis_id,

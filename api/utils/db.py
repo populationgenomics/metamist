@@ -22,7 +22,9 @@ async def dependable_get_project_connection(
     project: str, author: str = Depends(authenticate)
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
-    return await SMConnections.get_connection(project_name=project, author=author)
+    return await SMConnections.get_connection(
+        project_name=project, author=author, readonly=False
+    )
 
 
 async def dependable_get_connection(author: str = Depends(authenticate)):

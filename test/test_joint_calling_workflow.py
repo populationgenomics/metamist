@@ -2,9 +2,7 @@ import os
 import string
 import random
 import sys
-from collections import defaultdict
 
-from models.models.sample import sample_id_format
 from sample_metadata import AnalysisUpdateModel
 from sample_metadata.api import SampleApi, AnalysisApi
 from sample_metadata.models.new_sample import NewSample
@@ -68,32 +66,38 @@ def _jc_pipeline_submit_analyses():
     # so on reruns, pipelien will redo haploytype calling. We want to avoid that.
 
     # Get the list of latest complete analyses
-    latest_complete_analyses = aapi.get_latest_complete_analyses_per_sample(
-        project=PROJ
+    latest_joint_call_analysis = aapi.get_latest_complete_analysis_for_type(
+        project=PROJ, analysis_type='joint-calling'
     )
-    print(f'Latest complete analyses: {latest_complete_analyses}')
-    latest_by_type_and_sids = defaultdict(list)
-    for a in latest_complete_analyses:
-        a_s_ids = sample_id_format(a['sample_ids'])
-        latest_by_type_and_sids[(a['type'], tuple(set(a_s_ids)))].append(a)
+    print(f'Latest complete analyses: {latest_joint_call_analysis}')
 
-    # Iterate over samples, check latest complete analyses, and add next-step analyses
     sapi = SampleApi()
-    samples = sapi.get_all_samples(project=PROJ)
+    samples = sapi.get_samples(project=PROJ)
 
-    if latest_by_type_and_sids.get(
-        ('joint-calling', tuple(set(s.id for s in samples)))
-    ):
+    samples_by_sid = {s.id: s for s in samples}
+    sample_ids = set(samples_by_sid.keys())
+    samples_in_latest_joint_calling = set(latest_joint_call_analysis['sample_ids'])
+    samples_not_in_joint_calling = sample_ids - samples_in_latest_joint_calling
+
+    if len(samples_not_in_joint_calling) == 0:
         print(f'All samples went through joint-calling, nothing to submit')
         return
 
-    latest_complete_gvcf_analyses = aapi.get_latest_complete_analyses_by_type(
-        project=PROJ, analysis_type='gvcf'
+    latest_complete_gvcf_analyses = aapi.get_latest_analysis_for_samples_and_type(
+        analysis_type='gvcf',
+        request_body=list(sample_ids),
     )
+    latest_complete_cram_analyses = aapi.get_latest_analysis_for_samples_and_type(
+        analysis_type='cram', request_body=list(sample_ids)
+    )
+
     sids_with_gvcf = set(
-        sample_id_format(a['sample_ids'])[0] for a in latest_complete_gvcf_analyses
+        s for a in latest_complete_gvcf_analyses for s in a['sample_ids']
     )
-    new_sids_with_gvcf = set(s.id for s in samples) - sids_with_gvcf
+    sids_with_crams = set(
+        s for a in latest_complete_cram_analyses for s in a['sample_ids']
+    )
+    new_sids_with_gvcf = sample_ids - sids_with_gvcf
     if not new_sids_with_gvcf:
         print('All samples went through variant calling, so can submit joint-calling')
         analysis = AnalysisModel(
@@ -106,18 +110,18 @@ def _jc_pipeline_submit_analyses():
         aapi.create_new_analysis(project=PROJ, analysis_model=analysis)
         return
 
-    for s in [s for s in samples if s.id in new_sids_with_gvcf]:
-        print(f'Sample {s.id}')
+    for sample in samples:
+        print(f'Sample {sample.id}')
 
-        if latest_by_type_and_sids.get(('gvcf', (s.id,))):
+        if sample.id in sids_with_gvcf:
             print('  Sample has a complete gvcf analysis')
 
-        elif latest_by_type_and_sids.get(('cram', (s.id,))):
+        elif sample.id in sids_with_crams:
             print(f'  Sample has a complete CRAM analysis, queueing variant calling')
             analysis = AnalysisModel(
-                sample_ids=[s.id],
+                sample_ids=[sample.id],
                 type='gvcf',
-                output=f'gs://my-bucket/variant-calling/{s.id}.g.vcf.gz',
+                output=f'gs://my-bucket/variant-calling/{sample.id}.g.vcf.gz',
                 status='queued',
             )
             aapi.create_new_analysis(project=PROJ, analysis_model=analysis)
@@ -127,13 +131,13 @@ def _jc_pipeline_submit_analyses():
                 f'  Sample doesn not have any analysis yet, trying to get "reads" '
                 'metadata to submit alignment'
             )
-            reads_data = s.meta.get('reads')
+            reads_data = sample.meta.get('reads')
             if not reads_data:
                 print(f'  ERROR: no "reads" data')
             elif isinstance(reads_data, str):
                 if reads_data.endswith('.g.vcf.gz'):
                     analysis = AnalysisModel(
-                        sample_ids=[s.id],
+                        sample_ids=[sample.id],
                         type='gvcf',
                         output=reads_data,
                         status='completed',
@@ -142,9 +146,9 @@ def _jc_pipeline_submit_analyses():
                 elif reads_data.endswith('.cram') or reads_data.endswith('.bam'):
                     print(f'  Queueing cram re-alignment analysis')
                     analysis = AnalysisModel(
-                        sample_ids=[s.id],
+                        sample_ids=[sample.id],
                         type='cram',
-                        output=f'gs://my-bucket/realignment/{s.id}.cram',
+                        output=f'gs://my-bucket/realignment/{sample.id}.cram',
                         status='queued',
                     )
                     aapi.create_new_analysis(project=PROJ, analysis_model=analysis)
@@ -153,9 +157,9 @@ def _jc_pipeline_submit_analyses():
             elif isinstance(reads_data, list) and len(reads_data) == 2:
                 print(f'  Queueing cram alignment analyses')
                 analysis = AnalysisModel(
-                    sample_ids=[s.id],
+                    sample_ids=[sample.id],
                     type='cram',
-                    output=f'gs://my-bucket/alignment/{s.id}.cram',
+                    output=f'gs://my-bucket/alignment/{sample.id}.cram',
                     status='queued',
                 )
                 aapi.create_new_analysis(project=PROJ, analysis_model=analysis)
@@ -245,15 +249,11 @@ def test_simulate_joint_calling_pipeline():
     # Checking that after all calls, a 'completed' 'joint-calling' analysis must exist
     # for the initally added samples
     aapi = AnalysisApi()
-    analyses = aapi.get_latest_complete_analyses_per_sample(project=PROJ)
-    assert any(
-        a['type'] == 'joint-calling'
-        and set(sample_ids) & set(sample_id_format(a['sample_ids'])) == set(sample_ids)
-        for a in analyses
-    ), [
-        (a['type'], set(sample_id_format(a['sample_ids'])), set(sample_ids))
-        for a in analyses
-    ]
+    analysis = aapi.get_latest_complete_analysis_for_type(
+        project=PROJ, analysis_type='joint-calling'
+    )
+    assert analysis['type'] == 'joint-calling'
+    assert set(sample_ids) & set(analysis['sample_ids']) == set(sample_ids)
 
 
 if __name__ == '__main__':

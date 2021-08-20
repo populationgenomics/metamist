@@ -99,6 +99,35 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         await self.connection.execute(_query, {**fields, 'analysis_id': analysis_id})
 
+    async def get_latest_complete_analysis_for_type(
+        self, project: ProjectId, analysis_type: AnalysisType
+    ):
+        """Find the most recent completed analysis for some analysis type"""
+        _query = """
+SELECT a.id as id, a.type as type, a.status as status,
+        a.output as output, a_s.sample_id as sample_id,
+        a.project as project
+FROM analysis_sample a_s
+INNER JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.id = (
+    SELECT id FROM analysis
+    WHERE type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL
+    ORDER BY timestamp_completed DESC
+    LIMIT 1
+)"""
+        values = {'project': project, 'type': analysis_type.value}
+        rows = await self.connection.fetch_all(_query, values)
+        if len(rows) == 0:
+            return NotFoundError(
+                f"Couldn't find any analysis with type {analysis_type.value}"
+            )
+        a = Analysis.from_db(**dict(rows[0]))
+        # .from_db maps 'sample_id' -> sample_ids
+        for row in rows[1:]:
+            a.sample_ids.append(row['sample_id'])
+
+        return a
+
     async def get_all_sample_ids_without_analysis_type(
         self, analysis_type: AnalysisType, project: ProjectId
     ):

@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name
 from typing import Dict
 
 from db.python.tables.participant import ParticipantTable

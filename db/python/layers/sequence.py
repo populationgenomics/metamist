@@ -23,7 +23,9 @@ class SampleSequenceLayer(BaseLayer):
         project, sequence = await self.seqt.get_sequence_by_id(sequence_id)
 
         if check_project_id:
-            await self.ptable.check_access_to_project_id(self.author, project)
+            await self.ptable.check_access_to_project_id(
+                self.author, project, readonly=True
+            )
 
         return sequence
 
@@ -36,7 +38,9 @@ class SampleSequenceLayer(BaseLayer):
         )
 
         if check_project_id:
-            await self.ptable.check_access_to_project_id(self.author, project)
+            await self.ptable.check_access_to_project_id(
+                self.author, project, readonly=True
+            )
 
         return sequence_id
 
@@ -54,7 +58,9 @@ class SampleSequenceLayer(BaseLayer):
         )
 
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.author, projects)
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         return sequences
 
@@ -75,7 +81,9 @@ class SampleSequenceLayer(BaseLayer):
             return sample_sequence_map
 
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=True
+            )
 
         return sample_sequence_map
 
@@ -97,7 +105,9 @@ class SampleSequenceLayer(BaseLayer):
             sample_ids = set(s.sample_id for s in sequencing)
             st = SampleTable(self.connection)
             project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.seqt.insert_many_sequencing(
             sequencing=sequencing, author=author
@@ -118,7 +128,9 @@ class SampleSequenceLayer(BaseLayer):
         if check_project_id:
             st = SampleTable(self.connection)
             project_ids = await st.get_project_ids_for_sample_ids([sample_id])
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.seqt.insert_sequencing(
             sample_id=sample_id,
@@ -138,9 +150,12 @@ class SampleSequenceLayer(BaseLayer):
         author=None,
         check_project_id=True,
     ):
+        """Update a sequence"""
         if check_project_id:
             project_ids = await self.seqt.get_projects_by_sequence_ids([sequence_id])
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.seqt.update_sequence(
             sequence_id=sequence_id,
@@ -152,9 +167,12 @@ class SampleSequenceLayer(BaseLayer):
     async def update_status(
         self, sequencing_id, status: SequenceStatus, author=None, check_project_id=True
     ):
+        """Update status of a sequence"""
         if check_project_id:
             project_ids = await self.seqt.get_projects_by_sequence_ids([sequencing_id])
-            await self.ptable.check_access_to_project_ids(self.author, project_ids)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
 
         return await self.seqt.update_status(
             sequencing_id=sequencing_id,

@@ -208,7 +208,7 @@ class SMConnections:
         return conn
 
     @staticmethod
-    async def get_connection(*, author: str, project_name: Optional[str]):
+    async def get_connection(*, author: str, project_name: str, readonly: bool):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate connection to {project_name} with "{author}"')
@@ -217,7 +217,7 @@ class SMConnections:
         pt = ProjectPermissionsTable(connection=conn)
 
         project_id = await pt.get_project_id_from_name_and_user(
-            user=author, project_name=project_name
+            user=author, project_name=project_name, readonly=readonly
         )
 
         return Connection(connection=conn, author=author, project=project_id)
@@ -258,11 +258,11 @@ class DbBase:
     """Base class for table subclasses"""
 
     @classmethod
-    async def from_project(cls, project, author):
+    async def from_project(cls, project, author, readonly: bool):
         """Create the Db object from a project with user details"""
         return cls(
             connection=await SMConnections.get_connection(
-                project_name=project, author=author
+                project_name=project, author=author, readonly=readonly
             ),
         )
 
