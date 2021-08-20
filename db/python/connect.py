@@ -107,32 +107,14 @@ class SMConnections:
             return SMConnections._credentials
 
         config = DatabaseConfiguration.dev_config()
-        if os.getenv('SM_ENVIRONMENT') == 'PRODUCTION':
+        creds_from_env = os.getenv('SM_DBCREDS')
+        if creds_from_env is not None:
             logger.info('Using production mysql configurations')
-            config = SMConnections._load_database_configurations_from_secret_manager()
+            config = DatabaseConfiguration(json.loads(creds_from_env))
 
         SMConnections._credentials = config
 
         return SMConnections._credentials
-
-    # @staticmethod
-    # def _get_connections(force_reconnect=False):
-    #     if not SMConnections._connections or force_reconnect:
-    #
-    #
-    #         # SMConnections._admin_db = SMConnections.make_connection(admin_config)
-    #
-    #         try:
-    #             SMConnections._connections = {
-    #                 config.project: SMConnections.make_connection(config)
-    #                 for config in project_configs
-    #             }
-    #             logger.info('Created connections to databases')
-    #         except Exception as exp:
-    #             logger.error(f"Couldn't create mysql connection: {exp}")
-    #             raise exp
-    #
-    #     return SMConnections._connections
 
     @staticmethod
     def make_connection(config: DatabaseConfiguration):
@@ -179,30 +161,12 @@ class SMConnections:
     async def connect():
         """Create connections to database"""
 
-        # if SMConnections._connected:
-        #     return False
-        #
-        # connections = SMConnections._get_connections()
-        # await SMConnections._admin_db.connect()
-        # for dbname, db in connections.items():
-        #     logger.info(f'Connecting to {dbname}')
-        #     await db.connect()
-        #
-        # return True
-
         # this will now not connect, new connection will be made on every request
         return False
 
     @staticmethod
     async def disconnect():
         """Disconnect from database"""
-        # if not SMConnections._connected:
-        #     return False
-        #
-        # await asyncio.gather(
-        #     [v.disconnect() for v in SMConnections._get_connections().values()]
-        # )
-        # return True
 
         return False
 
@@ -251,24 +215,6 @@ class SMConnections:
             raise Forbidden
 
         return Connection(connection=conn, author=author, project=None)
-
-    @staticmethod
-    def _read_secret(name: str) -> str:
-        """Reads the latest version of the given secret from Google's Secret Manager."""
-        # pylint: disable=import-outside-toplevel,no-name-in-module
-        from google.cloud import secretmanager
-
-        secret_manager = secretmanager.SecretManagerServiceClient()
-
-        secret_name = f'projects/sample-metadata/secrets/{name}/versions/latest'
-        response = secret_manager.access_secret_version(request={'name': secret_name})
-        return response.payload.data.decode('UTF-8')
-
-    @staticmethod
-    def _load_database_configurations_from_secret_manager() -> DatabaseConfiguration:
-        config_dict = json.loads(SMConnections._read_secret('databases'))
-        config = DatabaseConfiguration(**config_dict)
-        return config
 
 
 class DbBase:
