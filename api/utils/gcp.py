@@ -6,8 +6,12 @@ from google.auth.exceptions import DefaultCredentialsError
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
-IGNORE_GCP_CREDENTIALS_ERROR = bool(os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR'))
-USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING').lower() in ('y', 'true', '1')
+IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in (
+    'y',
+    'true',
+    '1',
+)
+USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
 LOGGING_LEVEL = levels_map.get(os.getenv('SM_LOGGING_LEVEL'), logging.DEBUG)
 
 
