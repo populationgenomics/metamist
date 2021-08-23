@@ -40,44 +40,39 @@ jobs:
           channel-priority: true
           python-version: 3.7
 
-      - name: set deployment type
-        run: |
-          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
-          else
-            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
-          fi
-
       - name: Setup build env
         run: |
           conda install pip conda-build anaconda-client requests
           pip install openapi-generator-cli
 
+      - name: prepare-deployment
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
+          else
+            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
+            pip install bump2version
+            # add
+            bump2version patch \
+              --no-commit --allow-dirty \
+              --new-version $(cat deploy/python/version.txt)-dev$(echo $(git rev-parse HEAD) | cut -c1-7)
+          fi
+
       - name: "build image"
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
-#      - name: "build deployable API"
-#        run: |
-#          python regenerate_api.py
-#          ls -lGh sample_metadata
-#
-#      - name: Build sample-metadata API conda package
-#        run: conda build conda/$(basename $GITHUB_REPOSITORY)
+      - name: "build deployable API"
+        run: |
+          python regenerate_api.py
+          ls -lGh sample_metadata
+
+      - name: Build sample-metadata API conda package
+        run: conda build conda/$(basename $GITHUB_REPOSITORY)
 
       - name: "push server image"
         run: |
           docker push $SM_DOCKER
-
-      # TODO: implement test deploy to check whether everything is in order
-      # - name: "deploy test-web"
-      #   run: |
-      #     gcloud run deploy test-web \
-      #       --region australia-southeast1 \
-      #       --no-allow-unauthenticated \
-      #       --platform managed \
-      #       --set-env-vars=BUCKET_SUFFIX=test-web \
-      #       --image $DOCKER_IMAGE
 
       - name: "deploy to Cloud Run"
         run: |
@@ -86,18 +81,21 @@ jobs:
           else
             gcloud_deploy_name=sample-metadata-api-dev
           fi
-          gcloud run deploy $gcloud_deploy_name --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
+          gcloud run deploy \
+            $gcloud_deploy_name --image $SM_DOCKER \
+            --region australia-southeast1 --no-allow-unauthenticated \
+            --platform managed
 
-#      - name: Upload to anaconda package repository
-#        run: |
-#          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-#          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
-#
-#      - name: Build and push sample-metadata API docker image
-#        run: |
-#          version=$(cat deploy/python/version.txt)
-#          docker build \
-#            -t $SM_API_DOCKER:$version \
-#            --build-arg SM_VERSION=$version \
-#            deploy/python
-#          docker push $SM_API_DOCKER:$version
+      - name: Upload to anaconda package repository
+        run: |
+          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
+            upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+
+      - name: Build and push sample-metadata API docker image
+        run: |
+          version=$(cat deploy/python/version.txt)
+          docker build \
+            -t $SM_API_DOCKER:$version \
+            --build-arg SM_VERSION=$version \
+            deploy/python
+          docker push $SM_API_DOCKER:$version
