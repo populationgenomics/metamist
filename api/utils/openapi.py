@@ -3,9 +3,9 @@ from fastapi.openapi.utils import get_openapi
 
 env = getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
 URL = None
-if 'dev' in env.lower():
+if 'dev' in env:
     URL = 'https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app'
-else:
+elif 'prod' in env:
     URL = 'https://sample-metadata.populationgenomics.org.au'
 
 
