@@ -1,9 +1,14 @@
-import json
 from typing import Optional, Dict, Union, List
+
+import os
+import json
 
 from pydantic import BaseModel
 
 from models.enums.sample import SampleType
+
+SAMPLE_PREFIX = os.getenv('SM_SAMPLEPREFIX', 'CPGLCL').upper()
+CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 
 
 class Sample(BaseModel):
@@ -15,16 +20,17 @@ class Sample(BaseModel):
     active: Optional[bool] = None
     meta: Optional[Dict] = None
     type: Optional[SampleType] = None
+    project: Optional[int] = None
 
     @staticmethod
-    def from_db(**kwargs):
+    def from_db(d):
         """
         Convert from db keys, mainly converting id to id_
         """
-        _id = sample_id_format(kwargs.pop('id', None))
-        type_ = kwargs.pop('type', None)
-        meta = kwargs.pop('meta', None)
-        active = kwargs.pop('active', None)
+        _id = sample_id_format(d.pop('id', None))
+        type_ = d.pop('type', None)
+        meta = d.pop('meta', None)
+        active = d.pop('active', None)
         if active is not None:
             active = bool(active)
         if meta:
@@ -33,9 +39,7 @@ class Sample(BaseModel):
             if isinstance(meta, str):
                 meta = json.loads(meta)
 
-        return Sample(
-            id=_id, type=SampleType(type_), meta=meta, active=active, **kwargs
-        )
+        return Sample(id=_id, type=SampleType(type_), meta=meta, active=active, **d)
 
 
 def sample_id_transform_to_raw(
@@ -56,12 +60,12 @@ def sample_id_transform_to_raw(
     if isinstance(identifier, int):
         return identifier
 
-    if not identifier.startswith('CPG'):
+    if not identifier.startswith(SAMPLE_PREFIX):
         raise Exception(
             f'Invalid prefix found for CPG sample identifier "{identifier}"'
         )
 
-    stripped_identifier = identifier.lstrip('CPG')
+    stripped_identifier = identifier.lstrip(SAMPLE_PREFIX)
     if not stripped_identifier.isdigit():
         raise ValueError(f'Invalid sample identifier "{identifier}"')
 
@@ -90,12 +94,16 @@ def sample_id_format(sample_id: Union[int, List[int]]):
         return [sample_id_format(s) for s in sample_id]
 
     if isinstance(sample_id, str) and not sample_id.isdigit():
-        if sample_id.startswith('CPG'):
+        if sample_id.startswith(SAMPLE_PREFIX):
             return sample_id
         raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
     sample_id = int(sample_id)
 
-    return f'CPG{sample_id}{luhn_compute(sample_id)}'
+    checksum = luhn_compute(sample_id)
+    if CHECKSUM_OFFSET:
+        checksum = (checksum + CHECKSUM_OFFSET) % 10
+
+    return f'{SAMPLE_PREFIX}{sample_id}{checksum}'
 
 
 def luhn_is_valid(n):
