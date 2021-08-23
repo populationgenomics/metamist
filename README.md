@@ -16,7 +16,7 @@ You can configure this with:
 
 ```shell
 # use credentials defined in db/python/connect.py:dev_config
-export SM_ENVIRONMENT=dev
+export SM_ENVIRONMENT=LOCAL
 # use specific mysql settings
 export SM_DEV_DB_PROJECT=sm_dev
 export SM_DEV_DB_USER=root
@@ -37,7 +37,7 @@ You can configure these separately with:
 
 ```shell
 # use localhost:8000
-export SM_ENVIRONMENT=dev
+export SM_ENVIRONMENT=LOCAL
  # use a local account to generate identity-token for auth
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
 ```
@@ -104,7 +104,7 @@ export SM_DEV_DB_USER=root
 export SM_DEV_DB_PORT=3307
 export SM_DEV_DB_HOST=127.0.0.1
 export SM_DEV_DB_PASSWORD=root
-export SM_ENVIRONMENT=dev
+export SM_ENVIRONMENT=LOCAL
 python3 -m api.server
 ```
 
@@ -213,4 +213,8 @@ You'll want to complete the following steps:
 
 ```bash
 export SM_ENVIRONMENT='PRODUCTION'
+
+# OR, point to the dev instance with
+export SM_ENVIRONMENT='DEVELOPMENT'
+
 ```

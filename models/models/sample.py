@@ -7,15 +7,8 @@ from pydantic import BaseModel
 
 from models.enums.sample import SampleType
 
-ENV = os.getenv('SM_ENVIRONMENT', 'local').lower()
-SAMPLE_PREFIX = 'CPG'
-CHECKSUM_OFFSET = 0
-if 'dev' in ENV:
-    SAMPLE_PREFIX = 'CPGDEV'
-    CHECKSUM_OFFSET = 1
-elif 'local' in ENV:
-    SAMPLE_PREFIX = 'CPGLCL'
-    CHECKSUM_OFFSET = 2
+SAMPLE_PREFIX = os.getenv('SM_SAMPLEPREFIX', 'CPGLCL').upper()
+CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 
 
 class Sample(BaseModel):
