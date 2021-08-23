@@ -12,7 +12,7 @@ IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in (
     '1',
 )
 USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
-LOGGING_LEVEL = levels_map.get(os.getenv('SM_LOGGING_LEVEL'), logging.DEBUG)
+LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'DEBUG').upper()]
 
 
 def setup_gcp_logging_if_required(
