@@ -64,13 +64,16 @@ RETURNING id
 
     async def get_id_map_by_internal_ids(
         self, internal_participant_ids: List[int], allow_missing=False
-    ) -> Dict[str, int]:
+    ) -> Dict[int, str]:
         """Get map of {internal_id: external_participant_id}"""
+        if len(internal_participant_ids) == 0:
+            return {}
+
         _query = 'SELECT id, external_id FROM participant WHERE id in :ids'
         results = await self.connection.fetch_all(
             _query, {'ids': internal_participant_ids}
         )
-        id_map = {r['id']: r['external_id'] for r in results}
+        id_map: Dict[int, str] = {r['id']: r['external_id'] for r in results}
 
         if not allow_missing and len(id_map) != len(internal_participant_ids):
             provided_internal_ids = set(internal_participant_ids)
@@ -81,7 +84,7 @@ RETURNING id
                 missing_participant_ids = provided_internal_ids - set(id_map.keys())
 
                 raise NotFoundError(
-                    f"Couldn't find participants with internal IDS: {', '.join(missing_participant_ids)}"
+                    f"Couldn't find participants with internal IDS: {', '.join(str(s) for s in missing_participant_ids)}"
                 )
 
         return id_map
