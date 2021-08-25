@@ -74,6 +74,8 @@ VALUES
             'notes',
             'author',
         }
+        ignore_keys_during_update = {'participant_id'}
+
         remapped_ds = []
         for row in dictionaries:
             d = {k: row.get(k) for k in keys}
@@ -82,11 +84,16 @@ VALUES
 
         str_keys = ', '.join(keys)
         placeholder_keys = ', '.join(f':{k}' for k in keys)
+        update_keys = ', '.join(
+            f'{k}=:{k}' for k in keys if k not in ignore_keys_during_update
+        )
         _query = f"""
 INSERT INTO family_participant
     ({str_keys})
 VALUES
     ({placeholder_keys})
+ON DUPLICATE KEY UPDATE
+    {update_keys}
 """
         return await self.connection.execute_many(_query, remapped_ds)
 
