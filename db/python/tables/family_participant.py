@@ -1,4 +1,5 @@
-from typing import Tuple, List, Dict, Optional
+from collections import defaultdict
+from typing import Tuple, List, Dict, Optional, Set, Any
 
 from db.python.connect import DbBase
 
@@ -50,7 +51,7 @@ VALUES
 
     async def create_rows(
         self,
-        dictionaries: List[Dict[str, str]],
+        dictionaries: List[Dict[str, Any]],
         author=None,
     ):
         """
@@ -76,26 +77,32 @@ VALUES
         }
         ignore_keys_during_update = {'participant_id'}
 
-        remapped_ds = []
+        remapped_ds_by_keys: Dict[Tuple[str], List[Dict]] = defaultdict(list)
+        # this now works when only a portion of the keys are specified
         for row in dictionaries:
-            d = {k: row.get(k) for k in keys}
+            d = {k: row.get(k) for k in keys if k in row}
             d['author'] = author or self.author
-            remapped_ds.append(d)
 
-        str_keys = ', '.join(keys)
-        placeholder_keys = ', '.join(f':{k}' for k in keys)
-        update_keys = ', '.join(
-            f'{k}=:{k}' for k in keys if k not in ignore_keys_during_update
-        )
-        _query = f"""
+            remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
+
+        for d_keys, remapped_ds in remapped_ds_by_keys.items():
+
+            str_keys = ', '.join(d_keys)
+            placeholder_keys = ', '.join(f':{k}' for k in d_keys)
+            update_keys = ', '.join(
+                f'{k}=:{k}' for k in d_keys if k not in ignore_keys_during_update
+            )
+            _query = f"""
 INSERT INTO family_participant
     ({str_keys})
 VALUES
     ({placeholder_keys})
 ON DUPLICATE KEY UPDATE
     {update_keys}
-"""
-        return await self.connection.execute_many(_query, remapped_ds)
+    """
+            await self.connection.execute_many(_query, remapped_ds)
+
+        return True
 
     async def get_rows(
         self, family_ids: Optional[int] = None, project: Optional[int] = None
@@ -129,3 +136,28 @@ WHERE {conditions}
 
         rows = await self.connection.fetch_all(_query, values)
         return rows
+
+    async def get_participant_family_map(
+        self, participant_ids: List[int]
+    ) -> Tuple[Set[int], Dict[int, int]]:
+        """
+        Get {participant_id: family_id} map
+        w/ projects
+        """
+
+        if len(participant_ids) == 0:
+            return set(), {}
+
+        _query = """
+SELECT p.project, p.id, fp.family_id
+FROM family_participant fp
+INNER JOIN participant p ON p.id = fp.participant_id
+WHERE fp.participant_id in :participant_ids
+"""
+        rows = await self.connection.fetch_all(
+            _query, {'participant_ids': participant_ids}
+        )
+        projects = set(r['project'] for r in rows)
+        m = {r['id']: r['family_id'] for r in rows}
+
+        return projects, m

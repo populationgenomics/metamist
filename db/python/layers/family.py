@@ -141,6 +141,21 @@ class PedRow:
 class FamilyLayer(BaseLayer):
     """Layer for import logic"""
 
+    async def get_participant_family_map(
+        self, participant_ids: List[int], check_project_ids=False
+    ):
+        """Get participant family map"""
+
+        fptable = FamilyParticipantTable(self.connection)
+        projects, family_map = await fptable.get_participant_family_map(
+            participant_ids=participant_ids
+        )
+
+        if check_project_ids:
+            raise NotImplementedError(f'Must check specified projects: {projects}')
+
+        return family_map
+
     async def import_pedigree(self, header: Optional[List[str]], rows: List[List[str]]):
         """
         Import pedigree file

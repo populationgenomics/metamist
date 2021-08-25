@@ -213,11 +213,15 @@
 		<sql>ALTER TABLE participant_phenotypes CHANGE participant_id participant_id INT NOT NULL;</sql>
         <sql>ALTER TABLE participant_phenotypes CHANGE description description VARCHAR(255);</sql>
 
-		<addPrimaryKey
-			tableName="family_participant"
-			columnNames="participant_id"
-		/>
-
+<!--		<addPrimaryKey-->
+<!--			tableName="family_participant"-->
+<!--			columnNames="participant_id"-->
+<!--		/>-->
+		<sql>
+			ALTER TABLE participant_phenotypes
+			ADD CONSTRAINT uk_participant_phenotypes_pid_hpo_description
+			UNIQUE (`participant_id`,`hpo_term`,`description`)
+		</sql>
         <addForeignKeyConstraint
             constraintName="fk_participant_phenotype"
             baseTableName="participant_phenotypes"
@@ -225,18 +229,14 @@
             referencedTableName="participant"
             referencedColumnNames="id"
 		/>
-		<addColumn
-			tableName="participant_phenotypes">
-			<column
-				name="value"
-				type="JSON"
-                beforeColumn="author"
-			/>
-		</addColumn>
-		<addUniqueConstraint
-			constraintName="uk_participant_phenotypes_pid_hpo_description"
-			tableName="participant_phenotypes"
-			columnNames="participant_id,hpo_term,description"
-		/>
+<!--		<addColumn-->
+<!--			tableName="participant_phenotypes">-->
+<!--			<column-->
+<!--				name="value"-->
+<!--				type="JSON"-->
+<!--                beforeColumn="author"-->
+<!--			/>-->
+<!--		</addColumn>-->
+
 	</changeSet>
 </databaseChangeLog>

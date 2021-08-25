@@ -47,6 +47,9 @@ async def get_individual_metadata_template_for_seqr(
         replace_with_participant_external_ids=replace_with_participant_external_ids,
     )
 
+    if delimeter == '\\t':
+        delimeter = '\t'
+
     output = io.StringIO()
     writer = csv.writer(output, delimiter=delimeter)
     writer.writerows(rows)

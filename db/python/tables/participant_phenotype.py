@@ -20,8 +20,8 @@ class ParticipantPhenotypeTable(DbBase):
         Create a new sample, and add it to database
         """
         _query = f"""
-INSERT INTO participant_phenotypes (participant_id, description, value, author)
-VALUES (:participant_id, :description, :value, :author)
+INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
+VALUES (:participant_id, :description, :value, :author, 'DESCRIPTION')
 ON DUPLICATE KEY UPDATE
     description=:description, value=:value, author=:author
         """
