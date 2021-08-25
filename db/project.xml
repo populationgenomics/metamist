@@ -213,6 +213,11 @@
 		<sql>ALTER TABLE participant_phenotypes CHANGE participant_id participant_id INT NOT NULL;</sql>
         <sql>ALTER TABLE participant_phenotypes CHANGE description description VARCHAR(255);</sql>
 
+		<addPrimaryKey
+			tableName="family_participant"
+			columnNames="participant_id"
+		/>
+
         <addForeignKeyConstraint
             constraintName="fk_participant_phenotype"
             baseTableName="participant_phenotypes"
