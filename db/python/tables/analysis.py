@@ -229,7 +229,7 @@ WHERE a.id = :analysis_id
 
         return a
 
-    async def get_cram_path_csv_for_seqr(self, project: int):
+    async def get_sample_cram_path_map_for_seqr(self, project: int):
         """Get (ext_sample_id, cram_path, internal_id) map"""
         _query = """
 SELECT s.external_id, a.output, s.id

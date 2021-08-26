@@ -160,13 +160,13 @@ async def get_analysis_by_id(
 
 
 @router.get(
-    '/{project}/cram-paths/csv',
-    operation_id='getCramPathsCsv',
+    '/{project}/cram-paths/tsv',
+    operation_id='getCramPathsTsv',
     response_class=StreamingResponse,
 )
 async def get_cram_path_csv(connection: Connection = get_project_db_connection):
     """
-    Get map of ExternalSampleId,pathToCram,InternalSampleID for seqr
+    Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr
 
     Description:
         Column 1: Individual ID
@@ -175,7 +175,7 @@ async def get_cram_path_csv(connection: Connection = get_project_db_connection):
     """
 
     at = AnalysisTable(connection)
-    rows = await at.get_cram_path_csv_for_seqr(project=connection.project)
+    rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
 
     # remap sample ids
     for row in rows:
@@ -185,10 +185,10 @@ async def get_cram_path_csv(connection: Connection = get_project_db_connection):
     writer = csv.writer(output, delimiter='\t')
     writer.writerows(rows)
 
-    basefn = f'{connection.project}-{date.today().isoformat()}'
+    basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
 
     return StreamingResponse(
         iter(output.getvalue()),
-        media_type='text/csv',
-        headers={'Content-Disposition': f'filename={basefn}.ped'},
+        media_type='text/tab-separated-values',
+        headers={'Content-Disposition': f'filename={basefn}.tsv'},
     )
