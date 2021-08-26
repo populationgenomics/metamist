@@ -128,7 +128,7 @@ WHERE a.project = :project AND (a.status='queued' OR a.status='in-progress')
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
         )
-        analysis_by_id = dict()
+        analysis_by_id = {}
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
@@ -166,7 +166,7 @@ AND a.timestamp_completed = (
         if analysis_type:
             values['analysis_type'] = analysis_type
         rows = await self.connection.fetch_all(_query, values)
-        analysis_by_id = dict()
+        analysis_by_id = {}
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
