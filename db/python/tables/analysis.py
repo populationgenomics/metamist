@@ -236,7 +236,7 @@ SELECT s.external_id, a.output, s.id
 FROM analysis a
 INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
-WHERE a.type = 'gvcf' AND a.status = 'completed' AND s.project = :project
+WHERE a.type = 'cram' AND a.status = 'completed' AND s.project = :project
 """
 
         rows = await self.connection.fetch_all(_query, {'project': project})
