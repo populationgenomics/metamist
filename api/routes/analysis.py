@@ -1,7 +1,12 @@
 from typing import List, Optional
 
+import io
+import csv
+from datetime import date
+
 from fastapi import APIRouter
 from pydantic import BaseModel
+from starlette.responses import StreamingResponse
 
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
@@ -152,3 +157,38 @@ async def get_analysis_by_id(
     result = await atable.get_analysis_by_id(analysis_id)
     result.sample_ids = sample_id_format(result.sample_ids)
     return result
+
+
+@router.get(
+    '/{project}/cram-paths/csv',
+    operation_id='getCramPathsCsv',
+    response_class=StreamingResponse,
+)
+async def get_cram_path_csv(connection: Connection = get_project_db_connection):
+    """
+    Get map of ExternalSampleId,pathToCram,InternalSampleID for seqr
+
+    Description:
+        Column 1: Individual ID
+        Column 2: gs:// Google bucket path or server filesystem path for this Individual
+        Column 3: Sample ID for this file, if different from the Individual ID. Used primarily for gCNV files to identify the sample in the batch path
+    """
+
+    at = AnalysisTable(connection)
+    rows = await at.get_cram_path_csv_for_seqr(project=connection.project)
+
+    # remap sample ids
+    for row in rows:
+        row[2] = sample_id_format(row[2])
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter='\t')
+    writer.writerows(rows)
+
+    basefn = f'{connection.project}-{date.today().isoformat()}'
+
+    return StreamingResponse(
+        iter(output.getvalue()),
+        media_type='text/csv',
+        headers={'Content-Disposition': f'filename={basefn}.ped'},
+    )
