@@ -160,11 +160,13 @@ async def get_analysis_by_id(
 
 
 @router.get(
-    '/{project}/cram-paths/tsv',
-    operation_id='getCramPathsTsv',
+    '/{project}/sample-cram-path-map/tsv',
+    operation_id='getSampleReadsMapForSeqr',
     response_class=StreamingResponse,
 )
-async def get_cram_path_csv(connection: Connection = get_project_db_connection):
+async def get_sample_reads_map_for_seqr(
+    connection: Connection = get_project_db_connection,
+):
     """
     Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr
 
