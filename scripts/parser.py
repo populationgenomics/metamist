@@ -123,7 +123,7 @@ class GenericParser:
                 logger.warning(f"FORBIDDEN: Can't download {filename}")
                 return None
 
-        with open(filename) as f:
+        with open(filename, encoding='utf-8') as f:
             return f.read()
 
     def file_exists(self, filename: str) -> bool:

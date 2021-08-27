@@ -15,15 +15,15 @@ from api.routes import (
     participant_router,
     family_router,
 )
-from api.utils import IS_PRODUCTION, get_openapi_schema_func
-from api.utils.gcp import setup_gcp_logging
+from api.utils import get_openapi_schema_func
+from api.utils.gcp import setup_gcp_logging_if_required
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
-_VERSION = '2.0.4'
+_VERSION = '2.0.5'
 
 
-logger = setup_gcp_logging(IS_PRODUCTION)
+logger = setup_gcp_logging_if_required()
 
 SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()
@@ -85,7 +85,7 @@ app.include_router(sequence_router, prefix='/api/v1')
 app.include_router(participant_router, prefix='/api/v1')
 app.include_router(family_router, prefix='/api/v1')
 
-app.openapi = get_openapi_schema_func(app, _VERSION, is_production=IS_PRODUCTION)
+app.openapi = get_openapi_schema_func(app, _VERSION)
 
 
 if __name__ == '__main__':

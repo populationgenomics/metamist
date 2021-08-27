@@ -126,7 +126,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             raise NotFoundError(f'Couldn\'t find sample with internal id {internal_id}')
 
         kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
-        sample = Sample.from_db(**kwargs)
+        sample = Sample.from_db(kwargs)
         return sample
 
     async def get_all(self, check_active: bool = True) -> List[Sample]:
@@ -148,7 +148,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         samples = []
         for sample_row in sample_rows:
             kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
-            sample = Sample.from_db(**kwargs)
+            sample = Sample.from_db(kwargs)
             samples.append(sample)
         return samples
 
@@ -185,7 +185,7 @@ LIMIT 1;"""
             )
 
         kwargs = {keys[i]: sample_row[i] for i in range(len(keys))}
-        sample = Sample.from_db(**kwargs)
+        sample = Sample.from_db(kwargs)
         return sample
 
     async def get_sample_id_map_by_external_ids(
@@ -295,7 +295,7 @@ LIMIT 1;"""
             _query += f' WHERE {" AND ".join(where)}'
 
         samples = await self.connection.fetch_all(_query, replacements)
-        return [Sample.from_db(**s) for s in samples]
+        return [Sample.from_db(s) for s in samples]
 
     async def samples_with_missing_participants(
         self, project: Optional[int] = None
