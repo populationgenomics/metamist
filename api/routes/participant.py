@@ -9,6 +9,7 @@ from fastapi.params import Query
 from starlette.responses import StreamingResponse
 
 from api.utils.db import get_project_db_connection, Connection
+from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
 
 router = APIRouter(prefix='/participant', tags=['participant'])
@@ -27,14 +28,14 @@ async def fill_in_missing_participants(
 
 
 @router.get(
-    '/{project}/individual-metadata-template/seqr',
-    operation_id='getIndividualMetadataTemplateForSeqr',
+    '/{project}/individual-metadata-seqr/{export_type}',
+    operation_id='getIndividualMetadataForSeqr',
     response_class=StreamingResponse,
 )
 async def get_individual_metadata_template_for_seqr(
     project: str,
+    export_type: ExportType,
     external_participant_ids: Optional[List[str]] = Query(default=None),
-    delimeter: str = ',',
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
     connection: Connection = get_project_db_connection,
@@ -47,21 +48,14 @@ async def get_individual_metadata_template_for_seqr(
         replace_with_participant_external_ids=replace_with_participant_external_ids,
     )
 
-    if delimeter == '\\t':
-        delimeter = '\t'
-
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=delimeter)
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
     writer.writerows(rows)
 
-    ext = '.csv'
-    if delimeter == '\t':
-        ext = '.tsv'
-
     basefn = f'{project}-{date.today().isoformat()}'
-
+    ext = export_type.get_extension()
     return StreamingResponse(
         iter(output.getvalue()),
-        media_type='text/csv',
-        headers={'Content-Disposition': f'filename={basefn}.{ext}'},
+        media_type=export_type.get_mime_type(),
+        headers={'Content-Disposition': f'filename={basefn}{ext}'},
     )
