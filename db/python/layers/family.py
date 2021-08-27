@@ -48,9 +48,9 @@ class PedRow:
         self.individual_id = individual_id
         self.paternal_id = None
         self.maternal_id = None
-        if paternal_id is not None and paternal_id not in ('0', 0):
+        if paternal_id is not None and paternal_id not in ('0', 0, ''):
             self.paternal_id = paternal_id
-        if maternal_id is not None and maternal_id not in ('0', 0):
+        if maternal_id is not None and maternal_id not in ('0', 0, ''):
             self.maternal_id = maternal_id
         self.sex = self.parse_sex(sex)
         self.affected = int(affected)
@@ -140,6 +140,21 @@ class PedRow:
 
 class FamilyLayer(BaseLayer):
     """Layer for import logic"""
+
+    async def get_participant_family_map(
+        self, participant_ids: List[int], check_project_ids=False
+    ):
+        """Get participant family map"""
+
+        fptable = FamilyParticipantTable(self.connection)
+        projects, family_map = await fptable.get_participant_family_map(
+            participant_ids=participant_ids
+        )
+
+        if check_project_ids:
+            raise NotImplementedError(f'Must check specified projects: {projects}')
+
+        return family_map
 
     async def import_pedigree(self, header: Optional[List[str]], rows: List[List[str]]):
         """
