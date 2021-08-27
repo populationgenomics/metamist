@@ -14,7 +14,7 @@ all_packages.extend(
     'sample_metadata.' + p for p in sorted(find_packages(f'./sample_metadata'))
 )
 
-with open('README.md') as f:
+with open('README.md', encoding='utf-8') as f:
     readme = f.read()
 
 

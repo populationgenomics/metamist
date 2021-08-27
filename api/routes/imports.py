@@ -3,10 +3,10 @@ import codecs
 
 from fastapi import APIRouter, UploadFile, File
 
-from db.python.layers.imports import ImportLayer
-
-from api.utils.db import get_project_db_connection, Connection
 from models.models.sample import sample_id_format
+from db.python.layers.imports import ImportLayer
+from db.python.layers.participant import ParticipantLayer
+from api.utils.db import get_project_db_connection, Connection
 
 router = APIRouter(prefix='/import', tags=['import'])
 
@@ -22,3 +22,19 @@ async def import_airtable_manifest(
 
     sample_ids = await import_layer.import_airtable_manifest_csv(headers, csvreader)
     return {'success': True, 'sample_ids': sample_id_format(sample_ids)}
+
+
+@router.post(
+    '/{project}/individual-metadata-manifest',
+    operation_id='importIndividualMetadataManifest',
+)
+async def import_individual_metadata_manifest(
+    file: UploadFile = File(...), connection: Connection = get_project_db_connection
+):
+    """Get sample by external ID"""
+    player = ParticipantLayer(connection)
+    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
+    headers = next(csvreader)
+
+    await player.generic_individual_metadata_importer(headers, list(csvreader))
+    return {'success': True}

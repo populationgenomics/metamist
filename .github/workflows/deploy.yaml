@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - add-foundations # test the deploy
+      - dev
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
@@ -44,6 +44,19 @@ jobs:
           conda install pip conda-build anaconda-client requests
           pip install openapi-generator-cli
 
+      - name: prepare-deployment
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
+          else
+            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
+            pip install bump2version
+            # add
+            bump2version patch \
+              --no-commit --allow-dirty \
+              --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
+          fi
+
       - name: "build image"
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
@@ -60,24 +73,22 @@ jobs:
         run: |
           docker push $SM_DOCKER
 
-      # TODO: implement test deploy to check whether everything is in order
-      # - name: "deploy test-web"
-      #   run: |
-      #     gcloud run deploy test-web \
-      #       --region australia-southeast1 \
-      #       --no-allow-unauthenticated \
-      #       --platform managed \
-      #       --set-env-vars=BUCKET_SUFFIX=test-web \
-      #       --image $DOCKER_IMAGE
-
       - name: "deploy to Cloud Run"
         run: |
-          gcloud run deploy sample-metadata-api --region australia-southeast1 --no-allow-unauthenticated --platform managed --image $SM_DOCKER
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            gcloud_deploy_name=sample-metadata-api
+          else
+            gcloud_deploy_name=sample-metadata-api-dev
+          fi
+          gcloud run deploy \
+            $gcloud_deploy_name --image $SM_DOCKER \
+            --region australia-southeast1 --no-allow-unauthenticated \
+            --platform managed
 
       - name: Upload to anaconda package repository
         run: |
           anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-          upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+            upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
 
       - name: Build and push sample-metadata API docker image
         run: |
