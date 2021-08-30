@@ -20,7 +20,7 @@ from api.utils.gcp import setup_gcp_logging_if_required
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
-_VERSION = '2.0.5'
+_VERSION = '2.0.6'
 
 
 logger = setup_gcp_logging_if_required()
