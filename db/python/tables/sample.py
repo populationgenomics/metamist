@@ -295,7 +295,7 @@ LIMIT 1;"""
             _query += f' WHERE {" AND ".join(where)}'
 
         samples = await self.connection.fetch_all(_query, replacements)
-        return [Sample.from_db(s) for s in samples]
+        return [Sample.from_db(dict(s)) for s in samples]
 
     async def samples_with_missing_participants(
         self, project: Optional[int] = None
