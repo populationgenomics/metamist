@@ -11,6 +11,14 @@ from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 
 
+class ExtraParticipantImporterHandler(Enum):
+    """How to handle extra participants during metadata import"""
+
+    FAIL = 'fail'
+    IGNORE = 'ignore'
+    ADD = 'add'
+
+
 class SeqrMetadataKeys(Enum):
     """Describes keys for Seqr individual metadata template"""
 
@@ -108,14 +116,27 @@ class ParticipantLayer(BaseLayer):
         """Update the sequencing status from the internal sample id"""
         sample_table = SampleTable(connection=self.connection)
 
+        # { external_id: internal_id }
         samples_with_no_participant_id: Dict[str, int] = dict(
             await sample_table.samples_with_missing_participants()
         )
         ext_sample_id_to_pid = {}
 
+        unlinked_participants = await self.ptable.get_id_map_by_external_ids(
+            list(samples_with_no_participant_id.keys()), allow_missing=True
+        )
+        external_participant_ids_to_add = set(
+            samples_with_no_participant_id.keys()
+        ) - set(unlinked_participants.keys())
+
         async with self.connection.connection.transaction():
-            sample_ids_to_update = {}
-            for external_id, sample_id in samples_with_no_participant_id.items():
+            sample_ids_to_update = {
+                samples_with_no_participant_id[external_id]: pid
+                for external_id, pid in unlinked_participants.items()
+            }
+
+            for external_id in external_participant_ids_to_add:
+                sample_id = samples_with_no_participant_id[external_id]
                 participant_id = await self.ptable.create_participant(
                     external_id=external_id
                 )
@@ -129,7 +150,10 @@ class ParticipantLayer(BaseLayer):
         return f'Updated {len(sample_ids_to_update)} records'
 
     async def generic_individual_metadata_importer(
-        self, headers: List[str], rows: List[List[str]]
+        self,
+        headers: List[str],
+        rows: List[List[str]],
+        extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     ):
         """
         Import individual level metadata,
@@ -137,6 +161,8 @@ class ParticipantLayer(BaseLayer):
         """
         # pylint: disable=too-many-locals
         # currently only does the seqr metadata template
+
+        # filter to non-comment rows
         async with self.connection.connection.transaction():
             pptable = ParticipantPhenotypeTable(self.connection)
 
@@ -158,9 +184,29 @@ class ParticipantLayer(BaseLayer):
             # TODO: determine better way to add persons if they're not here, if we add them here
             #       we risk when the samples are added, we might not link them correctly.
             # will throw if missing external ids
-            external_pid_map = await self.ptable.get_id_map_by_external_ids(
-                list(external_participant_ids), allow_missing=False
+
+            # we'll allow missing (from the db) participants if we're going to add them
+            allow_missing_participants = (
+                extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
+            external_pid_map = await self.ptable.get_id_map_by_external_ids(
+                list(external_participant_ids), allow_missing=allow_missing_participants
+            )
+            if extra_participants_method == ExtraParticipantImporterHandler.ADD:
+                missing_participant_eids = external_participant_ids - set(
+                    external_pid_map.keys()
+                )
+                for ex_pid in missing_participant_eids:
+                    external_pid_map[ex_pid] = await self.ptable.create_participant(
+                        external_id=ex_pid, project=self.connection.project
+                    )
+            elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
+                rows = [
+                    row
+                    for row in rows
+                    if row[participant_id_field_idx] in external_pid_map
+                ]
+
             internal_to_external_pid_map = {v: k for k, v in external_pid_map.items()}
             pids = list(external_pid_map.values())
 
