@@ -23,7 +23,7 @@ class Sample(BaseModel):
     project: Optional[int] = None
 
     @staticmethod
-    def from_db(d):
+    def from_db(d: Dict):
         """
         Convert from db keys, mainly converting id to id_
         """
