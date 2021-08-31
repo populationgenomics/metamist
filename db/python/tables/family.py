@@ -70,6 +70,8 @@ RETURNING id
         self, family_ids: List[int], allow_missing=False
     ):
         """Get map of {external_id: internal_id} for a family"""
+        if len(family_ids) == 0:
+            return {}
         _query = 'SELECT id, external_id FROM family WHERE id in :ids'
         results = await self.connection.fetch_all(_query, {'ids': family_ids})
         id_map = {r['id']: r['external_id'] for r in results}

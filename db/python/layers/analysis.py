@@ -85,6 +85,12 @@ class AnalysisLayer(BaseLayer):
         """
         return await self.at.get_incomplete_analyses(project=project)
 
+    async def get_sample_cram_path_map_for_seqr(
+        self, project: ProjectId
+    ) -> List[List[str]]:
+        """Get (ext_sample_id, cram_path, internal_id) map"""
+        return await self.at.get_sample_cram_path_map_for_seqr(project=project)
+
     # CREATE / UPDATE
 
     async def insert_analysis(

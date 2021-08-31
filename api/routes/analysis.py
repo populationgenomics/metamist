@@ -1,7 +1,12 @@
 from typing import List, Optional
 
+import io
+import csv
+from datetime import date
+
 from fastapi import APIRouter
 from pydantic import BaseModel
+from starlette.responses import StreamingResponse
 
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import Analysis
@@ -144,3 +149,40 @@ async def get_analysis_by_id(
     result = await atable.get_analysis_by_id(analysis_id)
     result.sample_ids = sample_id_format(result.sample_ids)
     return result
+
+
+@router.get(
+    '/{project}/sample-cram-path-map/tsv',
+    operation_id='getSampleReadsMapForSeqr',
+    response_class=StreamingResponse,
+)
+async def get_sample_reads_map_for_seqr(
+    connection: Connection = get_project_db_connection,
+):
+    """
+    Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr
+
+    Description:
+        Column 1: Individual ID
+        Column 2: gs:// Google bucket path or server filesystem path for this Individual
+        Column 3: Sample ID for this file, if different from the Individual ID. Used primarily for gCNV files to identify the sample in the batch path
+    """
+
+    at = AnalysisLayer(connection)
+    rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
+
+    # remap sample ids
+    for row in rows:
+        row[2] = sample_id_format(row[2])
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter='\t')
+    writer.writerows(rows)
+
+    basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
+
+    return StreamingResponse(
+        iter(output.getvalue()),
+        media_type='text/tab-separated-values',
+        headers={'Content-Disposition': f'filename={basefn}.tsv'},
+    )

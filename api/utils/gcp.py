@@ -4,11 +4,18 @@ import logging
 
 from google.auth.exceptions import DefaultCredentialsError
 
-IGNORE_GCP_CREDENTIALS_ERROR = bool(os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR'))
+levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
+
+IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in (
+    'y',
+    'true',
+    '1',
+)
+USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
+LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'DEBUG').upper()]
 
 
-def setup_gcp_logging(
-    is_production,
+def setup_gcp_logging_if_required(
     ignore_gcp_credentials_error=IGNORE_GCP_CREDENTIALS_ERROR,
 ):
     """
@@ -17,11 +24,10 @@ def setup_gcp_logging(
     Python logging module. By default this captures all logs
     at INFO level and higher
     """
-    level = logging.INFO if is_production else logging.DEBUG
-    logging.basicConfig(level=level)
+    logging.basicConfig(level=LOGGING_LEVEL)
     logger = logging.getLogger('sample-metadata-api')
 
-    if is_production:
+    if USE_GCP_LOGGING:
         try:
             # pylint: disable=import-outside-toplevel,c-extension-no-member
             import google.cloud.logging

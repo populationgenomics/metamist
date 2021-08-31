@@ -8,6 +8,8 @@ class ProjectRow(SMBase):
     name: str = None
     gcp_id: str = None
     dataset: str = None
+    read_secret_name: str = None
+    write_secret_name: str = None
 
     @staticmethod
     def from_db(kwargs):

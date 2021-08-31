@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import groupby
 from typing import List, Optional, Set, Tuple
 
 from db.python.connect import DbBase, NotFoundError  # , to_db_json
@@ -165,7 +166,7 @@ WHERE a.project = :project AND (a.status='queued' OR a.status='in-progress')
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
         )
-        analysis_by_id = dict()
+        analysis_by_id = {}
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
@@ -228,3 +229,22 @@ WHERE a.id = :analysis_id
             a.sample_ids.append(row['sample_id'])
 
         return project, a
+
+    async def get_sample_cram_path_map_for_seqr(
+        self, project: ProjectId
+    ) -> List[List[str]]:
+        """Get (ext_sample_id, cram_path, internal_id) map"""
+        _query = """
+SELECT s.external_id, a.output, s.id
+FROM analysis a
+INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+INNER JOIN sample s ON a_s.sample_id = s.id
+WHERE a.type = 'cram' AND a.status = 'completed' AND s.project = :project
+ORDER BY a.timestamp_completed DESC
+"""
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        # 1 per analysis
+        return [
+            list(list(g_rows)[0]) for _, g_rows in groupby(rows, lambda seq: seq['id'])
+        ]

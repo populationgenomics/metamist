@@ -130,7 +130,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         d = dict(sample_row)
         project = d.pop('project')
-        sample = Sample.from_db(**d)
+        sample = Sample.from_db(d)
         return project, sample
 
     async def get_all(
@@ -186,7 +186,7 @@ LIMIT 1;"""
                 f'Couldn\'t find active sample with external id {external_id}'
             )
 
-        return Sample.from_db(sample_row)
+        return Sample.from_db(dict(sample_row))
 
     async def get_sample_id_map_by_external_ids(
         self,
