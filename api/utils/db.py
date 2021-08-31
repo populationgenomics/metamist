@@ -18,12 +18,21 @@ def authenticate(
     return None
 
 
-async def dependable_get_project_connection(
+async def dependable_get_write_project_connection(
     project: str, author: str = Depends(authenticate)
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
     return await SMConnections.get_connection(
         project_name=project, author=author, readonly=False
+    )
+
+
+async def dependable_get_readonly_project_connection(
+    project: str, author: str = Depends(authenticate)
+) -> Connection:
+    """FastAPI handler for getting connection WITH project"""
+    return await SMConnections.get_connection(
+        project_name=project, author=author, readonly=True
     )
 
 
@@ -33,5 +42,6 @@ async def dependable_get_connection(author: str = Depends(authenticate)):
 
 
 get_author = Depends(authenticate)
-get_project_db_connection = Depends(dependable_get_project_connection)
+get_project_readonly_connection = Depends(dependable_get_readonly_project_connection)
+get_project_write_connection = Depends(dependable_get_write_project_connection)
 get_projectless_db_connection = Depends(dependable_get_connection)

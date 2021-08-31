@@ -15,7 +15,8 @@ from db.python.layers.analysis import AnalysisLayer
 
 from api.utils.db import (
     get_projectless_db_connection,
-    get_project_db_connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
     Connection,
 )
 
@@ -40,7 +41,7 @@ class AnalysisUpdateModel(BaseModel):
 
 @router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
 async def create_new_analysis(
-    analysis: AnalysisModel, connection: Connection = get_project_db_connection
+    analysis: AnalysisModel, connection: Connection = get_project_write_connection
 ):
     """Create a new analysis"""
 
@@ -78,7 +79,7 @@ async def update_analysis_status(
 )
 async def get_all_sample_ids_without_analysis_type(
     analysis_type: AnalysisType,
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
@@ -92,7 +93,9 @@ async def get_all_sample_ids_without_analysis_type(
     '/{project}/incomplete',
     operation_id='getIncompleteAnalyses',
 )
-async def get_incomplete_analyses(connection: Connection = get_project_db_connection):
+async def get_incomplete_analyses(
+    connection: Connection = get_project_readonly_connection,
+):
     """Get analyses with status queued or in-progress"""
     atable = AnalysisLayer(connection)
     result = await atable.get_incomplete_analyses(project=connection.project)
@@ -107,7 +110,7 @@ async def get_latest_analysis_for_samples_and_type(
     sample_ids: List[str],
     analysis_type: AnalysisType,
     allow_missing: bool = True,
-    connection: Connection = get_projectless_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """Get latest complete gvcfs for sample"""
     atable = AnalysisLayer(connection)
@@ -128,7 +131,8 @@ async def get_latest_analysis_for_samples_and_type(
     operation_id='getLatestCompleteAnalysisForType',
 )
 async def get_latest_complete_analysis_for_type(
-    analysis_type: AnalysisType, connection: Connection = get_project_db_connection
+    analysis_type: AnalysisType,
+    connection: Connection = get_project_readonly_connection,
 ):
     """Get latest complete analysis for some analysis type"""
     alayer = AnalysisLayer(connection)
@@ -157,7 +161,7 @@ async def get_analysis_by_id(
     response_class=StreamingResponse,
 )
 async def get_sample_reads_map_for_seqr(
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """
     Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr

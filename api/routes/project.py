@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter
 
@@ -21,6 +21,8 @@ async def create_project(
     name: str,
     dataset: str,
     gcp_id: str,
+    read_secret_name: Optional[str],
+    write_secret_name: Optional[str],
     connection: Connection = get_projectless_db_connection,
 ) -> int:
     """Get sample by external ID"""
@@ -29,6 +31,8 @@ async def create_project(
         project_name=name,
         dataset_name=dataset,
         gcp_project_id=gcp_id,
+        read_secret_name=read_secret_name,
+        write_secret_name=write_secret_name,
         author=connection.author,
     )
 

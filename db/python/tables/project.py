@@ -1,6 +1,7 @@
+from typing import Dict, List, Set, Iterable, Optional, Tuple
+
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Set, Iterable, Optional
 
 from databases import Database
 from google.cloud import secretmanager
@@ -10,7 +11,7 @@ from models.models.project import ProjectRow
 
 PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
-IS_DEVELOPMENT = 'dev' in os.getenv('SM_ENVIRONMENT', 'development').lower()
+ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
 
 ProjectId = int
 
@@ -33,10 +34,13 @@ class ProjectDoesNotExist(Forbidden):
 class NoProjectAccess(Forbidden):
     """Not allowed access to a project (or not allowed project-less access)"""
 
-    def __init__(self, project_names: Iterable[str], *args):
+    def __init__(self, project_names: Iterable[str], *args, readonly: bool = None):
         project_names_str = ', '.join(project_names)
+        access_type = ''
+        if readonly is False:
+            access_type = 'write '
         super().__init__(
-            'You do not have access to resources from the '
+            f'You do not have {access_type}access to resources from the '
             f'following project(s): {project_names_str}',
             *args,
         )
@@ -71,9 +75,9 @@ class ProjectPermissionsTable:
     _cached_project_names: Dict[str, ProjectId] = None
     _cached_project_by_id: Dict[ProjectId, ProjectRow] = None
 
-    _cached_permissions: Dict[ProjectId, ProjectPermissionCacheObject] = {}
+    _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
-    def __init__(self, connection: Database, allow_full_access=IS_DEVELOPMENT):
+    def __init__(self, connection: Database, allow_full_access=ALLOW_FULL_ACCESS):
 
         self.connection: Database = connection
         self.allow_full_access = allow_full_access
@@ -124,7 +128,7 @@ class ProjectPermissionsTable:
                 missing_project_names = [
                     project_map[pid].name for pid in missing_project_ids
                 ]
-                raise NoProjectAccess(missing_project_names)
+                raise NoProjectAccess(missing_project_names, readonly=readonly)
             return False
 
         return True
@@ -138,30 +142,44 @@ class ProjectPermissionsTable:
         if not readonly:
             # validate write privileges here connection
             pass
-        users = await self.get_allowed_users_for_project_id(project_id)
-        has_access = user in users
+        users = await self.get_allowed_users_for_project_id(
+            project_id, readonly=readonly
+        )
+        has_access = users is None or user in users
         if not has_access and raise_exception:
             project_name = (await self.get_project_id_map())[project_id].name
-            raise NoProjectAccess([project_name])
+            raise NoProjectAccess([project_name], readonly=readonly)
         return has_access
 
-    async def get_allowed_users_for_project_id(self, project_id) -> Set[str]:
+    async def get_allowed_users_for_project_id(
+        self, project_id, readonly: bool
+    ) -> Optional[Set[str]]:
         """Get allowed users for a project_id"""
+        cache_key = (project_id, readonly)
         if (
-            project_id not in self._cached_permissions
-            or not self._cached_permissions[project_id].is_valid()
+            cache_key not in self._cached_permissions
+            or not self._cached_permissions[cache_key].is_valid()
         ):
             project_id_map = await self.get_project_id_map()
             project = project_id_map[project_id]
-            response = self._read_secret(
-                project.gcp_id, f'{project.dataset}-access-members-cache'
+            secret_name = (
+                project.read_secret_name if readonly else project.write_secret_name
             )
-            users = set(response.split(','))
-            self._cached_permissions[project_id] = ProjectPermissionCacheObject(
+            users = None
+            if secret_name is not None:
+                try:
+                    response = self._read_secret(project.gcp_id, secret_name)
+                except Exception as e:
+                    raise Exception(
+                        f'An error occurred when determining access to this project: {e}'
+                    ) from e
+
+                users = set(response.split(','))
+            self._cached_permissions[cache_key] = ProjectPermissionCacheObject(
                 users=users
             )
 
-        return self._cached_permissions[project_id].users
+        return self._cached_permissions[cache_key].users
 
     async def ensure_project_id_cache_is_filled(self):
         """(CACHED) Get map of project names to project IDs"""
@@ -231,7 +249,7 @@ class ProjectPermissionsTable:
             project_ids.append(project_id)
 
         if invalid_project_names:
-            raise NoProjectAccess(invalid_project_names)
+            raise NoProjectAccess(invalid_project_names, readonly=readonly)
 
         if len(project_ids) != len(project_names):
             raise Exception(
@@ -259,7 +277,7 @@ class ProjectPermissionsTable:
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
-        _query = 'SELECT id, name, gcp_id, dataset FROM project'
+        _query = 'SELECT id, name, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
 
@@ -269,6 +287,8 @@ class ProjectPermissionsTable:
         dataset_name: str,
         gcp_project_id: str,
         author: str,
+        read_secret_name: str,
+        write_secret_name: str,
         check_permissions=True,
     ):
         """Create project row"""
@@ -276,14 +296,16 @@ class ProjectPermissionsTable:
             await self.check_project_creator_permissions(author)
 
         _query = """\
-INSERT INTO project (name, gcp_id, dataset, author)
-VALUES (:name, :gcp_id, :dataset, :author)
+INSERT INTO project (name, gcp_id, dataset, author, read_secret_name, write_secret_name)
+VALUES (:name, :gcp_id, :dataset, :author, :read_secret_name, :write_secret_name)
 RETURNING ID"""
         values = {
             'name': project_name,
             'dataset': dataset_name,
             'gcp_id': gcp_project_id,
             'author': author,
+            'read_secret_name': read_secret_name,
+            'write_secret_name': write_secret_name,
         }
 
         project_id = await self.connection.fetch_val(_query, values)

@@ -9,7 +9,8 @@ from db.python.layers.sample import Sample, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
-    get_project_db_connection,
+    get_project_write_connection,
+    get_project_readonly_connection,
     Connection,
     get_projectless_db_connection,
 )
@@ -38,7 +39,7 @@ router = APIRouter(prefix='/sample', tags=['sample'])
 
 @router.put('/{project}/', response_model=str, operation_id='createNewSample')
 async def create_new_sample(
-    sample: NewSample, connection: Connection = get_project_db_connection
+    sample: NewSample, connection: Connection = get_project_write_connection
 ) -> str:
     """Creates a new sample, and returns the internal sample ID"""
     st = SampleLayer(connection)
@@ -49,7 +50,7 @@ async def create_new_sample(
             active=True,
             meta=sample.meta,
             participant_id=sample.participant_id,
-            # already checked on get_project_db_connection
+            # already checked on get_project_write_connection
             check_project_id=False,
         )
         return sample_id_format(internal_id)
@@ -59,7 +60,7 @@ async def create_new_sample(
 async def get_sample_id_map_by_external(
     external_ids: List[str],
     allow_missing: bool = False,
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """Get map of sample IDs, { [externalId]: internal_sample_id }"""
     st = SampleLayer(connection)
@@ -88,7 +89,7 @@ async def get_sample_id_map_by_internal(
     '/{project}/id-map/internal/all', operation_id='getAllSampleIdMapByInternal'
 )
 async def get_all_sample_id_map_by_internal(
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """Get map of ALL sample IDs, { [internal_id]: external_sample_id }"""
     st = SampleLayer(connection)
@@ -102,7 +103,7 @@ async def get_all_sample_id_map_by_internal(
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
-    external_id: str, connection: Connection = get_project_db_connection
+    external_id: str, connection: Connection = get_project_readonly_connection
 ):
     """Get sample by external ID"""
     st = SampleLayer(connection)

@@ -8,7 +8,11 @@ from datetime import date
 from fastapi import APIRouter, UploadFile, File, Query
 from starlette.responses import StreamingResponse
 
-from api.utils.db import get_project_db_connection, Connection
+from api.utils.db import (
+    get_project_readonly_connection,
+    get_project_write_connection,
+    Connection,
+)
 from db.python.layers.family import FamilyLayer
 
 router = APIRouter(prefix='/family', tags=['family'])
@@ -18,7 +22,7 @@ router = APIRouter(prefix='/family', tags=['family'])
 async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_write_connection,
 ):
     """Get sample by external ID"""
     family_layer = FamilyLayer(connection)
@@ -44,7 +48,7 @@ async def get_pedigree(
     replace_with_participant_external_ids: bool = False,
     replace_with_family_external_ids: bool = False,
     empty_participant_value: Optional[str] = '',
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """
     Generate tab-separated Pedigree file for ALL families
