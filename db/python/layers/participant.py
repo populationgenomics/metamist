@@ -118,7 +118,6 @@ class ParticipantLayer(BaseLayer):
         """Update the sequencing status from the internal sample id"""
         sample_table = SampleTable(connection=self.connection)
 
-        # TODO: resolve merge conflict here
         # { external_id: internal_id }
         internal_sample_map_with_no_pid = dict(
             await sample_table.get_sample_with_missing_participants_by_internal_id(
