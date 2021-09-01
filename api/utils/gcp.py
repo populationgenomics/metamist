@@ -1,6 +1,5 @@
 # pylint: disable=unused-import
 import os
-import logging
 
 from google.auth.exceptions import DefaultCredentialsError
 

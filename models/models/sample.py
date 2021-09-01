@@ -124,7 +124,7 @@ def luhn_is_valid(n, offset=0):
     odd_digits = digits[-1::-2]
     even_digits = digits[-2::-2]
     checksum = sum(odd_digits) + sum(sum(digits_of(d * 2)) for d in even_digits)
-    return checksum % 10 == CHECKSUM_OFFSET
+    return checksum % 10 == offset
 
 
 def luhn_compute(n, offset=0):

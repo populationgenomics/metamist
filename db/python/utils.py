@@ -9,6 +9,8 @@ levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.W
 
 LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'DEBUG').upper()]
 USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
+
+# pylint: disable=invalid-name
 _logger = None
 
 
@@ -49,6 +51,7 @@ def get_logger():
     Python logging module. By default this captures all logs
     at INFO level and higher
     """
+    # pylint: disable=invalid-name,global-statement
     global _logger
     if _logger:
         return _logger
