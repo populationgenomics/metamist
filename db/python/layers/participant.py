@@ -130,7 +130,9 @@ class ParticipantLayer(BaseLayer):
         ext_sample_id_to_pid = {}
 
         unlinked_participants = await self.ptable.get_id_map_by_external_ids(
-            list(external_sample_map_with_no_pid.keys()), allow_missing=True
+            list(external_sample_map_with_no_pid.keys()),
+            project=self.connection.project,
+            allow_missing=True,
         )
         external_participant_ids_to_add = set(
             external_sample_map_with_no_pid.keys()
@@ -197,7 +199,9 @@ class ParticipantLayer(BaseLayer):
                 extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
             external_pid_map = await self.ptable.get_id_map_by_external_ids(
-                list(external_participant_ids), allow_missing=allow_missing_participants
+                list(external_participant_ids),
+                project=self.connection.project,
+                allow_missing=allow_missing_participants,
             )
             if extra_participants_method == ExtraParticipantImporterHandler.ADD:
                 missing_participant_eids = external_participant_ids - set(
@@ -237,7 +241,9 @@ class ParticipantLayer(BaseLayer):
             fids = set(pid_to_internal_family.values())
             fmap_by_internal = await ftable.get_id_map_by_internal_ids(list(fids))
             fmap_from_external = await ftable.get_id_map_by_external_ids(
-                list(external_family_ids), allow_missing=True
+                list(external_family_ids),
+                project=self.connection.project,
+                allow_missing=True,
             )
             fmap_by_external = {
                 **fmap_from_external,
@@ -319,7 +325,9 @@ class ParticipantLayer(BaseLayer):
 
         if external_participant_ids:
             pids = await self.ptable.get_id_map_by_external_ids(
-                external_participant_ids, allow_missing=False
+                external_participant_ids,
+                project=self.connection.project,
+                allow_missing=False,
             )
             pid_to_features = await pptable.get_key_value_rows_for_participant_ids(
                 participant_ids=list(pids.values())
