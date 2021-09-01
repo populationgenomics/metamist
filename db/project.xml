@@ -197,21 +197,21 @@
 
 		</createTable>
 
-        <sql>ALTER TABLE project ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE participant ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE sample ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE sample_sequencing ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE participant_phenotypes ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE analysis ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE analysis_sample ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE family ADD SYSTEM VERSIONING;</sql>
-        <sql>ALTER TABLE family_participant ADD SYSTEM VERSIONING;</sql>
-    </changeSet>
+		<sql>ALTER TABLE project ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE participant ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE sample ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE sample_sequencing ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE participant_phenotypes ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE analysis ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE analysis_sample ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE family ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE family_participant ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 	<changeSet author="michael.franklin" id="2021-08-24_add-participant-key-value">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<dropForeignKeyConstraint baseTableName="participant_phenotypes" constraintName="fk_participant_phenotype" />
 		<sql>ALTER TABLE participant_phenotypes CHANGE participant_id participant_id INT NOT NULL;</sql>
-        <sql>ALTER TABLE participant_phenotypes CHANGE description description VARCHAR(255);</sql>
+		<sql>ALTER TABLE participant_phenotypes CHANGE description description VARCHAR(255);</sql>
 
 		<addPrimaryKey
 			tableName="family_participant"
@@ -222,35 +222,35 @@
 			ADD CONSTRAINT uk_participant_phenotypes_pid_hpo_description
 			UNIQUE (`participant_id`,`hpo_term`,`description`)
 		</sql>
-        <addForeignKeyConstraint
-            constraintName="fk_participant_phenotype"
-            baseTableName="participant_phenotypes"
-            baseColumnNames="participant_id"
-            referencedTableName="participant"
-            referencedColumnNames="id"
+		<addForeignKeyConstraint
+			constraintName="fk_participant_phenotype"
+			baseTableName="participant_phenotypes"
+			baseColumnNames="participant_id"
+			referencedTableName="participant"
+			referencedColumnNames="id"
 		/>
 		<addColumn
 			tableName="participant_phenotypes">
 			<column
 				name="value"
 				type="JSON"
-                beforeColumn="author"
+				beforeColumn="author"
 			/>
 		</addColumn>
 
 	</changeSet>
 	<changeSet author="michael.franklin" id="2021-08-16_add-project-id">
-        <sql>SET @@system_versioning_alter_history = 1;</sql>
-        <addColumn
-            tableName="project">
-            <column
-                name="dataset"
-                type="VARCHAR(255)"
-            />
-            <column
-                name="gcp_id"
-                type="VARCHAR(255)"
-            />
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn
+			tableName="project">
+			<column
+				name="dataset"
+				type="VARCHAR(255)"
+			/>
+			<column
+				name="gcp_id"
+				type="VARCHAR(255)"
+			/>
 			<column
 				name="read_secret_name"
 				type="VARCHAR(255)"
@@ -259,6 +259,6 @@
 				name="write_secret_name"
 				type="VARCHAR(255)"
 			/>
-        </addColumn>
-    </changeSet>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>
