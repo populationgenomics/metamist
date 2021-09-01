@@ -6,44 +6,15 @@ from datetime import datetime, timedelta
 from databases import Database
 from google.cloud import secretmanager
 
-# minutes
+from db.python.utils import ProjectId, Forbidden, NoProjectAccess, get_logger
 from models.models.project import ProjectRow
 
+# minutes
 PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
 ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
 
-ProjectId = int
-
-
-class Forbidden(Exception):
-    """Forbidden action"""
-
-
-class ProjectDoesNotExist(Forbidden):
-    """Custom error for ProjectDoesNotExist"""
-
-    def __init__(self, project_name, *args: object) -> None:
-        super().__init__(
-            f'Project with id "{project_name}" does not exist, '
-            'or you do not have the appropriate permissions',
-            *args,
-        )
-
-
-class NoProjectAccess(Forbidden):
-    """Not allowed access to a project (or not allowed project-less access)"""
-
-    def __init__(self, project_names: Iterable[str], *args, readonly: bool = None):
-        project_names_str = ', '.join(project_names)
-        access_type = ''
-        if readonly is False:
-            access_type = 'write '
-        super().__init__(
-            f'You do not have {access_type}access to resources from the '
-            f'following project(s): {project_names_str}',
-            *args,
-        )
+logger = get_logger()
 
 
 class ProjectPermissionCacheObject:

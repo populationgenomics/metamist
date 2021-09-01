@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 
 from db.python.connect import SMConnections
+from db.python.utils import get_logger
 
 from api.routes import (
     sample_router,
@@ -17,14 +18,12 @@ from api.routes import (
     project_router,
 )
 from api.utils import get_openapi_schema_func
-from api.utils.gcp import setup_gcp_logging_if_required
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
 _VERSION = '2.0.6'
 
-
-logger = setup_gcp_logging_if_required()
+logger = get_logger()
 
 SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()

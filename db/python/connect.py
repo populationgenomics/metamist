@@ -11,7 +11,7 @@ from typing import Optional
 # import asyncio
 import databases
 
-from db.python.tables.project import ProjectPermissionsTable, Forbidden  # noqa: F401
+from db.python.tables.project import ProjectPermissionsTable
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
