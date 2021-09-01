@@ -137,21 +137,27 @@ class ProjectPermissionsTable:
             secret_name = (
                 project.read_secret_name if readonly else project.write_secret_name
             )
-            users = None
-            if secret_name is not None:
-                try:
-                    start = datetime.utcnow()
-                    response = self._read_secret(project.gcp_id, secret_name)
-                    logger.debug(
-                        f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
-                    )
+            if secret_name is None:
+                project_name = (await self.get_project_id_map())[project_id].name
+                read_or_write = 'read' if readonly else 'write'
+                raise Exception(
+                    f'An internal error occurred when validating access to {project_name}, '
+                    f'there must be a value in the DB for "{read_or_write}_secret_name" to lookup'
+                )
 
-                except Exception as e:
-                    raise Exception(
-                        f'An error occurred when determining access to this project: {e}'
-                    ) from e
+            try:
+                start = datetime.utcnow()
+                response = self._read_secret(project.gcp_id, secret_name)
+                logger.debug(
+                    f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
+                )
 
-                users = set(response.split(','))
+            except Exception as e:
+                raise Exception(
+                    f'An error occurred when determining access to this project: {e}'
+                ) from e
+
+            users = set(response.split(','))
             self._cached_permissions[cache_key] = ProjectPermissionCacheObject(
                 users=users
             )

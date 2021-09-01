@@ -24,17 +24,15 @@ async def create_project(
     read_secret_name: Optional[str] = None,
     write_secret_name: Optional[str] = None,
     create_test_project: bool = True,
-    guess_read_write_secrets: bool = True,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
     """
     Create a new project
     """
-    if guess_read_write_secrets:
-        if not read_secret_name:
-            read_secret_name = f'{dataset}-sample-metadata-main-read-members-cache'
-        if not write_secret_name:
-            write_secret_name = f'{dataset}-sample-metadata-main-write-members-cache'
+    if not read_secret_name:
+        read_secret_name = f'{dataset}-sample-metadata-main-read-members-cache'
+    if not write_secret_name:
+        write_secret_name = f'{dataset}-sample-metadata-main-write-members-cache'
 
     ptable = ProjectPermissionsTable(connection.connection)
     pid = await ptable.create_project(
