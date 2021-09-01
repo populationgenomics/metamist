@@ -21,11 +21,21 @@ async def create_project(
     name: str,
     dataset: str,
     gcp_id: str,
-    read_secret_name: Optional[str],
-    write_secret_name: Optional[str],
+    read_secret_name: Optional[str] = None,
+    write_secret_name: Optional[str] = None,
+    create_test_project: bool = True,
+    guess_read_write_secrets: bool = True,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
-    """Get sample by external ID"""
+    """
+    Create a new project
+    """
+    if guess_read_write_secrets:
+        if not read_secret_name:
+            read_secret_name = f'{dataset}-sample-metadata-main-read-members-cache'
+        if not write_secret_name:
+            write_secret_name = f'{dataset}-sample-metadata-main-write-members-cache'
+
     ptable = ProjectPermissionsTable(connection.connection)
     pid = await ptable.create_project(
         project_name=name,
@@ -33,6 +43,7 @@ async def create_project(
         gcp_project_id=gcp_id,
         read_secret_name=read_secret_name,
         write_secret_name=write_secret_name,
+        create_test_project=create_test_project,
         author=connection.author,
     )
 

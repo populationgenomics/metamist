@@ -289,6 +289,7 @@ class ProjectPermissionsTable:
         author: str,
         read_secret_name: str,
         write_secret_name: str,
+        create_test_project: bool,
         check_permissions=True,
     ):
         """Create project row"""
@@ -309,4 +310,17 @@ RETURNING ID"""
         }
 
         project_id = await self.connection.fetch_val(_query, values)
+
+        if create_test_project:
+            values = {
+                'name': project_name + '-test',
+                'dataset': dataset_name,
+                'gcp_id': gcp_project_id,
+                'author': author,
+                'read_secret_name': read_secret_name.replace('-main-', 'test'),
+                'write_secret_name': write_secret_name.replace('-main-', 'test'),
+            }
+
+            project_id = await self.connection.fetch_val(_query, values)
+
         return project_id
