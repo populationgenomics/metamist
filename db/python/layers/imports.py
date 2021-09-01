@@ -78,26 +78,8 @@ class ImportLayer(BaseLayer):
         well formed objects, keyed by the corresponding header.
         """
 
-        # TODO: work out how this could be async as well,
-        # probably won't be a performance bottleneck for a while though
-        class RowToDictIterator:
-            """Build object from headers and rows, but as an iterator"""
-
-            def __init__(self, headers, rows):
-                self.headers = headers
-                self.rows = rows
-
-            def __iter__(self):
-                return self
-
-            def __next__(self):
-                # I originaly wrote this as a list comprehension
-                #   { k: v for k,v in zip(...) }
-                # but the pylint error 'unnecessary-comprehension'
-                # suggests this as the better way:
-                return dict(zip(self.headers, next(rows)))
-
-        return await self.import_airtable_manifest(RowToDictIterator(headers, rows))
+        drows = [dict(zip(headers, r)) for r in rows]
+        return await self.import_airtable_manifest(drows)
 
     @staticmethod
     def parse_specimen_type_to_sample_type(specimen_type: str) -> SampleType:
