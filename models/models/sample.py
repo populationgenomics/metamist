@@ -69,7 +69,7 @@ def sample_id_transform_to_raw(
         raise ValueError(f'Invalid sample identifier "{identifier}"')
 
     sample_id_with_checksum = int(stripped_identifier)
-    if not luhn_is_valid(sample_id_with_checksum):
+    if not luhn_is_valid(sample_id_with_checksum, offset=CHECKSUM_OFFSET):
         raise ValueError(f'The provided sample ID was not valid: "{identifier}"')
 
     return int(stripped_identifier[:-1])
@@ -98,14 +98,12 @@ def sample_id_format(sample_id: Union[int, List[int]]):
         raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
     sample_id = int(sample_id)
 
-    checksum = luhn_compute(sample_id)
-    if CHECKSUM_OFFSET:
-        checksum = (checksum + CHECKSUM_OFFSET) % 10
+    checksum = luhn_compute(sample_id, offset=CHECKSUM_OFFSET)
 
     return f'{SAMPLE_PREFIX}{sample_id}{checksum}'
 
 
-def luhn_is_valid(n):
+def luhn_is_valid(n, offset=0):
     """
     Based on: https://stackoverflow.com/a/21079551
 
@@ -126,10 +124,10 @@ def luhn_is_valid(n):
     odd_digits = digits[-1::-2]
     even_digits = digits[-2::-2]
     checksum = sum(odd_digits) + sum(sum(digits_of(d * 2)) for d in even_digits)
-    return checksum % 10 == 0
+    return checksum % 10 == CHECKSUM_OFFSET
 
 
-def luhn_compute(n):
+def luhn_compute(n, offset=0):
     """
     Compute Luhn check digit of number given as string
 
@@ -144,4 +142,5 @@ def luhn_compute(n):
     """
     m = [int(d) for d in reversed(str(n))]
     result = sum(m) + sum(d + (d >= 5) for d in m[::2])
-    return -result % 10
+    checksum = ((-result % 10) + offset) % 10
+    return checksum
