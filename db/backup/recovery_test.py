@@ -8,18 +8,19 @@ It will drop the local mysql database after each run.
 import os
 import unittest
 import subprocess
+import json
 from typing import Tuple, Optional
 from collections import namedtuple
 from google.cloud import storage
+from google.cloud import secretmanager
 import mysql.connector
 from parameterized import parameterized
 
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
-DATABASE = 'sm_production'
 
-ConnectionDetails = namedtuple('ConnectionDetails', 'address user')
+ConnectionDetails = namedtuple('ConnectionDetails', 'address user password')
 
 TABLES = [
     ('analysis'),
@@ -42,8 +43,26 @@ FIELDS = [
     ('sample_sequencing', ('id',)),
     ('analysis_sample', ('analysis_id', 'sample_id')),
     ('participant_phenotypes', ('participant_id', 'hpo_term', 'description')),
-    ('family_participant', ('family_id', 'participant_id')),
+    ('family_participant', ('id',)),
 ]
+
+secret_manager = secretmanager.SecretManagerServiceClient()
+
+SECRET_NAME = 'projects/sample-metadata/secrets/db-validate-backup/versions/latest'
+config_str = secret_manager.access_secret_version(
+    request={'name': SECRET_NAME}
+).payload.data.decode('UTF-8')
+config = json.loads(config_str)
+
+DATABASE = config['dbname']
+
+PROD_HOST = config['p_host']
+PROD_USER = config['p_username']
+PROD_PASSWORD = config['p_password']
+
+LOCAL_USER = config['l_username']
+LOCAL_HOST = config['l_host']
+LOCAL_PASSWORD = config['l_password']
 
 
 class TestDatabaseBackup(unittest.TestCase):
@@ -52,6 +71,7 @@ class TestDatabaseBackup(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """ Pull the backup file, and restore the database."""
+
         backup_folder = pull_latest_backup()
         get_timestamp(backup_folder)
         # Pull the latest backup
@@ -80,9 +100,10 @@ class TestDatabaseBackup(unittest.TestCase):
         subprocess.run(['sudo', 'systemctl', 'stop', 'mariadb'], check=True)
 
         if os.path.isdir('/var/lib/mysql/'):
-            print('Backup cannot be performed unless /var/lib/mysql is empty.')
-        else:
-            print('Performing backup')
+            raise RuntimeError(
+                'Backup cannot be performed unless /var/lib/mysql is empty.'
+            )
+
         # Perform backup
         subprocess.run(
             [
@@ -102,16 +123,21 @@ class TestDatabaseBackup(unittest.TestCase):
         subprocess.run(['sudo', 'systemctl', 'start', 'mariadb'], check=True)
 
     def setUp(self):
-        self.prod_connection = ConnectionDetails('10.152.0.2', 'backup')
-        self.local_connection = ConnectionDetails('localhost', 'root')
         backup_folder = pull_latest_backup()
         self.timestamp = get_timestamp(backup_folder)
+
+        self.local_conn = mysql.connector.connect(
+            user=LOCAL_USER, host=LOCAL_HOST, password=LOCAL_PASSWORD, database=DATABASE
+        )
+        self.prod_conn = mysql.connector.connect(
+            host=PROD_HOST, user=PROD_USER, password=PROD_PASSWORD, database=DATABASE
+        )
 
     def test_database_exists(self):
         """Validates that the db in the production
         database matches those produced by the restored db"""
-        backup_databases = get_databases(self.local_connection)
-        prod_databases = get_databases(self.prod_connection)
+        backup_databases = get_results(self.local_conn, 'show databases;')
+        prod_databases = get_results(self.prod_conn, 'show databases;')
         self.assertEqual(backup_databases, prod_databases)
 
     @parameterized.expand(TABLES)
@@ -119,11 +145,11 @@ class TestDatabaseBackup(unittest.TestCase):
         """ Tests that the count of rows for each table matches """
 
         restored_count = get_results(
-            self.local_connection,
+            self.local_conn,
             f'SELECT COUNT(*) FROM {table};',
         )
         prod_count = get_results(
-            self.local_connection,
+            self.prod_conn,
             f"SELECT COUNT(*) FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}'",
         )
 
@@ -133,11 +159,11 @@ class TestDatabaseBackup(unittest.TestCase):
     def test_rows_top(self, table):
         """ Validates the top 10 rows in each table match """
         restored_results = get_results(
-            self.local_connection,
+            self.local_conn,
             f'SELECT * FROM {table} LIMIT 10;',
         )
         prod_results = get_results(
-            self.prod_connection,
+            self.prod_conn,
             f"SELECT * FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}' LIMIT 10;",
         )
         self.assertEqual(restored_results, prod_results)
@@ -148,7 +174,7 @@ class TestDatabaseBackup(unittest.TestCase):
         Operates on tables with a unique id field"""
 
         restored_random_results = get_results(
-            self.local_connection,
+            self.local_conn,
             f'SELECT * FROM {table} ORDER BY RAND() LIMIT 10',
         )
 
@@ -163,7 +189,7 @@ FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}'
 WHERE {wheres_str};"""
 
             prod_random_results = get_results(
-                self.prod_connection,
+                self.prod_conn,
                 _query,
                 ids,
             )
@@ -192,22 +218,8 @@ def get_timestamp(folder: str):
     return timestamp
 
 
-def get_databases(connection: ConnectionDetails):
-    """ Returns a list of the databases """
-    conn = mysql.connector.connect(user=connection.user, host=connection.address)
-    cursor = conn.cursor()
-    cursor.execute('show databases')
-    databases = list(cursor)
-    return databases
-
-
-def get_results(
-    connection: ConnectionDetails, query: str, values: Optional[Tuple] = None
-):
+def get_results(conn, query: str, values: Optional[Tuple] = None):
     """ Returns the results from a provided query at a given connection """
-    conn = mysql.connector.connect(
-        user=connection.user, host=connection.address, database=DATABASE
-    )
     cursor = conn.cursor()
     cursor.execute(query, values)
     results = list(cursor)
