@@ -59,7 +59,7 @@ INSERT INTO analysis
     ({cs_keys})
 VALUES ({cs_id_keys}) RETURNING id;"""
 
-            id_of_new_analysis = await self.connection.execute(
+            id_of_new_analysis = await self.connection.fetch_val(
                 _query,
                 dict(kv_pairs),
             )
