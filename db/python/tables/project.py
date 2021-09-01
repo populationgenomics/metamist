@@ -60,7 +60,7 @@ class ProjectPermissionCacheObject:
 
     def is_valid(self):
         """Is the value still valid, or has it expired"""
-        return self.expiry < datetime.utcnow()
+        return datetime.utcnow() < self.expiry
 
 
 class ProjectPermissionsTable:
@@ -115,7 +115,8 @@ class ProjectPermissionsTable:
         if self.allow_full_access:
             return True
         missing_project_ids = []
-        for project_id in set(project_ids):
+        spids = set(project_ids)
+        for project_id in spids:
             has_access = await self.check_access_to_project_id(
                 user, project_id, readonly=readonly, raise_exception=False
             )
@@ -168,7 +169,12 @@ class ProjectPermissionsTable:
             users = None
             if secret_name is not None:
                 try:
+                    start = datetime.utcnow()
                     response = self._read_secret(project.gcp_id, secret_name)
+                    logger.debug(
+                        f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
+                    )
+
                 except Exception as e:
                     raise Exception(
                         f'An error occurred when determining access to this project: {e}'
