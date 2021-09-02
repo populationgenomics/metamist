@@ -98,8 +98,12 @@ async def get_incomplete_analyses(
 ):
     """Get analyses with status queued or in-progress"""
     atable = AnalysisLayer(connection)
-    result = await atable.get_incomplete_analyses(project=connection.project)
-    return result
+    results = await atable.get_incomplete_analyses(project=connection.project)
+    if results:
+        for result in results:
+            result.sample_ids = sample_id_format(result.sample_ids)
+
+    return results
 
 
 @router.post(
@@ -140,6 +144,9 @@ async def get_latest_complete_analysis_for_type(
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project, analysis_type=analysis_type
     )
+    if analysis:
+        analysis.sample_ids = sample_id_format(analysis.sample_ids)
+
     return analysis
 
 
