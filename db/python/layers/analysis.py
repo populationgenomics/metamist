@@ -69,6 +69,8 @@ class AnalysisLayer(BaseLayer):
                 f'Missing gvcfs for the following sample IDs: {sample_ids_str}'
             )
 
+        return analyses
+
     async def get_all_sample_ids_without_analysis_type(
         self, project: ProjectId, analysis_type: AnalysisType
     ):
