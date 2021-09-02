@@ -143,7 +143,7 @@ class AnalysisLayer(BaseLayer):
                 self.author, project_ids, readonly=False
             )
 
-        return await self.at.update_analysis(
+        await self.at.update_analysis(
             analysis_id=analysis_id,
             status=status,
             output=output,

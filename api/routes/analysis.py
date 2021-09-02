@@ -120,8 +120,9 @@ async def get_latest_analysis_for_samples_and_type(
         allow_missing=allow_missing,
     )
 
-    for result in results:
-        result.sample_ids = sample_id_format(result.sample_ids)
+    if results:
+        for result in results:
+            result.sample_ids = sample_id_format(result.sample_ids)
 
     return results
 
