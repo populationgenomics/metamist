@@ -300,7 +300,7 @@ RETURNING ID"""
                 'dataset': dataset_name,
                 'gcp_id': gcp_project_id,
                 'author': author,
-                'read_secret_name': read_secret_name.replace('-main-', 'test'),
+                'read_secret_name': read_secret_name.replace('-main-', '-test-'),
                 'write_secret_name': write_secret_name.replace('-main-', 'test'),
             }
 
