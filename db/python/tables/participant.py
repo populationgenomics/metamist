@@ -1,6 +1,7 @@
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from db.python.connect import DbBase, NotFoundError
+from db.python.utils import ProjectId
 
 
 class ParticipantTable(DbBase):
@@ -11,7 +12,7 @@ class ParticipantTable(DbBase):
     table_name = 'participant'
 
     async def create_participant(
-        self, external_id: str, author: str = None, project: int = None
+        self, external_id: str, author: str = None, project: ProjectId = None
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -34,8 +35,8 @@ RETURNING id
     async def get_id_map_by_external_ids(
         self,
         external_participant_ids: List[str],
+        project: ProjectId,
         allow_missing=False,
-        project: Optional[int] = None,
     ) -> Dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
         _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
@@ -43,7 +44,7 @@ RETURNING id
             _query,
             {
                 'external_ids': external_participant_ids,
-                'project': project or self.project,
+                'project': project,
             },
         )
         id_map = {r['external_id']: r['id'] for r in results}

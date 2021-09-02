@@ -1,3 +1,5 @@
+# pylint: disable=unused-import
+#
 """
 Code for connecting to Postgres database
 """
@@ -9,7 +11,7 @@ from typing import Optional
 # import asyncio
 import databases
 
-from db.python.tables.project import ProjectTable
+from db.python.tables.project import ProjectPermissionsTable
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -41,21 +43,6 @@ class Connection:
                 'An internal error has occurred when passing the project context, '
                 'please send this stacktrace to your system administrator'
             )
-
-
-class ProjectDoesNotExist(Exception):
-    """Custom error for ProjectDoesNotExist"""
-
-    def __init__(self, project_id, *args: object) -> None:
-        super().__init__(
-            f'Project with id "{project_id}" does not exist, '
-            'or you do not have the appropriate permissions',
-            *args,
-        )
-
-
-class Forbidden(Exception):
-    """Not allowed access to a project (or not allowed project-less access)"""
 
 
 class NotFoundError(Exception):
@@ -185,19 +172,17 @@ class SMConnections:
         return conn
 
     @staticmethod
-    async def get_connection(*, author: str, project_name: Optional[str]):
+    async def get_connection(*, author: str, project_name: str, readonly: bool):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate connection to {project_name} with "{author}"')
 
         conn = await SMConnections._get_made_connection()
-        pt = ProjectTable(connection=conn)
+        pt = ProjectPermissionsTable(connection=conn)
 
         project_id = await pt.get_project_id_from_name_and_user(
-            user=author, project=project_name
+            user=author, project_name=project_name, readonly=readonly
         )
-        if project_id is False:
-            raise ProjectDoesNotExist(project_name)
 
         return Connection(connection=conn, author=author, project=project_id)
 
@@ -208,11 +193,9 @@ class SMConnections:
         logger.debug(f'Authenticate no-project connection with "{author}"')
 
         conn = await SMConnections._get_made_connection()
-        pt = ProjectTable(connection=conn)
 
-        has_access = pt.get_project_id_from_name_and_user(user=author, project=None)
-        if not has_access:
-            raise Forbidden
+        # we don't authenticate project-less connection, but rely on the
+        # the endpoint to validate the resources
 
         return Connection(connection=conn, author=author, project=None)
 
@@ -221,11 +204,11 @@ class DbBase:
     """Base class for table subclasses"""
 
     @classmethod
-    async def from_project(cls, project, author):
+    async def from_project(cls, project, author, readonly: bool):
         """Create the Db object from a project with user details"""
         return cls(
             connection=await SMConnections.get_connection(
-                project_name=project, author=author
+                project_name=project, author=author, readonly=readonly
             ),
         )
 

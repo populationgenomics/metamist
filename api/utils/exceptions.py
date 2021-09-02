@@ -1,4 +1,5 @@
-from db.python.connect import NotFoundError, Forbidden
+from db.python.connect import NotFoundError
+from db.python.utils import Forbidden
 
 
 def determine_code_from_error(e):

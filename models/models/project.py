@@ -1,10 +1,18 @@
 from models.base import SMBase
 
 
-class ProjectSettings(SMBase):
-    """Settings for a project, eg: sample_prefix"""
+class ProjectRow(SMBase):
+    """Row for project in 'project' table"""
 
-    def __init__(self, sample_prefix: str) -> None:
-        super().__init__()
+    id: int = None
+    name: str = None
+    gcp_id: str = None
+    dataset: str = None
+    read_secret_name: str = None
+    write_secret_name: str = None
 
-        self.sample_prefix = sample_prefix
+    @staticmethod
+    def from_db(kwargs):
+        """From DB row, with db keys"""
+        kwargs = dict(kwargs)
+        return ProjectRow(**kwargs)

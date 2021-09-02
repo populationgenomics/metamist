@@ -17,8 +17,9 @@
 #    import-error ("Unable to import")
 #    no-member
 #    c-extension-no-member
+# 9. consider-using-set-comprehension
 
-disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation,import-error,missing-module-docstring,line-too-long,too-many-return-statements,no-name-in-module,R0801
+disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,fixme,logging-fstring-interpolation,import-error,missing-module-docstring,line-too-long,too-many-return-statements,no-name-in-module,R0801,consider-using-set-comprehension
 
 # Overriding variable name patterns to allow short 1- or 2-letter variables
 attr-rgx=[a-z_][a-z0-9_]{0,30}$

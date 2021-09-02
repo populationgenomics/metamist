@@ -429,13 +429,9 @@ class Configuration(object):
 
         :return: An array of host settings
         """
-        url = 'https://sample-metadata.populationgenomics.org.au'
-        environment = getenv('SM_ENVIRONMENT', 'PRODUCTION')
-        if 'dev' in environment.lower():
-            url = "http://localhost:8000"
         return [
             {
-                'url': url,
+                'url': self._base_path,
                 'description': "No description provided",
             }
         ]

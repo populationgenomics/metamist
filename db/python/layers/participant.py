@@ -1,6 +1,8 @@
+# pylint: disable=invalid-name
+from typing import Dict, List, Tuple, Optional
+
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, List, Tuple, Optional
 
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -117,26 +119,33 @@ class ParticipantLayer(BaseLayer):
         sample_table = SampleTable(connection=self.connection)
 
         # { external_id: internal_id }
-        samples_with_no_participant_id: Dict[str, int] = dict(
-            await sample_table.samples_with_missing_participants()
+        internal_sample_map_with_no_pid = dict(
+            await sample_table.get_sample_with_missing_participants_by_internal_id(
+                project=self.connection.project
+            )
         )
+        external_sample_map_with_no_pid = {
+            v: k for k, v in internal_sample_map_with_no_pid.items()
+        }
         ext_sample_id_to_pid = {}
 
         unlinked_participants = await self.ptable.get_id_map_by_external_ids(
-            list(samples_with_no_participant_id.keys()), allow_missing=True
+            list(external_sample_map_with_no_pid.keys()),
+            project=self.connection.project,
+            allow_missing=True,
         )
         external_participant_ids_to_add = set(
-            samples_with_no_participant_id.keys()
+            external_sample_map_with_no_pid.keys()
         ) - set(unlinked_participants.keys())
 
         async with self.connection.connection.transaction():
             sample_ids_to_update = {
-                samples_with_no_participant_id[external_id]: pid
+                external_sample_map_with_no_pid[external_id]: pid
                 for external_id, pid in unlinked_participants.items()
             }
 
             for external_id in external_participant_ids_to_add:
-                sample_id = samples_with_no_participant_id[external_id]
+                sample_id = external_sample_map_with_no_pid[external_id]
                 participant_id = await self.ptable.create_participant(
                     external_id=external_id
                 )
@@ -190,7 +199,9 @@ class ParticipantLayer(BaseLayer):
                 extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
             external_pid_map = await self.ptable.get_id_map_by_external_ids(
-                list(external_participant_ids), allow_missing=allow_missing_participants
+                list(external_participant_ids),
+                project=self.connection.project,
+                allow_missing=allow_missing_participants,
             )
             if extra_participants_method == ExtraParticipantImporterHandler.ADD:
                 missing_participant_eids = external_participant_ids - set(
@@ -230,7 +241,9 @@ class ParticipantLayer(BaseLayer):
             fids = set(pid_to_internal_family.values())
             fmap_by_internal = await ftable.get_id_map_by_internal_ids(list(fids))
             fmap_from_external = await ftable.get_id_map_by_external_ids(
-                list(external_family_ids), allow_missing=True
+                list(external_family_ids),
+                project=self.connection.project,
+                allow_missing=True,
             )
             fmap_by_external = {
                 **fmap_from_external,
@@ -312,7 +325,9 @@ class ParticipantLayer(BaseLayer):
 
         if external_participant_ids:
             pids = await self.ptable.get_id_map_by_external_ids(
-                external_participant_ids, allow_missing=False
+                external_participant_ids,
+                project=self.connection.project,
+                allow_missing=False,
             )
             pid_to_features = await pptable.get_key_value_rows_for_participant_ids(
                 participant_ids=list(pids.values())
