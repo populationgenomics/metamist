@@ -1,8 +1,7 @@
-from typing import List
+from typing import List, Dict, Optional
 
 from sample_metadata import AnalysisUpdateModel
 from sample_metadata.api import SampleApi, AnalysisApi
-from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.analysis_model import AnalysisModel
 
 
@@ -14,42 +13,6 @@ aapi = AnalysisApi()
 sapi = SampleApi()
 
 
-def _add_samples(test_run_id: str, project: str):
-    """
-    Add 3 samples: one with fastq input, one with CRAM input, one with GVCF input.
-    :param test_run_id: to suffix sample names for uniqueness
-    """
-    s1 = NewSample(
-        external_id=f'NA12878-from-fq-{test_run_id}',
-        type='blood',
-        meta={
-            'reads': [
-                [
-                    'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878_L001_R1.fq',
-                    'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878_L002_R1.fq',
-                ],
-                [
-                    'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878_L001_R2.fq',
-                    'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878_L002_R2.fq',
-                ],
-            ]
-        },
-    )
-    s2 = NewSample(
-        external_id=f'NA12878-from-cram-{test_run_id}',
-        type='blood',
-        meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878.cram'},
-    )
-    s3 = NewSample(
-        external_id=f'NA12878-from-gvcf-{test_run_id}',
-        type='blood',
-        meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio/NA12878.g.vcf.gz'},
-    )
-    sample_ids = [sapi.create_new_sample(project, s) for s in (s1, s2, s3)]
-    print(f'Added samples {", ".join(sample_ids)}')
-    return sample_ids
-
-
 def _submit_analyses(samples: List, output_project: str, a_type: str):
     """
     Add or update analyses. Iterate over completed analyses,
@@ -59,7 +22,9 @@ def _submit_analyses(samples: List, output_project: str, a_type: str):
     if a_type in ['gvcf', 'cram']:
         for s in samples:
             if a_type == 'gvcf':
-                cram_analysis = aapi.get_latest_analysis_for_samples_and_type(
+                cram_analysis: Optional[
+                    Dict
+                ] = aapi.get_latest_analysis_for_samples_and_type(
                     project=output_project,
                     analysis_type='cram',
                     request_body=[s['id']],
@@ -77,7 +42,9 @@ def _submit_analyses(samples: List, output_project: str, a_type: str):
 
     elif a_type == 'joint-calling':
         for s in samples:
-            gvcf_analysis = aapi.get_latest_analysis_for_samples_and_type(
+            gvcf_analysis: Optional[
+                Dict
+            ] = aapi.get_latest_analysis_for_samples_and_type(
                 project=output_project,
                 analysis_type='gvcf',
                 request_body=[s['id']],
@@ -119,7 +86,7 @@ def test_simulate_joint_calling_pipeline(
     """
     Simulates events of the joint-calling workflow
     """
-    samples = sapi.get_samples(
+    samples: List[Dict] = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
             'project_ids': [input_project],
             'active': True,
@@ -152,7 +119,7 @@ def test_simulate_joint_calling_pipeline(
 
     # Checking that after all calls, a 'completed' 'joint-calling' analysis must exist
     # that includes all initally added samples
-    analysis = aapi.get_latest_complete_analysis_for_type(
+    analysis: Optional[Dict] = aapi.get_latest_complete_analysis_for_type(
         project=output_project, analysis_type='joint-calling'
     )
     assert analysis['type'] == 'joint-calling'

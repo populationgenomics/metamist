@@ -3,7 +3,7 @@ from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.analysis_model import AnalysisModel
 
 
-PROJ = 'test_project'
+PROJ = 'test_output_project'
 
 
 sapi = SampleApi()
@@ -33,23 +33,30 @@ def _print_samples():
             analysis_type=t,
         )
         print(f'   Type: {t}: {a}')
+    print()
+    return samples
 
 
-_print_samples()
-print()
+existing_samples = _print_samples()
 
-new_sample = NewSample(external_id='Test', type='blood', meta={'other-meta': 'value'})
-sample_id = sapi.create_new_sample(PROJ, new_sample)
-print(f'Inserted sample with ID: {sample_id}')
+if not existing_samples:
+    sample_id = sapi.create_new_sample(
+        PROJ, NewSample(external_id='Test', type='blood', meta={'other-meta': 'value'})
+    )
+    print(f'Inserted sample with ID: {sample_id}')
+else:
+    sample_id = existing_samples[0]['id']
 
-analysis = AnalysisModel(
-    sample_ids=[sample_id],
-    type='gvcf',
-    output='gs://output-path',
-    status='completed',
+analysis_id = aapi.create_new_analysis(
+    PROJ,
+    AnalysisModel(
+        sample_ids=[sample_id],
+        type='gvcf',
+        output='gs://output-path',
+        status='completed',
+    ),
 )
-analysis_id = aapi.create_new_analysis(PROJ, analysis)
 print(f'Inserted analysis with ID: {analysis_id}')
-
 print()
+
 _print_samples()

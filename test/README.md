@@ -1,8 +1,5 @@
 # Running tests locally
 
-```bash
-```
-
 Clone the repo and install the env
 
 ```bash
@@ -12,41 +9,38 @@ conda env create -n sample-metadata --file environment-dev.yml
 conda activate sample-metadata
 ```
 
-Start the DB server
+Configure required environment variables
 
 ```bash
-docker stop mysql-p3307
-docker rm mysql-p3307
-docker run -p 3307:3306 --name mysql-p3307 -e MYSQL_ROOT_PASSWORD=root -d mariadb
-```
-
-Configure environment variables
-
-```bash
-# use credentials defined in db/python/connect.py:dev_config
 export SM_ENVIRONMENT=LOCAL
-# use specific mysql settings
 export SM_DEV_DB_PROJECT=sm_dev
 export SM_DEV_DB_USER=root
 export SM_DEV_DB_PORT=3307
 export SM_DEV_DB_HOST=127.0.0.1
-export SM_DEV_DB_PASSWORD=root
 ```
 
-Create the DB
+Start the DB server
 
 ```bash
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -p -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
-# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -p -e 'show databases;'
+docker stop mysql-sm
+docker rm mysql-sm
+docker run -p $SM_DEV_DB_PORT:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 --name mysql-sm -d mariadb
+```
+
+Create a DB
+
+```bash
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
+# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'show databases;'
 ```
 
 Install tables
 
 ```bash
 cd db
-liquibase update --url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB_PROJECT --username=$SM_DEV_DB_USER --password=$SM_DEV_DB_PASSWORD --classpath mariadb-java-client-2.7.3.jar --changelog-file=project.xml
+liquibase update --url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB_PROJECT --username=$SM_DEV_DB_USER --classpath mariadb-java-client-2.7.3.jar --changelog-file=project.xml
 
-# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -p -e 'use '$SM_DEV_DB_PROJECT'; show tables;'
+# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; show tables;'
 ```
 
 Add project into the DB
@@ -57,9 +51,9 @@ OUTPUT_PROJECT=test_output_project
 USER=vladislav.savelyev@populationgenomics.org.au
 GCP_ID=vlad-dev
 
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -p -e 'use '$SM_DEV_DB_PROJECT'; insert into project (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) values (1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-sample-metadata-main-write-members-cache"), (2, "'$INPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-sample-metadata-main-write-members-cache");'
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; insert into project (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) values (1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-sample-metadata-main-write-members-cache"), (2, "'$INPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-sample-metadata-main-write-members-cache");'
 
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -p -e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
 ```
 
 Create secrets to test access to a project
