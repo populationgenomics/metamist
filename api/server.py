@@ -70,7 +70,6 @@ async def exception_handler(_: Request, e: Exception):
 
     if add_stacktrace:
         st = traceback.format_exc()
-        logger.error(traceback.format_exc())
         base_params['stacktrace'] = st
 
     return JSONResponse(
