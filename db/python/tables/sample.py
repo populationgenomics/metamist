@@ -258,7 +258,8 @@ WHERE external_id in :external_ids AND project = :project
 
         if sample_ids:
             where.append('id in :sample_ids')
-            replacements['id']: sample_ids
+            replacements['sample_ids']: sample_ids
+
         if meta:
             for k, v in meta.items():
                 k_replacer = f'meta_{k}'

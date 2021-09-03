@@ -39,7 +39,7 @@ class NoProjectAccess(Forbidden):
             access_type = 'write '
         super().__init__(
             f'You do not have {access_type}access to resources from the '
-            f'following project(s): {project_names_str}',
+            f'following project(s), or they may not exist: {project_names_str}',
             *args,
         )
 

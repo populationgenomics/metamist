@@ -21,7 +21,7 @@ from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
-_VERSION = '2.0.6'
+_VERSION = '3.0.0'
 
 logger = get_logger()
 
@@ -70,7 +70,6 @@ async def exception_handler(_: Request, e: Exception):
 
     if add_stacktrace:
         st = traceback.format_exc()
-        logger.error(traceback.format_exc())
         base_params['stacktrace'] = st
 
     return JSONResponse(
