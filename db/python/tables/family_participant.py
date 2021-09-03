@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Tuple, List, Dict, Optional, Set, Any
 
 from db.python.connect import DbBase
+from db.python.tables.project import ProjectId
 
 
 class FamilyParticipantTable(DbBase):
@@ -104,9 +105,7 @@ ON DUPLICATE KEY UPDATE
 
         return True
 
-    async def get_rows(
-        self, family_ids: Optional[int] = None, project: Optional[int] = None
-    ):
+    async def get_rows(self, project: ProjectId, family_ids: Optional[int] = None):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
         """

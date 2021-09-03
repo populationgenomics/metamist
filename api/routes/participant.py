@@ -8,7 +8,11 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import StreamingResponse
 
-from api.utils.db import get_project_db_connection, Connection
+from api.utils.db import (
+    get_project_write_connection,
+    get_project_readonly_connection,
+    Connection,
+)
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
 
@@ -19,7 +23,7 @@ router = APIRouter(prefix='/participant', tags=['participant'])
     '/{project}/fill-in-missing-participants', operation_id='fillInMissingParticipants'
 )
 async def fill_in_missing_participants(
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_write_connection,
 ):
     """Get sample by external ID"""
     participant_layer = ParticipantLayer(connection)
@@ -38,7 +42,7 @@ async def get_individual_metadata_template_for_seqr(
     external_participant_ids: Optional[List[str]] = Query(default=None),
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_readonly_connection,
 ):
     """Get individual metadata template for SEQR as a CSV"""
     participant_layer = ParticipantLayer(connection)

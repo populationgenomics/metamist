@@ -1,11 +1,10 @@
 from typing import Optional, List, Union
 
-from pydantic.main import BaseModel
-
+from models.base import SMBase
 from models.enums import AnalysisType, AnalysisStatus
 
 
-class Analysis(BaseModel):
+class Analysis(SMBase):
     """Model for Analysis"""
 
     id: str = None

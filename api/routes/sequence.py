@@ -4,10 +4,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
-from db.python.tables.sequencing import (
+from db.python.layers.sequence import (
     SequenceType,
     SequenceStatus,
-    SampleSequencingTable,
+    SampleSequenceLayer,
 )
 
 
@@ -40,7 +40,7 @@ async def create_sequence(
     sequence: NewSequence, connection: Connection = get_projectless_db_connection
 ):
     """Create new sequence, attached to a sample"""
-    seq_table = SampleSequencingTable(connection)
+    seq_table = SampleSequenceLayer(connection)
     return await seq_table.insert_sequencing(
         sample_id=sample_id_transform_to_raw(sequence.sample_id),
         sequence_type=sequence.type,
@@ -56,7 +56,7 @@ async def update_sequence(
     connection: Connection = get_projectless_db_connection,
 ):
     """Get sample by external ID"""
-    sequence_layer = SampleSequencingTable(connection)
+    sequence_layer = SampleSequenceLayer(connection)
     _ = await sequence_layer.update_sequence(
         sequence_id, status=sequence.status, meta=sequence.meta
     )
@@ -69,8 +69,8 @@ async def get_sequence(
     sequence_id: int, connection: Connection = get_projectless_db_connection
 ):
     """Get sequence by sequence ID"""
-    sequence_layer = SampleSequencingTable(connection)
-    resp = await sequence_layer.get_sequence_by_id(sequence_id)
+    sequence_layer = SampleSequenceLayer(connection)
+    resp = await sequence_layer.get_sequence_by_id(sequence_id, check_project_id=True)
     resp.sample_id = sample_id_format(resp.sample_id)
     return resp
 
@@ -82,9 +82,9 @@ async def get_sequences_by_internal_sample_ids(
     connection: Connection = get_projectless_db_connection,
 ):
     """Get a list of sequence objects by their internal CPG sample IDs"""
-    sequence_layer = SampleSequencingTable(connection)
+    sequence_layer = SampleSequenceLayer(connection)
     unwrapped_sample_ids: List[int] = sample_id_transform_to_raw(sample_ids)
-    sequences = await sequence_layer.get_sequences_by_sample_ids(
+    sequences = await sequence_layer.get_sequences_for_sample_ids(
         unwrapped_sample_ids, get_latest_sequence_only=get_latest_sequence_only
     )
 
@@ -101,9 +101,9 @@ async def get_sequence_id_from_sample_id(
     sample_id: str, connection: Connection = get_projectless_db_connection
 ) -> int:
     """Get sequence by internal Sample ID"""
-    sequence_layer = SampleSequencingTable(connection)
+    sequence_layer = SampleSequenceLayer(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)
-    sequence_id = await sequence_layer.get_latest_sequence_id_by_sample_id(
+    sequence_id = await sequence_layer.get_latest_sequence_id_for_sample_id(
         sample_id_raw
     )
 
@@ -115,9 +115,9 @@ async def get_sequence_ids_from_sample_ids(
     sample_ids: List[str], connection: Connection = get_projectless_db_connection
 ) -> Dict[str, int]:
     """Get sequence ids from internal sample ids"""
-    sequence_layer = SampleSequencingTable(connection)
+    sequence_layer = SampleSequenceLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw(sample_ids)
-    sequence_id_map = await sequence_layer.get_latest_sequence_ids_by_sample_ids(
+    sequence_id_map = await sequence_layer.get_latest_sequence_ids_for_sample_ids(
         sample_ids_raw
     )
     return {sample_id_format(k): v for k, v in sequence_id_map.items()}

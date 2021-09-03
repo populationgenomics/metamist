@@ -1,10 +1,10 @@
-from typing import Optional, Dict, List
 from itertools import groupby
+from typing import Optional, Dict, List, Tuple, Iterable, Set
 
-from models.models.sequence import SampleSequencing
+from db.python.connect import DbBase, to_db_json, NotFoundError
+from db.python.tables.project import ProjectId
 from models.enums import SequenceType, SequenceStatus
-
-from db.python.connect import DbBase, to_db_json
+from models.models.sequence import SampleSequencing
 
 
 class SampleSequencingTable(DbBase):
@@ -13,6 +13,19 @@ class SampleSequencingTable(DbBase):
     """
 
     table_name = 'sample_sequencing'
+
+    async def get_projects_by_sequence_ids(
+        self, sequence_ids: List[int]
+    ) -> Set[ProjectId]:
+        """Get project IDs for sampleIds (mostly for checking auth)"""
+        _query = """
+SELECT s.project FROM sample_sequencing sq
+INNER JOIN sample s ON s.id = sq.sample_id
+WHERE s.id in :sequence_ids
+GROUP BY s.project
+"""
+        rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
+        return set(r['project'] for r in rows)
 
     async def insert_many_sequencing(
         self,
@@ -71,7 +84,9 @@ RETURNING id;"""
 
         return id_of_new_sample
 
-    async def get_sequence_by_id(self, sequence_id: int) -> SampleSequencing:
+    async def get_sequence_by_id(
+        self, sequence_id: int
+    ) -> Tuple[ProjectId, SampleSequencing]:
         """Get sequence by sequence ID"""
         keys = [
             'id',
@@ -80,85 +95,102 @@ RETURNING id;"""
             'meta',
             'status',
         ]
-        keys_str = ', '.join(keys)
-        _query = f'SELECT {keys_str} FROM sample_sequencing WHERE id = :id'
+        keys_str = ', '.join('sq.' + k for k in keys)
+        _query = f"""
+SELECT {keys_str}, s.project as project
+FROM sample_sequencing sq
+INNER JOIN sample s ON sq.sample_id = s.id
+WHERE sq.id = :id
+"""
         d = await self.connection.fetch_one(_query, {'id': sequence_id})
-        return SampleSequencing.from_db(dict(d))
+        if not d:
+            raise NotFoundError(f'sequence with id = {sequence_id}')
+        d = dict(d)
 
-    async def get_latest_sequence_id_by_sample_id(self, sample_id: int):
+        return d.pop('project'), SampleSequencing.from_db(d)
+
+    async def get_latest_sequence_id_for_sample_id(
+        self, sample_id: int
+    ) -> Tuple[ProjectId, int]:
         """
         Get latest added sequence ID from internal sample_id
         """
         _query = """\
-SELECT id from sample_sequencing
+SELECT sq.id, s.project FROM sample_sequencing sq
+INNER JOIN sample s ON sq.sample_id = s.id
 WHERE sample_id = :sample_id
-ORDER by id DESC
+ORDER by sq.id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
-        return result[0]
+        return result['project'], result['id']
 
-    async def get_latest_sequence_id_by_external_sample_id(self, external_sample_id):
+    async def get_latest_sequence_id_for_external_sample_id(
+        self, project: ProjectId, external_sample_id
+    ) -> int:
         """
         Get latest added sequence ID from external sample_id
         """
         _query = """\
 SELECT sq.id from sample_sequencing sq
 INNER JOIN sample s ON s.id = sq.sample_id
-WHERE s.external_id = :external_id
+WHERE s.external_id = :external_id AND s.project = :project
 ORDER by s.id DESC
 LIMIT 1
 """
-        result = await self.connection.fetch_one(
-            _query, {'external_id': external_sample_id}
+        result = await self.connection.fetch_val(
+            _query, {'project': project, 'external_id': external_sample_id}
         )
-        return result[0]
+        return result
 
-    async def get_latest_sequence_ids_by_sample_ids(self, sample_ids: List[int]):
+    async def get_latest_sequence_ids_for_sample_ids(
+        self, sample_ids: List[int]
+    ) -> Tuple[Iterable[ProjectId], Dict[int, int]]:
         """
         Get the IDs of the latest sequence for a sample, keyed by the internal sample ID
         """
         if not sample_ids:
-            return {}
+            return [], {}
 
         _query = """
-SELECT id, sample_id from sample_sequencing
-WHERE sample_id in :sample_ids
-ORDER by id DESC;
+SELECT sq.id, sq.sample_id, s.project FROM sample_sequencing sq
+INNER JOIN sample s on sq.sample_id = s.id
+WHERE sq.sample_id in :sample_ids
+ORDER by sq.id DESC;
 """
         # hopefully there aren't too many
         sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        projects = set(s['project'] for s in sequences)
         sample_id_to_seq_id = {}
+        # groupby preserves ordering
         for sample_id, seqs in groupby(sequences, lambda seq: seq['sample_id']):
             sample_id_to_seq_id[sample_id] = list(seqs)[-1]['id']  # get last one
 
-        return sample_id_to_seq_id
+        return projects, sample_id_to_seq_id
 
-    async def get_sequences_by_sample_ids(
+    async def get_latest_sequence_for_sample_ids(
         self, sample_ids: List[int], get_latest_sequence_only=True
-    ) -> List[SampleSequencing]:
+    ) -> Tuple[Iterable[ProjectId], List[SampleSequencing]]:
         """Get a list of sequence objects by their internal sample IDs"""
-        keys = [
-            'id',
-            'sample_id',
-            'type',
-            'meta',
-            'status',
-        ]
-        keys_str = ', '.join(keys)
         # there's an implicit ordering by id
-        _query = (
-            f'SELECT {keys_str} FROM sample_sequencing WHERE sample_id in :sample_ids'
-        )
-        sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        _query = f"""
+SELECT sq.id, sq.sample_id, sq.type, sq.meta, sq.status, s.project
+FROM sample_sequencing sq
+INNER JOIN sample s ON sq.sample_id = s.id
+WHERE sq.sample_id in :sample_ids
+"""
+        rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        sequence_dicts = [dict(s) for s in rows]
+        projects = set(s.pop('project') for s in sequence_dicts)
         if get_latest_sequence_only:
             # get last one
-            sequences = [
+            sequence_dicts = [
                 list(seqs)[-1]
-                for _, seqs in groupby(sequences, lambda seq: seq['sample_id'])
+                for _, seqs in groupby(sequence_dicts, lambda seq: seq['sample_id'])
             ]
 
-        return [SampleSequencing.from_db(dict(s)) for s in sequences]
+        sequences = [SampleSequencing.from_db(s) for s in sequence_dicts]
+        return projects, sequences
 
     async def update_status(
         self,
@@ -169,7 +201,7 @@ ORDER by id DESC;
         """Update status of sequencing with sequencing_id"""
         _query = """
 UPDATE sample_sequencing
-    SET status = :status, author=:author
+SET status = :status, author=:author
 WHERE id = :sequencing_id
 """
 
@@ -189,9 +221,7 @@ WHERE id = :sequencing_id
         meta: Optional[Dict] = None,
         author=None,
     ):
-        """
-        Can't update type
-        """
+        """Update a sequence"""
 
         fields = {'sequencing_id': sequence_id, 'author': author or self.author}
 

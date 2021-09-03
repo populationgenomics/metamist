@@ -9,14 +9,14 @@ from db.python.layers.participant import (
     ParticipantLayer,
     ExtraParticipantImporterHandler,
 )
-from api.utils.db import get_project_db_connection, Connection
+from api.utils.db import get_project_write_connection, Connection
 
 router = APIRouter(prefix='/import', tags=['import'])
 
 
 @router.post('/{project}/airtable-manifest', operation_id='importAirtableManifest')
 async def import_airtable_manifest(
-    file: UploadFile = File(...), connection: Connection = get_project_db_connection
+    file: UploadFile = File(...), connection: Connection = get_project_write_connection
 ):
     """Get sample by external ID"""
     import_layer = ImportLayer(connection)
@@ -34,7 +34,7 @@ async def import_airtable_manifest(
 async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
     extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
-    connection: Connection = get_project_db_connection,
+    connection: Connection = get_project_write_connection,
 ):
     """
     Import individual metadata manifest

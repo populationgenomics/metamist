@@ -1,9 +1,11 @@
 from typing import List, Union, Optional
 
+from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
+from db.python.tables.project import ProjectId
 
 
 class PedRow:
@@ -84,7 +86,11 @@ class PedRow:
 
     @staticmethod
     def order(rows: List['PedRow']) -> List['PedRow']:
-        """Order a list of PedRows"""
+        """
+        Order a list of PedRows, but also validates:
+        - There are no circular dependencies
+        - All maternal / paternal IDs are found in the pedigree
+        """
         rows_to_order: List[PedRow] = [*rows]
         ordered = []
         seen_individuals = set()
@@ -108,7 +114,8 @@ class PedRow:
             if remaining_iterations_in_round <= 0 and len(rows_to_order) > 0:
                 participant_ids = ', '.join(r.individual_id for r in rows_to_order)
                 raise Exception(
-                    "Circular dependency detected (eg: someone's child is an ancestor's parent). "
+                    "There was an issue in the pedigree, either a parent wasn't found in the pedigree, "
+                    "or a circular dependency detected (eg: someone's child is an ancestor's parent). "
                     f"Can't resolve participants: {participant_ids}"
                 )
 
@@ -140,6 +147,76 @@ class PedRow:
 
 class FamilyLayer(BaseLayer):
     """Layer for import logic"""
+
+    def __init__(self, connection: Connection):
+        super().__init__(connection)
+        self.ftable = FamilyTable(connection)
+        self.fptable = FamilyParticipantTable(self.connection)
+
+    async def get_pedigree(
+        self,
+        project: ProjectId,
+        family_ids: List[int] = None,
+        # pylint: disable=invalid-name
+        replace_with_participant_external_ids=False,
+        # pylint: disable=invalid-name
+        replace_with_family_external_ids=False,
+        empty_participant_value='',
+    ) -> List[List[Optional[str]]]:
+        """
+        Generate pedigree file for ALL families in project
+        (unless internal_family_ids is specified).
+
+        Use internal IDs unless specific options are specified.
+        """
+
+        # this is important because a PED file MUST be ordered like this
+        ordered_keys = [
+            'family_id',
+            'participant_id',
+            'paternal_participant_id',
+            'maternal_participant_id',
+            'sex',
+            'affected',
+        ]
+        pid_fields = {
+            'participant_id',
+            'paternal_participant_id',
+            'maternal_participant_id',
+        }
+
+        rows = await self.fptable.get_rows(project=project, family_ids=family_ids)
+        pmap, fmap = {}, {}
+        if replace_with_participant_external_ids:
+            participant_ids = set(
+                s
+                for r in rows
+                for s in [r[pfield] for pfield in pid_fields]
+                if s is not None
+            )
+            ptable = ParticipantTable(connection=self.connection)
+            pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
+
+        if replace_with_family_external_ids:
+            family_ids = set(r['family_id'] for r in rows if r['family_id'] is not None)
+            fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
+
+        formatted_rows = []
+        for row in rows:
+            formatted_row = []
+            for field in ordered_keys:
+                value = row[field]
+                if field == 'family_id':
+                    formatted_row.append(fmap.get(value, value))
+                elif field in pid_fields:
+                    formatted_row.append(
+                        pmap.get(value, value) or empty_participant_value
+                    )
+                else:
+                    formatted_row.append(value)
+            formatted_rows.append(formatted_row)
+
+        return formatted_rows
 
     async def get_participant_family_map(
         self, participant_ids: List[int], check_project_ids=False
@@ -180,6 +257,7 @@ class FamilyLayer(BaseLayer):
         pedrows: List[PedRow] = [
             PedRow(**{_header[i]: r[i] for i in range(len(_header))}) for r in rows
         ]
+        # this validates a lot of the pedigree too
         pedrows: List[PedRow] = PedRow.order(pedrows)
 
         external_family_ids = set(r.family_id for r in pedrows)
@@ -191,24 +269,25 @@ class FamilyLayer(BaseLayer):
             if pid
         )
 
-        family_table = FamilyTable(self.connection)
         participant_table = ParticipantTable(self.connection)
-        family_participant_table = FamilyParticipantTable(self.connection)
 
-        external_family_id_map = await family_table.get_id_map_by_external_ids(
-            list(external_family_ids), allow_missing=True
+        external_family_id_map = await self.ftable.get_id_map_by_external_ids(
+            list(external_family_ids),
+            project=self.connection.project,
+            allow_missing=True,
         )
         missing_external_family_ids = [
             f for f in external_family_ids if f not in external_family_id_map
         ]
         # these will fail if any of them are missing
         external_participant_ids = await participant_table.get_id_map_by_external_ids(
-            list(external_participant_ids)
+            list(external_participant_ids),
+            project=self.connection.project,
         )
 
         async with self.connection.connection.transaction():
             for external_family_id in missing_external_family_ids:
-                internal_family_id = await family_table.create_family(
+                internal_family_id = await self.ftable.create_family(
                     external_id=external_family_id,
                     description=None,
                     coded_phenotype=None,
@@ -232,71 +311,6 @@ class FamilyLayer(BaseLayer):
                 }
                 for row in pedrows
             ]
-            await family_participant_table.create_rows(insertable_rows)
+            await self.fptable.create_rows(insertable_rows)
 
         return True
-
-    async def get_pedigree(
-        self,
-        family_ids: List[int] = None,
-        # pylint: disable=invalid-name
-        replace_with_participant_external_ids=False,
-        # pylint: disable=invalid-name
-        replace_with_family_external_ids=False,
-        empty_participant_value='',
-    ) -> List[List[Optional[str]]]:
-        """
-        Generate pedigree file for ALL families in project
-        (unless internal_family_ids is specified).
-
-        Use internal IDs unless specific options are specified.
-        """
-
-        ordered_keys = [
-            'family_id',
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-            'sex',
-            'affected',
-        ]
-        pid_fields = {
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-        }
-
-        fptable = FamilyParticipantTable(self.connection)
-        rows = await fptable.get_rows(family_ids=family_ids)
-        pmap, fmap = {}, {}
-        if replace_with_participant_external_ids:
-            participant_ids = set(
-                s
-                for r in rows
-                for s in [r[pfield] for pfield in pid_fields]
-                if s is not None
-            )
-            ptable = ParticipantTable(connection=self.connection)
-            pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
-
-        if replace_with_family_external_ids:
-            family_ids = set(r['family_id'] for r in rows if r['family_id'] is not None)
-            ftable = FamilyTable(connection=self.connection)
-            fmap = await ftable.get_id_map_by_internal_ids(list(family_ids))
-
-        formatted_rows = []
-        for row in rows:
-            formatted_row = []
-            for field in ordered_keys:
-                value = row[field]
-                if field == 'family_id':
-                    formatted_row.append(fmap.get(value, value))
-                elif field in pid_fields:
-                    formatted_row.append(
-                        pmap.get(value, value) or empty_participant_value
-                    )
-                else:
-                    formatted_row.append(value)
-            formatted_rows.append(formatted_row)
-
-        return formatted_rows

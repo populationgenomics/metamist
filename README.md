@@ -23,7 +23,6 @@ export SM_DEV_DB_USER=root
 export SM_DEV_DB_PORT=3307
 export SM_DEV_DB_HOST=127.0.0.1
 export SM_DEV_DB_PASSWORD=root
-export SM_ENVIRONMENT=dev
 ```
 
 ### Using the Python API
