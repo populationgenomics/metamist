@@ -95,6 +95,8 @@ class SampleLayer(BaseLayer):
             project_ids=project_ids,
             active=active,
         )
+        if not samples:
+            return []
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
