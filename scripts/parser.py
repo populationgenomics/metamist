@@ -193,6 +193,7 @@ class GenericParser:
 
         if len(external_id_map) > 0:
             internal_sample_id_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
+                project=self.sample_metadata_project,
                 request_body=list(external_id_map.values()),
             )
 
@@ -273,13 +274,17 @@ Updating {len(sequences_to_update)} sequences"""
         for sample_id, sequences_to_add in sequencing_to_add.items():
             for seq in sequences_to_add:
                 seq.sample_id = ext_sample_to_internal_id[sample_id]
-                seqapi.create_new_sequence(new_sequence=seq)
+                seqapi.create_new_sequence(
+                    new_sequence=seq,
+                    project=self.sample_metadata_project,
+                )
 
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
             sapi.update_sample(
                 id_=internal_sample_id,
                 sample_update_model=sample_update,
+                project=self.sample_metadata_project,
             )
 
         logger.info(f'Updating {len(sequences_to_update)} sequences')
@@ -287,6 +292,7 @@ Updating {len(sequences_to_update)} sequences"""
             seqapi.update_sequence(
                 sequence_id=seq_id,
                 sequence_update_model=seq_update,
+                project=self.sample_metadata_project,
             )
 
         return ext_sample_to_internal_id
