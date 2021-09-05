@@ -11,10 +11,10 @@ import subprocess
 import json
 from typing import Tuple, Optional
 from collections import namedtuple
-from google.cloud import storage
 from google.cloud import secretmanager
 import mysql.connector
 from parameterized import parameterized
+from restore import pull_latest_backup
 
 
 BACKUP_BUCKET = 'cpg-sm-backups'
@@ -72,7 +72,7 @@ class TestDatabaseBackup(unittest.TestCase):
     def setUpClass(cls):
         """ Pull the backup file, and restore the database."""
 
-        backup_folder = pull_latest_backup()
+        backup_folder = pull_latest_backup(BACKUP_BUCKET)
         get_timestamp(backup_folder)
         # Pull the latest backup
         subprocess.run(['mkdir', LOCAL_BACKUP_FOLDER], check=True)
@@ -104,7 +104,7 @@ class TestDatabaseBackup(unittest.TestCase):
                 'Backup cannot be performed unless /var/lib/mysql is empty.'
             )
 
-        # Perform backup
+        # Restore
         subprocess.run(
             [
                 'sudo',
@@ -123,7 +123,7 @@ class TestDatabaseBackup(unittest.TestCase):
         subprocess.run(['sudo', 'systemctl', 'start', 'mariadb'], check=True)
 
     def setUp(self):
-        backup_folder = pull_latest_backup()
+        backup_folder = pull_latest_backup(BACKUP_BUCKET)
         self.timestamp = get_timestamp(backup_folder)
 
         self.local_conn = mysql.connector.connect(
@@ -200,16 +200,6 @@ WHERE {wheres_str};"""
         """ Delete test database following testing """
         subprocess.run(['rm', '-r', LOCAL_BACKUP_FOLDER], check=True)
         subprocess.run(['sudo', 'rm', '-r', '/var/lib/mysql'], check=True)
-
-
-def pull_latest_backup():
-    """ Assumes no changes to metadata since initial upload """
-    storage_client = storage.Client()
-    blobs = [(blob, blob.updated) for blob in storage_client.list_blobs(BACKUP_BUCKET)]
-    latest = sorted(blobs, key=lambda tup: tup[1])[-1][0]
-    full_path = os.path.dirname(latest.name)
-    backup_folder = os.path.dirname(full_path)
-    return backup_folder
 
 
 def get_timestamp(folder: str):
