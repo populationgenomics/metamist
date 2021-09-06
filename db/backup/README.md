@@ -27,33 +27,24 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
 #### Setting Up
 
 1. Create a log-based metric
-   Monitoring Successful Backups
 
-   > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity = INFO
-
-   Catching Failed Backups
-
-   > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity >= ERROR
+   > Monitoring Successful Backups
+   >
+   > > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity = INFO
+   >
+   > Catching Failed Backups
+   >
+   > > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity >= ERROR
 
 2. Create an alerting policy based on the log-based metric.
-   Monitoring Successful Backups Configuration:
-   > Target
-   > Aggregator : `Sum`
-   > Period : `1 day`
-   > Configuration
-   > Condition Triggers if : `Any time series violates`
-   > condition : `is above`
-   > threshold : `2`
-   > for : `1 minute`
+
+   > Monitoring Successful Backups Configuration:
    >
-   > - Catching Failed Backups Configuration:
-   >   Target
-   >   Period : `1 minute`
-   >   Configuration
-   >   Condition Triggers if : `Any time series violates`
-   >   condition : `is above`
-   >   threshold : `0`
-   >   for : `most recent value`
+   > > Aggregator : `Sum`, Period : `1 day`, Condition Triggers if : `Any time series violates`, condition : `is above`, threshold : `2`, for : `1 minute`
+   >
+   > Catching Failed Backups Configuration:
+   >
+   > > Period : `1 minute`, Condition Triggers if : `Any time series violates`, condition : `is above`, threshold : `0`, for : `most recent value`
 
 ## DR Validation
 
