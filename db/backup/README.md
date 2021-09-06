@@ -55,23 +55,25 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
 To test our backup procedure, the validate_backup script will be run twice a year. All tests must pass. In the case that tests fail, an investigation should take place.
 
 This includes:
-Identify which tests have failed
-Determine the cause of the failure i.e. the validation script itself, or the backup script.
-Make appropriate changes, and repeat the process until all tests pass.
+
+- Identify which tests have failed
+- Determine the cause of the failure i.e. the validation script itself, or the backup script.
+- Make appropriate changes, and repeat the process until all tests pass.
 
 #### Yearly Procedures
 
 To test our monitoring and alerting policy, once a year our database backups will be disabled for 24 hours. In the case that an alert isn’t triggered, an investigation should take place. In the case of failure, this activity should be repeated within 7 days to ensure relevant changes have taken effect.
 
-Further, to test the effectiveness of our DR procedure, once a year the sm_db_dev_instance will be deleted and restored in line with our recovery procedures.
+Further, to test the effectiveness of our DR procedure, once a year the sm_db_dev_instance will be deleted and restored.
 
-A copy of the VM will be made.
-The db-validate-backup secret should be updated to redirect update the prod_instance details in line with the new VM. This is for testing purposes.
-The sm_db_dev_instance will be deleted.
-A new instance will be created and restored in line with our recovery procedures.
-Validation will occur in line with our validation procedures,
-Then, our sm api will be tested.
-Following successful validation, the db-validate-backup secret should be updated to now point to the new instance and the copy of the VM can be deleted.
+- Copy the current VM instance, creating a new instance (VM_COPY), as a safety measure.
+- Update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_COPY. This is for testing purposes.
+- Delete `sm_db_dev_instance`
+- Create a new prod instance (VM_PROD) and restore in line with the [recovery procedures](#Recovery).
+- Validate the new instance in line with the [validation procedures](#Set-Up).
+- Test the SM API. #TODO -
+- Following successful validation, update the db-validate-backup secret to reassigne the `p_host` field to match the address of VM_PROD.
+- Delete VM_COPY.
 
 ### Validation Procedure
 
@@ -79,9 +81,9 @@ Following successful validation, the db-validate-backup secret should be updated
 
 IMPORTANT: Do not run the validation script in a production environment. In order to run the script, all databases on the VM must be dropped.
 
-Use a VM with MariaDB 10.5 installed. For instructions, see # TO LINK of the recovery procedures.
-In the production instance of the database, create a user that has read access to all of the tables.
-In the Secret Manager, create a secret db-validate-backup, with a JSON config as follows, where p_username and p_password matches the user created in step # TO LINK .
+1. Use a VM with MariaDB 10.5 installed. For instructions, see [Install MariaDB 10.5](#Install-MariaDB-10.5) in the recovery procedures.
+2. In the production instance of the database, create a user that has read access to all of the tables.
+3. In the Secret Manager, create a secret `db-validate-backup`, with a JSON config as follows, where p_username and p_password matches the user created in step 2 above.
 
 ```json
 {
@@ -115,8 +117,8 @@ The full recovery process is detailed below. It is broken up into a series of re
 
 ### Recovery
 
-1. Restore VM. For instructions on rebuilding the VM see here. If the VM does not need to be restored skip to step 2.
-2. Restore MariaDB Instance. For instructions on installing MariaDB 10.5 see here. If MariaDB 10.5 is already running on the VM, skip to 3.
+1. Restore VM. For instructions on rebuilding the VM [Rebuild VM](#Rebuild-VM). If the VM does not need to be restored skip to step 2.
+2. Restore MariaDB Instance. For instructions on installing MariaDB 10.5 the [instructions](#Install-MariaDB-10.5). If MariaDB 10.5 is already running on the VM, skip to 3.
 3. Restore the database by running the `restore.py` script
 
 ### Rebuild VM
