@@ -59,10 +59,10 @@ jobs:
       - name: run liquibase
         run: |
           pushd db
-          if [ ! -e db/mariadb-java-client-2.7.3.jar ]; then 
+          if [ ! -e db/mariadb-java-client-2.7.3.jar ]; then
             gsutil cp gs://cpg-us-sample-metadata-ci/mariadb-java-client-2.7.3.jar .
           fi
-          if [ ! -e db/liquibase.jar ]; then 
+          if [ ! -e db/liquibase.jar ]; then
             gsutil cp gs://cpg-us-sample-metadata-ci/liquibase.jar .
           fi
           java -jar liquibase.jar \
@@ -109,7 +109,7 @@ jobs:
           python3 -m api.server &
           sleep 3
           python test/test_add_samples_for_joint_calling.py
-        env: 
+        env:
           SM_ALLOWALLACCESS: "1"
 
       - name: run test that simulates joint-calling workflow
@@ -117,5 +117,5 @@ jobs:
           python3 -m api.server &
           sleep 3
           python test/test_joint_calling_workflow.py
-        env: 
+        env:
           SM_ALLOWALLACCESS: "0"
