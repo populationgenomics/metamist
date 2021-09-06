@@ -28,9 +28,12 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
 
 1. Create a log-based metric
    Monitoring Successful Backups
-   Filter: logName="projects/sample-metadata/logs/backup_log" AND severity = INFO
+
+   > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity = INFO
+
    Catching Failed Backups
-   Filter: logName="projects/sample-metadata/logs/backup_log" AND severity >= ERROR
+
+   > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity >= ERROR
 
 2. Create an alerting policy based on the log-based metric.
    Monitoring Successful Backups Configuration:
