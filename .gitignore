@@ -6,5 +6,6 @@ __pycache__/
 .DS_Store
 .idea/
 db/mariadb-java-client-*.jar
+db/liquibase.jar
 sample_metadata
 *.egg-info/

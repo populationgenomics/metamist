@@ -33,6 +33,7 @@ setup(
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
+        'cpg-utils',
     ],
     include_package_data=True,
     zip_safe=False,

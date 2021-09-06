@@ -7,3 +7,7 @@ fastapi[all]==0.68.0
 python-multipart==0.0.5
 uvicorn==0.13.4
 databases[mysql]==0.4.3
+cpg-utils
+openapi-generator-cli
+python-dateutil
+urllib3 >= 1.25.3

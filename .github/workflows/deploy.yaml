@@ -1,11 +1,11 @@
-name: Deploy
+name: deploy
 on:
   push:
     branches:
       - main
       - dev
 jobs:
-  build-publish:
+  deploy:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
 #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest

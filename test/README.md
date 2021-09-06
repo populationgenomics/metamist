@@ -15,6 +15,7 @@ Configure required environment variables
 export SM_ENVIRONMENT=LOCAL
 export SM_DEV_DB_PROJECT=sm_dev
 export SM_DEV_DB_USER=root
+export SM_DEV_DB_PASSWORD=root
 export SM_DEV_DB_PORT=3307
 export SM_DEV_DB_HOST=127.0.0.1
 ```
@@ -22,16 +23,20 @@ export SM_DEV_DB_HOST=127.0.0.1
 Start the DB server
 
 ```bash
-docker stop mysql-sm
-docker rm mysql-sm
-docker run -p $SM_DEV_DB_PORT:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 --name mysql-sm -d mariadb
+export NAME=mariadb-sm
+docker stop $NAME
+docker rm $NAME
+docker run -d -p $SM_DEV_DB_PORT:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 --name $NAME mariadb
+docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" $NAME
+# Wait until started
+until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'; do sleep 3; done
 ```
 
 Create a DB
 
 ```bash
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
-# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'show databases;'
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
+# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'show databases;'
 ```
 
 Install tables
@@ -46,12 +51,15 @@ liquibase update --url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB
 Add project into the DB
 
 ```bash
-INPUT_PROJECT=test_input_project
-OUTPUT_PROJECT=test_output_project
-USER=vladislav.savelyev@populationgenomics.org.au
-GCP_ID=vlad-dev
+export INPUT_PROJECT=test_input_project
+export OUTPUT_PROJECT=test_output_project
+export USER=sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com
+export GCP_ID=sample-metadata
 
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; insert into project (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) values (1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-sample-metadata-main-write-members-cache"), (2, "'$INPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-sample-metadata-main-write-members-cache");'
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; insert into project (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
+values \
+(1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-ci-sample-metadata-main-write-members-cache"), \
+(2, "'$OUTPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-write-members-cache");'
 
 mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
 ```
@@ -60,19 +68,19 @@ Create secrets to test access to a project
 
 ```bash
 # To read and NOT write input project:
-gcloud secrets create $INPUT_PROJECT-sample-metadata-main-read-members-cache --project $GCP_ID
-gcloud secrets create $INPUT_PROJECT-sample-metadata-main-write-members-cache --project $GCP_ID
+gcloud secrets create $INPUT_PROJECT-ci-sample-metadata-main-read-members-cache --project $GCP_ID
+gcloud secrets create $INPUT_PROJECT-ci-sample-metadata-main-write-members-cache --project $GCP_ID
 
-gcloud secrets versions add $INPUT_PROJECT-sample-metadata-main-read-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
+gcloud secrets versions add $INPUT_PROJECT-ci-sample-metadata-main-read-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
 # Note empty user list for the write secret:
-gcloud secrets versions add $INPUT_PROJECT-sample-metadata-main-write-members-cache --data-file=<(echo ,) --project $GCP_ID
+gcloud secrets versions add $INPUT_PROJECT-ci-sample-metadata-main-write-members-cache --data-file=<(echo ,) --project $GCP_ID
 
 # To read and write input project:
-gcloud secrets create $OUTPUT_PROJECT-sample-metadata-main-read-members-cache --project $GCP_ID
-gcloud secrets create $OUTPUT_PROJECT-sample-metadata-main-write-members-cache --project $GCP_ID
+gcloud secrets create $OUTPUT_PROJECT-ci-sample-metadata-main-read-members-cache --project $GCP_ID
+gcloud secrets create $OUTPUT_PROJECT-ci-sample-metadata-main-write-members-cache --project $GCP_ID
 
-gcloud secrets versions add $OUTPUT_PROJECT-sample-metadata-main-read-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
-gcloud secrets versions add $OUTPUT_PROJECT-sample-metadata-main-write-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
+gcloud secrets versions add $OUTPUT_PROJECT-ci-sample-metadata-main-read-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
+gcloud secrets versions add $OUTPUT_PROJECT-ci-sample-metadata-main-write-members-cache --data-file=<(echo ,$USER,) --project $GCP_ID
 ```
 
 Generate and install API
