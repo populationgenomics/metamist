@@ -49,6 +49,15 @@ class SeqrMetadataKeys(Enum):
     CANDIDATE_GENES = 'Candidate Genes'
 
     @staticmethod
+    def get_key_parsers():
+        """Get specific parsers for individual fields"""
+        return {
+            SeqrMetadataKeys.AGE_OF_ONSET: SeqrMetadataKeys.parse_age_of_onset,
+            SeqrMetadataKeys.HPO_TERMS_ABSENT: SeqrMetadataKeys.parse_hpo_terms,
+            SeqrMetadataKeys.HPO_TERMS_PRESENT: SeqrMetadataKeys.parse_hpo_terms,
+        }
+
+    @staticmethod
     def get_ordered_headers():
         """Get ordered headers for OUTPUT"""
         return [
@@ -105,6 +114,72 @@ class SeqrMetadataKeys(Enum):
             SeqrMetadataKeys.PREVIOUSLY_TESTED_GENES,
             SeqrMetadataKeys.CANDIDATE_GENES,
         ]
+
+    @staticmethod
+    def get_age_of_onset_allowed_keys():
+        """
+        SEQR age of onset must be one of these values
+        """
+        return {
+            'Congenital onset',
+            'Embryonal onset',
+            'Fetal onset',
+            'Neonatal onset',
+            'Infantile onset',
+            'Childhood onset',
+            'Juvenile onset',
+            'Adult onset',
+            'Young adult onset',
+            'Middle age onset',
+            'Late onset',
+        }
+
+    @staticmethod
+    def parse_age_of_onset(age_of_onset: str):
+        """
+        Age of onset in seqr must be a value defined
+        in `get_age_of_onset_allowed_keys`, validate that it's either
+        true or we can can simply guess which one they meant.
+
+        >>> SeqrMetadataKeys.parse_age_of_onset('congenital')
+        'Congenital onset'
+
+        >>> SeqrMetadataKeys.parse_age_of_onset(' iNFaNtIlE OnsET ')
+        'Infantile onset'
+        """
+        if not age_of_onset:
+            return None
+        keys = SeqrMetadataKeys.get_age_of_onset_allowed_keys()
+        if age_of_onset in keys:
+            return age_of_onset
+        lkeys_without_onset = {k.lower().replace('onset', '').strip(): k for k in keys}
+        stripped_aoo = age_of_onset.lower().replace('onset', '').strip()
+        if stripped_aoo in lkeys_without_onset:
+            return lkeys_without_onset[stripped_aoo]
+
+        raise ValueError(
+            f"Didn't recognise age of set key {age_of_onset}, "
+            f"expected one of: {', '.join(keys)}"
+        )
+
+    @staticmethod
+    def parse_hpo_terms(hpo_terms: str):
+        """
+        Validate that comma-separated HPO terms must start with 'HP:'
+        """
+        if not hpo_terms:
+            return None
+        terms = [t.strip() for t in hpo_terms.split(',')]
+        # mfranklin (2021-09-06): There were no IDs that didn't start with HP
+        # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
+        failing_terms = [term for term in terms if not term.startswith('HP')]
+        if failing_terms:
+            raise ValueError(
+                'HPO terms must start with "HP", found ' + ', '.join(failing_terms)
+            )
+
+        # do this, because sometimes collaborators use ', ' instead of ','
+        return ','.join(terms)
 
 
 class ParticipantLayer(BaseLayer):
@@ -438,6 +513,7 @@ class ParticipantLayer(BaseLayer):
 
         # List of (PersonId, Key, value) to insert into the participant_phenotype table
         insertable_rows: List[Tuple[int, str, any]] = []
+        parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         for row in rows:
             external_participant_id = row[participant_id_field_idx]
@@ -445,6 +521,10 @@ class ParticipantLayer(BaseLayer):
 
             for header_key, col_number in storeable_header_col_number_tuples:
                 value = row[col_number]
+                if header_key in parsers:
+                    # use custom parse declared in SeqrMetadataKeys.get_key_parsers
+                    value = parsers[header_key](value)
+
                 if value:
                     insertable_rows.append((participant_id, header_key, value))
 
