@@ -37,8 +37,8 @@ jobs:
         run: |
           docker stop $NAME
           docker rm $NAME
-          docker run -d -p $SM_DEV_DB_PORT:3306 -e MARIADB_ROOT_PASSWORD=$SM_DEV_DB_PASSWORD \
-          --name $NAME mariadb
+          docker run -d -p $SM_DEV_DB_PORT:3306 \
+          -e MARIADB_ROOT_PASSWORD=$SM_DEV_DB_PASSWORD --name $NAME mariadb
           docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" $NAME
           # Wait until started
           until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
@@ -47,7 +47,7 @@ jobs:
         env:
           NAME: mariadb-sm
 
-      - name: create database
+      - name: create a database
         run: |
           mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
           -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
@@ -59,10 +59,10 @@ jobs:
       - name: run liquibase
         run: |
           pushd db
-          if [ ! -e db/mariadb-java-client-2.7.3.jar ]; then
+          if [ ! -e mariadb-java-client-2.7.3.jar ]; then
             gsutil cp gs://cpg-us-sample-metadata-ci/mariadb-java-client-2.7.3.jar .
           fi
-          if [ ! -e db/liquibase.jar ]; then
+          if [ ! -e liquibase.jar ]; then
             gsutil cp gs://cpg-us-sample-metadata-ci/liquibase.jar .
           fi
           java -jar liquibase.jar \
@@ -72,11 +72,15 @@ jobs:
           --classpath mariadb-java-client-2.7.3.jar \
           --changelogFile=project.xml \
           update
+          mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+          -e 'use '$SM_DEV_DB_PROJECT'; show tables;'
           popd
 
       - name: add database projects
         run: |
-          mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+          mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+          -u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
           -e 'use '$SM_DEV_DB_PROJECT'; insert into project \
           (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
           values \
@@ -107,7 +111,7 @@ jobs:
       - name: populate samples
         run: |
           python3 -m api.server &
-          sleep 3
+          sleep 3  # to make sure server finished starting
           python test/test_add_samples_for_joint_calling.py
         env:
           SM_ALLOWALLACCESS: "1"
@@ -115,7 +119,7 @@ jobs:
       - name: run test that simulates joint-calling workflow
         run: |
           python3 -m api.server &
-          sleep 3
+          sleep 3  # to make sure server finished starting
           python test/test_joint_calling_workflow.py
         env:
           SM_ALLOWALLACCESS: "0"

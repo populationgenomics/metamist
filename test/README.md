@@ -7,6 +7,7 @@ git clone https://github.com/populationgenomics/sample-metadata
 cd sample-metadata
 conda env create -n sample-metadata --file environment-dev.yml
 conda activate sample-metadata
+pip install -r requirements.txt
 ```
 
 Configure required environment variables
@@ -26,26 +27,43 @@ Start the DB server
 export NAME=mariadb-sm
 docker stop $NAME
 docker rm $NAME
-docker run -d -p $SM_DEV_DB_PORT:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 --name $NAME mariadb
+docker run -d -p $SM_DEV_DB_PORT:3306 \
+-e MARIADB_ROOT_PASSWORD=$SM_DEV_DB_PASSWORD --name $NAME mariadb
 docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" $NAME
 # Wait until started
-until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'show databases;'; do sleep 3; done
+until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+-e 'show databases;'; do sleep 3; done
 ```
 
 Create a DB
 
 ```bash
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
-# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'show databases;'
+mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+-e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'
+mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+-e 'show databases;'
 ```
 
 Install tables
 
 ```bash
-cd db
-liquibase update --url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB_PROJECT --username=$SM_DEV_DB_USER --classpath mariadb-java-client-2.7.3.jar --changelog-file=project.xml
-
-# mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; show tables;'
+pushd db
+gsutil cp gs://cpg-us-sample-metadata-ci/mariadb-java-client-2.7.3.jar .
+gsutil cp gs://cpg-us-sample-metadata-ci/liquibase.jar .
+java -jar liquibase.jar \
+--url jdbc:mariadb://$SM_DEV_DB_HOST:$SM_DEV_DB_PORT/$SM_DEV_DB_PROJECT \
+--username=$SM_DEV_DB_USER \
+--password=$SM_DEV_DB_PASSWORD \
+--classpath mariadb-java-client-2.7.3.jar \
+--changelogFile=project.xml \
+update
+mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+-e 'use '$SM_DEV_DB_PROJECT'; show tables;'
+popd
 ```
 
 Add project into the DB
@@ -56,12 +74,17 @@ export OUTPUT_PROJECT=test_output_project
 export USER=sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com
 export GCP_ID=sample-metadata
 
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; insert into project (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
+-e 'use '$SM_DEV_DB_PROJECT'; insert into project \
+(id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
 values \
 (1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-ci-sample-metadata-main-write-members-cache"), \
 (2, "'$OUTPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-write-members-cache");'
 
-mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u $SM_DEV_DB_USER -e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
+mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
+-u $SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD  \
+-e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
 ```
 
 Create secrets to test access to a project
@@ -94,7 +117,7 @@ Start the server to populate samples (can do in a separate window)
 
 ```bash
 export SM_ALLOWALLACCESS=1
-python3 -m api.server
+python3 -m api.server &
 ```
 
 Populate samples
@@ -107,7 +130,7 @@ Stop the server and restart with SM_ALLOWALLACCESS unset, to test permissions
 
 ```bash
 export SM_ALLOWALLACCESS=0
-python3 -m api.server
+python3 -m api.server &
 ```
 
 Run the test that simulates the joint-calling workflow
