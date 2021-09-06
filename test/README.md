@@ -29,7 +29,7 @@ docker rm $NAME
 docker run -d -p $SM_DEV_DB_PORT:3306 -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=1 --name $NAME mariadb
 docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" $NAME
 # Wait until started
-until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'CREATE DATABASE '$SM_DEV_DB_PROJECT';'; do sleep 3; done
+until mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT -u$SM_DEV_DB_USER -e 'show databases;'; do sleep 3; done
 ```
 
 Create a DB
