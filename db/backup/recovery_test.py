@@ -5,7 +5,6 @@ It will drop the local mysql database after each run.
 
 """
 
-import os
 import unittest
 import subprocess
 import json
@@ -14,25 +13,13 @@ from collections import namedtuple
 from google.cloud import secretmanager
 import mysql.connector
 from parameterized import parameterized
-from restore import pull_latest_backup
+from restore import pull_latest_backup, restore
 
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
 
 ConnectionDetails = namedtuple('ConnectionDetails', 'address user password')
-
-TABLES = [
-    ('analysis'),
-    ('family'),
-    ('participant'),
-    ('project '),
-    ('sample'),
-    ('sample_sequencing'),
-    ('analysis_sample'),
-    ('participant_phenotypes'),
-    ('family_participant'),
-]
 
 FIELDS = [
     ('analysis', ('id',)),
@@ -43,8 +30,10 @@ FIELDS = [
     ('sample_sequencing', ('id',)),
     ('analysis_sample', ('analysis_id', 'sample_id')),
     ('participant_phenotypes', ('participant_id', 'hpo_term', 'description')),
-    ('family_participant', ('id',)),
+    ('family_participant', ('participant_id',)),
 ]
+
+TABLES = [field[0] for field in FIELDS]
 
 secret_manager = secretmanager.SecretManagerServiceClient()
 
@@ -73,54 +62,7 @@ class TestDatabaseBackup(unittest.TestCase):
         """ Pull the backup file, and restore the database."""
 
         backup_folder = pull_latest_backup(BACKUP_BUCKET)
-        get_timestamp(backup_folder)
-        # Pull the latest backup
-        subprocess.run(['mkdir', LOCAL_BACKUP_FOLDER], check=True)
-        subprocess.run(
-            [
-                'gsutil',
-                '-m',
-                'cp',
-                '-r',
-                f'gs://cpg-sm-backups/{backup_folder}',
-                LOCAL_BACKUP_FOLDER,
-            ],
-            check=True,
-        )
-        # Prepare the backup for restoration
-        subprocess.run(
-            [
-                'mariabackup',
-                '--prepare',
-                f'--target-dir={LOCAL_BACKUP_FOLDER}/{backup_folder}',
-            ],
-            check=True,
-        )
-        # Stop the MariaDB server
-        subprocess.run(['sudo', 'systemctl', 'stop', 'mariadb'], check=True)
-
-        if os.path.isdir('/var/lib/mysql/'):
-            raise RuntimeError(
-                'Backup cannot be performed unless /var/lib/mysql is empty.'
-            )
-
-        # Restore
-        subprocess.run(
-            [
-                'sudo',
-                'mariabackup',
-                '--copy-back',
-                f'--target-dir={LOCAL_BACKUP_FOLDER}/{backup_folder}',
-            ],
-            check=True,
-        )
-        # Fix permissions
-        subprocess.run(
-            ['sudo', 'chown', '-R', 'mysql:mysql', '/var/lib'],
-            check=True,
-        )
-        # Start the MariaDB server
-        subprocess.run(['sudo', 'systemctl', 'start', 'mariadb'], check=True)
+        restore(backup_folder)
 
     def setUp(self):
         backup_folder = pull_latest_backup(BACKUP_BUCKET)
@@ -173,9 +115,11 @@ class TestDatabaseBackup(unittest.TestCase):
         """Pulls 10 random rows for testing.
         Operates on tables with a unique id field"""
 
+        id_fields_str = ', '.join(id_fields) + f', {table}.*'
+
         restored_random_results = get_results(
             self.local_conn,
-            f'SELECT * FROM {table} ORDER BY RAND() LIMIT 10',
+            f'SELECT {id_fields_str} FROM {table} ORDER BY RAND() LIMIT 10',
         )
 
         for row in restored_random_results:
@@ -183,7 +127,7 @@ class TestDatabaseBackup(unittest.TestCase):
             wheres_str = ' AND '.join(f'{field} = %s' for field in id_fields)
 
             _query = f"""\
-SELECT *
+SELECT {id_fields_str}
 FROM {table}
 FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}'
 WHERE {wheres_str};"""
