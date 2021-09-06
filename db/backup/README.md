@@ -4,7 +4,7 @@
 
 ### Daily Backup
 
-A cron job runs a backup script daily. The script outputs a folder that is uploaded to GCS in the cpg-sm-backups bucket.
+A cron job runs a [backup script](https://github.com/populationgenomics/sample-metadata/blob/dev/db/backup/backup.py) daily. The script outputs a folder that is uploaded to GCS in the [cpg-sm-backups](https://console.cloud.google.com/storage/browser/cpg-sm-backups;tab=objects?forceOnBucketsSortingFiltering=false&project=sample-metadata&prefix=&forceOnObjectsSortingFiltering=false) bucket.
 
 All backups will be retained for 30 days in the event that they are deleted.
 Setting up
@@ -26,7 +26,7 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
 
 #### Setting Up
 
-1. Create a log-based metric
+1. [Create a log-based metric](https://cloud.google.com/logging/docs/logs-based-metrics#user-metrics)
 
    > Monitoring Successful Backups
    >
@@ -36,7 +36,7 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
    >
    > > Filter: logName="projects/sample-metadata/logs/backup_log" AND severity >= ERROR
 
-2. Create an alerting policy based on the log-based metric.
+2. [Create an alerting policy](https://cloud.google.com/logging/docs/logs-based-metrics/charts-and-alerts#alert-on-lbm) based on the log-based metric.
 
    > Monitoring Successful Backups Configuration:
    >
@@ -66,7 +66,7 @@ To test our monitoring and alerting policy, once a year our database backups wil
 
 Further, to test the effectiveness of our DR procedure, once a year the sm_db_dev_instance will be deleted and restored.
 
-- Copy the current VM instance, creating a new instance (VM_COPY), as a safety measure.
+- [Copy the current VM instance](https://cloud.google.com/compute/docs/instances/create-vm-from-similar-instance), creating a new instance (VM_COPY), as a safety measure.
 - Update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_COPY. This is for testing purposes.
 - Delete `sm_db_dev_instance`
 - Create a new prod instance (VM_PROD) and restore in line with the [recovery procedures](#Recovery).
@@ -146,7 +146,7 @@ The full recovery process is detailed below. It is broken up into a series of re
 
 ### Install MariaDB 10.5
 
-1. Install MariaDB 10.5. Upon writing this, MariaDB 10.3 is included in the APT package repositories by default, on Debian 10 and Ubuntu 20.4. The following guide describes the steps involved with configuring the APT package to install 10.5.
+1. Install MariaDB 10.5. Upon writing this, MariaDB 10.3 is included in the APT package repositories by default, on Debian 10 and Ubuntu 20.4. [The following guide](https://mariadb.com/docs/deploy/upgrade-community-server-cs105-debian9/#install-via-apt-debian-ubuntu) describes the steps involved with configuring the APT package to install 10.5.
 2. Install apt-transport-https sudo apt-get install -y apt-transport-https
 3. Run the included mysql_secure_installation security script to restrict access to the server. Set up the installation according to your needs. This will allow you to:
 
