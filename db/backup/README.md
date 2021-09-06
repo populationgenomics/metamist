@@ -79,9 +79,9 @@ Following successful validation, the db-validate-backup secret should be updated
 
 IMPORTANT: Do not run the validation script in a production environment. In order to run the script, all databases on the VM must be dropped.
 
-Use a VM with MariaDB 10.5 installed. For instructions, see step 2 of the recovery procedures.
+Use a VM with MariaDB 10.5 installed. For instructions, see # TO LINK of the recovery procedures.
 In the production instance of the database, create a user that has read access to all of the tables.
-In the Secret Manager, create a secret db-validate-backup, with a JSON config as follows, where p_username and p_password matches the user created in step 2.
+In the Secret Manager, create a secret db-validate-backup, with a JSON config as follows, where p_username and p_password matches the user created in step # TO LINK .
 
 ```json
 {
@@ -113,31 +113,41 @@ python3 -W ignore:ResourceWarning -m unittest validate_backup.py
 
 The full recovery process is detailed below. It is broken up into a series of recovery stages. Follow those that are applicable. It is worth noting that individual tables or databases cannot be restored. In the event that only one table or database has been lost, the entire instance will need to be restored from the last backup point.
 
-Restore VM. If the VM does not need to be restored skip to step 2.
-Restore the VM from image link to image, and then proceed to step 2 OR
-Restore VM from scratch
-Create a new VM instance in the GCP Console.
-Enable storage write permissions. On the create instance page, scroll down to Access Scopes. Select Set access for each API. Set Storage to Read/Write.
-Select a service account. The Compute Engine default service account will be selected by default.
-Connect to your VM
+### Recovery
 
-```bash
-gcloud compute ssh --project=<PROJECT-NAME> --zone=<ZONE> <VM-NAME>
-```
+1. Restore VM. For instructions on rebuilding the VM see here. If the VM does not need to be restored skip to step 2.
+2. Restore MariaDB Instance. For instructions on installing MariaDB 10.5 see here. If MariaDB 10.5 is already running on the VM, skip to 3.
+3. Restore the database by running the `restore.py` script
 
-If you enabled storage write permissions retrospectively, you may encounter AccessDeniedException: 403 Insufficient Permission while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache rm -r ~/.gsutil
-If you forget to enable storage write permissions or change your service account while creating your instance, you can update these settings retrospectively.
-View your instance in the GCP Console
-Stop your instance
-Click Edit
-Repeat step 2 or 3.
-Restore MariaDB Instance If MariaDB is already running on the VM, skip to 3.
-Install MariaDB 10.5. Upon writing this, MariaDB 10.3 is included in the APT package repositories by default, on Debian 10 and Ubuntu 20.4. The following guide describes the steps involved with configuring the APT package to install 10.5.
-Install apt-transport-https sudo apt-get install -y apt-transport-https
-Run the included mysql_secure_installation security script to restrict access to the server
-Set up the installation according to your needs; This will allow you to
-Disallow root login remotely
-Remove anonymous users
-Remove test database and access to it
-Restore Database
-Run the restore.py script
+### Rebuild VM
+
+1. Create a new VM instance in the GCP Console.
+2. Enable storage write permissions. On the create instance page, scroll down to Access Scopes. Select Set access for each API. Set Storage to Read/Write.
+3. Select a service account. The Compute Engine default service account will be selected by default.
+4. Connect to your VM
+
+   > ```bash
+   > gcloud compute ssh --project=<PROJECT-NAME> >>> --zone=<ZONE> <VM-NAME>
+   > ```
+
+5. If you enabled storage write permissions retrospectively, you may encounter `AccessDeniedException: 403 Insufficient Permission` while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache
+
+   > ```bash
+   > rm -r ~/.gsutil
+   > ```
+
+6. If you forget to enable storage write permissions or change your service account while creating your instance, you can update these settings retrospectively.
+
+   > - View your instance in the GCP Console
+   > - Stop your instance
+   > - Click Edit
+
+### Install MariaDB 10.5
+
+1. Install MariaDB 10.5. Upon writing this, MariaDB 10.3 is included in the APT package repositories by default, on Debian 10 and Ubuntu 20.4. The following guide describes the steps involved with configuring the APT package to install 10.5.
+2. Install apt-transport-https sudo apt-get install -y apt-transport-https
+3. Run the included mysql_secure_installation security script to restrict access to the server. Set up the installation according to your needs. This will allow you to:
+
+   > - Disallow root login remotely
+   > - Remove anonymous users
+   > - Remove test database and access to it
