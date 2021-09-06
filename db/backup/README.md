@@ -108,6 +108,10 @@ cd sample-metadata/db/backup
 ```
 
 ```bash
+pip3 install -r requirements.txt
+```
+
+```bash
 python3 -W ignore:ResourceWarning -m unittest validate_backup.py
 ```
 
