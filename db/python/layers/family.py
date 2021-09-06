@@ -36,6 +36,18 @@ class PedRow:
             'notes',
         ]
 
+    @staticmethod
+    def row_header():
+        """Default RowHeader for output"""
+        return [
+            '#Family ID',
+            'Individual ID',
+            'Paternal ID',
+            'Maternal ID',
+            'Sex',
+            'Affected',
+        ]
+
     def __init__(
         self,
         family_id,
@@ -128,10 +140,18 @@ class PedRow:
 
         >>> PedRow.parse_header_order(['family', 'mother', 'paternal id', 'phenotypes', 'gender'])
         ['family_id', 'maternal_id', 'paternal_id', 'affected', 'sex']
+
+        >>> PedRow.parse_header_order(['#family id'])
+        ['family_id']
+
+        >>> PedRow.parse_header_order(['unexpected header'])
+        Traceback (most recent call last):
+        ValueError: Unable to identity header elements: "unexpected header"
         """
         ordered_init_keys = []
+        unmatched = []
         for item in header:
-            litem = item.lower()
+            litem = item.lower().strip().strip('#')
             found = False
             for h, options in PedRow.PedRowKeys.items():
                 for potential_key in options:
@@ -141,6 +161,15 @@ class PedRow:
                         break
                 if found:
                     break
+
+            if not found:
+                unmatched.append(item)
+
+        if unmatched:
+            unmatched_headers_str = ', '.join(f'"{u}"' for u in unmatched)
+            raise ValueError(
+                'Unable to identity header elements: ' + unmatched_headers_str
+            )
 
         return ordered_init_keys
 
@@ -162,6 +191,7 @@ class FamilyLayer(BaseLayer):
         # pylint: disable=invalid-name
         replace_with_family_external_ids=False,
         empty_participant_value='',
+        include_header=True,
     ) -> List[List[Optional[str]]]:
         """
         Generate pedigree file for ALL families in project
@@ -202,6 +232,9 @@ class FamilyLayer(BaseLayer):
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
 
         formatted_rows = []
+        if include_header:
+            formatted_rows.append(PedRow.row_header())
+
         for row in rows:
             formatted_row = []
             for field in ordered_keys:
