@@ -121,7 +121,7 @@ The full recovery process is detailed below. It is broken up into a series of re
 
 ### Recovery
 
-1. Restore VM. For instructions on rebuilding the VM [Rebuild VM](#Rebuild-VM). If the VM does not need to be restored skip to step 2.
+1. Restore VM. The VM can be built from the [validate-db-backup-machine-image](https://console.cloud.google.com/compute/machineImages/details/validate-db-backup-machine-image?project=sample-metadata). Alternatively, to rebuild the VM from scratch see [Rebuild VM](#Rebuild-VM). If the VM does not need to be restored skip to step 2.
 2. Restore MariaDB Instance. For instructions on installing MariaDB 10.5 the [instructions](#Install-MariaDB-10.5). If MariaDB 10.5 is already running on the VM, skip to 3.
 3. Restore the database by running the `restore.py` script
 
