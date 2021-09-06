@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+# pylint: disable=no-member
 """
 Run the sample-metadata API through the analysis runner
 in a very generic, customisable way!
 
 For example:
 
-    python arbitrary_sm.py \
+    python scripts/arbitrary_sm.py \
         sample get_sample_by_external_id \
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
