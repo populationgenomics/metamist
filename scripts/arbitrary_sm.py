@@ -20,7 +20,9 @@ import json
 import sample_metadata
 
 
-def run_sm(api_name: str, method_name: str, *args, **kwargs):
+def run_sm(
+    api_name: str, method_name: str, args: List[str] = None, kwargs: dict = None
+):
     """
     Use the sample metadata API based on:
     :param api_name: pure name of API, eg: 'analysis'
@@ -33,7 +35,7 @@ def run_sm(api_name: str, method_name: str, *args, **kwargs):
     api_class_name = api_name.title() + 'Api'
     api = getattr(sample_metadata.api, api_class_name)
     api_instance = api()
-    response = getattr(api_instance, method_name)(*args, **kwargs)
+    response = getattr(api_instance, method_name)(*(args or []), **(kwargs or {}))
 
     return response
 
@@ -51,14 +53,11 @@ def from_args(args):
     if json_str:
         kwargs = json.loads(json_str)
 
-    elif '--json' in positional_args:
-        json_idx = positional_args.index('--json')
-        positional_args.pop(json_idx)
-
-        kwargs = json.loads(positional_args.pop(json_idx))
-
     return run_sm(
-        api_name=args.api_name, method_name=args.method_name, *positional_args, **kwargs
+        api_name=args.api_name,
+        method_name=args.method_name,
+        args=positional_args,
+        kwargs=kwargs,
     )
 
 
@@ -73,8 +72,8 @@ def main(args=None):
     )
     parser.add_argument('--json', help='JSON encoded dictionary for kwargs')
     parser.add_argument(
-        'args',
-        nargs=argparse.REMAINDER,
+        '--args',
+        nargs='+',
         help='any positional arguments to pass to the API',
     )
 
