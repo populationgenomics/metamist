@@ -11,6 +11,7 @@ For example:
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
 """
+import subprocess
 from typing import List
 
 import argparse
@@ -42,6 +43,10 @@ def from_args(args):
     positional_args: List[str] = args.args
     kwargs = {}
 
+    if args.file_to_localise:
+        for file in args.file_to_localise:
+            subprocess.check_output(['gsutil', 'cp', file, '.'])
+
     json_str = args.json
     if json_str:
         kwargs = json.loads(json_str)
@@ -63,6 +68,9 @@ def main(args=None):
     parser = argparse.ArgumentParser('Arbitrary sample-metadata script')
     parser.add_argument('api_name')
     parser.add_argument('method_name')
+    parser.add_argument(
+        '--file-to-localise', action='append', help='List of GS files to localise'
+    )
     parser.add_argument('--json', help='JSON encoded dictionary for kwargs')
     parser.add_argument(
         'args',
