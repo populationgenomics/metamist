@@ -48,7 +48,7 @@ async def get_pedigree(
     replace_with_participant_external_ids: bool = False,
     replace_with_family_external_ids: bool = False,
     empty_participant_value: Optional[str] = '',
-    include_header: bool = False,
+    include_header: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):
     """

@@ -191,7 +191,7 @@ class FamilyLayer(BaseLayer):
         # pylint: disable=invalid-name
         replace_with_family_external_ids=False,
         empty_participant_value='',
-        include_header=True,
+        include_header=False,
     ) -> List[List[Optional[str]]]:
         """
         Generate pedigree file for ALL families in project
