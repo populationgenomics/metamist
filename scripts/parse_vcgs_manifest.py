@@ -7,9 +7,9 @@ from typing import Dict
 
 import click
 
-from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_status import SequenceStatus
-from sample_metadata.model.sequence_type import SequenceType
+from sample_metadata.models.sample_type import SampleType
+from sample_metadata.models.sequence_status import SequenceStatus
+from sample_metadata.models.sequence_type import SequenceType
 
 from parser import GenericParser, GroupedRow
 
