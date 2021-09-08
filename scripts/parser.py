@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument
 import csv
 import logging
 import os
@@ -28,7 +28,7 @@ BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
-rmatch = re.compile(r'_[Rr]\d')
+rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
 
 
@@ -51,8 +51,8 @@ class GenericParser:
 
         self.sample_metadata_project = sample_metadata_project
 
-        self.default_sequence_type = default_sequence_type
-        self.default_sample_type = default_sample_type
+        self.default_sequence_type: SequenceType = SequenceType(default_sequence_type)
+        self.default_sample_type: SampleType = SampleType(default_sample_type)
 
         # gs specific
         self.default_bucket = None
@@ -109,6 +109,16 @@ class GenericParser:
         # first where r.name == path (or None)
         return next((r for r in blobs if r.name == path), None)
 
+    def list_directory(self, directory_name) -> List[str]:
+        """List directory"""
+        path = self.file_path(directory_name)
+        if path.startswith('gs://'):
+            bucket_name, *components = directory_name[5:].split('/')
+            blobs = self.client.list_blobs(bucket_name, prefix='/'.join(components))
+            return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
+
+        return [os.path.join(path, f) for f in os.listdir(path)]
+
     def file_contents(self, filename) -> Optional[str]:
         """Get contents of file (decoded as utf8)"""
         path = self.file_path(filename)
@@ -146,24 +156,24 @@ class GenericParser:
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, any]):
+    def get_sample_id(self, row: Dict[str, any]) -> str:
         """Get external sample ID from row"""
 
     @abstractmethod
-    def get_sample_meta(self, sample_id: str, row: GroupedRow):
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sample-metadata from row"""
 
     @abstractmethod
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
-    @abstractmethod
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
+        return self.default_sample_type
 
-    @abstractmethod
     def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
         """Get sequence type from row"""
+        return self.default_sequence_type
 
     @abstractmethod
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
