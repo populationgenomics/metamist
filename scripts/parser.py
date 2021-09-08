@@ -109,6 +109,16 @@ class GenericParser:
         # first where r.name == path (or None)
         return next((r for r in blobs if r.name == path), None)
 
+    def list_directory(self, directory_name) -> List[str]:
+        """List directory"""
+        path = self.file_path(directory_name)
+        if path.startswith('gs://'):
+            bucket_name, *components = directory_name[5:].split('/')
+            blobs = self.client.list_blobs(bucket_name, prefix='/'.join(components))
+            return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
+
+        return [os.path.join(path, f) for f in os.listdir(path)]
+
     def file_contents(self, filename) -> Optional[str]:
         """Get contents of file (decoded as utf8)"""
         path = self.file_path(filename)
