@@ -48,7 +48,7 @@ class SampleMapParser(GenericParser):
 
     def populate_filename_map(self, search_locations: List[str]):
         """
-        ParseFileMap uses search locations based on the filename,
+        FileMapParser uses search locations based on the filename,
         so let's prepopulate that filename_map from the search_locations!
         """
         self.filename_map = {}
@@ -73,16 +73,16 @@ class SampleMapParser(GenericParser):
 
         return super().file_path(filename)
 
-    def get_sample_id(self, row: Dict[str, any]):
+    def get_sample_id(self, row: Dict[str, any]) -> str:
         """Get external sample ID from row"""
         external_id = row[Columns.INDIVIDUAL_ID]
         return external_id
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow):
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sample-metadata from row"""
         return {}
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
         collapsed_sample_meta = {}
         if isinstance(row, list):
@@ -151,6 +151,11 @@ def main(
     """Run script from CLI arguments"""
     if not manifests:
         raise ValueError('Expected at least 1 manifest')
+
+    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_seach_paths:
+        search_path = list(set(search_path).union(set(extra_seach_paths)))
+
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
         resp = SampleMapParser.from_manifest_path(

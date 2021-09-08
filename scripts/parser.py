@@ -156,15 +156,15 @@ class GenericParser:
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, any]):
+    def get_sample_id(self, row: Dict[str, any]) -> str:
         """Get external sample ID from row"""
 
     @abstractmethod
-    def get_sample_meta(self, sample_id: str, row: GroupedRow):
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sample-metadata from row"""
 
     @abstractmethod
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
