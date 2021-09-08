@@ -28,7 +28,7 @@ BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
-rmatch = re.compile(r'_[Rr]\d')
+rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
 
 
