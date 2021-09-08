@@ -83,8 +83,8 @@ values \
 (2, "'$OUTPUT_PROJECT'", "'$USER'", "'$OUTPUT_PROJECT'", "'$GCP_ID'", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$OUTPUT_PROJECT'-ci-sample-metadata-main-write-members-cache");'
 
 mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
--u $SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD  \
--e 'use '$SM_DEV_DB_PROJECT'; select * from project;'
+-u $SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT  \
+-e 'select * from project;'
 ```
 
 Create secrets to test access to a project
