@@ -100,25 +100,28 @@ class VcgsManifestParser(GenericParser):
                 col: ','.join(set(r[col] for r in row))
                 for col in Columns.sample_columns()
             }
-            filenames = [self.file_path(r[Columns.FILENAME]) for r in row]
-            reads, reads_type = self.parse_file(filenames)
         else:
             collapsed_sample_meta = {col: row[col] for col in Columns.sample_columns()}
-            reads, reads_type = self.parse_file([self.file_path(row[Columns.FILENAME])])
-
-        collapsed_sample_meta['reads'] = reads
-        collapsed_sample_meta['reads_type'] = reads_type
 
         return collapsed_sample_meta
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
         if isinstance(row, list):
-            return {
+            sequence_meta = {
                 col: ','.join(set(r[col] for r in row))
                 for col in Columns.sequence_columns()
             }
-        return {col: row[col] for col in Columns.sequence_columns()}
+            filenames = [self.file_path(r[Columns.FILENAME]) for r in row]
+        else:
+            sequence_meta = {col: row[col] for col in Columns.sequence_columns()}
+            filenames = [self.file_path(row[Columns.FILENAME])]
+
+        reads, reads_type = self.parse_file(filenames)
+        sequence_meta['reads'] = reads
+        sequence_meta['reads_type'] = reads_type
+
+        return sequence_meta
 
     def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
         """
