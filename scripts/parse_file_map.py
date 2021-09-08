@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
 import logging
 import os
