@@ -75,8 +75,8 @@ export USER=sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com
 export GCP_ID=sample-metadata
 
 mysql --host=$SM_DEV_DB_HOST --port=$SM_DEV_DB_PORT \
--u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
--e 'use '$SM_DEV_DB_PROJECT'; insert into project \
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT \
+-e 'insert into project \
 (id, name, author, dataset, gcp_id, read_secret_name, write_secret_name) \
 values \
 (1, "'$INPUT_PROJECT'", "'$USER'", "'$INPUT_PROJECT'", "'$GCP_ID'", "'$INPUT_PROJECT'-ci-sample-metadata-main-read-members-cache", "'$INPUT_PROJECT'-ci-sample-metadata-main-write-members-cache"), \
