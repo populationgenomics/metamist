@@ -61,8 +61,8 @@ java -jar liquibase.jar \
 --changelogFile=project.xml \
 update
 mysql --host $SM_DEV_DB_HOST --port $SM_DEV_DB_PORT \
--u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD \
--e 'use '$SM_DEV_DB_PROJECT'; show tables;'
+-u$SM_DEV_DB_USER -p$SM_DEV_DB_PASSWORD $SM_DEV_DB_PROJECT \
+-e 'show tables;'
 popd
 ```
 
