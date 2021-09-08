@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument
 import csv
 import logging
 import os
@@ -51,8 +51,8 @@ class GenericParser:
 
         self.sample_metadata_project = sample_metadata_project
 
-        self.default_sequence_type = default_sequence_type
-        self.default_sample_type = default_sample_type
+        self.default_sequence_type: SequenceType = SequenceType(default_sequence_type)
+        self.default_sample_type: SampleType = SampleType(default_sample_type)
 
         # gs specific
         self.default_bucket = None
@@ -157,13 +157,13 @@ class GenericParser:
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
 
-    @abstractmethod
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
+        return self.default_sample_type
 
-    @abstractmethod
     def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
         """Get sequence type from row"""
+        return self.default_sequence_type
 
     @abstractmethod
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
