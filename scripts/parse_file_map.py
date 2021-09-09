@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
+from typing import Dict, List
+
 import logging
 import os
 from io import StringIO
-from parser import GenericParser, GroupedRow
-from typing import Dict, List
 
 import click
 
-from sample_metadata.models.sequence_status import SequenceStatus
+from parser import GenericParser, GroupedRow
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -100,9 +100,9 @@ class SampleMapParser(GenericParser):
 
         return collapsed_sample_meta
 
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
-        return SequenceStatus('uploaded')
+        return 'uploaded'
 
     @staticmethod
     def from_manifest_path(

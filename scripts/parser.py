@@ -13,7 +13,6 @@ from google.api_core.exceptions import Forbidden
 from sample_metadata.api import SampleApi, SequenceApi
 from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.new_sequence import NewSequence
-from sample_metadata.models.sequence_status import SequenceStatus
 from sample_metadata.models.sequence_type import SequenceType
 from sample_metadata.models.sequence_update_model import SequenceUpdateModel
 from sample_metadata.models.sample_update_model import SampleUpdateModel
@@ -175,7 +174,7 @@ class GenericParser:
         return self.default_sequence_type
 
     @abstractmethod
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
     def parse_manifest(self, file_pointer):
