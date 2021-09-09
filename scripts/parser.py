@@ -15,7 +15,6 @@ from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.new_sequence import NewSequence
 from sample_metadata.models.sequence_status import SequenceStatus
 from sample_metadata.models.sequence_type import SequenceType
-from sample_metadata.models.sample_type import SampleType
 from sample_metadata.models.sequence_update_model import SequenceUpdateModel
 from sample_metadata.models.sample_update_model import SampleUpdateModel
 
@@ -51,8 +50,8 @@ class GenericParser:
 
         self.sample_metadata_project = sample_metadata_project
 
-        self.default_sequence_type: SequenceType = SequenceType(default_sequence_type)
-        self.default_sample_type: SampleType = SampleType(default_sample_type)
+        self.default_sequence_type: str = default_sequence_type
+        self.default_sample_type: str = default_sample_type
 
         # gs specific
         self.default_bucket = None
@@ -167,11 +166,11 @@ class GenericParser:
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get sample type from row"""
         return self.default_sample_type
 
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence type from row"""
         return self.default_sequence_type
 

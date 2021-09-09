@@ -2,15 +2,12 @@
 import logging
 import os
 from io import StringIO
+from parser import GenericParser, GroupedRow
 from typing import Dict, Optional
 
 import click
 
 from sample_metadata.models.sequence_status import SequenceStatus
-from sample_metadata.models.sequence_type import SequenceType
-
-from parser import GenericParser, GroupedRow
-
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -135,7 +132,7 @@ class TobWgsParser(GenericParser):
 
         return collapsed_sequence_meta
 
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
