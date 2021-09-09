@@ -1,14 +1,14 @@
 import os
-import sys
 from typing import Set
 
+import click
 import hailtop.batch as hb
 from google.cloud import storage
 
 
-def validate_all_objects_in_directory(gs_dir):
+def validate_all_objects_in_directory(gs_dir, billing_project):
     """Validate files with MD5s in the provided gs directory"""
-    backend = hb.ServiceBackend()
+    backend = hb.ServiceBackend(billing_project=billing_project)
     b = hb.Batch('validate_md5s', backend=backend)
     client = storage.Client()
 
@@ -49,5 +49,14 @@ def validate_md5(job: hb.batch.job, file, md5_path=None) -> hb.batch.job:
     return job
 
 
+@click.command()
+@click.argument('gs_dir')
+@click.argument('billing_project')
+def main(gs_dir, billing_project):
+    """Main from CLI"""
+    validate_all_objects_in_directory(gs_dir=gs_dir, billing_project=billing_project)
+
+
 if __name__ == '__main__':
-    validate_all_objects_in_directory(sys.argv[1])
+    # pylint: disable=no-value-for-parameter
+    main()
