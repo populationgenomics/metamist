@@ -6,9 +6,9 @@ import hailtop.batch as hb
 from google.cloud import storage
 
 
-def validate_all_objects_in_directory(gs_dir, billing_project):
+def validate_all_objects_in_directory(gs_dir, billing_project, bucket):
     """Validate files with MD5s in the provided gs directory"""
-    backend = hb.ServiceBackend(billing_project=billing_project)
+    backend = hb.ServiceBackend(billing_project=billing_project, bucket=bucket)
     b = hb.Batch('validate_md5s', backend=backend)
     client = storage.Client()
 
@@ -52,9 +52,12 @@ def validate_md5(job: hb.batch.job, file, md5_path=None) -> hb.batch.job:
 @click.command()
 @click.argument('gs_dir')
 @click.argument('billing_project')
-def main(gs_dir, billing_project):
+@click.argument('bucket')
+def main(gs_dir, billing_project, bucket):
     """Main from CLI"""
-    validate_all_objects_in_directory(gs_dir=gs_dir, billing_project=billing_project)
+    validate_all_objects_in_directory(
+        gs_dir=gs_dir, billing_project=billing_project, bucket=bucket
+    )
 
 
 if __name__ == '__main__':
