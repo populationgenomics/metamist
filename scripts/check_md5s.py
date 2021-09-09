@@ -8,7 +8,8 @@ from google.cloud import storage
 
 def validate_all_objects_in_directory(gs_dir):
     """Validate files with MD5s in the provided gs directory"""
-    b = hb.Batch('validate_md5s')
+    backend = hb.ServiceBackend()
+    b = hb.Batch('validate_md5s', backend=backend)
     client = storage.Client()
 
     if not gs_dir.startswith('gs://'):
