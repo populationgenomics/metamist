@@ -21,17 +21,12 @@ def validate_all_objects_in_directory(gs_dir, billing_project, bucket):
 
     blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
     files: Set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
-    # TODO: remove this
-    dev_counter = 0
     for obj in files:
         if obj.endswith('.md5'):
             continue
         if f'{obj}.md5' not in files:
             continue
-        if dev_counter >= 2:
-            break
 
-        dev_counter += 1
         job = b.new_job(f'validate_{os.path.basename(obj)}')
         job.image(DRIVER_IMAGE)
         validate_md5(job, obj)
@@ -45,10 +40,15 @@ def validate_md5(job: hb.batch.job, file, md5_path=None) -> hb.batch.job:
     """
 
     # Calculate md5 checksum.
-    job.command(f'gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5')
-
     md5 = md5_path or f'{file}.md5'
-    job.command(f'diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5} | cut -d " " -f1 )')
+    job.env('GOOGLE_APPLICATION_CREDENTIALS', '/gsa-key/key.json')
+    job.command(
+        f"""\
+gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+gsutil cat {file} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5')
+diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5} | cut -d " " -f1 )
+    """
+    )
 
     return job
 
