@@ -8,9 +8,12 @@ from google.cloud import storage
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:8cc869505251c8396fefef01c42225a7b7930a97-hail-0.2.73.devc6f6f09cec08'
 
 
-def validate_all_objects_in_directory(gs_dir, billing_project, bucket):
+def validate_all_objects_in_directory(gs_dir):
     """Validate files with MD5s in the provided gs directory"""
-    backend = hb.ServiceBackend(billing_project=billing_project, bucket=bucket)
+    backend = hb.ServiceBackend(
+        billing_project=os.getenv('HAIL_BILLING_PROJECT'),
+        bucket=os.getenv('HAIL_BUCKET'),
+    )
     b = hb.Batch('validate_md5s', backend=backend)
     client = storage.Client()
 
@@ -55,13 +58,9 @@ diff <(cat /tmp/uploaded.md5) <(gsutil cat {md5} | cut -d " " -f1)
 
 @click.command()
 @click.argument('gs_dir')
-@click.argument('billing_project')
-@click.argument('bucket')
-def main(gs_dir, billing_project, bucket):
+def main(gs_dir):
     """Main from CLI"""
-    validate_all_objects_in_directory(
-        gs_dir=gs_dir, billing_project=billing_project, bucket=bucket
-    )
+    validate_all_objects_in_directory(gs_dir=gs_dir)
 
 
 if __name__ == '__main__':
