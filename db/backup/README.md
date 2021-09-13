@@ -72,7 +72,7 @@ Further, to test the effectiveness of our DR procedure, once a year the sm_db_de
 - Create a new prod instance (VM_PROD) and restore in line with the [recovery procedures](#Recovery).
 - Validate the new instance in line with the [validation procedures](#Set-Up).
 - Test the SM API. #TODO -
-- Following successful validation, update the db-validate-backup secret to reassigne the `p_host` field to match the address of VM_PROD.
+- Following successful validation, update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_PROD.
 - Delete VM_COPY.
 
 ### Validation Procedure
