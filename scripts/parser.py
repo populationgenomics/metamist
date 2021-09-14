@@ -235,20 +235,8 @@ class GenericParser:
             sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
-            if external_sample_id in external_id_map:
-                # it already exists
-                cpgid = external_id_map[external_sample_id]
-                samples_to_update[cpgid] = SampleUpdateModel(
-                    meta=collapsed_sample_meta,
-                )
-                seq_id = internal_sample_id_to_seq_id[cpgid]
-                sequences_to_update[seq_id] = SequenceUpdateModel(
-                    meta=collapsed_sequencing_meta, status=sequence_status
-                )
+            if external_sample_id not in external_id_map:
 
-                # ignore QC results if sample already exists
-
-            else:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
@@ -256,14 +244,7 @@ class GenericParser:
                         meta=collapsed_sample_meta,
                     )
                 )
-                sequencing_to_add[external_sample_id].append(
-                    NewSequence(
-                        sample_id='<None>',  # keep the type initialisation happy
-                        meta=collapsed_sequencing_meta,
-                        type=SequenceType.WGS,
-                        status=sequence_status,
-                    )
-                )
+
                 if collapsed_qc:
                     qc_to_add[external_sample_id].append(
                         AnalysisModel(
@@ -273,12 +254,40 @@ class GenericParser:
                             meta=collapsed_qc,
                         )
                     )
+            else:
+                # it already exists
+                cpgid = external_id_map[external_sample_id]
+                samples_to_update[cpgid] = SampleUpdateModel(
+                    meta=collapsed_sample_meta,
+                )
+                # ignore QC results if sample already exists
+
+            if (
+                external_sample_id in external_id_map
+                and external_id_map[external_sample_id] in sequences_to_update
+            ):
+                cpgid = external_id_map[external_sample_id]
+
+                seq_id = internal_sample_id_to_seq_id[cpgid]
+                sequences_to_update[seq_id] = SequenceUpdateModel(
+                    meta=collapsed_sequencing_meta, status=sequence_status
+                )
+            else:
+                sequencing_to_add[external_sample_id].append(
+                    NewSequence(
+                        sample_id='<None>',  # keep the type initialisation happy
+                        meta=collapsed_sequencing_meta,
+                        type=SequenceType.WGS,
+                        status=sequence_status,
+                    )
+                )
 
         message = f"""\
 Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequencing_to_add)} sequences
+Adding {len(qc_to_add)} QC analysis results
 
 Updating {len(samples_to_update)} sample
 Updating {len(sequences_to_update)} sequences"""
