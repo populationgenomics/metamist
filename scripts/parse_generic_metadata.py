@@ -148,20 +148,26 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def prepare_dict_from_keys(key_parts: List[str], value):
+        def prepare_dict_from_keys(key_parts: List[str], val):
+            """Recursive production of dictionary"""
             if len(key_parts) == 1:
-                return {key_parts[0]: value}
-            return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], value)}
+                return {key_parts[0]: val}
+            return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
         is_list = isinstance(row, list)
         dicts = []
         for row_key, dict_key in key_map.items():
             if is_list:
-                value = list(set(r[row_key] for r in row if row_key in r))
-                if len(value) == 0:
-                    continue
-                if len(value) == 1:
-                    value = value[0]
+                inner_values = [r[row_key] for r in row if row_key in r]
+                if any(isinstance(inner, list) for inner in inner_values):
+                    # lists are unhashable
+                    value = inner_values
+                else:
+                    value = list(set(inner_values))
+                    if len(value) == 0:
+                        continue
+                    if len(value) == 1:
+                        value = value[0]
             else:
                 if row_key not in row:
                     continue
@@ -341,7 +347,7 @@ def main(
         for manifest in manifests
         if not any(manifest.endswith(ext) for ext in extension_to_delimeter)
     ]
-    if len(invalid_manifests):
+    if len(invalid_manifests) == 0:
         raise ValueError(
             'Unrecognised extensions on manifests: ' + ', '.join(invalid_manifests)
         )
