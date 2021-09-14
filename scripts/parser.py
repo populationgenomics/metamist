@@ -177,14 +177,14 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(self, file_pointer):
+    def parse_manifest(self, file_pointer, delimiter=None):
         """
         Parse manifest from iterable (file pointer / String.IO)
         """
         # a sample has many rows
         sample_map = defaultdict(list)
 
-        reader = csv.DictReader(file_pointer, delimiter=self.delimeter)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter or self.delimeter)
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
