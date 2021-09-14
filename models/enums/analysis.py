@@ -18,3 +18,4 @@ class AnalysisStatus(Enum):
     IN_PROGRESS = 'in-progress'
     FAILED = 'failed'
     COMPLETED = 'completed'
+    UNKNOWN = 'unknown'
