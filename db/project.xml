@@ -272,7 +272,7 @@
 			/>
 			<column
 				name="active"
-				type="bit"
+				type="BIT NOT NULL"
 				defaultValue="1"
 			/>
 			<column
@@ -280,6 +280,8 @@
 				type="VARCHAR(255)"
 			/>
 		</addColumn>
+		<sql>ALTER TABLE analysis MODIFY COLUMN status ENUM('queued', 'in-progress', 'failed', 'completed', 'unknown');</sql>
+
 	</changeSet>
 	<changeSet author="michael.franklin" id="2021-09-14_add-exome-sequence-type">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
