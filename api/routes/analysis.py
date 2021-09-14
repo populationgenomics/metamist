@@ -164,7 +164,7 @@ async def get_latest_complete_analysis_for_type_post(
     '/{project}/{analysis_type}/latest-complete',
     operation_id='getLatestCompleteAnalysisForType',
 )
-async def get_latest_complete_analysis_for_type_meta(
+async def get_latest_complete_analysis_for_type(
     analysis_type: AnalysisType,
     connection: Connection = get_project_readonly_connection,
 ):
