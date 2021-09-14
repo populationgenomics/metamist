@@ -261,4 +261,24 @@
 			/>
 		</addColumn>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2021-09-13_add-analysis-improvements">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn
+			tableName="analysis">
+			<column
+				name="meta"
+				type="JSON"
+				defaultValue="{}"
+			/>
+			<column
+				name="active"
+				type="bit"
+				defaultValue="1"
+			/>
+			<column
+				name="on_behalf_of"
+				type="VARCHAR(255)"
+			/>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>
