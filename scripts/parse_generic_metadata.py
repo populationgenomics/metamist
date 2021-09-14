@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
-from typing import Dict, List, Optional
+from functools import reduce
+from typing import Dict, List, Optional, Tuple, Any
 
 import logging
 import os
@@ -22,8 +23,9 @@ class GenericMetadataParser(GenericParser):
         self,
         search_locations: List[str],
         sample_name_column: str,
-        sample_meta_fields: List[str],
-        sequence_meta_fields: List[str],
+        sample_meta_map: Dict[str, str],
+        sequence_meta_map: Dict[str, str],
+        qc_meta_map: Dict[str, str],
         sample_metadata_project: str,
         reads_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
@@ -48,8 +50,9 @@ class GenericMetadataParser(GenericParser):
             raise ValueError('A sample name column MUST be provided')
 
         self.sample_name_column = sample_name_column
-        self.sample_meta_fields = sample_meta_fields or []
-        self.sequence_meta_fields = sequence_meta_fields or []
+        self.sample_meta_map = sample_meta_map or {}
+        self.sequence_meta_map = sequence_meta_map or {}
+        self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
 
@@ -58,9 +61,13 @@ class GenericMetadataParser(GenericParser):
         FileMapParser uses search locations based on the filename,
         so let's prepopulate that filename_map from the search_locations!
         """
+
         self.filename_map = {}
         for directory in search_locations:
-            for file in self.list_directory(directory):
+            directory_list = self.list_directory(directory)
+
+            for file in directory_list:
+                file = file.strip()
                 file_base = os.path.basename(file)
                 if file_base in self.filename_map:
                     logger.warning(
@@ -85,22 +92,94 @@ class GenericMetadataParser(GenericParser):
         external_id = row[self.sample_name_column]
         return external_id
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        """Get sample-metadata from row"""
-        if not self.sample_meta_fields:
+    @staticmethod
+    def merge_dicts(a: Dict, b: Dict):
+        """
+        Recursively merge two dictionaries:
+        - collapse equal values
+        - put differing values into a list (not guaranteeing order)
+        """
+        if b is None:
+            return a
+        if a is None:
+            return b
+
+        res = {}
+        for key in set(a.keys()).union(b.keys()):
+            a_val = a.get(key)
+            b_val = b.get(key)
+            if a_val is not None and b_val is not None:
+                # combine values
+                a_is_dict = isinstance(a_val, dict)
+                b_is_dict = isinstance(b_val, dict)
+
+                if a_is_dict and b_is_dict:
+                    # merge dict
+                    res[key] = GenericMetadataParser.merge_dicts(a_val, b_val)
+                elif a_val == b_val:
+                    res[key] = a_val
+                else:
+                    res[key] = [a_val, b_val]
+            else:
+                res[key] = a_val or b_val
+
+        return res
+
+    @staticmethod
+    def collapse_arbitrary_meta(key_map: Dict[str, str], row: GroupedRow):
+        """
+        This is a little bit tricky
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1', 'new_key'}, {'key1': True})
+        {'new_key': True}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new_key'}, [{'key1': True}])
+        {'new_key': True}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': True}])
+        {'new': {'key': True}}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key'}, [{'key1': 1}, {'key1': 2}, {'key1': 3}])
+        {'new': {'key': [1, 2, 3]}}
+
+        >>> GenericMetadataParser.collapse_arbitrary_meta({'key1': 'new.key', 'key2': 'new.another'}, [{'key1': 1}, {'key1': 2}, {'key2': False}])
+        {'new': {'key': [1, 2], 'another': False}}
+        """
+        if not key_map or not row:
             return {}
 
-        if isinstance(row, list):
-            return {
-                col: ','.join(set(r[col] for r in row))
-                for col in self.sample_meta_fields
-            }
+        def prepare_dict_from_keys(key_parts: List[str], value):
+            if len(key_parts) == 1:
+                return {key_parts[0]: value}
+            return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], value)}
 
-        return {key: row[key] for key in row}
+        is_list = isinstance(row, list)
+        dicts = []
+        for row_key, dict_key in key_map.items():
+            if is_list:
+                value = list(set(r[row_key] for r in row if row_key in r))
+                if len(value) == 0:
+                    continue
+                if len(value) == 1:
+                    value = value[0]
+            else:
+                if row_key not in row:
+                    continue
+                value = row[row_key]
+
+            dicts.append(prepare_dict_from_keys(dict_key.split('.'), value))
+
+        return reduce(GenericMetadataParser.merge_dicts, dicts)
+
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+        """Get sample-metadata from row"""
+        return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
-        collapsed_sequence_meta = {}
+        collapsed_sequence_meta = self.collapse_arbitrary_meta(
+            self.sequence_meta_map, row
+        )
 
         read_filenames = []
         gvcf_filenames = []
@@ -111,19 +190,11 @@ class GenericMetadataParser(GenericParser):
                 if self.gvcf_column and self.gvcf_column in row:
                     gvcf_filenames.extend(r[self.gvcf_column].split(','))
 
-            collapsed_sequence_meta = {
-                col: ','.join(set(r[col] for r in row))
-                for col in self.sequence_meta_fields
-            }
         else:
             if self.reads_column and self.reads_column in row:
                 read_filenames.extend(row[self.reads_column].split(','))
             if self.gvcf_column and self.gvcf_column in row:
                 gvcf_filenames.extend(row[self.gvcf_column].split(','))
-
-            collapsed_sequence_meta = {
-                key: row[key] for key in self.sequence_meta_fields
-            }
 
         # strip in case collaborator put "file1, file2"
         if read_filenames:
@@ -142,6 +213,13 @@ class GenericMetadataParser(GenericParser):
 
         return collapsed_sequence_meta
 
+    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+        """Get collapsed qc meta"""
+        if not self.qc_meta_map:
+            return None
+
+        return self.collapse_arbitrary_meta(self.qc_meta_map, row)
+
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
         return 'uploaded'
@@ -151,8 +229,9 @@ class GenericMetadataParser(GenericParser):
         manifest: str,
         sample_metadata_project: str,
         sample_name_column: str,
-        sample_meta_fields: List[str],
-        sequence_meta_fields: List[str],
+        sample_meta_map: Dict[str, str],
+        sequence_meta_map: Dict[str, str],
+        qc_meta_map: Dict[str, str],
         reads_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
@@ -166,8 +245,9 @@ class GenericMetadataParser(GenericParser):
             search_locations=search_paths,
             sample_metadata_project=sample_metadata_project,
             sample_name_column=sample_name_column,
-            sample_meta_fields=sample_meta_fields,
-            sequence_meta_fields=sequence_meta_fields,
+            sample_meta_map=sample_meta_map,
+            sequence_meta_map=sequence_meta_map,
+            qc_meta_map=qc_meta_map,
             reads_column=reads_column,
             gvcf_column=gvcf_column,
             default_sequence_type=default_sequence_type,
@@ -184,7 +264,8 @@ class GenericMetadataParser(GenericParser):
 @click.command(help='Parse manifest files')
 @click.option(
     '--sample-metadata-project',
-    help='The sample-metadata project to import manifest into (probably "seqr")',
+    required=True,
+    help='The sample-metadata project ($DATASET) to import manifest into',
 )
 @click.option('--sample-name-column', required=True)
 @click.option(
@@ -195,8 +276,34 @@ class GenericMetadataParser(GenericParser):
     '--gvcf-column',
     help='Column where the reads information is held, comma-separated if multiple',
 )
-@click.option('--sample-meta-fields', multiple=True)
-@click.option('--sequence-meta-fields', multiple=True)
+@click.option(
+    '--qc-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+)
+@click.option(
+    '--sample-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in sample.meta',
+)
+@click.option(
+    '--sample-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --sample-meta-field-map "name-in-manifest" "name-in-sample.meta"',
+)
+@click.option(
+    '--sequence-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in sample.meta',
+)
+@click.option(
+    '--sequence-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --sequence-meta-field "name-in-manifest" "name-in-sequence.meta"',
+)
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
 @click.option(
@@ -209,8 +316,11 @@ def main(
     search_path: List[str],
     sample_metadata_project,
     sample_name_column: str,
-    sample_meta_fields: List[str],
-    sequence_meta_fields: List[str],
+    sample_meta_field: List[str],
+    sample_meta_field_map: List[Tuple[str, str]],
+    sequence_meta_field: List[str],
+    sequence_meta_field_map: List[Tuple[str, str]],
+    qc_meta_field_map: List[Tuple[str, str]] = None,
     reads_column: Optional[str] = None,
     gvcf_column: Optional[str] = None,
     default_sample_type='blood',
@@ -236,6 +346,17 @@ def main(
             'Unrecognised extensions on manifests: ' + ', '.join(invalid_manifests)
         )
 
+    sample_meta_map, sequence_meta_map = {}, {}
+    qc_meta_map = dict(qc_meta_field_map)
+    if sample_meta_field_map:
+        sample_meta_map.update(dict(sample_meta_field_map))
+    if sample_meta_field:
+        sample_meta_map.update({k: k for k in sample_meta_field})
+    if sequence_meta_field_map:
+        sequence_meta_map.update(dict(sequence_meta_field_map))
+    if sequence_meta_field:
+        sequence_meta_map.update({k: k for k in sequence_meta_field})
+
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
         delimiter = extension_to_delimeter[os.path.splitext(manifest)[1]]
@@ -244,8 +365,9 @@ def main(
             manifest=manifest,
             sample_metadata_project=sample_metadata_project,
             sample_name_column=sample_name_column,
-            sample_meta_fields=sample_meta_fields,
-            sequence_meta_fields=sequence_meta_fields,
+            sample_meta_map=sample_meta_map,
+            sequence_meta_map=sequence_meta_map,
+            qc_meta_map=qc_meta_map,
             reads_column=reads_column,
             gvcf_column=gvcf_column,
             default_sample_type=default_sample_type,
