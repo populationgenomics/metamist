@@ -46,7 +46,7 @@ class AnalysisUpdateModel(BaseModel):
     status: AnalysisStatus
     output: Optional[str] = None
     meta: Dict[str, Any] = None
-    active: bool = False
+    active: bool = None
 
 
 @router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
