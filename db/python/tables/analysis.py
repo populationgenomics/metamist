@@ -1,8 +1,8 @@
 from datetime import datetime
 from itertools import groupby
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple, Dict
 
-from db.python.connect import DbBase, NotFoundError  # , to_db_json
+from db.python.connect import DbBase, NotFoundError, to_db_json  # , to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
@@ -30,22 +30,29 @@ class AnalysisTable(DbBase):
         analysis_type: AnalysisType,
         status: AnalysisStatus,
         sample_ids: List[int],
+        meta: Dict[str, any] = None,
         output: str = None,
+        active: bool = True,
         author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
-        async with self.connection.transaction():
 
+        async with self.connection.transaction():
             kv_pairs = [
                 ('type', analysis_type.value),
                 ('status', status.value),
+                ('meta', to_db_json(meta or {})),
                 ('output', output),
                 ('author', author or self.author),
                 ('project', project or self.project),
+                ('active', active if active is not None else True),
             ]
+
+            if author is not None:
+                kv_pairs.append(('on_behalf_of', self.author))
 
             if status == AnalysisStatus.COMPLETED:
                 kv_pairs.append(('timestamp_completed', datetime.utcnow()))
@@ -81,6 +88,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self,
         analysis_id: int,
         status: AnalysisStatus,
+        meta: Dict[str, any] = None,
+        active: bool = None,
         output: Optional[str] = None,
         author: Optional[str] = None,
     ):
@@ -88,35 +97,67 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         Update the status of an analysis, set timestamp_completed if relevant
         """
 
-        fields = {'status': status.value, 'author': self.author or author}
+        fields = {
+            'author': self.author or author,
+            'on_behalf_of': self.author,
+            'analysis_id': analysis_id,
+        }
+        setters = ['author = :author', 'on_behalf_of = :on_behalf_of']
+        if status:
+            setters.append('status = :status')
+            fields['status'] = status.value
+
+        if active is not None:
+            setters.append('active = :active')
+            fields['active'] = active
+
         if status == AnalysisStatus.COMPLETED:
             fields['timestamp_completed'] = datetime.utcnow()
+            setters.append('timestamp_completed = :timestamp_completed')
+
         if output:
             fields['output'] = output
+            setters.append('output = :output')
 
-        fields_str = ', '.join(f'{key} = :{key}' for key in fields)
+        if meta is not None and len(meta) > 0:
+            fields['meta'] = to_db_json(meta)
+            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
 
+        fields_str = ', '.join(setters)
         _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
 
-        await self.connection.execute(_query, {**fields, 'analysis_id': analysis_id})
+        await self.connection.execute(_query, fields)
 
     async def get_latest_complete_analysis_for_type(
-        self, project: ProjectId, analysis_type: AnalysisType
+        self,
+        project: ProjectId,
+        analysis_type: AnalysisType,
+        meta: Dict[str, any] = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
-        _query = """
+
+        values = {'project': project, 'type': analysis_type.value}
+
+        meta_str = ''
+        if meta:
+            for k, v in meta.items():
+                k_replacer = f'meta_{k}'
+                meta_str += f" AND json_extract(meta, '$.{k}') = :{k_replacer}"
+                values[k_replacer] = v
+
+        _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
         a.output as output, a_s.sample_id as sample_id,
-        a.project as project
+        a.project as project, a.timestamp_completed as timestamp_completed
 FROM analysis_sample a_s
 INNER JOIN analysis a ON a_s.analysis_id = a.id
 WHERE a.id = (
     SELECT id FROM analysis
-    WHERE type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL
+    WHERE active AND type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL{meta_str}
     ORDER BY timestamp_completed DESC
     LIMIT 1
-)"""
-        values = {'project': project, 'type': analysis_type.value}
+)
+"""
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
             return NotFoundError(
@@ -141,7 +182,7 @@ WHERE s.project = :project AND
       id NOT IN (
           SELECT a_s.sample_id FROM analysis_sample a_s
           LEFT JOIN analysis a ON a_s.analysis_id = a.id
-          WHERE a.type = :analysis_type
+          WHERE a.type = :analysis_type AND a.active
       )
 ;"""
 
@@ -161,7 +202,7 @@ SELECT a.id as id, a.type as type, a.status as status,
         a.project as project
 FROM analysis_sample a_s
 INNER JOIN analysis a ON a_s.analysis_id = a.id
-WHERE a.project = :project AND (a.status='queued' OR a.status='in-progress')
+WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-progress')
 """
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
@@ -185,7 +226,11 @@ SELECT a.id AS id, a.type as type, a.status as status, a.output as output,
 a.project as project, a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed
 FROM analysis a
 LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
-WHERE a.type = :type AND a.timestamp_completed IS NOT NULL AND a_s.sample_id in :sample_ids
+WHERE
+    a.active AND
+    a.type = :type AND
+    a.timestamp_completed IS NOT NULL AND
+    a_s.sample_id in :sample_ids
 ORDER BY a.timestamp_completed DESC
         """
         expected_type = (AnalysisType.GVCF, AnalysisType.CRAM, AnalysisType.QC)
@@ -213,7 +258,7 @@ ORDER BY a.timestamp_completed DESC
         _query = """
 SELECT a.id as id, a.type as type, a.status as status,
 a.output as output, a.project as project, a_s.sample_id as sample_id,
-a.timestamp_completed as timestamp_completed
+a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
 LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 WHERE a.id = :analysis_id
@@ -239,7 +284,11 @@ SELECT s.external_id, a.output, s.id
 FROM analysis a
 INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
-WHERE a.type = 'cram' AND a.status = 'completed' AND s.project = :project
+WHERE
+    a.active AND
+    a.type = 'cram' AND
+    a.status = 'completed' AND
+    s.project = :project
 ORDER BY a.timestamp_completed DESC
 """
 
