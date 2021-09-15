@@ -21,7 +21,7 @@ The full recovery process is detailed below. Follow the recovery stages that are
 
 ### Recover Sample Metadata Database
 
-1. If the `sm-dm-vm-instance` needs to be restored, create a new instance from the [sm-db-vm-image](https://console.cloud.google.com/compute/machineImages/details/sm-dm-vm-image?project=sample-metadata). If you can't access the image, you can rebuild the instance from scratch. See [Rebuild VM](#Rebuild-VM) for further instructions.
+1. If the `sm-dm-vm-instance` needs to be restored, create a new instance from the [sm-db-vm-image](https://console.cloud.google.com/compute/machineImages/details/sm-dm-vm-image?project=sample-metadata). If you can't access the image, you can rebuild the instance from scratch. See [Rebuild Database VM](#Rebuild-Database-VM) for further instructions.
 2. Validate that MariaDB 10.5 is running on the vm.
 
    > ```bash
@@ -48,7 +48,7 @@ The full recovery process is detailed below. Follow the recovery stages that are
    > python3 restore.py
    > ```
 
-#### Rebuild VM
+#### Rebuild Database VM
 
 1. Create a new VM instance in the GCP Console.
 2. Enable storage write permissions. On the create instance page, scroll down to Access Scopes. Select Set access for each API. Set Storage to Read/Write.
