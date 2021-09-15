@@ -52,6 +52,7 @@ class SampleMapParser(GenericMetadataParser):
         search_paths=None,
         confirm=False,
     ):
+        """From manifest path, same defaults in __init__"""
         super().from_manifest_path(
             manifest=manifest,
             search_paths=search_paths,
