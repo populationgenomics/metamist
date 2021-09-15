@@ -192,14 +192,3 @@ This includes:
 #### Yearly Procedures
 
 To test our monitoring and alerting policy, once a year our database backups will be disabled for 24 hours. In the case that an alert isn’t triggered, an investigation should take place. In the case of failure, this activity should be repeated within 7 days to ensure relevant changes have taken effect.
-
-Further, to test the effectiveness of our DR procedure, once a year the sm_db_dev_instance will be deleted and restored.
-
-- [Copy the current VM instance](https://cloud.google.com/compute/docs/instances/create-vm-from-similar-instance), creating a new instance (VM_COPY), as a safety measure.
-- Update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_COPY. This is for testing purposes.
-- Delete `sm_db_dev_instance`
-- Create a new prod instance (VM_PROD) and restore in line with the [recovery procedures](#Recovery).
-- Validate the new instance in line with the [validation procedures](#Set-Up).
-- Test the SM API. (The testing workflow is currently under development [#35](https://github.com/populationgenomics/sample-metadata/pull/35))
-- Following successful validation, update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_PROD.
-- Delete VM_COPY.
