@@ -192,3 +192,8 @@ This includes:
 #### Yearly Procedures
 
 To test our monitoring and alerting policy, once a year our database backups will be disabled for 24 hours. In the case that an alert isn’t triggered, an investigation should take place. In the case of failure, this activity should be repeated within 7 days to ensure relevant changes have taken effect.
+
+Further, alongside the procedure to validate the [database restoration](#Running-the-validation-script), the SM API will be validated.
+
+1. Update the configuration to point to the new VM as the production VM.
+2. Run the test script, currently under construction [#35](https://github.com/populationgenomics/sample-metadata/pull/35)
