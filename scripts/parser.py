@@ -260,10 +260,12 @@ class GenericParser:
                 )
                 # ignore QC results if sample already exists
 
+            # should we add or update sequencing
             if (
                 external_sample_id in external_id_map
                 and external_id_map[external_sample_id] in sequences_to_update
             ):
+                # update, we have a cpg sample ID AND a sequencing ID
                 cpgid = external_id_map[external_sample_id]
 
                 seq_id = internal_sample_id_to_seq_id[cpgid]
@@ -271,6 +273,7 @@ class GenericParser:
                     meta=collapsed_sequencing_meta, status=sequence_status
                 )
             else:
+                # the internal sample ID gets mapped back later
                 sequences_to_add[external_sample_id].append(
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy

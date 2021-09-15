@@ -55,7 +55,6 @@ class GenericMetadataParser(GenericParser):
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
-        self.gvcf_column = gvcf_column
 
     def populate_filename_map(self, search_locations: List[str]):
         """
@@ -245,6 +244,7 @@ class GenericMetadataParser(GenericParser):
         default_sample_type='blood',
         search_paths=None,
         confirm=False,
+        delimiter=',',
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         parser = GenericMetadataParser(
@@ -357,7 +357,7 @@ def main(
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
 
-        resp = GenericMetadataParser.from_manifest_path(
+        GenericMetadataParser.from_manifest_path(
             manifest=manifest,
             sample_metadata_project=sample_metadata_project,
             sample_name_column=sample_name_column,
@@ -371,7 +371,6 @@ def main(
             confirm=confirm,
             search_paths=search_path,
         )
-        print(resp)
 
 
 if __name__ == '__main__':
