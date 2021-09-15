@@ -90,10 +90,7 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
   "Dbname": "sm_production",
   "P_host": "sm-db-vm-instance.australia-southeast1-b.c.sample-metadata.internal",
   "P_username": "backup",
-  "p_password": "example_password123",
-  "l_host": "localhost",
-  "L_username": "root",
-  "L_password": ""
+  "p_password": "example_password123"
 }
 ```
 
