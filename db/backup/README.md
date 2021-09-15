@@ -5,7 +5,7 @@ This document defines the procedures defined for database recovery, backup and v
 ## Table of Contents
 
 1. [Recovery Procedures](#Recovery-Procedures)
-   1. [Sample Metadata Database Recovery](#Sample-Metadata-Database-Recovery)
+   1. [Recover Sample Metadata Database](#Recover-Sample-Metadata-Database)
       1. [Rebuild the VM](#Rebuild-VM)
       2. [Install MariaDB 10.5](#Install-MariaDB-10.5)
 2. [Current Systems](#Current-Systems)
@@ -19,11 +19,34 @@ This document defines the procedures defined for database recovery, backup and v
 
 The full recovery process is detailed below. Follow the recovery stages that are applicable. It is worth noting that individual tables or databases cannot be restored. In the event that only one table or database has been lost, the entire instance will need to be restored from the last backup point.
 
-### Sample Metadata Database Recovery
+### Recover Sample Metadata Database
 
-1. Restore VM. The VM can be built from the [validate-db-backup-machine-image](https://console.cloud.google.com/compute/machineImages/details/validate-db-backup-machine-image?project=sample-metadata). Alternatively, to rebuild the VM from scratch see [Rebuild VM](#Rebuild-VM). If the VM does not need to be restored skip to step 2.
-2. Restore MariaDB Instance. For instructions on installing MariaDB 10.5 the [instructions](#Install-MariaDB-10.5). If MariaDB 10.5 is already running on the VM, skip to 3.
-3. Restore the database by running the `restore.py` script
+1. If the `sm-dm-vm-instance` needs to be restored, create a new instance from the [sm-db-vm-image](https://console.cloud.google.com/compute/machineImages/details/sm-dm-vm-image?project=sample-metadata). If you can't access the image, you can rebuild the instance from scratch. See [Rebuild VM](#Rebuild-VM) for further instructions.
+2. Validate that MariaDB 10.5 is running on the vm.
+
+   > ```bash
+   > > mariadb --version
+   > ```
+   >
+   > If MariaDB 10.5 is not installed, see [Install-MariaDB-10.5](#Install-MariaDB-10.5)
+
+3. Clone this repo
+
+   > ```bash
+   > git clone https://github.com/populationgenomics/sample-metadata.git
+   > ```
+
+4. Navigate to the appropriate directory
+
+   > ```bash
+   > cd sample-metadata/db/backup
+   > ```
+
+5. Restore the database
+
+   > ```bash
+   > python3 restore.py
+   > ```
 
 #### Rebuild VM
 
