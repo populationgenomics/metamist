@@ -46,7 +46,7 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
    >
    > > Period : `1 minute`, Condition Triggers if : `Any time series violates`, condition : `is above`, threshold : `0`, for : `most recent value`
 
-## DR Validation
+## Validation
 
 ### Validation Plan
 
@@ -71,7 +71,7 @@ Further, to test the effectiveness of our DR procedure, once a year the sm_db_de
 - Delete `sm_db_dev_instance`
 - Create a new prod instance (VM_PROD) and restore in line with the [recovery procedures](#Recovery).
 - Validate the new instance in line with the [validation procedures](#Set-Up).
-- Test the SM API. #TODO -
+- Test the SM API. (The testing workflow is currently under development [#35](https://github.com/populationgenomics/sample-metadata/pull/35))
 - Following successful validation, update the db-validate-backup secret to reassign the `p_host` field to match the address of VM_PROD.
 - Delete VM_COPY.
 
