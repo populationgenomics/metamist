@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none
 import csv
 import logging
 import os
@@ -10,12 +10,13 @@ from typing import List, Dict, Union, Optional, Tuple
 
 from google.api_core.exceptions import Forbidden
 
-from sample_metadata.api import SampleApi, SequenceApi
+from sample_metadata.api import SampleApi, SequenceApi, AnalysisApi
 from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.new_sequence import NewSequence
 from sample_metadata.models.sequence_type import SequenceType
 from sample_metadata.models.sequence_update_model import SequenceUpdateModel
 from sample_metadata.models.sample_update_model import SampleUpdateModel
+from sample_metadata.models.analysis_model import AnalysisModel
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -46,6 +47,9 @@ class GenericParser:
         self.path_prefix = path_prefix
         self.delimeter = delimeter
         self.confirm = confirm
+
+        if not sample_metadata_project:
+            raise ValueError('sample-metadata project is required')
 
         self.sample_metadata_project = sample_metadata_project
 
@@ -165,6 +169,10 @@ class GenericParser:
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
+    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
+        """Get qc-meta from row, creates a QC object """
+        return None
+
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get sample type from row"""
         return self.default_sample_type
@@ -177,14 +185,14 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(self, file_pointer):
+    def parse_manifest(self, file_pointer, delimiter=None):
         """
         Parse manifest from iterable (file pointer / String.IO)
         """
         # a sample has many rows
         sample_map = defaultdict(list)
 
-        reader = csv.DictReader(file_pointer, delimiter=self.delimeter)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter or self.delimeter)
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
@@ -192,6 +200,7 @@ class GenericParser:
         # now we can start adding!!
         sapi = SampleApi()
         seqapi = SequenceApi()
+        analysisapi = AnalysisApi()
 
         # determine if any samples exist
         external_id_map = sapi.get_sample_id_map_by_external(
@@ -207,6 +216,7 @@ class GenericParser:
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
+        qc_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
         sequences_to_update: Dict[int, SequenceUpdateModel] = {}
@@ -220,21 +230,13 @@ class GenericParser:
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
+            collapsed_qc = self.get_qc_meta(external_sample_id, rows)
+
             sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
-            if external_sample_id in external_id_map:
-                # it already exists
-                cpgid = external_id_map[external_sample_id]
-                samples_to_update[cpgid] = SampleUpdateModel(
-                    meta=collapsed_sample_meta,
-                )
-                seq_id = internal_sample_id_to_seq_id[cpgid]
-                sequences_to_update[seq_id] = SequenceUpdateModel(
-                    meta=collapsed_sequencing_meta, status=sequence_status
-                )
+            if external_sample_id not in external_id_map:
 
-            else:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
@@ -242,6 +244,35 @@ class GenericParser:
                         meta=collapsed_sample_meta,
                     )
                 )
+
+                if collapsed_qc:
+                    qc_to_add[external_sample_id].append(
+                        AnalysisModel(
+                            sample_ids=['<none>'],
+                            type='qc',
+                            status='completed',
+                            meta=collapsed_qc,
+                        )
+                    )
+            else:
+                # it already exists
+                cpgid = external_id_map[external_sample_id]
+                samples_to_update[cpgid] = SampleUpdateModel(
+                    meta=collapsed_sample_meta,
+                )
+                # ignore QC results if sample already exists
+
+            if (
+                external_sample_id in external_id_map
+                and external_id_map[external_sample_id] in sequences_to_update
+            ):
+                cpgid = external_id_map[external_sample_id]
+
+                seq_id = internal_sample_id_to_seq_id[cpgid]
+                sequences_to_update[seq_id] = SequenceUpdateModel(
+                    meta=collapsed_sequencing_meta, status=sequence_status
+                )
+            else:
                 sequencing_to_add[external_sample_id].append(
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
@@ -251,15 +282,12 @@ class GenericParser:
                     )
                 )
 
-        if not self.sample_metadata_project:
-            logger.info('No sample-metadata project set, so skipping add into SM-DB')
-            return samples_to_add, sequencing_to_add
-
         message = f"""\
 Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequencing_to_add)} sequences
+Adding {len(qc_to_add)} QC analysis results
 
 Updating {len(samples_to_update)} sample
 Updating {len(sequences_to_update)} sequences"""
@@ -282,6 +310,13 @@ Updating {len(sequences_to_update)} sequences"""
             for seq in sequences_to_add:
                 seq.sample_id = ext_sample_to_internal_id[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
+
+        for sample_id, qc_to_add in qc_to_add.items():
+            for analysis in qc_to_add:
+                analysis.sample_ids = [ext_sample_to_internal_id[sample_id]]
+                analysisapi.create_new_analysis(
+                    project=self.sample_metadata_project, analysis_model=analysis
+                )
 
         logger.info(f'Updating {len(samples_to_update)} samples')
         for internal_sample_id, sample_update in samples_to_update.items():
