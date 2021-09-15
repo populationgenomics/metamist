@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
-from typing import Dict, List
-
+from typing import List
 import logging
-import os
-from io import StringIO
 
 import click
 
-from parser import GenericParser, GroupedRow
+from parse_generic_metadata import GenericMetadataParser
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -22,7 +19,7 @@ class Columns:
     FILENAMES = 'Filenames'
 
 
-class SampleMapParser(GenericParser):
+class SampleMapParser(GenericMetadataParser):
     """Parser for SampleMap"""
 
     def __init__(
@@ -32,77 +29,19 @@ class SampleMapParser(GenericParser):
         default_sequence_type='wgs',
         default_sample_type='blood',
         confirm=False,
-        delimeter='\t',
     ):
         super().__init__(
-            path_prefix=search_locations[0],
+            search_locations=search_locations,
             sample_metadata_project=sample_metadata_project,
+            sample_name_column='Individual ID',
+            reads_column='Filenames',
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            delimeter=delimeter,
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
             confirm=confirm,
         )
-        self.search_locations = search_locations
-        self.filename_map = {}
-        self.populate_filename_map(self.search_locations)
-
-    def populate_filename_map(self, search_locations: List[str]):
-        """
-        FileMapParser uses search locations based on the filename,
-        so let's prepopulate that filename_map from the search_locations!
-        """
-        self.filename_map = {}
-        for directory in search_locations:
-            for file in self.list_directory(directory):
-                file_base = os.path.basename(file)
-                if file_base in self.filename_map:
-                    logger.warning(
-                        f'File "{file}" already exists in directory map: {self.filename_map[file_base]}'
-                    )
-                    continue
-                self.filename_map[file_base] = file
-
-    def file_path(self, filename: str) -> str:
-        """
-        Get complete filepath of filename:
-        - Includes gs://{bucket} if relevant
-        - Includes path_prefix decided early on
-        """
-        if filename in self.filename_map:
-            return self.filename_map[filename]
-
-        return super().file_path(filename)
-
-    def get_sample_id(self, row: Dict[str, any]) -> str:
-        """Get external sample ID from row"""
-        external_id = row[Columns.INDIVIDUAL_ID]
-        return external_id
-
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        """Get sample-metadata from row"""
-        return {}
-
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        """Get sequence-metadata from row"""
-        collapsed_sample_meta = {}
-        if isinstance(row, list):
-            filenames = []
-            for r in row:
-                filenames.extend(r[Columns.FILENAMES].split(','))
-        else:
-            filenames = row[Columns.FILENAMES].split(',')
-        # strip in case collaborator put "file1, file2"
-        full_filenames = [self.file_path(f.strip()) for f in filenames]
-        reads, reads_type = self.parse_file(full_filenames)
-
-        collapsed_sample_meta['reads'] = reads
-        collapsed_sample_meta['reads_type'] = reads_type
-
-        return collapsed_sample_meta
-
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
-        """Get sequence status from row"""
-        return 'uploaded'
 
     @staticmethod
     def from_manifest_path(
@@ -113,19 +52,18 @@ class SampleMapParser(GenericParser):
         search_paths=None,
         confirm=False,
     ):
-        """Parse manifest from path, and return result of parsing manifest"""
-        parser = SampleMapParser(
-            search_locations=search_paths,
+        super().from_manifest_path(
+            manifest=manifest,
+            search_paths=search_paths,
             sample_metadata_project=sample_metadata_project,
+            sample_name_column='Individual ID',
+            reads_column='Filenames',
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            confirm=confirm,
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
         )
-
-        file_contents = parser.file_contents(manifest)
-        resp = parser.parse_manifest(StringIO(file_contents))
-
-        return resp
 
 
 @click.command(help='Parse manifest files')

@@ -32,14 +32,14 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='wgs',
         default_sample_type='blood',
         confirm=False,
-        delimeter='\t',
     ):
+        path_prefix = search_locations[0] if search_locations else None
+
         super().__init__(
-            path_prefix=search_locations[0],
+            path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            delimeter=delimeter,
             confirm=confirm,
         )
         self.search_locations = search_locations
@@ -54,6 +54,7 @@ class GenericMetadataParser(GenericParser):
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
+        self.gvcf_column = gvcf_column
         self.gvcf_column = gvcf_column
 
     def populate_filename_map(self, search_locations: List[str]):
@@ -244,7 +245,6 @@ class GenericMetadataParser(GenericParser):
         default_sample_type='blood',
         search_paths=None,
         confirm=False,
-        delimiter=',',
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         parser = GenericMetadataParser(
@@ -260,6 +260,8 @@ class GenericMetadataParser(GenericParser):
             default_sample_type=default_sample_type,
             confirm=confirm,
         )
+
+        delimiter = GenericMetadataParser.guess_delimiter_from_filename(manifest)
 
         file_contents = parser.file_contents(manifest)
         resp = parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
@@ -341,17 +343,6 @@ def main(
     if extra_seach_paths:
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
-    extension_to_delimeter = {'.csv': ',', '.tsv': '\t'}
-    invalid_manifests = [
-        manifest
-        for manifest in manifests
-        if not any(manifest.endswith(ext) for ext in extension_to_delimeter)
-    ]
-    if len(invalid_manifests) == 0:
-        raise ValueError(
-            'Unrecognised extensions on manifests: ' + ', '.join(invalid_manifests)
-        )
-
     sample_meta_map, sequence_meta_map = {}, {}
     qc_meta_map = dict(qc_meta_field_map)
     if sample_meta_field_map:
@@ -365,7 +356,6 @@ def main(
 
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        delimiter = extension_to_delimeter[os.path.splitext(manifest)[1]]
 
         resp = GenericMetadataParser.from_manifest_path(
             manifest=manifest,
@@ -378,7 +368,6 @@ def main(
             gvcf_column=gvcf_column,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
-            delimiter=delimiter,
             confirm=confirm,
             search_paths=search_path,
         )
