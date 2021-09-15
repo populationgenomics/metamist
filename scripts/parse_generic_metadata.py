@@ -264,9 +264,7 @@ class GenericMetadataParser(GenericParser):
         delimiter = GenericMetadataParser.guess_delimiter_from_filename(manifest)
 
         file_contents = parser.file_contents(manifest)
-        resp = parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
-
-        return resp
+        return parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
 
 
 @click.command(help='Parse manifest files')
