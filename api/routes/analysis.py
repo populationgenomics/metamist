@@ -160,23 +160,29 @@ async def get_latest_complete_analysis_for_type_post(
     return analysis
 
 
-@router.get(
-    '/{project}/{analysis_type}/latest-complete',
-    operation_id='getLatestCompleteAnalysisForType',
+@router.post(
+    '/{project}/{analysis_type}/{latest-complete}/for-samples',
+    operation_id='getLatestAnalysisForSamplesAndType',
 )
-async def get_latest_complete_analysis_for_type(
+async def get_latest_analysis_for_samples_and_type(
+    sample_ids: List[str],
     analysis_type: AnalysisType,
+    allow_missing: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete analysis for some analysis type"""
-    alayer = AnalysisLayer(connection)
-    analysis = await alayer.get_latest_complete_analysis_for_type(
-        project=connection.project, analysis_type=analysis_type
+    """Get latest complete gvcfs for sample"""
+    atable = AnalysisLayer(connection)
+    results = await atable.get_latest_complete_analysis_for_samples_and_type(
+        analysis_type=analysis_type,
+        sample_ids=sample_id_transform_to_raw(sample_ids),
+        allow_missing=allow_missing,
     )
-    if analysis:
-        analysis.sample_ids = sample_id_format(analysis.sample_ids)
 
-    return analysis
+    if results:
+        for result in results:
+            result.sample_ids = sample_id_format(result.sample_ids)
+
+    return results
 
 
 @router.get(
