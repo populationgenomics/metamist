@@ -8,7 +8,7 @@ from models.enums import AnalysisType, AnalysisStatus
 class Analysis(SMBase):
     """Model for Analysis"""
 
-    id: str = None
+    id: int = None
     type: AnalysisType = None
     status: AnalysisStatus = None
     output: Optional[str] = None
@@ -26,7 +26,7 @@ class Analysis(SMBase):
         analysis_type = kwargs.pop('type', None)
         status = kwargs.pop('status', None)
         timestamp_completed = kwargs.pop('timestamp_completed', None)
-        meta = kwargs.pop('meta', None)
+        meta = kwargs.get('meta')
 
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
@@ -42,7 +42,7 @@ class Analysis(SMBase):
             sample_ids=[kwargs.pop('sample_id')],
             output=kwargs.pop('output', []),
             timestamp_completed=timestamp_completed,
-            project=kwargs.pop('project'),
+            project=kwargs.get('project'),
             meta=meta,
-            active=kwargs.pop('active'),
+            active=kwargs.get('active'),
         )

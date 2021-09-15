@@ -148,7 +148,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
         a.output as output, a_s.sample_id as sample_id,
-        a.project as project, a.timestamp_completed as timestamp_completed
+        a.project as project, a.timestamp_completed as timestamp_completed,
+        a.meta as meta
 FROM analysis_sample a_s
 INNER JOIN analysis a ON a_s.analysis_id = a.id
 WHERE a.id = (
@@ -160,7 +161,7 @@ WHERE a.id = (
 """
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
-            return NotFoundError(
+            raise NotFoundError(
                 f"Couldn't find any analysis with type {analysis_type.value}"
             )
         a = Analysis.from_db(**dict(rows[0]))
@@ -199,7 +200,7 @@ WHERE s.project = :project AND
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
         a.output as output, a_s.sample_id as sample_id,
-        a.project as project
+        a.project as project, a.meta as meta
 FROM analysis_sample a_s
 INNER JOIN analysis a ON a_s.analysis_id = a.id
 WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-progress')
@@ -223,7 +224,8 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
 SELECT a.id AS id, a.type as type, a.status as status, a.output as output,
-a.project as project, a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed
+a.project as project, a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed,
+a.meta as meta
 FROM analysis a
 LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 WHERE

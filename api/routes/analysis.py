@@ -161,7 +161,7 @@ async def get_latest_complete_analysis_for_type_post(
 
 
 @router.post(
-    '/{project}/{analysis_type}/{latest-complete}/for-samples',
+    '/{project}/{analysis_type}/latest-complete/for-samples',
     operation_id='getLatestAnalysisForSamplesAndType',
 )
 async def get_latest_analysis_for_samples_and_type(
