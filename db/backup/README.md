@@ -51,21 +51,21 @@ The full recovery process is detailed below. Follow the recovery stages that are
 #### Rebuild Database VM
 
 1. Create a new VM instance in the GCP Console.
-2. Enable storage write permissions. On the create instance page, scroll down to Access Scopes. Select Set access for each API. Set Storage to Read/Write.
-3. Select a service account. The Compute Engine default service account will be selected by default.
-4. Connect to your VM
+   1. Enable storage write permissions. On the create instance page, scroll down to Access Scopes. Select Set access for each API. Set Storage to Read/Write.
+   2. Select the `sm-db-sa@sample-metadata.iam.gserviceaccount.com` service account.
+2. Connect to your VM
 
    > ```bash
    > gcloud compute ssh --project=<PROJECT-NAME> >>> --zone=<ZONE> <VM-NAME>
    > ```
 
-5. If you enabled storage write permissions retrospectively, you may encounter `AccessDeniedException: 403 Insufficient Permission` while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache
+3. If you enabled storage write permissions retrospectively, you may encounter `AccessDeniedException: 403 Insufficient Permission` while saving your backups to GCS in later steps. To avoid this, remove the gsutil cache
 
    > ```bash
    > rm -r ~/.gsutil
    > ```
 
-6. If you forget to enable storage write permissions or change your service account while creating your instance, you can update these settings retrospectively.
+4. If you forget to enable storage write permissions or change your service account while creating your instance, you can update these settings retrospectively.
 
    > - View your instance in the GCP Console
    > - Stop your instance
@@ -136,7 +136,7 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
 #### Running the validation script
 
 1. Create a new VM using the [validate-db-backup-machine-image](https://console.cloud.google.com/compute/machineImages/details/validate-db-backup-machine-image?project=sample-metadata).
-   - Select the `sm-db-dev` service account, to ensure that this VM will have access to the `db-validate-backup` secret.
+   - Select the `sm-db-sa` service account, to ensure that this VM will have access to the `db-validate-backup` secret.
    - Alternatively, if you wish to select a different service account, ensure that it has access to view the `db-validate-backup` secret in the `sample-metadata` project.
 2. Clone this repo
 
