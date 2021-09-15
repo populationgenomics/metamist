@@ -8,6 +8,7 @@ It will drop the local mysql database after each run.
 import unittest
 import subprocess
 import json
+import os
 from typing import Tuple, Optional
 from collections import namedtuple
 from google.cloud import secretmanager
@@ -49,9 +50,9 @@ PROD_HOST = config['p_host']
 PROD_USER = config['p_username']
 PROD_PASSWORD = config['p_password']
 
-LOCAL_USER = config['l_username']
-LOCAL_HOST = config['l_host']
-LOCAL_PASSWORD = config['l_password']
+LOCAL_USER = os.environ.get('local_username', 'root')
+LOCAL_HOST = os.environ.get('local_host', 'localhost')
+LOCAL_PASSWORD = os.environ.get('local_password', '')
 
 
 class TestDatabaseBackup(unittest.TestCase):
