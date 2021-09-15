@@ -131,9 +131,38 @@ Similarly, an alerting policy exists to capture failures within the backup scrip
 
 ### Validation Procedure
 
-#### Set-Up
-
 IMPORTANT: Do not run the validation script in a production environment. In order to run the script, all databases on the VM must be dropped.
+
+#### Running the validation script
+
+1. Create a new VM using the [validate-db-backup-machine-image](https://console.cloud.google.com/compute/machineImages/details/validate-db-backup-machine-image?project=sample-metadata).
+   - Select the `sm-db-dev` service account, to ensure that this VM will have access to the `db-validate-backup` secret.
+   - Alternatively, if you wish to select a different service account, ensure that it has access to view the `db-validate-backup` secret in the `sample-metadata` project.
+2. Clone this repo
+
+   > ```bash
+   > git clone https://github.com/populationgenomics/sample-metadata.git
+   > ```
+
+3. Navigate to the directory
+
+   > ```bash
+   > cd sample-metadata/db/backup
+   > ```
+
+4. Ensure all the dependencies are installed
+
+   > ```bash
+   > pip3 install -r requirements.txt
+   > ```
+
+5. Run the validation script
+
+   > ```bash
+   > python3 -W ignore:ResourceWarning -m unittest validate_backup.py
+   > ```
+
+#### First Time Set-Up
 
 1. Use a VM with MariaDB 10.5 installed. For instructions, see [Install MariaDB 10.5](#Install-MariaDB-10.5) in the recovery procedures.
 2. In the production instance of the database, create a user that has read access to all of the tables.
@@ -146,24 +175,6 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
   "P_username": "backup",
   "p_password": "example_password123"
 }
-```
-
-#### Running the validation script
-
-```bash
-git clone git@github.com:populationgenomics/sample-metadata.git
-```
-
-```bash
-cd sample-metadata/db/backup
-```
-
-```bash
-pip3 install -r requirements.txt
-```
-
-```bash
-python3 -W ignore:ResourceWarning -m unittest validate_backup.py
 ```
 
 ### Validation Plan
