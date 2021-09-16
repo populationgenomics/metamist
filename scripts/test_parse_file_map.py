@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from parse_file_map import SampleMapParser
+from parse_sample_file_map import SampleFileMapParser
 
 
 class TestSampleMapParser(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestSampleMapParser(unittest.TestCase):
             'Individual ID\tFilenames',
             '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz',
         ]
-        parser = SampleMapParser(
+        parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
             sample_metadata_project='dev',
