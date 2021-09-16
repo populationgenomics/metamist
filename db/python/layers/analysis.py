@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -32,11 +32,14 @@ class AnalysisLayer(BaseLayer):
         return analysis
 
     async def get_latest_complete_analysis_for_type(
-        self, project: ProjectId, analysis_type: AnalysisType
+        self,
+        project: ProjectId,
+        analysis_type: AnalysisType,
+        meta: Dict[str, any] = None,
     ) -> Analysis:
         """Get SINGLE latest complete analysis for some analysis type"""
         return await self.at.get_latest_complete_analysis_for_type(
-            project=project, analysis_type=analysis_type
+            project=project, analysis_type=analysis_type, meta=meta
         )
 
     async def get_latest_complete_analysis_for_samples_and_type(
@@ -100,7 +103,9 @@ class AnalysisLayer(BaseLayer):
         analysis_type: AnalysisType,
         status: AnalysisStatus,
         sample_ids: List[int],
+        meta: Dict[str, any],
         output: str = None,
+        active: bool = True,
         author: str = None,
         project: ProjectId = None,
     ) -> int:
@@ -109,7 +114,9 @@ class AnalysisLayer(BaseLayer):
             analysis_type=analysis_type,
             status=status,
             sample_ids=sample_ids,
+            meta=meta,
             output=output,
+            active=active,
             author=author,
             project=project,
         )
@@ -132,6 +139,7 @@ class AnalysisLayer(BaseLayer):
         self,
         analysis_id: int,
         status: AnalysisStatus,
+        meta: Dict[str, any] = None,
         output: Optional[str] = None,
         author: Optional[str] = None,
         check_project_id=True,
@@ -148,6 +156,7 @@ class AnalysisLayer(BaseLayer):
         await self.at.update_analysis(
             analysis_id=analysis_id,
             status=status,
+            meta=meta,
             output=output,
             author=author,
         )

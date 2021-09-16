@@ -1,10 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import io
 import csv
 from datetime import date
 
 from fastapi import APIRouter
+from fastapi.params import Body
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -24,12 +25,19 @@ router = APIRouter(prefix='/analysis', tags=['analysis'])
 
 
 class AnalysisModel(BaseModel):
-    """Model for 'createNewAnalysis'"""
+    """
+    Model for 'createNewAnalysis'
+    """
 
     sample_ids: List[str]
     type: AnalysisType
     status: AnalysisStatus
+    meta: Dict[str, Any] = None
     output: str = None
+    active: bool = True
+    # please don't use this, unless you're the analysis-runner,
+    # the usage is tracked ... (Ծ_Ծ)
+    author: Optional[str] = None
 
 
 class AnalysisUpdateModel(BaseModel):
@@ -37,6 +45,8 @@ class AnalysisUpdateModel(BaseModel):
 
     status: AnalysisStatus
     output: Optional[str] = None
+    meta: Dict[str, Any] = None
+    active: bool = None
 
 
 @router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
@@ -53,7 +63,10 @@ async def create_new_analysis(
         analysis_type=analysis.type,
         status=analysis.status,
         sample_ids=sample_ids,
+        meta=analysis.meta,
         output=analysis.output,
+        # analysis-runner: usage is tracked through `on_behalf_of`
+        author=analysis.author,
     )
 
     return analysis_id
@@ -68,7 +81,7 @@ async def update_analysis_status(
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
-        analysis_id, status=analysis.status, output=analysis.output
+        analysis_id, status=analysis.status, output=analysis.output, meta=analysis.meta
     )
     return True
 
@@ -106,8 +119,49 @@ async def get_incomplete_analyses(
     return results
 
 
+@router.get(
+    '/{project}/{analysis_type}/latest-complete',
+    operation_id='getLatestCompleteAnalysisForType',
+)
+async def get_latest_complete_analysis_for_type(
+    analysis_type: AnalysisType,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get latest complete analysis for some analysis type"""
+    alayer = AnalysisLayer(connection)
+    analysis = await alayer.get_latest_complete_analysis_for_type(
+        project=connection.project, analysis_type=analysis_type
+    )
+    if analysis:
+        analysis.sample_ids = sample_id_format(analysis.sample_ids)
+
+    return analysis
+
+
 @router.post(
-    '/latest_complete/{analysis_type}/for-samples',
+    '/{project}/{analysis_type}/latest-complete',
+    operation_id='getLatestCompleteAnalysisForTypePost',
+)
+async def get_latest_complete_analysis_for_type_post(
+    analysis_type: AnalysisType,
+    meta: Dict[str, Any] = Body(..., embed=True),
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get latest complete analysis for some analysis type"""
+    alayer = AnalysisLayer(connection)
+    analysis = await alayer.get_latest_complete_analysis_for_type(
+        project=connection.project,
+        analysis_type=analysis_type,
+        meta=meta,
+    )
+    if analysis:
+        analysis.sample_ids = sample_id_format(analysis.sample_ids)
+
+    return analysis
+
+
+@router.post(
+    '/{project}/{analysis_type}/latest-complete/for-samples',
     operation_id='getLatestAnalysisForSamplesAndType',
 )
 async def get_latest_analysis_for_samples_and_type(
@@ -129,25 +183,6 @@ async def get_latest_analysis_for_samples_and_type(
             result.sample_ids = sample_id_format(result.sample_ids)
 
     return results
-
-
-@router.get(
-    '/{project}/{analysis_type}/latest-complete',
-    operation_id='getLatestCompleteAnalysisForType',
-)
-async def get_latest_complete_analysis_for_type(
-    analysis_type: AnalysisType,
-    connection: Connection = get_project_readonly_connection,
-):
-    """Get latest complete analysis for some analysis type"""
-    alayer = AnalysisLayer(connection)
-    analysis = await alayer.get_latest_complete_analysis_for_type(
-        project=connection.project, analysis_type=analysis_type
-    )
-    if analysis:
-        analysis.sample_ids = sample_id_format(analysis.sample_ids)
-
-    return analysis
 
 
 @router.get(
