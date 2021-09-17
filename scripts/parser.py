@@ -40,12 +40,10 @@ class GenericParser:
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        delimeter=',',
         confirm=False,
     ):
 
         self.path_prefix = path_prefix
-        self.delimeter = delimeter
         self.confirm = confirm
 
         if not sample_metadata_project:
@@ -62,7 +60,7 @@ class GenericParser:
         self.client = None
         self.bucket_clients = {}
 
-        if path_prefix.startswith('gs://'):
+        if path_prefix and path_prefix.startswith('gs://'):
             # pylint: disable=import-outside-toplevel
             from google.cloud import storage
 
@@ -91,10 +89,10 @@ class GenericParser:
 
         if self.client and not filename.startswith('/'):
             return os.path.join(
-                'gs://', self.default_bucket, self.path_prefix, filename
+                'gs://', self.default_bucket, self.path_prefix or '', filename
             )
 
-        return os.path.join(self.path_prefix, filename)
+        return os.path.join(self.path_prefix or '', filename)
 
     def get_blob(self, filename):
         """Convenience function for getting blob from fully qualified GCS path"""
@@ -170,7 +168,7 @@ class GenericParser:
         """Get sequence-metadata from row"""
 
     def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
-        """Get qc-meta from row, creates a QC object """
+        """Get qc-meta from row, creates a QC object"""
         return None
 
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
@@ -185,14 +183,14 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(self, file_pointer, delimiter=None):
+    def parse_manifest(self, file_pointer, delimiter=',', dry_run=False):
         """
         Parse manifest from iterable (file pointer / String.IO)
         """
         # a sample has many rows
         sample_map = defaultdict(list)
 
-        reader = csv.DictReader(file_pointer, delimiter=delimiter or self.delimeter)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
@@ -215,7 +213,7 @@ class GenericParser:
 
         samples_to_add: List[NewSample] = []
         # by external_sample_id
-        sequencing_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
+        sequences_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
         qc_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
@@ -262,10 +260,12 @@ class GenericParser:
                 )
                 # ignore QC results if sample already exists
 
+            # should we add or update sequencing
             if (
                 external_sample_id in external_id_map
                 and external_id_map[external_sample_id] in sequences_to_update
             ):
+                # update, we have a cpg sample ID AND a sequencing ID
                 cpgid = external_id_map[external_sample_id]
 
                 seq_id = internal_sample_id_to_seq_id[cpgid]
@@ -273,7 +273,8 @@ class GenericParser:
                     meta=collapsed_sequencing_meta, status=sequence_status
                 )
             else:
-                sequencing_to_add[external_sample_id].append(
+                # the internal sample ID gets mapped back later
+                sequences_to_add[external_sample_id].append(
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
@@ -286,11 +287,22 @@ class GenericParser:
 Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
-Adding {len(sequencing_to_add)} sequences
+Adding {len(sequences_to_add)} sequences
 Adding {len(qc_to_add)} QC analysis results
 
 Updating {len(samples_to_update)} sample
 Updating {len(sequences_to_update)} sequences"""
+
+        if dry_run:
+            logger.info('Dry run, so returning without inserting / updating metadata')
+            return (
+                samples_to_add,
+                sequences_to_add,
+                samples_to_update,
+                sequences_to_update,
+                qc_to_add,
+            )
+
         if self.confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
             if resp.lower() != 'y':
@@ -306,7 +318,7 @@ Updating {len(sequences_to_update)} sequences"""
             )
             ext_sample_to_internal_id[new_sample.external_id] = sample_id
 
-        for sample_id, sequences_to_add in sequencing_to_add.items():
+        for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
                 seq.sample_id = ext_sample_to_internal_id[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
@@ -457,6 +469,25 @@ Updating {len(sequences_to_update)} sequences"""
                 secondaries.append(self.create_file_object(sec_file))
 
         return secondaries
+
+    @staticmethod
+    def guess_delimiter_from_filename(filename: str):
+        """
+        Guess delimiter from filename
+        """
+        extension_to_delimiter = {'.csv': ',', '.tsv': '\t'}
+        relevant_delimiter = next(
+            (
+                delimiter
+                for ext, delimiter in extension_to_delimiter.items()
+                if filename.endswith(ext)
+            ),
+            None,
+        )
+        if relevant_delimiter:
+            return relevant_delimiter
+
+        raise ValueError(f'Unrecognised extension on file: {filename}')
 
 
 def _apply_secondary_file_format_to_filename(
