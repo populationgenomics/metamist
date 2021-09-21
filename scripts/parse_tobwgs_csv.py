@@ -1,55 +1,19 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
+from typing import Optional
 import logging
 import os
 from io import StringIO
-from parser import GenericParser, GroupedRow
-from typing import Dict, Optional
 
 import click
 
-from sample_metadata.models.sequence_status import SequenceStatus
+from parse_generic_metadata import GenericMetadataParser, GroupedRow
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 
-class Columns:
-    """Column keys for VCGS manifest"""
-
-    KCCG_ID = 'sample.id'
-    SAMPLE_NAME = 'sample.sample_name'
-    FLOWCELL_LANE = 'sample.flowcell_lane'
-    LIBRARY_ID = 'sample.library_id'
-    PLATFORM = 'sample.platform'
-    CENTRE = 'sample.centre'
-    REFERENCE_GENOME = 'sample.reference_genome'
-    FREEMIX = 'raw_data.FREEMIX'
-    PCT_CHIMERAS = 'raw_data.PCT_CHIMERAS'
-    PERCENT_DUPLICATION = 'raw_data.PERCENT_DUPLICATION'
-    MEDIAN_INSERT_SIZE = 'raw_data.MEDIAN_INSERT_SIZE'
-    MEDIAN_COVERAGE = 'raw_data.MEDIAN_COVERAGE'
-    BATCH_NAME = 'batch.batch_name'
-    SAMPLE_COUNT = 'batch.sample_count'
-
-    @staticmethod
-    def sequence_columns():
-        """Columns that will be put into sequence.meta"""
-        return [
-            Columns.FLOWCELL_LANE,
-            Columns.LIBRARY_ID,
-            Columns.PLATFORM,
-            Columns.CENTRE,
-            Columns.REFERENCE_GENOME,
-            Columns.FREEMIX,
-            Columns.PCT_CHIMERAS,
-            Columns.PERCENT_DUPLICATION,
-            Columns.MEDIAN_INSERT_SIZE,
-            Columns.MEDIAN_COVERAGE,
-        ]
-
-
-class TobWgsParser(GenericParser):
+class TobWgsParser(GenericMetadataParser):
     """Parser for TOBWgs manifest"""
 
     buckets = {}
@@ -86,30 +50,11 @@ class TobWgsParser(GenericParser):
 
         return None
 
-    def get_sample_id(self, row: Dict[str, any]):
-        """Get external sample ID from row"""
-        return row[Columns.SAMPLE_NAME]
-
-    def get_sample_meta(self, sample_id: str, row: GroupedRow):
-        """Get sample-metadata from row"""
-        collapsed_sample_meta = {}
-
-        return collapsed_sample_meta
-
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
-
-        if isinstance(row, list):
-            collapsed_sequence_meta = {
-                col: ','.join(set(r[col] for r in row))
-                for col in Columns.sequence_columns()
-            }
-        else:
-            collapsed_sequence_meta = {
-                col: row[col] for col in Columns.sequence_columns()
-            }
-
-        batch_number = int(row[Columns.BATCH_NAME][-3:])
+        collapsed_sequence_meta = super().get_sequence_meta(sample_id, row)
+        batch_number = int(row['batch.batch_name'][-3:])
+        collapsed_sequence_meta['batch'] = batch_number
 
         gvcf, variants_type = self.parse_file(
             [self.get_gvcf_path(sample_id, batch_number)]
@@ -128,24 +73,7 @@ class TobWgsParser(GenericParser):
         collapsed_sequence_meta['gvcf'] = gvcf
         collapsed_sequence_meta['gvcf_type'] = variants_type
 
-        collapsed_sequence_meta['batch'] = batch_number
-
         return collapsed_sequence_meta
-
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
-        """
-        Parse sequencing type (wgs / single-cell, etc)
-        """
-        # filter false-y values
-        return self.default_sequence_type
-
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
-        """Get sample type"""
-        return self.default_sample_type
-
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
-        """Get sequence status from row"""
-        return SequenceStatus.UPLOADED
 
     @staticmethod
     def from_manifest_path(
@@ -163,15 +91,36 @@ class TobWgsParser(GenericParser):
         else:
             manifest_filename = manifest
 
+        delimiter = TobWgsParser.guess_delimiter_from_filename(manifest_filename)
+
+        sequence_map = {
+            'sample.flowcell_lane': 'flowcell_lane',
+            'sample.library_id': 'library_id',
+            'sample.platform': 'platform',
+            'sample.centre': 'centre',
+            'sample.reference_genome': 'reference_genome',
+            'raw_data.FREEMIX': 'freemix',
+            'raw_data.PCT_CHIMERAS': 'pct_chimeras',
+            'raw_data.PERCENT_DUPLICATION': 'percent_duplication',
+            'raw_data.MEDIAN_INSERT_SIZE': 'median_insert_size',
+            'raw_data.MEDIAN_COVERAGE': 'median_coverage',
+            'batch.sample_count': 'sample_count',
+        }
+
         parser = TobWgsParser(
             path_prefix,
             sample_metadata_project=sample_metadata_project,
+            sequence_meta_map=sequence_map,
+            sample_name_column='sample.sample_name',
+            sample_meta_map={},
+            qc_meta_map={},
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             confirm=confirm,
         )
+
         file_contents = parser.file_contents(manifest_filename)
-        resp = parser.parse_manifest(StringIO(file_contents))
+        resp = parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
 
         return resp
 
