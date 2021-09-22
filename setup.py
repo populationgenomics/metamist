@@ -33,6 +33,8 @@ setup(
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
+        'click',
+        'google-cloud-storage',
     ],
     include_package_data=True,
     zip_safe=False,
