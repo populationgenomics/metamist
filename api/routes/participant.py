@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import io
 import csv
@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import StreamingResponse
 
+from api.utils import get_projectless_db_connection
 from api.utils.db import (
     get_project_write_connection,
     get_project_readonly_connection,
@@ -15,6 +16,7 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
+
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -63,3 +65,31 @@ async def get_individual_metadata_template_for_seqr(
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={basefn}{ext}'},
     )
+
+
+@router.post(
+    '/{project}/id-map/external',
+    operation_id='getParticipantIdMapByExternalIds',
+)
+async def get_id_map_by_external_ids(
+    external_participant_ids: List[str],
+    allow_missing: bool = False,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get ID map of participants, by external_id"""
+    player = ParticipantLayer(connection)
+    return await player.get_id_map_by_external_ids(
+        external_participant_ids,
+        allow_missing=allow_missing,
+        project=connection.project,
+    )
+
+
+@router.post('/update-many', operation_id='updateManyParticipants')
+async def update_many_participant_external_ids(
+    internal_to_external_id: Dict[int, str],
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update external_ids of participants by providing an update map"""
+    player = ParticipantLayer(connection)
+    return await player.update_many_participant_external_ids(internal_to_external_id)
