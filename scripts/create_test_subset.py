@@ -15,6 +15,7 @@ from sample_metadata import (
     NewSequence,
     NewSample,
     AnalysisModel,
+    SampleUpdateModel,
     exceptions,
 )
 
@@ -38,6 +39,7 @@ seqapi = SequenceApi()
     '-n',
     required=True,
     type=int,
+    default=10,
     help='Number of samples to subset',
 )
 def main(
@@ -49,6 +51,16 @@ def main(
     A new project with a prefix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
+    if n < 1:
+        raise click.BadParameter('Please specify n higher than 0')
+
+    if n >= 100:
+        resp = str(
+            input(f'You requested a subset of {n} samples. Please confirm (y): ')
+        )
+        if resp.lower() != 'y':
+            raise SystemExit()
+
     samples = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
             'project_ids': [project],
@@ -59,36 +71,59 @@ def main(
     random.seed(42)  # for reproducibility
     samples = random.sample(samples, n)
     sample_ids = [s['id'] for s in samples]
-    logger.info(f'Subset to {len(samples)} samples: {", ".join(sample_ids)}')
+    logger.info(
+        f'Subset to {len(samples)} samples (internal ID / external ID): '
+        f'{_pretty(samples)}'
+    )
 
-    seq_infos: List[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
-    seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
-
+    # Checking existing test samples in the target test project
     target_project = project + '-test'
+    test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
+
+    try:
+        seq_infos: List[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
+    except exceptions.ApiException:
+        seq_info_by_s_id = dict()
+    else:
+        seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
+
+    analysis_by_sid_by_type = dict()
+    for a_type in ['cram', 'gvcf']:
+        try:
+            analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
+                project=project,
+                analysis_type=a_type,
+                request_body=sample_ids,
+            )
+        except exceptions.ApiException:
+            analysis_by_sid_by_type[a_type] = dict()
+        else:
+            analysis_by_sid_by_type[a_type] = dict(zip(sample_ids, analyses))
+            logger.info(
+                f'Will copy {a_type} analysis entries: {analysis_by_sid_by_type[a_type]}'
+            )
 
     for s in samples:
         logger.info(f'Processing sample {s["id"]}')
 
-        # processing sample entries
-        try:
-            new_s = sapi.get_sample_by_external_id(s['external_id'], target_project)
-        except exceptions.ApiException:
+        if s['external_id'] in test_sample_by_external_id:
+            new_s_id = test_sample_by_external_id.get(s['external_id'])['id']
+        else:
+            logger.info('Creating test sample entry')
             new_s_id = sapi.create_new_sample(
                 project=target_project,
                 new_sample=NewSample(
-                    external_id=s['external_id'] + '-test',
+                    external_id=s['external_id'],
                     type=s['type'],
                     meta=_copy_files_in_dict(s['meta'], project),
                 ),
             )
-        else:
-            new_s_id = new_s.id
 
-        # processing sequence entries
         seq_info = seq_info_by_s_id.get(s['id'])
         if seq_info:
+            logger.info('Processing sequence entry')
             new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
-            print(new_meta)
+            logger.info('Creating sequence entry in test')
             seqapi.create_new_sequence(
                 new_sequence=NewSequence(
                     sample_id=new_s_id,
@@ -98,24 +133,19 @@ def main(
                 )
             )
 
-        # processing analysis entries
         for a_type in ['cram', 'gvcf']:
-            try:
-                analysis = aapi.get_latest_analysis_for_samples_and_type(
-                    project=project,
-                    analysis_type=a_type,
-                    request_body=[s['id']],
-                )
-            except exceptions.ApiException:
-                pass
-            else:
+            analysis = analysis_by_sid_by_type[a_type].get(s['id'])
+            if analysis:
+                logger.info(f'Processing {a_type} analysis entry')
                 am = AnalysisModel(
                     type=a_type,
                     output=_copy_files_in_dict(analysis['output'], project),
                     status=analysis['status'],
                     sample_ids=[s['id']],
                 )
+                logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
+        logger.info(f'-')
 
 
 def _copy_files_in_dict(d, dataset: str):
@@ -150,6 +180,33 @@ def _copy_files_in_dict(d, dataset: str):
     if isinstance(d, dict):
         return {k: _copy_files_in_dict(v, dataset) for k, v in d.items()}
     return d
+
+
+def _pretty(samples: List[Dict]) -> str:
+    return ', '.join('/'.join([s['id'], s['external_id']]) for s in samples)
+
+
+def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
+    test_samples = sapi.get_samples(
+        body_get_samples_by_criteria_api_v1_sample_post={
+            'project_ids': [test_project],
+            'active': True,
+        }
+    )
+    external_ids = [s['external_id'] for s in samples]
+    test_samples_to_remove = [
+        s for s in test_samples if s['external_id'] not in external_ids
+    ]
+    test_samples_to_keep = [s for s in test_samples if s['external_id'] in external_ids]
+    if test_samples_to_remove:
+        logger.info(f'Removing test samples: {_pretty(test_samples_to_remove)}')
+        for s in test_samples_to_remove:
+            sapi.update_sample(s['id'], SampleUpdateModel(active=False))
+
+    if test_samples_to_keep:
+        logger.info(f'Test samples already exist: {_pretty(test_samples_to_keep)}')
+
+    return {s['external_id']: s for s in test_samples_to_keep}
 
 
 def file_exists(path: str) -> bool:
