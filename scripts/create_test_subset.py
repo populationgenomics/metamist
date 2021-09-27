@@ -83,11 +83,11 @@ def main(
     try:
         seq_infos: List[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
     except exceptions.ApiException:
-        seq_info_by_s_id = dict()
+        seq_info_by_s_id = {}
     else:
         seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
 
-    analysis_by_sid_by_type = dict()
+    analysis_by_sid_by_type = {}
     for a_type in ['cram', 'gvcf']:
         try:
             analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
@@ -96,7 +96,7 @@ def main(
                 request_body=sample_ids,
             )
         except exceptions.ApiException:
-            analysis_by_sid_by_type[a_type] = dict()
+            analysis_by_sid_by_type[a_type] = {}
         else:
             analysis_by_sid_by_type[a_type] = dict(zip(sample_ids, analyses))
             logger.info(
