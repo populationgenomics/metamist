@@ -13,9 +13,7 @@ class ParticipantTable(DbBase):
 
     async def get_project_ids_for_participant_ids(self, participant_ids: List[int]):
         """Get project IDs for participant_ids (mostly for checking auth)"""
-        _query = (
-            'SELECT project FROM sample WHERE id in :participant_ids GROUP BY project'
-        )
+        _query = 'SELECT project FROM participant WHERE id in :participant_ids GROUP BY project'
         rows = await self.connection.fetch_all(
             _query, {'participant_ids': participant_ids}
         )
