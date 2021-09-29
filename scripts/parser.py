@@ -6,7 +6,7 @@ import re
 from abc import abstractmethod
 from collections import defaultdict
 from itertools import groupby
-from typing import List, Dict, Union, Optional, Tuple
+from typing import List, Dict, Union, Optional, Tuple, Match
 
 from google.api_core.exceptions import Forbidden
 
@@ -406,15 +406,24 @@ Updating {len(sequences_to_update)} sequences"""
         """
         Takes a list of fastqs, and a set of nested lists of each R1 + R2 read.
 
-        >>> GenericParser.parse_fastqs_structure(['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz'])
-        [['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz'], ['20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz']]
+        >>> GenericParser.parse_fastqs_structure(['/seqr_transfers/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L004_R1.fastq.gz', '/seqr_transfers/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L004_R2.fastq.gz'])
+        [['/seqr_transfers/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L004_R1.fastq.gz', '/seqr_transfers/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L004_R2.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['20210727_PROJECT1_L002_R2.fastq.gz', '20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz', '20210727_PROJECT1_L001_R1.fastq.gz'])
+        [['20210727_PROJECT1_L001_R1.fastq.gz', '20210727_PROJECT1_L001_R2.fastq.gz'], ['20210727_PROJECT1_L002_R1.fastq.gz', '20210727_PROJECT1_L002_R2.fastq.gz']]
+
+        >>> GenericParser.parse_fastqs_structure(['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz'])
+        [['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz']]
 
         """
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
-        r_matches = {r: rmatch.search(r) for r in sorted_fastqs}
-        no_r_match = [r for r, matched in r_matches.items() if matched is None]
+
+        r_matches: Dict[str, Tuple[str, Optional[Match[str]]]] = {
+            r: (os.path.basename(r), rmatch.search(os.path.basename(r)))
+            for r in sorted_fastqs
+        }
+        no_r_match = [r for r, (_, matched) in r_matches.items() if matched is None]
         if no_r_match:
             no_r_match_str = ', '.join(no_r_match)
             raise ValueError(
@@ -422,10 +431,12 @@ Updating {len(sequences_to_update)} sequences"""
             )
 
         values = []
-        for _, grouped in groupby(sorted_fastqs, lambda r: r[: r_matches[r].start()]):
+        for _, grouped in groupby(
+            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]
+        ):
             values.append(sorted(grouped))
 
-        return values
+        return sorted(values, key=lambda el: el[0])
 
     def create_file_object(
         self,
