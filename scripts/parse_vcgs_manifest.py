@@ -1,9 +1,8 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 import logging
-import os
 import re
 from io import StringIO
-from typing import Dict
+from typing import Dict, List
 
 import click
 
@@ -113,12 +112,11 @@ class VcgsManifestParser(GenericMetadataParser):
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        path_prefix=None,
+        search_locations: List[str] = None,
         confirm=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        if path_prefix is None:
-            path_prefix = os.path.dirname(manifest)
+        _search_locations = search_locations or []
 
         sequence_meta_map = {
             'library_ID': 'library_ID',
@@ -140,9 +138,10 @@ class VcgsManifestParser(GenericMetadataParser):
         }
 
         parser = VcgsManifestParser(
-            search_locations=[path_prefix],
+            search_locations=_search_locations,
             sample_metadata_project=sample_metadata_project,
-            sample_name_column='filename',
+            sample_name_column=Columns.SAMPLE_NAME,
+            reads_column=Columns.FILENAME,
             sample_meta_map=sample_meta_map,
             sequence_meta_map=sequence_meta_map,
             qc_meta_map={},
@@ -169,6 +168,7 @@ class VcgsManifestParser(GenericMetadataParser):
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
+@click.option('--search-path', multiple=True, required=False)
 @click.argument('manifests', nargs=-1)
 def main(
     manifests,
@@ -176,6 +176,7 @@ def main(
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
+    search_path: List[str] = None,
 ):
     """Run script from CLI arguments"""
 
@@ -186,6 +187,7 @@ def main(
             sample_metadata_project=sample_metadata_project,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
+            search_locations=search_path,
             confirm=confirm,
         )
         print(resp)
