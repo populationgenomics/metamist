@@ -1,6 +1,5 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 import logging
-import os
 import re
 from io import StringIO
 from typing import Dict, List
