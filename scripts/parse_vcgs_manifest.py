@@ -119,10 +119,6 @@ class VcgsManifestParser(GenericMetadataParser):
         """Parse manifest from path, and return result of parsing manifest"""
         _search_locations = search_locations or []
 
-        path_prefix = os.path.dirname(manifest)
-        if path_prefix not in _search_locations:
-            _search_locations.append(path_prefix)
-
         sequence_meta_map = {
             'library_ID': 'library_ID',
             'library_strategy': 'library_strategy',
@@ -146,6 +142,7 @@ class VcgsManifestParser(GenericMetadataParser):
             search_locations=_search_locations,
             sample_metadata_project=sample_metadata_project,
             sample_name_column=Columns.SAMPLE_NAME,
+            reads_column=Columns.FILENAME,
             sample_meta_map=sample_meta_map,
             sequence_meta_map=sequence_meta_map,
             qc_meta_map={},
