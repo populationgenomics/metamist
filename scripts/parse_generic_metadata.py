@@ -242,9 +242,9 @@ class GenericMetadataParser(GenericParser):
         gvcf_filenames = []
         if isinstance(row, list):
             for r in row:
-                if self.reads_column and self.reads_column in row:
+                if self.reads_column and self.reads_column in r:
                     read_filenames.extend(r[self.reads_column].split(','))
-                if self.gvcf_column and self.gvcf_column in row:
+                if self.gvcf_column and self.gvcf_column in r:
                     gvcf_filenames.extend(r[self.gvcf_column].split(','))
 
         else:
