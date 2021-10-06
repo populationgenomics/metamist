@@ -32,13 +32,16 @@ class ProjectDoesNotExist(Forbidden):
 class NoProjectAccess(Forbidden):
     """Not allowed access to a project (or not allowed project-less access)"""
 
-    def __init__(self, project_names: Iterable[str], *args, readonly: bool = None):
+    def __init__(
+        self, project_names: Iterable[str], author: str, *args, readonly: bool = None
+    ):
         project_names_str = ', '.join(project_names)
         access_type = ''
         if readonly is False:
             access_type = 'write '
+
         super().__init__(
-            f'You do not have {access_type}access to resources from the '
+            f'{author} does not have {access_type}access to resources from the '
             f'following project(s), or they may not exist: {project_names_str}',
             *args,
         )

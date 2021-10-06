@@ -100,7 +100,9 @@ class ProjectPermissionsTable:
                 missing_project_names = [
                     project_map[pid].name for pid in missing_project_ids
                 ]
-                raise NoProjectAccess(missing_project_names, readonly=readonly)
+                raise NoProjectAccess(
+                    missing_project_names, readonly=readonly, author=user
+                )
             return False
 
         return True
@@ -120,7 +122,7 @@ class ProjectPermissionsTable:
         has_access = users is None or user in users
         if not has_access and raise_exception:
             project_name = (await self.get_project_id_map())[project_id].name
-            raise NoProjectAccess([project_name], readonly=readonly)
+            raise NoProjectAccess([project_name], readonly=readonly, author=user)
         return has_access
 
     async def get_allowed_users_for_project_id(
@@ -232,7 +234,7 @@ class ProjectPermissionsTable:
             project_ids.append(project_id)
 
         if invalid_project_names:
-            raise NoProjectAccess(invalid_project_names, readonly=readonly)
+            raise NoProjectAccess(invalid_project_names, readonly=readonly, author=user)
 
         if len(project_ids) != len(project_names):
             raise Exception(
