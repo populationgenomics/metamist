@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import ProjectId
@@ -96,3 +96,22 @@ RETURNING id
         ]
         await self.connection.execute_many(_query, mapped_values)
         return True
+
+    async def get_external_participant_id_to_internal_sample_id_map(
+        self, project: ProjectId
+    ) -> List[Tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sample_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple samples.
+        """
+        _query = """
+SELECT p.external_id, s.id
+FROM participant p
+INNER JOIN sample s ON p.id = s.participant_id
+WHERE p.project = :project
+"""
+        values = await self.connection.fetch_all(_query, {'project': project})
+        return [(r[0], r[1]) for r in values]
