@@ -16,7 +16,7 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
-
+from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -93,3 +93,55 @@ async def update_many_participant_external_ids(
     """Update external_ids of participants by providing an update map"""
     player = ParticipantLayer(connection)
     return await player.update_many_participant_external_ids(internal_to_external_id)
+
+
+@router.get(
+    '/{project}/external-pid-to-internal-sample-id',
+    operation_id='getExternalParticipantIdToInternalSampleId',
+)
+async def get_external_participant_id_to_internal_sample_id(
+    connection: Connection = get_project_readonly_connection,
+):
+    """
+    Get a map of {external_participant_id} -> {internal_sample_id}
+    useful to matching joint-called samples in the matrix table to the participant
+
+    Return a list not dictionary, because dict could lose
+    participants with multiple samples.
+    """
+    player = ParticipantLayer(connection)
+    m = await player.get_external_participant_id_to_internal_sample_id_map(
+        project=connection.project
+    )
+    return [[pid, sample_id_format(sid)] for pid, sid in m]
+
+
+@router.get(
+    '/{project}/external-pid-to-internal-sample-id/{export_type}',
+    operation_id='getExternalParticipantIdToInternalSampleId',
+    response_class=StreamingResponse,
+)
+async def get_external_participant_id_to_internal_sample_id_export(
+    project: str,
+    export_type: ExportType,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get csv / tsv export of external_participant_id to internal_sample_id"""
+    player = ParticipantLayer(connection)
+    # this wants project ID (connection.project)
+    m = await player.get_external_participant_id_to_internal_sample_id_map(
+        project=connection.project
+    )
+    rows = [[pid, sample_id_format(sid)] for pid, sid in m]
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
+    writer.writerows(rows)
+
+    ext = export_type.get_extension()
+    filename = f'{project}-participant-to-sample-map-{date.today().isoformat()}{ext}'
+    return StreamingResponse(
+        iter(output.getvalue()),
+        media_type=export_type.get_mime_type(),
+        headers={'Content-Disposition': f'filename={filename}'},
+    )

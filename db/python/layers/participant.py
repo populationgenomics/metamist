@@ -572,3 +572,17 @@ class ParticipantLayer(BaseLayer):
                     insertable_rows.append((participant_id, header_key, value))
 
         return insertable_rows
+
+    async def get_external_participant_id_to_internal_sample_id_map(
+        self, project: int
+    ) -> List[Tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sample_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple samples.
+        """
+        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
+            project=project
+        )
