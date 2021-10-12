@@ -269,7 +269,7 @@ WHERE a.id = :analysis_id
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
 
-        project = rows[0].get('project')
+        project = rows[0]['project']
 
         a = Analysis.from_db(**dict(rows[0]))
         for row in rows[1:]:

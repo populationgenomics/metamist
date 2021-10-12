@@ -39,10 +39,10 @@ class Analysis(SMBase):
             id=kwargs.pop('id'),
             type=AnalysisType(analysis_type),
             status=AnalysisStatus(status),
-            sample_ids=[kwargs.pop('sample_id')],
+            sample_ids=[kwargs.pop('sample_id')] if 'sample_id' in kwargs else [],
             output=kwargs.pop('output', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
-            active=kwargs.get('active'),
+            active=bool(kwargs.get('active')),
         )
