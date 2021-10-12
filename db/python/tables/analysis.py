@@ -299,3 +299,24 @@ ORDER BY a.timestamp_completed DESC
         return [
             list(list(g_rows)[0]) for _, g_rows in groupby(rows, lambda seq: seq['id'])
         ]
+
+    async def get_analysis_runner_log(
+        self, project_ids: List[int] = None
+    ) -> List[Analysis]:
+        """
+        Get log for the analysis-runner, useful for checking this history of analysis
+        """
+        values = {}
+        wheres = [
+            "status = 'unknown'",
+            "json_extract(meta, '$.source') = 'analysis-runner'",
+            'active',
+        ]
+        if project_ids:
+            wheres.append('project in :project_ids')
+            values['project_ids'] = project_ids
+
+        wheres_str = ' AND '.join(wheres)
+        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        rows = await self.connection.fetch_all(_query, values)
+        return [Analysis.from_db(**dict(r)) for r in rows]
