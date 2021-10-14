@@ -131,7 +131,7 @@ def main(
     else:
         seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
 
-    analysis_by_sid_by_type = {'cram': dict(), 'gvcf': dict()}
+    analysis_by_sid_by_type = {'cram': {}, 'gvcf': {}}
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
             analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
