@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 PKG = 'sample_metadata'
 
-all_packages = ['sample_metadata']
+all_packages = ['sample_metadata', 'sample_metadata.parser']
 all_packages.extend(
     'sample_metadata.' + p for p in sorted(find_packages(f'./sample_metadata'))
 )
@@ -28,17 +28,18 @@ setup(
     url=f'https://github.com/populationgenomics/{PKG}',
     license='MIT',
     packages=all_packages,
+    package_dir={
+        'sample_metadata.parser': 'parser',
+    },
     requirements=[
         'google-auth',
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
+        'click',
     ],
     include_package_data=True,
     zip_safe=False,
-    entry_points={
-        # 'console_scripts': ['=analysis_runner.cli:main_from_args']
-    },
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',
