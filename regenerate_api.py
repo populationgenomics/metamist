@@ -124,9 +124,9 @@ def copy_files_from(tmpdir):
     Copy a selection of API files generated from openapi-generator:
 
         FROM:   $tmpdir/sample_metadata
-        TO:     ./sample_metadata/api
+        TO:     ./sample_metadata
 
-    This clears the ./sample_metadata/api folder except for 'files_to_ignore'.
+    This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
     files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py'}
