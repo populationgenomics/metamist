@@ -2,7 +2,7 @@
 from typing import List
 import logging
 
-from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
+from sample_metadata_parser.generic_metadata_parser import GenericMetadataParser
 
 SAMPLE_ID_COL_NAME = 'Individual ID'
 READS_COL_NAME = 'Filenames'
