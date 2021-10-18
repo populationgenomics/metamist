@@ -1,4 +1,4 @@
-name: Deploy
+name: Unittests
 on: [push, pull_request]
 
 jobs:
