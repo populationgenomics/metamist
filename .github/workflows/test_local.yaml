@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SM_ENVIRONMENT: LOCAL
-      SM_DEV_DB_PROJECT: sm_dev
+      SM_DEV_DB_PROJECT: dev
       SM_DEV_DB_HOST: '127.0.0.1'
       SM_DEV_DB_PORT: '3307'
       SM_DEV_DB_USER: root
@@ -123,3 +123,5 @@ jobs:
           python -m unittest discover test/
         env:
           SM_ALLOWALLACCESS: "0"
+          INPUT_PROJECT: test_input_project
+          OUTPUT_PROJECT: test_output_project

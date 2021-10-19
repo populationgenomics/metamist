@@ -43,3 +43,5 @@ jobs:
       - name: "Run unit tests"
         run: |
           python -m unittest discover test/
+          INPUT_PROJECT: dev
+          OUTPUT_PROJECT: dev
