@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
 from enum import Enum
 
+from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.family import FamilyTable
@@ -11,6 +12,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
+from db.python.utils import ProjectId
 
 
 class ExtraParticipantImporterHandler(Enum):
@@ -47,6 +49,15 @@ class SeqrMetadataKeys(Enum):
     PRE_DISCOVERY_OMIM_DISORDERS = 'Pre-discovery OMIM disorders'
     PREVIOUSLY_TESTED_GENES = 'Previously Tested Genes'
     CANDIDATE_GENES = 'Candidate Genes'
+
+    @staticmethod
+    def get_key_parsers():
+        """Get specific parsers for individual fields"""
+        return {
+            SeqrMetadataKeys.AGE_OF_ONSET: SeqrMetadataKeys.parse_age_of_onset,
+            SeqrMetadataKeys.HPO_TERMS_ABSENT: SeqrMetadataKeys.parse_hpo_terms,
+            SeqrMetadataKeys.HPO_TERMS_PRESENT: SeqrMetadataKeys.parse_hpo_terms,
+        }
 
     @staticmethod
     def get_ordered_headers():
@@ -106,13 +117,79 @@ class SeqrMetadataKeys(Enum):
             SeqrMetadataKeys.CANDIDATE_GENES,
         ]
 
+    @staticmethod
+    def get_age_of_onset_allowed_keys():
+        """
+        SEQR age of onset must be one of these values
+        """
+        return {
+            'Congenital onset',
+            'Embryonal onset',
+            'Fetal onset',
+            'Neonatal onset',
+            'Infantile onset',
+            'Childhood onset',
+            'Juvenile onset',
+            'Adult onset',
+            'Young adult onset',
+            'Middle age onset',
+            'Late onset',
+        }
+
+    @staticmethod
+    def parse_age_of_onset(age_of_onset: str):
+        """
+        Age of onset in seqr must be a value defined
+        in `get_age_of_onset_allowed_keys`, validate that it's either
+        true or we can can simply guess which one they meant.
+
+        >>> SeqrMetadataKeys.parse_age_of_onset('congenital')
+        'Congenital onset'
+
+        >>> SeqrMetadataKeys.parse_age_of_onset(' iNFaNtIlE OnsET ')
+        'Infantile onset'
+        """
+        if not age_of_onset:
+            return None
+        keys = SeqrMetadataKeys.get_age_of_onset_allowed_keys()
+        if age_of_onset in keys:
+            return age_of_onset
+        lkeys_without_onset = {k.lower().replace('onset', '').strip(): k for k in keys}
+        stripped_aoo = age_of_onset.lower().replace('onset', '').strip()
+        if stripped_aoo in lkeys_without_onset:
+            return lkeys_without_onset[stripped_aoo]
+
+        raise ValueError(
+            f"Didn't recognise age of set key {age_of_onset}, "
+            f"expected one of: {', '.join(keys)}"
+        )
+
+    @staticmethod
+    def parse_hpo_terms(hpo_terms: str):
+        """
+        Validate that comma-separated HPO terms must start with 'HP:'
+        """
+        if not hpo_terms:
+            return None
+        terms = [t.strip() for t in hpo_terms.split(',')]
+        # mfranklin (2021-09-06): There were no IDs that didn't start with HP
+        # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
+        failing_terms = [term for term in terms if not term.startswith('HP')]
+        if failing_terms:
+            raise ValueError(
+                'HPO terms must start with "HP", found ' + ', '.join(failing_terms)
+            )
+
+        # do this, because sometimes collaborators use ', ' instead of ','
+        return ','.join(terms)
+
 
 class ParticipantLayer(BaseLayer):
     """Layer for more complex sample logic"""
 
     def __init__(self, connection):
         super().__init__(connection)
-        self.ptable = ParticipantTable(connection=connection)
+        self.pttable = ParticipantTable(connection=connection)
 
     async def fill_in_missing_participants(self):
         """Update the sequencing status from the internal sample id"""
@@ -129,7 +206,7 @@ class ParticipantLayer(BaseLayer):
         }
         ext_sample_id_to_pid = {}
 
-        unlinked_participants = await self.ptable.get_id_map_by_external_ids(
+        unlinked_participants = await self.get_id_map_by_external_ids(
             list(external_sample_map_with_no_pid.keys()),
             project=self.connection.project,
             allow_missing=True,
@@ -146,7 +223,7 @@ class ParticipantLayer(BaseLayer):
 
             for external_id in external_participant_ids_to_add:
                 sample_id = external_sample_map_with_no_pid[external_id]
-                participant_id = await self.ptable.create_participant(
+                participant_id = await self.pttable.create_participant(
                     external_id=external_id
                 )
                 ext_sample_id_to_pid[external_id] = participant_id
@@ -173,7 +250,7 @@ class ParticipantLayer(BaseLayer):
 
         # filter to non-comment rows
         async with self.connection.connection.transaction():
-            pptable = ParticipantPhenotypeTable(self.connection)
+            ppttable = ParticipantPhenotypeTable(self.connection)
 
             self._validate_individual_metadata_headers(headers)
 
@@ -198,7 +275,7 @@ class ParticipantLayer(BaseLayer):
             allow_missing_participants = (
                 extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
-            external_pid_map = await self.ptable.get_id_map_by_external_ids(
+            external_pid_map = await self.get_id_map_by_external_ids(
                 list(external_participant_ids),
                 project=self.connection.project,
                 allow_missing=allow_missing_participants,
@@ -208,7 +285,7 @@ class ParticipantLayer(BaseLayer):
                     external_pid_map.keys()
                 )
                 for ex_pid in missing_participant_eids:
-                    external_pid_map[ex_pid] = await self.ptable.create_participant(
+                    external_pid_map[ex_pid] = await self.pttable.create_participant(
                         external_id=ex_pid, project=self.connection.project
                     )
             elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
@@ -225,7 +302,7 @@ class ParticipantLayer(BaseLayer):
             # then we'll insert a row in the FamilyParticipant if unknown (by SM) and specified
 
             ftable = FamilyTable(self.connection)
-            fptable = FamilyParticipantTable(self.connection)
+            fpttable = FamilyParticipantTable(self.connection)
 
             provided_pid_to_external_family = {
                 external_pid_map[row[participant_id_field_idx]]: row[
@@ -237,7 +314,7 @@ class ParticipantLayer(BaseLayer):
 
             external_family_ids = set(provided_pid_to_external_family.values())
             # check that all the family ids actually line up
-            _, pid_to_internal_family = await fptable.get_participant_family_map(pids)
+            _, pid_to_internal_family = await fpttable.get_participant_family_map(pids)
             fids = set(pid_to_internal_family.values())
             fmap_by_internal = await ftable.get_id_map_by_internal_ids(list(fids))
             fmap_from_external = await ftable.get_id_map_by_external_ids(
@@ -296,7 +373,7 @@ class ParticipantLayer(BaseLayer):
                     }
                     for external_family_id, pid in family_persons_to_insert
                 ]
-                await fptable.create_rows(formed_rows)
+                await fpttable.create_rows(formed_rows)
 
             storeable_keys = [k.value for k in SeqrMetadataKeys.get_storeable_keys()]
             insertable_rows = self._prepare_individual_metadata_insertable_rows(
@@ -307,7 +384,7 @@ class ParticipantLayer(BaseLayer):
                 rows=rows,
             )
 
-            await pptable.add_key_value_rows(insertable_rows)
+            await ppttable.add_key_value_rows(insertable_rows)
             return True
 
     async def get_seqr_individual_template(
@@ -319,28 +396,28 @@ class ParticipantLayer(BaseLayer):
         replace_with_family_external_ids=True,
     ) -> List[List[str]]:
         """Get seqr individual level metadata template as List[List[str]]"""
-        pptable = ParticipantPhenotypeTable(self.connection)
+        ppttable = ParticipantPhenotypeTable(self.connection)
         internal_to_external_pid_map = {}
         internal_to_external_fid_map = {}
 
         if external_participant_ids:
-            pids = await self.ptable.get_id_map_by_external_ids(
+            pids = await self.get_id_map_by_external_ids(
                 external_participant_ids,
                 project=self.connection.project,
                 allow_missing=False,
             )
-            pid_to_features = await pptable.get_key_value_rows_for_participant_ids(
+            pid_to_features = await ppttable.get_key_value_rows_for_participant_ids(
                 participant_ids=list(pids.values())
             )
             if replace_with_participant_external_ids:
                 internal_to_external_pid_map = {v: k for k, v in pids.items()}
         else:
-            pid_to_features = await pptable.get_key_value_rows_for_all_participants(
+            pid_to_features = await ppttable.get_key_value_rows_for_all_participants(
                 project=project
             )
             if replace_with_participant_external_ids:
                 internal_to_external_pid_map = (
-                    await self.ptable.get_id_map_by_internal_ids(
+                    await self.pttable.get_id_map_by_internal_ids(
                         list(pid_to_features.keys())
                     )
                 )
@@ -370,6 +447,47 @@ class ParticipantLayer(BaseLayer):
             rows.append([ld.get(h, '') for h in lheaders])
 
         return rows
+
+    async def get_id_map_by_external_ids(
+        self,
+        external_ids: List[str],
+        project: ProjectId,
+        allow_missing=False,
+    ) -> Dict[str, int]:
+        """Get participant ID map by external_ids"""
+        id_map = await self.pttable.get_id_map_by_external_ids(
+            external_ids, project=project
+        )
+        if not allow_missing and len(id_map) != len(external_ids):
+            provided_external_ids = set(external_ids)
+            # do the check again, but use the set this time
+            # (in case we're provided a list with duplicates)
+            if len(id_map) != len(provided_external_ids):
+                # we have families missing from the map, so we'll 404 the whole thing
+                missing_participant_ids = provided_external_ids - set(id_map.keys())
+
+                raise NotFoundError(
+                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
+                )
+
+        return id_map
+
+    async def update_many_participant_external_ids(
+        self, internal_to_external_id: Dict[int, str], check_project_ids=True
+    ):
+        """Update many participant external ids"""
+        if check_project_ids:
+
+            projects = await self.pttable.get_project_ids_for_participant_ids(
+                list(internal_to_external_id.keys())
+            )
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.pttable.update_many_participant_external_ids(
+            internal_to_external_id
+        )
 
     @staticmethod
     def _validate_individual_metadata_headers(headers):
@@ -438,6 +556,7 @@ class ParticipantLayer(BaseLayer):
 
         # List of (PersonId, Key, value) to insert into the participant_phenotype table
         insertable_rows: List[Tuple[int, str, any]] = []
+        parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         for row in rows:
             external_participant_id = row[participant_id_field_idx]
@@ -445,7 +564,25 @@ class ParticipantLayer(BaseLayer):
 
             for header_key, col_number in storeable_header_col_number_tuples:
                 value = row[col_number]
+                if header_key in parsers:
+                    # use custom parse declared in SeqrMetadataKeys.get_key_parsers
+                    value = parsers[header_key](value)
+
                 if value:
                     insertable_rows.append((participant_id, header_key, value))
 
         return insertable_rows
+
+    async def get_external_participant_id_to_internal_sample_id_map(
+        self, project: int
+    ) -> List[Tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sample_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple samples.
+        """
+        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
+            project=project
+        )

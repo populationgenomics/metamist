@@ -1,17 +1,12 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 import logging
-import os
 import re
 from io import StringIO
-from typing import Dict
+from typing import Dict, List
 
 import click
 
-from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_status import SequenceStatus
-from sample_metadata.model.sequence_type import SequenceType
-
-from parser import GenericParser, GroupedRow
+from parse_generic_metadata import GenericMetadataParser, GroupedRow
 
 rmatch = re.compile(r'_[Rr]\d')
 
@@ -65,68 +60,22 @@ class Columns:
         ]
 
 
-class VcgsManifestParser(GenericParser):
+class VcgsManifestParser(GenericMetadataParser):
     """Parser for VCGS manifest"""
 
-    def __init__(
-        self,
-        path_prefix: str,
-        sample_metadata_project: str,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        confirm=False,
-        delimeter='\t',
-    ):
-        super().__init__(
-            path_prefix=path_prefix,
-            sample_metadata_project=sample_metadata_project,
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            delimeter=delimeter,
-            confirm=confirm,
-        )
-
-    def get_sample_id(self, row: Dict[str, any]):
+    def get_sample_id(self, row: Dict[str, any]) -> str:
         """Get external sample ID from row"""
-        external_id = row[Columns.SAMPLE_NAME]
+        external_id = row[self.sample_name_column]
         if '-' in external_id:
             external_id = external_id.split('-')[0]
         return external_id
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow):
-        """Get sample-metadata from row"""
-        if isinstance(row, list):
-            collapsed_sample_meta = {
-                col: ','.join(set(r[col] for r in row))
-                for col in Columns.sample_columns()
-            }
-            filenames = [self.file_path(r[Columns.FILENAME]) for r in row]
-            reads, reads_type = self.parse_file(filenames)
-        else:
-            collapsed_sample_meta = {col: row[col] for col in Columns.sample_columns()}
-            reads, reads_type = self.parse_file([self.file_path(row[Columns.FILENAME])])
-
-        collapsed_sample_meta['reads'] = reads
-        collapsed_sample_meta['reads_type'] = reads_type
-
-        return collapsed_sample_meta
-
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
-        """Get sequence-metadata from row"""
-        if isinstance(row, list):
-            return {
-                col: ','.join(set(r[col] for r in row))
-                for col in Columns.sequence_columns()
-            }
-        return {col: row[col] for col in Columns.sequence_columns()}
-
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
-        # filter false-y values
         if not isinstance(row, list):
-            return SequenceType(row[Columns.LIBRARY_STRATEGY])
+            row = [row]
 
         types = list(
             set(r[Columns.LIBRARY_STRATEGY] for r in row if r[Columns.LIBRARY_STRATEGY])
@@ -151,19 +100,11 @@ class VcgsManifestParser(GenericParser):
 
         type_ = types[0].lower()
         if type_ == 'wgs':
-            return SequenceType('wgs')
+            return 'wgs'
         if type_ in ('single-cell', 'ss'):
-            return SequenceType('single-cell')
+            return 'single-cell'
 
         raise ValueError(f'Unrecognised sequencing type {type_}')
-
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
-        """Get sample type from row"""
-        return self.default_sample_type
-
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
-        """Get sequence status from row"""
-        return SequenceStatus('uploaded')
 
     @staticmethod
     def from_manifest_path(
@@ -171,23 +112,48 @@ class VcgsManifestParser(GenericParser):
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        path_prefix=None,
+        search_locations: List[str] = None,
         confirm=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        if path_prefix is None:
-            path_prefix = os.path.dirname(manifest)
+        _search_locations = search_locations or []
+
+        sequence_meta_map = {
+            'library_ID': 'library_ID',
+            'library_strategy': 'library_strategy',
+            'library_source': 'library_source',
+            'library_selection': 'library_selection',
+            'library_layout': 'library_layout',
+            'platform': 'platform',
+            'instrument_model': 'instrument_model',
+            'design_description': 'design_description',
+            'reference_genome_assembly': 'reference_genome_assembly',
+            'alignment_software': 'alignment_software',
+            'forward_read_length': 'forward_read_length',
+            'reverse_read_length': 'reverse_read_length',
+        }
+
+        sample_meta_map = {
+            'phs_accession': 'phs_accession',
+        }
 
         parser = VcgsManifestParser(
-            path_prefix,
+            search_locations=_search_locations,
             sample_metadata_project=sample_metadata_project,
+            sample_name_column=Columns.SAMPLE_NAME,
+            reads_column=Columns.FILENAME,
+            sample_meta_map=sample_meta_map,
+            sequence_meta_map=sequence_meta_map,
+            qc_meta_map={},
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             confirm=confirm,
         )
 
+        delimiter = VcgsManifestParser.guess_delimiter_from_filename(manifest)
+
         file_contents = parser.file_contents(manifest)
-        resp = parser.parse_manifest(StringIO(file_contents))
+        resp = parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
 
         return resp
 
@@ -202,6 +168,7 @@ class VcgsManifestParser(GenericParser):
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
+@click.option('--search-path', multiple=True, required=False)
 @click.argument('manifests', nargs=-1)
 def main(
     manifests,
@@ -209,6 +176,7 @@ def main(
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
+    search_path: List[str] = None,
 ):
     """Run script from CLI arguments"""
 
@@ -219,6 +187,7 @@ def main(
             sample_metadata_project=sample_metadata_project,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
+            search_locations=search_path,
             confirm=confirm,
         )
         print(resp)

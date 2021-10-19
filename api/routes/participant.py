@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import io
 import csv
@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import StreamingResponse
 
+from api.utils import get_projectless_db_connection
 from api.utils.db import (
     get_project_write_connection,
     get_project_readonly_connection,
@@ -15,6 +16,7 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
+from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -62,4 +64,84 @@ async def get_individual_metadata_template_for_seqr(
         iter(output.getvalue()),
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={basefn}{ext}'},
+    )
+
+
+@router.post(
+    '/{project}/id-map/external',
+    operation_id='getParticipantIdMapByExternalIds',
+)
+async def get_id_map_by_external_ids(
+    external_participant_ids: List[str],
+    allow_missing: bool = False,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get ID map of participants, by external_id"""
+    player = ParticipantLayer(connection)
+    return await player.get_id_map_by_external_ids(
+        external_participant_ids,
+        allow_missing=allow_missing,
+        project=connection.project,
+    )
+
+
+@router.post('/update-many', operation_id='updateManyParticipants')
+async def update_many_participant_external_ids(
+    internal_to_external_id: Dict[int, str],
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update external_ids of participants by providing an update map"""
+    player = ParticipantLayer(connection)
+    return await player.update_many_participant_external_ids(internal_to_external_id)
+
+
+@router.get(
+    '/{project}/external-pid-to-internal-sample-id',
+    operation_id='getExternalParticipantIdToInternalSampleId',
+)
+async def get_external_participant_id_to_internal_sample_id(
+    connection: Connection = get_project_readonly_connection,
+):
+    """
+    Get a map of {external_participant_id} -> {internal_sample_id}
+    useful to matching joint-called samples in the matrix table to the participant
+
+    Return a list not dictionary, because dict could lose
+    participants with multiple samples.
+    """
+    player = ParticipantLayer(connection)
+    m = await player.get_external_participant_id_to_internal_sample_id_map(
+        project=connection.project
+    )
+    return [[pid, sample_id_format(sid)] for pid, sid in m]
+
+
+@router.get(
+    '/{project}/external-pid-to-internal-sample-id/{export_type}',
+    operation_id='getExternalParticipantIdToInternalSampleId',
+    response_class=StreamingResponse,
+)
+async def get_external_participant_id_to_internal_sample_id_export(
+    project: str,
+    export_type: ExportType,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get csv / tsv export of external_participant_id to internal_sample_id"""
+    player = ParticipantLayer(connection)
+    # this wants project ID (connection.project)
+    m = await player.get_external_participant_id_to_internal_sample_id_map(
+        project=connection.project
+    )
+    rows = [[pid, sample_id_format(sid)] for pid, sid in m]
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
+    writer.writerows(rows)
+
+    ext = export_type.get_extension()
+    filename = f'{project}-participant-to-sample-map-{date.today().isoformat()}{ext}'
+    return StreamingResponse(
+        iter(output.getvalue()),
+        media_type=export_type.get_mime_type(),
+        headers={'Content-Disposition': f'filename={filename}'},
     )

@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import ProjectId
@@ -10,6 +10,14 @@ class ParticipantTable(DbBase):
     """
 
     table_name = 'participant'
+
+    async def get_project_ids_for_participant_ids(self, participant_ids: List[int]):
+        """Get project IDs for participant_ids (mostly for checking auth)"""
+        _query = 'SELECT project FROM participant WHERE id in :participant_ids GROUP BY project'
+        rows = await self.connection.fetch_all(
+            _query, {'participant_ids': participant_ids}
+        )
+        return set(r['project'] for r in rows)
 
     async def create_participant(
         self, external_id: str, author: str = None, project: ProjectId = None
@@ -36,7 +44,6 @@ RETURNING id
         self,
         external_participant_ids: List[str],
         project: ProjectId,
-        allow_missing=False,
     ) -> Dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
         _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
@@ -48,18 +55,6 @@ RETURNING id
             },
         )
         id_map = {r['external_id']: r['id'] for r in results}
-
-        if not allow_missing and len(id_map) != len(external_participant_ids):
-            provided_external_ids = set(external_participant_ids)
-            # do the check again, but use the set this time
-            # (in case we're provided a list with duplicates)
-            if len(id_map) != len(provided_external_ids):
-                # we have families missing from the map, so we'll 404 the whole thing
-                missing_participant_ids = provided_external_ids - set(id_map.keys())
-
-                raise NotFoundError(
-                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
-                )
 
         return id_map
 
@@ -89,3 +84,34 @@ RETURNING id
                 )
 
         return id_map
+
+    async def update_many_participant_external_ids(
+        self, internal_to_external_id: Dict[int, str]
+    ):
+        """Update many participant external_ids through the {internal: external} map"""
+        _query = 'UPDATE participant SET external_id = :external_id WHERE id = :participant_id'
+        mapped_values = [
+            {'participant_id': k, 'external_id': v}
+            for k, v in internal_to_external_id.items()
+        ]
+        await self.connection.execute_many(_query, mapped_values)
+        return True
+
+    async def get_external_participant_id_to_internal_sample_id_map(
+        self, project: ProjectId
+    ) -> List[Tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sample_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple samples.
+        """
+        _query = """
+SELECT p.external_id, s.id
+FROM participant p
+INNER JOIN sample s ON p.id = s.participant_id
+WHERE p.project = :project
+"""
+        values = await self.connection.fetch_all(_query, {'project': project})
+        return [(r[0], r[1]) for r in values]
