@@ -9,3 +9,4 @@ db/mariadb-java-client-*.jar
 db/liquibase.jar
 sample_metadata
 *.egg-info/
+db/liquibase.jar

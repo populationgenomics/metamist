@@ -183,7 +183,7 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(self, file_pointer, delimiter=',', dry_run=False):
+    def parse_manifest(self, file_pointer, delimiter=',', dry_run=False):  # pylint: disable=too-many-branches
         """
         Parse manifest from iterable (file pointer / String.IO)
         """
@@ -201,15 +201,14 @@ class GenericParser:
         analysisapi = AnalysisApi()
 
         # determine if any samples exist
-        external_id_map = sapi.get_sample_id_map_by_external(
+        existing_external_id_to_cpgid = sapi.get_sample_id_map_by_external(
             self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
         )
-        internal_sample_id_to_seq_id = {}
+        existing_cpgid_to_seq_id = {}
 
-        if len(external_id_map) > 0:
-            internal_sample_id_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
-                project=self.sample_metadata_project,
-                request_body=list(external_id_map.values()),
+        if len(existing_external_id_to_cpgid) > 0:
+            existing_cpgid_to_seq_id = seqapi.get_sequence_ids_from_sample_ids(
+                request_body=list(existing_external_id_to_cpgid.values())
             )
 
         samples_to_add: List[NewSample] = []
@@ -234,8 +233,7 @@ class GenericParser:
             sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
-            if external_sample_id not in external_id_map:
-
+            if external_sample_id not in existing_external_id_to_cpgid:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
@@ -255,7 +253,7 @@ class GenericParser:
                     )
             else:
                 # it already exists
-                cpgid = external_id_map[external_sample_id]
+                cpgid = existing_external_id_to_cpgid[external_sample_id]
                 samples_to_update[cpgid] = SampleUpdateModel(
                     meta=collapsed_sample_meta,
                 )
@@ -263,13 +261,12 @@ class GenericParser:
 
             # should we add or update sequencing
             if (
-                external_sample_id in external_id_map
-                and external_id_map[external_sample_id] in sequences_to_update
+                external_sample_id in existing_external_id_to_cpgid
+                and existing_external_id_to_cpgid[external_sample_id] in existing_cpgid_to_seq_id
             ):
                 # update, we have a cpg sample ID AND a sequencing ID
-                cpgid = external_id_map[external_sample_id]
-
-                seq_id = internal_sample_id_to_seq_id[cpgid]
+                cpgid = existing_external_id_to_cpgid[external_sample_id]
+                seq_id = existing_cpgid_to_seq_id[cpgid]
                 sequences_to_update[seq_id] = SequenceUpdateModel(
                     meta=collapsed_sequencing_meta, status=sequence_status
                 )
@@ -312,24 +309,21 @@ Updating {len(sequences_to_update)} sequences"""
             logger.info(message)
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
-        ext_sample_to_internal_id = {}
+        added_ext_sample_to_internal_id = {}
         for new_sample in samples_to_add:
             sample_id = sapi.create_new_sample(
                 project=self.sample_metadata_project, new_sample=new_sample
             )
-            ext_sample_to_internal_id[new_sample.external_id] = sample_id
+            added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
 
         for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
-                seq.sample_id = ext_sample_to_internal_id[sample_id]
-                seqapi.create_new_sequence(
-                    new_sequence=seq,
-                    project=self.sample_metadata_project,
-                )
+                seq.sample_id = existing_external_id_to_cpgid[sample_id]
+                seqapi.create_new_sequence(new_sequence=seq)
 
         for sample_id, qc_to_add in qc_to_add.items():
             for analysis in qc_to_add:
-                analysis.sample_ids = [ext_sample_to_internal_id[sample_id]]
+                analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
                 )
@@ -347,10 +341,9 @@ Updating {len(sequences_to_update)} sequences"""
             seqapi.update_sequence(
                 sequence_id=seq_id,
                 sequence_update_model=seq_update,
-                project=self.sample_metadata_project,
             )
 
-        return ext_sample_to_internal_id
+        return added_ext_sample_to_internal_id
 
     def parse_file(
         self, reads: List[str]

@@ -28,18 +28,18 @@ setup(
     url=f'https://github.com/populationgenomics/{PKG}',
     license='MIT',
     packages=all_packages,
-    requirements=[
+    install_requires=[
         'google-auth',
+        'google-api-core',  # dependency to google-auth that however is not
+        # pulled automatically: https://github.com/googleapis/google-auth-library-python/blob/main/setup.py#L22-L27
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
         'cpg-utils',
+        'click',
     ],
     include_package_data=True,
     zip_safe=False,
-    entry_points={
-        # 'console_scripts': ['=analysis_runner.cli:main_from_args']
-    },
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',

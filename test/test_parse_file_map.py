@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from parse_sample_file_map import SampleFileMapParser
+from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 
 class TestSampleMapParser(unittest.TestCase):
