@@ -1,7 +1,7 @@
 name: Deploy locally and unittest
 on: [push, pull_request]
 jobs:
-  test:
+  deploy_locally_and_unittest:
     runs-on: ubuntu-latest
     env:
       SM_ENVIRONMENT: LOCAL
@@ -10,7 +10,6 @@ jobs:
       SM_DEV_DB_PORT: '3307'
       SM_DEV_DB_USER: root
       SM_DEV_DB_PASSWORD: root
-      CONDA: /usr/share/miniconda
     defaults:
       run:
         shell: bash -l {0}

@@ -2,7 +2,7 @@ name: Test dev deployment
 on: [push, pull_request]
 
 jobs:
-  build-publish:
+  deploy_dev_and_unittest:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
 #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
@@ -23,7 +23,7 @@ jobs:
           activate-environment: buildenv
           channels: conda-forge,bioconda,defaults
           channel-priority: true
-          python-version: 3.7
+          python-version: 3.9
 
       - name: "setup build env"
         run: |
