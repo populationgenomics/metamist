@@ -29,6 +29,7 @@ setup(
     license='MIT',
     packages=all_packages,
     install_requires=[
+        'google-api-core',
         'google-auth',
         'urllib3 >= 1.25.3',
         'python-dateutil',
