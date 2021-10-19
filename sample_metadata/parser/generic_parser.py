@@ -3,6 +3,7 @@ import csv
 import logging
 import os
 import re
+import traceback
 from abc import abstractmethod
 from collections import defaultdict
 from itertools import groupby
@@ -10,6 +11,7 @@ from typing import List, Dict, Union, Optional, Tuple, Match
 
 from google.api_core.exceptions import Forbidden
 
+from sample_metadata import ApiException
 from sample_metadata.api import SampleApi, SequenceApi, AnalysisApi
 from sample_metadata.models.new_sample import NewSample
 from sample_metadata.models.new_sequence import NewSequence
@@ -234,7 +236,6 @@ class GenericParser:
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
             if external_sample_id not in external_id_map:
-
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
@@ -261,13 +262,9 @@ class GenericParser:
                 # ignore QC results if sample already exists
 
             # should we add or update sequencing
-            if (
-                external_sample_id in external_id_map
-                and external_id_map[external_sample_id] in sequences_to_update
-            ):
+            if external_sample_id not in internal_sample_id_to_seq_id:
                 # update, we have a cpg sample ID AND a sequencing ID
                 cpgid = external_id_map[external_sample_id]
-
                 seq_id = internal_sample_id_to_seq_id[cpgid]
                 sequences_to_update[seq_id] = SequenceUpdateModel(
                     meta=collapsed_sequencing_meta, status=sequence_status
@@ -311,21 +308,21 @@ Updating {len(sequences_to_update)} sequences"""
             logger.info(message)
 
         logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
-        ext_sample_to_internal_id = {}
+        added_ext_sample_to_internal_id = {}
         for new_sample in samples_to_add:
             sample_id = sapi.create_new_sample(
                 project=self.sample_metadata_project, new_sample=new_sample
             )
-            ext_sample_to_internal_id[new_sample.external_id] = sample_id
+            added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
 
         for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
-                seq.sample_id = ext_sample_to_internal_id[sample_id]
+                seq.sample_id = external_id_map[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
         for sample_id, qc_to_add in qc_to_add.items():
             for analysis in qc_to_add:
-                analysis.sample_ids = [ext_sample_to_internal_id[sample_id]]
+                analysis.sample_ids = [external_id_map[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
                 )
@@ -338,13 +335,18 @@ Updating {len(sequences_to_update)} sequences"""
             )
 
         logger.info(f'Updating {len(sequences_to_update)} sequences')
-        for seq_id, seq_update in sequences_to_update.items():
-            seqapi.update_sequence(
-                sequence_id=seq_id,
-                sequence_update_model=seq_update,
-            )
+        for i, (seq_id, seq_update) in enumerate(sequences_to_update.items()):
+            try:
+                seqapi.update_sequence(
+                    sequence_id=seq_id,
+                    sequence_update_model=seq_update,
+                )
+                logger.info(f'#{i+1}: updating sequence')
+            except ApiException:
+                traceback.print_exc()
+                logger.error(f'#{i+1}: error updating sequence {seq_id}: {seq_update}')
 
-        return ext_sample_to_internal_id
+        return added_ext_sample_to_internal_id
 
     def parse_file(
         self, reads: List[str]
