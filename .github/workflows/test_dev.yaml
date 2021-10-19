@@ -1,4 +1,4 @@
-name: Unittests
+name: Test dev deployment
 on: [push, pull_request]
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           channel-priority: true
           python-version: 3.7
 
-      - name: Setup build env
+      - name: "setup build env"
         run: |
           conda install pip conda-build anaconda-client requests
           pip install openapi-generator-cli
