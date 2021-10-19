@@ -6,7 +6,10 @@ from io import StringIO
 
 import click
 
-from parse_generic_metadata import GenericMetadataParser, GroupedRow
+from sample_metadata.parser.generic_metadata_parser import (
+    GenericMetadataParser,
+    GroupedRow,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())

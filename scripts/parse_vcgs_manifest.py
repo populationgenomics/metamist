@@ -6,7 +6,10 @@ from typing import Dict, List
 
 import click
 
-from parse_generic_metadata import GenericMetadataParser, GroupedRow
+from sample_metadata.parser.generic_metadata_parser import (
+    GenericMetadataParser,
+    GroupedRow,
+)
 
 rmatch = re.compile(r'_[Rr]\d')
 
