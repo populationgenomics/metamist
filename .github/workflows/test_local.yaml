@@ -108,20 +108,12 @@ jobs:
       - name: "install python api"
         run: sudo pip install -e .
 
-      - name: "populate samples"
-        run: |
-          python3 -m api.server &
-          sleep 3  # to make sure server finished starting
-          python test/test_add_samples_for_joint_calling.py
-        env:
-          SM_ALLOWALLACCESS: "1"
-
       - name: "run tests"
         run: |
           python3 -m api.server &
           sleep 3  # to make sure server finished starting
           python -m unittest discover test/
         env:
-          SM_ALLOWALLACCESS: "0"
+          SM_ALLOWALLACCESS: "1"
           INPUT_PROJECT: test_input_project
           OUTPUT_PROJECT: test_output_project

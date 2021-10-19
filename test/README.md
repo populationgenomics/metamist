@@ -123,7 +123,7 @@ python3 -m api.server &
 Populate samples
 
 ```bash
-python test/test_add_samples_for_joint_calling.py
+python test/test_api.py
 ```
 
 Stop the server and restart with SM_ALLOWALLACCESS unset, to test permissions
