@@ -29,8 +29,9 @@ setup(
     license='MIT',
     packages=all_packages,
     install_requires=[
-        'google-api-core',
         'google-auth',
+        'google-api-core',  # dependency to google-auth that however is not
+        # pulled automatically
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
