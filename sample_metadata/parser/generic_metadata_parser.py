@@ -5,7 +5,7 @@ import logging
 from io import StringIO
 from functools import reduce
 
-from sample_metadata_parser.generic_parser import GenericParser, GroupedRow
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
