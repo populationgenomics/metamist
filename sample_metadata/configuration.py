@@ -488,7 +488,7 @@ class Configuration(object):
         self.server_index = None
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/') -> str:
     """
     Get google auth token in two ways:
