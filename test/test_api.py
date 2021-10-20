@@ -36,6 +36,7 @@ class AddSampleTestCase(unittest.TestCase):
         samples_by_extid = [s['external_id'] for s in samples_by_cpgid.values()]
         self.assertIn(cpgid, samples_by_cpgid)
         self.assertIn(extid, samples_by_extid)
+        sapi.update_sample(cpgid, SampleUpdateModel(active=False))
 
 
 class AddAnalysisSequencingTestCase(unittest.TestCase):
@@ -106,12 +107,22 @@ class AddAnalysisSequencingTestCase(unittest.TestCase):
         self.assertEqual(analysis['id'], added_aid)
         self.assertListEqual(analysis['sample_ids'], [self.cpgid])
 
+    @classmethod
+    def tearDownClass(cls) -> None:
+        """
+        Delete the sample.
+        """
+        sapi.update_sample(cls.cpgid, SampleUpdateModel(active=False))
+
 
 class UpdateTestCase(unittest.TestCase):
     """
     Assuming adding samples, analyses and sequences is working,
     test updating analyses and sequences
     """
+    cpgid = None
+    analysis_id = None
+
     @classmethod
     def setUpClass(cls) -> None:
         """
@@ -156,6 +167,13 @@ class UpdateTestCase(unittest.TestCase):
         seq_by_cpgid = _get_sequence_by_cpgid([self.cpgid])
         seq = seq_by_cpgid[self.cpgid]
         self.assertEqual(seq['status'], 'uploaded')
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        """
+        Delete the sample.
+        """
+        sapi.update_sample(cls.cpgid, SampleUpdateModel(active=False))
 
 
 class DeactivateSampleTestCase(unittest.TestCase):
