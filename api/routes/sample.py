@@ -166,3 +166,8 @@ async def update_sample(
         active=model.active,
     )
     return result
+
+
+@router.post('{project}/kccg-update/{external_id}')
+def do_kccg_update(body={}, connection: Connection = get_project_write_connection):
+    pass
