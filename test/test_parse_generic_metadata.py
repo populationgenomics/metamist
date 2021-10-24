@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from parse_generic_metadata import GenericMetadataParser
+from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
 
 class TestParseGenericMetadata(unittest.TestCase):
