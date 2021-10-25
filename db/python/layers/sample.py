@@ -2,10 +2,14 @@ from typing import Dict, List
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
+from db.python.layers.sequence import SampleSequenceLayer
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from models.enums import SampleType
-from models.models.sample import Sample, sample_id_format
+from models.enums import SampleType, SequenceType
+from models.models.sample import Sample, sample_id_format, sample_id_transform_to_raw
+
+# Is there a better way to handle this?
+DEFAULT_SAMPLE_TYPE = SampleType('blood')
 
 
 class SampleLayer(BaseLayer):
@@ -13,6 +17,7 @@ class SampleLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
+        self.seq_table = SampleSequenceLayer(connection)
         self.st: SampleTable = SampleTable(connection)
 
     # GETS
@@ -185,4 +190,47 @@ class SampleLayer(BaseLayer):
         await self.st.update_many_participant_ids(
             ids=ids, participant_ids=participant_ids
         )
+        return True
+
+    async def kccg_update(self, external_id, project, sequence_status, sample_meta):
+        """
+        Update sample + sequencing status
+        """
+        try:
+            internal_sample = await self.get_single_by_external_id(external_id, project)
+            internal_id = internal_sample.id
+
+        except NotFoundError as e:
+            new_sample = await self.insert_sample(
+                external_id=external_id,
+                sample_type=DEFAULT_SAMPLE_TYPE,
+                active=True,
+                meta=sample_meta,
+            )
+            internal_id = await self.get_single_by_external_id(
+                external_id=external_id, project=project
+            )
+            print(e)
+            print(new_sample)
+
+        try:
+            sequence_id = await self.seq_table.get_latest_sequence_id_for_sample_id(
+                sample_id_transform_to_raw(internal_id)
+            )
+
+            sequence_update = await self.seq_table.update_status(
+                sequencing_id=sequence_id, status=sequence_status
+            )
+
+            print(sequence_update)
+
+        except NotFoundError as e:
+            create_sequence = await self.seq_table.insert_sequencing(
+                sample_id=sample_id_transform_to_raw(internal_id),
+                sequence_type=SequenceType('wgs'),
+                status=sequence_status,
+            )
+            print(create_sequence)
+            print(e)
+
         return True

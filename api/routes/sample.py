@@ -3,7 +3,7 @@ from typing import Optional, List, Dict
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
-from models.enums import SampleType
+from models.enums import SampleType, SequenceStatus
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
 from db.python.layers.sample import Sample, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
@@ -32,6 +32,13 @@ class SampleUpdateModel(BaseModel):
     type: Optional[SampleType] = None
     participant_id: Optional[int] = None
     active: Optional[bool] = None
+
+
+class KCCGUpdateModel(BaseModel):
+    """ Combination of Sequence + Sample Update Model """
+
+    status: SequenceStatus
+    sample_meta: Optional[Dict] = {}
 
 
 router = APIRouter(prefix='/sample', tags=['sample'])
@@ -168,6 +175,19 @@ async def update_sample(
     return result
 
 
-@router.post('{project}/kccg-update/{external_id}')
-def do_kccg_update(body={}, connection: Connection = get_project_write_connection):
-    pass
+@router.post('/{project}/kccg-update/{external_id}', operation_id='KccgUpdate')
+async def kccg_update(
+    external_id: str,
+    model: KCCGUpdateModel,
+    connection: Connection = get_project_write_connection,
+):
+    """ Update sample status """
+    st = SampleLayer(connection)
+    result = await st.kccg_update(
+        external_id=external_id,
+        project=connection.project,
+        sequence_status=model.status,
+        sample_meta=model.sample_meta,
+    )
+
+    return result
