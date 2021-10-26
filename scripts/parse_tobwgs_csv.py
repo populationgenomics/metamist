@@ -59,6 +59,9 @@ class TobWgsParser(GenericMetadataParser):
         batch_number = int(row['batch.batch_name'][-3:])
         collapsed_sequence_meta['batch'] = batch_number
 
+        batch_name = row['batch.batch_name'][:-5]
+        collapsed_sequence_meta['batch_name'] = batch_name
+
         gvcf, variants_type = self.parse_file(
             [self.get_gvcf_path(sample_id, batch_number)]
         )
