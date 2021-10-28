@@ -92,7 +92,8 @@ class TobWgsParser(GenericMetadataParser):
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         if path_prefix is None:
-            path_prefix = os.path.dirname(manifest)
+            path_prefix = []
+            path_prefix.append(os.path.dirname(manifest))
             manifest_filename = os.path.basename(manifest)
         else:
             manifest_filename = manifest
@@ -138,7 +139,7 @@ class TobWgsParser(GenericMetadataParser):
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
-@click.option('--path-prefix', default=None)
+@click.option('--path-prefix', default=None, multiple=True)
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -152,6 +153,7 @@ def main(
     confirm=False,
 ):
     """Run script from CLI arguments"""
+    _path_prefix = list(path_prefix)
 
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
@@ -160,7 +162,7 @@ def main(
             sample_metadata_project=sample_metadata_project,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
-            path_prefix=path_prefix,
+            path_prefix=_path_prefix,
             confirm=confirm,
         )
         print(resp)
