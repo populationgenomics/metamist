@@ -8,3 +8,4 @@ __pycache__/
 db/mariadb-java-client-*.jar
 sample_metadata
 *.egg-info/
+db/liquibase.jar
