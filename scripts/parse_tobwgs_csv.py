@@ -92,8 +92,7 @@ class TobWgsParser(GenericMetadataParser):
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         if path_prefix is None:
-            path_prefix = []
-            path_prefix.append(os.path.dirname(manifest))
+            path_prefix = [os.path.dirname(manifest)]
             manifest_filename = os.path.basename(manifest)
         else:
             manifest_filename = manifest
