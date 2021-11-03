@@ -6,7 +6,7 @@ URL = None
 if 'dev' in env:
     URL = 'https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app'
 elif 'prod' in env:
-    URL = 'https://sample-metadata.populationgenomics.org.au'
+    URL = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
 
 
 def get_openapi_schema_func(app, version):
