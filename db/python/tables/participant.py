@@ -20,7 +20,14 @@ class ParticipantTable(DbBase):
         return set(r['project'] for r in rows)
 
     async def create_participant(
-        self, external_id: str, reported_sex: int=None, reported_gender: str=None, karyotype: str=None, meta: Dict=None, author: str = None, project: ProjectId = None
+        self,
+        external_id: str,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author: str = None,
+        project: ProjectId = None,
     ) -> int:
         """
         Create a new sample, and add it to database
@@ -44,8 +51,20 @@ RETURNING id
             },
         )
 
-    async def update_participants(self, participant_ids: List[int], reported_sexes: List[int]=None, reported_genders: List[str]=None, karyotypes: List[str]=None, metas: List[Dict]=None, author=None):
-
+    async def update_participants(
+        self,
+        participant_ids: List[int],
+        reported_sexes: List[int] = None,
+        reported_genders: List[str] = None,
+        karyotypes: List[str] = None,
+        metas: List[Dict] = None,
+        author=None,
+    ):
+        """
+        Update many participants, expects that all lists contain the same number of values.
+        You can't update selective fields on selective samples, if you provide metas, this
+        function will update EVERY participant with the provided meta values.
+        """
         _author = author or self.author
         updaters = ['author = :author']
         values = {'pid': participant_ids, 'author': [_author] * len(participant_ids)}
@@ -63,7 +82,10 @@ RETURNING id
             values['meta'] = metas
 
         keys = list(values.keys())
-        list_values = [{k: values[k][idx] for k in values} for idx in range(len(values[keys[0]]))]
+        list_values = [
+            {k: l[idx] for k, l in values.items()}
+            for idx in range(len(values[keys[0]]))
+        ]
 
         updaters_str = ', '.join(updaters)
         _query = f'UPDATE participant SET {updaters_str} WHERE id = :pid'

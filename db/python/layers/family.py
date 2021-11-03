@@ -267,7 +267,12 @@ class FamilyLayer(BaseLayer):
 
         return family_map
 
-    async def import_pedigree(self, header: Optional[List[str]], rows: List[List[str]], create_missing_participants=False):
+    async def import_pedigree(
+        self,
+        header: Optional[List[str]],
+        rows: List[List[str]],
+        create_missing_participants=False,
+    ):
         """
         Import pedigree file
         """
@@ -317,19 +322,22 @@ class FamilyLayer(BaseLayer):
             list(external_participant_ids),
             project=self.connection.project,
             # Allow missing participants if we're creating them
-            allow_missing=create_missing_participants
+            allow_missing=create_missing_participants,
         )
 
         async with self.connection.connection.transaction():
 
             if create_missing_participants:
-                missing_participant_ids = set(external_participant_ids) - set(external_participant_ids_map)
+                missing_participant_ids = set(external_participant_ids) - set(
+                    external_participant_ids_map
+                )
                 for row in pedrows:
                     if row.individual_id not in missing_participant_ids:
                         continue
-                    external_participant_ids_map[row.individual_id] = await participant_table.create_participant(
-                        external_id=row.individual_id,
-                        reported_sex=row.sex
+                    external_participant_ids_map[
+                        row.individual_id
+                    ] = await participant_table.create_participant(
+                        external_id=row.individual_id, reported_sex=row.sex
                     )
 
             for external_family_id in missing_external_family_ids:
@@ -359,8 +367,10 @@ class FamilyLayer(BaseLayer):
             ]
 
             await participant_table.update_participants(
-                participant_ids=[external_participant_ids_map[row.individual_id] for row in pedrows],
-                reported_sexes=[row.sex for row in pedrows]
+                participant_ids=[
+                    external_participant_ids_map[row.individual_id] for row in pedrows
+                ],
+                reported_sexes=[row.sex for row in pedrows],
             )
             await self.fptable.create_rows(insertable_rows)
 

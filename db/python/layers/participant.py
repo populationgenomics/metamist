@@ -592,15 +592,30 @@ class ParticipantLayer(BaseLayer):
         )
 
     async def create_participant(
-            self, external_id: str, reported_sex: int = None, reported_gender: str = None, karyotype: str = None,
-            meta: Dict = None, author: str = None, project: ProjectId = None
+        self,
+        external_id: str,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author: str = None,
+        project: ProjectId = None,
     ) -> int:
+        """Create a single participant"""
+        # pylint: disable=unused-argument
         d = {k: v for k, v in locals().items() if k != 'self'}
         return await self.pttable.create_participant(**d)
 
-    async def update_participants(self, participant_ids: List[int], reported_sexes: List[int] = None,
-                                  reported_genders: List[str] = None, karyotypes: List[str] = None,
-                                  metas: List[Dict] = None, author=None):
+    async def update_participants(
+        self,
+        participant_ids: List[int],
+        reported_sexes: List[int] = None,
+        reported_genders: List[str] = None,
+        karyotypes: List[str] = None,
+        metas: List[Dict] = None,
+        author=None,
+    ):
+        """Update many participants"""
+        # pylint: disable=unused-argument
         d = {k: v for k, v in locals().items() if k != 'self'}
         return await self.pttable.update_participants(**d)
-
