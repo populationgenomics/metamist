@@ -2,6 +2,7 @@ from typing import List, Union, Optional
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
+from db.python.layers.participant import ParticipantLayer
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
@@ -266,7 +267,7 @@ class FamilyLayer(BaseLayer):
 
         return family_map
 
-    async def import_pedigree(self, header: Optional[List[str]], rows: List[List[str]]):
+    async def import_pedigree(self, header: Optional[List[str]], rows: List[List[str]], create_missing_participants=False):
         """
         Import pedigree file
         """
@@ -302,7 +303,7 @@ class FamilyLayer(BaseLayer):
             if pid
         )
 
-        participant_table = ParticipantTable(self.connection)
+        participant_table = ParticipantLayer(self.connection)
 
         external_family_id_map = await self.ftable.get_id_map_by_external_ids(
             list(external_family_ids),
@@ -312,13 +313,25 @@ class FamilyLayer(BaseLayer):
         missing_external_family_ids = [
             f for f in external_family_ids if f not in external_family_id_map
         ]
-        # these will fail if any of them are missing
-        external_participant_ids = await participant_table.get_id_map_by_external_ids(
+        external_participant_ids_map = await participant_table.get_id_map_by_external_ids(
             list(external_participant_ids),
             project=self.connection.project,
+            # Allow missing participants if we're creating them
+            allow_missing=create_missing_participants
         )
 
         async with self.connection.connection.transaction():
+
+            if create_missing_participants:
+                missing_participant_ids = set(external_participant_ids) - set(external_participant_ids_map)
+                for row in pedrows:
+                    if row.individual_id not in missing_participant_ids:
+                        continue
+                    external_participant_ids_map[row.individual_id] = await participant_table.create_participant(
+                        external_id=row.individual_id,
+                        reported_sex=row.sex
+                    )
+
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
                     external_id=external_family_id,
@@ -328,22 +341,27 @@ class FamilyLayer(BaseLayer):
                 external_family_id_map[external_family_id] = internal_family_id
 
             # now let's map participants back
+
             insertable_rows = [
                 {
                     'family_id': external_family_id_map[row.family_id],
-                    'participant_id': external_participant_ids[row.individual_id],
-                    'paternal_participant_id': external_participant_ids.get(
+                    'participant_id': external_participant_ids_map[row.individual_id],
+                    'paternal_participant_id': external_participant_ids_map.get(
                         row.paternal_id
                     ),
-                    'maternal_participant_id': external_participant_ids.get(
+                    'maternal_participant_id': external_participant_ids_map.get(
                         row.maternal_id
                     ),
-                    'sex': row.sex,
                     'affected': row.affected,
                     'notes': row.notes,
                 }
                 for row in pedrows
             ]
+
+            await participant_table.update_participants(
+                participant_ids=[external_participant_ids_map[row.individual_id] for row in pedrows],
+                reported_sexes=[row.sex for row in pedrows]
+            )
             await self.fptable.create_rows(insertable_rows)
 
         return True
