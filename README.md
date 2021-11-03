@@ -39,7 +39,7 @@ stores these values separately on the `participant` as:
 
 - `reported_gender` (string, expected `male` | `female` | _other values_)
 - `reported_sex` (follows pedigree convention: `unknown=0 | null`, `male=1`, `female=2`)
-- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes) 
+- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes)
 
 If you import a pedigree, the sex value is written to the `reported_sex` attribute.
 
