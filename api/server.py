@@ -101,7 +101,9 @@ app.include_router(family_router, prefix='/api/v1')
 app.include_router(project_router, prefix='/api/v1')
 
 static_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
-app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
+if os.path.exists(static_dir):
+    # only allow static files if the static files are available
+    app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
 
 app.openapi = get_openapi_schema_func(app, _VERSION)
 
