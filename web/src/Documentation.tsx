@@ -6,6 +6,8 @@ import {
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+// import { materialDark as syntaxStyle } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface IDocumentationArticleProps {
     articleId?: string
@@ -24,7 +26,7 @@ function RouterLink(props: any) {
 
 const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> = (props: IDocumentationArticleProps) => {
 
-    const [text, setText] = React.useState<string>('')
+    const [text, setText] = React.useState<string | null>(null)
 
     const match = useParams()
 
@@ -53,13 +55,41 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
         fetchData()
     })
 
+    if (!text) {
+        return <p style={{ textAlign: 'center' }}><em>Loading...</em></p>
+    }
+
 
     return <div className="article">
         {/* <p>{text}</p> */}
         <Markdown
             children={text}
             remarkPlugins={[remarkGfm, remarkToc]}
-            components={{ a: RouterLink }}
+            components={{
+                a: RouterLink,
+                code({ node, inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '')
+                    return !inline && match ? (
+                        // @ts-ignore
+                        <SyntaxHighlighter
+                            children={String(children).replace(/\n$/, '')}
+                            // style={syntaxStyle}
+                            language={match[1]}
+                            PreTag="div"
+                            // showLineNumbers={true}
+                            customStyle={{
+                                margin: 0,
+                                background: '#f8f8f8',
+                            }}
+                            {...props}
+                        />
+                    ) : (
+                        <code className={className} {...props}>
+                            {children}
+                        </code>
+                    )
+                }
+            }}
         />
     </div>
 

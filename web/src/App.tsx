@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import logo from './logo.svg';
+import React from 'react';
 import DocumentationArticle from './Documentation'
 import SwaggerUI from 'swagger-ui-react'
 import "swagger-ui-react/swagger-ui.css"
@@ -11,24 +10,8 @@ import {
   Route,
   Link
 } from "react-router-dom";
-import ReactMarkdown from 'react-markdown';
-import { setUncaughtExceptionCaptureCallback } from 'process';
 
 const Index = () => {
-
-  const [readmeText, setREADME] = React.useState('')
-
-  // useEffect(() => {
-  //   // async function loadText()
-  //   function loadData() {
-  //     return import('../public/sm-readme.md')
-  //       .then(file => fetch(file.default))
-  //       .then(response => response.text())
-  //       .then(text => setREADME(text))
-  //   }
-  //   loadData()
-  // })
-
 
   return (<div>
     <h2>Sample metadata server</h2>
@@ -37,7 +20,6 @@ const Index = () => {
       <li><Link to="swagger">Swagger page</Link></li>
     </ul>
 
-    <ReactMarkdown children={readmeText} />
   </div>)
 }
 
@@ -70,8 +52,10 @@ function App() {
     <Router>
       <div className="App">
         <header className="App-header">
-          <Link to="/">CPG Sample Metadata</Link>
-          <Link to="/documentation" >Docs</Link>
+          <div className="header">
+            <Link to="/">CPG Sample Metadata</Link>
+            <Link to="/documentation" >Docs</Link>
+          </div>
         </header>
         <div className="body">
           <Routes />
