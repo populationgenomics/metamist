@@ -83,6 +83,9 @@ def start_server() -> Optional[subprocess.Popen]:
 
 def generate_api_and_copy():
     """Get JSON from server"""
+    with open('deploy/python/version.txt', encoding='utf-8') as f:
+        version = f.read().strip()
+
     tmpdir = tempfile.mkdtemp()
     command = [
         'openapi-generator',
@@ -95,8 +98,14 @@ def generate_api_and_copy():
         tmpdir,
         '--package-name',
         MODULE_NAME,
+        '--template-dir',
+        'openapi-templates',
+        '--artifact-version',
+        version,
         '--skip-validate-spec',
     ]
+    jcom = ' '.join(f"'{c}'" for c in command)
+    logger.info('Generating with command: ' + jcom)
     # 5 attempts
     n_attempts = 1
     succeeded = False
