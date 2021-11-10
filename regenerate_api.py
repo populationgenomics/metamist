@@ -186,9 +186,9 @@ def copy_files_from(tmpdir):
         os.makedirs(static_dir)
     shutil.copytree(docs_dir, output_docs_dir)
     shutil.copy(
-        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'index.md')
+        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'README.md')
     )
-    shutil.copy('README.md', output_docs_dir)
+    shutil.copy('README.md', os.path.join(output_docs_dir, 'index.md'))
 
 
 def main():

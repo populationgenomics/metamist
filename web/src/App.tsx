@@ -21,7 +21,7 @@ const Index = () => {
       <li><Link to="swagger">Swagger page</Link></li>
     </ul>
 
-    <DocumentationArticle articleId="README" />
+    <DocumentationArticle articleId="index" />
 
   </div>)
 }
