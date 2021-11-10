@@ -4,7 +4,7 @@ on:
     branches:
       - main
       - dev
-      - add-docs-website
+
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
