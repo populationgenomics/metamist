@@ -33,13 +33,14 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     useEffect(() => {
         console.log('Loading data')
         async function fetchData() {
-            const articleId = props.articleId || match.id || 'README';
+            const articleId = props.articleId || match.id || 'index';
             let filename = articleId?.split('#')[0]
             if (!filename.endsWith('.md')) {
                 filename = `${filename}.md`
             }
             try {
-                const file = await import(`../sm_docs/${filename}`);
+                debugger
+                const file = require(`./static/sm_docs/${filename}`);
                 const response = await fetch(file.default);
                 let text = await response.text();
                 text = text

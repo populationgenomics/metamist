@@ -11,6 +11,7 @@ import {
   Link
 } from "react-router-dom";
 
+
 const Index = () => {
 
   return (<div>
@@ -19,6 +20,8 @@ const Index = () => {
       <li><Link to="documentation">Python API documentation</Link></li>
       <li><Link to="swagger">Swagger page</Link></li>
     </ul>
+
+    <DocumentationArticle articleId="README" />
 
   </div>)
 }
@@ -36,7 +39,7 @@ const Routes = () => {
 
       <Route
         path="/swagger"
-        element={<SwaggerUI url="http://localhost:8000/openapi.json" />}
+        element={<SwaggerUI url="openapi.json" />}
       />
 
       <Route

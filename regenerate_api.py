@@ -177,6 +177,19 @@ def copy_files_from(tmpdir):
         else:
             shutil.copy(path_to_copy, output_path)
 
+    docs_dir = os.path.join(tmpdir, 'docs')
+    static_dir = 'web/src/static'
+    output_docs_dir = os.path.join(static_dir, 'sm_docs')
+    if os.path.exists(output_docs_dir):
+        shutil.rmtree(output_docs_dir)
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    shutil.copytree(docs_dir, output_docs_dir)
+    shutil.copy(
+        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'index.md')
+    )
+    shutil.copy('README.md', output_docs_dir)
+
 
 def main():
     """

@@ -12,4 +12,5 @@ db/liquibase.jar
 node_modules/
 web/build
 api/public
-web/sm_docs
+web/src/static/sm_docs
+sm/
