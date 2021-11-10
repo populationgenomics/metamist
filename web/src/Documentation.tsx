@@ -33,7 +33,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     useEffect(() => {
         console.log('Loading data')
         async function fetchData() {
-            const articleId = props.articleId || match.id || 'index';
+            const articleId = props.articleId || match.id || 'README';
             let filename = articleId?.split('#')[0]
             if (!filename.endsWith('.md')) {
                 filename = `${filename}.md`
