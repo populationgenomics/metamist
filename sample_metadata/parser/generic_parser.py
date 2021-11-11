@@ -320,6 +320,7 @@ Updating {len(sequences_to_update)} sequences"""
                 project=self.sample_metadata_project, new_sample=new_sample
             )
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
+            existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
         for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
