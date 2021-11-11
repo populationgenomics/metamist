@@ -39,7 +39,6 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
                 filename = `${filename}.md`
             }
             try {
-                debugger
                 const file = require(`./static/sm_docs/${filename}`);
                 const response = await fetch(file.default);
                 let text = await response.text();
