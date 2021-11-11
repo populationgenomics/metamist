@@ -42,6 +42,8 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
                 const file = require(`./static/sm_docs/${filename}`);
                 const response = await fetch(file.default);
                 let text = await response.text();
+                // Do some URL rewriting, because the openapi generator
+                // generates links in a way that's incompatible with this hosting
                 text = text
                     .replaceAll('docs/', '/documentation/')
                     .replaceAll('../', '/documentation/')
