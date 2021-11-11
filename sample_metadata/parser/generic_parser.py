@@ -321,14 +321,19 @@ Updating {len(sequences_to_update)} sequences"""
             )
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
 
+        # Reload the external_id to cpgid map after new samples were added
+        current_external_id_to_cpgid = sapi.get_sample_id_map_by_external(
+            self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
+        )
+
         for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
-                seq.sample_id = existing_external_id_to_cpgid[sample_id]
+                seq.sample_id = current_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
         for sample_id, qc_to_add in qc_to_add.items():
             for analysis in qc_to_add:
-                analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
+                analysis.sample_ids = [current_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
                 )
