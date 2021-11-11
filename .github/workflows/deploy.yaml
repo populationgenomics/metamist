@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - dev
+      - add-docs-website
 
 jobs:
   build-publish:
