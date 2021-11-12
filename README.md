@@ -16,7 +16,6 @@ are cached in a secret as group-membership identity checks are slow.
 
 ## Structure
 
-
 ### Sample IDs
 
 In an effort to reduce our dependency on potentially mutable external sample IDs with inconsistent format,
@@ -168,7 +167,7 @@ request to create a new project called 'dev'
 curl -X 'PUT' \
   'http://localhost:8000/api/v1/project/?name=dev&dataset=dev&gcp_id=dev&create_test_project=false' \
   -H 'accept: application/json' \
-  -H "Authorization: Bearer $(gcloud auth-print-identity-token)"
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)"
 ```
 
 #### Quickstart: Generate and install the installable API

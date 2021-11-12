@@ -123,8 +123,7 @@ class Configuration(object):
         elif 'dev' in env.lower():
             self._base_path = 'https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app'
         else:
-            # self._base_path = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
-            self._base_path = 'https://sample-metadata.populationgenomics.org.au'
+            self._base_path = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
 
         """Default Base url
         """

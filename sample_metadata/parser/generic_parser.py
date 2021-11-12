@@ -125,7 +125,7 @@ class GenericParser:
         """Get contents of file (decoded as utf8)"""
         path = self.file_path(filename)
         if path.startswith('gs://'):
-            blob = self.get_blob(filename)
+            blob = self.get_blob(path)
             try:
                 retval = blob.download_as_string()
                 if isinstance(retval, bytes):
@@ -185,7 +185,9 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(self, file_pointer, delimiter=',', dry_run=False):  # pylint: disable=too-many-branches
+    def parse_manifest(
+        self, file_pointer, delimiter=',', dry_run=False
+    ):  # pylint: disable=too-many-branches
         """
         Parse manifest from iterable (file pointer / String.IO)
         """
@@ -264,7 +266,8 @@ class GenericParser:
             # should we add or update sequencing
             if (
                 external_sample_id in existing_external_id_to_cpgid
-                and existing_external_id_to_cpgid[external_sample_id] in existing_cpgid_to_seq_id
+                and existing_external_id_to_cpgid[external_sample_id]
+                in existing_cpgid_to_seq_id
             ):
                 # update, we have a cpg sample ID AND a sequencing ID
                 cpgid = existing_external_id_to_cpgid[external_sample_id]
@@ -317,6 +320,7 @@ Updating {len(sequences_to_update)} sequences"""
                 project=self.sample_metadata_project, new_sample=new_sample
             )
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
+            existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
         for sample_id, sequences_to_add in sequences_to_add.items():
             for seq in sequences_to_add:
