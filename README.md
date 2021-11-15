@@ -16,6 +16,7 @@ are cached in a secret as group-membership identity checks are slow.
 
 ## Structure
 
+![Database structure](resources/2021-10-27_db-diagram.png)
 
 ## Sample IDs
 
@@ -32,7 +33,7 @@ For example, let's consider the production environment which uses the prefix of 
 > We can then concatenate the results, for the final sample ID to be `CPG123455`.
 
 
-## Local develompent of SM
+## Local development of SM
 
 The recommended way to develop the sample-metadata system is to run a local copy of SM.
 > There have been some reported issues of running a local SM environment on an M1 mac.

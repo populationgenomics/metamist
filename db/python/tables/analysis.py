@@ -143,6 +143,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             for k, v in meta.items():
                 k_replacer = f'meta_{k}'
                 meta_str += f" AND json_extract(meta, '$.{k}') = :{k_replacer}"
+                if v is None:
+                    # mariadb does a bad cast for NULL
+                    v = 'null'
                 values[k_replacer] = v
 
         _query = f"""
