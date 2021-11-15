@@ -129,8 +129,8 @@ async def get_samples_by_criteria(
 
     if project_ids:
         project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, project_ids, readonly=True
-    )
+            connection.author, project_ids, readonly=True
+        )
 
     sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
 
