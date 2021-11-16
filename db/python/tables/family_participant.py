@@ -18,7 +18,6 @@ class FamilyParticipantTable(DbBase):
         participant_id: int,
         paternal_id: int,
         maternal_id: int,
-        sex: int,
         affected: int,
         notes: str = None,
         author=None,
@@ -31,7 +30,6 @@ class FamilyParticipantTable(DbBase):
             'participant_id': participant_id,
             'paternal_participant_id': paternal_id,
             'maternal_participant_id': maternal_id,
-            'sex': sex,
             'affected': affected,
             'notes': notes,
             'author': author or self.author,
@@ -61,7 +59,6 @@ VALUES
         - participant_id
         - paternal_participant_id
         - maternal_participant_id
-        - sex
         - affected
         - notes
         - author
@@ -71,7 +68,6 @@ VALUES
             'participant_id',
             'paternal_participant_id',
             'maternal_participant_id',
-            'sex',
             'affected',
             'notes',
             'author',
@@ -110,17 +106,17 @@ ON DUPLICATE KEY UPDATE
         Get rows from database, return ALL rows unless family_ids is specified.
         """
         keys = [
-            'family_id',
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-            'sex',
-            'affected',
+            'fp.family_id',
+            'fp.participant_id',
+            'fp.paternal_participant_id',
+            'fp.maternal_participant_id',
+            'p.reported_sex as sex',
+            'fp.affected',
         ]
-        keys_str = ', '.join('fp.' + k for k in keys)
+        keys_str = ', '.join(keys)
 
         values = {'project': project or self.project}
-        wheres = ['project = :project']
+        wheres = ['f.project = :project']
         if family_ids:
             wheres.append('family_id in :family_ids')
             values['family_ids'] = family_ids
@@ -130,6 +126,7 @@ ON DUPLICATE KEY UPDATE
         _query = f"""
 SELECT {keys_str} FROM family_participant fp
 INNER JOIN family f ON f.id = fp.family_id
+INNER JOIN participant p on fp.participant_id = p.id
 WHERE {conditions}
         """
 

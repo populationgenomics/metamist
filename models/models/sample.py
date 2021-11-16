@@ -52,16 +52,18 @@ def sample_id_transform_to_raw(
     if isinstance(identifier, list):
         return [sample_id_transform_to_raw(s) for s in identifier]
 
-    if strict and not (isinstance(identifier, str) and identifier.startswith('CPG')):
-        raise Exception(
-            f'Invalid prefix found for CPG sample identifier "{identifier}"'
+    expected_type = str if strict else (str, int)
+    if not isinstance(identifier, expected_type):
+        raise TypeError(
+            f'Expected identifier type to be "{expected_type}", received "{type(identifier)}"'
         )
+
     if isinstance(identifier, int):
         return identifier
 
     if not identifier.startswith(SAMPLE_PREFIX):
         raise Exception(
-            f'Invalid prefix found for CPG sample identifier "{identifier}"'
+            f'Invalid prefix found for {SAMPLE_PREFIX} sample identifier "{identifier}"'
         )
 
     stripped_identifier = identifier.lstrip(SAMPLE_PREFIX)

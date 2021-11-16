@@ -10,7 +10,7 @@ LOCAL_BACKUP_FOLDER = 'latest_backup'
 
 
 def restore(backup_folder=None):
-    """ Restore the database """
+    """Restore the database"""
     print('Starting Restoration')
     if backup_folder is None:
         backup_folder = pull_latest_backup(BACKUP_BUCKET)
@@ -68,7 +68,7 @@ def restore(backup_folder=None):
 
 
 def pull_latest_backup(backup_bucket):
-    """ Assumes no changes to metadata since initial upload """
+    """Assumes no changes to metadata since initial upload"""
     print('Pulling Latest Backup from GCS')
     storage_client = storage.Client()
     blobs = [(blob, blob.updated) for blob in storage_client.list_blobs(backup_bucket)]

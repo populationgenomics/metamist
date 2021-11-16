@@ -4,10 +4,11 @@ on:
     branches:
       - main
       - dev
+
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-#    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -56,7 +57,8 @@ jobs:
               --no-commit --allow-dirty \
               --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
-
+      # we have to build the image first without the web files to
+      # generate the openapi file to then generate the documentation
       - name: "build image"
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
@@ -65,6 +67,19 @@ jobs:
         run: |
           python regenerate_api.py
           ls -lGh sample_metadata
+
+        # also copies build artifacts to api/public
+      - name: "build web front-end"
+        run: |
+          pushd web
+          npm install
+          npm run build
+          popd
+
+      # rebuild docker image now that front-end files are in the right place
+      - name: "build image II"
+        run: |
+          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
       - name: Build sample-metadata API conda package
         run: conda build conda/$(basename $GITHUB_REPOSITORY)

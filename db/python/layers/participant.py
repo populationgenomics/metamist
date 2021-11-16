@@ -6,7 +6,6 @@ from enum import Enum
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer
-from db.python.layers.family import FamilyLayer
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
@@ -396,6 +395,11 @@ class ParticipantLayer(BaseLayer):
         replace_with_family_external_ids=True,
     ) -> List[List[str]]:
         """Get seqr individual level metadata template as List[List[str]]"""
+
+        # avoid circular imports
+        # pylint: disable=import-outside-toplevel
+        from db.python.layers.family import FamilyLayer
+
         ppttable = ParticipantPhenotypeTable(self.connection)
         internal_to_external_pid_map = {}
         internal_to_external_fid_map = {}
@@ -586,3 +590,32 @@ class ParticipantLayer(BaseLayer):
         return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
             project=project
         )
+
+    async def create_participant(
+        self,
+        external_id: str,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author: str = None,
+        project: ProjectId = None,
+    ) -> int:
+        """Create a single participant"""
+        # pylint: disable=unused-argument
+        d = {k: v for k, v in locals().items() if k != 'self'}
+        return await self.pttable.create_participant(**d)
+
+    async def update_participants(
+        self,
+        participant_ids: List[int],
+        reported_sexes: List[int] = None,
+        reported_genders: List[str] = None,
+        karyotypes: List[str] = None,
+        metas: List[Dict] = None,
+        author=None,
+    ):
+        """Update many participants"""
+        # pylint: disable=unused-argument
+        d = {k: v for k, v in locals().items() if k != 'self'}
+        return await self.pttable.update_participants(**d)
