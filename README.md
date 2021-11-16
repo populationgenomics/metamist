@@ -16,6 +16,8 @@ are cached in a secret as group-membership identity checks are slow.
 
 ## Structure
 
+![Database structure](resources/2021-10-27_db-diagram.png)
+
 ### Sample IDs
 
 In an effort to reduce our dependency on potentially mutable external sample IDs with inconsistent format,
@@ -29,7 +31,6 @@ For example, let's consider the production environment which uses the prefix of 
 
 > A sample is given the internal ID `12345`, we calculate the Luhn checksum to be `5` (with no offset applied).
 > We can then concatenate the results, for the final sample ID to be `CPG123455`.
-
 
 ### Reporting sex
 

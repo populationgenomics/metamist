@@ -128,7 +128,7 @@ async def get_latest_complete_analysis_for_type(
     analysis_type: AnalysisType,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete analysis for some analysis type"""
+    """Get (SINGLE) latest complete analysis for some analysis type"""
     alayer = AnalysisLayer(connection)
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project, analysis_type=analysis_type
@@ -148,7 +148,10 @@ async def get_latest_complete_analysis_for_type_post(
     meta: Dict[str, Any] = Body(..., embed=True),
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete analysis for some analysis type"""
+    """
+    Get SINGLE latest complete analysis for some analysis type
+    (you can specify meta attributes in this route)
+    """
     alayer = AnalysisLayer(connection)
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project,
