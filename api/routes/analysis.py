@@ -9,10 +9,11 @@ from fastapi.params import Body
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from db.python.tables.project import ProjectPermissionsTable
+from db.python.layers.analysis import AnalysisLayer
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import Analysis
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
-from db.python.layers.analysis import AnalysisLayer
 
 from api.utils.db import (
     get_projectless_db_connection,
@@ -127,7 +128,7 @@ async def get_latest_complete_analysis_for_type(
     analysis_type: AnalysisType,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete analysis for some analysis type"""
+    """Get (SINGLE) latest complete analysis for some analysis type"""
     alayer = AnalysisLayer(connection)
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project, analysis_type=analysis_type
@@ -147,7 +148,10 @@ async def get_latest_complete_analysis_for_type_post(
     meta: Dict[str, Any] = Body(..., embed=True),
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete analysis for some analysis type"""
+    """
+    Get SINGLE latest complete analysis for some analysis type
+    (you can specify meta attributes in this route)
+    """
     alayer = AnalysisLayer(connection)
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project,
@@ -196,6 +200,26 @@ async def get_analysis_by_id(
     result = await atable.get_analysis_by_id(analysis_id)
     result.sample_ids = sample_id_format(result.sample_ids)
     return result
+
+
+@router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
+async def get_analysis_runner_log(
+    project_names: List[str] = None,
+    connection: Connection = get_projectless_db_connection,
+) -> List[Analysis]:
+    """
+    Get log for the analysis-runner, useful for checking this history of analysis
+    """
+    atable = AnalysisLayer(connection)
+    project_ids = None
+    if project_names:
+        pt = ProjectPermissionsTable(connection=connection.connection)
+        project_ids = await pt.get_project_ids_from_names_and_user(
+            connection.author, project_names, readonly=True
+        )
+
+    results = await atable.get_analysis_runner_log(project_ids=project_ids)
+    return results
 
 
 @router.get(

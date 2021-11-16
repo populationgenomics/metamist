@@ -88,6 +88,17 @@ class SampleLayer(BaseLayer):
         check_project_ids=True,
     ) -> List[Sample]:
         """Get samples by some criteria"""
+        if not sample_ids and not project_ids:
+            raise ValueError('Must specify one of "project_ids" or "sample_ids"')
+        if sample_ids and check_project_ids:
+            # project_ids were already checked when transformed to ints,
+            # so no else required
+
+            projects = self.st.get_project_ids_for_sample_ids(sample_ids)
+            self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
         projects, samples = await self.st.get_samples_by(
             sample_ids=sample_ids,
             meta=meta,
@@ -97,10 +108,6 @@ class SampleLayer(BaseLayer):
         )
         if not samples:
             return []
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
 
         return samples
 

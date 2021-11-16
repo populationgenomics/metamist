@@ -14,9 +14,7 @@ import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
-OUTPUT_DIR = 'sample_metadata'  # in cwd
-
-PACKAGE_NAME = 'sample_metadata'
+MODULE_NAME = 'sample_metadata'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -85,6 +83,9 @@ def start_server() -> Optional[subprocess.Popen]:
 
 def generate_api_and_copy():
     """Get JSON from server"""
+    with open('deploy/python/version.txt', encoding='utf-8') as f:
+        version = f.read().strip()
+
     tmpdir = tempfile.mkdtemp()
     command = [
         'openapi-generator',
@@ -96,9 +97,15 @@ def generate_api_and_copy():
         '-o',
         tmpdir,
         '--package-name',
-        'sample_metadata',
+        MODULE_NAME,
+        '--template-dir',
+        'openapi-templates',
+        '--artifact-version',
+        version,
         '--skip-validate-spec',
     ]
+    jcom = ' '.join(f"'{c}'" for c in command)
+    logger.info('Generating with command: ' + jcom)
     # 5 attempts
     n_attempts = 1
     succeeded = False
@@ -131,10 +138,11 @@ def copy_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py'}
+    files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py', 'parser'}
 
-    dir_to_copy_to = OUTPUT_DIR  # should be relative to this script
-    dir_to_copy_from = os.path.join(tmpdir, 'sample_metadata')
+    module_dir = MODULE_NAME.replace('.', '/')
+    dir_to_copy_to = module_dir  # should be relative to this script
+    dir_to_copy_from = os.path.join(tmpdir, module_dir)
 
     if not os.path.exists(dir_to_copy_to):
         raise FileNotFoundError(
@@ -168,6 +176,19 @@ def copy_files_from(tmpdir):
             shutil.copytree(path_to_copy, output_path)
         else:
             shutil.copy(path_to_copy, output_path)
+
+    docs_dir = os.path.join(tmpdir, 'docs')
+    static_dir = 'web/src/static'
+    output_docs_dir = os.path.join(static_dir, 'sm_docs')
+    if os.path.exists(output_docs_dir):
+        shutil.rmtree(output_docs_dir)
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    shutil.copytree(docs_dir, output_docs_dir)
+    shutil.copy(
+        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'README.md')
+    )
+    shutil.copy('README.md', os.path.join(output_docs_dir, 'index.md'))
 
 
 def main():

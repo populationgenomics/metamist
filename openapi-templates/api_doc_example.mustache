@@ -1,0 +1,48 @@
+```python
+import {{{packageName}}}
+
+from {{{packageName}}} import {{classname}}
+api_instance = {{{classname}}}()
+{{#requiredParams}}
+{{^defaultValue}}
+{{paramName}} = {{{example}}} # {{{dataType}}} | {{{description}}}
+{{/defaultValue}}
+{{/requiredParams}}
+{{#optionalParams}}
+{{paramName}} = {{{example}}} # {{{dataType}}} | {{{description}}}{{^required}} (optional){{/required}}{{#defaultValue}} if omitted the server will use the default value of {{{.}}}{{/defaultValue}}
+{{/optionalParams}}
+{{#requiredParams}}
+{{#-last}}
+
+{{#summary}}
+# {{{.}}}
+{{/summary}}
+{{#returnType}}api_response = {{/returnType}}api_instance.{{{operationId}}}({{#requiredParams}}{{^defaultValue}}{{paramName}}{{^-last}}, {{/-last}}{{/defaultValue}}{{/requiredParams}})
+{{#returnType}}
+print(api_response)
+{{/returnType}}
+{{/-last}}
+{{/requiredParams}}
+{{#optionalParams}}
+{{#-last}}
+{{#summary}}
+# {{{.}}}
+{{/summary}}
+{{#returnType}}api_response = {{/returnType}}api_instance.{{{operationId}}}({{#requiredParams}}{{^defaultValue}}{{paramName}}, {{/defaultValue}}{{/requiredParams}}{{#optionalParams}}{{paramName}}={{paramName}}{{^-last}}, {{/-last}}{{/optionalParams}})
+{{#returnType}}
+print(api_response)
+{{/returnType}}
+{{/-last}}
+{{/optionalParams}}
+{{^requiredParams}}
+{{^optionalParams}}
+{{#summary}}
+# {{{.}}}
+{{/summary}}
+{{#returnType}}api_response = {{/returnType}}api_instance.{{{operationId}}}()
+{{#returnType}}
+print(api_response)
+{{/returnType}}
+{{/optionalParams}}
+{{/requiredParams}}
+```

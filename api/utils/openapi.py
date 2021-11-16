@@ -1,12 +1,16 @@
 from os import getenv
 from fastapi.openapi.utils import get_openapi
 
-env = getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
-URL = None
+env = getenv('SM_ENVIRONMENT', 'local').lower()
+URLS = []
 if 'dev' in env:
-    URL = 'https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app'
+    URLS.append('https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app')
 elif 'prod' in env:
-    URL = 'https://sample-metadata.populationgenomics.org.au'
+    URLS.append('https://sample-metadata.populationgenomics.org.au')
+    URLS.append('https://sample-metadata-api-mnrpw3mdza-ts.a.run.app')
+else:
+    port = getenv('PORT', '8000')
+    URLS.append(f'http://localhost:{port}')
 
 
 def get_openapi_schema_func(app, version):
@@ -22,14 +26,7 @@ def get_openapi_schema_func(app, version):
             routes=app.routes,
         )
 
-        servers = []
-        if URL:
-            servers.append({'url': URL})
-        else:
-            port = getenv('PORT', '8000')
-            servers.append({'url': f'http://localhost:{port}'})
-
-        openapi_schema['servers'] = servers
+        openapi_schema['servers'] = [{'url': url} for url in URLS]
 
         app.openapi_schema = openapi_schema
         return openapi_schema

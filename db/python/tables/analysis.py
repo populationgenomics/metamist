@@ -143,6 +143,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             for k, v in meta.items():
                 k_replacer = f'meta_{k}'
                 meta_str += f" AND json_extract(meta, '$.{k}') = :{k_replacer}"
+                if v is None:
+                    # mariadb does a bad cast for NULL
+                    v = 'null'
                 values[k_replacer] = v
 
         _query = f"""
@@ -269,7 +272,7 @@ WHERE a.id = :analysis_id
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
 
-        project = rows[0].get('project')
+        project = rows[0]['project']
 
         a = Analysis.from_db(**dict(rows[0]))
         for row in rows[1:]:
@@ -299,3 +302,24 @@ ORDER BY a.timestamp_completed DESC
         return [
             list(list(g_rows)[0]) for _, g_rows in groupby(rows, lambda seq: seq['id'])
         ]
+
+    async def get_analysis_runner_log(
+        self, project_ids: List[int] = None
+    ) -> List[Analysis]:
+        """
+        Get log for the analysis-runner, useful for checking this history of analysis
+        """
+        values = {}
+        wheres = [
+            "status = 'unknown'",
+            "json_extract(meta, '$.source') = 'analysis-runner'",
+            'active',
+        ]
+        if project_ids:
+            wheres.append('project in :project_ids')
+            values['project_ids'] = project_ids
+
+        wheres_str = ' AND '.join(wheres)
+        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        rows = await self.connection.fetch_all(_query, values)
+        return [Analysis.from_db(**dict(r)) for r in rows]
