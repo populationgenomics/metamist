@@ -83,6 +83,9 @@ def start_server() -> Optional[subprocess.Popen]:
 
 def generate_api_and_copy():
     """Get JSON from server"""
+    with open('deploy/python/version.txt', encoding='utf-8') as f:
+        version = f.read().strip()
+
     tmpdir = tempfile.mkdtemp()
     command = [
         'openapi-generator',
@@ -95,8 +98,14 @@ def generate_api_and_copy():
         tmpdir,
         '--package-name',
         MODULE_NAME,
+        '--template-dir',
+        'openapi-templates',
+        '--artifact-version',
+        version,
         '--skip-validate-spec',
     ]
+    jcom = ' '.join(f"'{c}'" for c in command)
+    logger.info('Generating with command: ' + jcom)
     # 5 attempts
     n_attempts = 1
     succeeded = False
@@ -167,6 +176,19 @@ def copy_files_from(tmpdir):
             shutil.copytree(path_to_copy, output_path)
         else:
             shutil.copy(path_to_copy, output_path)
+
+    docs_dir = os.path.join(tmpdir, 'docs')
+    static_dir = 'web/src/static'
+    output_docs_dir = os.path.join(static_dir, 'sm_docs')
+    if os.path.exists(output_docs_dir):
+        shutil.rmtree(output_docs_dir)
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    shutil.copytree(docs_dir, output_docs_dir)
+    shutil.copy(
+        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'README.md')
+    )
+    shutil.copy('README.md', os.path.join(output_docs_dir, 'index.md'))
 
 
 def main():

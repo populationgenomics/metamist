@@ -22,6 +22,7 @@ router = APIRouter(prefix='/family', tags=['family'])
 async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
+    create_missing_participants: bool = False,
     connection: Connection = get_project_write_connection,
 ):
     """Get sample by external ID"""
@@ -37,7 +38,11 @@ async def import_pedigree(
             'Only one column was detected in the pedigree, ensure the file is TAB separated (\\t)'
         )
 
-    return {'success': await family_layer.import_pedigree(headers, rows)}
+    return {
+        'success': await family_layer.import_pedigree(
+            headers, rows, create_missing_participants=create_missing_participants
+        )
+    }
 
 
 @router.get(
