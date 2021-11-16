@@ -1,9 +1,10 @@
-from os import getenv
+import os
 import time
 import traceback
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
@@ -25,8 +26,21 @@ _VERSION = '3.5.1'
 
 logger = get_logger()
 
-SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATABASE_CONNECTION'))
+SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()
+
+
+class SPAStaticFiles(StaticFiles):
+    """
+    https://stackoverflow.com/a/68363904
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 404 and not path.startswith('api'):
+            # server index.html if can't find existing resource
+            response = await super().get_response('.', scope)
+        return response
 
 
 @app.on_event('startup')
@@ -86,10 +100,15 @@ app.include_router(participant_router, prefix='/api/v1')
 app.include_router(family_router, prefix='/api/v1')
 app.include_router(project_router, prefix='/api/v1')
 
+static_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
+if os.path.exists(static_dir):
+    # only allow static files if the static files are available
+    app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
+
 app.openapi = get_openapi_schema_func(app, _VERSION)
 
 
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host='0.0.0.0', port=int(getenv('PORT', '8000')), debug=True)
+    uvicorn.run(app, host='0.0.0.0', port=int(os.getenv('PORT', '8000')), debug=True)
