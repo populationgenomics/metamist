@@ -18,7 +18,7 @@ are cached in a secret as group-membership identity checks are slow.
 
 ![Database structure](resources/2021-10-27_db-diagram.png)
 
-## Sample IDs
+### Sample IDs
 
 In an effort to reduce our dependency on potentially mutable external sample IDs with inconsistent format,
 the sample-metadata server generates an internal sample id for every sample. Internally they're an
@@ -32,8 +32,18 @@ For example, let's consider the production environment which uses the prefix of 
 > A sample is given the internal ID `12345`, we calculate the Luhn checksum to be `5` (with no offset applied).
 > We can then concatenate the results, for the final sample ID to be `CPG123455`.
 
+### Reporting sex
 
-## Local development of SM
+To avoid ambiguity in reporting of gender, sex and karyotype - the sample metadata system
+stores these values separately on the `participant` as:
+
+- `reported_gender` (string, expected `male` | `female` | _other values_)
+- `reported_sex` (follows pedigree convention: `unknown=0 | null`, `male=1`, `female=2`)
+- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes)
+
+If you import a pedigree, the sex value is written to the `reported_sex` attribute.
+
+## Local develompent of SM
 
 The recommended way to develop the sample-metadata system is to run a local copy of SM.
 > There have been some reported issues of running a local SM environment on an M1 mac.
