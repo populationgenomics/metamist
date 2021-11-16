@@ -286,7 +286,7 @@ def _copy_files_in_dict(d, dataset: str):
 
 
 def _pretty_format_samples(samples: List[Dict]) -> str:
-    return ', '.join('/'.join([s['id'], s['external_id']]) for s in samples)
+    return ', '.join(f"{s['id']}/{s['external_id']}" for s in samples)
 
 
 def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
