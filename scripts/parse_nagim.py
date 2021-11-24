@@ -464,4 +464,4 @@ cli.add_command(parse)
 
 if __name__ == '__main__':
     # pylint: disable=no-value-for-parameter
-    cli(obj={})  # pylint: disable=unexpected-keyword-arg
+    cli()  # pylint: disable=unexpected-keyword-arg
