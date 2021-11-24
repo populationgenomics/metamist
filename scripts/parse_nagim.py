@@ -1,7 +1,34 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 """
 Prepare populate sample metadata for NAGIM project.
+
+Has 2 commands: transfer and parse.
+
+```
+python scripts/parse_nagim.py transfer \
+    --tmp-dir ~/tmp \
+    --transfer-crams \
+    --transfer-gvcfs
+```
+
+Transfers the CRAM and GVCF files along with correponding indices from a Terra
+workspace to the GCP upload bucket. Currently only works under a personal acccount,
+but ideally Terra bucket can be shared to a service account, so the transfer
+command can be submitted to Hail Batch (with `--use-batch`).
+
+```
+python scripts/parse_nagim.py parse \
+    nagim.samples_list.tsv \
+    --tmp-dir ~/tmp \
+    --skip-checking-objects \
+    --confirm
+```
+
+Assuming CRAM and GVCFs are transferred, populates the sample metadata DB objects.
+The first parameter is a path to a TSV with 2 columns: sample IDs used in the NAGIM
+run, and project ID (in a format defined below in `PROJECT_ID_MAP`).
 """
+
 import dataclasses
 import logging
 import os
