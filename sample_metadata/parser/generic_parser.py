@@ -43,10 +43,14 @@ class GenericParser:
         default_sequence_type='wgs',
         default_sample_type='blood',
         confirm=False,
+        skip_checking_gcs_objects=False,
+        verbose=True,
     ):
 
         self.path_prefix = path_prefix
         self.confirm = confirm
+        self.skip_checking_gcs_objects = skip_checking_gcs_objects
+        self.verbose = verbose
 
         if not sample_metadata_project:
             raise ValueError('sample-metadata project is required')
@@ -170,7 +174,7 @@ class GenericParser:
         """Get sequence-metadata from row"""
 
     def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
-        """Get qc-meta from row, creates a QC object"""
+        """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
@@ -185,11 +189,13 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(
+    def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', dry_run=False
-    ):  # pylint: disable=too-many-branches
+    ) -> Dict[str, str]:
         """
         Parse manifest from iterable (file pointer / String.IO)
+
+        Returns a dict mapping external sample ID to CPG sample ID
         """
         # a sample has many rows
         sample_map = defaultdict(list)
@@ -198,6 +204,9 @@ class GenericParser:
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
+
+        if len(sample_map) == 0:
+            raise ValueError(f'The manifest file contains no records')
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -224,7 +233,9 @@ class GenericParser:
         sequences_to_update: Dict[int, SequenceUpdateModel] = {}
 
         for external_sample_id in sample_map:
-            logger.info(f'Preparing {external_sample_id}')
+            if self.verbose:
+                logger.info(f'Preparing {external_sample_id}')
+
             rows = sample_map[external_sample_id]
 
             if len(rows) == 1:
@@ -327,8 +338,8 @@ Updating {len(sequences_to_update)} sequences"""
                 seq.sample_id = existing_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
-        for sample_id, qc_to_add in qc_to_add.items():
-            for analysis in qc_to_add:
+        for sample_id, analyses in qc_to_add.items():
+            for analysis in analyses:
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
@@ -454,18 +465,23 @@ Updating {len(sequences_to_update)} sequences"""
     ) -> Dict[str, any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
-        md5_filename = self.file_path(filename + '.md5')
-        if self.file_exists(md5_filename):
-            contents = self.file_contents(md5_filename)
-            if contents:
-                checksum = f'md5:{contents.strip()}'
+        if not self.skip_checking_gcs_objects:
+            md5_filename = self.file_path(filename + '.md5')
+            if self.file_exists(md5_filename):
+                contents = self.file_contents(md5_filename)
+                if contents:
+                    checksum = f'md5:{contents.strip()}'
+
+        file_size = None
+        if not self.skip_checking_gcs_objects:
+            file_size = self.file_size(filename)
 
         d = {
             'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
             'checksum': checksum,
-            'size': self.file_size(filename),
+            'size': file_size,
         }
 
         if secondary_files:
@@ -485,7 +501,7 @@ Updating {len(sequences_to_update)} sequences"""
         secondaries = []
         for sec in potential_secondary_patterns:
             sec_file = _apply_secondary_file_format_to_filename(filename, sec)
-            if self.file_exists(sec_file):
+            if self.skip_checking_gcs_objects or self.file_exists(sec_file):
                 secondaries.append(self.create_file_object(sec_file))
 
         return secondaries
