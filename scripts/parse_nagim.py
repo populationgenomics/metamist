@@ -1,6 +1,6 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 """
-Prepare populate sample metadata for NAGIM project.
+Taking Terra results, populate sample-metadata for NAGIM project. 
 
 Has 2 commands: transfer and parse.
 
@@ -25,8 +25,10 @@ python scripts/parse_nagim.py parse \
 ```
 
 Assuming CRAM and GVCFs are transferred, populates the sample metadata DB objects.
-The first parameter is a path to a TSV with 2 columns: sample IDs used in the NAGIM
-run, and project ID (in a format defined below in `PROJECT_ID_MAP`).
+Writes to multiple projects. The first parameter is a path to a TSV with 2 columns: 
+sample IDs used in the NAGIM run, and project ID (in a format defined below in 
+`PROJECT_ID_MAP`). Has to be run under nagim-test or nagim-standard, thus running
+with `analysis-runner --dataset nagim` is recommended.
 """
 
 import dataclasses
@@ -56,6 +58,7 @@ SRC_BUCKETS_TEST = [
 
 SRC_BUCKETS_MAIN = []
 
+# Terra buckets names start with "fc-"
 assert all(b.startswith('gs://fc-') for b in SRC_BUCKETS_MAIN + SRC_BUCKETS_TEST)
 
 PROJECT = 'nagim'
@@ -77,7 +80,6 @@ class Sample:
     """
     Represent a parsed sample so we can populate and fix all the IDs transparently
     """
-
     nagim_id: str = None
     cpg_id: str = None
     ext_id: str = None
@@ -128,7 +130,7 @@ def transfer(
     namespace = 'main' if prod else 'test'
 
     # Putting to -upload because we need to rename them after CPG IDs, and because
-    # we need to run ReblockGVCFs on GVCFs
+    # we need to run ReblockGVCFs on GVCFs.
     upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
     upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
 
@@ -183,7 +185,7 @@ def parse(
     skip_checking_objects: bool,
 ):
     """
-    Assuming the data is transferred to the CPG bucket, populat the SM project.
+    Assuming the data is transferred to the CPG bucket, populate the SM projects.
     """
     namespace = 'main' if prod else 'test'
 
@@ -194,12 +196,14 @@ def parse(
     # corresponding TBI/CRAM, and initializing the sample list.
     samples = _find_upload_files(upload_gvcf_bucket, upload_cram_bucket, tmp_dir)
 
-    # Checks sample and project IDs.
+    # Annotate project IDs so we can split samples between correponding SM projects.
+    samples = _set_project_ids(samples, sample_to_project_path)
     # Some samples processed with Terra use CPG IDs, checking if we already
     # have them in the SMDB and fixing the external IDs.
-    samples = _fix_ids(samples, sample_to_project_path, prod=prod)
+    samples = _fix_sample_ids(samples, prod=prod)
 
-    # Creating a parser for each project separately
+    # Creating a parser for each project separately, because `sample_metadata_project`
+    # is an initialization parameter, and we want to write to multiple projects.
     for proj_id in PROJECT_ID_MAP.values():
         sm_proj_id = proj_id if prod else f'{proj_id}-test'
         sample_tsv_file = join(tmp_dir, f'samples-{sm_proj_id}.csv')
@@ -234,15 +238,15 @@ def parse(
             parser.parse_manifest(f, dry_run=dry_run)
 
 
-def _fix_ids(
-    samples_from_found_files: List[Sample],
-    sample_to_project_path: str,
-    prod: bool,
-) -> List[Sample]:
+def _fix_sample_ids(samples: List[Sample], prod: bool) -> List[Sample]:
+    """
+    Some samples processed with Terra use CPG IDs, so checking if we already
+    have them in the SMDB, and fixing the external IDs.
+    """
+    sm_proj_ids = [
+        f'{proj}-test' if not prod else proj for proj in PROJECT_ID_MAP.values()
+    ]
     sapi = SampleApi()
-
-    proj_ids = PROJECT_ID_MAP.values()
-    sm_proj_ids = [f'{proj}-test' if not prod else proj for proj in proj_ids]
     sm_sample_dicts = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
             'project_ids': sm_proj_ids,
@@ -253,30 +257,9 @@ def _fix_ids(
     cpgid_to_extid = {s['id']: s['external_id'] for s in sm_sample_dicts}
     extid_to_cpgid = {s['external_id']: s['id'] for s in sm_sample_dicts}
 
-    # Parse KCCG metadata (two columns: sample and project)
-    proj_by_nagim_id = dict()
-    with open(sample_to_project_path) as f:
-        for line in f:
-            if line.strip():
-                nagim_id, proj = line.strip().split('\t')
-                nagim_id = nagim_id.split('.')[
-                    0
-                ]  # AAACD__ST-E00141_HKJ2MCCXX.3 -> AAACD__ST-E00141_HKJ2MCCXX
-                proj_by_nagim_id[nagim_id] = PROJECT_ID_MAP[proj]
-
-    # Setting up project IDs
-    for sample in samples_from_found_files:
-        if sample.nagim_id not in proj_by_nagim_id:
-            logger.critical(
-                f'Sample {sample.nagim_id} not found in {sample_to_project_path}'
-            )
-            sys.exit(1)
-
-        sample.project_id = proj_by_nagim_id[sample.nagim_id]
-
     # Fixing sample IDs. Some samples (tob-wgs and acute-care)
     # have CPG IDs as nagim ids, some don't
-    for sample in samples_from_found_files:
+    for sample in samples:
         if sample.nagim_id in extid_to_cpgid:
             sample.ext_id = sample.nagim_id
             sample.cpg_id = extid_to_cpgid[sample.nagim_id]
@@ -286,7 +269,38 @@ def _fix_ids(
         else:
             sample.ext_id = sample.nagim_id
 
-    return samples_from_found_files
+    return samples
+
+
+def _set_project_ids(
+    samples: List[Sample],
+    sample_to_project_map_fpath: str,
+) -> List[Sample]:
+    """
+    Use sample-project map provided by the KCCG to set project IDs.
+    `sample_to_project_map_fpath` has two columns: sample and project name.
+    """
+    proj_by_nagim_id = dict()
+    with open(sample_to_project_map_fpath) as f:
+        for line in f:
+            if line.strip():
+                nagim_id, proj = line.strip().split('\t')
+                nagim_id = nagim_id.split('.')[
+                    0
+                ]  # AAACD__ST-E00141_HKJ2MCCXX.3 -> AAACD__ST-E00141_HKJ2MCCXX
+                proj_by_nagim_id[nagim_id] = PROJECT_ID_MAP[proj]
+
+    # Setting up project IDs
+    for sample in samples:
+        if sample.nagim_id not in proj_by_nagim_id:
+            logger.critical(
+                f'Sample {sample.nagim_id} not found in {sample_to_project_map_fpath}'
+            )
+            sys.exit(1)
+
+        sample.project_id = proj_by_nagim_id[sample.nagim_id]
+
+    return samples
 
 
 def _transfer_cram_from_terra(upload_bucket: str, prod: bool, hbatch=None):
@@ -354,7 +368,7 @@ class NagimParser(GenericParser):
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         sequence_meta = dict()
-        if 'gvcf' in row and row['gvcf'] and row['gvcf'] != '-':
+        if 'gvcf' in row and row['gvcf']:
             gvcf, variants_type = self.parse_file([row['gvcf']])
             sequence_meta['gvcf'] = gvcf
             sequence_meta['gvcf_type'] = variants_type
