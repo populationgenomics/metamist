@@ -80,6 +80,7 @@ class Sample:
     """
     Represent a parsed sample so we can populate and fix all the IDs transparently
     """
+
     nagim_id: str = None
     cpg_id: str = None
     ext_id: str = None

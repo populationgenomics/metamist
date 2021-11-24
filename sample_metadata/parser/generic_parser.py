@@ -206,8 +206,7 @@ class GenericParser:
             sample_map[sample_id].append(row)
 
         if len(sample_map) == 0:
-            logger.error(f'No sample information read from the manifest')
-            return dict()
+            raise ValueError(f'The manifest file contains no records')
 
         # now we can start adding!!
         sapi = SampleApi()
