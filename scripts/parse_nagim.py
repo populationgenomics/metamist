@@ -11,8 +11,8 @@ python scripts/parse_nagim.py transfer \
     --transfer-gvcfs
 ```
 
-Transfers the CRAM and GVCF files along with correponding indices from a Terra
-workspace to the GCP upload bucket. Currently only works under a personal acccount,
+Transfers the CRAM and GVCF files along with corresponding indices from a Terra
+workspace to the GCP upload bucket. Currently only works under a personal account,
 but ideally Terra bucket can be shared to a service account, so the transfer
 command can be submitted to Hail Batch (with `--use-batch`).
 
