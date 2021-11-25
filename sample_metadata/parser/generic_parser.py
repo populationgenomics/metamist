@@ -270,7 +270,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 )
                 # ignore QC results if sample already exists
 
-            analyses_to_add[external_sample_id] = collapsed_analyses
+            if collapsed_analyses:
+                analyses_to_add[external_sample_id].extend(collapsed_analyses)
 
             if collapsed_qc:
                 analyses_to_add[external_sample_id].append(
