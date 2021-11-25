@@ -33,7 +33,7 @@ rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
 
 
-class GenericParser:
+class GenericParser:  # pylint: disable=too-many-public-methods
     """Parser for VCGS manifest"""
 
     def __init__(
@@ -173,6 +173,10 @@ class GenericParser:
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
+    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
+        """Get analysis objects from row"""
+        return []
+
     def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
@@ -228,6 +232,7 @@ class GenericParser:
         # by external_sample_id
         sequences_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
         qc_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
+        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
         sequences_to_update: Dict[int, SequenceUpdateModel] = {}
@@ -244,6 +249,7 @@ class GenericParser:
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
             collapsed_qc = self.get_qc_meta(external_sample_id, rows)
+            collapsed_analyses = self.get_analyses(external_sample_id, rows)
 
             sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
@@ -257,15 +263,6 @@ class GenericParser:
                     )
                 )
 
-                if collapsed_qc:
-                    qc_to_add[external_sample_id].append(
-                        AnalysisModel(
-                            sample_ids=['<none>'],
-                            type='qc',
-                            status='completed',
-                            meta=collapsed_qc,
-                        )
-                    )
             else:
                 # it already exists
                 cpgid = existing_external_id_to_cpgid[external_sample_id]
@@ -273,6 +270,18 @@ class GenericParser:
                     meta=collapsed_sample_meta,
                 )
                 # ignore QC results if sample already exists
+
+            analyses_to_add[external_sample_id] = collapsed_analyses
+
+            if collapsed_qc:
+                analyses_to_add[external_sample_id].append(
+                    AnalysisModel(
+                        sample_ids=['<none>'],
+                        type='qc',
+                        status='completed',
+                        meta=collapsed_qc,
+                    )
+                )
 
             # should we add or update sequencing
             if (
@@ -302,7 +311,7 @@ Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequences_to_add)} sequences
-Adding {len(qc_to_add)} QC analysis results
+Adding {len(analyses_to_add)} analysis results
 
 Updating {len(samples_to_update)} sample
 Updating {len(sequences_to_update)} sequences"""
@@ -315,6 +324,7 @@ Updating {len(sequences_to_update)} sequences"""
                 samples_to_update,
                 sequences_to_update,
                 qc_to_add,
+                analyses_to_add,
             )
 
         if self.confirm:
@@ -338,7 +348,7 @@ Updating {len(sequences_to_update)} sequences"""
                 seq.sample_id = existing_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
-        for sample_id, analyses in qc_to_add.items():
+        for sample_id, analyses in analyses_to_add.items():
             for analysis in analyses:
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
