@@ -105,5 +105,5 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'freemix': '0.01',
                 'pct_chimeras': '0.01',
             },
-            qc_to_add['<sample-id>'][0].meta,
+            analyses_to_add['<sample-id>'][0].meta,
         )
