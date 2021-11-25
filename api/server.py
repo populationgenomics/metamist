@@ -22,7 +22,7 @@ from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
 # This tag is automatically updated by bump2version
-_VERSION = '3.5.1'
+_VERSION = '3.5.2'
 
 logger = get_logger()
 

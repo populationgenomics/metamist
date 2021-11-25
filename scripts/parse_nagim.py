@@ -66,6 +66,8 @@ import click
 import pandas as pd
 
 from cpg_pipes.pipeline import setup_batch
+
+from sample_metadata.models.analysis_model import AnalysisModel
 from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
 from sample_metadata import SampleApi
 
@@ -265,7 +267,7 @@ def parse(
             confirm=confirm,
             verbose=False,
         )
-        with open(sample_tsv_file, encoding='locale') as f:
+        with open(sample_tsv_file) as f:
             parser.parse_manifest(f, dry_run=dry_run)
 
 
@@ -312,7 +314,7 @@ def _set_project_ids(
     `sample_to_project_map_fpath` has two columns: sample and project name.
     """
     proj_by_nagim_id = {}
-    with open(sample_to_project_map_fpath, encoding='locale') as f:
+    with open(sample_to_project_map_fpath) as f:
         for line in f:
             if line.strip():
                 nagim_id, proj = line.strip().split('\t')
@@ -406,17 +408,34 @@ class NagimParser(GenericParser):
     def get_sample_id(self, row: Dict[str, any]) -> str:
         return row['ext_id']
 
+    def get_analyses(self, sample_id: str, row: Dict[str, any]) -> List[AnalysisModel]:
+        gvcf = row.get('gvcf')
+        cram = row.get('cram')
+        results = []
+        if gvcf:
+            results.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type='gvcf',
+                    status='in-progress',
+                    output=gvcf,
+                    meta={'source': 'nagim'},
+                )
+            )
+        if cram:
+            results.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type='cram',
+                    status='in-progress',
+                    output=gvcf,
+                    meta={'source': 'nagim'},
+                )
+            )
+        return results
+
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        sequence_meta = {}
-        if 'gvcf' in row and row['gvcf']:
-            gvcf, variants_type = self.parse_file([row['gvcf']])
-            sequence_meta['gvcf'] = gvcf
-            sequence_meta['gvcf_type'] = variants_type
-        if 'cram' in row and row['cram'] and row['cram'] != '-':
-            reads, reads_type = self.parse_file([row['cram']])
-            sequence_meta['reads'] = reads
-            sequence_meta['reads_type'] = reads_type
-        return sequence_meta
+        return {}
 
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         return 'uploaded'
@@ -437,7 +456,7 @@ def _get_bucket_ls(
             ext = [ext]
         for e in ext:
             _call(f'gsutil ls "{source_bucket}/*{e}" >> {output_path}')
-    with open(output_path, encoding='locale') as f:
+    with open(output_path) as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
