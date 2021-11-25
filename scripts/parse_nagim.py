@@ -35,21 +35,22 @@ sample metadata DB objects:
 
 ```
 python scripts/parse_nagim.py parse \
-    nagim.samples_list.tsv \
+    nagim-terra-samples.tsv \
     --skip-checking-objects \
     --confirm
 ```
 
 It would write each sample to a corresponding project according to the map provided
-as the first positional argument (`nagim.samples_list.tsv`). The file should be TSV
+as the first positional argument (`nagim-terra-samples.tsv`). The file should be TSV
 with 2 columns: sample IDs used in the NAGIM run, and a project ID.
 
-The `--skip-checking-objects` tells the parser to skip cheching the bucket object
-existence, which is useful to speed up the execution as long as we trust
- the transfer hat happened in the previous `transfer` command.
+The `--skip-checking-objects` tells the parser to skip checking the existence of
+objects on buckets, which is useful to speed up the execution as long as we trust
+the transfer hat happened in the previous `transfer` command. It would also
+disable md5 and file size checks.
 
 The script also has to be run under nagim-test or nagim-standard. The `standard`
-access level needed to populate the data from production results, which is done by
+access level needed to populate data from a production run, which is controlled by
 adding `--prod` flag to both `transfer` and `parse` commands.
 """
 
