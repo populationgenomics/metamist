@@ -195,7 +195,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', dry_run=False
-    ) -> Dict[str, str]:
+    ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
 
@@ -231,7 +231,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequences_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
-        qc_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
@@ -323,7 +322,6 @@ Updating {len(sequences_to_update)} sequences"""
                 sequences_to_add,
                 samples_to_update,
                 sequences_to_update,
-                qc_to_add,
                 analyses_to_add,
             )
 
