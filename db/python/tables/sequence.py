@@ -21,11 +21,18 @@ class SampleSequencingTable(DbBase):
         _query = """
 SELECT s.project FROM sample_sequencing sq
 INNER JOIN sample s ON s.id = sq.sample_id
-WHERE s.id in :sequence_ids
+WHERE sq.id in :sequence_ids
 GROUP BY s.project
 """
+        if len(sequence_ids) == 0:
+            raise ValueError('Received no sequence IDs to get project ids for')
         rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
-        return set(r['project'] for r in rows)
+        projects = set(r['project'] for r in rows)
+        if not projects:
+            raise ValueError(
+                'No projects were found for given sequences, this is likely an error'
+            )
+        return projects
 
     async def insert_many_sequencing(
         self,
