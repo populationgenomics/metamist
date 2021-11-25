@@ -50,6 +50,21 @@ class AnalysisUpdateModel(BaseModel):
     active: bool = None
 
 
+class AnalysisQueryModel(BaseModel):
+    """Used to query for many analysis"""
+
+    # sample_ids means it contains the analysis contains at least one of the sample_ids in the list
+    sample_ids: List[str] = None
+    # # sample_ids_all means the analysis contains ALL of the sample_ids
+    # sample_ids_all: List[str] = None
+    projects: List[str] = None
+    type: AnalysisType = None
+    status: AnalysisStatus = None
+    meta: Dict[str, Any] = None
+    output: str = None
+    active: bool = None
+
+
 @router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
 async def create_new_analysis(
     analysis: AnalysisModel, connection: Connection = get_project_write_connection
@@ -200,6 +215,36 @@ async def get_analysis_by_id(
     result = await atable.get_analysis_by_id(analysis_id)
     result.sample_ids = sample_id_format(result.sample_ids)
     return result
+
+
+@router.post('/query', operation_id='queryAnalyses')
+async def query_analyses(
+    query: AnalysisQueryModel, connection: Connection = get_projectless_db_connection
+):
+    """Get analyses by some criteria"""
+    if not query.projects:
+        raise ValueError('Must specify "projects"')
+
+    pt = ProjectPermissionsTable(connection=connection.connection)
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, query.projects, readonly=True
+    )
+    atable = AnalysisLayer(connection)
+    analyses = await atable.query_analysis(
+        sample_ids=sample_id_transform_to_raw(query.sample_ids)
+        if query.sample_ids
+        else None,
+        project_ids=project_ids,
+        analysis_type=query.type,
+        status=query.status,
+        meta=query.meta,
+        output=query.output,
+        active=query.active,
+    )
+    for analysis in analyses:
+        analysis.sample_ids = sample_id_format(analysis.sample_ids)
+
+    return analyses
 
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')

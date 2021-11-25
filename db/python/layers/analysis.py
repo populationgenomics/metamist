@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -95,6 +95,37 @@ class AnalysisLayer(BaseLayer):
     ) -> List[List[str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
         return await self.at.get_sample_cram_path_map_for_seqr(project=project)
+
+    async def query_analysis(
+        self,
+        sample_ids: List[int] = None,
+        sample_ids_all: List[int] = None,
+        project_ids: List[int] = None,
+        analysis_type: AnalysisType = None,
+        status: AnalysisStatus = None,
+        meta: Dict[str, Any] = None,
+        output: str = None,
+        active: bool = None,
+    ):
+        """
+        :param sample_ids: sample_ids means it contains the analysis contains at least one of the sample_ids in the list
+        :param sample_ids_all: sample_ids_all means the analysis contains ALL of the sample_ids
+        """
+        if sample_ids and sample_ids_all:
+            raise ValueError("Can't search for both sample_ids and sample_ids_all")
+
+        analyses = await self.at.query_analysis(
+            sample_ids=sample_ids,
+            sample_ids_all=sample_ids_all,
+            project_ids=project_ids,
+            analysis_type=analysis_type,
+            status=status,
+            meta=meta,
+            output=output,
+            active=active,
+        )
+
+        return analyses
 
     # CREATE / UPDATE
 
