@@ -265,7 +265,7 @@ def parse(
             confirm=confirm,
             verbose=False,
         )
-        with open(sample_tsv_file) as f:
+        with open(sample_tsv_file, encoding='locale') as f:
             parser.parse_manifest(f, dry_run=dry_run)
 
 
@@ -312,7 +312,7 @@ def _set_project_ids(
     `sample_to_project_map_fpath` has two columns: sample and project name.
     """
     proj_by_nagim_id = {}
-    with open(sample_to_project_map_fpath) as f:
+    with open(sample_to_project_map_fpath, encoding='locale') as f:
         for line in f:
             if line.strip():
                 nagim_id, proj = line.strip().split('\t')
@@ -437,7 +437,7 @@ def _get_bucket_ls(
             ext = [ext]
         for e in ext:
             _call(f'gsutil ls "{source_bucket}/*{e}" >> {output_path}')
-    with open(output_path) as f:
+    with open(output_path, encoding='locale') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
