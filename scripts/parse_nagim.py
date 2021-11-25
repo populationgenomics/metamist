@@ -1,34 +1,57 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 """
-Taking Terra results, populate sample-metadata for NAGIM project. 
+Taking Terra results, populate sample-metadata for NAGIM project.
 
 Has 2 commands: transfer and parse.
 
+The following command transfers the CRAM and GVCF files along with corresponding
+indices from a Terra workspace to the GCP upload bucket.
+
 ```
 python scripts/parse_nagim.py transfer \
-    --tmp-dir ~/tmp \
     --transfer-crams \
-    --transfer-gvcfs
+    --transfer-gvcfs \
+    --use-batch
 ```
 
-Transfers the CRAM and GVCF files along with corresponding indices from a Terra
-workspace to the GCP upload bucket. Currently only works under a personal account,
-but ideally Terra bucket can be shared to a service account, so the transfer
-command can be submitted to Hail Batch (with `--use-batch`).
+This can be run through the analysis runner with the `nagim` dataset, because
+the hail nagim service accounts were added as readers to the Terra workspace using
+[Terra tools](https://github.com/broadinstitute/terra-tools/tree/master/scripts/register_service_account)
+as follows:
+
+```
+git clone https://github.com/broadinstitute/terra-tools
+python terra-tools/scripts/register_service_account/register_service_account.py \
+    --json_credentials nagim-test-133-hail.json \
+    --owner_email vladislav.savelyev@populationgenomics.org.au
+```
+
+(Assuming the `-j` value is the JSON key for the hail "test" service account - so
+should repeat the same command for the "standard" one - and the `-e` value is
+the email where notifications will be sent to.)
+
+Now, assuming CRAM and GVCFs are transferred, the following command populates the
+sample metadata DB objects:
 
 ```
 python scripts/parse_nagim.py parse \
-    nagim.samples_list.tsv \
-    --tmp-dir ~/tmp \
+    nagim-terra-samples.tsv \
     --skip-checking-objects \
     --confirm
 ```
 
-Assuming CRAM and GVCFs are transferred, populates the sample metadata DB objects.
-Writes to multiple projects. The first parameter is a path to a TSV with 2 columns: 
-sample IDs used in the NAGIM run, and project ID (in a format defined below in 
-`PROJECT_ID_MAP`). Has to be run under nagim-test or nagim-standard, thus running
-with `analysis-runner --dataset nagim` is recommended.
+It would write each sample to a corresponding project according to the map provided
+as the first positional argument (`nagim-terra-samples.tsv`). The file should be TSV
+with 2 columns: sample IDs used in the NAGIM run, and a project ID.
+
+The `--skip-checking-objects` tells the parser to skip checking the existence of
+objects on buckets, which is useful to speed up the execution as long as we trust
+the transfer hat happened in the previous `transfer` command. It would also
+disable md5 and file size checks.
+
+The script also has to be run under nagim-test or nagim-standard. The `standard`
+access level needed to populate data from a production run, which is controlled by
+adding `--prod` flag to both `transfer` and `parse` commands.
 """
 
 import dataclasses
@@ -36,6 +59,7 @@ import logging
 import os
 import subprocess
 import sys
+import tempfile
 from os.path import join, exists
 from typing import List, Dict, Union
 import click
@@ -130,6 +154,9 @@ def transfer(
 
     namespace = 'main' if prod else 'test'
 
+    if not tmp_dir:
+        tmp_dir = tempfile.gettempdir()
+
     # Putting to -upload because we need to rename them after CPG IDs, and because
     # we need to run ReblockGVCFs on GVCFs.
     upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
@@ -193,6 +220,9 @@ def parse(
     upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
     upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
 
+    if not tmp_dir:
+        tmp_dir = tempfile.gettempdir()
+
     # Finds GVCFs and CRAMs after transferring, and checks that all of them have
     # corresponding TBI/CRAM, and initializing the sample list.
     samples = _find_upload_files(upload_gvcf_bucket, upload_cram_bucket, tmp_dir)
@@ -207,7 +237,7 @@ def parse(
     # is an initialization parameter, and we want to write to multiple projects.
     for proj_id in PROJECT_ID_MAP.values():
         sm_proj_id = proj_id if prod else f'{proj_id}-test'
-        sample_tsv_file = join(tmp_dir, f'samples-{sm_proj_id}.csv')
+        sample_tsv_file = join(tmp_dir, f'sm-nagim-parser-samples-{sm_proj_id}.csv')
         df = pd.DataFrame(
             dict(
                 cpg_id=s.cpg_id,
@@ -235,7 +265,7 @@ def parse(
             confirm=confirm,
             verbose=False,
         )
-        with open(sample_tsv_file) as f:
+        with open(sample_tsv_file, encoding='locale') as f:
             parser.parse_manifest(f, dry_run=dry_run)
 
 
@@ -281,15 +311,24 @@ def _set_project_ids(
     Use sample-project map provided by the KCCG to set project IDs.
     `sample_to_project_map_fpath` has two columns: sample and project name.
     """
-    proj_by_nagim_id = dict()
-    with open(sample_to_project_map_fpath) as f:
+    proj_by_nagim_id = {}
+    with open(sample_to_project_map_fpath, encoding='locale') as f:
         for line in f:
             if line.strip():
                 nagim_id, proj = line.strip().split('\t')
-                nagim_id = nagim_id.split('.')[
-                    0
-                ]  # AAACD__ST-E00141_HKJ2MCCXX.3 -> AAACD__ST-E00141_HKJ2MCCXX
-                proj_by_nagim_id[nagim_id] = PROJECT_ID_MAP[proj]
+
+                # AAACD__ST-E00141_HKJ2MCCXX.3 -> AAACD__ST-E00141_HKJ2MCCXX
+                nagim_id = nagim_id.split('.')[0]
+
+                if proj in PROJECT_ID_MAP.values():
+                    cpg_proj = proj
+                elif proj in PROJECT_ID_MAP:
+                    cpg_proj = PROJECT_ID_MAP[proj]
+                else:
+                    raise ValueError(
+                        f'Unknown project {proj}. Known project IDs: {PROJECT_ID_MAP}'
+                    )
+                proj_by_nagim_id[nagim_id] = cpg_proj
 
     # Setting up project IDs
     for sample in samples:
@@ -359,7 +398,7 @@ class NagimParser(GenericParser):
     """
 
     def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        return dict()
+        return {}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -368,7 +407,7 @@ class NagimParser(GenericParser):
         return row['ext_id']
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
-        sequence_meta = dict()
+        sequence_meta = {}
         if 'gvcf' in row and row['gvcf']:
             gvcf, variants_type = self.parse_file([row['gvcf']])
             sequence_meta['gvcf'] = gvcf
@@ -390,15 +429,15 @@ def _get_bucket_ls(
     overwrite,
 ) -> List[str]:
     label = ext.replace('.', '-')
-    output_path = join(tmp_dir, f'gs-ls{label}.txt')
+    output_path = join(tmp_dir, f'sm-nagim-parser-gs-ls{label}.txt')
     if overwrite or not exists(output_path):
-        _call(f'test -e {output_path} && rm {output_path}')
+        _call(f'test ! -e {output_path} || rm {output_path}')
         _call(f'touch {output_path}')
         if isinstance(ext, str):
             ext = [ext]
         for e in ext:
             _call(f'gsutil ls "{source_bucket}/*{e}" >> {output_path}')
-    with open(output_path) as f:
+    with open(output_path, encoding='locale') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
@@ -434,10 +473,10 @@ def _find_upload_files(
     )
 
     file_by_type_by_sid = {
-        'gvcf': dict(),
-        'tbi': dict(),
-        'cram': dict(),
-        'crai': dict(),
+        'gvcf': {},
+        'tbi': {},
+        'cram': {},
+        'crai': {},
     }
 
     for fname in gvcf_paths:
