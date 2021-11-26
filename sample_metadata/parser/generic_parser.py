@@ -33,7 +33,7 @@ rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
 
 
-class GenericParser:
+class GenericParser:  # pylint: disable=too-many-public-methods
     """Parser for VCGS manifest"""
 
     def __init__(
@@ -43,10 +43,14 @@ class GenericParser:
         default_sequence_type='wgs',
         default_sample_type='blood',
         confirm=False,
+        skip_checking_gcs_objects=False,
+        verbose=True,
     ):
 
         self.path_prefix = path_prefix
         self.confirm = confirm
+        self.skip_checking_gcs_objects = skip_checking_gcs_objects
+        self.verbose = verbose
 
         if not sample_metadata_project:
             raise ValueError('sample-metadata project is required')
@@ -169,8 +173,12 @@ class GenericParser:
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
         """Get sequence-metadata from row"""
 
+    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
+        """Get analysis objects from row"""
+        return []
+
     def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
-        """Get qc-meta from row, creates a QC object"""
+        """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
     def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
@@ -185,11 +193,13 @@ class GenericParser:
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
         """Get sequence status from row"""
 
-    def parse_manifest(
+    def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', dry_run=False
-    ):  # pylint: disable=too-many-branches
+    ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
+
+        Returns a dict mapping external sample ID to CPG sample ID
         """
         # a sample has many rows
         sample_map = defaultdict(list)
@@ -198,6 +208,9 @@ class GenericParser:
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
+
+        if len(sample_map) == 0:
+            raise ValueError(f'The manifest file contains no records')
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -218,13 +231,15 @@ class GenericParser:
         samples_to_add: List[NewSample] = []
         # by external_sample_id
         sequences_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
-        qc_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
+        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
         sequences_to_update: Dict[int, SequenceUpdateModel] = {}
 
         for external_sample_id in sample_map:
-            logger.info(f'Preparing {external_sample_id}')
+            if self.verbose:
+                logger.info(f'Preparing {external_sample_id}')
+
             rows = sample_map[external_sample_id]
 
             if len(rows) == 1:
@@ -233,6 +248,7 @@ class GenericParser:
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
             collapsed_qc = self.get_qc_meta(external_sample_id, rows)
+            collapsed_analyses = self.get_analyses(external_sample_id, rows)
 
             sample_type = str(self.get_sample_type(external_sample_id, rows))
             sequence_status = self.get_sequence_status(external_sample_id, rows)
@@ -246,15 +262,6 @@ class GenericParser:
                     )
                 )
 
-                if collapsed_qc:
-                    qc_to_add[external_sample_id].append(
-                        AnalysisModel(
-                            sample_ids=['<none>'],
-                            type='qc',
-                            status='completed',
-                            meta=collapsed_qc,
-                        )
-                    )
             else:
                 # it already exists
                 cpgid = existing_external_id_to_cpgid[external_sample_id]
@@ -262,6 +269,19 @@ class GenericParser:
                     meta=collapsed_sample_meta,
                 )
                 # ignore QC results if sample already exists
+
+            if collapsed_analyses:
+                analyses_to_add[external_sample_id].extend(collapsed_analyses)
+
+            if collapsed_qc:
+                analyses_to_add[external_sample_id].append(
+                    AnalysisModel(
+                        sample_ids=['<none>'],
+                        type='qc',
+                        status='completed',
+                        meta=collapsed_qc,
+                    )
+                )
 
             # should we add or update sequencing
             if (
@@ -291,7 +311,7 @@ Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequences_to_add)} sequences
-Adding {len(qc_to_add)} QC analysis results
+Adding {len(analyses_to_add)} analysis results
 
 Updating {len(samples_to_update)} sample
 Updating {len(sequences_to_update)} sequences"""
@@ -303,7 +323,7 @@ Updating {len(sequences_to_update)} sequences"""
                 sequences_to_add,
                 samples_to_update,
                 sequences_to_update,
-                qc_to_add,
+                analyses_to_add,
             )
 
         if self.confirm:
@@ -327,8 +347,8 @@ Updating {len(sequences_to_update)} sequences"""
                 seq.sample_id = existing_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
-        for sample_id, qc_to_add in qc_to_add.items():
-            for analysis in qc_to_add:
+        for sample_id, analyses in analyses_to_add.items():
+            for analysis in analyses:
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
@@ -454,18 +474,23 @@ Updating {len(sequences_to_update)} sequences"""
     ) -> Dict[str, any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
-        md5_filename = self.file_path(filename + '.md5')
-        if self.file_exists(md5_filename):
-            contents = self.file_contents(md5_filename)
-            if contents:
-                checksum = f'md5:{contents.strip()}'
+        if not self.skip_checking_gcs_objects:
+            md5_filename = self.file_path(filename + '.md5')
+            if self.file_exists(md5_filename):
+                contents = self.file_contents(md5_filename)
+                if contents:
+                    checksum = f'md5:{contents.strip()}'
+
+        file_size = None
+        if not self.skip_checking_gcs_objects:
+            file_size = self.file_size(filename)
 
         d = {
             'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
             'checksum': checksum,
-            'size': self.file_size(filename),
+            'size': file_size,
         }
 
         if secondary_files:
@@ -485,7 +510,7 @@ Updating {len(sequences_to_update)} sequences"""
         secondaries = []
         for sec in potential_secondary_patterns:
             sec_file = _apply_secondary_file_format_to_filename(filename, sec)
-            if self.file_exists(sec_file):
+            if self.skip_checking_gcs_objects or self.file_exists(sec_file):
                 secondaries.append(self.create_file_object(sec_file))
 
         return secondaries
