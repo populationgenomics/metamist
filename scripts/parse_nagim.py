@@ -1,0 +1,540 @@
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
+"""
+Taking Terra results, populate sample-metadata for NAGIM project.
+
+Has 2 commands: transfer and parse.
+
+The following command transfers the CRAM and GVCF files along with corresponding
+indices from a Terra workspace to the GCP upload bucket.
+
+```
+python scripts/parse_nagim.py transfer \
+    --transfer-crams \
+    --transfer-gvcfs \
+    --use-batch
+```
+
+This can be run through the analysis runner with the `nagim` dataset, because
+the hail nagim service accounts were added as readers to the Terra workspace using
+[Terra tools](https://github.com/broadinstitute/terra-tools/tree/master/scripts/register_service_account)
+as follows:
+
+```
+git clone https://github.com/broadinstitute/terra-tools
+python terra-tools/scripts/register_service_account/register_service_account.py \
+    --json_credentials nagim-test-133-hail.json \
+    --owner_email vladislav.savelyev@populationgenomics.org.au
+```
+
+(Assuming the `-j` value is the JSON key for the hail "test" service account - so
+should repeat the same command for the "standard" one - and the `-e` value is
+the email where notifications will be sent to.)
+
+Now, assuming CRAM and GVCFs are transferred, the following command populates the
+sample metadata DB objects:
+
+```
+python scripts/parse_nagim.py parse \
+    nagim-terra-samples.tsv \
+    --skip-checking-objects \
+    --confirm
+```
+
+It would write each sample to a corresponding project according to the map provided
+as the first positional argument (`nagim-terra-samples.tsv`). The file should be TSV
+with 2 columns: sample IDs used in the NAGIM run, and a project ID.
+
+The `--skip-checking-objects` tells the parser to skip checking the existence of
+objects on buckets, which is useful to speed up the execution as long as we trust
+the transfer hat happened in the previous `transfer` command. It would also
+disable md5 and file size checks.
+
+The script also has to be run under nagim-test or nagim-standard. The `standard`
+access level needed to populate data from a production run, which is controlled by
+adding `--prod` flag to both `transfer` and `parse` commands.
+"""
+
+import dataclasses
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+from os.path import join, exists
+from typing import List, Dict, Union
+import click
+import pandas as pd
+
+from cpg_pipes.pipeline import setup_batch
+
+from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+from sample_metadata import SampleApi
+
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.INFO)
+
+
+SRC_BUCKETS_TEST = [
+    # Australian Terra workspace
+    'gs://fc-7d762f69-bb45-48df-901b-b3bcec656ee0/2232b739-5183-4935-bb84-452a631c31ea',
+    # The US Terra workspace
+    'gs://fc-bda68b2d-bed3-495f-a63c-29477968feff/1a9237ff-2e6e-4444-b67d-bd2715b8a156',
+]
+
+SRC_BUCKETS_MAIN = []
+
+# Terra buckets names start with "fc-"
+assert all(b.startswith('gs://fc-') for b in SRC_BUCKETS_MAIN + SRC_BUCKETS_TEST)
+
+PROJECT = 'nagim'
+
+# Mapping the KCCG project IDs to internal CPG project IDs
+PROJECT_ID_MAP = {
+    '1KB': 'thousand-genomes',
+    'ALS': PROJECT,  # we don't have a stack for ALS, so just using nagim
+    'AMP-PD': 'amp-pd',
+    'HGDP': 'hgdp',
+    'MGRB': 'mgrb',
+    'TOB': 'tob-wgs',
+    'acute_care': 'acute-care',
+}
+
+
+@dataclasses.dataclass
+class Sample:
+    """
+    Represent a parsed sample so we can populate and fix all the IDs transparently
+    """
+
+    nagim_id: str = None
+    cpg_id: str = None
+    ext_id: str = None
+    project_id: str = None
+    gvcf: str = None
+    cram: str = None
+
+
+@click.group()
+def cli():
+    """
+    Click group to handle multiple CLI commands defined further
+    """
+
+
+@cli.command()
+@click.option('--prod', 'prod', is_flag=True)
+@click.option('--tmp-dir', 'tmp_dir')
+@click.option(
+    '--transfer-gvcfs',
+    is_flag=True,
+    help='Transfer GVCF and TBI files from gs://fc-... to gs://cpg-...-upload',
+)
+@click.option(
+    '--transfer-crams',
+    is_flag=True,
+    help='Transfer CRAM and CRAI from gs://fc-... to gs://cpg-...-upload',
+)
+@click.option('--use-batch', is_flag=True, help='Use a Batch job to transfer data')
+def transfer(
+    prod,
+    tmp_dir,
+    transfer_gvcfs: bool,
+    transfer_crams: bool,
+    use_batch: bool,
+):
+    """
+    Transfer data from the Terra workspaces to the GCP bucket. Must be run with
+    a personal account, because the read permissions to Terra buckets match
+    to the Terra user emails for whom the workspace is sharred, so Hail service
+    acounts won't work here.
+    """
+    if not transfer_gvcfs and not transfer_crams:
+        raise click.BadParameter(
+            'Please, specify at leat one of --transfer-crams or --transfer-gvcfs'
+        )
+
+    namespace = 'main' if prod else 'test'
+
+    if not tmp_dir:
+        tmp_dir = tempfile.gettempdir()
+
+    # Putting to -upload because we need to rename them after CPG IDs, and because
+    # we need to run ReblockGVCFs on GVCFs.
+    upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
+    upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
+
+    if use_batch:
+        hbatch = setup_batch(
+            title='Transferring NAGIM data',
+            keep_scratch=False,
+            tmp_bucket=f'cpg-{PROJECT}-{namespace}-tmp',
+            analysis_project_name=PROJECT,
+        )
+    else:
+        hbatch = None
+
+    if transfer_gvcfs:
+        _transfer_gvcf_from_terra(upload_gvcf_bucket, prod, hbatch)
+    if transfer_crams:
+        _transfer_cram_from_terra(upload_cram_bucket, prod, hbatch)
+
+    if use_batch:
+        hbatch.run(wait=True)
+
+    # Finds GVCFs and CRAMs after transferring, and checks that all of them have
+    # corresponding TBI/CRAM, and initializing the sample list.
+    _find_upload_files(
+        upload_gvcf_bucket,
+        upload_cram_bucket,
+        tmp_dir,
+        overwrite=True,  # Force finding files
+    )
+
+
+@cli.command()
+@click.argument('sample_to_project_path')
+@click.option('--prod', 'prod', is_flag=True)
+@click.option('--tmp-dir', 'tmp_dir')
+@click.option(
+    '--confirm', is_flag=True, help='Confirm with user input before updating server'
+)
+@click.option('--dry-run', 'dry_run', is_flag=True)
+@click.option(
+    '--skip-checking-objects',
+    'skip_checking_objects',
+    is_flag=True,
+    help='Do not check objects on buckets (existence, size, md5)',
+)
+def parse(
+    sample_to_project_path: str,
+    prod,
+    tmp_dir,
+    confirm: bool,
+    dry_run: bool,
+    skip_checking_objects: bool,
+):
+    """
+    Assuming the data is transferred to the CPG bucket, populate the SM projects.
+    """
+    namespace = 'main' if prod else 'test'
+
+    upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
+    upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
+
+    if not tmp_dir:
+        tmp_dir = tempfile.gettempdir()
+
+    # Finds GVCFs and CRAMs after transferring, and checks that all of them have
+    # corresponding TBI/CRAM, and initializing the sample list.
+    samples = _find_upload_files(upload_gvcf_bucket, upload_cram_bucket, tmp_dir)
+
+    # Annotate project IDs so we can split samples between correponding SM projects.
+    samples = _set_project_ids(samples, sample_to_project_path)
+    # Some samples processed with Terra use CPG IDs, checking if we already
+    # have them in the SMDB and fixing the external IDs.
+    samples = _fix_sample_ids(samples, prod=prod)
+
+    # Creating a parser for each project separately, because `sample_metadata_project`
+    # is an initialization parameter, and we want to write to multiple projects.
+    for proj_id in PROJECT_ID_MAP.values():
+        sm_proj_id = proj_id if prod else f'{proj_id}-test'
+        sample_tsv_file = join(tmp_dir, f'sm-nagim-parser-samples-{sm_proj_id}.csv')
+        df = pd.DataFrame(
+            dict(
+                cpg_id=s.cpg_id,
+                ext_id=s.ext_id,
+                gvcf=s.gvcf,
+                cram=s.cram,
+            )
+            for s in samples
+            if s.project_id == proj_id
+        )
+        if len(df) == 0:
+            logger.info(f'No samples for project {sm_proj_id} found, skipping')
+            continue
+
+        df.to_csv(sample_tsv_file, index=False)
+        logger.info(
+            f'Processing {len(df)} samples for project {sm_proj_id}, '
+            f'sample manifest: {sample_tsv_file}'
+        )
+
+        parser = NagimParser(
+            path_prefix=None,
+            sample_metadata_project=sm_proj_id,
+            skip_checking_gcs_objects=skip_checking_objects,
+            confirm=confirm,
+            verbose=False,
+        )
+        with open(sample_tsv_file) as f:
+            parser.parse_manifest(f, dry_run=dry_run)
+
+
+def _fix_sample_ids(samples: List[Sample], prod: bool) -> List[Sample]:
+    """
+    Some samples processed with Terra use CPG IDs, so checking if we already
+    have them in the SMDB, and fixing the external IDs.
+    """
+    sm_proj_ids = [
+        f'{proj}-test' if not prod else proj for proj in PROJECT_ID_MAP.values()
+    ]
+    sapi = SampleApi()
+    sm_sample_dicts = sapi.get_samples(
+        body_get_samples_by_criteria_api_v1_sample_post={
+            'project_ids': sm_proj_ids,
+            'active': True,
+        }
+    )
+
+    cpgid_to_extid = {s['id']: s['external_id'] for s in sm_sample_dicts}
+    extid_to_cpgid = {s['external_id']: s['id'] for s in sm_sample_dicts}
+
+    # Fixing sample IDs. Some samples (tob-wgs and acute-care)
+    # have CPG IDs as nagim ids, some don't
+    for sample in samples:
+        if sample.nagim_id in extid_to_cpgid:
+            sample.ext_id = sample.nagim_id
+            sample.cpg_id = extid_to_cpgid[sample.nagim_id]
+        elif sample.nagim_id in cpgid_to_extid:
+            sample.ext_id = cpgid_to_extid[sample.nagim_id]
+            sample.cpg_id = sample.nagim_id
+        else:
+            sample.ext_id = sample.nagim_id
+
+    return samples
+
+
+def _set_project_ids(
+    samples: List[Sample],
+    sample_to_project_map_fpath: str,
+) -> List[Sample]:
+    """
+    Use sample-project map provided by the KCCG to set project IDs.
+    `sample_to_project_map_fpath` has two columns: sample and project name.
+    """
+    proj_by_nagim_id = {}
+    with open(sample_to_project_map_fpath) as f:
+        for line in f:
+            if line.strip():
+                nagim_id, proj = line.strip().split('\t')
+
+                # AAACD__ST-E00141_HKJ2MCCXX.3 -> AAACD__ST-E00141_HKJ2MCCXX
+                nagim_id = nagim_id.split('.')[0]
+
+                if proj in PROJECT_ID_MAP.values():
+                    cpg_proj = proj
+                elif proj in PROJECT_ID_MAP:
+                    cpg_proj = PROJECT_ID_MAP[proj]
+                else:
+                    raise ValueError(
+                        f'Unknown project {proj}. Known project IDs: {PROJECT_ID_MAP}'
+                    )
+                proj_by_nagim_id[nagim_id] = cpg_proj
+
+    # Setting up project IDs
+    for sample in samples:
+        if sample.nagim_id not in proj_by_nagim_id:
+            logger.critical(
+                f'Sample {sample.nagim_id} not found in {sample_to_project_map_fpath}'
+            )
+            sys.exit(1)
+
+        sample.project_id = proj_by_nagim_id[sample.nagim_id]
+
+    return samples
+
+
+def _transfer_cram_from_terra(upload_bucket: str, prod: bool, hbatch=None):
+    for bucket in SRC_BUCKETS_TEST if not prod else SRC_BUCKETS_MAIN:
+        # Find all crams and crais and copy them in parallel
+        cmd = (
+            f'gsutil ls '
+            f"'{bucket}/WholeGenomeReprocessingMultiple/*/call-WholeGenomeReprocessing/shard-*/WholeGenomeReprocessing/*/call-WholeGenomeGermlineSingleSample/WholeGenomeGermlineSingleSample/*/"
+            f"call-BamToCram/BamToCram/*/call-ConvertToCram/**/*.cram*'"
+            f' | gsutil -m cp -I {upload_bucket}/'
+        )
+        if hbatch:
+            _add_batch_job(hbatch, cmd, f'Transfer CRAMs from {bucket}')
+        else:
+            _call(cmd)
+
+
+def _transfer_gvcf_from_terra(upload_bucket: str, prod: bool, hbatch=None):
+    for bucket in SRC_BUCKETS_TEST if not prod else SRC_BUCKETS_MAIN:
+        # Find all GVCFs and TBIs and copy them in parallel
+        cmd = (
+            f'gsutil ls '
+            f"'{bucket}/WholeGenomeReprocessingMultiple/*/call-WholeGenomeReprocessing/shard-*/WholeGenomeReprocessing/*/call-WholeGenomeGermlineSingleSample/WholeGenomeGermlineSingleSample/*/"
+            f"call-BamToGvcf/VariantCalling/*/call-MergeVCFs/**/*.hard-filtered.g.vcf.gz*'"
+            f' | gsutil -m cp -I {upload_bucket}/'
+        )
+        if hbatch:
+            _add_batch_job(hbatch, cmd, f'Transfer GVCFs from {bucket}')
+        else:
+            _call(cmd)
+
+
+def _add_batch_job(hbatch, cmd, job_name):
+    j = hbatch.new_job(job_name)
+    j.cpu(32)
+    j.memory('lowmem')
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/aspera:v1')
+    j.command('export GOOGLE_APPLICATION_CREDENTIALS=/gsa-key/key.json')
+    j.command(
+        'gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS'
+    )
+    j.command(cmd)
+    return j
+
+
+def _call(cmd):
+    print(cmd)
+    subprocess.run(cmd, shell=True, check=True)
+
+
+class NagimParser(GenericParser):
+    """
+    Inherits from sample_metadata's GenericParser class and implements parsing
+    logic specific to the NAGIM project
+    """
+
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+        return {}
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def get_sample_id(self, row: Dict[str, any]) -> str:
+        return row['ext_id']
+
+    def get_analyses(self, sample_id: str, row: Dict[str, any]) -> List[AnalysisModel]:
+        gvcf = row.get('gvcf')
+        cram = row.get('cram')
+        results = []
+        if gvcf:
+            results.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type='gvcf',
+                    status='in-progress',
+                    output=gvcf,
+                    meta={'source': 'nagim'},
+                )
+            )
+        if cram:
+            results.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type='cram',
+                    status='in-progress',
+                    output=gvcf,
+                    meta={'source': 'nagim'},
+                )
+            )
+        return results
+
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+        return {}
+
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
+        return 'uploaded'
+
+
+def _get_bucket_ls(
+    ext: Union[str, List[str]],
+    source_bucket,
+    tmp_dir,
+    overwrite,
+) -> List[str]:
+    label = ext.replace('.', '-')
+    output_path = join(tmp_dir, f'sm-nagim-parser-gs-ls{label}.txt')
+    if overwrite or not exists(output_path):
+        _call(f'test ! -e {output_path} || rm {output_path}')
+        _call(f'touch {output_path}')
+        if isinstance(ext, str):
+            ext = [ext]
+        for e in ext:
+            _call(f'gsutil ls "{source_bucket}/*{e}" >> {output_path}')
+    with open(output_path) as f:
+        return [line.strip() for line in f.readlines() if line.strip()]
+
+
+def _find_upload_files(
+    upload_gvcf_bucket,
+    upload_cram_bucket,
+    tmp_dir,
+    overwrite=False,
+) -> List[Sample]:
+    gvcf_paths = _get_bucket_ls(
+        ext='.vcf.gz',
+        source_bucket=upload_gvcf_bucket,
+        tmp_dir=tmp_dir,
+        overwrite=overwrite,
+    )
+    tbi_paths = _get_bucket_ls(
+        ext='.vcf.gz.tbi',
+        source_bucket=upload_gvcf_bucket,
+        tmp_dir=tmp_dir,
+        overwrite=overwrite,
+    )
+    cram_paths = _get_bucket_ls(
+        ext='.cram',
+        source_bucket=upload_cram_bucket,
+        tmp_dir=tmp_dir,
+        overwrite=overwrite,
+    )
+    crai_paths = _get_bucket_ls(
+        ext='.cram.crai',
+        source_bucket=upload_cram_bucket,
+        tmp_dir=tmp_dir,
+        overwrite=overwrite,
+    )
+
+    file_by_type_by_sid = {
+        'gvcf': {},
+        'tbi': {},
+        'cram': {},
+        'crai': {},
+    }
+
+    for fname in gvcf_paths:
+        sid = os.path.basename(fname).replace('.hard-filtered.g.vcf.gz', '')
+        file_by_type_by_sid['gvcf'][sid] = fname
+
+    for fname in tbi_paths:
+        sid = os.path.basename(fname).replace('.hard-filtered.g.vcf.gz.tbi', '')
+        if sid not in file_by_type_by_sid['gvcf']:
+            logger.info(f'Found TBI without GVCF: {fname}')
+        else:
+            file_by_type_by_sid['tbi'][sid] = fname
+
+    for fname in cram_paths:
+        sid = os.path.basename(fname).replace('.cram', '')
+        file_by_type_by_sid['cram'][sid] = fname
+
+    for fname in crai_paths:
+        sid = os.path.basename(fname).replace('.cram.crai', '')
+        if sid not in file_by_type_by_sid['cram']:
+            logger.info(f'Found CRAI without CRAM: {fname}')
+        else:
+            file_by_type_by_sid['crai'][sid] = fname
+
+    samples = []
+    for sid in file_by_type_by_sid['gvcf']:
+        samples.append(
+            Sample(
+                nagim_id=sid,
+                gvcf=file_by_type_by_sid['gvcf'][sid],
+                cram=file_by_type_by_sid.get('cram', {}).get(sid),
+            )
+        )
+    return samples
+
+
+cli.add_command(transfer)
+cli.add_command(parse)
+
+if __name__ == '__main__':
+    # pylint: disable=no-value-for-parameter
+    cli()  # pylint: disable=unexpected-keyword-arg

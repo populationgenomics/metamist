@@ -41,14 +41,14 @@ class TestSampleMapParser(unittest.TestCase):
             sequencing_to_add,
             samples_to_update,
             sequencing_to_update,
-            qc_to_add,
+            analyses_to_add,
         ) = resp
 
         self.assertEqual(1, len(samples_to_add))
         self.assertEqual(1, len(sequencing_to_add))
         self.assertEqual(0, len(samples_to_update))
         self.assertEqual(0, len(sequencing_to_update))
-        self.assertEqual(0, len(qc_to_add))
+        self.assertEqual(0, len(analyses_to_add))
 
         self.assertDictEqual({}, samples_to_add[0].meta)
         expected_sequence_dict = {

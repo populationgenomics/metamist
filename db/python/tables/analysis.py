@@ -1,6 +1,6 @@
 from datetime import datetime
 from itertools import groupby
-from typing import List, Optional, Set, Tuple, Dict
+from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError, to_db_json  # , to_db_json
 from db.python.tables.project import ProjectId
@@ -127,6 +127,80 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
 
         await self.connection.execute(_query, fields)
+
+    async def query_analysis(
+        self,
+        sample_ids: List[int] = None,
+        sample_ids_all: List[int] = None,
+        project_ids: List[int] = None,
+        analysis_type: AnalysisType = None,
+        status: AnalysisStatus = None,
+        meta: Dict[str, Any] = None,
+        output: str = None,
+        active: bool = None,
+    ) -> List[Analysis]:
+        """
+        :param sample_ids: sample_ids means it contains the analysis contains at least one of the sample_ids in the list
+        :param sample_ids_all: (UNIMPLEMENTED) sample_ids_all means the analysis contains ALL of the sample_ids
+        """
+
+        wheres = ['project in :project_ids']
+        values = {'project_ids': project_ids}
+
+        if sample_ids_all:
+            raise NotImplementedError
+
+        if sample_ids:
+            wheres.append('a_s.sample_id in :sample_ids')
+            values['sample_ids'] = sample_ids
+
+        if analysis_type is not None:
+            wheres.append('a.type = :type')
+            values['type'] = analysis_type.value
+        if status is not None:
+            wheres.append('a.status = :status')
+            values['status'] = status.value
+        if output is not None:
+            wheres.append('a.output = :output')
+            values['output'] = output
+        if active is not None:
+            if active:
+                wheres.append('a.active = 1')
+            else:
+                wheres.append('a.active = 0')
+        if meta:
+            for k, v in meta.items():
+                k_replacer = f'meta_{k}'
+                wheres.append(f"json_extract(a.meta, '$.{k}') = :{k_replacer}")
+                if v is None:
+                    # mariadb does a bad cast for NULL
+                    v = 'null'
+                values[k_replacer] = v
+
+        where_str = ' AND '.join(wheres)
+        _query = f"""
+SELECT a.id as id, a.type as type, a.status as status,
+        a.output as output, a_s.sample_id as sample_id,
+        a.project as project, a.timestamp_completed as timestamp_completed, a.active as active,
+        a.meta as meta
+FROM analysis_sample a_s
+INNER JOIN analysis a ON a_s.analysis_id = a.id
+WHERE a.id in (
+    SELECT a.id FROM analysis a
+    LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+    WHERE {where_str}
+)
+"""
+
+        rows = await self.connection.fetch_all(_query, values)
+        retvals: Dict[int, Analysis] = {}
+        for row in rows:
+            if row['id'] in retvals:
+                retvals[row['id']].sample_ids.append(row['sample_id'])
+            else:
+                retvals[row['id']] = Analysis.from_db(**dict(row))
+
+        return list(retvals.values())
 
     async def get_latest_complete_analysis_for_type(
         self,

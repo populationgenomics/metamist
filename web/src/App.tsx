@@ -39,7 +39,7 @@ const Routes = () => {
 
       <Route
         path="/swagger"
-        element={<SwaggerUI url="openapi.json" />}
+        element={<SwaggerUI url="/openapi.json" />}
       />
 
       <Route
