@@ -6,16 +6,28 @@ import io
 from datetime import date
 
 from fastapi import APIRouter, UploadFile, File, Query
+from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from api.utils import get_projectless_db_connection
 from api.utils.db import (
     get_project_readonly_connection,
     get_project_write_connection,
     Connection,
 )
 from db.python.layers.family import FamilyLayer
+from models.models.family import Family
 
 router = APIRouter(prefix='/family', tags=['family'])
+
+
+class FamilyUpdateModel(BaseModel):
+    """Model for updating a family"""
+
+    id: int
+    external_id: Optional[str] = None
+    description: Optional[str] = None
+    coded_phenotype: Optional[str] = None
 
 
 @router.post('/{project}/pedigree', operation_id='importPedigree')
@@ -86,4 +98,27 @@ async def get_pedigree(
         iter(output.getvalue()),
         media_type='text/csv',
         headers={'Content-Disposition': f'filename={basefn}.ped'},
+    )
+
+
+@router.get('/{project}/', operation_id='getFamilies')
+async def get_families(
+    connection: Connection = get_project_readonly_connection,
+) -> List[Family]:
+    """Get families for some project"""
+    family_layer = FamilyLayer(connection)
+    return await family_layer.get_families()
+
+
+@router.post('/', operation_id='updateFamily')
+async def update_family(
+    family: FamilyUpdateModel, connection: Connection = get_projectless_db_connection
+):
+    """Update information for a single family"""
+    family_layer = FamilyLayer(connection)
+    return await family_layer.update_family(
+        id_=family.id,
+        external_id=family.external_id,
+        description=family.description,
+        coded_phenotype=family.coded_phenotype,
     )

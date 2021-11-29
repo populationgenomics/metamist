@@ -183,6 +183,32 @@ class FamilyLayer(BaseLayer):
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
+    async def get_families(self, project: int = None):
+        """Get all families for a project"""
+        return await self.ftable.get_families(project=project)
+
+    async def update_family(
+        self,
+        id_: int,
+        external_id: str = None,
+        description: str = None,
+        coded_phenotype: str = None,
+        check_project_ids: bool = True,
+    ) -> bool:
+        """Update fields on some family"""
+        if check_project_ids:
+            project_ids = self.ftable.get_projects_by_family_ids([id_])
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
+
+        return await self.ftable.update_family(
+            id_=id_,
+            external_id=external_id,
+            description=description,
+            coded_phenotype=coded_phenotype,
+        )
+
     async def get_pedigree(
         self,
         project: ProjectId,

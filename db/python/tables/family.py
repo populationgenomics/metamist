@@ -1,7 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
+from models.models.family import Family
 
 
 class FamilyTable(DbBase):
@@ -9,7 +10,63 @@ class FamilyTable(DbBase):
     Capture Analysis table operations and queries
     """
 
-    table_name = 'family_participant'
+    table_name = 'family'
+
+    async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
+        """Get project IDs for sampleIds (mostly for checking auth)"""
+        _query = """
+        SELECT project FROM family
+        WHERE project in :family_ids
+        GROUP BY project
+        """
+        if len(family_ids) == 0:
+            raise ValueError('Received no family IDs to get project ids for')
+        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+        projects = set(r['project'] for r in rows)
+        if not projects:
+            raise ValueError(
+                'No projects were found for given families, this is likely an error'
+            )
+        return projects
+
+    async def get_families(self, project: int = None) -> List[Family]:
+        """Get all families for some project"""
+        _query = """\
+SELECT id, external_id, description, coded_phenotype, project
+FROM family
+WHERE project = :project"""
+
+        rows = await self.connection.fetch_all(
+            _query, {'project': project or self.project}
+        )
+        families = [Family.from_db(dict(r)) for r in rows]
+        return families
+
+    async def update_family(
+        self,
+        id_: int,
+        external_id: str = None,
+        description: str = None,
+        coded_phenotype: str = None,
+        author: str = None,
+    ) -> bool:
+        """Update values for a family"""
+        values = {'author': author or self.author}
+        if external_id:
+            values['external_id'] = external_id
+        if description:
+            values['description'] = description
+        if coded_phenotype:
+            values['coded_phenotype'] = coded_phenotype
+
+        setters = ', '.join(f'{field} = :{field}' for field in values)
+        _query = f"""
+UPDATE family
+SET {setters}
+WHERE id = :id
+        """
+        await self.connection.execute(_query, {**values, 'id': id_})
+        return True
 
     async def create_family(
         self,
