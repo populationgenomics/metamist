@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
+import re
 from typing import Optional
 
 import os
@@ -81,8 +82,21 @@ def start_server() -> Optional[subprocess.Popen]:
     return None
 
 
+def check_openapi_version():
+    command = ['openapi-generator', '--version']
+    out = subprocess.check_output(command).decode().split('\n')[0].strip()
+    try:
+        version = re.match(pattern=r'\d+\.\d+\.\d+', string=out).group()
+        major = version.split('.')[0]
+        if int(major) != 5:
+            raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
+    except ValueError:
+        logger.warning(f'Could not detect version of openapi-generator from "{out}"')
+
+
 def generate_api_and_copy():
     """Get JSON from server"""
+    check_openapi_version()
     with open('deploy/python/version.txt', encoding='utf-8') as f:
         version = f.read().strip()
 
