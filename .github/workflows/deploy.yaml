@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - dev
+      - update-packages
 
 jobs:
   build-publish:
@@ -40,10 +41,16 @@ jobs:
           channel-priority: true
           python-version: 3.7
 
+      - uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '17'
+
       - name: Setup build env
         run: |
           conda install pip conda-build anaconda-client requests
-          pip install openapi-generator-cli
+          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
+          alias openapi-generator="java -jar openapi-generator-cli.jar"
 
       - name: prepare-deployment
         run: |

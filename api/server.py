@@ -39,7 +39,7 @@ class SPAStaticFiles(StaticFiles):
         response = await super().get_response(path, scope)
         if response.status_code == 404 and not path.startswith('api'):
             # server index.html if can't find existing resource
-            response = await super().get_response('.', scope)
+            response = await super().get_response('index.html', scope)
         return response
 
 

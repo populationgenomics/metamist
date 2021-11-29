@@ -99,7 +99,8 @@ async def get_all_sample_id_map_by_internal(
 
 @router.get(
     '/{project}/{external_id}/details',
-    response_model=Sample,
+    # Don't support this until openapi 3.1
+    # response_model=Sample,
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
