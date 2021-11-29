@@ -15,6 +15,7 @@ import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
+OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
 MODULE_NAME = 'sample_metadata'
 
 logging.basicConfig(level=logging.DEBUG)
@@ -83,15 +84,15 @@ def start_server() -> Optional[subprocess.Popen]:
 
 
 def check_openapi_version():
-    command = ['openapi-generator', '--version']
+    command = [*OPENAPI_COMMAND, '--version']
     out = subprocess.check_output(command).decode().split('\n')[0].strip()
-    try:
-        version = re.match(pattern=r'\d+\.\d+\.\d+', string=out).group()
-        major = version.split('.')[0]
-        if int(major) != 5:
-            raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
-    except ValueError:
-        logger.warning(f'Could not detect version of openapi-generator from "{out}"')
+    version = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
+    if not version:
+        raise Exception(f'Could not detect version of openapi-generator from "{out}"')
+
+    major = version.group().split('.')[0]
+    if int(major) != 5:
+        raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
 
 
 def generate_api_and_copy():
@@ -102,7 +103,7 @@ def generate_api_and_copy():
 
     tmpdir = tempfile.mkdtemp()
     command = [
-        'openapi-generator',
+        *OPENAPI_COMMAND,
         'generate',
         '-i',
         SCHEMA_URL,

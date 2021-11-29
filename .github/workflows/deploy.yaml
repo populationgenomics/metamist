@@ -71,7 +71,7 @@ jobs:
 
       - name: "build deployable API"
         run: |
-          alias openapi-generator="java -jar openapi-generator-cli.jar"
+          export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
           ls -lGh sample_metadata
 
