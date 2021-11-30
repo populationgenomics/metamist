@@ -89,11 +89,12 @@ def check_openapi_version():
     """
     command = [*OPENAPI_COMMAND, '--version']
     out = subprocess.check_output(command).decode().split('\n', maxsplit=1)[0].strip()
-    version = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
-    if not version:
+    version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
+    if not version_match:
         raise Exception(f'Could not detect version of openapi-generator from "{out}"')
 
-    major = version.group().split('.')[0]
+    version = version_match.group()
+    major = version.split('.')[0]
     if int(major) != 5:
         raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
 
