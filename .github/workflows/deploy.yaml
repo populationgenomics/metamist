@@ -79,7 +79,8 @@ jobs:
       - name: "build web front-end"
         run: |
           pushd web
-          npm install
+          # installs package-lock, not what it thinks it should be
+          npm ci
           npm run build
           popd
 

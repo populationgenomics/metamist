@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from models.enums import SampleType
 from models.models.sample import sample_id_transform_to_raw, sample_id_format
-from db.python.layers.sample import Sample, SampleLayer
+from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (

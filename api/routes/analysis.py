@@ -205,7 +205,10 @@ async def get_latest_analysis_for_samples_and_type(
 
 
 @router.get(
-    '/{analysis_id}/details', operation_id='getAnalysisById', response_model=Analysis
+    '/{analysis_id}/details',
+    operation_id='getAnalysisById',
+    # mfranklin: uncomment when we supported OpenAPI 3.1
+    # response_model=Analysis
 )
 async def get_analysis_by_id(
     analysis_id: int, connection: Connection = get_projectless_db_connection

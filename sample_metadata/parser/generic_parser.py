@@ -12,13 +12,8 @@ from typing import List, Dict, Union, Optional, Tuple, Match
 from google.api_core.exceptions import Forbidden
 
 from sample_metadata import ApiException
-from sample_metadata.api import SampleApi, SequenceApi, AnalysisApi
-from sample_metadata.models.new_sample import NewSample
-from sample_metadata.models.new_sequence import NewSequence
-from sample_metadata.models.sequence_type import SequenceType
-from sample_metadata.models.sequence_update_model import SequenceUpdateModel
-from sample_metadata.models.sample_update_model import SampleUpdateModel
-from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
+from sample_metadata.models import NewSample, NewSequence, SequenceType, SequenceUpdateModel, SampleUpdateModel, AnalysisModel
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
