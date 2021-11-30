@@ -299,3 +299,23 @@ WHERE participant_id IS NULL AND project = :project
             _query, {'project': project or self.project}
         )
         return {row['id']: row['external_id'] for row in rows}
+
+    async def get_history_of_sample(self, id_: int):
+        """Get all versions (history) of a sample"""
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active+1 as active',
+            'type',
+            'project',
+            'author',
+        ]
+        keys_str = ', '.join(keys)
+        _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'
+
+        rows = await self.connection.fetch_all(_query, {'id': id_})
+        samples = [Sample.from_db(dict(d)) for d in rows]
+
+        return samples

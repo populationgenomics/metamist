@@ -193,3 +193,17 @@ class SampleLayer(BaseLayer):
             ids=ids, participant_ids=participant_ids
         )
         return True
+
+    async def get_history_of_sample(
+        self, id_: int, check_sample_ids: bool = True
+    ) -> List[Sample]:
+        """Get the full history of a sample"""
+        rows = await self.st.get_history_of_sample(id_)
+
+        if check_sample_ids:
+            project_ids = set(r.project for r in rows)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
+
+        return rows

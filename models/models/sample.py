@@ -20,6 +20,7 @@ class Sample(SMBase):
     meta: Optional[Dict] = None
     type: Optional[SampleType] = None
     project: Optional[int] = None
+    author: Optional[str] = None
 
     @staticmethod
     def from_db(d: Dict):

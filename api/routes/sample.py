@@ -165,3 +165,15 @@ async def update_sample(
         active=model.active,
     )
     return result
+
+
+@router.get('/{id_}/history', operation_id='getHistoryOfSample')
+async def get_history_of_sample(
+    id_: str, connection: Connection = get_projectless_db_connection
+):
+    """Get full history of sample from internal ID"""
+    st = SampleLayer(connection)
+    internal_id = sample_id_transform_to_raw(id_)
+    result = await st.get_history_of_sample(internal_id)
+
+    return result
