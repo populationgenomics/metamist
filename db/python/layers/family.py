@@ -401,3 +401,72 @@ class FamilyLayer(BaseLayer):
             await self.fptable.create_rows(insertable_rows)
 
         return True
+
+    async def import_families(
+        self, headers: Optional[List[str]], rows: List[List[str]]
+    ):
+        """Import a family table"""
+        ordered_headers = [
+            'Family ID',
+            'Display Name',
+            'Description',
+            'Coded Phenotype',
+        ]
+        _headers = headers or ordered_headers[: len(rows[0])]
+        lheaders = [k.lower() for k in _headers]
+        key_map = {
+            'externalId': {'family_id', 'family id', 'familyid'},
+            'displayName': {'display name', 'displayname', 'display_name'},
+            'description': {'description'},
+            'phenotype': {
+                'coded phenotype',
+                'phenotype',
+                'codedphenotype',
+                'coded_phenotype',
+            },
+        }
+
+        def get_idx_for_header(header) -> Optional[int]:
+            return next(
+                iter(idx for idx, key in enumerate(lheaders) if key in key_map[header]),
+                None,
+            )
+
+        external_identifier_idx = get_idx_for_header('externalId')
+        display_name_idx = get_idx_for_header('displayName')
+        description_idx = get_idx_for_header('description')
+        phenotype_idx = get_idx_for_header('phenotype')
+
+        # replace empty strings with None
+        def replace_empty_string_with_none(val):
+            """Don't set as empty string, prefer to set as null"""
+            return None if val == '' else val
+
+        rows = [[replace_empty_string_with_none(el) for el in r] for r in rows]
+
+        empty = [None] * len(rows)
+
+        def select_columns(col1: Optional[int], col2: Optional[int] = None):
+            """
+            - If col1 and col2 is None, return [None] * len(rows)
+            - if either col1 or col2 is not None, return that column
+            - else, return a mixture of column col1 | col2 if set
+            """
+            if col1 is None and col2 is None:
+                # if col1 AND col2 is NONE
+                return empty
+            if col1 is not None and col2 is None:
+                # if only col1 is set
+                return [r[col1] for r in rows]
+            if col2 is not None and col1 is None:
+                # if only col2 is set
+                return [r[col2] for r in rows]
+            # if col1 AND col2 are not None
+            return [r[col1] if r[col1] is not None else r[col2] for r in rows]
+
+        await self.ftable.insert_or_update_multiple_families(
+            external_ids=select_columns(external_identifier_idx, display_name_idx),
+            descriptions=select_columns(description_idx),
+            coded_phenotypes=select_columns(phenotype_idx),
+        )
+        return True
