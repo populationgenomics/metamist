@@ -1,3 +1,4 @@
+# pylint: disable=used-before-assignment
 from typing import List, Union, Optional
 
 from db.python.connect import Connection
@@ -104,7 +105,7 @@ class PedRow:
         - There are no circular dependencies
         - All maternal / paternal IDs are found in the pedigree
         """
-        rows_to_order: List[PedRow] = [*rows]
+        rows_to_order: List['PedRow'] = [*rows]
         ordered = []
         seen_individuals = set()
         remaining_iterations_in_round = len(rows_to_order)
