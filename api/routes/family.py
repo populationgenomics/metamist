@@ -116,9 +116,36 @@ async def update_family(
 ):
     """Update information for a single family"""
     family_layer = FamilyLayer(connection)
-    return await family_layer.update_family(
-        id_=family.id,
-        external_id=family.external_id,
-        description=family.description,
-        coded_phenotype=family.coded_phenotype,
-    )
+    return {
+        'success': await family_layer.update_family(
+            id_=family.id,
+            external_id=family.external_id,
+            description=family.description,
+            coded_phenotype=family.coded_phenotype,
+        )
+    }
+
+
+@router.post('/{project}/family-template', operation_id='importFamilies')
+async def import_families(
+    file: UploadFile = File(...),
+    has_header: bool = True,
+    delimiter='\t',
+    connection: Connection = get_project_write_connection,
+):
+    """Get sample by external ID"""
+    delimiter = delimiter.replace('\\t', '\t')
+
+    family_layer = FamilyLayer(connection)
+    reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
+    headers = None
+    if has_header:
+        headers = next(reader)
+
+    rows = [r for r in reader if not r[0].startswith('#')]
+    if len(rows[0]) == 1:
+        raise ValueError(
+            'Only one column was detected in the pedigree, ensure the file is TAB separated (\\t)'
+        )
+    success = await family_layer.import_families(headers, rows)
+    return {'success': success}

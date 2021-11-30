@@ -99,6 +99,45 @@ RETURNING id
 
         return await self.connection.fetch_val(_query, updater)
 
+    async def insert_or_update_multiple_families(
+        self,
+        external_ids: List[str],
+        descriptions: List[str],
+        coded_phenotypes: List[Optional[str]],
+        project: int = None,
+        author: str = None,
+    ):
+        """Upsert"""
+        updater = [
+            {
+                'external_id': eid,
+                'description': descr,
+                'coded_phenotype': cph,
+                'author': author or self.author,
+                'project': project or self.project,
+            }
+            for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)
+        ]
+
+        keys = list(updater[0].keys())
+        str_keys = ', '.join(keys)
+        placeholder_keys = ', '.join(f':{k}' for k in keys)
+
+        update_only_keys = [k for k in keys if k not in ('external_id', 'project')]
+        str_uo_placeholder_keys = ', '.join(f'{k} = :{k}' for k in update_only_keys)
+
+        _query = f"""\
+INSERT INTO family
+    ({str_keys})
+VALUES
+    ({placeholder_keys})
+ON DUPLICATE KEY UPDATE
+    {str_uo_placeholder_keys}
+        """
+
+        await self.connection.execute_many(_query, updater)
+        return True
+
     async def get_id_map_by_external_ids(
         self, family_ids: List[str], allow_missing=False, project: Optional[int] = None
     ):

@@ -15,4 +15,4 @@ class Family(BaseModel):
     @staticmethod
     def from_db(d):
         """From DB fields"""
-        return Family( **d)
+        return Family(**d)
