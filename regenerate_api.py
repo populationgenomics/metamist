@@ -58,6 +58,7 @@ def start_server() -> Optional[subprocess.Popen]:
         preexec_fn=os.setsid,
     )
 
+    assert _process.stdout
     for c in iter(_process.stdout.readline, 'b'):
         line = None
         if c:
