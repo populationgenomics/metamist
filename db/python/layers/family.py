@@ -1,6 +1,8 @@
 # pylint: disable=used-before-assignment
 from typing import List, Union, Optional
 
+from dns.set import Set
+
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.participant import ParticipantLayer
@@ -198,7 +200,7 @@ class FamilyLayer(BaseLayer):
     ) -> bool:
         """Update fields on some family"""
         if check_project_ids:
-            project_ids = self.ftable.get_projects_by_family_ids([id_])
+            project_ids = await self.ftable.get_projects_by_family_ids([id_])
             await self.ptable.check_access_to_project_ids(
                 self.author, project_ids, readonly=False
             )
@@ -256,7 +258,7 @@ class FamilyLayer(BaseLayer):
             pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
 
         if replace_with_family_external_ids:
-            family_ids = set(r['family_id'] for r in rows if r['family_id'] is not None)
+            family_ids = list(set(r['family_id'] for r in rows if r['family_id'] is not None))
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
 
         formatted_rows = []
@@ -324,7 +326,7 @@ class FamilyLayer(BaseLayer):
             PedRow(**{_header[i]: r[i] for i in range(len(_header))}) for r in rows
         ]
         # this validates a lot of the pedigree too
-        pedrows: List[PedRow] = PedRow.order(pedrows)
+        pedrows = PedRow.order(pedrows)
 
         external_family_ids = set(r.family_id for r in pedrows)
         # get set of all individual, paternal, maternal participant ids
@@ -463,6 +465,7 @@ class FamilyLayer(BaseLayer):
                 # if only col2 is set
                 return [r[col2] for r in rows]
             # if col1 AND col2 are not None
+            assert col1 is not None and col2 is not None
             return [r[col1] if r[col1] is not None else r[col2] for r in rows]
 
         await self.ftable.insert_or_update_multiple_families(

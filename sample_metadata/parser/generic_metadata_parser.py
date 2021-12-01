@@ -83,7 +83,7 @@ class GenericMetadataParser(GenericParser):
 
         return super().file_path(filename)
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         return external_id
@@ -180,11 +180,11 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row

@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
@@ -32,8 +32,10 @@ class SampleLayer(BaseLayer):
     ):
         """Get map of samples {external_id: internal_id}"""
         external_ids_set = set(external_ids)
+        _project = project or self.connection.project
+        assert _project
         sample_id_map = await self.st.get_sample_id_map_by_external_ids(
-            external_ids=list(external_ids_set), project=project
+            external_ids=list(external_ids_set), project=_project
         )
 
         if allow_missing or len(sample_id_map) == len(external_ids_set):
@@ -81,7 +83,7 @@ class SampleLayer(BaseLayer):
     async def get_samples_by(
         self,
         sample_ids: List[int] = None,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
         participant_ids: List[int] = None,
         project_ids=None,
         active=True,
@@ -93,10 +95,9 @@ class SampleLayer(BaseLayer):
         if sample_ids and check_project_ids:
             # project_ids were already checked when transformed to ints,
             # so no else required
-
-            projects = self.st.get_project_ids_for_sample_ids(sample_ids)
+            pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
             self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
+                self.author, pjcts, readonly=True
             )
 
         projects, samples = await self.st.get_samples_by(

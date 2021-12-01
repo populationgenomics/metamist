@@ -66,7 +66,7 @@ class Columns:
 class VcgsManifestParser(GenericMetadataParser):
     """Parser for VCGS manifest"""
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         if '-' in external_id:

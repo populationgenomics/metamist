@@ -36,7 +36,7 @@ CRAM_EXTENSIONS = ('.cram',)
 VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
-GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
+GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
 
 
 class GenericParser:  # pylint: disable=too-many-public-methods
@@ -168,22 +168,22 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
 
     @abstractmethod
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
 
     @abstractmethod
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
 
     def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
         """Get analysis objects from row"""
         return []
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
+    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
@@ -476,8 +476,8 @@ Updating {len(sequences_to_update)} sequences"""
     def create_file_object(
         self,
         filename: str,
-        secondary_files: List[Dict[str, any]] = None,
-    ) -> Dict[str, any]:
+        secondary_files: List[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
         if not self.skip_checking_gcs_objects:
@@ -506,7 +506,7 @@ Updating {len(sequences_to_update)} sequences"""
 
     def create_secondary_file_objects_by_potential_pattern(
         self, filename, potential_secondary_patterns: List[str]
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Take a base filename and potential secondary patterns:
         - Try each secondary pattern, see if it works

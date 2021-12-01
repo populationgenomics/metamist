@@ -8,15 +8,15 @@ from models.enums import AnalysisType, AnalysisStatus
 class Analysis(SMBase):
     """Model for Analysis"""
 
-    id: int = None
-    type: AnalysisType = None
-    status: AnalysisStatus = None
+    id: Optional[int]
+    type: AnalysisType
+    status: AnalysisStatus
     output: Optional[str] = None
-    sample_ids: List[Union[str, int]] = None
+    sample_ids: Optional[List[Union[str, int]]] = None
     timestamp_completed: Optional[str] = None
-    project: int = None
-    active: bool = None
-    meta: Dict[str, Any] = None
+    project: Optional[int] = None
+    active: Optional[bool] = None
+    meta: Dict[str, Any] = {}
 
     @staticmethod
     def from_db(**kwargs):

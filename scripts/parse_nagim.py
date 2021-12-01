@@ -399,16 +399,16 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project
     """
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(self, sample_id: str, row: Dict[str, any]) -> List[AnalysisModel]:
+    def get_analyses(self, sample_id: str, row: Dict[str, Any]) -> List[AnalysisModel]:
         gvcf = row.get('gvcf')
         cram = row.get('cram')
         results = []
@@ -434,7 +434,7 @@ class NagimParser(GenericParser):
             )
         return results
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:

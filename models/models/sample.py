@@ -1,7 +1,7 @@
-from typing import Optional, Dict, Union, List
+from typing import Optional, Dict, Union, List, Sequence, Tuple, Type
 
-import os
 import json
+import os
 
 from models.base import SMBase
 from models.enums.sample import SampleType
@@ -13,8 +13,8 @@ CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 class Sample(SMBase):
     """Model for a Sample"""
 
-    id: Union[str] = None
-    external_id: str = None
+    id: str
+    external_id: str
     participant_id: Optional[str] = None
     active: Optional[bool] = None
     meta: Optional[Dict] = None
@@ -41,9 +41,10 @@ class Sample(SMBase):
 
         return Sample(id=_id, type=SampleType(type_), meta=meta, active=active, **d)
 
+SampleIdRaw = Union[str, int]
 
 def sample_id_transform_to_raw(
-    identifier: Union[List[Union[str, int]], Union[str, int]], strict=True
+    identifier: Union[SampleIdRaw, Sequence[SampleIdRaw]], strict=True
 ) -> Union[int, List[int]]:
     """
     Transform STRING sample identifier (CPGXXXH) to XXX by:
@@ -51,9 +52,16 @@ def sample_id_transform_to_raw(
         - validating checksum
     """
     if isinstance(identifier, list):
-        return [sample_id_transform_to_raw(s) for s in identifier]
+        sids: List[int] = []
+        for s in identifier:
+            tsids = sample_id_transform_to_raw(s)
+            if isinstance(tsids, list):
+                sids.extend(tsids)
+            else:
+                sids.append(tsids)
+        return sids
 
-    expected_type = str if strict else (str, int)
+    expected_type: Type[Union[str, SampleType]] = str if strict else SampleType
     if not isinstance(identifier, expected_type):
         raise TypeError(
             f'Expected identifier type to be "{expected_type}", received "{type(identifier)}"'
@@ -61,6 +69,9 @@ def sample_id_transform_to_raw(
 
     if isinstance(identifier, int):
         return identifier
+
+    if not isinstance(identifier, str):
+        raise ValueError('Programming error related to sample checks')
 
     if not identifier.startswith(SAMPLE_PREFIX):
         raise Exception(

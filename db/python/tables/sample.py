@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Iterable, Set
+from typing import List, Dict, Tuple, Iterable, Set, Sequence, Any
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.tables.project import ProjectId
@@ -69,7 +69,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     ):
         """Update a single sample"""
 
-        values = {
+        values: Dict[str, Any] = {
             'author': author or self.author,
         }
         fields = [
@@ -80,7 +80,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             fields.append('participant_id = :participant_id')
 
         if type_:
-            values['type'] = type_
+            values['type'] = type_.value
             fields.append('type = :type')
 
         if meta is not None and len(meta) > 0:
@@ -232,7 +232,7 @@ WHERE external_id in :external_ids AND project = :project
     async def get_samples_by(
         self,
         sample_ids: List[int] = None,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
         participant_ids: List[int] = None,
         project_ids=None,
         active=True,
@@ -282,7 +282,7 @@ WHERE external_id in :external_ids AND project = :project
         sample_rows = await self.connection.fetch_all(_query, replacements)
 
         sample_dicts = [dict(s) for s in sample_rows]
-        projects = set(s.get('project') for s in sample_dicts)
+        projects: Iterable[int] = set(s['project'] for s in sample_dicts if s.get('project'))
         samples = list(map(Sample.from_db, sample_dicts))
         return projects, samples
 

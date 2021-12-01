@@ -74,10 +74,10 @@ VALUES
         }
         ignore_keys_during_update = {'participant_id'}
 
-        remapped_ds_by_keys: Dict[Tuple[str], List[Dict]] = defaultdict(list)
+        remapped_ds_by_keys: Dict[Tuple, List[Dict]] = defaultdict(list)
         # this now works when only a portion of the keys are specified
         for row in dictionaries:
-            d = {k: row.get(k) for k in keys if k in row}
+            d: Dict[str, Any] = {k: row.get(k) for k in keys if k in row}
             d['author'] = author or self.author
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
@@ -101,7 +101,7 @@ ON DUPLICATE KEY UPDATE
 
         return True
 
-    async def get_rows(self, project: ProjectId, family_ids: Optional[int] = None):
+    async def get_rows(self, project: ProjectId, family_ids: Optional[List[int]] = None):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
         """
@@ -115,7 +115,7 @@ ON DUPLICATE KEY UPDATE
         ]
         keys_str = ', '.join(keys)
 
-        values = {'project': project or self.project}
+        values: Dict[str, Any] = {'project': project or self.project}
         wheres = ['f.project = :project']
         if family_ids:
             wheres.append('family_id in :family_ids')
