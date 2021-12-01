@@ -1,4 +1,4 @@
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Any, Dict
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
@@ -51,7 +51,7 @@ WHERE project = :project"""
         author: str = None,
     ) -> bool:
         """Update values for a family"""
-        values = {'author': author or self.author}
+        values: Dict[str, Any] = {'author': author or self.author}
         if external_id:
             values['external_id'] = external_id
         if description:

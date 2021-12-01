@@ -76,6 +76,7 @@ async def get_pedigree(
     with their external counterparts.
     """
     family_layer = FamilyLayer(connection)
+    assert connection.project
     pedigree_rows = await family_layer.get_pedigree(
         project=connection.project,
         family_ids=internal_family_ids,

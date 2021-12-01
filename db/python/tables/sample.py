@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Iterable, Set, Sequence, Any
+from typing import List, Dict, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.tables.project import ProjectId
@@ -282,7 +282,9 @@ WHERE external_id in :external_ids AND project = :project
         sample_rows = await self.connection.fetch_all(_query, replacements)
 
         sample_dicts = [dict(s) for s in sample_rows]
-        projects: Iterable[int] = set(s['project'] for s in sample_dicts if s.get('project'))
+        projects: Iterable[int] = set(
+            s['project'] for s in sample_dicts if s.get('project')
+        )
         samples = list(map(Sample.from_db, sample_dicts))
         return projects, samples
 

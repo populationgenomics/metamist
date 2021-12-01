@@ -66,7 +66,7 @@ VALUES (:sample_id, :type, :meta, :status, :author);"""
         sequence_type: SequenceType,
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
-        author: Optional[str]=None,
+        author: Optional[str] = None,
     ) -> int:
         """
         Create a new sequence for a sample, and add it to database

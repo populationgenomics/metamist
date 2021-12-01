@@ -61,15 +61,15 @@ import subprocess
 import sys
 import tempfile
 from os.path import join, exists
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any, Optional
 import click
 import pandas as pd
 
 from cpg_pipes.pipeline import setup_batch
 
-from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.apis import SampleApi
+from sample_metadata.models import AnalysisModel
 from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
-from sample_metadata import SampleApi
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
@@ -82,7 +82,7 @@ SRC_BUCKETS_TEST = [
     'gs://fc-bda68b2d-bed3-495f-a63c-29477968feff/1a9237ff-2e6e-4444-b67d-bd2715b8a156',
 ]
 
-SRC_BUCKETS_MAIN = []
+SRC_BUCKETS_MAIN: List[str] = []
 
 # Terra buckets names start with "fc-"
 assert all(b.startswith('gs://fc-') for b in SRC_BUCKETS_MAIN + SRC_BUCKETS_TEST)
@@ -107,12 +107,12 @@ class Sample:
     Represent a parsed sample so we can populate and fix all the IDs transparently
     """
 
-    nagim_id: str = None
-    cpg_id: str = None
-    ext_id: str = None
-    project_id: str = None
-    gvcf: str = None
-    cram: str = None
+    nagim_id: str
+    cpg_id: Optional[str]
+    ext_id: Optional[str]
+    project_id: Optional[str]
+    gvcf: Optional[str]
+    cram: Optional[str]
 
 
 @click.group()
@@ -408,7 +408,9 @@ class NagimParser(GenericParser):
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(self, sample_id: str, row: Dict[str, Any]) -> List[AnalysisModel]:
+    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
+        assert not isinstance(row, list)
+
         gvcf = row.get('gvcf')
         cram = row.get('cram')
         results = []
@@ -447,7 +449,10 @@ def _get_bucket_ls(
     tmp_dir,
     overwrite,
 ) -> List[str]:
-    label = ext.replace('.', '-')
+    if isinstance(ext, list):
+        label = '-'.join(e.replace('.', '-') for e in ext)
+    else:
+        label = ext.replace('.', '-')
     output_path = join(tmp_dir, f'sm-nagim-parser-gs-ls{label}.txt')
     if overwrite or not exists(output_path):
         _call(f'test ! -e {output_path} || rm {output_path}')
@@ -491,7 +496,7 @@ def _find_upload_files(
         overwrite=overwrite,
     )
 
-    file_by_type_by_sid = {
+    file_by_type_by_sid: Dict[str, Dict[str, str]] = {
         'gvcf': {},
         'tbi': {},
         'cram': {},
@@ -527,6 +532,9 @@ def _find_upload_files(
                 nagim_id=sid,
                 gvcf=file_by_type_by_sid['gvcf'][sid],
                 cram=file_by_type_by_sid.get('cram', {}).get(sid),
+                cpg_id=None,
+                ext_id=None,
+                project_id=None,
             )
         )
     return samples

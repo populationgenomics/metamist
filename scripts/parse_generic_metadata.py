@@ -131,7 +131,8 @@ def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     sample_meta_map, sequence_meta_map = {}, {}
-    qc_meta_map = dict(qc_meta_field_map)
+
+    qc_meta_map = dict(qc_meta_field_map or {})
     if sample_meta_field_map:
         sample_meta_map.update(dict(sample_meta_field_map))
     if sample_meta_field:

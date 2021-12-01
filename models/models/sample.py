@@ -1,7 +1,6 @@
-from typing import Optional, Dict, Union, List, Sequence, Tuple, Type
-
 import json
 import os
+from typing import Optional, Dict, Union, List, Sequence, Type
 
 from models.base import SMBase
 from models.enums.sample import SampleType
@@ -13,7 +12,7 @@ CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 class Sample(SMBase):
     """Model for a Sample"""
 
-    id: str
+    id: Union[str, int]
     external_id: str
     participant_id: Optional[str] = None
     active: Optional[bool] = None
@@ -41,26 +40,27 @@ class Sample(SMBase):
 
         return Sample(id=_id, type=SampleType(type_), meta=meta, active=active, **d)
 
+
 SampleIdRaw = Union[str, int]
 
-def sample_id_transform_to_raw(
-    identifier: Union[SampleIdRaw, Sequence[SampleIdRaw]], strict=True
-) -> Union[int, List[int]]:
+
+def sample_id_transform_to_raw_list(
+    identifier: Sequence[SampleIdRaw], strict=True
+) -> List[int]:
+    """
+    Transform LIST of STRING sample identifier (CPGXXXH) to XXX by:
+        - validating prefix
+        - validating checksum
+    """
+    return [sample_id_transform_to_raw(s, strict=strict) for s in identifier]
+
+
+def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
     """
     Transform STRING sample identifier (CPGXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
-    if isinstance(identifier, list):
-        sids: List[int] = []
-        for s in identifier:
-            tsids = sample_id_transform_to_raw(s)
-            if isinstance(tsids, list):
-                sids.extend(tsids)
-            else:
-                sids.append(tsids)
-        return sids
-
     expected_type: Type[Union[str, SampleType]] = str if strict else SampleType
     if not isinstance(identifier, expected_type):
         raise TypeError(
@@ -89,12 +89,22 @@ def sample_id_transform_to_raw(
     return int(stripped_identifier[:-1])
 
 
-def sample_id_format(sample_id: Union[int, List[int]]):
+def sample_id_format_list(sample_ids: Sequence[Union[int, str]]) -> List[str]:
+    """
+    Transform LIST of raw (int) sample identifier to format (CPGXXXH) where:
+        - CPG is the prefix
+        - XXX is the original identifier
+        - H is the Luhn checksum
+    """
+    return [sample_id_format(s) for s in sample_ids]
+
+
+def sample_id_format(sample_id: Union[int, str]) -> str:
     """
     Transform raw (int) sample identifier to format (CPGXXXH) where:
         - CPG is the prefix
-        - H is the Luhn checksum
         - XXX is the original identifier
+        - H is the Luhn checksum
 
     >>> sample_id_format(10)
     'CPG109'
@@ -102,9 +112,6 @@ def sample_id_format(sample_id: Union[int, List[int]]):
     >>> sample_id_format(12345)
     'CPG123455'
     """
-
-    if isinstance(sample_id, list):
-        return [sample_id_format(s) for s in sample_id]
 
     if isinstance(sample_id, str) and not sample_id.isdigit():
         if sample_id.startswith(SAMPLE_PREFIX):

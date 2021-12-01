@@ -30,7 +30,7 @@ class AnalysisTable(DbBase):
         analysis_type: AnalysisType,
         status: AnalysisStatus,
         sample_ids: List[int],
-        meta: Dict[str, Any] = None,
+        meta: Optional[Dict[str, Any]] = None,
         output: str = None,
         active: bool = True,
         author: str = None,
@@ -197,7 +197,10 @@ WHERE a.id in (
         for row in rows:
             key = row['id']
             if key in retvals:
-                retvals[key].sample_ids = [*(retvals[key].sample_ids or []), row['sample_id']]
+                retvals[key].sample_ids = [
+                    *(retvals[key].sample_ids or []),
+                    row['sample_id'],
+                ]
             else:
                 retvals[key] = Analysis.from_db(**dict(row))
 

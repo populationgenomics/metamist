@@ -1,5 +1,5 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
-from typing import Optional
+from typing import Optional, Union, List, Dict, Any
 import logging
 import os
 from io import StringIO
@@ -18,8 +18,6 @@ logger.setLevel(logging.INFO)
 
 class TobWgsParser(GenericMetadataParser):
     """Parser for TOBWgs manifest"""
-
-    buckets = {}
 
     def get_gvcf_path(self, sample_id: str, batch_number: int) -> Optional[str]:
         """
@@ -55,6 +53,7 @@ class TobWgsParser(GenericMetadataParser):
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
+        assert not isinstance(row, list)
         collapsed_sequence_meta = super().get_sequence_meta(sample_id, row)
         batch_number = int(row['batch.batch_name'][-3:])
         collapsed_sequence_meta['batch'] = batch_number
@@ -62,12 +61,17 @@ class TobWgsParser(GenericMetadataParser):
         batch_name = row['batch.batch_name'][:-5]
         collapsed_sequence_meta['batch_name'] = batch_name
 
-        gvcf, variants_type = self.parse_file(
-            [self.get_gvcf_path(sample_id, batch_number)]
-        )
-        reads, reads_type = self.parse_file(
-            [self.get_cram_path(sample_id, batch_number)]
-        )
+        cram_path = self.get_cram_path(sample_id, batch_number)
+        gvcf_path = self.get_gvcf_path(sample_id, batch_number)
+        assert cram_path
+        assert gvcf_path
+
+        FILE_TYPE = Dict[Any, Any]
+        gvcf: Union[FILE_TYPE, List[FILE_TYPE], List[List[FILE_TYPE]]]
+        reads: Union[FILE_TYPE, List[FILE_TYPE], List[List[FILE_TYPE]]]
+
+        reads, reads_type = self.parse_file([cram_path])
+        gvcf, variants_type = self.parse_file([gvcf_path])
 
         if len(gvcf) == 1:
             gvcf = gvcf[0]
@@ -82,13 +86,14 @@ class TobWgsParser(GenericMetadataParser):
         return collapsed_sequence_meta
 
     @staticmethod
-    def from_manifest_path(
+    def from_manifest_path(  # type: ignore[override]
         manifest: str,
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
         path_prefix=None,
         confirm=False,
+        **kwargs,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
         if path_prefix is None:

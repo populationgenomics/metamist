@@ -67,7 +67,10 @@ RETURNING id
         """
         _author = author or self.author
         updaters = ['author = :author']
-        values: Dict[str, List[Any]] = {'pid': participant_ids, 'author': [_author] * len(participant_ids)}
+        values: Dict[str, List[Any]] = {
+            'pid': participant_ids,
+            'author': [_author] * len(participant_ids),
+        }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
             values['reported_sex'] = reported_sexes

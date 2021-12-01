@@ -2,7 +2,7 @@
 import logging
 import re
 from io import StringIO
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import click
 
@@ -110,16 +110,17 @@ class VcgsManifestParser(GenericMetadataParser):
         raise ValueError(f'Unrecognised sequencing type {type_}')
 
     @staticmethod
-    def from_manifest_path(
+    def from_manifest_path(  # type: ignore[override]
         manifest: str,
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        search_locations: List[str] = None,
+        search_paths: List[str] = None,
         confirm=False,
+        **kwargs,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        _search_locations = search_locations or []
+        _search_locations = search_paths or []
 
         sequence_meta_map = {
             'library_ID': 'library_ID',
@@ -190,7 +191,7 @@ def main(
             sample_metadata_project=sample_metadata_project,
             default_sample_type=default_sample_type,
             default_sequence_type=default_sequence_type,
-            search_locations=search_path,
+            search_paths=search_path,
             confirm=confirm,
         )
         print(resp)

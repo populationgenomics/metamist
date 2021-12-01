@@ -101,7 +101,9 @@ ON DUPLICATE KEY UPDATE
 
         return True
 
-    async def get_rows(self, project: ProjectId, family_ids: Optional[List[int]] = None):
+    async def get_rows(
+        self, project: ProjectId, family_ids: Optional[List[int]] = None
+    ):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
         """

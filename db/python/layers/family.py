@@ -1,5 +1,5 @@
 # pylint: disable=used-before-assignment
-from typing import List, Union, Optional, Set
+from typing import List, Union, Optional
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -256,7 +256,9 @@ class FamilyLayer(BaseLayer):
             pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
 
         if replace_with_family_external_ids:
-            family_ids = list(set(r['family_id'] for r in rows if r['family_id'] is not None))
+            family_ids = list(
+                set(r['family_id'] for r in rows if r['family_id'] is not None)
+            )
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
 
         formatted_rows = []

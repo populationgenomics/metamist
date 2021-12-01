@@ -21,6 +21,7 @@ from api.routes import (
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
+
 # This tag is automatically updated by bump2version
 _VERSION = '4.0.0'
 
@@ -105,7 +106,7 @@ if os.path.exists(static_dir):
     # only allow static files if the static files are available
     app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
 
-app.openapi = get_openapi_schema_func(app, _VERSION)
+app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':

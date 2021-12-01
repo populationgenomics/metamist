@@ -1,30 +1,35 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
 
+from typing import Dict, List, Optional, Tuple
+import logging
 import os
+import random
 import subprocess
 import traceback
+import typing
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
-import random
-import logging
+
 import click
 from google.cloud import storage
+from peddy import Ped
 
-from sample_metadata import (
+from sample_metadata import exceptions
+from sample_metadata.apis import (
     AnalysisApi,
     SequenceApi,
     SampleApi,
+    FamilyApi,
+    ParticipantApi,
+)
+from sample_metadata.configuration import _get_google_auth_token
+from sample_metadata.models import (
+    AnalysisType,
     NewSequence,
     NewSample,
     AnalysisModel,
     SampleUpdateModel,
-    FamilyApi,
-    ParticipantApi,
-    exceptions,
 )
-from sample_metadata.configuration import _get_google_auth_token
-from peddy import Ped
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -92,7 +97,7 @@ def main(
     random.seed(42)  # for reproducibility
 
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
-    sample_id_by_participan_id = dict(pid_sid)
+    sample_id_by_participant_id = dict(pid_sid)
 
     ped_lines = export_ped_file(project, replace_with_participant_external_ids=True)
     if families_n is not None:
@@ -106,10 +111,11 @@ def main(
         sample_ids = []
         for fam in families:
             for s in fam.samples:
-                sample_ids.append(sample_id_by_participan_id[s.sample_id])
+                sample_ids.append(sample_id_by_participant_id[s.sample_id])
         samples = [s for s in all_samples if s['id'] in sample_ids]
 
     else:
+        assert samples_n
         samples = random.sample(all_samples, samples_n)
         sample_ids = [s['id'] for s in samples]
 
@@ -131,12 +137,12 @@ def main(
     else:
         seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
 
-    analysis_by_sid_by_type = {'cram': {}, 'gvcf': {}}
+    analysis_by_sid_by_type: Dict[str, Dict] = {'cram': {}, 'gvcf': {}}
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
             analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
-                analysis_type=a_type,
+                analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
             )
         except exceptions.ApiException:
@@ -150,7 +156,7 @@ def main(
         logger.info(f'Processing sample {s["id"]}')
 
         if s['external_id'] in test_sample_by_external_id:
-            new_s_id = test_sample_by_external_id.get(s['external_id'])['id']
+            new_s_id = test_sample_by_external_id[s['external_id']]['id']
             logger.info(f'Sample already in test project, with ID {new_s_id}')
         else:
             logger.info('Creating test sample entry')
@@ -231,7 +237,7 @@ def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]
 
 
 def _print_fam_stats(families: List):
-    fam_by_size = Counter()
+    fam_by_size: typing.Counter[int] = Counter()
     for fam in families:
         fam_by_size[len(fam.samples)] += 1
     for fam_size in sorted(fam_by_size):

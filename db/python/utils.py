@@ -1,7 +1,6 @@
-from typing import Iterable, Sequence, Optional
-
-import os
 import logging
+import os
+from typing import Sequence, Optional
 
 ProjectId = int
 
@@ -33,7 +32,11 @@ class NoProjectAccess(Forbidden):
     """Not allowed access to a project (or not allowed project-less access)"""
 
     def __init__(
-        self, project_names: Sequence[Optional[str]], author: str, *args, readonly: bool = None
+        self,
+        project_names: Sequence[Optional[str]],
+        author: str,
+        *args,
+        readonly: bool = None,
     ):
         project_names_str = ', '.join(str(p) for p in project_names)
         access_type = ''

@@ -12,7 +12,7 @@ class Analysis(SMBase):
     type: AnalysisType
     status: AnalysisStatus
     output: Optional[str] = None
-    sample_ids: Optional[List[Union[str, int]]] = None
+    sample_ids: List[Union[str, int]]
     timestamp_completed: Optional[str] = None
     project: Optional[int] = None
     active: Optional[bool] = None
@@ -31,9 +31,8 @@ class Analysis(SMBase):
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
 
-        if timestamp_completed:
-            if not isinstance(timestamp_completed, str):
-                timestamp_completed = timestamp_completed.isoformat()
+        if timestamp_completed is not None and not isinstance(timestamp_completed, str):
+            timestamp_completed = timestamp_completed.isoformat()
 
         return Analysis(
             id=kwargs.pop('id'),

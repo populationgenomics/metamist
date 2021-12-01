@@ -5,7 +5,7 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from models.enums import SampleType
-from models.models.sample import Sample, sample_id_format
+from models.models.sample import Sample, sample_id_format_list
 
 
 class SampleLayer(BaseLayer):
@@ -71,7 +71,7 @@ class SampleLayer(BaseLayer):
         # we have samples missing from the map, so we'll 404 the whole thing
         missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
         raise NotFoundError(
-            f"Couldn't find samples with IDS: {', '.join(sample_id_format(list(missing_sample_ids)))}"
+            f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
         )
 
     async def get_all_sample_id_map_by_internal_ids(
@@ -96,11 +96,9 @@ class SampleLayer(BaseLayer):
             # project_ids were already checked when transformed to ints,
             # so no else required
             pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
-            self.ptable.check_access_to_project_ids(
-                self.author, pjcts, readonly=True
-            )
+            self.ptable.check_access_to_project_ids(self.author, pjcts, readonly=True)
 
-        projects, samples = await self.st.get_samples_by(
+        _, samples = await self.st.get_samples_by(
             sample_ids=sample_ids,
             meta=meta,
             participant_ids=participant_ids,
