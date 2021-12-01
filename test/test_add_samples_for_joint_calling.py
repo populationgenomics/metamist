@@ -5,11 +5,11 @@ Requires either write access to test_input_project,
 or the server run with SM_ALLOWALLACCESS=1
 """
 
-import string
 import random
-from sample_metadata.api import SampleApi
-from sample_metadata.models.new_sample import NewSample
+import string
 
+from sample_metadata.apis import SampleApi
+from sample_metadata.models import NewSample, SampleType
 
 INPUT_PROJECT = 'test_input_project'
 
@@ -24,7 +24,7 @@ def _add_samples(run_id: str, project: str):
     """
     s1 = NewSample(
         external_id=f'NA12878-from-fq-{run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={
             'reads': [
                 [
@@ -40,12 +40,12 @@ def _add_samples(run_id: str, project: str):
     )
     s2 = NewSample(
         external_id=f'NA12878-from-cram-{run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878.cram'},
     )
     s3 = NewSample(
         external_id=f'NA12878-from-gvcf-{run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio/NA12878.g.vcf.gz'},
     )
     sample_ids = [sapi.create_new_sample(project, s) for s in (s1, s2, s3)]

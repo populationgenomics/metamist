@@ -13,7 +13,18 @@ from google.api_core.exceptions import Forbidden
 
 from sample_metadata import ApiException
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
-from sample_metadata.models import NewSample, NewSequence, SequenceType, SequenceUpdateModel, SampleUpdateModel, AnalysisModel
+from sample_metadata.models import (
+    NewSample,
+    NewSequence,
+    SequenceType,
+    SequenceUpdateModel,
+    SampleUpdateModel,
+    AnalysisModel,
+    SampleType,
+    AnalysisType,
+    SequenceStatus,
+    AnalysisStatus,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -245,14 +256,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             collapsed_qc = self.get_qc_meta(external_sample_id, rows)
             collapsed_analyses = self.get_analyses(external_sample_id, rows)
 
-            sample_type = str(self.get_sample_type(external_sample_id, rows))
+            sample_type = self.get_sample_type(external_sample_id, rows)
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
             if external_sample_id not in existing_external_id_to_cpgid:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
-                        type=sample_type,
+                        type=SampleType(sample_type),
                         meta=collapsed_sample_meta,
                     )
                 )
@@ -272,8 +283,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 analyses_to_add[external_sample_id].append(
                     AnalysisModel(
                         sample_ids=['<none>'],
-                        type='qc',
-                        status='completed',
+                        type=AnalysisType('qc'),
+                        status=AnalysisStatus('completed'),
                         meta=collapsed_qc,
                     )
                 )
@@ -296,8 +307,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
-                        type=SequenceType.WGS,
-                        status=sequence_status,
+                        type=SequenceType('wgs'),
+                        status=SequenceStatus(sequence_status),
                     )
                 )
 
