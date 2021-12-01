@@ -30,7 +30,6 @@ class GenericMetadataParser(GenericParser):
         confirm=False,
     ):
         path_prefix = search_locations[0] if search_locations else None
-        assert path_prefix is not None
         super().__init__(
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,

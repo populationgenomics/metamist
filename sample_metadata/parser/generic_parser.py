@@ -44,7 +44,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     def __init__(
         self,
-        path_prefix: str,
+        path_prefix: Optional[str],
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
