@@ -30,7 +30,7 @@ class GenericMetadataParser(GenericParser):
         confirm=False,
     ):
         path_prefix = search_locations[0] if search_locations else None
-
+        assert path_prefix is not None
         super().__init__(
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
@@ -39,7 +39,7 @@ class GenericMetadataParser(GenericParser):
             confirm=confirm,
         )
         self.search_locations = search_locations
-        self.filename_map = {}
+        self.filename_map: Dict[str, str] = {}
         self.populate_filename_map(self.search_locations)
 
         if not sample_name_column:
@@ -157,10 +157,9 @@ class GenericMetadataParser(GenericParser):
                 return {key_parts[0]: val}
             return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
-        is_list = isinstance(row, list)
         dicts = []
         for row_key, dict_key in key_map.items():
-            if is_list:
+            if isinstance(row, list):
                 inner_values = [r[row_key] for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable

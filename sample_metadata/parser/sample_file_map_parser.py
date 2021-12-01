@@ -53,16 +53,17 @@ class SampleFileMapParser(GenericMetadataParser):
         )
 
     @staticmethod
-    def from_manifest_path(
+    def from_manifest_path(     # type: ignore
         manifest: str,
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
         search_paths=None,
         confirm=False,
+            **kwargs
     ):
         """From manifest path, same defaults in __init__"""
-        super().from_manifest_path(
+        super().from_manifest_path(     # type: ignore
             manifest=manifest,
             search_paths=search_paths,
             sample_metadata_project=sample_metadata_project,
@@ -73,4 +74,5 @@ class SampleFileMapParser(GenericMetadataParser):
             sample_meta_map={},
             sequence_meta_map={},
             qc_meta_map={},
+            **kwargs
         )

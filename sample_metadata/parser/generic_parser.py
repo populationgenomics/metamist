@@ -70,7 +70,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_bucket = None
 
         self.client = None
-        self.bucket_clients = {}
+        self.bucket_clients: Dict[str, Any] = {}
 
         if path_prefix and path_prefix.startswith('gs://'):
             # pylint: disable=import-outside-toplevel
@@ -101,7 +101,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         if self.client and not filename.startswith('/'):
             return os.path.join(
-                'gs://', self.default_bucket, self.path_prefix or '', filename
+                'gs://', self.default_bucket or '', self.path_prefix or '', filename or ''
             )
 
         return os.path.join(self.path_prefix or '', filename)
@@ -126,6 +126,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         path = self.file_path(directory_name)
         if path.startswith('gs://'):
             bucket_name, *components = directory_name[5:].split('/')
+            assert self.client
             blobs = self.client.list_blobs(bucket_name, prefix='/'.join(components))
             return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
 
@@ -246,9 +247,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'Preparing {external_sample_id}')
 
-            rows = sample_map[external_sample_id]
+            rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[external_sample_id]
 
-            if len(rows) == 1:
+            if isinstance(rows, list) and len(rows) == 1:
                 rows = rows[0]
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
@@ -348,8 +349,8 @@ Updating {len(sequences_to_update)} sequences"""
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
             existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
-        for sample_id, sequences_to_add in sequences_to_add.items():
-            for seq in sequences_to_add:
+        for sample_id, seqs_to_add in sequences_to_add.items():
+            for seq in seqs_to_add:
                 seq.sample_id = existing_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
@@ -389,17 +390,19 @@ Updating {len(sequences_to_update)} sequences"""
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
+
         if all(any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS) for r in reads):
             structured_fastqs = self.parse_fastqs_structure(reads)
-            files = []
+            fastq_files: List[List[Dict]] = []
             for fastq_group in structured_fastqs:
-                files.append([self.create_file_object(f) for f in fastq_group])
+                fastq_files.append([self.create_file_object(f) for f in fastq_group])
 
-            return files, 'fastq'
+            return fastq_files, 'fastq'
+
+        files: List[Dict] = []
 
         if all(any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS) for r in reads):
             sec_format = ['.crai', '^.crai']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -410,7 +413,6 @@ Updating {len(sequences_to_update)} sequences"""
 
         if all(any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS) for r in reads):
             sec_format = ['.bai', '^.bai']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -421,7 +423,6 @@ Updating {len(sequences_to_update)} sequences"""
 
         if all(any(r.lower().endswith(ext) for ext in VCFGZ_EXTENSIONS) for r in reads):
             sec_format = ['.tbi']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -467,7 +468,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         values = []
         for _, grouped in groupby(
-            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]
+            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]     # type: ignore
         ):
             values.append(sorted(grouped))
 
