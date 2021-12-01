@@ -1,7 +1,5 @@
 # pylint: disable=used-before-assignment
-from typing import List, Union, Optional
-
-from dns.set import Set
+from typing import List, Union, Optional, Set
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
