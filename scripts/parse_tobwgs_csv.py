@@ -1,11 +1,12 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
-from typing import Optional
+from typing import Optional, Dict, List
 import logging
 import os
 from io import StringIO
 
 import click
 
+from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
@@ -21,14 +22,18 @@ class TobWgsParser(GenericMetadataParser):
 
     buckets = {}
 
-    def get_gvcf_path(self, sample_id: str, batch_number: int) -> Optional[str]:
+    def find_file(
+        self, sample_id: str, batch_number: int, analysis_type: str
+    ) -> Optional[str]:
         """
-        GVCFs can be in a few places, so please find it from search locations
+        GVCFs and CRAMs can be in a few places, so please find it from search locations
         """
-        filename = f'{sample_id}.g.vcf.gz'
+        assert analysis_type in ['cram', 'gvcf']
+        extention = 'g.vcf.gz' if analysis_type == 'gvcf' else 'cram'
+        filename = f'{sample_id}.{extention}'
         dirs = [
             'gs://cpg-tob-wgs-main-upload/',
-            f'gs://cpg-tob-wgs-main/gvcf/batch{batch_number}/',
+            f'gs://cpg-tob-wgs-archive/{analysis_type}/batch{batch_number}/',
         ]
         for base in dirs:
             fpath = os.path.join(base, filename)
@@ -37,21 +42,39 @@ class TobWgsParser(GenericMetadataParser):
 
         return None
 
-    def get_cram_path(self, sample_id: str, batch_number: int) -> Optional[str]:
-        """
-        CRAMs can be in a few places, so please find it from search locations
-        """
-        filename = f'{sample_id}.cram'
-        dirs = [
-            'gs://cpg-tob-wgs-main-upload/',
-            f'gs://cpg-tob-wgs-archive/cram/batch{batch_number}/',
-        ]
-        for base in dirs:
-            fpath = os.path.join(base, filename)
-            if self.file_exists(fpath):
-                return fpath
+    def get_analyses(self, sample_id: str, row: Dict[str, any]) -> List[AnalysisModel]:
+        """Get Analysis entries from a row"""
+        analyses = super().get_analyses(sample_id, row)
 
-        return None
+        batch_number = int(row['batch.batch_name'][-3:])
+
+        for atype in ['gvcf', 'cram']:
+            file_path, file_type = self.parse_file(
+                [self.find_file(sample_id, batch_number, atype)]
+            )
+            assert file_type == atype, (file_type, atype, sample_id)
+
+            if not isinstance(file_path, str):
+                file_path = file_path[0]
+
+            analyses.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type=AnalysisType(atype),
+                    status=AnalysisStatus('completed'),
+                    output=file_path,
+                    meta={
+                        # To distinguish TOB processed on Terra as part from NAGIM
+                        # from those processed at the KCCG:
+                        'source': 'kccg',
+                        # Indicating that files need to be renamed to use CPG IDs,
+                        # and moved from -upload to -test/-main. (For gvcf, also
+                        # need to reblock):
+                        'staging': True,
+                    },
+                )
+            )
+        return analyses
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
@@ -61,23 +84,6 @@ class TobWgsParser(GenericMetadataParser):
 
         batch_name = row['batch.batch_name'][:-5]
         collapsed_sequence_meta['batch_name'] = batch_name
-
-        gvcf, variants_type = self.parse_file(
-            [self.get_gvcf_path(sample_id, batch_number)]
-        )
-        reads, reads_type = self.parse_file(
-            [self.get_cram_path(sample_id, batch_number)]
-        )
-
-        if len(gvcf) == 1:
-            gvcf = gvcf[0]
-        if len(reads) == 1:
-            reads = reads[0]
-
-        collapsed_sequence_meta['reads'] = reads
-        collapsed_sequence_meta['reads_type'] = reads_type
-        collapsed_sequence_meta['gvcf'] = gvcf
-        collapsed_sequence_meta['gvcf_type'] = variants_type
 
         return collapsed_sequence_meta
 
