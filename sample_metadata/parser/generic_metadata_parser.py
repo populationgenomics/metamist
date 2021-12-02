@@ -27,7 +27,6 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
     ):
         path_prefix = search_locations[0] if search_locations else None
         super().__init__(
@@ -35,7 +34,6 @@ class GenericMetadataParser(GenericParser):
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            confirm=confirm,
         )
         self.search_locations = search_locations
         self.filename_map: Dict[str, str] = {}
@@ -231,38 +229,19 @@ class GenericMetadataParser(GenericParser):
         """Get sequence status from row"""
         return 'uploaded'
 
-    @staticmethod
     def from_manifest_path(
+        self,
         manifest: str,
-        sample_metadata_project: str,
-        sample_name_column: str,
-        sample_meta_map: Dict[str, str],
-        sequence_meta_map: Dict[str, str],
-        qc_meta_map: Dict[str, str],
-        reads_column: Optional[str] = None,
-        gvcf_column: Optional[str] = None,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        search_paths=None,
-        confirm=False,
-        delimiter=',',
+        confirm=True,
+        delimiter=None,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        parser = GenericMetadataParser(
-            search_locations=search_paths,
-            sample_metadata_project=sample_metadata_project,
-            sample_name_column=sample_name_column,
-            sample_meta_map=sample_meta_map,
-            sequence_meta_map=sequence_meta_map,
-            qc_meta_map=qc_meta_map,
-            reads_column=reads_column,
-            gvcf_column=gvcf_column,
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            confirm=confirm,
+
+        _delimiter = delimiter or GenericMetadataParser.guess_delimiter_from_filename(
+            manifest
         )
 
-        delimiter = GenericMetadataParser.guess_delimiter_from_filename(manifest)
-
-        file_contents = parser.file_contents(manifest)
-        return parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
+        file_contents = self.file_contents(manifest)
+        return self.parse_manifest(
+            StringIO(file_contents), delimiter=_delimiter, confirm=confirm
+        )

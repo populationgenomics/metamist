@@ -48,13 +48,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
         skip_checking_gcs_objects=False,
         verbose=True,
     ):
 
         self.path_prefix = path_prefix
-        self.confirm = confirm
         self.skip_checking_gcs_objects = skip_checking_gcs_objects
         self.verbose = verbose
 
@@ -201,7 +199,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get sequence status from row"""
 
     def parse_manifest(  # pylint: disable=too-many-branches
-        self, file_pointer, delimiter=',', dry_run=False
+        self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
@@ -333,7 +331,7 @@ Updating {len(sequences_to_update)} sequences"""
                 analyses_to_add,
             )
 
-        if self.confirm:
+        if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
             if resp.lower() != 'y':
                 raise SystemExit()

@@ -1,8 +1,7 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
-from typing import Optional, Union, List, Dict, Any
 import logging
 import os
-from io import StringIO
+from typing import Optional, Union, List, Dict, Any
 
 import click
 
@@ -15,9 +14,41 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
+SEQUENCE_MAP = {
+    'sample.flowcell_lane': 'flowcell_lane',
+    'sample.library_id': 'library_id',
+    'sample.platform': 'platform',
+    'sample.centre': 'centre',
+    'sample.reference_genome': 'reference_genome',
+    'raw_data.FREEMIX': 'freemix',
+    'raw_data.PCT_CHIMERAS': 'pct_chimeras',
+    'raw_data.PERCENT_DUPLICATION': 'percent_duplication',
+    'raw_data.MEDIAN_INSERT_SIZE': 'median_insert_size',
+    'raw_data.MEDIAN_COVERAGE': 'median_coverage',
+    'batch.sample_count': 'sample_count',
+}
+
 
 class TobWgsParser(GenericMetadataParser):
     """Parser for TOBWgs manifest"""
+
+    def __init__(
+        self,
+        sample_metadata_project: str,
+        search_locations: List[str],
+        default_sequence_type='wgs',
+        default_sample_type='blood',
+    ):
+        super().__init__(
+            search_locations=search_locations,
+            sample_metadata_project=sample_metadata_project,
+            default_sequence_type=default_sequence_type,
+            default_sample_type=default_sample_type,
+            sample_name_column='sample.sample_name',
+            sample_meta_map={},
+            sequence_meta_map=SEQUENCE_MAP,
+            qc_meta_map={},
+        )
 
     def get_gvcf_path(self, sample_id: str, batch_number: int) -> Optional[str]:
         """
@@ -85,56 +116,6 @@ class TobWgsParser(GenericMetadataParser):
 
         return collapsed_sequence_meta
 
-    @staticmethod
-    def from_manifest_path(  # type: ignore[override]
-        manifest: str,
-        sample_metadata_project: str,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        path_prefix=None,
-        confirm=False,
-        **kwargs,
-    ):
-        """Parse manifest from path, and return result of parsing manifest"""
-        if path_prefix is None:
-            path_prefix = [os.path.dirname(manifest)]
-            manifest_filename = os.path.basename(manifest)
-        else:
-            manifest_filename = manifest
-
-        delimiter = TobWgsParser.guess_delimiter_from_filename(manifest_filename)
-
-        sequence_map = {
-            'sample.flowcell_lane': 'flowcell_lane',
-            'sample.library_id': 'library_id',
-            'sample.platform': 'platform',
-            'sample.centre': 'centre',
-            'sample.reference_genome': 'reference_genome',
-            'raw_data.FREEMIX': 'freemix',
-            'raw_data.PCT_CHIMERAS': 'pct_chimeras',
-            'raw_data.PERCENT_DUPLICATION': 'percent_duplication',
-            'raw_data.MEDIAN_INSERT_SIZE': 'median_insert_size',
-            'raw_data.MEDIAN_COVERAGE': 'median_coverage',
-            'batch.sample_count': 'sample_count',
-        }
-
-        parser = TobWgsParser(
-            path_prefix,
-            sample_metadata_project=sample_metadata_project,
-            sequence_meta_map=sequence_map,
-            sample_name_column='sample.sample_name',
-            sample_meta_map={},
-            qc_meta_map={},
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            confirm=confirm,
-        )
-
-        file_contents = parser.file_contents(manifest_filename)
-        resp = parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
-
-        return resp
-
 
 @click.command(help='GCS path to manifest file')
 @click.option(
@@ -157,16 +138,18 @@ def main(
     confirm=False,
 ):
     """Run script from CLI arguments"""
-    _path_prefix = list(path_prefix)
+    _search_locations = path_prefix if isinstance(path_prefix, list) else [path_prefix]
 
+    parser = TobWgsParser(
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
+        sample_metadata_project=sample_metadata_project,
+        search_locations=_search_locations,
+    )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = TobWgsParser.from_manifest_path(
+        resp = parser.from_manifest_path(
             manifest=manifest,
-            sample_metadata_project=sample_metadata_project,
-            default_sample_type=default_sample_type,
-            default_sequence_type=default_sequence_type,
-            path_prefix=_path_prefix,
             confirm=confirm,
         )
         print(resp)
