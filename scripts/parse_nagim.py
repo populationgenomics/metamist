@@ -438,7 +438,7 @@ class NagimParser(GenericParser):
                             # from those processed at the KCCG:
                             'source': 'nagim',
                             # Indicating that files need to be renamed to use CPG IDs,
-                            # an moved from -upload to -test/-main. (For gvcf, also
+                            # and moved from -upload to -test/-main. (For gvcf, also
                             # need to reblock):
                             'staging': True,
                             'project': row.get('project'),
