@@ -66,10 +66,15 @@ import click
 import pandas as pd
 
 from cpg_pipes.pipeline import setup_batch
-
+from sample_metadata.models import (
+    SequenceStatus,
+    AnalysisStatus,
+    AnalysisType,
+    AnalysisModel,
+)
 from sample_metadata.apis import SampleApi
-from sample_metadata.models import AnalysisModel
 from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
@@ -87,12 +92,12 @@ SRC_BUCKETS_MAIN: List[str] = []
 # Terra buckets names start with "fc-"
 assert all(b.startswith('gs://fc-') for b in SRC_BUCKETS_MAIN + SRC_BUCKETS_TEST)
 
-PROJECT = 'nagim'
+NAGIM_PROJ_ID = 'nagim'
 
 # Mapping the KCCG project IDs to internal CPG project IDs
 PROJECT_ID_MAP = {
     '1KB': 'thousand-genomes',
-    'ALS': PROJECT,  # we don't have a stack for ALS, so just using nagim
+    'ALS': 'csiro-als',
     'AMP-PD': 'amp-pd',
     'HGDP': 'hgdp',
     'MGRB': 'mgrb',
@@ -155,21 +160,20 @@ def transfer(
         )
 
     namespace = 'main' if prod else 'test'
+    # Putting to -upload because we need to rename them after CPG IDs, and because
+    # we need to run ReblockGVCFs on GVCFs.
+    upload_gvcf_bucket = f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-upload/gvcf'
+    upload_cram_bucket = f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-upload/cram'
 
     if not tmp_dir:
         tmp_dir = tempfile.gettempdir()
-
-    # Putting to -upload because we need to rename them after CPG IDs, and because
-    # we need to run ReblockGVCFs on GVCFs.
-    upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
-    upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
 
     if use_batch:
         hbatch = setup_batch(
             title='Transferring NAGIM data',
             keep_scratch=False,
-            tmp_bucket=f'cpg-{PROJECT}-{namespace}-tmp',
-            analysis_project_name=PROJECT,
+            tmp_bucket=f'cpg-{NAGIM_PROJ_ID}-{namespace}-tmp',
+            analysis_project_name=NAGIM_PROJ_ID,
         )
     else:
         hbatch = None
@@ -217,10 +221,12 @@ def parse(
     """
     Assuming the data is transferred to the CPG bucket, populate the SM projects.
     """
-    namespace = 'main' if prod else 'test'
 
-    upload_gvcf_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/gvcf'
-    upload_cram_bucket = f'gs://cpg-{PROJECT}-{namespace}-upload/cram'
+    namespace = 'main' if prod else 'test'
+    # Putting to -upload because we need to rename them after CPG IDs, and because
+    # we need to run ReblockGVCFs on GVCFs.
+    upload_gvcf_bucket = f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-upload/gvcf'
+    upload_cram_bucket = f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-upload/cram'
 
     if not tmp_dir:
         tmp_dir = tempfile.gettempdir()
@@ -237,32 +243,33 @@ def parse(
 
     # Creating a parser for each project separately, because `sample_metadata_project`
     # is an initialization parameter, and we want to write to multiple projects.
-    for proj_id in PROJECT_ID_MAP.values():
-        sm_proj_id = proj_id if prod else f'{proj_id}-test'
-        sample_tsv_file = join(tmp_dir, f'sm-nagim-parser-samples-{sm_proj_id}.csv')
+    for proj in PROJECT_ID_MAP.values():
+        sm_proj = _get_sm_proj_id(proj, prod)
+        sample_tsv_file = join(tmp_dir, f'sm-nagim-parser-samples-{sm_proj}.csv')
         df = pd.DataFrame(
             dict(
                 cpg_id=s.cpg_id,
                 ext_id=s.ext_id,
                 gvcf=s.gvcf,
                 cram=s.cram,
+                project=s.project_id,
             )
             for s in samples
-            if s.project_id == proj_id
+            if s.project_id == proj
         )
         if len(df) == 0:
-            logger.info(f'No samples for project {sm_proj_id} found, skipping')
+            logger.info(f'No samples for project {sm_proj} found, skipping')
             continue
 
         df.to_csv(sample_tsv_file, index=False)
         logger.info(
-            f'Processing {len(df)} samples for project {sm_proj_id}, '
+            f'Processing {len(df)} samples for project {sm_proj}, '
             f'sample manifest: {sample_tsv_file}'
         )
 
         parser = NagimParser(
             path_prefix=None,
-            sample_metadata_project=sm_proj_id,
+            sample_metadata_project=sm_proj,
             skip_checking_gcs_objects=skip_checking_objects,
             confirm=confirm,
             verbose=False,
@@ -271,14 +278,21 @@ def parse(
             parser.parse_manifest(f, dry_run=dry_run)
 
 
+def _get_sm_proj_id(proj: str, prod: bool):
+    """
+    Matching the project ID to a sample-metadata project
+    """
+    if proj == 'csiro-als':  # We don't have a project for ALS yet
+        proj = 'nagim'
+    return f'{proj}-test' if not prod else proj
+
+
 def _fix_sample_ids(samples: List[Sample], prod: bool) -> List[Sample]:
     """
     Some samples processed with Terra use CPG IDs, so checking if we already
     have them in the SMDB, and fixing the external IDs.
     """
-    sm_proj_ids = [
-        f'{proj}-test' if not prod else proj for proj in PROJECT_ID_MAP.values()
-    ]
+    sm_proj_ids = [_get_sm_proj_id(proj, prod) for proj in PROJECT_ID_MAP.values()]
     sapi = SampleApi()
     sm_sample_dicts = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
@@ -411,27 +425,28 @@ class NagimParser(GenericParser):
     def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
         assert not isinstance(row, list)
 
-        gvcf = row.get('gvcf')
-        cram = row.get('cram')
         results = []
-        if gvcf:
+        for atype in ['gvcf', 'cram']:
+            file_path = row.get(atype)
+            if not file_path:
+                continue
+
             results.append(
                 AnalysisModel(
                     sample_ids=['<none>'],
-                    type='gvcf',
-                    status='in-progress',
-                    output=gvcf,
-                    meta={'source': 'nagim'},
-                )
-            )
-        if cram:
-            results.append(
-                AnalysisModel(
-                    sample_ids=['<none>'],
-                    type='cram',
-                    status='in-progress',
-                    output=gvcf,
-                    meta={'source': 'nagim'},
+                    type=AnalysisType(atype),
+                    status=AnalysisStatus('completed'),
+                    output=file_path,
+                    meta={
+                        # To distinguish TOB processed on Terra as part from NAGIM
+                        # from those processed at the KCCG:
+                        'source': 'nagim',
+                        # Indicating that files need to be renamed to use CPG IDs,
+                        # and moved from -upload to -test/-main. (For gvcf, also
+                        # need to reblock):
+                        'staging': True,
+                        'project': row.get('project'),
+                    },
                 )
             )
         return results
@@ -439,27 +454,25 @@ class NagimParser(GenericParser):
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
-        return 'uploaded'
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+        return SequenceStatus('uploaded')
 
 
-def _get_bucket_ls(
-    ext: Union[str, List[str]],
+def _cache_bucket_ls(
+    extentions_to_search: Union[str, List[str]],
     source_bucket,
     tmp_dir,
     overwrite,
 ) -> List[str]:
-    if isinstance(ext, list):
-        label = '-'.join(e.replace('.', '-') for e in ext)
-    else:
-        label = ext.replace('.', '-')
+    if isinstance(extentions_to_search, str):
+        extentions_to_search = [extentions_to_search]
+    label = '-'.join(extentions_to_search).replace('.', '-')
+
     output_path = join(tmp_dir, f'sm-nagim-parser-gs-ls{label}.txt')
     if overwrite or not exists(output_path):
         _call(f'test ! -e {output_path} || rm {output_path}')
         _call(f'touch {output_path}')
-        if isinstance(ext, str):
-            ext = [ext]
-        for e in ext:
+        for e in extentions_to_search:
             _call(f'gsutil ls "{source_bucket}/*{e}" >> {output_path}')
     with open(output_path) as f:
         return [line.strip() for line in f.readlines() if line.strip()]
@@ -471,26 +484,26 @@ def _find_upload_files(
     tmp_dir,
     overwrite=False,
 ) -> List[Sample]:
-    gvcf_paths = _get_bucket_ls(
-        ext='.vcf.gz',
+    gvcf_paths = _cache_bucket_ls(
+        extentions_to_search='.vcf.gz',
         source_bucket=upload_gvcf_bucket,
         tmp_dir=tmp_dir,
         overwrite=overwrite,
     )
-    tbi_paths = _get_bucket_ls(
-        ext='.vcf.gz.tbi',
+    tbi_paths = _cache_bucket_ls(
+        extentions_to_search='.vcf.gz.tbi',
         source_bucket=upload_gvcf_bucket,
         tmp_dir=tmp_dir,
         overwrite=overwrite,
     )
-    cram_paths = _get_bucket_ls(
-        ext='.cram',
+    cram_paths = _cache_bucket_ls(
+        extentions_to_search='.cram',
         source_bucket=upload_cram_bucket,
         tmp_dir=tmp_dir,
         overwrite=overwrite,
     )
-    crai_paths = _get_bucket_ls(
-        ext='.cram.crai',
+    crai_paths = _cache_bucket_ls(
+        extentions_to_search='.cram.crai',
         source_bucket=upload_cram_bucket,
         tmp_dir=tmp_dir,
         overwrite=overwrite,

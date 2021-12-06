@@ -232,7 +232,7 @@ class GenericMetadataParser(GenericParser):
     def from_manifest_path(
         self,
         manifest: str,
-        confirm=True,
+        confirm=False,
         delimiter=None,
     ):
         """Parse manifest from path, and return result of parsing manifest"""

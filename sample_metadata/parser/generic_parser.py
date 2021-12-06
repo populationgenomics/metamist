@@ -186,16 +186,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> Union[str, SampleType]:
         """Get sample type from row"""
         return self.default_sample_type
 
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> Union[str, SequenceType]:
         """Get sequence type from row"""
         return self.default_sequence_type
 
     @abstractmethod
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> Union[str, SequenceStatus]:
         """Get sequence status from row"""
 
     def parse_manifest(  # pylint: disable=too-many-branches
@@ -298,7 +298,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 cpgid = existing_external_id_to_cpgid[external_sample_id]
                 seq_id = existing_cpgid_to_seq_id[cpgid]
                 sequences_to_update[seq_id] = SequenceUpdateModel(
-                    meta=collapsed_sequencing_meta, status=sequence_status
+                    meta=collapsed_sequencing_meta, status=SequenceStatus(sequence_status)
                 )
             else:
                 # the internal sample ID gets mapped back later
