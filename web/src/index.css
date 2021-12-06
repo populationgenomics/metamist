@@ -22,7 +22,7 @@ code {
 }
 
 
-pre {
+pre :not(small) :not(span) {
   margin: 0px;
   padding: 0;
   background: #f8f8f8;
@@ -37,7 +37,6 @@ blockquote {
   margin: 0;
   padding-left: 1em;
   font-style: italic;
-
 }
 
 

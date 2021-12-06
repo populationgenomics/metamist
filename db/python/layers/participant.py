@@ -1,5 +1,5 @@
 # pylint: disable=invalid-name
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 
 from collections import defaultdict
 from enum import Enum
@@ -274,6 +274,7 @@ class ParticipantLayer(BaseLayer):
             allow_missing_participants = (
                 extra_participants_method != ExtraParticipantImporterHandler.FAIL
             )
+            assert self.connection.project
             external_pid_map = await self.get_id_map_by_external_ids(
                 list(external_participant_ids),
                 project=self.connection.project,
@@ -405,6 +406,7 @@ class ParticipantLayer(BaseLayer):
         internal_to_external_fid_map = {}
 
         if external_participant_ids:
+            assert self.connection.project
             pids = await self.get_id_map_by_external_ids(
                 external_participant_ids,
                 project=self.connection.project,
@@ -455,7 +457,7 @@ class ParticipantLayer(BaseLayer):
     async def get_id_map_by_external_ids(
         self,
         external_ids: List[str],
-        project: ProjectId,
+        project: Optional[ProjectId],
         allow_missing=False,
     ) -> Dict[str, int]:
         """Get participant ID map by external_ids"""
@@ -559,7 +561,7 @@ class ParticipantLayer(BaseLayer):
         ]
 
         # List of (PersonId, Key, value) to insert into the participant_phenotype table
-        insertable_rows: List[Tuple[int, str, any]] = []
+        insertable_rows: List[Tuple[int, str, Any]] = []
         parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         for row in rows:

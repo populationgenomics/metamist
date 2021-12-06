@@ -3,17 +3,19 @@ from typing import Optional, Dict, List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from models.models.sample import sample_id_transform_to_raw, sample_id_format
+from api.utils.db import (
+    Connection,
+    get_projectless_db_connection,
+)
 from db.python.layers.sequence import (
     SequenceType,
     SequenceStatus,
     SampleSequenceLayer,
 )
-
-
-from api.utils.db import (
-    Connection,
-    get_projectless_db_connection,
+from models.models.sample import (
+    sample_id_transform_to_raw,
+    sample_id_transform_to_raw_list,
+    sample_id_format,
 )
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
@@ -71,7 +73,7 @@ async def get_sequence(
     """Get sequence by sequence ID"""
     sequence_layer = SampleSequenceLayer(connection)
     resp = await sequence_layer.get_sequence_by_id(sequence_id, check_project_id=True)
-    resp.sample_id = sample_id_format(resp.sample_id)
+    resp.sample_id = sample_id_format(resp.sample_id)  # type: ignore[arg-type]
     return resp
 
 
@@ -83,13 +85,13 @@ async def get_sequences_by_internal_sample_ids(
 ):
     """Get a list of sequence objects by their internal CPG sample IDs"""
     sequence_layer = SampleSequenceLayer(connection)
-    unwrapped_sample_ids: List[int] = sample_id_transform_to_raw(sample_ids)
+    unwrapped_sample_ids: List[int] = sample_id_transform_to_raw_list(sample_ids)
     sequences = await sequence_layer.get_sequences_for_sample_ids(
         unwrapped_sample_ids, get_latest_sequence_only=get_latest_sequence_only
     )
 
     for seq in sequences:
-        seq.sample_id = sample_id_format(seq.sample_id)
+        seq.sample_id = sample_id_format(int(seq.sample_id))
 
     return sequences
 
@@ -116,7 +118,7 @@ async def get_sequence_ids_from_sample_ids(
 ) -> Dict[str, int]:
     """Get sequence ids from internal sample ids"""
     sequence_layer = SampleSequenceLayer(connection)
-    sample_ids_raw = sample_id_transform_to_raw(sample_ids)
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)
     sequence_id_map = await sequence_layer.get_latest_sequence_ids_for_sample_ids(
         sample_ids_raw
     )

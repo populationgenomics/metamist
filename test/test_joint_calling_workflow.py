@@ -1,9 +1,14 @@
 from typing import List
 
-from sample_metadata import AnalysisUpdateModel
-from sample_metadata.api import SampleApi, AnalysisApi
-from sample_metadata.models.new_sample import NewSample
-from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.apis import SampleApi, AnalysisApi
+from sample_metadata.models import (
+    NewSample,
+    AnalysisModel,
+    AnalysisUpdateModel,
+    SampleType,
+    AnalysisType,
+    AnalysisStatus,
+)
 
 
 INPUT_PROJECT = 'test_input_project'
@@ -21,7 +26,7 @@ def _add_samples(test_run_id: str, project: str):
     """
     s1 = NewSample(
         external_id=f'NA12878-from-fq-{test_run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={
             'reads': [
                 [
@@ -37,12 +42,12 @@ def _add_samples(test_run_id: str, project: str):
     )
     s2 = NewSample(
         external_id=f'NA12878-from-cram-{test_run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878.cram'},
     )
     s3 = NewSample(
         external_id=f'NA12878-from-gvcf-{test_run_id}',
-        type='blood',
+        type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio/NA12878.g.vcf.gz'},
     )
     sample_ids = [sapi.create_new_sample(project, s) for s in (s1, s2, s3)]
@@ -61,16 +66,16 @@ def _submit_analyses(samples: List, output_project: str, a_type: str):
             if a_type == 'gvcf':
                 cram_analysis = aapi.get_latest_analysis_for_samples_and_type(
                     project=output_project,
-                    analysis_type='cram',
+                    analysis_type=AnalysisType('cram'),
                     request_body=[s['id']],
                 )
                 assert cram_analysis, s
 
             # completed_analysis = latest_by_type_and_sids.get(('cram', (s['id'],))),
             am = AnalysisModel(
-                type=a_type,
+                type=AnalysisType(a_type),
                 output=f'result.{a_type}',
-                status='queued',
+                status=AnalysisStatus('queued'),
                 sample_ids=[s['id']],
             )
             aapi.create_new_analysis(project=output_project, analysis_model=am)
@@ -79,16 +84,16 @@ def _submit_analyses(samples: List, output_project: str, a_type: str):
         for s in samples:
             gvcf_analysis = aapi.get_latest_analysis_for_samples_and_type(
                 project=output_project,
-                analysis_type='gvcf',
+                analysis_type=AnalysisType('gvcf'),
                 request_body=[s['id']],
             )
             assert gvcf_analysis, s
 
         am = AnalysisModel(
             sample_ids=[s['id'] for s in samples],
-            type='joint-calling',
+            type=AnalysisType('joint-calling'),
             output='joint-called.vcf',
-            status='queued',
+            status=AnalysisStatus('queued'),
         )
         aapi.create_new_analysis(project=output_project, analysis_model=am)
 
@@ -105,7 +110,7 @@ def _update_analyses(proj: str, new_status: str):
     if analyses:
         for a in analyses:
             print(f'Setting analysis {a} to {new_status}')
-            aum = AnalysisUpdateModel(status=new_status)
+            aum = AnalysisUpdateModel(status=AnalysisStatus(new_status))
             aapi.update_analysis_status(
                 analysis_id=a['id'],
                 analysis_update_model=aum,
@@ -153,7 +158,7 @@ def test_simulate_joint_calling_pipeline(
     # Checking that after all calls, a 'completed' 'joint-calling' analysis must exist
     # that includes all initally added samples
     analysis = aapi.get_latest_complete_analysis_for_type(
-        project=output_project, analysis_type='joint-calling'
+        project=output_project, analysis_type=AnalysisType('joint-calling')
     )
     assert analysis['type'] == 'joint-calling'
     assert set([s['id'] for s in samples]).issubset(set(analysis['sample_ids']))

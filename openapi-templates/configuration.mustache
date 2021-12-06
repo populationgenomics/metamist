@@ -1,5 +1,7 @@
 {{>partial_header}}
 
+from os import getenv
+import json
 import copy
 import logging
 {{^asyncio}}
@@ -7,6 +9,10 @@ import multiprocessing
 {{/asyncio}}
 import sys
 import urllib3
+
+import google.oauth2.id_token
+import google.auth.exceptions
+import google.auth.transport.requests
 
 from http import client as http_client
 from {{packageName}}.exceptions import ApiValueError
@@ -482,7 +488,7 @@ conf = {{{packageName}}}.Configuration(
 
         :return: The Auth Settings information dict.
         """
-                auth = {
+        auth = {
             'HTTPBearer': {
                 'type': 'bearer',
                 'in': 'header',
@@ -570,7 +576,9 @@ conf = {{{packageName}}}.Configuration(
 
 def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/') -> str:
     """
-    Get google auth token
+    Get google auth token in two ways:
+    - if GOOGLE_APPLICATION_CREDENTIALS is set, then grab from there
+    - or run the equivalent of 'gcloud auth print-identity-token'
     """
     # https://stackoverflow.com/a/55804230
 

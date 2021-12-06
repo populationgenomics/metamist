@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
+import re
 from typing import Optional
 
 import os
@@ -14,6 +15,7 @@ import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
+OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
 MODULE_NAME = 'sample_metadata'
 
 logging.basicConfig(level=logging.DEBUG)
@@ -56,6 +58,7 @@ def start_server() -> Optional[subprocess.Popen]:
         preexec_fn=os.setsid,
     )
 
+    assert _process.stdout
     for c in iter(_process.stdout.readline, 'b'):
         line = None
         if c:
@@ -81,14 +84,31 @@ def start_server() -> Optional[subprocess.Popen]:
     return None
 
 
+def check_openapi_version():
+    """
+    Check compatible OpenAPI version
+    """
+    command = [*OPENAPI_COMMAND, '--version']
+    out = subprocess.check_output(command).decode().split('\n', maxsplit=1)[0].strip()
+    version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
+    if not version_match:
+        raise Exception(f'Could not detect version of openapi-generator from "{out}"')
+
+    version = version_match.group()
+    major = version.split('.')[0]
+    if int(major) != 5:
+        raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
+
+
 def generate_api_and_copy():
     """Get JSON from server"""
+    check_openapi_version()
     with open('deploy/python/version.txt', encoding='utf-8') as f:
         version = f.read().strip()
 
     tmpdir = tempfile.mkdtemp()
     command = [
-        'openapi-generator',
+        *OPENAPI_COMMAND,
         'generate',
         '-i',
         SCHEMA_URL,
@@ -138,7 +158,7 @@ def copy_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py', 'parser'}
+    files_to_ignore = {'README.md', 'parser'}
 
     module_dir = MODULE_NAME.replace('.', '/')
     dir_to_copy_to = module_dir  # should be relative to this script

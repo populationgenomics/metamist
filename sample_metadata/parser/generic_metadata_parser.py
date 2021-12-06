@@ -27,19 +27,16 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
     ):
         path_prefix = search_locations[0] if search_locations else None
-
         super().__init__(
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            confirm=confirm,
         )
         self.search_locations = search_locations
-        self.filename_map = {}
+        self.filename_map: Dict[str, str] = {}
         self.populate_filename_map(self.search_locations)
 
         if not sample_name_column:
@@ -83,7 +80,7 @@ class GenericMetadataParser(GenericParser):
 
         return super().file_path(filename)
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         return external_id
@@ -157,10 +154,9 @@ class GenericMetadataParser(GenericParser):
                 return {key_parts[0]: val}
             return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
-        is_list = isinstance(row, list)
         dicts = []
         for row_key, dict_key in key_map.items():
-            if is_list:
+            if isinstance(row, list):
                 inner_values = [r[row_key] for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
@@ -180,11 +176,11 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
@@ -233,38 +229,19 @@ class GenericMetadataParser(GenericParser):
         """Get sequence status from row"""
         return 'uploaded'
 
-    @staticmethod
     def from_manifest_path(
+        self,
         manifest: str,
-        sample_metadata_project: str,
-        sample_name_column: str,
-        sample_meta_map: Dict[str, str],
-        sequence_meta_map: Dict[str, str],
-        qc_meta_map: Dict[str, str],
-        reads_column: Optional[str] = None,
-        gvcf_column: Optional[str] = None,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        search_paths=None,
         confirm=False,
-        delimiter=',',
+        delimiter=None,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        parser = GenericMetadataParser(
-            search_locations=search_paths,
-            sample_metadata_project=sample_metadata_project,
-            sample_name_column=sample_name_column,
-            sample_meta_map=sample_meta_map,
-            sequence_meta_map=sequence_meta_map,
-            qc_meta_map=qc_meta_map,
-            reads_column=reads_column,
-            gvcf_column=gvcf_column,
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            confirm=confirm,
+
+        _delimiter = delimiter or GenericMetadataParser.guess_delimiter_from_filename(
+            manifest
         )
 
-        delimiter = GenericMetadataParser.guess_delimiter_from_filename(manifest)
-
-        file_contents = parser.file_contents(manifest)
-        return parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
+        file_contents = self.file_contents(manifest)
+        return self.parse_manifest(
+            StringIO(file_contents), delimiter=_delimiter, confirm=confirm
+        )
