@@ -60,7 +60,7 @@ WHERE participant_id in :participant_ids AND value IS NOT NULL
         rows = await self.connection.fetch_all(
             _query, {'participant_ids': participant_ids}
         )
-        formed_key_value_pairs = defaultdict(dict)
+        formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
             pid, key, value = row
             formed_key_value_pairs[pid][key] = json.loads(value)
@@ -82,7 +82,7 @@ INNER JOIN participant p ON p.id = pp.participant_id
 WHERE p.project = :project AND pp.value IS NOT NULL
 """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        formed_key_value_pairs = defaultdict(dict)
+        formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:
             pid, key, value = row
             formed_key_value_pairs[pid][key] = json.loads(value)

@@ -1,7 +1,6 @@
-from typing import Optional, Dict, Union, List
-
-import os
 import json
+import os
+from typing import Optional, Dict, Union, List, Sequence, Type
 
 from models.base import SMBase
 from models.enums.sample import SampleType
@@ -13,8 +12,8 @@ CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 class Sample(SMBase):
     """Model for a Sample"""
 
-    id: Union[str] = None
-    external_id: str = None
+    id: Union[str, int]
+    external_id: str
     participant_id: Optional[str] = None
     active: Optional[bool] = None
     meta: Optional[Dict] = None
@@ -42,18 +41,27 @@ class Sample(SMBase):
         return Sample(id=_id, type=SampleType(type_), meta=meta, active=active, **d)
 
 
-def sample_id_transform_to_raw(
-    identifier: Union[List[Union[str, int]], Union[str, int]], strict=True
-) -> Union[int, List[int]]:
+SampleIdRaw = Union[str, int]
+
+
+def sample_id_transform_to_raw_list(
+    identifier: Sequence[SampleIdRaw], strict=True
+) -> List[int]:
+    """
+    Transform LIST of STRING sample identifier (CPGXXXH) to XXX by:
+        - validating prefix
+        - validating checksum
+    """
+    return [sample_id_transform_to_raw(s, strict=strict) for s in identifier]
+
+
+def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
     """
     Transform STRING sample identifier (CPGXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
-    if isinstance(identifier, list):
-        return [sample_id_transform_to_raw(s) for s in identifier]
-
-    expected_type = str if strict else (str, int)
+    expected_type: Type[Union[str, SampleType]] = str if strict else SampleType
     if not isinstance(identifier, expected_type):
         raise TypeError(
             f'Expected identifier type to be "{expected_type}", received "{type(identifier)}"'
@@ -61,6 +69,9 @@ def sample_id_transform_to_raw(
 
     if isinstance(identifier, int):
         return identifier
+
+    if not isinstance(identifier, str):
+        raise ValueError('Programming error related to sample checks')
 
     if not identifier.startswith(SAMPLE_PREFIX):
         raise Exception(
@@ -78,12 +89,22 @@ def sample_id_transform_to_raw(
     return int(stripped_identifier[:-1])
 
 
-def sample_id_format(sample_id: Union[int, List[int]]):
+def sample_id_format_list(sample_ids: Sequence[Union[int, str]]) -> List[str]:
+    """
+    Transform LIST of raw (int) sample identifier to format (CPGXXXH) where:
+        - CPG is the prefix
+        - XXX is the original identifier
+        - H is the Luhn checksum
+    """
+    return [sample_id_format(s) for s in sample_ids]
+
+
+def sample_id_format(sample_id: Union[int, str]) -> str:
     """
     Transform raw (int) sample identifier to format (CPGXXXH) where:
         - CPG is the prefix
-        - H is the Luhn checksum
         - XXX is the original identifier
+        - H is the Luhn checksum
 
     >>> sample_id_format(10)
     'CPG109'
@@ -91,9 +112,6 @@ def sample_id_format(sample_id: Union[int, List[int]]):
     >>> sample_id_format(12345)
     'CPG123455'
     """
-
-    if isinstance(sample_id, list):
-        return [sample_id_format(s) for s in sample_id]
 
     if isinstance(sample_id, str) and not sample_id.isdigit():
         if sample_id.startswith(SAMPLE_PREFIX):

@@ -1,15 +1,16 @@
+from typing import Optional
 from models.base import SMBase
 
 
 class ProjectRow(SMBase):
     """Row for project in 'project' table"""
 
-    id: int = None
-    name: str = None
-    gcp_id: str = None
-    dataset: str = None
-    read_secret_name: str = None
-    write_secret_name: str = None
+    id: Optional[int] = None
+    name: Optional[str] = None
+    gcp_id: Optional[str] = None
+    dataset: Optional[str] = None
+    read_secret_name: Optional[str] = None
+    write_secret_name: Optional[str] = None
 
     @staticmethod
     def from_db(kwargs):

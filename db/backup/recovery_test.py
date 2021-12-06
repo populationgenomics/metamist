@@ -11,7 +11,7 @@ import json
 import os
 from typing import Tuple, Optional
 from collections import namedtuple
-from google.cloud import secretmanager
+import google.cloud.secretmanager
 import mysql.connector
 from parameterized import parameterized
 from restore import pull_latest_backup, restore
@@ -36,7 +36,7 @@ FIELDS = [
 
 TABLES = [field[0] for field in FIELDS]
 
-secret_manager = secretmanager.SecretManagerServiceClient()
+secret_manager = google.cloud.secretmanager.SecretManagerServiceClient()
 
 SECRET_NAME = 'projects/sample-metadata/secrets/db-validate-backup/versions/latest'
 config_str = secret_manager.access_secret_version(

@@ -37,34 +37,9 @@ class SampleFileMapParser(GenericMetadataParser):
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
     ):
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
-            sample_name_column=SAMPLE_ID_COL_NAME,
-            reads_column=READS_COL_NAME,
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            sample_meta_map={},
-            sequence_meta_map={},
-            qc_meta_map={},
-            confirm=confirm,
-        )
-
-    @staticmethod
-    def from_manifest_path(
-        manifest: str,
-        sample_metadata_project: str,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        search_paths=None,
-        confirm=False,
-    ):
-        """From manifest path, same defaults in __init__"""
-        super().from_manifest_path(
-            manifest=manifest,
-            search_paths=search_paths,
             sample_metadata_project=sample_metadata_project,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,

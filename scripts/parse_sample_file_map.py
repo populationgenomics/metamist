@@ -61,15 +61,17 @@ def main(
     if extra_seach_paths:
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
+    parser = SampleFileMapParser(
+        sample_metadata_project=sample_metadata_project,
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
+        search_locations=search_path,
+    )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = SampleFileMapParser.from_manifest_path(
+        resp = parser.from_manifest_path(
             manifest=manifest,
-            sample_metadata_project=sample_metadata_project,
-            default_sample_type=default_sample_type,
-            default_sequence_type=default_sequence_type,
             confirm=confirm,
-            search_paths=search_path,
         )
         print(resp)
 

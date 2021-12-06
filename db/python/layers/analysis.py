@@ -8,7 +8,7 @@ from db.python.tables.analysis import AnalysisTable
 
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
-from models.models.sample import sample_id_format
+from models.models.sample import sample_id_format_list
 
 
 class AnalysisLayer(BaseLayer):
@@ -35,7 +35,7 @@ class AnalysisLayer(BaseLayer):
         self,
         project: ProjectId,
         analysis_type: AnalysisType,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
     ) -> Analysis:
         """Get SINGLE latest complete analysis for some analysis type"""
         return await self.at.get_latest_complete_analysis_for_type(
@@ -64,9 +64,14 @@ class AnalysisLayer(BaseLayer):
         )
 
         if not allow_missing and len(sample_ids) != len(analyses):
-            seen_sample_ids = set(s for a in analyses for s in a.sample_ids)
-            missing_sample_ids = set(sample_ids) - seen_sample_ids
-            sample_ids_str = ', '.join(sample_id_format(list(missing_sample_ids)))
+            seen_sample_ids = set(
+                s
+                for a in analyses
+                for s in (a.sample_ids or [])
+                if a.sample_ids is not None
+            )
+            missing_sample_ids = set(sample_ids).difference(seen_sample_ids)
+            sample_ids_str = ', '.join(sample_id_format_list(list(missing_sample_ids)))
 
             raise Exception(
                 f'Missing gvcfs for the following sample IDs: {sample_ids_str}'
@@ -134,7 +139,7 @@ class AnalysisLayer(BaseLayer):
         analysis_type: AnalysisType,
         status: AnalysisStatus,
         sample_ids: List[int],
-        meta: Dict[str, any],
+        meta: Optional[Dict[str, Any]],
         output: str = None,
         active: bool = True,
         author: str = None,
@@ -170,7 +175,7 @@ class AnalysisLayer(BaseLayer):
         self,
         analysis_id: int,
         status: AnalysisStatus,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
         output: Optional[str] = None,
         author: Optional[str] = None,
         check_project_id=True,

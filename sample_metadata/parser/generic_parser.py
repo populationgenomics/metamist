@@ -7,18 +7,24 @@ import traceback
 from abc import abstractmethod
 from collections import defaultdict
 from itertools import groupby
-from typing import List, Dict, Union, Optional, Tuple, Match
+from typing import List, Dict, Union, Optional, Tuple, Match, Any
 
 from google.api_core.exceptions import Forbidden
 
 from sample_metadata import ApiException
-from sample_metadata.api import SampleApi, SequenceApi, AnalysisApi
-from sample_metadata.models.new_sample import NewSample
-from sample_metadata.models.new_sequence import NewSequence
-from sample_metadata.models.sequence_type import SequenceType
-from sample_metadata.models.sequence_update_model import SequenceUpdateModel
-from sample_metadata.models.sample_update_model import SampleUpdateModel
-from sample_metadata.models.analysis_model import AnalysisModel
+from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
+from sample_metadata.models import (
+    NewSample,
+    NewSequence,
+    SequenceType,
+    SequenceUpdateModel,
+    SampleUpdateModel,
+    AnalysisModel,
+    SampleType,
+    AnalysisType,
+    SequenceStatus,
+    AnalysisStatus,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -30,7 +36,7 @@ CRAM_EXTENSIONS = ('.cram',)
 VCFGZ_EXTENSIONS = ('.vcf.gz',)
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
-GroupedRow = Union[List[Dict[str, any]], Dict[str, any]]
+GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
 
 
 class GenericParser:  # pylint: disable=too-many-public-methods
@@ -38,17 +44,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     def __init__(
         self,
-        path_prefix: str,
+        path_prefix: Optional[str],
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
         skip_checking_gcs_objects=False,
         verbose=True,
     ):
 
         self.path_prefix = path_prefix
-        self.confirm = confirm
         self.skip_checking_gcs_objects = skip_checking_gcs_objects
         self.verbose = verbose
 
@@ -64,7 +68,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_bucket = None
 
         self.client = None
-        self.bucket_clients = {}
+        self.bucket_clients: Dict[str, Any] = {}
 
         if path_prefix and path_prefix.startswith('gs://'):
             # pylint: disable=import-outside-toplevel
@@ -95,7 +99,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         if self.client and not filename.startswith('/'):
             return os.path.join(
-                'gs://', self.default_bucket, self.path_prefix or '', filename
+                'gs://', self.default_bucket or '', self.path_prefix or '', filename or ''
             )
 
         return os.path.join(self.path_prefix or '', filename)
@@ -120,6 +124,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         path = self.file_path(directory_name)
         if path.startswith('gs://'):
             bucket_name, *components = directory_name[5:].split('/')
+            assert self.client
             blobs = self.client.list_blobs(bucket_name, prefix='/'.join(components))
             return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
 
@@ -162,39 +167,39 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
 
     @abstractmethod
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
 
     @abstractmethod
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
 
     def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
         """Get analysis objects from row"""
         return []
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, any]]:
+    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> Union[str, SampleType]:
         """Get sample type from row"""
         return self.default_sample_type
 
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> Union[str, SequenceType]:
         """Get sequence type from row"""
         return self.default_sequence_type
 
     @abstractmethod
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> Union[str, SequenceStatus]:
         """Get sequence status from row"""
 
     def parse_manifest(  # pylint: disable=too-many-branches
-        self, file_pointer, delimiter=',', dry_run=False
+        self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
@@ -240,9 +245,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'Preparing {external_sample_id}')
 
-            rows = sample_map[external_sample_id]
+            rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[external_sample_id]
 
-            if len(rows) == 1:
+            if isinstance(rows, list) and len(rows) == 1:
                 rows = rows[0]
             # now we have sample / sequencing meta across 4 different rows, so collapse them
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
@@ -250,14 +255,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             collapsed_qc = self.get_qc_meta(external_sample_id, rows)
             collapsed_analyses = self.get_analyses(external_sample_id, rows)
 
-            sample_type = str(self.get_sample_type(external_sample_id, rows))
+            sample_type = self.get_sample_type(external_sample_id, rows)
             sequence_status = self.get_sequence_status(external_sample_id, rows)
 
             if external_sample_id not in existing_external_id_to_cpgid:
                 samples_to_add.append(
                     NewSample(
                         external_id=external_sample_id,
-                        type=sample_type,
+                        type=SampleType(sample_type),
                         meta=collapsed_sample_meta,
                     )
                 )
@@ -277,8 +282,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 analyses_to_add[external_sample_id].append(
                     AnalysisModel(
                         sample_ids=['<none>'],
-                        type='qc',
-                        status='completed',
+                        type=AnalysisType('qc'),
+                        status=AnalysisStatus('completed'),
                         meta=collapsed_qc,
                     )
                 )
@@ -293,7 +298,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 cpgid = existing_external_id_to_cpgid[external_sample_id]
                 seq_id = existing_cpgid_to_seq_id[cpgid]
                 sequences_to_update[seq_id] = SequenceUpdateModel(
-                    meta=collapsed_sequencing_meta, status=sequence_status
+                    meta=collapsed_sequencing_meta, status=SequenceStatus(sequence_status)
                 )
             else:
                 # the internal sample ID gets mapped back later
@@ -301,8 +306,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
-                        type=SequenceType.WGS,
-                        status=sequence_status,
+                        type=SequenceType('wgs'),
+                        status=SequenceStatus(sequence_status),
                     )
                 )
 
@@ -326,7 +331,7 @@ Updating {len(sequences_to_update)} sequences"""
                 analyses_to_add,
             )
 
-        if self.confirm:
+        if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
             if resp.lower() != 'y':
                 raise SystemExit()
@@ -342,8 +347,8 @@ Updating {len(sequences_to_update)} sequences"""
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
             existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
-        for sample_id, sequences_to_add in sequences_to_add.items():
-            for seq in sequences_to_add:
+        for sample_id, seqs_to_add in sequences_to_add.items():
+            for seq in seqs_to_add:
                 seq.sample_id = existing_external_id_to_cpgid[sample_id]
                 seqapi.create_new_sequence(new_sequence=seq)
 
@@ -383,17 +388,19 @@ Updating {len(sequences_to_update)} sequences"""
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
+
         if all(any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS) for r in reads):
             structured_fastqs = self.parse_fastqs_structure(reads)
-            files = []
+            fastq_files: List[List[Dict]] = []
             for fastq_group in structured_fastqs:
-                files.append([self.create_file_object(f) for f in fastq_group])
+                fastq_files.append([self.create_file_object(f) for f in fastq_group])
 
-            return files, 'fastq'
+            return fastq_files, 'fastq'
+
+        files: List[Dict] = []
 
         if all(any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS) for r in reads):
             sec_format = ['.crai', '^.crai']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -404,7 +411,6 @@ Updating {len(sequences_to_update)} sequences"""
 
         if all(any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS) for r in reads):
             sec_format = ['.bai', '^.bai']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -415,7 +421,6 @@ Updating {len(sequences_to_update)} sequences"""
 
         if all(any(r.lower().endswith(ext) for ext in VCFGZ_EXTENSIONS) for r in reads):
             sec_format = ['.tbi']
-            files = []
             for r in reads:
                 secondaries = self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
@@ -461,7 +466,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         values = []
         for _, grouped in groupby(
-            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]
+            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]     # type: ignore
         ):
             values.append(sorted(grouped))
 
@@ -470,8 +475,8 @@ Updating {len(sequences_to_update)} sequences"""
     def create_file_object(
         self,
         filename: str,
-        secondary_files: List[Dict[str, any]] = None,
-    ) -> Dict[str, any]:
+        secondary_files: List[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
         if not self.skip_checking_gcs_objects:
@@ -500,7 +505,7 @@ Updating {len(sequences_to_update)} sequences"""
 
     def create_secondary_file_objects_by_potential_pattern(
         self, filename, potential_secondary_patterns: List[str]
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Take a base filename and potential secondary patterns:
         - Try each secondary pattern, see if it works

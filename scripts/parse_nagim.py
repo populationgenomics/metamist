@@ -61,7 +61,7 @@ import subprocess
 import sys
 import tempfile
 from os.path import join, exists
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any, Optional
 import click
 import pandas as pd
 
@@ -87,7 +87,7 @@ SRC_BUCKETS_TEST = [
     'gs://fc-bda68b2d-bed3-495f-a63c-29477968feff/1a9237ff-2e6e-4444-b67d-bd2715b8a156',
 ]
 
-SRC_BUCKETS_MAIN = []
+SRC_BUCKETS_MAIN: List[str] = []
 
 # Terra buckets names start with "fc-"
 assert all(b.startswith('gs://fc-') for b in SRC_BUCKETS_MAIN + SRC_BUCKETS_TEST)
@@ -112,12 +112,12 @@ class Sample:
     Represent a parsed sample so we can populate and fix all the IDs transparently
     """
 
-    nagim_id: str = None
-    cpg_id: str = None
-    ext_id: str = None
-    project_id: str = None
-    gvcf: str = None
-    cram: str = None
+    nagim_id: str
+    cpg_id: Optional[str]
+    ext_id: Optional[str]
+    project_id: Optional[str]
+    gvcf: Optional[str]
+    cram: Optional[str]
 
 
 @click.group()
@@ -413,41 +413,45 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project
     """
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(self, sample_id: str, row: Dict[str, any]) -> List[AnalysisModel]:
+    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
+        assert not isinstance(row, list)
+
         results = []
         for atype in ['gvcf', 'cram']:
             file_path = row.get(atype)
-            if file_path:
-                results.append(
-                    AnalysisModel(
-                        sample_ids=['<none>'],
-                        type=AnalysisType(atype),
-                        status=AnalysisStatus('completed'),
-                        output=file_path,
-                        meta={
-                            # To distinguish TOB processed on Terra as part from NAGIM
-                            # from those processed at the KCCG:
-                            'source': 'nagim',
-                            # Indicating that files need to be renamed to use CPG IDs,
-                            # and moved from -upload to -test/-main. (For gvcf, also
-                            # need to reblock):
-                            'staging': True,
-                            'project': row.get('project'),
-                        },
-                    )
+            if not file_path:
+                continue
+
+            results.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type=AnalysisType(atype),
+                    status=AnalysisStatus('completed'),
+                    output=file_path,
+                    meta={
+                        # To distinguish TOB processed on Terra as part from NAGIM
+                        # from those processed at the KCCG:
+                        'source': 'nagim',
+                        # Indicating that files need to be renamed to use CPG IDs,
+                        # and moved from -upload to -test/-main. (For gvcf, also
+                        # need to reblock):
+                        'staging': True,
+                        'project': row.get('project'),
+                    },
                 )
+            )
         return results
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
@@ -505,7 +509,7 @@ def _find_upload_files(
         overwrite=overwrite,
     )
 
-    file_by_type_by_sid = {
+    file_by_type_by_sid: Dict[str, Dict[str, str]] = {
         'gvcf': {},
         'tbi': {},
         'cram': {},
@@ -541,6 +545,9 @@ def _find_upload_files(
                 nagim_id=sid,
                 gvcf=file_by_type_by_sid['gvcf'][sid],
                 cram=file_by_type_by_sid.get('cram', {}).get(sid),
+                cpg_id=None,
+                ext_id=None,
+                project_id=None,
             )
         )
     return samples
