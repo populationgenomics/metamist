@@ -61,7 +61,7 @@ import subprocess
 import sys
 import tempfile
 from os.path import join, exists
-from typing import List, Dict, Union, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import click
 import pandas as pd
 
@@ -422,9 +422,13 @@ class NagimParser(GenericParser):
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
+    def get_analyses(
+        self,
+        sample_id: str,
+        row: GroupedRow,
+        cpg_id: Optional[str],
+    ) -> List[AnalysisModel]:
         assert not isinstance(row, list)
-
         results = []
         for atype in ['gvcf', 'cram']:
             file_path = row.get(atype)

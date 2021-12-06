@@ -178,8 +178,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
 
-    def get_analyses(self, sample_id: str, row: GroupedRow) -> List[AnalysisModel]:
-        """Get analysis objects from row"""
+    def get_analyses(
+        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+    ) -> List[AnalysisModel]:
+        """
+        Get analysis objects from row. Optionally, a CPG ID can be passed for
+        to help finding files for previously added samples that were already renamed.
+        """
         return []
 
     def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
@@ -253,7 +258,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             collapsed_sequencing_meta = self.get_sequence_meta(external_sample_id, rows)
             collapsed_sample_meta = self.get_sample_meta(external_sample_id, rows)
             collapsed_qc = self.get_qc_meta(external_sample_id, rows)
-            collapsed_analyses = self.get_analyses(external_sample_id, rows)
+            collapsed_analyses = self.get_analyses(
+                external_sample_id,
+                rows,
+                cpg_id=existing_external_id_to_cpgid.get(external_sample_id)
+            )
 
             sample_type = self.get_sample_type(external_sample_id, rows)
             sequence_status = self.get_sequence_status(external_sample_id, rows)
