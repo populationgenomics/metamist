@@ -58,9 +58,9 @@ class TobWgsParser(GenericMetadataParser):
         """
         Find GVCF for the sample.
         """
-        extention = 'g.vcf.gz'
+        extension = 'g.vcf.gz'
 
-        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extention}']
+        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extension}']
 
         if cpg_id:
             # Sample was added before and CPG ID is known, so can search the locations
@@ -68,10 +68,10 @@ class TobWgsParser(GenericMetadataParser):
             search_locations += [
                 # After GVCFs were processed with joint-calling, staging ones
                 # are moved to the archive:
-                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/gvcf/staging/{cpg_id}.{extention}',
+                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/gvcf/staging/{cpg_id}.{extension}',
                 # Upload processor moves GVCFs from upload to the main bucket
                 # as "staging" for processing by joint-calling:
-                f'gs://cpg-tob-wgs-main/gvcf/staging/{cpg_id}.{extention}',
+                f'gs://cpg-tob-wgs-main/gvcf/staging/{cpg_id}.{extension}',
             ]
 
         for fpath in search_locations:
