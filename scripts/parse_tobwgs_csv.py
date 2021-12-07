@@ -1,10 +1,10 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 import logging
-import os
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, List
 
 import click
 
+from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
@@ -29,6 +29,10 @@ SEQUENCE_MAP = {
 }
 
 
+# Labelling analysis outputs to distinguish from Nagim
+SOURCE = 'kccg'
+
+
 class TobWgsParser(GenericMetadataParser):
     """Parser for TOBWgs manifest"""
 
@@ -50,37 +54,91 @@ class TobWgsParser(GenericMetadataParser):
             qc_meta_map={},
         )
 
-    def get_gvcf_path(self, sample_id: str, batch_number: int) -> Optional[str]:
+    def find_gvcf(self, sample_id: str, cpg_id: Optional[str] = None) -> Optional[str]:
         """
-        GVCFs can be in a few places, so please find it from search locations
+        Find GVCF for the sample.
         """
-        filename = f'{sample_id}.g.vcf.gz'
-        dirs = [
-            'gs://cpg-tob-wgs-main-upload/',
-            f'gs://cpg-tob-wgs-main/gvcf/batch{batch_number}/',
-        ]
-        for base in dirs:
-            fpath = os.path.join(base, filename)
+        extension = 'g.vcf.gz'
+
+        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extension}']
+
+        if cpg_id:
+            # Sample was added before and CPG ID is known, so can search the locations
+            # where downstream upload processor and pipelines might have moved files.
+            search_locations += [
+                # After GVCFs were processed with joint-calling, staging ones
+                # are moved to the archive:
+                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/gvcf/staging/{cpg_id}.{extension}',
+                # Upload processor moves GVCFs from upload to the main bucket
+                # as "staging" for processing by joint-calling:
+                f'gs://cpg-tob-wgs-main/gvcf/staging/{cpg_id}.{extension}',
+            ]
+
+        for fpath in search_locations:
             if self.file_exists(fpath):
                 return fpath
 
         return None
 
-    def get_cram_path(self, sample_id: str, batch_number: int) -> Optional[str]:
+    def find_cram(self, sample_id: str, cpg_id: Optional[str] = None) -> Optional[str]:
         """
-        CRAMs can be in a few places, so please find it from search locations
+        Find CRAM for the sample.
         """
-        filename = f'{sample_id}.cram'
-        dirs = [
-            'gs://cpg-tob-wgs-main-upload/',
-            f'gs://cpg-tob-wgs-archive/cram/batch{batch_number}/',
-        ]
-        for base in dirs:
-            fpath = os.path.join(base, filename)
+        extension = 'cram'
+
+        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extension}']
+
+        if cpg_id:
+            # Sample was added before and CPG ID is known, so can search the locations
+            # where downstream upload processor and pipelines might have moved files.
+            search_locations += [
+                # Upload processor moves CRAMs to the archive:
+                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/cram/{cpg_id}.{extension}',
+            ]
+
+        for fpath in search_locations:
             if self.file_exists(fpath):
                 return fpath
 
         return None
+
+    def get_analyses(
+        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+    ) -> List[AnalysisModel]:
+        """
+        Get Analysis entries from a row.
+        cpg_id is known for previously added samples.
+        """
+        analyses = super().get_analyses(sample_id, row, cpg_id)
+
+        for analysis_type in ['gvcf', 'cram']:
+            if analysis_type == 'gvcf':
+                file_path = self.find_gvcf(sample_id, cpg_id)
+            else:
+                file_path = self.find_cram(sample_id, cpg_id)
+
+            if not file_path:
+                logger.warning(f'Not found {analysis_type} file for {sample_id}')
+                continue
+
+            analyses.append(
+                AnalysisModel(
+                    sample_ids=['<none>'],
+                    type=AnalysisType(analysis_type),
+                    status=AnalysisStatus('completed'),
+                    output=file_path,
+                    meta={
+                        # To distinguish TOB processed on Terra as part from NAGIM
+                        # from those processed at the KCCG:
+                        'source': SOURCE,
+                        # Indicating that files need to be renamed to use CPG IDs,
+                        # and moved from -upload to -test/-main. (For gvcf, also
+                        # need to reblock):
+                        'staging': True,
+                    },
+                )
+            )
+        return analyses
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
@@ -91,28 +149,6 @@ class TobWgsParser(GenericMetadataParser):
 
         batch_name = row['batch.batch_name'][:-5]
         collapsed_sequence_meta['batch_name'] = batch_name
-
-        cram_path = self.get_cram_path(sample_id, batch_number)
-        gvcf_path = self.get_gvcf_path(sample_id, batch_number)
-        assert cram_path
-        assert gvcf_path
-
-        FILE_TYPE = Dict[Any, Any]
-        gvcf: Union[FILE_TYPE, List[FILE_TYPE], List[List[FILE_TYPE]]]
-        reads: Union[FILE_TYPE, List[FILE_TYPE], List[List[FILE_TYPE]]]
-
-        reads, reads_type = self.parse_file([cram_path])
-        gvcf, variants_type = self.parse_file([gvcf_path])
-
-        if len(gvcf) == 1:
-            gvcf = gvcf[0]
-        if len(reads) == 1:
-            reads = reads[0]
-
-        collapsed_sequence_meta['reads'] = reads
-        collapsed_sequence_meta['reads_type'] = reads_type
-        collapsed_sequence_meta['gvcf'] = gvcf
-        collapsed_sequence_meta['gvcf_type'] = variants_type
 
         return collapsed_sequence_meta
 
@@ -128,6 +164,7 @@ class TobWgsParser(GenericMetadataParser):
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
+@click.option('--dry-run', 'dry_run', is_flag=True)
 @click.argument('manifests', nargs=-1)
 def main(
     manifests,
@@ -136,6 +173,7 @@ def main(
     default_sequence_type='wgs',
     path_prefix=None,
     confirm=False,
+    dry_run=False,
 ):
     """Run script from CLI arguments"""
     _search_locations = path_prefix if isinstance(path_prefix, list) else [path_prefix]
@@ -151,6 +189,7 @@ def main(
         resp = parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
+            dry_run=dry_run,
         )
         print(resp)
 

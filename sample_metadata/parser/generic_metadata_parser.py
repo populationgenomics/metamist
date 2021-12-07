@@ -234,6 +234,7 @@ class GenericMetadataParser(GenericParser):
         manifest: str,
         confirm=False,
         delimiter=None,
+        dry_run=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
 
@@ -243,5 +244,8 @@ class GenericMetadataParser(GenericParser):
 
         file_contents = self.file_contents(manifest)
         return self.parse_manifest(
-            StringIO(file_contents), delimiter=_delimiter, confirm=confirm
+            StringIO(file_contents),
+            delimiter=_delimiter,
+            confirm=confirm,
+            dry_run=dry_run
         )
