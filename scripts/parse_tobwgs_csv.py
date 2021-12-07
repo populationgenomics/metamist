@@ -84,16 +84,16 @@ class TobWgsParser(GenericMetadataParser):
         """
         Find CRAM for the sample.
         """
-        extention = 'cram'
+        extension = 'cram'
 
-        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extention}']
+        search_locations = [f'gs://cpg-tob-wgs-main-upload/{sample_id}.{extension}']
 
         if cpg_id:
             # Sample was added before and CPG ID is known, so can search the locations
             # where downstream upload processor and pipelines might have moved files.
             search_locations += [
                 # Upload processor moves CRAMs to the archive:
-                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/cram/{cpg_id}.{extention}',
+                f'gs://cpg-tob-wgs-main-archive/{SOURCE}/cram/{cpg_id}.{extension}',
             ]
 
         for fpath in search_locations:
