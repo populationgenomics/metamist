@@ -189,6 +189,7 @@ def main(
         resp = parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
+            dry_run=dry_run,
         )
         print(resp)
 

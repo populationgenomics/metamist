@@ -61,7 +61,7 @@ import subprocess
 import sys
 import tempfile
 from os.path import join, exists
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Union, Any, Optional
 import click
 import pandas as pd
 
