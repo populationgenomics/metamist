@@ -18,7 +18,10 @@ def authenticate(
     ),
     x_goog_iap_jwt_assertion: Optional[str] = Cookie(None),
 ) -> str:
-    """If a token (OR Google IAP auth jwt) is provided, return the email, else raise an Exception"""
+    """
+    If a token (OR Google IAP auth jwt) is provided,
+    return the email, else raise an Exception
+    """
     if token:
         return email_from_id_token(token.credentials)
     if x_goog_iap_jwt_assertion:
@@ -50,16 +53,11 @@ async def dependable_get_connection(author: str = Depends(authenticate)):
 
 
 def validate_iap_jwt_and_get_email(iap_jwt):
-    """Validate an IAP JWT. AND return email
+    """
+    Validate an IAP JWT and return email
+    Source: https://cloud.google.com/iap/docs/signed-headers-howto
 
-    Args:
-      iap_jwt: The contents of the X-Goog-IAP-JWT-Assertion header.
-      expected_audience: The Signed Header JWT audience. See
-          https://cloud.google.com/iap/docs/signed-headers-howto
-          for details on how to get this value.
-
-    Returns:
-      (user_id, user_email, error_str).
+    :param iap_jwt: The contents of the X-Goog-IAP-JWT-Assertion header.
     """
 
     try:
