@@ -8,8 +8,8 @@ from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 class TestSampleMapParser(unittest.TestCase):
     """Test the TestSampleMapParser"""
 
-    @patch('sample_metadata.api.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.api.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
     def test_single_row_fastq(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id

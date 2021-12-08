@@ -30,7 +30,7 @@ class AnalysisTable(DbBase):
         analysis_type: AnalysisType,
         status: AnalysisStatus,
         sample_ids: List[int],
-        meta: Dict[str, any] = None,
+        meta: Optional[Dict[str, Any]] = None,
         output: str = None,
         active: bool = True,
         author: str = None,
@@ -88,7 +88,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         self,
         analysis_id: int,
         status: AnalysisStatus,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
         active: bool = None,
         output: Optional[str] = None,
         author: Optional[str] = None,
@@ -97,7 +97,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         Update the status of an analysis, set timestamp_completed if relevant
         """
 
-        fields = {
+        fields: Dict[str, Any] = {
             'author': self.author or author,
             'on_behalf_of': self.author,
             'analysis_id': analysis_id,
@@ -145,7 +145,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
 
         wheres = ['project in :project_ids']
-        values = {'project_ids': project_ids}
+        values: Dict[str, Any] = {'project_ids': project_ids}
 
         if sample_ids_all:
             raise NotImplementedError
@@ -195,10 +195,14 @@ WHERE a.id in (
         rows = await self.connection.fetch_all(_query, values)
         retvals: Dict[int, Analysis] = {}
         for row in rows:
-            if row['id'] in retvals:
-                retvals[row['id']].sample_ids.append(row['sample_id'])
+            key = row['id']
+            if key in retvals:
+                retvals[key].sample_ids = [
+                    *(retvals[key].sample_ids or []),
+                    row['sample_id'],
+                ]
             else:
-                retvals[row['id']] = Analysis.from_db(**dict(row))
+                retvals[key] = Analysis.from_db(**dict(row))
 
         return list(retvals.values())
 
@@ -206,7 +210,7 @@ WHERE a.id in (
         self,
         project: ProjectId,
         analysis_type: AnalysisType,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
 

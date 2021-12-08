@@ -1,3 +1,4 @@
+# pylint: disable=used-before-assignment
 from typing import List, Union, Optional
 
 from db.python.connect import Connection
@@ -104,7 +105,7 @@ class PedRow:
         - There are no circular dependencies
         - All maternal / paternal IDs are found in the pedigree
         """
-        rows_to_order: List[PedRow] = [*rows]
+        rows_to_order: List['PedRow'] = [*rows]
         ordered = []
         seen_individuals = set()
         remaining_iterations_in_round = len(rows_to_order)
@@ -183,6 +184,32 @@ class FamilyLayer(BaseLayer):
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
+    async def get_families(self, project: int = None):
+        """Get all families for a project"""
+        return await self.ftable.get_families(project=project)
+
+    async def update_family(
+        self,
+        id_: int,
+        external_id: str = None,
+        description: str = None,
+        coded_phenotype: str = None,
+        check_project_ids: bool = True,
+    ) -> bool:
+        """Update fields on some family"""
+        if check_project_ids:
+            project_ids = await self.ftable.get_projects_by_family_ids([id_])
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
+
+        return await self.ftable.update_family(
+            id_=id_,
+            external_id=external_id,
+            description=description,
+            coded_phenotype=coded_phenotype,
+        )
+
     async def get_pedigree(
         self,
         project: ProjectId,
@@ -229,7 +256,9 @@ class FamilyLayer(BaseLayer):
             pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
 
         if replace_with_family_external_ids:
-            family_ids = set(r['family_id'] for r in rows if r['family_id'] is not None)
+            family_ids = list(
+                set(r['family_id'] for r in rows if r['family_id'] is not None)
+            )
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
 
         formatted_rows = []
@@ -297,7 +326,7 @@ class FamilyLayer(BaseLayer):
             PedRow(**{_header[i]: r[i] for i in range(len(_header))}) for r in rows
         ]
         # this validates a lot of the pedigree too
-        pedrows: List[PedRow] = PedRow.order(pedrows)
+        pedrows = PedRow.order(pedrows)
 
         external_family_ids = set(r.family_id for r in pedrows)
         # get set of all individual, paternal, maternal participant ids
@@ -374,4 +403,74 @@ class FamilyLayer(BaseLayer):
             )
             await self.fptable.create_rows(insertable_rows)
 
+        return True
+
+    async def import_families(
+        self, headers: Optional[List[str]], rows: List[List[str]]
+    ):
+        """Import a family table"""
+        ordered_headers = [
+            'Family ID',
+            'Display Name',
+            'Description',
+            'Coded Phenotype',
+        ]
+        _headers = headers or ordered_headers[: len(rows[0])]
+        lheaders = [k.lower() for k in _headers]
+        key_map = {
+            'externalId': {'family_id', 'family id', 'familyid'},
+            'displayName': {'display name', 'displayname', 'display_name'},
+            'description': {'description'},
+            'phenotype': {
+                'coded phenotype',
+                'phenotype',
+                'codedphenotype',
+                'coded_phenotype',
+            },
+        }
+
+        def get_idx_for_header(header) -> Optional[int]:
+            return next(
+                iter(idx for idx, key in enumerate(lheaders) if key in key_map[header]),
+                None,
+            )
+
+        external_identifier_idx = get_idx_for_header('externalId')
+        display_name_idx = get_idx_for_header('displayName')
+        description_idx = get_idx_for_header('description')
+        phenotype_idx = get_idx_for_header('phenotype')
+
+        # replace empty strings with None
+        def replace_empty_string_with_none(val):
+            """Don't set as empty string, prefer to set as null"""
+            return None if val == '' else val
+
+        rows = [[replace_empty_string_with_none(el) for el in r] for r in rows]
+
+        empty = [None] * len(rows)
+
+        def select_columns(col1: Optional[int], col2: Optional[int] = None):
+            """
+            - If col1 and col2 is None, return [None] * len(rows)
+            - if either col1 or col2 is not None, return that column
+            - else, return a mixture of column col1 | col2 if set
+            """
+            if col1 is None and col2 is None:
+                # if col1 AND col2 is NONE
+                return empty
+            if col1 is not None and col2 is None:
+                # if only col1 is set
+                return [r[col1] for r in rows]
+            if col2 is not None and col1 is None:
+                # if only col2 is set
+                return [r[col2] for r in rows]
+            # if col1 AND col2 are not None
+            assert col1 is not None and col2 is not None
+            return [r[col1] if r[col1] is not None else r[col2] for r in rows]
+
+        await self.ftable.insert_or_update_multiple_families(
+            external_ids=select_columns(external_identifier_idx, display_name_idx),
+            descriptions=select_columns(description_idx),
+            coded_phenotypes=select_columns(phenotype_idx),
+        )
         return True

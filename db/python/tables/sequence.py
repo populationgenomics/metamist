@@ -1,5 +1,5 @@
 from itertools import groupby
-from typing import Optional, Dict, List, Tuple, Iterable, Set
+from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, to_db_json, NotFoundError
 from db.python.tables.project import ProjectId
@@ -65,8 +65,8 @@ VALUES (:sample_id, :type, :meta, :status, :author);"""
         sample_id,
         sequence_type: SequenceType,
         status: SequenceStatus,
-        sequence_meta: Dict[str, any] = None,
-        author=None,
+        sequence_meta: Optional[Dict[str, Any]] = None,
+        author: Optional[str] = None,
     ) -> int:
         """
         Create a new sequence for a sample, and add it to database
@@ -130,6 +130,9 @@ ORDER by sq.id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
+        if not result:
+            raise NotFoundError
+
         return result['project'], result['id']
 
     async def get_latest_sequence_id_for_external_sample_id(

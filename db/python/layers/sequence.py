@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
@@ -102,7 +102,7 @@ class SampleSequenceLayer(BaseLayer):
     ) -> None:
         """Insert many sequencing, returning no IDs"""
         if check_project_ids:
-            sample_ids = set(s.sample_id for s in sequencing)
+            sample_ids = set(int(s.sample_id) for s in sequencing)
             st = SampleTable(self.connection)
             project_ids = await st.get_project_ids_for_sample_ids(list(sample_ids))
             await self.ptable.check_access_to_project_ids(
@@ -118,7 +118,7 @@ class SampleSequenceLayer(BaseLayer):
         sample_id,
         sequence_type: SequenceType,
         status: SequenceStatus,
-        sequence_meta: Dict[str, any] = None,
+        sequence_meta: Dict[str, Any] = None,
         author=None,
         check_project_id=True,
     ) -> int:

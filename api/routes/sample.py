@@ -4,8 +4,12 @@ from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from models.enums import SampleType
-from models.models.sample import sample_id_transform_to_raw, sample_id_format
-from db.python.layers.sample import Sample, SampleLayer
+from models.models.sample import (
+    sample_id_transform_to_raw,
+    sample_id_format,
+    sample_id_transform_to_raw_list,
+)
+from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
@@ -80,7 +84,7 @@ async def get_sample_id_map_by_internal(
     Without specifying a project, you might see duplicate external identifiers
     """
     st = SampleLayer(connection)
-    internal_ids_raw = sample_id_transform_to_raw(internal_ids)
+    internal_ids_raw = sample_id_transform_to_raw_list(internal_ids)
     result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
     return {sample_id_format(k): v for k, v in result.items()}
 
@@ -93,13 +97,15 @@ async def get_all_sample_id_map_by_internal(
 ):
     """Get map of ALL sample IDs, { [internal_id]: external_sample_id }"""
     st = SampleLayer(connection)
+    assert connection.project
     result = await st.get_all_sample_id_map_by_internal_ids(project=connection.project)
     return {sample_id_format(k): v for k, v in result.items()}
 
 
 @router.get(
     '/{project}/{external_id}/details',
-    response_model=Sample,
+    # Don't support this until openapi 3.1
+    # response_model=Sample,
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
@@ -107,6 +113,7 @@ async def get_sample_by_external_id(
 ):
     """Get sample by external ID"""
     st = SampleLayer(connection)
+    assert connection.project
     result = await st.get_single_by_external_id(external_id, project=connection.project)
     return result
 
@@ -126,25 +133,25 @@ async def get_samples_by_criteria(
     st = SampleLayer(connection)
 
     pt = ProjectPermissionsTable(connection.connection)
-
+    pids: Optional[List[int]] = None
     if project_ids:
-        project_ids = await pt.get_project_ids_from_names_and_user(
+        pids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_ids, readonly=True
         )
 
-    sample_ids_raw = sample_id_transform_to_raw(sample_ids) if sample_ids else None
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
 
     result = await st.get_samples_by(
         sample_ids=sample_ids_raw,
         meta=meta,
         participant_ids=participant_ids,
-        project_ids=project_ids,
+        project_ids=pids,
         active=active,
         check_project_ids=True,
     )
 
     for sample in result:
-        sample.id = sample_id_format(sample.id)
+        sample.id = sample_id_format(int(sample.id))
 
     return result
 
@@ -164,4 +171,16 @@ async def update_sample(
         type_=model.type,
         active=model.active,
     )
+    return result
+
+
+@router.get('/{id_}/history', operation_id='getHistoryOfSample')
+async def get_history_of_sample(
+    id_: str, connection: Connection = get_projectless_db_connection
+):
+    """Get full history of sample from internal ID"""
+    st = SampleLayer(connection)
+    internal_id = sample_id_transform_to_raw(id_)
+    result = await st.get_history_of_sample(internal_id)
+
     return result
