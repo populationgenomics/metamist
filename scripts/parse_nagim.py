@@ -593,7 +593,7 @@ def _run_multiqc(
     def _parse_multiqc_json(json_fpath) -> Dict:
         with open(json_fpath) as f:
             d = json.load(f)
-        row_by_sample = dict()
+        row_by_sample = {}
         for tool_d in d['report_general_stats_data']:
             for sample, val_by_metric in tool_d.items():
                 if sample not in row_by_sample:
@@ -656,7 +656,7 @@ def _parse_sample_project_map(tsv_path: str) -> List[Sample]:
     """
     Initialize list of Sample object and set project IDs.
     """
-    sample_by_nagim_id = dict()
+    sample_by_nagim_id = {}
     df = pd.read_csv(tsv_path, sep='\t', header=None, names=['nagim_id', 'proj'])
     for (nagim_id, proj) in zip(df.nagim_id, df.proj):
         if proj in PROJECT_ID_MAP.values():
@@ -773,7 +773,7 @@ class NagimParser(GenericParser):
         if 'QC' not in SOURCES:
             return None
 
-        qc_data = dict()
+        qc_data = {}
         for metric, _ in QC_METRICS:
             value = row.get(f'qc_value_{metric}')
             if not value:
@@ -794,7 +794,7 @@ class NagimParser(GenericParser):
         if isinstance(row, list):
             row = row[0]
 
-        result = dict()
+        result = {}
         for metric, _ in QC_METRICS:
             if f'qc_value_{metric}' in row:
                 result[metric] = row[f'qc_value_{metric}']

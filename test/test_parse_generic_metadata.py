@@ -96,7 +96,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'gvcf_types': 'gvcf',
         }
         self.assertDictEqual(
-            expected_sequence_dict, sequencing_to_add['<sample-id>'][0].meta
+            expected_sequence_dict, sequencing_to_add['<sample-id>'].meta
         )
         self.assertDictEqual(
             {

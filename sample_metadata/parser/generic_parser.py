@@ -349,7 +349,7 @@ Updating {len(sequences_to_update)} sequences"""
         else:
             logger.info(message)
 
-        logger.info(f'Adding {len(samples_to_add)} sample entries')
+        logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
         added_ext_sample_to_internal_id = {}
         for new_sample in samples_to_add:
             sample_id = sapi.create_new_sample(
