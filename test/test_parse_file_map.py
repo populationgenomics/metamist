@@ -73,5 +73,5 @@ class TestSampleMapParser(unittest.TestCase):
             'reads_type': 'fastq',
         }
         self.assertDictEqual(
-            expected_sequence_dict, sequencing_to_add['<sample-id>'][0].meta
+            expected_sequence_dict, sequencing_to_add['<sample-id>'].meta
         )
