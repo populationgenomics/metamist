@@ -459,19 +459,17 @@ def parse(
     # have them in the SMDB and fixing the external IDs.
     _fix_sample_ids(samples)
 
-    multiqc_json_fpath = None
+    multiqc_html_path = join(
+        f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-web/qc/multiqc.html'
+    )
+    multiqc_json_path = join(
+        f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-analysis/qc/multiqc_data.json'
+    )
     if 'QC' in SOURCES_TO_PROCESS:
         logger.info('Running MultiQC on QC files')
-        multiqc_html_fpath = join(
-            f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-web/qc/multiqc.html'
-        )
-        multiqc_json_fpath = join(
-            f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-analysis/qc/multiqc_data.json'
-        )
         parsed_json_fpath = _run_multiqc(
-            samples, multiqc_html_fpath, multiqc_json_fpath, overwrite=overwrite_multiqc
+            samples, multiqc_html_path, multiqc_json_path, overwrite=overwrite_multiqc
         )
-
         gfs = gcsfs.GCSFileSystem()
         with gfs.open(parsed_json_fpath) as f:
             row_by_sample = json.load(f)
@@ -499,7 +497,6 @@ def parse(
             )
             for metric, val in s.qc_values.items():
                 row[f'qc_value_{metric}'] = val
-                row[f'qc_file_{metric}'] = multiqc_json_fpath
             rows.append(row)
 
         if len(rows) == 0:
@@ -518,6 +515,8 @@ def parse(
             sample_metadata_project=sm_proj,
             skip_checking_gcs_objects=skip_checking_objects,
             verbose=False,
+            multiqc_html_path=multiqc_html_path,
+            multiqc_json_path=multiqc_json_path,
         )
         with open(sample_tsv_file) as f:
             parser.parse_manifest(f, dry_run=dry_run, confirm=confirm)
@@ -721,8 +720,10 @@ class NagimParser(GenericParser):
     def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
-    def __init__(self, **kwargs):
+    def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
         super().__init__(**kwargs)
+        self.multiqc_html_path = multiqc_html_path
+        self.multiqc_json_path = multiqc_json_path
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
@@ -734,8 +735,7 @@ class NagimParser(GenericParser):
         cpg_id: Optional[str],
     ) -> List[AnalysisModel]:
         """
-        We create "staging" analyses for uploaded GVCFs and CRAMs,
-        as well as QC analyses for found QC files.
+        Creating "staging" analyses for uploaded GVCFs and CRAMs.
         """
         assert not isinstance(row, list)
         results = []
@@ -762,33 +762,33 @@ class NagimParser(GenericParser):
                     },
                 )
             )
-
-        if 'QC' in SOURCES:
-            for metric, _ in QC_METRICS:
-                value = row.get(f'qc_value_{metric}')
-                file_path = row.get(f'qc_file_{metric}')
-
-                if not file_path or not value:
-                    continue
-
-                results.append(
-                    AnalysisModel(
-                        sample_ids=['<none>'],
-                        type=AnalysisType('qc'),
-                        status=AnalysisStatus('completed'),
-                        output=file_path,
-                        meta={
-                            'metric': metric,
-                            'value': value,
-                            # To distinguish TOB processed on Terra as part from NAGIM
-                            # from those processed at the KCCG:
-                            'source': 'nagim',
-                            'project': row.get('project'),
-                        },
-                    )
-                )
-
         return results
+
+    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+        """
+        Create a QC analysis entry for found QC files.
+        """
+        assert not isinstance(row, list)
+
+        if 'QC' not in SOURCES:
+            return None
+
+        qc_data = dict()
+        for metric, _ in QC_METRICS:
+            value = row.get(f'qc_value_{metric}')
+            if not value:
+                continue
+            qc_data[metric] = value
+
+        return {
+            'metrics': qc_data,
+            'html_file': self.multiqc_html_path,
+            'json_file': self.multiqc_json_path,
+            # To distinguish TOB processed on Terra as part from NAGIM
+            # from those processed at the KCCG:
+            'source': 'nagim',
+            'project': row.get('project'),
+        }
 
     def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         if isinstance(row, list):
