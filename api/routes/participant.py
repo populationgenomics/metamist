@@ -41,13 +41,14 @@ async def fill_in_missing_participants(
 async def get_individual_metadata_template_for_seqr(
     project: str,
     export_type: ExportType,
-    external_participant_ids: Optional[List[str]] = Query(default=None),
+    external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get individual metadata template for SEQR as a CSV"""
     participant_layer = ParticipantLayer(connection)
+    assert connection.project
     rows = await participant_layer.get_seqr_individual_template(
         project=connection.project,
         external_participant_ids=external_participant_ids,
@@ -110,6 +111,7 @@ async def get_external_participant_id_to_internal_sample_id(
     participants with multiple samples.
     """
     player = ParticipantLayer(connection)
+    assert connection.project
     m = await player.get_external_participant_id_to_internal_sample_id_map(
         project=connection.project
     )
@@ -129,6 +131,7 @@ async def get_external_participant_id_to_internal_sample_id_export(
     """Get csv / tsv export of external_participant_id to internal_sample_id"""
     player = ParticipantLayer(connection)
     # this wants project ID (connection.project)
+    assert connection.project
     m = await player.get_external_participant_id_to_internal_sample_id_map(
         project=connection.project
     )

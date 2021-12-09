@@ -21,8 +21,9 @@ from api.routes import (
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
+
 # This tag is automatically updated by bump2version
-_VERSION = '3.5.2'
+_VERSION = '4.0.0'
 
 logger = get_logger()
 
@@ -39,7 +40,7 @@ class SPAStaticFiles(StaticFiles):
         response = await super().get_response(path, scope)
         if response.status_code == 404 and not path.startswith('api'):
             # server index.html if can't find existing resource
-            response = await super().get_response('.', scope)
+            response = await super().get_response('index.html', scope)
         return response
 
 
@@ -105,7 +106,7 @@ if os.path.exists(static_dir):
     # only allow static files if the static files are available
     app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
 
-app.openapi = get_openapi_schema_func(app, _VERSION)
+app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':

@@ -43,8 +43,8 @@ class ProjectPermissionsTable:
     _cached_client = None
 
     _cache_expiry = None
-    _cached_project_names: Dict[str, ProjectId] = None
-    _cached_project_by_id: Dict[ProjectId, ProjectRow] = None
+    _cached_project_names: Dict[str, ProjectId] = {}
+    _cached_project_by_id: Dict[ProjectId, ProjectRow] = {}
 
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
@@ -149,6 +149,7 @@ class ProjectPermissionsTable:
 
             try:
                 start = datetime.utcnow()
+                assert project.gcp_id is not None
                 response = self._read_secret(project.gcp_id, secret_name)
                 logger.debug(
                     f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'

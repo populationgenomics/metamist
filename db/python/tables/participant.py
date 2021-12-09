@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, Optional
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.utils import ProjectId
@@ -67,7 +67,10 @@ RETURNING id
         """
         _author = author or self.author
         updaters = ['author = :author']
-        values = {'pid': participant_ids, 'author': [_author] * len(participant_ids)}
+        values: Dict[str, List[Any]] = {
+            'pid': participant_ids,
+            'author': [_author] * len(participant_ids),
+        }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
             values['reported_sex'] = reported_sexes
@@ -94,9 +97,11 @@ RETURNING id
     async def get_id_map_by_external_ids(
         self,
         external_participant_ids: List[str],
-        project: ProjectId,
+        project: Optional[ProjectId],
     ) -> Dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
+        assert project
+
         _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
             _query,

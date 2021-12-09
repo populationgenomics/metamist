@@ -1,7 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Set, Any, Dict
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
+from models.models.family import Family
 
 
 class FamilyTable(DbBase):
@@ -9,7 +10,63 @@ class FamilyTable(DbBase):
     Capture Analysis table operations and queries
     """
 
-    table_name = 'family_participant'
+    table_name = 'family'
+
+    async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
+        """Get project IDs for sampleIds (mostly for checking auth)"""
+        _query = """
+        SELECT project FROM family
+        WHERE project in :family_ids
+        GROUP BY project
+        """
+        if len(family_ids) == 0:
+            raise ValueError('Received no family IDs to get project ids for')
+        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+        projects = set(r['project'] for r in rows)
+        if not projects:
+            raise ValueError(
+                'No projects were found for given families, this is likely an error'
+            )
+        return projects
+
+    async def get_families(self, project: int = None) -> List[Family]:
+        """Get all families for some project"""
+        _query = """\
+SELECT id, external_id, description, coded_phenotype, project
+FROM family
+WHERE project = :project"""
+
+        rows = await self.connection.fetch_all(
+            _query, {'project': project or self.project}
+        )
+        families = [Family.from_db(dict(r)) for r in rows]
+        return families
+
+    async def update_family(
+        self,
+        id_: int,
+        external_id: str = None,
+        description: str = None,
+        coded_phenotype: str = None,
+        author: str = None,
+    ) -> bool:
+        """Update values for a family"""
+        values: Dict[str, Any] = {'author': author or self.author}
+        if external_id:
+            values['external_id'] = external_id
+        if description:
+            values['description'] = description
+        if coded_phenotype:
+            values['coded_phenotype'] = coded_phenotype
+
+        setters = ', '.join(f'{field} = :{field}' for field in values)
+        _query = f"""
+UPDATE family
+SET {setters}
+WHERE id = :id
+        """
+        await self.connection.execute(_query, {**values, 'id': id_})
+        return True
 
     async def create_family(
         self,
@@ -41,6 +98,45 @@ RETURNING id
         """
 
         return await self.connection.fetch_val(_query, updater)
+
+    async def insert_or_update_multiple_families(
+        self,
+        external_ids: List[str],
+        descriptions: List[str],
+        coded_phenotypes: List[Optional[str]],
+        project: int = None,
+        author: str = None,
+    ):
+        """Upsert"""
+        updater = [
+            {
+                'external_id': eid,
+                'description': descr,
+                'coded_phenotype': cph,
+                'author': author or self.author,
+                'project': project or self.project,
+            }
+            for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)
+        ]
+
+        keys = list(updater[0].keys())
+        str_keys = ', '.join(keys)
+        placeholder_keys = ', '.join(f':{k}' for k in keys)
+
+        update_only_keys = [k for k in keys if k not in ('external_id', 'project')]
+        str_uo_placeholder_keys = ', '.join(f'{k} = :{k}' for k in update_only_keys)
+
+        _query = f"""\
+INSERT INTO family
+    ({str_keys})
+VALUES
+    ({placeholder_keys})
+ON DUPLICATE KEY UPDATE
+    {str_uo_placeholder_keys}
+        """
+
+        await self.connection.execute_many(_query, updater)
+        return True
 
     async def get_id_map_by_external_ids(
         self, family_ids: List[str], allow_missing=False, project: Optional[int] = None

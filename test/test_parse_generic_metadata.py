@@ -8,8 +8,8 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
-    @patch('sample_metadata.api.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.api.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
     def test_single_row(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id

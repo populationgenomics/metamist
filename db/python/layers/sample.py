@@ -1,11 +1,11 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from models.enums import SampleType
-from models.models.sample import Sample, sample_id_format
+from models.models.sample import Sample, sample_id_format_list
 
 
 class SampleLayer(BaseLayer):
@@ -32,8 +32,10 @@ class SampleLayer(BaseLayer):
     ):
         """Get map of samples {external_id: internal_id}"""
         external_ids_set = set(external_ids)
+        _project = project or self.connection.project
+        assert _project
         sample_id_map = await self.st.get_sample_id_map_by_external_ids(
-            external_ids=list(external_ids_set), project=project
+            external_ids=list(external_ids_set), project=_project
         )
 
         if allow_missing or len(sample_id_map) == len(external_ids_set):
@@ -69,7 +71,7 @@ class SampleLayer(BaseLayer):
         # we have samples missing from the map, so we'll 404 the whole thing
         missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
         raise NotFoundError(
-            f"Couldn't find samples with IDS: {', '.join(sample_id_format(list(missing_sample_ids)))}"
+            f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
         )
 
     async def get_all_sample_id_map_by_internal_ids(
@@ -81,7 +83,7 @@ class SampleLayer(BaseLayer):
     async def get_samples_by(
         self,
         sample_ids: List[int] = None,
-        meta: Dict[str, any] = None,
+        meta: Dict[str, Any] = None,
         participant_ids: List[int] = None,
         project_ids=None,
         active=True,
@@ -93,13 +95,10 @@ class SampleLayer(BaseLayer):
         if sample_ids and check_project_ids:
             # project_ids were already checked when transformed to ints,
             # so no else required
+            pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
+            self.ptable.check_access_to_project_ids(self.author, pjcts, readonly=True)
 
-            projects = self.st.get_project_ids_for_sample_ids(sample_ids)
-            self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
-
-        projects, samples = await self.st.get_samples_by(
+        _, samples = await self.st.get_samples_by(
             sample_ids=sample_ids,
             meta=meta,
             participant_ids=participant_ids,
@@ -193,3 +192,17 @@ class SampleLayer(BaseLayer):
             ids=ids, participant_ids=participant_ids
         )
         return True
+
+    async def get_history_of_sample(
+        self, id_: int, check_sample_ids: bool = True
+    ) -> List[Sample]:
+        """Get the full history of a sample"""
+        rows = await self.st.get_history_of_sample(id_)
+
+        if check_sample_ids:
+            project_ids = set(r.project for r in rows)
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
+
+        return rows

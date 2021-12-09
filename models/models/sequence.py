@@ -11,10 +11,10 @@ class SampleSequencing(BaseModel):
     """Model to hold SampleSequence data"""
 
     id: Optional[int] = None
-    sample_id: Optional[Union[str, int]] = None
-    type: Optional[SequenceType] = None
+    sample_id: Union[str, int]
+    type: SequenceType
     meta: Optional[Dict[str, Any]] = None
-    status: Optional[SequenceStatus] = None
+    status: SequenceStatus
 
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())
