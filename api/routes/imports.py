@@ -3,7 +3,7 @@ import codecs
 
 from fastapi import APIRouter, UploadFile, File
 
-from models.models.sample import sample_id_format
+from models.models.sample import sample_id_format_list
 from db.python.layers.imports import ImportLayer
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -24,7 +24,7 @@ async def import_airtable_manifest(
     headers = next(csvreader)
 
     sample_ids = await import_layer.import_airtable_manifest_csv(headers, csvreader)
-    return {'success': True, 'sample_ids': sample_id_format(sample_ids)}
+    return {'success': True, 'sample_ids': sample_id_format_list(sample_ids)}
 
 
 @router.post(
