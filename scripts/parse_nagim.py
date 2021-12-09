@@ -173,14 +173,16 @@ class Source:
         for region, buckets in SRC_BUCKETS[NAMESPACE].items():
             for bucket in buckets:
                 for ending, pattern in self.search_pattern_by_ending.items():
-                    cmd = (
-                        f"gsutil ls '{bucket}/{pattern}'"
-                        f' | gsutil -m cp -I {self.get_upload_bucket(ending)}/'
-                    )
-                    _batch_or_call(
-                        cmd,
+                    _add_batch_job(
+                        cmd=(
+                            f"gsutil ls '{bucket}/{pattern}'"
+                            f' | gsutil -m cp -I {self.get_upload_bucket(ending)}/'
+                        ),
                         hbatch=hbatch,
-                        job_name=f'{region}: transfer {self.name} {ending} files from {bucket}',
+                        job_name=(
+                            f'{region}: transfer {self.name} {ending} files '
+                            f'from {bucket}'
+                        ),
                     )
 
 
@@ -697,18 +699,6 @@ def _call(cmd):
     """
     logger.info(cmd)
     subprocess.run(cmd, shell=True, check=True)
-
-
-def _batch_or_call(cmd, hbatch=None, job_name=None):
-    """
-    Either add a command to Batch, or run it locally.
-    """
-    if hbatch:
-        _add_batch_job(cmd, hbatch, job_name)
-    else:
-        if job_name:
-            logger.info(job_name)
-        _call(cmd)
 
 
 class NagimParser(GenericParser):
