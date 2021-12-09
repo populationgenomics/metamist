@@ -118,7 +118,7 @@ async def get_all_sample_ids_without_analysis_type(
     result = await atable.get_all_sample_ids_without_analysis_type(
         connection.project, analysis_type
     )
-    return {'sample_ids': sample_id_format(result)}
+    return {'sample_ids': sample_id_format_list(result)}
 
 
 @router.get(
@@ -206,7 +206,7 @@ async def get_latest_analysis_for_samples_and_type(
 
     if results:
         for result in results:
-            result.sample_ids = sample_id_format(result.sample_ids)
+            result.sample_ids = sample_id_format_list(result.sample_ids)
 
     return results
 
@@ -223,7 +223,7 @@ async def get_analysis_by_id(
     """Get analysis by ID"""
     atable = AnalysisLayer(connection)
     result = await atable.get_analysis_by_id(analysis_id)
-    result.sample_ids = sample_id_format(result.sample_ids)
+    result.sample_ids = sample_id_format_list(result.sample_ids)
     return result
 
 
@@ -252,7 +252,7 @@ async def query_analyses(
         active=query.active,
     )
     for analysis in analyses:
-        analysis.sample_ids = sample_id_format(analysis.sample_ids)
+        analysis.sample_ids = sample_id_format_list(analysis.sample_ids)
 
     return analyses
 
