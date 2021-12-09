@@ -151,7 +151,7 @@ async def get_samples_by_criteria(
     )
 
     for sample in result:
-        sample.id = sample_id_format(int(sample.id))
+        sample.id = sample_id_format(sample.id)
 
     return result
 
