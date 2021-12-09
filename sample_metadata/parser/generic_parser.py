@@ -47,6 +47,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         path_prefix: Optional[str],
         sample_metadata_project: str,
         default_sequence_type='wgs',
+        default_sequence_status='uploaded',
         default_sample_type='blood',
         skip_checking_gcs_objects=False,
         verbose=True,
@@ -62,6 +63,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.sample_metadata_project = sample_metadata_project
 
         self.default_sequence_type: str = default_sequence_type
+        self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
 
         # gs specific
@@ -199,9 +201,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get sequence type from row"""
         return self.default_sequence_type
 
-    @abstractmethod
     def get_sequence_status(self, sample_id: str, row: GroupedRow) -> Union[str, SequenceStatus]:
         """Get sequence status from row"""
+        return self.default_sequence_status
 
     def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
@@ -240,7 +242,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         samples_to_add: List[NewSample] = []
         # by external_sample_id
-        sequences_to_add: Dict[str, List[NewSequence]] = defaultdict(list)
+        sequences_to_add: Dict[str, NewSequence] = defaultdict(list)
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
         samples_to_update: Dict[str, SampleUpdateModel] = {}
@@ -298,27 +300,27 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 )
 
             # should we add or update sequencing
-            if (
-                external_sample_id in existing_external_id_to_cpgid
-                and existing_external_id_to_cpgid[external_sample_id]
-                in existing_cpgid_to_seq_id
-            ):
-                # update, we have a cpg sample ID AND a sequencing ID
-                cpgid = existing_external_id_to_cpgid[external_sample_id]
-                seq_id = existing_cpgid_to_seq_id[cpgid]
-                sequences_to_update[seq_id] = SequenceUpdateModel(
-                    meta=collapsed_sequencing_meta, status=SequenceStatus(sequence_status)
-                )
-            else:
-                # the internal sample ID gets mapped back later
-                sequences_to_add[external_sample_id].append(
-                    NewSequence(
+            if collapsed_sequencing_meta:
+                if (
+                    external_sample_id in existing_external_id_to_cpgid
+                    and existing_external_id_to_cpgid[external_sample_id]
+                    in existing_cpgid_to_seq_id
+                ):
+                    # update, we have a cpg sample ID AND a sequencing ID
+                    cpgid = existing_external_id_to_cpgid[external_sample_id]
+                    seq_id = existing_cpgid_to_seq_id[cpgid]
+                    sequences_to_update[seq_id] = SequenceUpdateModel(
+                        meta=collapsed_sequencing_meta,
+                        status=SequenceStatus(sequence_status)
+                    )
+                else:
+                    # the internal sample ID gets mapped back later
+                    sequences_to_add[external_sample_id] = NewSequence(
                         sample_id='<None>',  # keep the type initialisation happy
                         meta=collapsed_sequencing_meta,
                         type=SequenceType('wgs'),
                         status=SequenceStatus(sequence_status),
                     )
-                )
 
         message = f"""\
 Processing samples: {', '.join(sample_map.keys())}
@@ -356,11 +358,12 @@ Updating {len(sequences_to_update)} sequences"""
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
             existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
-        for sample_id, seqs_to_add in sequences_to_add.items():
-            for seq in seqs_to_add:
-                seq.sample_id = existing_external_id_to_cpgid[sample_id]
-                seqapi.create_new_sequence(new_sequence=seq)
+        logger.info(f'Adding {len(sequences_to_add)} sequence entries')
+        for sample_id, seq in sequences_to_add.items():
+            seq.sample_id = existing_external_id_to_cpgid[sample_id]
+            seqapi.create_new_sequence(new_sequence=seq)
 
+        logger.info(f'Adding analysis entries for {len(analyses_to_add)} samples')
         for sample_id, analyses in analyses_to_add.items():
             for analysis in analyses:
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
