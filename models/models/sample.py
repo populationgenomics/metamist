@@ -117,6 +117,7 @@ def sample_id_format(sample_id: Union[int, str]) -> str:
         if sample_id.startswith(SAMPLE_PREFIX):
             return sample_id
         raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
+
     sample_id = int(sample_id)
 
     checksum = luhn_compute(sample_id, offset=CHECKSUM_OFFSET)
