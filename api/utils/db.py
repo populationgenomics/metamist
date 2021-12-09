@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import Depends, Cookie, HTTPException
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -16,7 +16,7 @@ def authenticate(
     token: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(auto_error=False)
     ),
-    x_goog_iap_jwt_assertion: Optional[str] = Cookie(None),
+    x_goog_iap_jwt_assertion: Optional[str] = Header(None),
 ) -> str:
     """
     If a token (OR Google IAP auth jwt) is provided,
