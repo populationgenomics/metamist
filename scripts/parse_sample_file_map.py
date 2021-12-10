@@ -27,6 +27,15 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
+from functools import update_wrapper
+import asyncio
+
+def coro(f):
+    def wrapper(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(f(*args, **kwargs))
+    return update_wrapper(wrapper, f)
+
 
 @click.command(help=__DOC)
 @click.option(
@@ -45,7 +54,8 @@ logger.setLevel(logging.INFO)
     help='Search path to search for files within',
 )
 @click.argument('manifests', nargs=-1)
-def main(
+@coro
+async def main(
     manifests,
     search_path: List[str],
     sample_metadata_project,
@@ -69,7 +79,7 @@ def main(
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = parser.from_manifest_path(
+        resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
         )

@@ -176,11 +176,11 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
@@ -204,21 +204,21 @@ class GenericMetadataParser(GenericParser):
         # strip in case collaborator put "file1, file2"
         if read_filenames:
             full_filenames = [self.file_path(f.strip()) for f in read_filenames]
-            reads, reads_type = self.parse_file(full_filenames)
+            reads, reads_type = await self.parse_file(full_filenames)
 
             collapsed_sequence_meta['reads'] = reads
             collapsed_sequence_meta['reads_type'] = reads_type
 
         if gvcf_filenames:
             full_filenames = [self.file_path(f.strip()) for f in gvcf_filenames]
-            gvcfs, gvcf_types = self.parse_file(full_filenames)
+            gvcfs, gvcf_types = await self.parse_file(full_filenames)
 
             collapsed_sequence_meta['gvcfs'] = gvcfs
             collapsed_sequence_meta['gvcf_types'] = gvcf_types
 
         return collapsed_sequence_meta
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
         """Get collapsed qc meta"""
         if not self.qc_meta_map:
             return None
@@ -229,7 +229,7 @@ class GenericMetadataParser(GenericParser):
         """Get sequence status from row"""
         return 'uploaded'
 
-    def from_manifest_path(
+    async def from_manifest_path(
         self,
         manifest: str,
         confirm=False,
@@ -242,8 +242,8 @@ class GenericMetadataParser(GenericParser):
             manifest
         )
 
-        file_contents = self.file_contents(manifest)
-        return self.parse_manifest(
+        file_contents = await self.file_contents(manifest)
+        return await self.parse_manifest(
             StringIO(file_contents),
             delimiter=_delimiter,
             confirm=confirm,
