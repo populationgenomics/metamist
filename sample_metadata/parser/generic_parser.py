@@ -55,7 +55,7 @@ GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
 T = TypeVar('T')
 
 
-def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[List[T]]:
+def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[List[T]]:
     for i in range(0, len(iterable), chunk_size):
         yield iterable[i : i + chunk_size]
 
