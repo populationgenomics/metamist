@@ -411,12 +411,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 if sample_to_add:
                     samples_to_add.append(sample_to_add)
                 if sample_to_update:
-                    samples_to_update[cpg_sample_id].append(sample_to_update)
+                    samples_to_update[cpg_sample_id] = sample_to_update
                 if sequence_to_add:
                     sequences_to_add[external_sample_id] = sequence_to_add
                 if sequence_to_update:
                     seq_id, update_model = sequence_to_update
-                    sequence_to_update[seq_id] = update_model
+                    sequences_to_update[seq_id] = update_model
 
                 if analysis_to_add:
                     analyses_to_add[external_sample_id] = analysis_to_add
