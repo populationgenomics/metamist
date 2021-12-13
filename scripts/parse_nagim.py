@@ -65,6 +65,7 @@ import pandas as pd
 from cpg_pipes.pipeline import setup_batch
 from cpg_pipes.resources import DRIVER_IMAGE
 from cpg_pipes.utils import can_reuse
+import hail as hl
 
 from sample_metadata.models import (
     AnalysisStatus,
@@ -72,6 +73,7 @@ from sample_metadata.models import (
     AnalysisModel,
 )
 from sample_metadata.apis import SampleApi
+from sample_metadata.models import SampleUpdateModel
 from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
 
 
@@ -80,18 +82,41 @@ logger.setLevel(logging.INFO)
 
 
 NAGIM_PROJ_ID = 'nagim'
-NAMESPACE = 'main'
 
 # Mapping the KCCG project IDs to internal CPG project IDs
 PROJECT_ID_MAP = {
     '1KB': 'thousand-genomes',
+    'HGDP': 'hgdp',
     'ALS': 'csiro-als',
     'AMP-PD': 'amp-pd',
-    'HGDP': 'hgdp',
     'MGRB': 'mgrb',
     'TOB': 'tob-wgs',
     'acute_care': 'acute-care',
 }
+
+# For debugging purposes: when we only want to process following projects.
+# If empty, everything will be processed.
+PROJECTS_TO_PROCESS: List[str] = []
+
+# For debugging purposes: when we only want to process following sources.
+SOURCES_TO_PROCESS = [
+    'QC',
+    'GVCF',
+    'CRAM',
+]
+
+# Metrics we extract from MultiQC and put into Sequence.meta and Analysis
+QC_METRICS = [
+    # id, multiqc id
+    ('freemix', 'FREEMIX'),
+    ('median_coverage', 'MEDIAN_COVERAGE'),
+    ('pct_chimeras', 'PCT_CHIMERAS'),
+    ('pct_30x', 'PCT_30X'),
+    ('pct_reads_aligned_in_pairs', 'PCT_READS_ALIGNED_IN_PAIRS'),
+    ('percent_duplication', 'PERCENT_DUPLICATION'),
+    ('median_insert_size', 'summed_median'),
+]
+
 
 # 2 columns: sample IDs used in the NAGIM run, and a project ID.
 SAMPLE_TO_PROJECT_TSV_PATH = 'gs://cpg-nagim-main/metadata/nagim-terra-samples.tsv'
@@ -101,7 +126,7 @@ SRC_BUCKETS = {
         'Australia': [  # Australian Terra workspace
             'gs://fc-7d762f69-bb45-48df-901b-b3bcec656ee0/2232b739-5183-4935-bb84-452a631c31ea',
         ],
-        'US': [  # The US Terra workspace§
+        'US': [  # The US Terra workspace
             'gs://fc-bda68b2d-bed3-495f-a63c-29477968feff/1a9237ff-2e6e-4444-b67d-bd2715b8a156',
         ],
     },
@@ -156,27 +181,25 @@ class Source:
 
     def get_upload_bucket(self, ending=None):
         """
-        Upload bucket can be a string or a lambda taking filename ending as an argument
+        Returns the full path in the "upload" bucket ("gs://cpg-*-upload/")
         """
-        if isinstance(self._upload_bucket, str):
-            return self._upload_bucket
-        assert ending
-        return self._upload_bucket(ending)
+        return self._upload_bucket.format(ending=ending)
 
     def __repr__(self):
         return self.name
 
-    def transfer(self, hbatch):
+    def transfer(self, hbatch, namespace: str):
         """
         Search files in buckets using search patterns and copy to CPG upload buckets
         """
-        for region, buckets in SRC_BUCKETS[NAMESPACE].items():
+        for region, buckets in SRC_BUCKETS[namespace].items():
             for bucket in buckets:
                 for ending, pattern in self.search_pattern_by_ending.items():
                     _add_batch_job(
                         cmd=(
                             f"gsutil ls '{bucket}/{pattern}'"
-                            f' | gsutil -m cp -I {self.get_upload_bucket(ending)}/'
+                            f' | gsutil -m cp -I '
+                            f'{self.get_upload_bucket(ending)}/'
                         ),
                         hbatch=hbatch,
                         job_name=(
@@ -197,7 +220,7 @@ SOURCES = {
                 'cram.crai': '**/call-ConvertToCram/**/*.cram.crai',
                 'cram.md5': '**/call-ConvertToCram/**/*.cram.md5',
             },
-            upload_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-upload/cram',
+            upload_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-main-upload/cram',
         ),
         Source(
             name='GVCF',
@@ -205,11 +228,11 @@ SOURCES = {
                 'hard-filtered.g.vcf.gz': '**/call-MergeVCFs/**/*.hard-filtered.g.vcf.gz',
                 'hard-filtered.g.vcf.gz.tbi': '**/call-MergeVCFs/**/*.hard-filtered.g.vcf.gz.tbi',
             },
-            upload_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-upload/gvcf',
+            upload_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-main-upload/gvcf',
         ),
         Source(
             name='QC',
-            upload_bucket=lambda ending: f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-upload/QC/{ending}',
+            upload_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-main-upload/QC/{{ending}}',
             search_pattern_by_ending={
                 e: f'**/*.{e}'
                 for e in [
@@ -233,25 +256,6 @@ SOURCES = {
         ),
     ]
 }
-
-# Metrics we extract from MultiQC and put into Sequence.meta and Analysis
-QC_METRICS = [
-    # id, multiqc id
-    ('freemix', 'FREEMIX'),
-    ('median_coverage', 'MEDIAN_COVERAGE'),
-    ('pct_chimeras', 'PCT_CHIMERAS'),
-    ('pct_30x', 'PCT_30X'),
-    ('pct_reads_aligned_in_pairs', 'PCT_READS_ALIGNED_IN_PAIRS'),
-    ('percent_duplication', 'PERCENT_DUPLICATION'),
-    ('median_insert_size', 'summed_median'),
-]
-
-# Only process the following sources:
-SOURCES_TO_PROCESS = [
-    'QC',
-    # 'GVCF',
-    # 'CRAM',
-]
 
 
 @dataclass
@@ -282,6 +286,8 @@ class Sample:
     # QC stats indexed by ending
     qc_values: Dict[str, str] = field(default_factory=dict)
 
+    meta: Dict[str, Any] = field(default_factory=dict)
+
 
 @click.group()
 def cli():
@@ -308,18 +314,20 @@ def transfer(
     if not tmp_dir:
         tmp_dir = tempfile.gettempdir()
 
+    namespace = 'main'
+
     if use_batch:
         hbatch = setup_batch(
             title='Transferring NAGIM data',
             keep_scratch=False,
-            tmp_bucket=f'cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-tmp',
+            tmp_bucket=f'cpg-{NAGIM_PROJ_ID}-{namespace}-tmp',
             analysis_project_name=NAGIM_PROJ_ID,
         )
     else:
         hbatch = None
 
     for source in SOURCES_TO_PROCESS:
-        SOURCES[source].transfer(hbatch)
+        SOURCES[source].transfer(hbatch, namespace)
 
     if use_batch:
         hbatch.run(wait=True, dry_run=dry_run)
@@ -337,7 +345,7 @@ def transfer(
     )
 
 
-def _find_upload_files(samples: List[Sample], tmp_dir, overwrite=False):
+def _find_upload_files(samples: List[Sample], tmp_dir: str, overwrite=False):
     """
     Populate fields for each sample and verify that every sample has an expected
     set of files.
@@ -438,12 +446,21 @@ def _find_upload_files(samples: List[Sample], tmp_dir, overwrite=False):
     is_flag=True,
     help='Do not check objects on buckets (existence, size, md5)',
 )
+@click.option(
+    '--clean-up-test',
+    'clean_up_test',
+    is_flag=True,
+    help='Remove all existing samples in "test" before prior to parsing',
+)
+@click.option('--prod', 'prod', is_flag=True)
 def parse(
     tmp_dir,
     confirm: bool,
     dry_run: bool,
     overwrite_multiqc: bool,
     skip_checking_objects: bool,
+    clean_up_test: bool,
+    prod: bool,
 ):
     """
     Assuming the data is transferred to the CPG bucket, populate the SM projects.
@@ -451,26 +468,57 @@ def parse(
     if not tmp_dir:
         tmp_dir = tempfile.gettempdir()
 
+    namespace = 'main' if prod else 'test'
+
+    if not prod and clean_up_test:
+        sapi = SampleApi()
+        for proj in PROJECT_ID_MAP.values():
+            smdb_proj = _get_sm_proj_id(proj, 'test')
+            existing_samples = sapi.get_samples(
+                body_get_samples_by_criteria_api_v1_sample_post={
+                    'project_ids': [smdb_proj],
+                    'active': True,
+                }
+            )
+            logger.info(
+                f'{smdb_proj}: Removing {len(existing_samples)} existing test samples'
+            )
+            for i, s in enumerate(existing_samples):
+                logger.info(
+                    f'{smdb_proj}: #{i+1}: removing {s["id"]}/{s["external_id"]}'
+                )
+                sapi.update_sample(s['id'], SampleUpdateModel(active=False))
+
     samples = _parse_sample_project_map(SAMPLE_TO_PROJECT_TSV_PATH)
+
+    if not prod:
+        samples = _subset_to_test(samples)
 
     # Find GVCFs, CRAMs and other files after transferring, and checks that all
     # of them have corresponding tbi/crai/md5.
+    # We are not using "test" "upload" buckets, so searching in "main" here as well.
     _find_upload_files(samples, tmp_dir)
 
     # Some samples processed with Terra use CPG IDs, checking if we already
     # have them in the SMDB and fixing the external IDs.
-    _fix_sample_ids(samples)
+    _fix_sample_ids(samples, namespace=namespace)
+
+    _add_hgdp_1kg_metadata(samples, tmp_dir)
 
     multiqc_html_path = join(
-        f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-web/qc/multiqc.html'
+        f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-web/qc/multiqc.html'
     )
     multiqc_json_path = join(
-        f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-analysis/qc/multiqc_data.json'
+        f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-analysis/qc/multiqc_data.json'
     )
     if 'QC' in SOURCES_TO_PROCESS:
         logger.info('Running MultiQC on QC files')
         parsed_json_fpath = _run_multiqc(
-            samples, multiqc_html_path, multiqc_json_path, overwrite=overwrite_multiqc
+            samples,
+            multiqc_html_path,
+            multiqc_json_path,
+            tmp_bucket=f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}-tmp/qc',
+            overwrite=overwrite_multiqc,
         )
         gfs = gcsfs.GCSFileSystem()
         with gfs.open(parsed_json_fpath) as f:
@@ -482,7 +530,7 @@ def parse(
     # Creating a parser for each project separately, because `sample_metadata_project`
     # is an initialization parameter, and we want to write to multiple projects.
     for proj in PROJECT_ID_MAP.values():
-        sm_proj = _get_sm_proj_id(proj)
+        sm_proj = _get_sm_proj_id(proj, namespace=namespace)
         sample_tsv_file = join(tmp_dir, f'sm-nagim-parser-samples-{sm_proj}.csv')
 
         rows = []
@@ -499,6 +547,8 @@ def parse(
             )
             for metric, val in s.qc_values.items():
                 row[f'qc_value_{metric}'] = val
+            for k, v in s.meta.items():
+                row[f'meta_{k}'] = v
             rows.append(row)
 
         if len(rows) == 0:
@@ -516,7 +566,7 @@ def parse(
             path_prefix=None,
             sample_metadata_project=sm_proj,
             skip_checking_gcs_objects=skip_checking_objects,
-            verbose=False,
+            verbose=not prod,
             multiqc_html_path=multiqc_html_path,
             multiqc_json_path=multiqc_json_path,
         )
@@ -528,6 +578,7 @@ def _run_multiqc(
     samples: List[Sample],
     html_fpath: str,
     json_fpath: str,
+    tmp_bucket: str,
     overwrite: bool = False,
 ) -> str:
     """
@@ -538,8 +589,6 @@ def _run_multiqc(
     Generates a JSON with metrics, extracts useful metrics into another JSON
     indexed by sample, and returns path to this JSON.
     """
-    tmp_bucket = f'gs://cpg-{NAGIM_PROJ_ID}-{NAMESPACE}-tmp/qc'
-
     row_by_sample_json_path = f'{tmp_bucket}/parsed-qc.json'
     if can_reuse(row_by_sample_json_path, overwrite):
         return row_by_sample_json_path
@@ -613,7 +662,7 @@ def _run_multiqc(
     return row_by_sample_json_path
 
 
-def _get_sm_proj_id(proj: str, namespace='main'):
+def _get_sm_proj_id(proj: str, namespace: str):
     """
     Matching the project ID to a sample-metadata project.
     """
@@ -624,7 +673,7 @@ def _get_sm_proj_id(proj: str, namespace='main'):
     return proj
 
 
-def _fix_sample_ids(samples: List[Sample], namespace: str = 'main'):
+def _fix_sample_ids(samples: List[Sample], namespace: str):
     """
     Some samples processed with Terra use CPG IDs, so checking if we already
     have them in the SMDB, and fixing the external IDs.
@@ -661,20 +710,71 @@ def _parse_sample_project_map(tsv_path: str) -> List[Sample]:
     sample_by_nagim_id = {}
     df = pd.read_csv(tsv_path, sep='\t', header=None, names=['nagim_id', 'proj'])
     for (nagim_id, proj) in zip(df.nagim_id, df.proj):
-        if proj in PROJECT_ID_MAP.values():
-            cpg_proj = proj
-        elif proj in PROJECT_ID_MAP:
-            cpg_proj = PROJECT_ID_MAP[proj]
-        else:
+        cpg_proj = PROJECT_ID_MAP.get(proj)
+        if cpg_proj is None:
             raise ValueError(
                 f'Unknown project {proj}. Known project IDs: {PROJECT_ID_MAP}'
             )
+        if PROJECTS_TO_PROCESS and cpg_proj not in PROJECTS_TO_PROCESS:
+            continue
         sample_by_nagim_id[nagim_id] = Sample(
             nagim_id=nagim_id,
             project_id=cpg_proj,
         )
     logger.info(f'Read {len(sample_by_nagim_id)} samples from {tsv_path}')
     return list(sample_by_nagim_id.values())
+
+
+def _subset_to_test(samples: List[Sample]) -> List[Sample]:
+    test_samples = []
+    for proj, cnt in {
+        'thousand-genomes': 30,
+        'hgdp': 20,
+        'csiro-als': 5,
+        'amp-pd': 10,
+        'mgrb': 15,
+        'tob-wgs': 10,
+        'acute-care': 10,
+    }.items():
+        proj_samples = [
+            s
+            for s in samples
+            if _get_sm_proj_id(s.project_id, 'main') == _get_sm_proj_id(proj, 'main')
+        ]
+        test_samples.extend(proj_samples[:cnt])
+    return test_samples
+
+
+def _add_hgdp_1kg_metadata(samples, tmp_dir, overwrite=False):
+    """
+    Using gnomAD to pull ancestry and sex metadata for 1KG and HGDP samples from gnomAD.
+    """
+    cache_path = join(tmp_dir, 'hgdp-1kg-meta.csv')
+    if not can_reuse(cache_path, overwrite):
+        mt = hl.read_matrix_table(
+            'gs://gcp-public-data--gnomad/release/3.1/mt/genomes/'
+            'gnomad.genomes.v3.1.hgdp_1kg_subset.mt/'
+        )
+        ht = mt.cols()
+        ht = ht.select(
+            ht.labeled_subpop,
+            ht.population_inference.pop,
+            ht.sex_imputation.sex_karyotype,
+        )
+        ht.to_pandas().to_csv(cache_path, index=False)
+
+    df = pd.read_csv(cache_path)
+
+    row_by_sid = dict()
+    for _, row in df.iterrows():
+        row_by_sid[row['s']] = row
+
+    for s in samples:
+        row = row_by_sid.get(s.ext_id)
+        if row is not None:
+            s.meta['continental_pop'] = row['pop']
+            s.meta['subpop'] = row['labeled_subpop']
+            s.meta['sex'] = {'XY': 1, 'XX': 2}.get(row['sex_karyotype'], 0)
 
 
 def _add_batch_job(cmd: str, hbatch, job_name: str):
@@ -707,8 +807,20 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
-        return {}
+    def get_sample_meta(self, sample_id: str, rows: GroupedRow) -> Dict[str, Any]:
+        if isinstance(rows, dict):
+            rows = [rows]
+        meta = dict()
+        for key in [
+            'continental_pop',
+            'subpop',
+            'sex',
+        ]:
+            for row in rows:
+                val = row.get(f'meta_{key}')
+                if val:
+                    meta[key] = val
+        return meta
 
     def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
         super().__init__(**kwargs)
@@ -760,7 +872,7 @@ class NagimParser(GenericParser):
         """
         assert not isinstance(row, list)
 
-        if 'QC' not in SOURCES:
+        if 'QC' not in SOURCES_TO_PROCESS:
             return None
 
         qc_data = {}
@@ -793,9 +905,9 @@ class NagimParser(GenericParser):
 
 def _cache_bucket_ls(
     ending_to_search: str,
-    source_bucket,
-    tmp_dir,
-    overwrite,
+    source_bucket: str,
+    tmp_dir: str,
+    overwrite: bool,
 ) -> List[str]:
     output_path = join(tmp_dir, f'sm-nagim-parser-gs-ls-{ending_to_search}.txt')
     if overwrite or not exists(output_path):
