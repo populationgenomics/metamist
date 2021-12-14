@@ -5,7 +5,7 @@ import logging
 from io import StringIO
 from functools import reduce
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -27,8 +27,8 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
+        path_prefix: Optional[str] = None,
     ):
-        path_prefix = search_locations[0] if search_locations else None
         super().__init__(
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
@@ -78,7 +78,11 @@ class GenericMetadataParser(GenericParser):
         if filename in self.filename_map:
             return self.filename_map[filename]
 
-        return super().file_path(filename)
+        if filename.startswith('gs://') or filename.startswith('/'):
+            return filename
+
+        sps = ', '.join(self.search_locations)
+        raise FileNotFoundError(f"Couldn't find file {filename} in search_paths: {sps}")
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
@@ -202,19 +206,34 @@ class GenericMetadataParser(GenericParser):
                 gvcf_filenames.extend(row[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
+        full_filenames = []
         if read_filenames:
-            full_filenames = [self.file_path(f.strip()) for f in read_filenames]
-            reads, reads_type = await self.parse_file(full_filenames)
-
-            collapsed_sequence_meta['reads'] = reads
-            collapsed_sequence_meta['reads_type'] = reads_type
-
+            full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
         if gvcf_filenames:
-            full_filenames = [self.file_path(f.strip()) for f in gvcf_filenames]
-            gvcfs, gvcf_types = await self.parse_file(full_filenames)
+            full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-            collapsed_sequence_meta['gvcfs'] = gvcfs
-            collapsed_sequence_meta['gvcf_types'] = gvcf_types
+        file_types = await self.parse_files(sample_id, full_filenames)
+        reads = file_types.get('reads')
+        variants = file_types.get('variants')
+        if reads:
+            keys = list(reads.keys())
+            if len(keys) > 1:
+                # 2021-12-14 mfranklin: In future we should return multiple
+                #       sequence meta, and handle that in the generic parser
+                raise ValueError(f'Multiple types of reads found ({", ".join(keys)}), currently not supported')
+
+            reads_type = keys[0]
+            collapsed_sequence_meta['reads_type'] = reads_type
+            collapsed_sequence_meta['reads'] = reads[reads_type]
+
+        if variants:
+            if 'gvcf' in variants:
+                collapsed_sequence_meta['gvcfs'] = variants.get('gvcf')
+                collapsed_sequence_meta['gvcf_types'] = 'gvcf'
+
+            if 'vcf' in variants:
+                collapsed_sequence_meta['vcfs'] = variants['vcf']
+                collapsed_sequence_meta['vcf_type'] = 'vcf'
 
         return collapsed_sequence_meta
 

@@ -4,8 +4,8 @@ import csv
 import logging
 import os
 import re
-import traceback
 from abc import abstractmethod
+from asyncio import Future
 from collections import defaultdict
 from itertools import groupby
 from typing import (
@@ -19,12 +19,14 @@ from typing import (
     Sequence,
     TypeVar,
     Iterator,
-    Coroutine,
+    Literal,
 )
+from functools import update_wrapper
+import asyncio
 
 from google.api_core.exceptions import Forbidden
+from google.cloud import storage
 
-from sample_metadata import ApiException
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
 from sample_metadata.models import (
@@ -47,17 +49,31 @@ logger.setLevel(logging.INFO)
 FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
-VCFGZ_EXTENSIONS = ('.vcf.gz',)
+GVCF_EXTENSIONS = ('.g.vcf.gz',)
+VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
+
+ALL_EXTENSIONS = FASTQ_EXTENSIONS + CRAM_EXTENSIONS + BAM_EXTENSIONS + GVCF_EXTENSIONS + VCF_EXTENSIONS
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
 
 T = TypeVar('T')
+SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
+SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
+SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
 def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[List[T]]:
     for i in range(0, len(iterable), chunk_size):
         yield iterable[i : i + chunk_size]
+
+
+def run_as_sync(f):
+    def wrapper(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(f(*args, **kwargs))
+    return update_wrapper(wrapper, f)
+
 
 
 class GenericParser:  # pylint: disable=too-many-public-methods
@@ -93,19 +109,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.client = None
         self.bucket_clients: Dict[str, Any] = {}
 
-        if path_prefix and path_prefix.startswith('gs://'):
-            # pylint: disable=import-outside-toplevel
-            from google.cloud import storage
+        self.client = storage.Client()
 
-            self.client = storage.Client()
-            path_components = path_prefix[5:].split('/')
-            self.default_bucket = path_components[0]
-            self.path_prefix = '/'.join(path_components[1:])
-
-    def get_bucket(self, bucket_name=None):
+    def get_bucket(self, bucket_name):
         """Get cached bucket client from optional bucket name"""
-        if bucket_name is None:
-            bucket_name = self.default_bucket
+        assert bucket_name
         if bucket_name not in self.bucket_clients:
             self.bucket_clients[bucket_name] = self.client.get_bucket(bucket_name)
 
@@ -117,10 +125,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         - Includes gs://{bucket} if relevant
         - Includes path_prefix decided early on
         """
-        if filename.startswith('gs://'):
+        if filename.startswith('gs://') or filename.startswith('/'):
             return filename
 
+        if not self.path_prefix:
+            raise FileNotFoundError(f"Can't form full path to '{filename}' as no path_prefix was defined")
+
         if self.client and not filename.startswith('/'):
+            assert self.default_bucket
             return os.path.join(
                 'gs://',
                 self.default_bucket or '',
@@ -519,62 +531,81 @@ Updating {len(sequences_to_update)} sequences"""
 
         return added_ext_sample_to_internal_id
 
-    async def parse_file(
-        self, reads: List[str]
-    ) -> Tuple[Union[List[List[Dict]], List[Dict]], str]:
+    async def parse_files(
+        self, sample_id: str, reads: List[str]
+    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES], Union[List[List[Dict]], List[Dict]]]]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
 
-        if all(any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS) for r in reads):
-            structured_fastqs = self.parse_fastqs_structure(reads)
-            fastq_files: List[List[Dict]] = []
+        file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(lambda: defaultdict(list))
+
+        fastqs = [r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)]
+        if fastqs:
+            structured_fastqs = self.parse_fastqs_structure(fastqs)
+            fastq_files: List[List[Future]] = []
             for fastq_group in structured_fastqs:
                 fastq_files.append(
-                    asyncio.gather(self.create_file_object(f) for f in fastq_group)
+                    asyncio.gather(*[self.create_file_object(f) for f in fastq_group])
                 )
 
-            return list(await asyncio.gather(*fastq_files)), 'fastq'
+            grouped_fastqs = list(await asyncio.gather(*fastq_files))
+            file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
-        files: List[Coroutine[Dict]] = []
-
-        if all(any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS) for r in reads):
+        crams = [r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)]
+        if crams:
+            file_promises = []
             sec_format = ['.crai', '^.crai']
-            for r in reads:
+            for r in crams:
                 secondaries = await self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
                 )
-                files.append(self.create_file_object(r, secondary_files=secondaries))
+                file_promises.append(self.create_file_object(r, secondary_files=secondaries))
+            file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)
 
-            return await asyncio.gather(*files), 'cram'
-
-        if all(any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS) for r in reads):
+        bams = [r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)]
+        if bams:
+            file_promises = []
             sec_format = ['.bai', '^.bai']
-            for r in reads:
+            for r in bams:
                 secondaries = await self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
                 )
-                files.append(self.create_file_object(r, secondary_files=secondaries))
+                sec_format.append(self.create_file_object(r, secondary_files=secondaries))
 
-            return await asyncio.gather(*files), 'bam'
+            file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)
 
-        if all(any(r.lower().endswith(ext) for ext in VCFGZ_EXTENSIONS) for r in reads):
+        gvcfs = [r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)]
+        vcfs = [r for r in reads if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs]
+
+        if gvcfs:
+            file_promises = []
             sec_format = ['.tbi']
-            for r in reads:
+            for r in vcfs:
                 secondaries = await self.create_secondary_file_objects_by_potential_pattern(
                     r, sec_format
                 )
-                files.append(self.create_file_object(r, secondary_files=secondaries))
+                file_promises.append(self.create_file_object(r, secondary_files=secondaries))
 
-            return await asyncio.gather(*files), 'gvcf'
+            file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)
 
-        extensions = set(os.path.splitext(r)[-1] for r in reads)
-        joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(reads))
-        raise ValueError(
-            f'Mixed, or unrecognised extensions ({", ".join(extensions)}) for reads: {joined_reads}'
-        )
+        if vcfs:
+            file_promises = []
+            for r in vcfs:
+                file_promises.append(self.create_file_object(r))
+
+            file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)
+
+        unhandled_files = [r for r in reads if not any(r.lower().endswith(ext) for ext in ALL_EXTENSIONS)]
+        if unhandled_files:
+            joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(unhandled_files))
+            logger.warning(
+                f'There were files with extensions that were skipped ({sample_id}): {joined_reads}'
+            )
+
+        return file_by_type
 
     @staticmethod
     def parse_fastqs_structure(fastqs) -> List[List[str]]:
