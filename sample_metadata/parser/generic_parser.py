@@ -273,7 +273,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
             (
-                external_sample_id,
                 sample_to_add,
                 sample_to_update,
                 sequence_to_add,
@@ -358,7 +357,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             )
 
         return (
-            external_sample_id,
             sample_to_add,
             sample_to_update,
             sequence_to_add,
@@ -415,7 +413,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         for ex_sample_ids in chunk(list(sample_map.keys())):
 
-            current_batch_promises = []
+            current_batch_promises = {}
 
             for external_sample_id in ex_sample_ids:
                 if self.verbose:
@@ -431,17 +429,18 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     cpg_sample_id=cpg_sample_id,
                     sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
                 )
-                current_batch_promises.append(promise)
+                current_batch_promises[external_sample_id] = promise
 
-            resolved_promises = await asyncio.gather(*current_batch_promises)
-            for (
-                external_sample_id,
-                sample_to_add,
-                sample_to_update,
-                sequence_to_add,
-                sequence_to_update,
-                analysis_to_add,
-            ) in resolved_promises:
+            processed_ex_sids, batch_promises = list(current_batch_promises.items())
+            resolved_promises = await asyncio.gather(*batch_promises)
+            for external_sample_id, resolved_promise in zip(processed_ex_sids, resolved_promises):
+                (
+                    sample_to_add,
+                    sample_to_update,
+                    sequence_to_add,
+                    sequence_to_update,
+                    analysis_to_add,
+                ) = resolved_promise
                 cpg_sample_id = existing_external_id_to_cpgid.get(external_sample_id)
                 if sample_to_add:
                     samples_to_add.append(sample_to_add)
