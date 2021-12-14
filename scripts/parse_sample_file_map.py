@@ -5,6 +5,7 @@ import logging
 
 import click
 
+from sample_metadata.parser.generic_parser import run_as_sync
 from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 __DOC = """
@@ -27,15 +28,6 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-from functools import update_wrapper
-import asyncio
-
-def coro(f):
-    def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(f(*args, **kwargs))
-    return update_wrapper(wrapper, f)
-
 
 @click.command(help=__DOC)
 @click.option(
@@ -54,7 +46,7 @@ def coro(f):
     help='Search path to search for files within',
 )
 @click.argument('manifests', nargs=-1)
-@coro
+@run_as_sync
 async def main(
     manifests,
     search_path: List[str],

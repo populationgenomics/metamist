@@ -8,6 +8,7 @@ from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
+    run_as_sync,
 )
 
 logger = logging.getLogger(__file__)
@@ -166,7 +167,8 @@ class TobWgsParser(GenericMetadataParser):
 )
 @click.option('--dry-run', 'dry_run', is_flag=True)
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     sample_metadata_project,
     default_sample_type='blood',
@@ -186,7 +188,7 @@ def main(
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = parser.from_manifest_path(
+        resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
             dry_run=dry_run,

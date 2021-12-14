@@ -72,7 +72,7 @@ from sample_metadata.models import (
     AnalysisModel,
 )
 from sample_metadata.apis import SampleApi
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
 
 
 logger = logging.getLogger(__file__)
@@ -438,7 +438,8 @@ def _find_upload_files(samples: List[Sample], tmp_dir, overwrite=False):
     is_flag=True,
     help='Do not check objects on buckets (existence, size, md5)',
 )
-def parse(
+@run_as_sync
+async def parse(
     tmp_dir,
     confirm: bool,
     dry_run: bool,
@@ -521,7 +522,7 @@ def parse(
             multiqc_json_path=multiqc_json_path,
         )
         with open(sample_tsv_file) as f:
-            parser.parse_manifest(f, dry_run=dry_run, confirm=confirm)
+            await parser.parse_manifest(f, dry_run=dry_run, confirm=confirm)
 
 
 def _run_multiqc(

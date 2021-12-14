@@ -9,6 +9,7 @@ import click
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
+    run_as_sync,
 )
 
 rmatch = re.compile(r'_[Rr]\d')
@@ -143,7 +144,8 @@ class VcgsManifestParser(GenericMetadataParser):
 )
 @click.option('--search-path', multiple=True, required=False)
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     sample_metadata_project,
     default_sample_type='blood',
@@ -161,9 +163,10 @@ def main(
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = parser.from_manifest_path(
+        resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
+            delimiter="\t",
         )
         print(resp)
 
