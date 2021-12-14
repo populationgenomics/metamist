@@ -708,7 +708,7 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         return {}
 
     def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
@@ -719,7 +719,7 @@ class NagimParser(GenericParser):
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(
+    async def get_analyses(
         self,
         sample_id: str,
         row: GroupedRow,
@@ -755,7 +755,9 @@ class NagimParser(GenericParser):
             )
         return results
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Optional[Dict[str, Any]]:
         """
         Create a QC analysis entry for found QC files.
         """
@@ -781,7 +783,9 @@ class NagimParser(GenericParser):
             'project': row.get('project'),
         }
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sequence_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Dict[str, Any]:
         if isinstance(row, list):
             row = row[0]
 

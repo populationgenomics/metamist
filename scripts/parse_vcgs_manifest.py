@@ -166,7 +166,7 @@ async def main(
         resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
-            delimiter="\t",
+            delimiter='\t',
         )
         print(resp)
 

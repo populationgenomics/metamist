@@ -1,11 +1,12 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from typing import Dict, List, Optional, Any
 import os
 import logging
 from io import StringIO
 from functools import reduce
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
+
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync    # noqa
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -82,7 +83,7 @@ class GenericMetadataParser(GenericParser):
             return filename
 
         sps = ', '.join(self.search_locations)
-        raise FileNotFoundError(f"Couldn't find file {filename} in search_paths: {sps}")
+        raise FileNotFoundError(f"Couldn't find file '{filename}' in search_paths: {sps}")
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""

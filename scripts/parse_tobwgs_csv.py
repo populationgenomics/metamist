@@ -55,7 +55,9 @@ class TobWgsParser(GenericMetadataParser):
             qc_meta_map={},
         )
 
-    def find_gvcf(self, sample_id: str, cpg_id: Optional[str] = None) -> Optional[str]:
+    async def find_gvcf(
+        self, sample_id: str, cpg_id: Optional[str] = None
+    ) -> Optional[str]:
         """
         Find GVCF for the sample.
         """
@@ -76,12 +78,14 @@ class TobWgsParser(GenericMetadataParser):
             ]
 
         for fpath in search_locations:
-            if self.file_exists(fpath):
+            if await self.file_exists(fpath):
                 return fpath
 
         return None
 
-    def find_cram(self, sample_id: str, cpg_id: Optional[str] = None) -> Optional[str]:
+    async def find_cram(
+        self, sample_id: str, cpg_id: Optional[str] = None
+    ) -> Optional[str]:
         """
         Find CRAM for the sample.
         """
@@ -98,25 +102,25 @@ class TobWgsParser(GenericMetadataParser):
             ]
 
         for fpath in search_locations:
-            if self.file_exists(fpath):
+            if await self.file_exists(fpath):
                 return fpath
 
         return None
 
-    def get_analyses(
+    async def get_analyses(
         self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get Analysis entries from a row.
         cpg_id is known for previously added samples.
         """
-        analyses = super().get_analyses(sample_id, row, cpg_id)
+        analyses = await super().get_analyses(sample_id, row, cpg_id)
 
         for analysis_type in ['gvcf', 'cram']:
             if analysis_type == 'gvcf':
-                file_path = self.find_gvcf(sample_id, cpg_id)
+                file_path = await self.find_gvcf(sample_id, cpg_id)
             else:
-                file_path = self.find_cram(sample_id, cpg_id)
+                file_path = await self.find_cram(sample_id, cpg_id)
 
             if not file_path:
                 logger.warning(f'Not found {analysis_type} file for {sample_id}')
@@ -141,10 +145,10 @@ class TobWgsParser(GenericMetadataParser):
             )
         return analyses
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+    async def get_sequence_meta(self, sample_id: str, row: GroupedRow):
         """Get sequence-metadata from row"""
         assert not isinstance(row, list)
-        collapsed_sequence_meta = super().get_sequence_meta(sample_id, row)
+        collapsed_sequence_meta = await super().get_sequence_meta(sample_id, row)
         batch_number = int(row['batch.batch_name'][-3:])
         collapsed_sequence_meta['batch'] = batch_number
 

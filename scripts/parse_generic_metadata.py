@@ -5,7 +5,10 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
+from sample_metadata.parser.generic_metadata_parser import (
+    GenericMetadataParser,
+    run_as_sync,
+)
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.

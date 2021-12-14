@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name
 import asyncio
 import csv
 import logging
@@ -22,7 +22,6 @@ from typing import (
     Literal,
 )
 from functools import update_wrapper
-import asyncio
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
@@ -64,16 +63,28 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
 def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[List[T]]:
+    """
+    Chunk a sequence by yielding lists of `chunk_size`
+    """
     for i in range(0, len(iterable), chunk_size):
         yield iterable[i : i + chunk_size]
 
 
 def run_as_sync(f):
+    """
+    Run an async function, synchronously.
+    Useful for @click functions that must be async, eg:
+
+    @click.command()
+    @click.option(...)
+    @run_as_sync
+    async def my_async_function(**kwargs):
+        return await awaitable_function(**kwargs)
+    """
     def wrapper(*args, **kwargs):
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(f(*args, **kwargs))
     return update_wrapper(wrapper, f)
-
 
 
 class GenericParser:  # pylint: disable=too-many-public-methods
@@ -259,7 +270,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         cpg_sample_id: str,
         sequence_id: str,
     ):
+        """
+        ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
+            (
+                external_sample_id,
+                sample_to_add,
+                sample_to_update,
+                sequence_to_add,
+                sequence_to_update,
+                analysis_to_add,
+            )
 
+        Then the calling function does the (reduce).
+        """
         if isinstance(rows, list) and len(rows) == 1:
             rows = rows[0]
 
@@ -520,7 +543,7 @@ Updating {len(sequences_to_update)} sequences"""
         logger.info(f'Updating {len(sequences_to_update)} sequences')
         for chunked_sequences in chunk(list(enumerate(sequences_to_update.items()))):
             promises = []
-            for i, (seq_id, seq_update) in chunked_sequences:
+            for _, (seq_id, seq_update) in chunked_sequences:
                 promises.append(
                     seqapi.update_sequence_async(
                         sequence_id=seq_id,
