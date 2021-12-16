@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -13,6 +13,7 @@ EXPECTED_AUDIENCE = '/projects/774248915715/global/backendServices/4615543739767
 
 
 def authenticate(
+    request: Request,
     token: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(auto_error=False)
     ),
@@ -26,7 +27,9 @@ def authenticate(
         return email_from_id_token(token.credentials)
     if x_goog_iap_jwt_assertion:
         return validate_iap_jwt_and_get_email(x_goog_iap_jwt_assertion)
-    raise HTTPException(status_code=401, detail='Not authenticated')
+
+    headers = ', '.join(request.headers.keys())
+    raise HTTPException(status_code=401, detail=f'Not authenticated w/ headers ({headers}) :(')
 
 
 async def dependable_get_write_project_connection(
