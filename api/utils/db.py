@@ -1,3 +1,4 @@
+from os import getenv
 import logging
 from typing import Optional
 
@@ -9,25 +10,40 @@ from google.oauth2 import id_token
 from db.python.connect import SMConnections, Connection
 from api.utils.gcp import email_from_id_token
 
-EXPECTED_AUDIENCE = '/projects/774248915715/global/backendServices/4615543739767186396'
+EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
+
+if EXPECTED_AUDIENCE:
+
+    def authenticate(
+        token: Optional[HTTPAuthorizationCredentials] = Depends(
+            HTTPBearer(auto_error=False)
+        ),
+        x_goog_iap_jwt_assertion: Optional[str] = Header(None),
+    ) -> str:
+        """
+        If a token (OR Google IAP auth jwt) is provided,
+        return the email, else raise an Exception
+        """
+        if token:
+            return email_from_id_token(token.credentials)
+        if x_goog_iap_jwt_assertion:
+            return validate_iap_jwt_and_get_email(x_goog_iap_jwt_assertion)
+
+        raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
 
-def authenticate(
-    token: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
-    ),
-    x_goog_iap_jwt_assertion: Optional[str] = Header(None),
-) -> str:
-    """
-    If a token (OR Google IAP auth jwt) is provided,
-    return the email, else raise an Exception
-    """
-    if token:
-        return email_from_id_token(token.credentials)
-    if x_goog_iap_jwt_assertion:
-        return validate_iap_jwt_and_get_email(x_goog_iap_jwt_assertion)
+else:
 
-    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
+    def authenticate(
+        token: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer()),
+    ) -> str:
+        """
+        If a token is provided, return the email, else raise an Exception
+        """
+        if token:
+            return email_from_id_token(token.credentials)
+
+        raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
