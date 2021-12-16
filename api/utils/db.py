@@ -32,12 +32,16 @@ def authenticate(
     If a token (OR Google IAP auth jwt) is provided,
     return the email, else raise an Exception
     """
-    if token:
-        return email_from_id_token(token.credentials)
     if x_goog_iap_jwt_assertion:
+        # We have to PREFER the IAP's identity, otherwise you could have a case where
+        # the JWT is forged, but IAP lets it through and authenticates, but then we take
+        # the identity then without checking.
         return validate_iap_jwt_and_get_email(
             x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
         )
+
+    if token:
+        return email_from_id_token(token.credentials)
 
     raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
