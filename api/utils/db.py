@@ -12,38 +12,34 @@ from api.utils.gcp import email_from_id_token
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 
-if EXPECTED_AUDIENCE:
 
-    def authenticate(
-        token: Optional[HTTPAuthorizationCredentials] = Depends(
-            HTTPBearer(auto_error=False)
-        ),
-        x_goog_iap_jwt_assertion: Optional[str] = Header(None),
-    ) -> str:
-        """
-        If a token (OR Google IAP auth jwt) is provided,
-        return the email, else raise an Exception
-        """
-        if token:
-            return email_from_id_token(token.credentials)
-        if x_goog_iap_jwt_assertion:
-            return validate_iap_jwt_and_get_email(x_goog_iap_jwt_assertion)
-
-        raise HTTPException(status_code=401, detail=f'Not authenticated :(')
+def get_jwt_from_request(request: Request) -> Optional[str]:
+    """
+    Get google JWT value, capture it like this instead of using
+        x_goog_iap_jwt_assertion = Header(None)
+    so it doesn't show up in the swagger parameters section
+    """
+    return request.headers.get('x-goog-iap-jwt-assertion')
 
 
-else:
+def authenticate(
+    token: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
+    x_goog_iap_jwt_assertion: Optional[str] = Depends(get_jwt_from_request),
+) -> str:
+    """
+    If a token (OR Google IAP auth jwt) is provided,
+    return the email, else raise an Exception
+    """
+    if token:
+        return email_from_id_token(token.credentials)
+    if x_goog_iap_jwt_assertion:
+        return validate_iap_jwt_and_get_email(
+            x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
+        )
 
-    def authenticate(
-        token: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer()),
-    ) -> str:
-        """
-        If a token is provided, return the email, else raise an Exception
-        """
-        if token:
-            return email_from_id_token(token.credentials)
-
-        raise HTTPException(status_code=401, detail=f'Not authenticated :(')
+    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
@@ -69,19 +65,20 @@ async def dependable_get_connection(author: str = Depends(authenticate)):
     return await SMConnections.get_connection_no_project(author)
 
 
-def validate_iap_jwt_and_get_email(iap_jwt):
+def validate_iap_jwt_and_get_email(iap_jwt, audience):
     """
     Validate an IAP JWT and return email
     Source: https://cloud.google.com/iap/docs/signed-headers-howto
 
     :param iap_jwt: The contents of the X-Goog-IAP-JWT-Assertion header.
+    :param audience: The audience to validate against
     """
 
     try:
         decoded_jwt = id_token.verify_token(
             iap_jwt,
             requests.Request(),
-            audience=EXPECTED_AUDIENCE,
+            audience=audience,
             certs_url='https://www.gstatic.com/iap/verify/public_key',
         )
         return decoded_jwt['email']
