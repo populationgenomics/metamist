@@ -207,7 +207,7 @@ class GenericMetadataParser(GenericParser):
                 gvcf_filenames.extend(row[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
-        full_filenames = []
+        full_filenames: List[str] = []
         if read_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
         if gvcf_filenames:

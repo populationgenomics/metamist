@@ -20,6 +20,7 @@ from typing import (
     TypeVar,
     Iterator,
     Literal,
+    Coroutine,
 )
 from functools import update_wrapper
 
@@ -62,12 +63,12 @@ SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
-def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[List[T]]:
+def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
     for i in range(0, len(iterable), chunk_size):
-        yield iterable[i : i + chunk_size]
+        yield iterable[i: i + chunk_size]
 
 
 def run_as_sync(f):
@@ -81,9 +82,11 @@ def run_as_sync(f):
     async def my_async_function(**kwargs):
         return await awaitable_function(**kwargs)
     """
+
     def wrapper(*args, **kwargs):
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(f(*args, **kwargs))
+
     return update_wrapper(wrapper, f)
 
 
@@ -91,14 +94,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     """Parser for VCGS manifest"""
 
     def __init__(
-        self,
-        path_prefix: Optional[str],
-        sample_metadata_project: str,
-        default_sequence_type='wgs',
-        default_sequence_status='uploaded',
-        default_sample_type='blood',
-        skip_checking_gcs_objects=False,
-        verbose=True,
+            self,
+            path_prefix: Optional[str],
+            sample_metadata_project: str,
+            default_sequence_type='wgs',
+            default_sequence_status='uploaded',
+            default_sample_type='blood',
+            skip_checking_gcs_objects=False,
+            verbose=True,
     ):
 
         self.path_prefix = path_prefix
@@ -226,12 +229,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     @abstractmethod
     async def get_sequence_meta(
-        self, sample_id: str, row: GroupedRow
+            self, sample_id: str, row: GroupedRow
     ) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
 
     async def get_analyses(
-        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+            self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get analysis objects from row. Optionally, a CPG ID can be passed for
@@ -240,35 +243,35 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return []
 
     async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
+            self, sample_id: str, row: GroupedRow
     ) -> Optional[Dict[str, Any]]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
     def get_sample_type(
-        self, sample_id: str, row: GroupedRow
+            self, sample_id: str, row: GroupedRow
     ) -> Union[str, SampleType]:
         """Get sample type from row"""
         return self.default_sample_type
 
     def get_sequence_type(
-        self, sample_id: str, row: GroupedRow
+            self, sample_id: str, row: GroupedRow
     ) -> Union[str, SequenceType]:
         """Get sequence type from row"""
         return self.default_sequence_type
 
     def get_sequence_status(
-        self, sample_id: str, row: GroupedRow
+            self, sample_id: str, row: GroupedRow
     ) -> Union[str, SequenceStatus]:
         """Get sequence status from row"""
         return self.default_sequence_status
 
     async def process_group(
-        self,
-        rows: GroupedRow,
-        external_sample_id: str,
-        cpg_sample_id: str,
-        sequence_id: str,
+            self,
+            rows: GroupedRow,
+            external_sample_id: str,
+            cpg_sample_id: str,
+            sequence_id: str,
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -286,27 +289,23 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             rows = rows[0]
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
-        promises = [
-            self.get_sequence_meta(external_sample_id, rows),
-            self.get_sample_meta(external_sample_id, rows),
-            self.get_qc_meta(external_sample_id, rows),
-            self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
-        ]
         (
             collapsed_sequencing_meta,
             collapsed_sample_meta,
             collapsed_qc,
             collapsed_analyses,
-        ) = await asyncio.gather(*promises)
-        # return collapsed_sequencing_meta, collapsed_sample_meta, collapsed_qc, collapsed_analyses
+        ) = await asyncio.gather(
+            self.get_sequence_meta(external_sample_id, rows),
+            self.get_sample_meta(external_sample_id, rows),
+            self.get_qc_meta(external_sample_id, rows),
+            self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
+        )
 
-        (
-            sample_to_add,
-            sample_to_update,
-            sequence_to_add,
-            sequence_to_update,
-            analysis_to_add,
-        ) = (None, None, None, None, [])
+        sample_to_add = None
+        sample_to_update = None
+        sequence_to_add = None
+        sequence_to_update = None
+        analysis_to_add = []
 
         sample_type = self.get_sample_type(external_sample_id, rows)
         sequence_status = self.get_sequence_status(external_sample_id, rows)
@@ -365,7 +364,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def parse_manifest(  # pylint: disable=too-many-branches
-        self, file_pointer, delimiter=',', confirm=False, dry_run=False
+            self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
@@ -414,10 +413,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for ex_sample_ids in chunk(list(sample_map.keys())):
 
             current_batch_promises = {}
+            if self.verbose:
+                logger.info(f'Preparing {", ".join(ex_sample_ids)}')
 
             for external_sample_id in ex_sample_ids:
-                if self.verbose:
-                    logger.info(f'Preparing {external_sample_id}')
 
                 rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
                     external_sample_id
@@ -430,8 +429,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
                 )
                 current_batch_promises[external_sample_id] = promise
-
-            processed_ex_sids, batch_promises = list(current_batch_promises.items())
+            processed_ex_sids = list(current_batch_promises.keys())
+            batch_promises = list(current_batch_promises.values())
             resolved_promises = await asyncio.gather(*batch_promises)
             for external_sample_id, resolved_promise in zip(processed_ex_sids, resolved_promises):
                 (
@@ -496,7 +495,7 @@ Updating {len(sequences_to_update)} sequences"""
                 )
 
             for external_id, sample_id in zip(
-                ordered_external_sample_ids, await asyncio.gather(*sample_id_promises)
+                    ordered_external_sample_ids, await asyncio.gather(*sample_id_promises)
             ):
                 added_ext_sample_to_internal_id[external_id] = sample_id
                 existing_external_id_to_cpgid[external_id] = sample_id
@@ -554,8 +553,9 @@ Updating {len(sequences_to_update)} sequences"""
         return added_ext_sample_to_internal_id
 
     async def parse_files(
-        self, sample_id: str, reads: List[str]
-    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES], Union[List[List[Dict]], List[Dict]]]]:
+            self, sample_id: str, reads: List[str]
+    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[
+        Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES], Union[List[List[Dict]], List[Dict]]]]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
@@ -567,7 +567,7 @@ Updating {len(sequences_to_update)} sequences"""
         fastqs = [r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
-            fastq_files: List[List[Future]] = []
+            fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []
             for fastq_group in structured_fastqs:
                 fastq_files.append(
                     asyncio.gather(*[self.create_file_object(f) for f in fastq_group])
@@ -660,16 +660,16 @@ Updating {len(sequences_to_update)} sequences"""
 
         values = []
         for _, grouped in groupby(
-            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
+                sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
         ):
             values.append(sorted(grouped))
 
         return sorted(values, key=lambda el: el[0])
 
     async def create_file_object(
-        self,
-        filename: str,
-        secondary_files: List[Dict[str, Any]] = None,
+            self,
+            filename: str,
+            secondary_files: List[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
@@ -698,7 +698,7 @@ Updating {len(sequences_to_update)} sequences"""
         return d
 
     async def create_secondary_file_objects_by_potential_pattern(
-        self, filename, potential_secondary_patterns: List[str]
+            self, filename, potential_secondary_patterns: List[str]
     ) -> List[Dict[str, Any]]:
         """
         Take a base filename and potential secondary patterns:
@@ -735,7 +735,7 @@ Updating {len(sequences_to_update)} sequences"""
 
 
 def _apply_secondary_file_format_to_filename(
-    filepath: Optional[str], secondary_file: str
+        filepath: Optional[str], secondary_file: str
 ):
     """
     You can trust this function to do what you want
