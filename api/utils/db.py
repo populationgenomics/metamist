@@ -13,7 +13,6 @@ EXPECTED_AUDIENCE = '/projects/774248915715/global/backendServices/4615543739767
 
 
 def authenticate(
-    request: Request,
     token: Optional[HTTPAuthorizationCredentials] = Depends(
         HTTPBearer(auto_error=False)
     ),
@@ -28,8 +27,7 @@ def authenticate(
     if x_goog_iap_jwt_assertion:
         return validate_iap_jwt_and_get_email(x_goog_iap_jwt_assertion)
 
-    headers = ', '.join(request.headers.keys())
-    raise HTTPException(status_code=401, detail=f'Not authenticated w/ headers ({headers}) :(')
+    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
