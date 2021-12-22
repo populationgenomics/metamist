@@ -16,7 +16,7 @@ class FamilyTable(DbBase):
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
         SELECT project FROM family
-        WHERE project in :family_ids
+        WHERE id in :family_ids
         GROUP BY project
         """
         if len(family_ids) == 0:
