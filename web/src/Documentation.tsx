@@ -45,7 +45,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
                 // this line turns ./static/sm_docs/{filename} into the bundled path
                 // eg: /static/media/README.e3454f58.md
                 const file = require(`./static/sm_docs/${filename}`);
-                const response = await fetch(file);
+                const response = await fetch(file.default);
                 let text = await response.text();
                 // Do some URL rewriting, because the openapi generator
                 // generates links in a way that's incompatible with this hosting
