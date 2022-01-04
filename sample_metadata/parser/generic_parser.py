@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
 import asyncio
 import csv
 import logging
@@ -19,7 +19,6 @@ from typing import (
     Sequence,
     TypeVar,
     Iterator,
-    Literal,
     Coroutine,
 )
 from functools import update_wrapper
@@ -42,6 +41,12 @@ from sample_metadata.models import (
     AnalysisStatus,
 )
 
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
+
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
@@ -58,6 +63,7 @@ rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
 
 T = TypeVar('T')
+
 SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
