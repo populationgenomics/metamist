@@ -417,7 +417,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 logger.info(f'Preparing {", ".join(ex_sample_ids)}')
 
             for external_sample_id in ex_sample_ids:
-
                 rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
                     external_sample_id
                 ]
@@ -539,9 +538,11 @@ Updating {len(sequences_to_update)} sequences"""
             await asyncio.gather(*promises)
 
         logger.info(f'Updating {len(sequences_to_update)} sequences')
-        for chunked_sequences in chunk(list(enumerate(sequences_to_update.items()))):
+        for chunked_update_sequences in chunk(
+            list(enumerate(sequences_to_update.items()))
+        ):
             promises = []
-            for _, (seq_id, seq_update) in chunked_sequences:
+            for _, (seq_id, seq_update) in chunked_update_sequences:
                 promises.append(
                     seqapi.update_sequence_async(
                         sequence_id=seq_id,
@@ -573,7 +574,7 @@ Updating {len(sequences_to_update)} sequences"""
                     asyncio.gather(*[self.create_file_object(f) for f in fastq_group])
                 )
 
-            grouped_fastqs = list(await asyncio.gather(*fastq_files))
+            grouped_fastqs = list(await asyncio.gather(*fastq_files))  # type: ignore
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
         crams = [r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)]
