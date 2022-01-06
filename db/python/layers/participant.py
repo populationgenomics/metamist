@@ -621,3 +621,17 @@ class ParticipantLayer(BaseLayer):
         # pylint: disable=unused-argument
         d = {k: v for k, v in locals().items() if k != 'self'}
         return await self.pttable.update_participants(**d)
+
+    async def update_single_participant(
+        self,
+        participant_id: int,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author=None,
+    ):
+        """Update single participants"""
+        # pylint: disable=unused-argument
+        d = {k: v for k, v in locals().items() if k != 'self'}
+        return await self.pttable.update_participant(**d)
