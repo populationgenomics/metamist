@@ -630,8 +630,21 @@ class ParticipantLayer(BaseLayer):
         karyotype: str = None,
         meta: Dict = None,
         author=None,
+        check_project_ids=True,
     ):
         """Update single participants"""
         # pylint: disable=unused-argument
-        d = {k: v for k, v in locals().items() if k != 'self'}
+        d = {
+            k: v for k, v in locals().items() if k not in ('self', 'check_project_ids')
+        }
+
+        if check_project_ids:
+
+            projects = await self.pttable.get_project_ids_for_participant_ids(
+                [participant_id]
+            )
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=False
+            )
+
         return await self.pttable.update_participant(**d)

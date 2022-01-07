@@ -160,13 +160,11 @@ async def get_external_participant_id_to_internal_sample_id_export(
     )
 
 
-@router.post(
-    '/{project}/update-single-participant', operation_id='updateSingleParticipant'
-)
-async def update_single_participant(
+@router.post('/{participant_id}/update-participant', operation_id='updateParticipant')
+async def update_participant(
     participant_id: int,
     participant: ParticipantUpdateModel,
-    connection: Connection = get_project_write_connection,
+    connection: Connection = get_projectless_db_connection,
 ):
     """Update Participant Data"""
     participant_layer = ParticipantLayer(connection)
