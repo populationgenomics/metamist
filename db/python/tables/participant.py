@@ -94,6 +94,42 @@ RETURNING id
         _query = f'UPDATE participant SET {updaters_str} WHERE id = :pid'
         await self.connection.execute_many(_query, list_values)
 
+    async def update_participant(
+        self,
+        participant_id: int,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author=None,
+    ):
+        """
+        Update participant
+        """
+        updaters = ['author = :author']
+        fields = {'pid': participant_id, 'author': author or self.author}
+
+        if reported_sex:
+            updaters.append('reported_sex = :reported_sex')
+            fields['reported_sex'] = reported_sex
+
+        if reported_gender:
+            updaters.append('reported_gender = :reported_gender')
+            fields['reported_gender'] = reported_gender
+
+        if karyotype:
+            updaters.append('karyotype = :karyotype')
+            fields['karyotype'] = karyotype
+
+        if meta:
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            fields['meta'] = to_db_json(meta)
+
+        _query = f'UPDATE participant SET {", ".join(updaters)} WHERE id = :pid'
+        await self.connection.execute(_query, fields)
+
+        return True
+
     async def get_id_map_by_external_ids(
         self,
         external_participant_ids: List[str],
