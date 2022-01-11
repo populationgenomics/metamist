@@ -11,7 +11,6 @@ import csv
 import io
 from os import path
 import traceback
-from typing import List
 
 import click
 
@@ -23,29 +22,19 @@ from sample_metadata import ApiException
 
 
 def update_metadata(
-    sample_id: str,
+    participant_id: int,
     updated_participant: ParticipantUpdateModel,
-    project: str,
-    skipped_samples: List[str],
 ):
     """Update participant level metadata in SM DB"""
     paapi = ParticipantApi()
 
     try:
-        id_map = paapi.get_participant_id_map_by_external_ids(
-            project=project, request_body=[sample_id]
-        )
-        participant_id = id_map[sample_id]
-
         paapi.update_participant(
             participant_id=participant_id, participant_update_model=updated_participant
         )
     except ApiException:
         traceback.print_exc()
-        print(f'Error updating {sample_id}, skipping.')
-        skipped_samples.append(sample_id)
-
-    return skipped_samples
+        print(f'Error updating participant {participant_id}, skipping.')
 
 
 def get_csv(full_file_path: str):
@@ -63,13 +52,22 @@ def get_csv(full_file_path: str):
 
 def parse_csv(csv_string: str, project: str):
     """Pull & format data from CSV for each participant"""
+    paapi = ParticipantApi()
 
-    # Keeping track of failed updates.
-    skipped_samples: List[str] = []
+    id_reader = csv.DictReader(io.StringIO(csv_string))
+    sample_ids = [row['SampleID'] for row in id_reader]
 
-    reader = csv.DictReader(io.StringIO(csv_string))
+    try:
+        id_map = paapi.get_participant_id_map_by_external_ids(
+            project=project, request_body=sample_ids
+        )
+    except ApiException:
+        traceback.print_exc()
+        return
 
-    for row in reader:
+    meta_reader = csv.DictReader(io.StringIO(csv_string))
+
+    for row in meta_reader:
         row = {k.lower(): v for k, v in row.items()}
         sample_id = row.pop('sampleid')
 
@@ -87,12 +85,7 @@ def parse_csv(csv_string: str, project: str):
 
         updated_participant['meta'] = row
 
-        skipped_samples = update_metadata(
-            sample_id, updated_participant, project, skipped_samples
-        )
-
-    if len(skipped_samples) > 0:
-        print(f'{len(skipped_samples)} sample/s skipped. {skipped_samples}')
+        update_metadata(id_map[sample_id], updated_participant)
 
 
 @click.command()
