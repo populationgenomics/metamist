@@ -55,7 +55,7 @@ def get_csv(full_file_path: str):
     blobs = list(client.list_blobs(bucket))
     blob = next((r for r in blobs if r.name == filename), None)
     csv_file = blob.download_as_string()
-    return csv_file.decode()
+    return csv_file.decode(encoding='utf-8-sig')
 
 
 def parse_csv(csv_string: str, project: str):
@@ -64,8 +64,7 @@ def parse_csv(csv_string: str, project: str):
     reader = csv.DictReader(io.StringIO(csv_string))
 
     for row in reader:
-        # Is there an efficient way to fix this?
-        sample_id = row.pop('\ufeffSampleID')
+        sample_id = row.pop('SampleID')
 
         updated_participant = ParticipantUpdateModel()
 
