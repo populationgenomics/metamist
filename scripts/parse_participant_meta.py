@@ -64,7 +64,8 @@ def parse_csv(csv_string: str, project: str):
     reader = csv.DictReader(io.StringIO(csv_string))
 
     for row in reader:
-        sample_id = row.pop('SampleID')
+        row = {k.lower(): v for k, v in row.items()}
+        sample_id = row.pop('sampleid')
 
         updated_participant = ParticipantUpdateModel()
 
