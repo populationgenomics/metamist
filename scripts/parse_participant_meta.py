@@ -75,13 +75,13 @@ def parse_csv(csv_string: str, project: str):
 
         updated_participant = ParticipantUpdateModel()
 
-        if 'reported_gender' in row.keys():
+        if 'reported_gender' in row:
             reported_gender = row.pop('reported_gender')
             updated_participant['reported_gender'] = reported_gender
-        if 'reported_sex' in row.keys():
+        if 'reported_sex' in row:
             reported_sex = row.pop('reported_sex')
             updated_participant['reported_sex'] = reported_sex
-        if 'karyotype' in row.keys():
+        if 'karyotype' in row:
             karyotype = row.pop('karyotype')
             updated_participant['karyotype'] = karyotype
 
