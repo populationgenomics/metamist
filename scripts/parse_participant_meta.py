@@ -11,6 +11,7 @@ import csv
 import io
 from os import path
 import traceback
+from typing import List
 
 import click
 
@@ -20,12 +21,12 @@ from sample_metadata.apis import ParticipantApi
 from sample_metadata.models import ParticipantUpdateModel
 from sample_metadata import ApiException
 
-# Keeping track of failed updates.
-skipped_samples = []
-
 
 def update_metadata(
-    sample_id: str, updated_participant: ParticipantUpdateModel, project: str
+    sample_id: str,
+    updated_participant: ParticipantUpdateModel,
+    project: str,
+    skipped_samples: List[str],
 ):
     """Update participant level metadata in SM DB"""
     paapi = ParticipantApi()
@@ -44,6 +45,8 @@ def update_metadata(
         print(f'Error updating {sample_id}, skipping.')
         skipped_samples.append(sample_id)
 
+    return skipped_samples
+
 
 def get_csv(full_file_path: str):
     """Pull CSV file from GCS"""
@@ -60,6 +63,9 @@ def get_csv(full_file_path: str):
 
 def parse_csv(csv_string: str, project: str):
     """Pull & format data from CSV for each participant"""
+
+    # Keeping track of failed updates.
+    skipped_samples: List[str] = []
 
     reader = csv.DictReader(io.StringIO(csv_string))
 
@@ -81,7 +87,12 @@ def parse_csv(csv_string: str, project: str):
 
         updated_participant['meta'] = row
 
-        update_metadata(sample_id, updated_participant, project)
+        skipped_samples = update_metadata(
+            sample_id, updated_participant, project, skipped_samples
+        )
+
+    if len(skipped_samples) > 0:
+        print(f'{len(skipped_samples)} sample/s skipped. {skipped_samples}')
 
 
 @click.command()
@@ -91,8 +102,6 @@ def main(project: str, full_file_path: str):
     """Run Script"""
     csv_file = get_csv(full_file_path)
     parse_csv(csv_file, project)
-    if len(skipped_samples) > 0:
-        print(f'{len(skipped_samples)} sample/s skipped. {skipped_samples}')
 
 
 if __name__ == '__main__':
