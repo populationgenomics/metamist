@@ -1,0 +1,255 @@
+import asyncio
+import dataclasses
+import itertools
+import json
+from collections import defaultdict
+from itertools import groupby
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel
+from db.python.connect import DbBase
+from db.python.layers.base import BaseLayer
+from db.python.layers.participant import ParticipantLayer
+from models.enums import SampleType, SequenceType, SequenceStatus
+
+
+class NestedSequence(BaseModel):
+    id: int
+    type: SequenceType
+    status: SequenceStatus
+    meta: Dict
+
+
+class NestedSample(BaseModel):
+    id: str
+    external_id: str
+    type: SampleType
+    meta: Dict
+    sequences: List[NestedSequence]
+    created_date: Optional[str]
+
+
+class NestedFamily(BaseModel):
+    id: int
+    external_id: str
+
+
+class NestedParticipant(BaseModel):
+    id: int
+    external_id: str
+    meta: Dict
+    families: List[NestedFamily]
+    samples: List[NestedSample]
+
+
+from .sample import SampleLayer
+
+
+@dataclasses.dataclass
+class ProjectSummary:
+    total_samples: int
+    participants: List[NestedParticipant]
+    sample_keys: List[str]
+    sequence_keys: List[str]
+
+
+class WebLayer(BaseLayer):
+    async def get_project_summary(
+        self, token: Optional[int], limit: int = 50
+    ) -> ProjectSummary:
+        webdb = WebDb(self.connection)
+        return await webdb.get_project_summary(token=token, limit=limit)
+
+
+class WebDb(DbBase):
+    def _project_summary_sample_query(self, after, limit):
+        wheres = ['project = :project']
+        values = {'limit': limit, 'project': self.project}
+        if after:
+            values['after'] = after
+            wheres.append('id > :after')
+
+        where_str = ''
+        if wheres:
+            where_str = 'WHERE ' + ' AND '.join(wheres)
+        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit'
+
+        return sample_query, values
+
+    @staticmethod
+    def _project_summary_process_sequence_rows_by_sample_id(
+        sequence_rows,
+    ) -> Dict[int, List[NestedSequence]]:
+
+        seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in sequence_rows}
+        seq_models = [
+            NestedSequence(
+                id=seq['id'],
+                status=SequenceStatus(seq['status']),
+                type=SequenceType(seq['type']),
+                meta=json.loads(seq['meta']),
+            )
+            for seq in sequence_rows
+        ]
+        seq_models_by_sample_id = {
+            k: list(v)
+            for k, v in (
+                groupby(seq_models, key=lambda s: seq_id_to_sample_id_map[s.id])
+            )
+        }
+
+        return seq_models_by_sample_id
+
+    @staticmethod
+    def _project_summary_process_sample_rows_by_pid(
+        sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, str]
+    ) -> Dict[int, List[NestedSample]]:
+        sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
+
+        smodels = [
+            NestedSample(
+                id=s['id'],
+                external_id=s['external_id'],
+                type=s['type'],
+                meta=json.loads(s['meta']),
+                created_date=sample_id_start_times.get(s['id'], ''),
+                sequences=seq_models_by_sample_id.get(s['id'], []),
+            )
+            for s in sample_rows
+        ]
+        # the pydantic model is casting to the id to a str, as that makes sense on the front end
+        # but cast back here to do the lookup
+        smodels_by_pid = {
+            k: list(v)
+            for k, v in (groupby(smodels, key=lambda s: sid_to_pid[int(s.id)]))
+        }
+
+        return smodels_by_pid
+
+    async def get_total_number_of_samples(self):
+        _query = 'SELECT COUNT(*) FROM sample WHERE project = :project'
+        return (await self.connection.fetch_one(_query, {'project': self.project}))[0]
+
+    @staticmethod
+    def _project_summary_process_family_rows_by_pid(
+        family_rows,
+    ) -> Dict[int, List[NestedFamily]]:
+        pid_to_fids = defaultdict(list)
+        for frow in family_rows:
+            pid_to_fids[frow['participant_id']].append(frow['family_id'])
+
+        res_families = {}
+        for f in family_rows:
+            if f['family_id'] in family_rows:
+                continue
+            res_families[f['family_id']] = NestedFamily(
+                id=f['family_id'], external_id=f['external_family_id']
+            )
+        pid_to_families = {
+            pid: [res_families[fid] for fid in fids]
+            for pid, fids in pid_to_fids.items()
+        }
+        return pid_to_families
+
+    async def _project_summary_get_sample_create_date(self, sample_ids: List[int]):
+        _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in :sids GROUP BY id'
+        rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
+        return {r[0]: str(r[1].date()) for r in rows}
+
+    async def get_project_summary(
+        self, token: Optional[int], limit: int
+    ) -> ProjectSummary:
+
+        # do initial query to get sample info
+        sample_query, values = self._project_summary_sample_query(token, limit)
+        sample_rows = list(await self.connection.fetch_all(sample_query, values))
+
+        if len(sample_rows) == 0:
+            return ProjectSummary(
+                participants=[], sample_keys=[], sequence_keys=[], total_samples=0
+            )
+
+        pids = list(set(s['participant_id'] for s in sample_rows))
+        sids = list(s['id'] for s in sample_rows)
+
+        # sequences
+
+        seq_query = 'SELECT id, sample_id, meta, type, status FROM sample_sequencing WHERE sample_id IN :sids'
+        sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
+
+        # participant
+        p_query = 'SELECT id, external_id, meta FROM participant WHERE id in :pids'
+        participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
+
+        # family
+        f_query = """
+SELECT f.id as family_id, f.external_id as external_family_id, fp.participant_id 
+FROM family_participant fp
+INNER JOIN family f ON f.id = fp.family_id
+WHERE fp.participant_id in :pids
+        """
+        family_promise = self.connection.fetch_all(f_query, {'pids': pids})
+
+        [
+            sequence_rows,
+            participant_rows,
+            family_rows,
+            sample_id_start_times,
+            total_samples,
+        ] = await asyncio.gather(
+            sequence_promise,
+            participant_promise,
+            family_promise,
+            self._project_summary_get_sample_create_date(sids),
+            self.get_total_number_of_samples(),
+        )
+
+        # post-processing
+        seq_models_by_sample_id = (
+            self._project_summary_process_sequence_rows_by_sample_id(sequence_rows)
+        )
+        smodels_by_pid = self._project_summary_process_sample_rows_by_pid(
+            sample_rows, seq_models_by_sample_id, sample_id_start_times
+        )
+        pid_to_families = self._project_summary_process_family_rows_by_pid(family_rows)
+
+        pmodels = [
+            NestedParticipant(
+                id=p['id'],
+                external_id=p['external_id'],
+                meta=json.loads(p['meta']),
+                families=pid_to_families.get(p['id'], []),
+                samples=list(smodels_by_pid.get(p['id'])),
+            )
+            for p in participant_rows
+        ]
+
+        ignore_sample_meta_keys = {'reads', 'vcfs'}
+        ignore_sequence_meta_keys = {'reads', 'vcfs'}
+        sample_meta_keys = set(
+            sk
+            for p in pmodels
+            for s in p.samples
+            for sk in s.meta.keys()
+            if (sk not in ignore_sample_meta_keys)
+        )
+        sequence_meta_keys = set(
+            sk
+            for p in pmodels
+            for s in p.samples
+            for seq in s.sequences
+            for sk in seq.meta
+            if (sk not in ignore_sequence_meta_keys)
+        )
+
+        sample_keys = ['id', 'external_id', 'created_date'] + [
+            'meta.' + k for k in sample_meta_keys
+        ]
+        sequence_keys = ['type'] + ['meta.' + k for k in sequence_meta_keys]
+
+        return ProjectSummary(
+            participants=pmodels,
+            sample_keys=sample_keys,
+            sequence_keys=sequence_keys,
+            total_samples=total_samples,
+        )
