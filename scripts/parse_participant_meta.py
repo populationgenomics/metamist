@@ -41,11 +41,11 @@ def get_csv(full_file_path: str):
     """Pull CSV file from GCS"""
     # Connect to GCS, retrieve CSV
     client = storage.Client()
-    bucket_name = path.dirname(full_file_path)[5:].split('/')[0]
-    filename = full_file_path[len(bucket_name) + 6 :]
+    path_components = full_file_path[5:].split('/')
+    bucket_name = path_components[0]
+    file_path = '/'.join(path_components[1:])
     bucket = client.get_bucket(bucket_name)
-    blobs = list(client.list_blobs(bucket))
-    blob = next((r for r in blobs if r.name == filename), None)
+    blob = bucket.blob(file_path)
     csv_file = blob.download_as_string()
     return csv_file.decode(encoding='utf-8-sig')
 
