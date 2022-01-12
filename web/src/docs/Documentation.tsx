@@ -44,6 +44,8 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
             try {
                 // this line turns ./static/sm_docs/{filename} into the bundled path
                 // eg: /static/media/README.e3454f58.md
+
+                // eslint-disable-next-line
                 const file = require(`./static/sm_docs/${filename}`);
                 const response = await fetch(file.default);
                 let text = await response.text();
