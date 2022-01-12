@@ -9,7 +9,6 @@ All other fields will be combined into the meta field.
 
 import csv
 import io
-from os import path
 import traceback
 
 import click
@@ -58,6 +57,7 @@ def parse_csv(csv_string: str, project: str):
     sample_ids = [row['SampleID'] for row in id_reader]
 
     try:
+        # For TOB-WGS, sample and participant IDs match.
         id_map = paapi.get_participant_id_map_by_external_ids(
             project=project, request_body=sample_ids
         )
