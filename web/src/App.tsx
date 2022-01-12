@@ -1,7 +1,8 @@
 import React from 'react';
-import DocumentationArticle from './Documentation'
+import DocumentationArticle from './docs/Documentation'
 import SwaggerUI from 'swagger-ui-react'
 import "swagger-ui-react/swagger-ui.css"
+// import 'bootstrap/dist/css/bootstrap.min.css'
 
 
 import {
@@ -10,6 +11,7 @@ import {
   Route,
   Link
 } from "react-router-dom";
+import { SampleTable } from './sample/SampleTable';
 
 
 const Index = () => {
@@ -19,6 +21,7 @@ const Index = () => {
     <ul>
       <li><Link to="documentation">Python API documentation</Link></li>
       <li><Link to="swagger">Swagger page</Link></li>
+      <li><Link to="samples">Samples table</Link></li>
     </ul>
 
     <DocumentationArticle articleId="index" />
@@ -41,6 +44,8 @@ const Routes = () => {
         path="/swagger"
         element={<SwaggerUI url="/openapi.json" />}
       />
+
+      <Route path="samples" element={<SampleTable />} />
 
       <Route
         path="/"
