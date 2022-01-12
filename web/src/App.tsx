@@ -11,7 +11,7 @@ import {
   Route,
   Link
 } from "react-router-dom";
-import { SampleTable } from './sample/SampleTable';
+import { ProjectSummary } from './project/ProjectSummary';
 
 
 const Index = () => {
@@ -45,7 +45,7 @@ const Routes = () => {
         element={<SwaggerUI url="/openapi.json" />}
       />
 
-      <Route path="samples" element={<SampleTable />} />
+      <Route path="samples" element={<ProjectSummary />} />
 
       <Route
         path="/"

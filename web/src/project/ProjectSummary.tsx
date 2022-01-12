@@ -1,21 +1,20 @@
+/* eslint react-hooks/exhaustive-deps: 0 */
+
 import * as React from 'react'
 import * as _ from 'lodash'
 
-
 import { AppContext } from '../GlobalState'
-import { ProjectSelector } from '../project/ProjectSelector'
+import { ProjectSelector } from './ProjectSelector'
 import { WebApi, ProjectSummaryResponse } from '../sm-api/api'
 
-import DataGrid, { Column } from 'react-data-grid'
 import { Input, Button } from 'reactstrap'
-import { size } from 'lodash'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
 
 export const ProjectSummary = () => {
 
-    // store project in global settings 
+    // store project in global settings
     const globalContext = React.useContext(AppContext)
 
 
@@ -42,12 +41,13 @@ export const ProjectSummary = () => {
             })
     }
 
-    function setPageLimit(e) {
+    function setPageLimit(e: React.ChangeEvent<HTMLInputElement>) {
         const value = e.currentTarget.value
         setPageTokens([])
-        _setPageLimit(value)
+        _setPageLimit(parseInt(value))
     }
 
+    // eslint:
     React.useEffect(() => {
         getProjectSummary(undefined, false)
 
