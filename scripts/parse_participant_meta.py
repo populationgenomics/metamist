@@ -45,7 +45,7 @@ def get_csv(full_file_path: str):
     file_path = '/'.join(path_components[1:])
     bucket = client.get_bucket(bucket_name)
     blob = bucket.blob(file_path)
-    csv_file = blob.download_as_string()
+    csv_file = blob.download_as_bytes()
     return csv_file.decode(encoding='utf-8-sig')
 
 
