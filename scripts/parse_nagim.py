@@ -43,7 +43,17 @@ python scripts/parse_nagim.py \
 
 It would create a sample entry at each corresponding project (e.g. mrgb, tob-wgs, etc).
 
-To populate test projects, you can add `--test` flag.
+To populate test projects, you can add `--test` flag (and optionally
+`--clean-up-test` to remove all existing "test" samples):
+
+```
+python scripts/parse_nagim.py \
+    parse \
+    --tmp-dir nagim-parse-tmp \
+    --test \
+    --clean-up-test \
+    --skip-checking-objects \
+```
 
 The `--skip-checking-objects` tells the parser to skip checking the existence of
 objects on buckets, which is useful to speed up the execution as long as we trust
