@@ -1083,7 +1083,7 @@ def _add_hgdp_1kg_metadata(samples, tmp_dir, overwrite=False):
 
     df = pd.read_csv(cache_path)
 
-    row_by_sid = dict()
+    row_by_sid = {}
     for _, row in df.iterrows():
         row_by_sid[row['s']] = row
 
@@ -1126,18 +1126,18 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    def get_sample_meta(self, sample_id: str, rows: GroupedRow) -> Dict[str, Any]:
-        if isinstance(rows, dict):
-            rows = [rows]
-        meta = dict()
-        for row in rows:
-            meta['project'] = row['project']
+    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+        if isinstance(row, dict):
+            row = [row]
+        meta = {}
+        for r in row:
+            meta['project'] = r['project']
             for key in [
                 'continental_pop',
                 'subcontinental_pop',
                 'sex',
             ]:
-                val = row.get(f'meta_{key}')
+                val = r.get(f'meta_{key}')
                 if val:
                     meta[key] = val
         return meta

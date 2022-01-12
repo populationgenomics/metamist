@@ -3,7 +3,7 @@ backup """
 
 import os
 import subprocess
-import google.cloud.storage
+import google.cloud.storage  # pylint: disable=c-extension-no-member
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
