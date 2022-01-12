@@ -274,9 +274,16 @@ class ProjectPermissionsTable:
         _query = 'SELECT id, name FROM project'
         project_id_map = {p[0]: p[1] for p in await self.connection.fetch_all(_query)}
 
-        promises = [self.check_access_to_project_id(author, pid, readonly=readonly) for pid in project_id_map.keys()]
+        promises = [
+            self.check_access_to_project_id(author, pid, readonly=readonly)
+            for pid in project_id_map.keys()
+        ]
         has_access_to_project = await asyncio.gather(*promises)
-        relevant_project_names = [name for name, has_access in zip(project_id_map.values(), has_access_to_project) if has_access]
+        relevant_project_names = [
+            name
+            for name, has_access in zip(project_id_map.values(), has_access_to_project)
+            if has_access
+        ]
 
         return relevant_project_names
 
