@@ -255,11 +255,11 @@ class Source:
         Path to the archive bucket for this file source
         """
         res = f'gs://cpg-{stack}-archive/{self.id}/{NAGIM_PROJ_ID}'
-        if namespace == 'test':  # we don't have a separate archive for test
-            res = res.replace('-archive/', '-archive/test/')
         if self.id == 'qc':
             assert ending is not None
-            res = join(res, ending)
+            return join(res, ending)
+        if namespace == 'test':  # we don't have a separate archive for test
+            res = res.replace('-archive/', '-archive/test/')
         return res
 
     def get_staging_bucket(self, stack: str, namespace: str) -> Optional[str]:
@@ -284,10 +284,14 @@ class Source:
     def get_final_bucket(self, stack: str, namespace: str, ending=None) -> str:
         """
         Final location of files
+
+        Note that keep all qc files in the "main" namespace: we are not interested
+        in qc files after this script (relevant metrics are populated into type=qc
+        analyses meta field), so no need to move them for a test subset.
         """
         if self.id == 'qc':
             assert ending is not None
-            return f'gs://cpg-{NAGIM_PROJ_ID}-{namespace}/qc/{ending}'
+            return f'gs://cpg-{NAGIM_PROJ_ID}-main/qc/{ending}'
         return f'gs://cpg-{stack}-{namespace}/{self.id}/{NAGIM_PROJ_ID}'
 
 
@@ -327,20 +331,21 @@ SOURCES = {
                 FileType(e, f'**/*.{e}')
                 for e in [
                     'alignment_summary_metrics',
-                    'bait_bias_detail_metrics',
-                    'bait_bias_summary_metrics',
-                    'detail_metrics',
                     'duplicate_metrics',
                     'insert_size_metrics',
-                    'pre_adapter_detail_metrics',
-                    'pre_adapter_summary_metrics',
-                    'quality_distribution_metrics',
-                    'raw_wgs_metrics',
-                    'summary_metrics',
-                    'variant_calling_detail_metrics',
-                    'variant_calling_summary_metrics',
                     'wgs_metrics',
                     'preBqsr.selfSM',
+                    # #Uncomment if you want other types of QC:
+                    # 'bait_bias_detail_metrics',
+                    # 'bait_bias_summary_metrics',
+                    # 'detail_metrics',
+                    # 'pre_adapter_detail_metrics',
+                    # 'pre_adapter_summary_metrics',
+                    # 'quality_distribution_metrics',
+                    # 'raw_wgs_metrics',
+                    # 'summary_metrics',
+                    # 'variant_calling_detail_metrics',
+                    # 'variant_calling_summary_metrics',
                 ]
             ],
         ),
@@ -386,8 +391,8 @@ class File:
         return str(path)
 
 
-@dataclass  # pylint: disable=too-many-instance-attributes
-class Sample:
+@dataclass
+class Sample:  # pylint: disable=too-many-instance-attributes
     """
     Represent a parsed sample, so we can check that all required files for
     a sample exist, and also populate and fix sample IDs.
@@ -395,6 +400,8 @@ class Sample:
 
     nagim_id: str
     cpg_id: Optional[str] = None
+    test_cpg_id: Optional[str] = None
+    main_cpg_id: Optional[str] = None
     ext_id: Optional[str] = None
     project_id: Optional[str] = None
 
@@ -430,6 +437,7 @@ def _find_moved_files(  # pylint: disable=too-many-nested-blocks
     Assumning s.cpg_id is populated.
     """
     sample_by_cpgid = {s.cpg_id: s for s in samples}
+    sample_by_nagim_id = {s.nagim_id: s for s in samples}
 
     for source_name in SOURCES_TO_PROCESS:
         source = SOURCES[source_name]
@@ -466,12 +474,16 @@ def _find_moved_files(  # pylint: disable=too-many-nested-blocks
                     )
                     for path in paths:
                         assert path.endswith(f'.{file_type.ending}')
-                        cpg_id = basename(path)[: -len(f'.{file_type.ending}')]
-                        if cpg_id not in sample_by_cpgid:
+                        sample_id = basename(path)[: -len(f'.{file_type.ending}')]
+                        if sample_id in sample_by_cpgid:
+                            s = sample_by_cpgid[sample_id]
+                        elif sample_id in sample_by_nagim_id:
+                            s = sample_by_nagim_id[sample_id]
+                        else:
                             continue
 
                         key = source.name, file_type.ending
-                        file = sample_by_cpgid[cpg_id].files.get(key)
+                        file = s.files.get(key)
                         if not file:
                             file = File(moved_path=path)
                         else:
@@ -480,7 +492,7 @@ def _find_moved_files(  # pylint: disable=too-many-nested-blocks
                             file.is_archive = True
                         if location_type in ['staging', 'staging_archive']:
                             file.is_staging = True
-                        sample_by_cpgid[cpg_id].files[key] = file
+                        s.files[key] = file
 
 
 def _find_upload_files(
@@ -575,8 +587,8 @@ def _check_found_files(samples):
                 'alignment_summary_metrics',
                 'duplicate_metrics',
                 'insert_size_metrics',
-                'preBqsr.selfSM',
                 'wgs_metrics',
+                'preBqsr.selfSM',
             ]:
                 no_qc = 0
                 key = (SOURCES['QC'].name, qc_ending)
@@ -958,16 +970,22 @@ def _fix_sample_ids(samples: List[Sample], namespace: str):
     """
     sapi = SampleApi()
 
-    sm_proj_ids = [_get_sm_proj_id(proj, namespace) for proj in PROJECT_ID_MAP.values()]
-    sm_sample_dicts = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': sm_proj_ids,
-            'active': True,
-        }
-    )
+    def _find_sm_samples(namespace):
+        sm_proj_ids = [
+            _get_sm_proj_id(proj, namespace) for proj in PROJECT_ID_MAP.values()
+        ]
+        return sapi.get_samples(
+            body_get_samples_by_criteria_api_v1_sample_post={
+                'project_ids': sm_proj_ids,
+                'active': True,
+            }
+        )
 
-    cpgid_to_extid = {s['id']: s['external_id'] for s in sm_sample_dicts}
-    extid_to_cpgid = {s['external_id']: s['id'] for s in sm_sample_dicts}
+    # Setting in main namespace here, because TOB-WGS Nagim IDs match the main CPG IDs
+    # test namespace will be processed separately further down
+    sm_dicts = _find_sm_samples('main')
+    cpgid_to_extid = {s['id']: s['external_id'] for s in sm_dicts}
+    extid_to_cpgid = {s['external_id']: s['id'] for s in sm_dicts}
 
     # Fixing sample IDs. Some samples (tob-wgs and acute-care)
     # have CPG IDs as nagim ids, some don't
@@ -980,6 +998,17 @@ def _fix_sample_ids(samples: List[Sample], namespace: str):
             sample.cpg_id = sample.nagim_id
         else:
             sample.ext_id = sample.nagim_id
+
+    if namespace == 'test':
+        # Setting test sample IDs
+        test_sm_dicts = _find_sm_samples('test')
+        extid_to_test_cpgid = {s['external_id']: s['id'] for s in test_sm_dicts}
+        for sample in samples:
+            sample.main_cpg_id = sample.cpg_id
+            sample.test_cpg_id = extid_to_test_cpgid.get(sample.ext_id)
+            # if not sample.test_cpg_id:
+            #     sample.test_cpg_id = extid_to_test_cpgid.get(sample.cpg_id)
+            sample.cpg_id = sample.test_cpg_id
 
 
 def _parse_sample_project_map(tsv_path: str) -> List[Sample]:
