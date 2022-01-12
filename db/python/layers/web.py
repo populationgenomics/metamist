@@ -1,15 +1,14 @@
 import asyncio
 import dataclasses
-import itertools
 import json
 from collections import defaultdict
 from itertools import groupby
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
+
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
-from db.python.layers.participant import ParticipantLayer
 from models.enums import SampleType, SequenceType, SequenceStatus
 
 
@@ -40,9 +39,6 @@ class NestedParticipant(BaseModel):
     meta: Dict
     families: List[NestedFamily]
     samples: List[NestedSample]
-
-
-from .sample import SampleLayer
 
 
 @dataclasses.dataclass

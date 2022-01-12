@@ -70,7 +70,7 @@ export const ProjectSummary = () => {
 
 
     if (error) {
-        return <p><em>An error occurred when fetching samples: {error}</em></p>
+        table = <p><em>An error occurred when fetching samples: {error}</em></p>
     }
     else if (!summary) {
         if (globalContext.project) { table = <p>Loading...</p> }

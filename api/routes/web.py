@@ -65,7 +65,7 @@ async def get_project_summary(
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
-            participants=[], sample_keys=[], sequence_keys=[], _links=None
+            participants=[], sample_keys=[], sequence_keys=[], _links=None, total_samples=0
         )
 
     participants = summary.participants
