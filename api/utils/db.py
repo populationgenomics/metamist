@@ -8,9 +8,15 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 
 from db.python.connect import SMConnections, Connection
+from db.python.tables.project import ALLOW_FULL_ACCESS
+
 from api.utils.gcp import email_from_id_token
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
+DEFAULT_USER = None
+_default_user = getenv('SM_LOCALONLY_DEFAULTUSER')
+if ALLOW_FULL_ACCESS and _default_user:
+    DEFAULT_USER = _default_user
 
 
 def get_jwt_from_request(request: Request) -> Optional[str]:
@@ -42,6 +48,11 @@ def authenticate(
 
     if token:
         return email_from_id_token(token.credentials)
+
+    if DEFAULT_USER is not None:
+        # this should only happen in LOCAL environments
+        logging.info(f'Using {DEFAULT_USER} as authenticated user')
+        return DEFAULT_USER
 
     raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 

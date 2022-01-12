@@ -200,6 +200,26 @@ VSCode allows you to debug python modules, we could debug the web API at `api/se
 
 We could now place breakpoints on the sample route (ie: `api/routes/sample.py`), and debug requests as they come in.
 
+#### Developing the UI
+
+```shell
+# Ensure you have started sm locally on your computer already, then in another tab open the UI. 
+# This will automatically proxy request to the server.
+cd web
+npm install
+npm start
+```
+
+
+#### Unauthenticated access
+
+You'll want to set the `SM_LOCALONLY_DEFAULTUSER` environment variable along with `ALLOWALLACCESS` to allow access to a local sample-metadata server without providing a bearer token. This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
+
+```shell
+export SM_ALLOWALLACCESS=1
+export SM_LOCALONLY_DEFAULTUSER=$(whoami)
+```
+
 ### OpenAPI and Swagger
 
 The Web API uses `apispec` with OpenAPI3 annotations on each route to describe interactions with the server. We can generate a swagger UI and an installable
