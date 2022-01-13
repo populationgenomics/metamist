@@ -11,10 +11,9 @@ def main():
     """Update participant IDs of PBMC Samples"""
     sapi = SampleApi()
 
-    # TODO: Swap test_project with tob-wgs
     all_samples = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': ['test_project'],
+            'project_ids': ['tob-wgs'],
             'active': True,
         }
     )
