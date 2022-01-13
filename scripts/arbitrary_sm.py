@@ -19,7 +19,6 @@ import json
 
 from sample_metadata import apis
 
-
 def run_sm(
     api_name: str, method_name: str, args: List[str] = None, kwargs: dict = None
 ):
