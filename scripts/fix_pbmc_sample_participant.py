@@ -13,44 +13,27 @@ def main():
 
     all_samples = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': ['tob-wgs'],
+            'project_ids': ['test_project'],
             'active': True,
         }
     )
 
-    all_sample_ids = [
-        sample['external_id'] for sample in all_samples if 'external_id' in sample
-    ]
+    sample_map_by_external_id = {s['external_id']: s for s in all_samples}
 
-    pbmc_ids = list(filter(lambda id: '-PBMC' in id, all_sample_ids))
-    pbmc_map = {i: i.strip('-PBMC') for i in pbmc_ids}
+    pbmc_samples = [s for s in all_samples if '-PBMC' in s['external_id']]
 
-    for pbmc_id, s_id in pbmc_map.items():
-        participant_id = int(
-            next(
-                (
-                    sample['participant_id']
-                    for sample in all_samples
-                    if sample['external_id'] == s_id
-                ),
-                None,
-            )
-        )
-
-        internal_id = next(
-            (
-                sample['id']
-                for sample in all_samples
-                if sample['external_id'] == pbmc_id
-            ),
-            None,
-        )
-
-        if participant_id is None:
-            print(f'Skipping {pbmc_id}, could not find.')
-        else:
+    for sample in pbmc_samples:
+        external_id = sample['external_id']
+        non_pbmc_id = external_id.strip('-PBMC')
+        non_pbmc_sample = sample_map_by_external_id.get(non_pbmc_id)
+        pbmc_sample = sample_map_by_external_id.get(external_id)
+        try:
+            participant_id = int(non_pbmc_sample['participant_id'])
+            internal_id = pbmc_sample['id']
             sample_update = SampleUpdateModel(participant_id=participant_id)
             sapi.update_sample(id_=internal_id, sample_update_model=sample_update)
+        except TypeError:
+            print(f'Skipping {external_id}, could not find.')
 
 
 if __name__ == '__main__':
