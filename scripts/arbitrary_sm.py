@@ -17,7 +17,7 @@ from typing import List
 import argparse
 import json
 
-import sample_metadata
+from sample_metadata import apis
 
 
 def run_sm(
@@ -33,7 +33,7 @@ def run_sm(
         'body_get_samples_by_criteria_api_v1_sample_post'
     """
     api_class_name = api_name.title() + 'Api'
-    api = getattr(sample_metadata.api, api_class_name)
+    api = getattr(apis, api_class_name)
     api_instance = api()
     response = getattr(api_instance, method_name)(*(args or []), **(kwargs or {}))
 
