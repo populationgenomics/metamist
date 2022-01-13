@@ -17,7 +17,7 @@ from typing import List
 import argparse
 import json
 
-import sample_metadata.apis as apis
+from sample_metadata import apis
 
 
 def run_sm(
