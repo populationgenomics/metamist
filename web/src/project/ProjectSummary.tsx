@@ -96,21 +96,27 @@ export const ProjectSummary = () => {
                 ...(summary.sequence_keys.map(sk => "sequence." + sk.replace(".meta", ""))),
             ]
 
-            table = <table className='table table-striped table-bordered'>
+            table = <table className='table table-bordered'>
                 <thead>
                     <tr>
                         {headers.map(k => <th key={k}>{k}</th>)}
                     </tr>
                 </thead>
                 <tbody>
-                    {summary.participants.map(p => p.samples.map((s, sidx) =>
-                        <tr>
-                            {sidx === 0 && <td rowSpan={p.samples.length}>{p.families.map(f => f.external_id).join(', ')}</td>}
-                            {sidx === 0 && <td rowSpan={p.samples.length}>{p.external_id}</td>}
-                            {summary.sample_keys.map(k => <td key={s.id + 'sample.' + k}>{_.get(s, k)}</td>)}
-                            {s.sequences[0] && summary.sequence_keys.map(k => <td key={s.id + 'sequence.' + k}>{_.get(s.sequences[0], k)}</td>)}
-                        </tr>
-                    ))}
+                    {summary.participants.map((p, pidx) => p.samples.map((s, sidx) => {
+                        // @ts-ignore
+                        const backgroundColor = pidx % 2 === 0 ? 'white' : 'var(--bs-table-striped-bg)'
+                        const lengthOfParticipant = p.samples.map(s => s.sequences.length).reduce((a, b) => a + b, 0)
+                        return s.sequences.map((seq, seqidx) => {
+                            return <tr key={`${p.external_id}-${s.id}-${seq.id}`}>
+                                {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.families.map(f => f.external_id).join(', ')}</td>}
+                                {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.external_id}</td>}
+                                {seqidx === 0 && summary.sample_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sample.' + k} rowSpan={s.sequences.length}>{_.get(s, k)}</td>)}
+                                {seq && summary.sequence_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sequence.' + k}>{_.get(seq, k)}</td>)}
+                            </tr>
+                        })
+
+                    }))}
                 </tbody>
             </table>
         }
