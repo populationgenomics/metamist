@@ -408,10 +408,18 @@ class Sample:  # pylint: disable=too-many-instance-attributes
     a sample exist, and also populate and fix sample IDs.
     """
 
+    # as used in the Terra run; can be external ID, or match the internal ID
+    # as for TOB-WGS and Acute-care projects.
     nagim_id: str
-    cpg_id: Optional[str] = None
+
+    # "test" CPG ID is different from the "main" CPG ID for the same sample,
+    # so we want to track both, so we know what files to move from "main"
+    # into "test" when creating a test subset.
     test_cpg_id: Optional[str] = None
     main_cpg_id: Optional[str] = None
+    # For "main", cpg_id==main_cpg_id; for "test", cpg_id==test_cpg_id
+    cpg_id: Optional[str] = None
+
     ext_id: Optional[str] = None
     project_id: Optional[str] = None
 
