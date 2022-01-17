@@ -27,7 +27,6 @@ from sample_metadata.models import (
 )
 
 logger = logging.getLogger(__file__)
-logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
@@ -213,6 +212,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
+        proj = self.sample_metadata_project
+
         # a sample has many rows
         sample_map = defaultdict(list)
 
@@ -222,7 +223,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_map[sample_id].append(row)
 
         if len(sample_map) == 0:
-            raise ValueError(f'The manifest file contains no records')
+            raise ValueError(f'{proj}: The manifest file contains no records')
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -241,16 +242,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             )
 
         samples_to_add: List[NewSample] = []
-        # by external_sample_id
+        # all dicts indexed by external_sample_id
         sequences_to_add: Dict[str, NewSequence] = defaultdict(list)
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-
         samples_to_update: Dict[str, SampleUpdateModel] = {}
-        sequences_to_update: Dict[int, SequenceUpdateModel] = {}
+        sequences_to_update: Dict[str, SequenceUpdateModel] = {}
 
         for external_sample_id in sample_map:
             if self.verbose:
-                logger.info(f'Preparing {external_sample_id}')
+                logger.info(f'{proj}: Preparing {external_sample_id}')
 
             rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[external_sample_id]
 
@@ -280,11 +280,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             else:
                 # it already exists
-                cpgid = existing_external_id_to_cpgid[external_sample_id]
-                samples_to_update[cpgid] = SampleUpdateModel(
+                samples_to_update[external_sample_id] = SampleUpdateModel(
                     meta=collapsed_sample_meta,
+                    active=True,
                 )
-                # ignore QC results if sample already exists
 
             if collapsed_analyses:
                 analyses_to_add[external_sample_id].extend(collapsed_analyses)
@@ -307,9 +306,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     in existing_cpgid_to_seq_id
                 ):
                     # update, we have a cpg sample ID AND a sequencing ID
-                    cpgid = existing_external_id_to_cpgid[external_sample_id]
-                    seq_id = existing_cpgid_to_seq_id[cpgid]
-                    sequences_to_update[seq_id] = SequenceUpdateModel(
+                    sequences_to_update[external_sample_id] = SequenceUpdateModel(
                         meta=collapsed_sequencing_meta,
                         status=SequenceStatus(sequence_status)
                     )
@@ -323,7 +320,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     )
 
         message = f"""\
-Processing samples: {', '.join(sample_map.keys())}
+{proj}: Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequences_to_add)} sequences
@@ -349,46 +346,60 @@ Updating {len(sequences_to_update)} sequences"""
         else:
             logger.info(message)
 
-        logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
+        logger.info(f'{proj}: Adding {len(samples_to_add)} samples to SM-DB database')
         added_ext_sample_to_internal_id = {}
-        for new_sample in samples_to_add:
+        for i, new_sample in enumerate(samples_to_add):
             sample_id = sapi.create_new_sample(
                 project=self.sample_metadata_project, new_sample=new_sample
             )
+            if self.verbose:
+                logger.info(f'{proj}: #{i+1} {new_sample.external_id}: created sample {sample_id}')
             added_ext_sample_to_internal_id[new_sample.external_id] = sample_id
             existing_external_id_to_cpgid[new_sample.external_id] = sample_id
 
-        logger.info(f'Adding {len(sequences_to_add)} sequence entries')
-        for sample_id, seq in sequences_to_add.items():
-            seq.sample_id = existing_external_id_to_cpgid[sample_id]
+        logger.info(f'{proj}: Adding {len(sequences_to_add)} sequence entries')
+        for i, (sample_id, seq) in enumerate(sequences_to_add.items()):
+            cpgid = existing_external_id_to_cpgid[sample_id]
+            if self.verbose:
+                logger.info(f'{proj}: #{i+1} {sample_id}/{cpgid}: creating sequence')
+            seq.sample_id = cpgid
             seqapi.create_new_sequence(new_sequence=seq)
 
-        logger.info(f'Adding analysis entries for {len(analyses_to_add)} samples')
-        for sample_id, analyses in analyses_to_add.items():
+        logger.info(f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples')
+        for i, (sample_id, analyses) in enumerate(analyses_to_add.items()):
+            cpgid = existing_external_id_to_cpgid[sample_id]
             for analysis in analyses:
+                if self.verbose:
+                    logger.info(f'{proj}: #{i+1} {sample_id}/{cpgid}: creating analysis {analysis.type}')
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 analysisapi.create_new_analysis(
                     project=self.sample_metadata_project, analysis_model=analysis
                 )
 
-        logger.info(f'Updating {len(samples_to_update)} samples')
-        for internal_sample_id, sample_update in samples_to_update.items():
+        logger.info(f'{proj}: Updating {len(samples_to_update)} samples')
+        for i, (sample_id, sample_update) in enumerate(samples_to_update.items()):
+            cpgid = existing_external_id_to_cpgid[sample_id]
+            if self.verbose:
+                logger.info(f'{proj}: #{i+1} {sample_id}: updating sample {cpgid}')
             sapi.update_sample(
-                id_=internal_sample_id,
+                id_=cpgid,
                 sample_update_model=sample_update,
             )
 
-        logger.info(f'Updating {len(sequences_to_update)} sequences')
-        for i, (seq_id, seq_update) in enumerate(sequences_to_update.items()):
+        logger.info(f'{proj}: Updating {len(sequences_to_update)} sequences')
+        for i, (sample_id, seq_update) in enumerate(sequences_to_update.items()):
+            cpgid = existing_external_id_to_cpgid[sample_id]
+            seq_id = existing_cpgid_to_seq_id[cpgid]
             try:
                 seqapi.update_sequence(
                     sequence_id=seq_id,
                     sequence_update_model=seq_update,
                 )
-                logger.info(f'#{i+1}: updating sequence')
+                if self.verbose:
+                    logger.info(f'{proj}: #{i+1} {sample_id}/{cpgid}: updating sequence')
             except ApiException:
                 traceback.print_exc()
-                logger.error(f'#{i+1}: error updating sequence {seq_id}: {seq_update}')
+                logger.error(f'{proj}: #{i+1} {sample_id}/{cpgid}: error updating sequence {seq_id}: {seq_update}')
 
         return added_ext_sample_to_internal_id
 
