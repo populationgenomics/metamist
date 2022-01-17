@@ -3,7 +3,7 @@ backup """
 
 import os
 import subprocess
-import google.cloud.storage  # pylint: disable=c-extension-no-member
+from google.cloud import storage
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
@@ -70,7 +70,7 @@ def restore(backup_folder=None):
 def pull_latest_backup(backup_bucket):
     """Assumes no changes to metadata since initial upload"""
     print('Pulling Latest Backup from GCS')
-    storage_client = google.cloud.storage.Client()
+    storage_client = storage.Client()
     blobs = [(blob, blob.updated) for blob in storage_client.list_blobs(backup_bucket)]
     latest = sorted(blobs, key=lambda tup: tup[1])[-1][0]
     full_path = os.path.dirname(latest.name)
