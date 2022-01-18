@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# pylint: disable=no-member
+# pylint: disable=no-member,consider-using-with
 """
 Run the sample-metadata API through the analysis runner
 in a very generic, customisable way!
@@ -41,23 +41,24 @@ def run_sm(
 
     # the latest sample-metadata API wants an IOBase, so let's
     # scan through the params, open and substitute the files
-    openapi_types = getattr(api, f'{method_name}__endpoint').__dict__['openapi_types']
-    params_to_open = [
-        k
-        for k, t in openapi_types.items()
-        if any(isinstance(it, file_type) for it in t)
+    openapi_types = getattr(api_instance, f'{method_name}_endpoint').__dict__[
+        'openapi_types'
     ]
+    params_to_open = [k for k, t in openapi_types.items() if file_type in t]
     files_to_close = []
     modified_kwargs = {**kwargs}
     for k in params_to_open:
         potential_path = kwargs.get(k)
         if potential_path and os.path.exists(potential_path):
+            logging.info(f'Opening "{k}": {potential_path}')
             files_to_close.append(open(potential_path))
             modified_kwargs[k] = files_to_close[-1]
         else:
             logging.info(f'Skipping opening {k}')
 
-    response = getattr(api_instance, method_name)(*(args or []), **(kwargs or {}))
+    response = getattr(api_instance, method_name)(
+        *(args or []), **(modified_kwargs or {})
+    )
 
     for f in files_to_close:
         f.close()

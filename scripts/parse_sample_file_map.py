@@ -44,7 +44,9 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Search path to search for files within',
 )
-@click.option('--dry-run', is_flag=True, help='Just prepare the run, without comitting it')
+@click.option(
+    '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
+)
 @click.argument('manifests', nargs=-1)
 def main(
     manifests,
