@@ -118,9 +118,9 @@ class PedRow:
             affected = affected.lower().strip()
             if affected in ['unknown']:
                 return 0
-            if affected in ['no', 'unknown']:
+            if affected in ['n', 'no']:
                 return 1
-            if affected in ['y', 'affected']:
+            if affected in ['y', 'yes', 'affected']:
                 return 2
 
         affected = int(affected)
