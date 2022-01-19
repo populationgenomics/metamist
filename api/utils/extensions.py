@@ -18,7 +18,7 @@ class FileExtension(Enum):
         return {
             FileExtension.CSV: '.csv',
             FileExtension.TSV: '.tsv',
-            FileExtension: '.ped',
+            FileExtension.PED: '.ped',
         }
 
     @staticmethod
@@ -36,6 +36,7 @@ class FileExtension(Enum):
         return {
             FileExtension.CSV: 'text/csv',
             FileExtension.TSV: 'text/tab-separated-values',
+            FileExtension.PED: 'text/tab-separated-values',
         }
 
     def get_extension(self):
