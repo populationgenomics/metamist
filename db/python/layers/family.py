@@ -89,7 +89,9 @@ class PedRow:
         if isinstance(sex, int):
             if sex in PedRow.ALLOWED_SEX_VALUES:
                 return sex
-            raise ValueError(f'Sex value ({sex}) was not an expected value {PedRow.ALLOWED_SEX_VALUES}.')
+            raise ValueError(
+                f'Sex value ({sex}) was not an expected value {PedRow.ALLOWED_SEX_VALUES}.'
+            )
 
         sl = sex.lower()
         if sl == 'm':
@@ -97,8 +99,12 @@ class PedRow:
         if sl == 'f':
             return 2
         if sl == "sex":
-            raise ValueError(f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?')
-        raise ValueError(f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}')
+            raise ValueError(
+                f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
+            )
+        raise ValueError(
+            f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
+        )
 
     @staticmethod
     def parse_affected_status(affected):
@@ -119,7 +125,9 @@ class PedRow:
 
         affected = int(affected)
         if affected not in PedRow.ALLOWED_AFFECTED_VALUES:
-            raise ValueError(f'Affected value {affected} was not in expected value: {PedRow.ALLOWED_AFFECTED_VALUES}')
+            raise ValueError(
+                f'Affected value {affected} was not in expected value: {PedRow.ALLOWED_AFFECTED_VALUES}'
+            )
 
         return affected
 

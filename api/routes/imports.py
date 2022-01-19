@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File
 
+from api.utils.extensions import guess_delimiter_by_filename
 from models.models.sample import sample_id_format_list
 from db.python.layers.imports import ImportLayer
 from db.python.layers.participant import (
@@ -19,7 +20,7 @@ router = APIRouter(prefix='/import', tags=['import'])
 async def import_airtable_manifest(
     file: UploadFile = File(...), connection: Connection = get_project_write_connection
 ):
-    """Get sample by external ID"""
+    """Import CSV from airtable"""
     import_layer = ImportLayer(connection)
     csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
     headers = next(csvreader)
@@ -45,18 +46,12 @@ async def import_individual_metadata_manifest(
         add a PARTICIPANT entry for them
     """
 
-    if not delimiter:
-        if file.filename.endswith(".csv"):
-            delimiter = ','
-        elif file.filename.endswith('.tsv'):
-            delimiter = '\t'
-        else:
-            raise ValueError('Unable to determine the delimiter of the uploaded file, please specify one')
-
-    delimiter = delimiter.replace('\\t', '\t')
+    delimiter = guess_delimiter_by_filename(file.filename, default_delimiter=delimiter)
 
     player = ParticipantLayer(connection)
-    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
+    csvreader = csv.reader(
+        codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter
+    )
     headers = next(csvreader)
 
     await player.generic_individual_metadata_importer(
