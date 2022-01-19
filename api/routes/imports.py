@@ -1,5 +1,6 @@
 import csv
 import codecs
+from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File
 
@@ -33,6 +34,7 @@ async def import_airtable_manifest(
 )
 async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
+    delimiter: Optional[str] = None,
     extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     connection: Connection = get_project_write_connection,
 ):
@@ -42,8 +44,19 @@ async def import_individual_metadata_manifest(
     :param extra_participants_method: If extra participants are in the uploaded file,
         add a PARTICIPANT entry for them
     """
+
+    if not delimiter:
+        if file.filename.endswith(".csv"):
+            delimiter = ','
+        elif file.filename.endswith('.tsv'):
+            delimiter = '\t'
+        else:
+            raise ValueError('Unable to determine the delimiter of the uploaded file, please specify one')
+
+    delimiter = delimiter.replace('\\t', '\t')
+
     player = ParticipantLayer(connection)
-    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
+    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
     headers = next(csvreader)
 
     await player.generic_individual_metadata_importer(
