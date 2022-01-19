@@ -67,13 +67,29 @@ class PedRow:
         self.individual_id = individual_id.strip()
         self.paternal_id = None
         self.maternal_id = None
-        if paternal_id is not None and paternal_id not in ('0', 0, '', 'NULL'):
-            self.paternal_id = paternal_id
-        if maternal_id is not None and maternal_id not in ('0', 0, '', 'NULL'):
-            self.maternal_id = maternal_id
+        self.paternal_id = self.check_linking_id(paternal_id, 'paternal_id')
+        self.maternal_id = self.check_linking_id(maternal_id, 'maternal_id')
         self.sex = self.parse_sex(sex)
         self.affected = self.parse_affected_status(affected)
         self.notes = notes
+
+    @staticmethod
+    def check_linking_id(linking_id, description: str, blank_values=('0', '')):
+        """Check that the ID is a valid value, or return None if it's a blank value"""
+        if linking_id is None:
+            return None
+        if isinstance(linking_id, int):
+            linking_id = str(linking_id)
+
+        if isinstance(linking_id, str):
+            if linking_id.lower() in blank_values:
+                return None
+            return linking_id
+
+        raise TypeError(
+            f'Unexpected type {type(linking_id)} ({linking_id}) '
+            f'for {description}, expected "str"'
+        )
 
     @staticmethod
     def parse_sex(sex: Union[str, int]) -> int:
@@ -82,7 +98,6 @@ class PedRow:
             0: unknown
             1: male (also accepts 'm')
             2: female (also accepts 'f')
-
         """
         if isinstance(sex, str) and sex.isdigit():
             sex = int(sex)
