@@ -13,6 +13,9 @@ from db.python.tables.project import ProjectId
 class PedRow:
     """Class for capturing a row in a pedigree"""
 
+    ALLOWED_SEX_VALUES = [0, 1, 2]
+    ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
+
     PedRowKeys = {
         # seqr individual template:
         # Family ID, Individual ID, Paternal ID, Maternal ID, Sex, Affected, Status, Notes
@@ -60,20 +63,20 @@ class PedRow:
         affected,
         notes=None,
     ):
-        self.family_id = family_id
-        self.individual_id = individual_id
+        self.family_id = family_id.strip()
+        self.individual_id = individual_id.strip()
         self.paternal_id = None
         self.maternal_id = None
-        if paternal_id is not None and paternal_id not in ('0', 0, ''):
+        if paternal_id is not None and paternal_id not in ('0', 0, '', 'NULL'):
             self.paternal_id = paternal_id
-        if maternal_id is not None and maternal_id not in ('0', 0, ''):
+        if maternal_id is not None and maternal_id not in ('0', 0, '', 'NULL'):
             self.maternal_id = maternal_id
         self.sex = self.parse_sex(sex)
-        self.affected = int(affected)
+        self.affected = self.parse_affected_status(affected)
         self.notes = notes
 
     @staticmethod
-    def parse_sex(sex: Union[str, int]):
+    def parse_sex(sex: Union[str, int]) -> int:
         """
         Parse the pedigree SEX value:
             0: unknown
@@ -84,16 +87,41 @@ class PedRow:
         if isinstance(sex, str) and sex.isdigit():
             sex = int(sex)
         if isinstance(sex, int):
-            if 0 <= sex <= 2:
+            if sex in PedRow.ALLOWED_SEX_VALUES:
                 return sex
-            raise ValueError(f'Sex value ({sex}) was not an expected value [0, 1, 2].')
+            raise ValueError(f'Sex value ({sex}) was not an expected value {PedRow.ALLOWED_SEX_VALUES}.')
 
         sl = sex.lower()
         if sl == 'm':
             return 1
         if sl == 'f':
             return 2
-        raise ValueError(f'Unknown sex "{sex}", please ensure sex is in (0, 1, 2)')
+        if sl == "sex":
+            raise ValueError(f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?')
+        raise ValueError(f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}')
+
+    @staticmethod
+    def parse_affected_status(affected):
+        """
+        Parse the pedigree "AFFECTED" value:
+            -9 / 0: unknown
+            1: unaffected
+            2: affected
+        """
+        if isinstance(affected, str) and not affected.isdigit():
+            affected = affected.lower().strip()
+            if affected in ['unknown']:
+                return 0
+            elif affected in ["no", "unknown"]:
+                return 1
+            elif affected in ['y', 'affected']:
+                return 2
+
+        affected = int(affected)
+        if affected not in PedRow.ALLOWED_AFFECTED_VALUES:
+            raise ValueError(f'Affected value {affected} was not in expected value: {PedRow.ALLOWED_AFFECTED_VALUES}')
+
+        return affected
 
     def __str__(self):
         return f'PedRow: {self.individual_id} ({self.sex})'
