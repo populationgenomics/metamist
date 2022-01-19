@@ -98,7 +98,7 @@ class PedRow:
             return 1
         if sl == 'f':
             return 2
-        if sl == "sex":
+        if sl == 'sex':
             raise ValueError(
                 f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
             )
@@ -118,9 +118,9 @@ class PedRow:
             affected = affected.lower().strip()
             if affected in ['unknown']:
                 return 0
-            elif affected in ["no", "unknown"]:
+            if affected in ['no', 'unknown']:
                 return 1
-            elif affected in ['y', 'affected']:
+            if affected in ['y', 'affected']:
                 return 2
 
         affected = int(affected)

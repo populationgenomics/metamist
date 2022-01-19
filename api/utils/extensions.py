@@ -14,6 +14,7 @@ class FileExtension(Enum):
 
     @staticmethod
     def get_extension_map():
+        """Get {FileExtension: ".ext"} map"""
         return {
             FileExtension.CSV: '.csv',
             FileExtension.TSV: '.tsv',
@@ -22,6 +23,7 @@ class FileExtension(Enum):
 
     @staticmethod
     def get_delimiter_map():
+        """Get {FileExtension: "delimiter"} map"""
         return {
             FileExtension.CSV: ',',
             FileExtension.TSV: '\t',
@@ -30,6 +32,7 @@ class FileExtension(Enum):
 
     @staticmethod
     def get_mimetype_map():
+        """Get {FileExtension: "text/mimetype"} map"""
         return {
             FileExtension.CSV: 'text/csv',
             FileExtension.TSV: 'text/tab-separated-values',
@@ -49,6 +52,10 @@ class FileExtension(Enum):
 
 
 def guess_delimiter_by_filename(filename: str, default_delimiter: Optional[str] = None):
+    """
+    Guess the delimiter from a filename, as a convenience, allow specifying
+    a default_delimiter, and do transformations based on that (eg: un-escaping backslash)
+    """
     if default_delimiter:
         return default_delimiter.replace('\\t', '\t')
 
