@@ -61,9 +61,10 @@ blockquote {
 }
 
 .body {
-  padding: 10px 20px;
+  /* padding: 10px 20px;
   max-width: 768px;
-  margin: calc(50px + 1vmin) auto 0 auto;
+  margin: calc(50px + 1vmin) auto 0 auto; */
+  padding: 80px;
 }
 
 
