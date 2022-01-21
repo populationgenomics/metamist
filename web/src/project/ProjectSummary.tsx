@@ -1,7 +1,8 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
 import * as React from 'react'
-import * as _ from 'lodash'
+import { useSearchParams } from 'react-router-dom'
+import _ from 'lodash'
 
 import { AppContext } from '../GlobalState'
 import { ProjectSelector } from './ProjectSelector'
@@ -17,21 +18,26 @@ export const ProjectSummary = () => {
     // store project in global settings
     const globalContext = React.useContext(AppContext)
 
+    let [searchParams, setSearchParams] = useSearchParams()
+
+    const directToken = searchParams.get('token')
 
     const [summary, setSummary] = React.useState<ProjectSummaryResponse | undefined>()
+    const [suppliedDirectToken, setSuppliedDirectToken] = React.useState<boolean | undefined>(undefined)
     const [pageTokens, setPageTokens] = React.useState<number[]>([])
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     const [error, setError] = React.useState<string | undefined>()
     const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[0])
 
-    async function getProjectSummary(after: any, addToPageToken: boolean) {
+    async function getProjectSummary(token: any, addToPageToken: boolean) {
         if (!globalContext.project) return
+        let sanitisedToken = !!token ? token : undefined
         setIsLoading(true)
         new WebApi()
-            .getProjectSummary(globalContext.project, pageLimit, after)
+            .getProjectSummary(globalContext.project, pageLimit, sanitisedToken)
             .then(resp => {
-                if (after && addToPageToken) {
-                    setPageTokens([...pageTokens, after])
+                if (token && addToPageToken) {
+                    setPageTokens([...pageTokens, token])
                 }
                 setIsLoading(false)
                 setSummary(resp.data)
@@ -43,13 +49,24 @@ export const ProjectSummary = () => {
 
     function setPageLimit(e: React.ChangeEvent<HTMLInputElement>) {
         const value = e.currentTarget.value
-        setPageTokens([])
+
+        if (!suppliedDirectToken) {
+            // if we supplied a token directly to the page,
+            // we want to START from that point, otherwise,
+            // let's go back to the start.
+            setPageTokens([])
+            searchParams.delete('token')
+            setSearchParams(searchParams)
+        }
         _setPageLimit(parseInt(value))
     }
 
     // eslint:
     React.useEffect(() => {
-        getProjectSummary(undefined, false)
+        if (_.isUndefined(suppliedDirectToken)) {
+            setSuppliedDirectToken(!!directToken)
+        }
+        getProjectSummary(directToken, false)
 
     }, [globalContext.project, pageLimit])
 
@@ -59,14 +76,33 @@ export const ProjectSummary = () => {
     const pageNumber = pageTokens.length + 1
     const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
 
-    let pageOptions: React.ReactElement = <>
-        {pageTokens.length >= 1 && <Button disabled={isLoading} onClick={(async () => {
-            setPageTokens(pageTokens.slice(undefined, pageTokens.length - 1))
-            await getProjectSummary(pageTokens[pageTokens.length - 2], false)
-        })}>Previous</Button>}
-        {(summary?.total_samples || 0) > 0 && <span style={{ padding: "0 10px" }}>Page {pageNumber} / {totalPageNumbers}</span>}
-        {summary?._links?.after && <Button disabled={isLoading} onClick={async () => await getProjectSummary(summary?._links?.after, true)}>Next</Button>}
-    </>
+    let pageOptions: React.ReactElement = <></>
+    if (suppliedDirectToken) {
+        let supplied_samples = summary?.participants.reduce((p, s) => s.samples.length + p, 0)
+        pageOptions = <>
+            {<Button disabled={isLoading} onClick={(async () => {
+                await getProjectSummary(undefined, false)
+                setSuppliedDirectToken(false)
+                searchParams.delete('token')
+                setSearchParams(searchParams)
+            })}>Go to start</Button>}
+            <span style={{ padding: "0 10px" }}>({supplied_samples} / {summary?.total_samples} samples)</span>
+        </>
+    } else {
+
+        pageOptions = <>
+            {pageTokens.length >= 1 && <Button disabled={isLoading} onClick={(async () => {
+                setPageTokens(pageTokens.slice(undefined, pageTokens.length - 1))
+                await getProjectSummary(pageTokens[pageTokens.length - 2], false)
+            })}>Previous</Button>}
+            {!!summary?.total_samples && <span style={{ padding: "0 10px" }}>Page {pageNumber} / {totalPageNumbers} ({summary?.total_samples} samples)</span>}
+            {summary?._links?.token && <Button disabled={isLoading} onClick={async () => {
+                searchParams.set('token', summary?._links?.token || '')
+                setSearchParams(searchParams)
+                await getProjectSummary(summary?._links?.token, true)
+            }}>Next</Button>}
+        </>
+    }
 
 
     if (error) {
@@ -81,13 +117,6 @@ export const ProjectSummary = () => {
         if (summary.participants.length === 0) {
             table = <p><em>No samples</em></p>
         } else {
-            // table = <DataGrid
-            //     columns={headers}
-            //     rows={samples}
-            //     style={{ resize: 'vertical' }}
-            // // sortColumns={sortColumns}
-            // // onSortColumnsChange={onSortColumnsChange}
-            // />
 
             const headers = [
                 'Family ID',

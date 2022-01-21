@@ -19,7 +19,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     let [searchParams, setSearchParams] = useSearchParams()
 
     const projectFromParams = searchParams.get('project')
-    if (!!projectFromParams && projectFromParams != globalContext.project) {
+    if (!!projectFromParams && projectFromParams !== globalContext.project) {
         globalContext.setProject?.(projectFromParams)
     }
 
