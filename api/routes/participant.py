@@ -15,7 +15,7 @@ from api.utils.db import (
     get_project_readonly_connection,
     Connection,
 )
-from api.utils.export import ExportType
+from api.utils.extensions import FileExtension
 from db.python.layers.participant import ParticipantLayer
 from models.models.sample import sample_id_format
 
@@ -37,7 +37,10 @@ class ParticipantUpdateModel(BaseModel):
 async def fill_in_missing_participants(
     connection: Connection = get_project_write_connection,
 ):
-    """Get sample by external ID"""
+    """
+    Create a corresponding participant (if required)
+    for each sample within a project, useful for then importing a pedigree
+    """
     participant_layer = ParticipantLayer(connection)
 
     return {'success': await participant_layer.fill_in_missing_participants()}
@@ -50,7 +53,7 @@ async def fill_in_missing_participants(
 )
 async def get_individual_metadata_template_for_seqr(
     project: str,
-    export_type: ExportType,
+    export_type: FileExtension,
     external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
@@ -135,7 +138,7 @@ async def get_external_participant_id_to_internal_sample_id(
 )
 async def get_external_participant_id_to_internal_sample_id_export(
     project: str,
-    export_type: ExportType,
+    export_type: FileExtension,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get csv / tsv export of external_participant_id to internal_sample_id"""
