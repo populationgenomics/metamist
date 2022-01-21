@@ -1,35 +1,31 @@
 """
+Web routes
 """
-from typing import Optional, List, Dict, Union
+from typing import Optional, List
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from models.enums import SampleType
-from models.enums.sequencing import SequenceStatus, SequenceType
-from models.models.sample import (
-    sample_id_transform_to_raw,
-    sample_id_format,
-    sample_id_transform_to_raw_list,
-)
+from models.models.sample import sample_id_format
 from db.python.layers.web import WebLayer, NestedParticipant
-from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
-    get_project_write_connection,
     get_project_readonly_connection,
     Connection,
-    get_projectless_db_connection,
 )
 
 
 class PagingLinks(BaseModel):
+    """Model for PAGING"""
+
     self: str
     next: Optional[str]
     token: Optional[str]
 
 
 class ProjectSummaryResponse(BaseModel):
+    """Response for the project summary"""
+
     participants: List[NestedParticipant]
     total_samples: int
     sample_keys: List[str]
@@ -38,6 +34,8 @@ class ProjectSummaryResponse(BaseModel):
     links: Optional[PagingLinks]
 
     class Config:
+        """Config for ProjectSummaryResponse"""
+
         fields = {'links': '_links'}
 
 
@@ -58,14 +56,15 @@ async def get_project_summary(
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
-    if token is not None:
-        # shhh, it's actually a sample ID
-        token = int(token)
     summary = await st.get_project_summary(token=token, limit=limit)
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
-            participants=[], sample_keys=[], sequence_keys=[], _links=None, total_samples=0
+            participants=[],
+            sample_keys=[],
+            sequence_keys=[],
+            _links=None,
+            total_samples=0,
         )
 
     participants = summary.participants

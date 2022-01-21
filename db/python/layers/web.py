@@ -1,3 +1,4 @@
+# pylint: disable=too-many-locals
 import asyncio
 import dataclasses
 import json
@@ -13,6 +14,8 @@ from models.enums import SampleType, SequenceType, SequenceStatus
 
 
 class NestedSequence(BaseModel):
+    """Sequence model"""
+
     id: int
     type: SequenceType
     status: SequenceStatus
@@ -20,6 +23,8 @@ class NestedSequence(BaseModel):
 
 
 class NestedSample(BaseModel):
+    """Sample with nested sequences"""
+
     id: str
     external_id: str
     type: SampleType
@@ -29,11 +34,15 @@ class NestedSample(BaseModel):
 
 
 class NestedFamily(BaseModel):
+    """Simplified family model"""
+
     id: int
     external_id: str
 
 
 class NestedParticipant(BaseModel):
+    """Participant with nested family and sampels"""
+
     id: int
     external_id: str
     meta: Dict
@@ -43,6 +52,8 @@ class NestedParticipant(BaseModel):
 
 @dataclasses.dataclass
 class ProjectSummary:
+    """Return class for the project summary endpoint"""
+
     total_samples: int
     participants: List[NestedParticipant]
     sample_keys: List[str]
@@ -50,15 +61,26 @@ class ProjectSummary:
 
 
 class WebLayer(BaseLayer):
+    """Web layer"""
+
     async def get_project_summary(
-        self, token: Optional[int], limit: int = 50
+        self, token: Optional[str], limit: int = 50
     ) -> ProjectSummary:
+        """
+        Get a summary of a project, allowing some "after" token,
+        and limit to the number of results.
+        """
         webdb = WebDb(self.connection)
         return await webdb.get_project_summary(token=token, limit=limit)
 
 
 class WebDb(DbBase):
+    """Db layer for web related routes,"""
+
     def _project_summary_sample_query(self, after, limit):
+        """
+        Get query for getting list of samples
+        """
         wheres = ['project = :project']
         values = {'limit': limit, 'project': self.project}
         if after:
@@ -76,6 +98,9 @@ class WebDb(DbBase):
     def _project_summary_process_sequence_rows_by_sample_id(
         sequence_rows,
     ) -> Dict[int, List[NestedSequence]]:
+        """
+        Get sequences for samples for project summary
+        """
 
         seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in sequence_rows}
         seq_models = [
@@ -100,6 +125,9 @@ class WebDb(DbBase):
     def _project_summary_process_sample_rows_by_pid(
         sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, str]
     ) -> Dict[int, List[NestedSample]]:
+        """
+        Process the returned sample rows into nested samples + sequences
+        """
         sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
 
         smodels = [
@@ -123,13 +151,17 @@ class WebDb(DbBase):
         return smodels_by_pid
 
     async def get_total_number_of_samples(self):
-        _query = 'SELECT COUNT(*) FROM sample WHERE project = :project'
+        """Get total number of active samples within a project"""
+        _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
         return (await self.connection.fetch_one(_query, {'project': self.project}))[0]
 
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
         family_rows,
     ) -> Dict[int, List[NestedFamily]]:
+        """
+        Process the family rows into NestedFamily objects
+        """
         pid_to_fids = defaultdict(list)
         for frow in family_rows:
             pid_to_fids[frow['participant_id']].append(frow['family_id'])
@@ -148,14 +180,20 @@ class WebDb(DbBase):
         return pid_to_families
 
     async def _project_summary_get_sample_create_date(self, sample_ids: List[int]):
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in :sids GROUP BY id'
         rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
         return {r[0]: str(r[1].date()) for r in rows}
 
     async def get_project_summary(
-        self, token: Optional[int], limit: int
+        self, token: Optional[str], limit: int
     ) -> ProjectSummary:
+        """
+        Get project summary
 
+        :param token: for PAGING
+        :param limit: Number of SAMPLEs to return, not including nested sequences
+        """
         # do initial query to get sample info
         sample_query, values = self._project_summary_sample_query(token, limit)
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
@@ -179,7 +217,7 @@ class WebDb(DbBase):
 
         # family
         f_query = """
-SELECT f.id as family_id, f.external_id as external_family_id, fp.participant_id 
+SELECT f.id as family_id, f.external_id as external_family_id, fp.participant_id
 FROM family_participant fp
 INNER JOIN family f ON f.id = fp.family_id
 WHERE fp.participant_id in :pids
