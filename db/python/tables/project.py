@@ -269,6 +269,9 @@ class ProjectPermissionsTable:
         return list(map(ProjectRow.from_db, rows))
 
     async def get_projects_accessible_by_user(self, author: str, readonly=True):
+        """
+        Get projects that are accessible by the specified user
+        """
         assert author
 
         _query = 'SELECT id, name FROM project'

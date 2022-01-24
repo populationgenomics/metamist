@@ -11,7 +11,7 @@ from db.python.connect import SMConnections
 from db.python.tables.project import ALLOW_FULL_ACCESS
 from db.python.utils import get_logger
 
-import api.routes as routes
+from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
