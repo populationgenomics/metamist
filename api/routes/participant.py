@@ -7,6 +7,7 @@ from datetime import date
 from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import StreamingResponse
+from pydantic import BaseModel
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
@@ -14,11 +15,20 @@ from api.utils.db import (
     get_project_readonly_connection,
     Connection,
 )
-from api.utils.export import ExportType
+from api.utils.extensions import FileExtension
 from db.python.layers.participant import ParticipantLayer
 from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
+
+
+class ParticipantUpdateModel(BaseModel):
+    """Update participant model"""
+
+    reported_sex: Optional[int] = None
+    reported_gender: Optional[str] = None
+    karyotype: Optional[str] = None
+    meta: Optional[Dict] = None
 
 
 @router.post(
@@ -27,7 +37,10 @@ router = APIRouter(prefix='/participant', tags=['participant'])
 async def fill_in_missing_participants(
     connection: Connection = get_project_write_connection,
 ):
-    """Get sample by external ID"""
+    """
+    Create a corresponding participant (if required)
+    for each sample within a project, useful for then importing a pedigree
+    """
     participant_layer = ParticipantLayer(connection)
 
     return {'success': await participant_layer.fill_in_missing_participants()}
@@ -40,7 +53,7 @@ async def fill_in_missing_participants(
 )
 async def get_individual_metadata_template_for_seqr(
     project: str,
-    export_type: ExportType,
+    export_type: FileExtension,
     external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
@@ -125,7 +138,7 @@ async def get_external_participant_id_to_internal_sample_id(
 )
 async def get_external_participant_id_to_internal_sample_id_export(
     project: str,
-    export_type: ExportType,
+    export_type: FileExtension,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get csv / tsv export of external_participant_id to internal_sample_id"""
@@ -148,3 +161,23 @@ async def get_external_participant_id_to_internal_sample_id_export(
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={filename}'},
     )
+
+
+@router.post('/{participant_id}/update-participant', operation_id='updateParticipant')
+async def update_participant(
+    participant_id: int,
+    participant: ParticipantUpdateModel,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update Participant Data"""
+    participant_layer = ParticipantLayer(connection)
+
+    return {
+        'success': await participant_layer.update_single_participant(
+            participant_id=participant_id,
+            reported_sex=participant.reported_sex,
+            reported_gender=participant.reported_gender,
+            karyotype=participant.karyotype,
+            meta=participant.meta,
+        )
+    }

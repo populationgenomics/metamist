@@ -45,6 +45,9 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Search path to search for files within',
 )
+@click.option(
+    '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -54,6 +57,7 @@ async def main(
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
+    dry_run=False,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -74,6 +78,7 @@ async def main(
         resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
+            dry_run=dry_run,
         )
         print(resp)
 

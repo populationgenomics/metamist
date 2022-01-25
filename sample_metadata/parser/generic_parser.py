@@ -50,7 +50,6 @@ else:
     from typing_extensions import Literal
 
 logger = logging.getLogger(__file__)
-logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
 FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
@@ -197,7 +196,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         if path.startswith('gs://'):
             blob = await self.get_blob(path)
             try:
-                retval = blob.download_as_string()
+                retval = blob.download_as_bytes()
                 if isinstance(retval, bytes):
                     retval = retval.decode()
                 return retval
@@ -379,6 +378,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
+        proj = self.sample_metadata_project
+
         # a sample has many rows
         sample_map = defaultdict(list)
 
@@ -388,7 +389,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_map[sample_id].append(row)
 
         if len(sample_map) == 0:
-            raise ValueError(f'The manifest file contains no records')
+            raise ValueError(f'{proj}: The manifest file contains no records')
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -409,12 +410,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             )
 
         samples_to_add: List[NewSample] = []
-        # by external_sample_id
+        # all dicts indexed by external_sample_id
         sequences_to_add: Dict[str, NewSequence] = {}
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-
         samples_to_update: Dict[str, SampleUpdateModel] = {}
-        sequences_to_update: Dict[int, SequenceUpdateModel] = {}
+        sequences_to_update: Dict[str, SequenceUpdateModel] = {}
 
         # we'll batch process the samples as not to open too many threads
 
@@ -422,7 +422,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             current_batch_promises = {}
             if self.verbose:
-                logger.info(f'Preparing {", ".join(ex_sample_ids)}')
+                logger.info(f'{proj}:Preparing {", ".join(ex_sample_ids)}')
 
             for external_sample_id in ex_sample_ids:
                 rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
@@ -462,7 +462,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     analyses_to_add[external_sample_id] = analysis_to_add
 
         message = f"""\
-Processing samples: {', '.join(sample_map.keys())}
+{proj}: Processing samples: {', '.join(sample_map.keys())}
 
 Adding {len(samples_to_add)} samples
 Adding {len(sequences_to_add)} sequences
@@ -488,8 +488,13 @@ Updating {len(sequences_to_update)} sequences"""
         else:
             logger.info(message)
 
-        logger.info(f'Adding {len(samples_to_add)} samples to SM-DB database')
+        logger.info(f'{proj}: Adding {len(samples_to_add)} samples to SM-DB database')
         added_ext_sample_to_internal_id = {}
+
+        # 2022-01-25 mfranklin: I've removed the sample specific verbose
+        #   logging, because it doesn't make sense in the batching sense.
+        #   We're a lot quicker, and I hope to move this to a batch
+        #   update endpoint soon anyway.
 
         for chunked_samples in chunk(samples_to_add):
             ordered_external_sample_ids = [s.external_id for s in chunked_samples]
@@ -507,7 +512,7 @@ Updating {len(sequences_to_update)} sequences"""
                 added_ext_sample_to_internal_id[external_id] = sample_id
                 existing_external_id_to_cpgid[external_id] = sample_id
 
-        logger.info(f'Adding {len(sequences_to_add)} sequence entries')
+        logger.info(f'{proj}: Adding {len(sequences_to_add)} sequence entries')
         for chunked_sequences in chunk(list(sequences_to_add.items())):
             promises = []
             for sample_id, seq in chunked_sequences:
@@ -516,7 +521,7 @@ Updating {len(sequences_to_update)} sequences"""
             # wait for them to finish
             await asyncio.gather(*promises)
 
-        logger.info(f'Adding analysis entries for {len(analyses_to_add)} samples')
+        logger.info(f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples')
         unwrapped_analysis_to_add = [
             (sample_id, a)
             for (sample_id, analyses) in analyses_to_add.items()
@@ -533,7 +538,7 @@ Updating {len(sequences_to_update)} sequences"""
                 )
             await asyncio.gather(*promises)
 
-        logger.info(f'Updating {len(samples_to_update)} samples')
+        logger.info(f'{proj}: Updating {len(samples_to_update)} samples')
         for chunked_samples in chunk(list(samples_to_update.items())):
             promises = []
             for internal_sample_id, sample_update in chunked_samples:
@@ -545,7 +550,7 @@ Updating {len(sequences_to_update)} sequences"""
                 )
             await asyncio.gather(*promises)
 
-        logger.info(f'Updating {len(sequences_to_update)} sequences')
+        logger.info(f'{proj}: Updating {len(sequences_to_update)} sequences')
         for chunked_update_sequences in chunk(
             list(enumerate(sequences_to_update.items()))
         ):

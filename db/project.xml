@@ -319,4 +319,8 @@
 			columnName="sex"
 		/>
 	</changeSet>
+		<changeSet author="michael.franklin" id="2022-01-19_expand-family-coded-phenotype-column">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<sql>ALTER TABLE family MODIFY COLUMN coded_phenotype TEXT;</sql>
+	</changeSet>
 </databaseChangeLog>

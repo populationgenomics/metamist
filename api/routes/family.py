@@ -15,6 +15,7 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
+from api.utils.extensions import guess_delimiter_by_filename
 from db.python.layers.family import FamilyLayer
 from models.models.family import Family
 
@@ -37,9 +38,10 @@ async def import_pedigree(
     create_missing_participants: bool = False,
     connection: Connection = get_project_write_connection,
 ):
-    """Get sample by external ID"""
+    """Import a pedigree"""
+    delimiter = guess_delimiter_by_filename(file.filename)
     family_layer = FamilyLayer(connection)
-    reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter='\t')
+    reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
     headers = None
     if has_header:
         headers = next(reader)
@@ -134,8 +136,8 @@ async def import_families(
     delimiter='\t',
     connection: Connection = get_project_write_connection,
 ):
-    """Get sample by external ID"""
-    delimiter = delimiter.replace('\\t', '\t')
+    """Import a family csv"""
+    delimiter = guess_delimiter_by_filename(file.filename, default_delimiter=delimiter)
 
     family_layer = FamilyLayer(connection)
     reader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter)
