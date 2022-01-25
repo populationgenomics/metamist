@@ -6,8 +6,9 @@ import io
 from datetime import date
 
 from fastapi import APIRouter, UploadFile, File, Query
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from starlette.responses import StreamingResponse
+from starlette.responses import StreamingResponse, JSONResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
@@ -21,6 +22,11 @@ from models.models.family import Family
 
 router = APIRouter(prefix='/family', tags=['family'])
 
+from enum import Enum
+class ContentType(Enum):
+    CSV = 'csv'
+    TSV = 'tsv'
+    JSON = 'json'
 
 class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
@@ -60,14 +66,15 @@ async def import_pedigree(
 
 
 @router.get(
-    '/{project}/pedigree', operation_id='getPedigree', response_class=StreamingResponse
+    '/{project}/pedigree', operation_id='getPedigree',
 )
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
+    response_type: ContentType = ContentType.JSON,
     replace_with_participant_external_ids: bool = False,
     replace_with_family_external_ids: bool = False,
-    empty_participant_value: Optional[str] = '',
     include_header: bool = True,
+    empty_participant_value: Optional[str] = '',
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -77,6 +84,7 @@ async def get_pedigree(
     Allow replacement of internal participant and family IDs
     with their external counterparts.
     """
+
     family_layer = FamilyLayer(connection)
     assert connection.project
     pedigree_rows = await family_layer.get_pedigree(
@@ -85,23 +93,34 @@ async def get_pedigree(
         replace_with_participant_external_ids=replace_with_participant_external_ids,
         replace_with_family_external_ids=replace_with_family_external_ids,
         empty_participant_value=empty_participant_value,
-        include_header=include_header,
+        include_header=True,
     )
 
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter='\t')
-    writer.writerows(pedigree_rows)
+    if response_type == ContentType.CSV or response_type == ContentType.TSV:
+        delim = '\t' if response_type == ContentType.TSV else ','
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=delim)
 
-    basefn = f'{connection.project}-{date.today().isoformat()}'
+        if not include_header:
+            next(pedigree_rows)
 
-    if internal_family_ids:
-        basefn += '-'.join(str(fm) for fm in internal_family_ids)
+        writer.writerows(pedigree_rows)
 
-    return StreamingResponse(
-        iter(output.getvalue()),
-        media_type='text/csv',
-        headers={'Content-Disposition': f'filename={basefn}.ped'},
-    )
+        basefn = f'{connection.project}-{date.today().isoformat()}'
+
+        if internal_family_ids:
+            basefn += '-'.join(str(fm) for fm in internal_family_ids)
+
+        return StreamingResponse(
+            iter(output.getvalue()),
+            media_type=f'text/{response_type}',
+            headers={'Content-Disposition': f'filename={basefn}.ped'},
+        )
+    else:
+        header = pedigree_rows.pop(0)
+        data = [dict(zip(header, x)) for x in pedigree_rows]
+        encoded = jsonable_encoder(data)
+        return JSONResponse(content=encoded)
 
 
 @router.get('/{project}/', operation_id='getFamilies')
