@@ -1,4 +1,5 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
+import sys
 import asyncio
 import csv
 import logging
@@ -41,10 +42,11 @@ from sample_metadata.models import (
     AnalysisStatus,
 )
 
-try:
-    from typing import Literal
 
-except ImportError:
+# https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-new-additions-to-the-typing-module
+if sys.version_info >= (3, 8):
+    from typing import Literal
+else:
     from typing_extensions import Literal
 
 logger = logging.getLogger(__file__)
