@@ -581,13 +581,7 @@ Updating {len(sequences_to_update)} sequences"""
 
     async def parse_files(
         self, sample_id: str, reads: List[str]
-    ) -> Dict[
-        SUPPORTED_FILE_TYPE,
-        Dict[
-            Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES],
-            Union[List[List[Dict]], List[Dict]],
-        ],
-    ]:
+    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
@@ -605,7 +599,9 @@ Updating {len(sequences_to_update)} sequences"""
             structured_fastqs = self.parse_fastqs_structure(fastqs)
             fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
             for fastq_group in structured_fastqs:
-                create_file_futures: List[Coroutine] = [self.create_file_object(f) for f in fastq_group]
+                create_file_futures: List[Coroutine] = [
+                    self.create_file_object(f) for f in fastq_group
+                ]
                 fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
             grouped_fastqs = list(await asyncio.gather(*fastq_files))  # type: ignore
@@ -626,13 +622,13 @@ Updating {len(sequences_to_update)} sequences"""
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
                 )
-            file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)
+            file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)  # type: ignore
 
         bams = [
             r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
         ]
         if bams:
-            file_promises = []
+            file_promises: List[Coroutine] = []
             sec_format = ['.bai', '^.bai']
             for r in bams:
                 secondaries = (
@@ -640,11 +636,11 @@ Updating {len(sequences_to_update)} sequences"""
                         r, sec_format
                     )
                 )
-                sec_format.append(
+                file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
                 )
 
-            file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)
+            file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)  # type: ignore
 
         gvcfs = [
             r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
@@ -668,14 +664,14 @@ Updating {len(sequences_to_update)} sequences"""
                     self.create_file_object(r, secondary_files=secondaries)
                 )
 
-            file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)
+            file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)  # type: ignore
 
         if vcfs:
             file_promises = []
             for r in vcfs:
                 file_promises.append(self.create_file_object(r))
 
-            file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)
+            file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)  # type: ignore
 
         unhandled_files = [
             r
