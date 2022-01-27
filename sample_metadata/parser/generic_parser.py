@@ -610,6 +610,8 @@ Updating {len(sequences_to_update)} sequences"""
         crams = [
             r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]
+        file_promises: List[Coroutine]
+
         if crams:
             file_promises = []
             sec_format = ['.crai', '^.crai']
@@ -628,7 +630,7 @@ Updating {len(sequences_to_update)} sequences"""
             r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
         ]
         if bams:
-            file_promises: List[Coroutine] = []
+            file_promises = []
             sec_format = ['.bai', '^.bai']
             for r in bams:
                 secondaries = (
