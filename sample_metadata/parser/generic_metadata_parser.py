@@ -213,9 +213,9 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-        file_types = await self.parse_files(sample_id, full_filenames)
-        reads = file_types.get('reads')
-        variants = file_types.get('variants')
+        file_types: Dict[str, Dict[str, List]] = await self.parse_files(sample_id, full_filenames)
+        reads: Dict[str, List] = file_types.get('reads')
+        variants: Dict[str, List] = file_types.get('variants')
         if reads:
             keys = list(reads.keys())
             if len(keys) > 1:
