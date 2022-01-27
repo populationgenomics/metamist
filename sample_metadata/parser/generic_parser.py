@@ -277,8 +277,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             self,
             rows: GroupedRow,
             external_sample_id: str,
-            cpg_sample_id: str,
-            sequence_id: str,
+            cpg_sample_id: Optional[str],
+            sequence_id: Optional[str],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
