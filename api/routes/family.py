@@ -1,8 +1,9 @@
 # pylint: disable=invalid-name
-import codecs
-import csv
-from typing import List, Optional
 import io
+import re
+import csv
+import codecs
+from typing import List, Optional
 from datetime import date
 
 from fastapi import APIRouter, UploadFile, File, Query
@@ -118,6 +119,7 @@ async def get_pedigree(
         )
     else:
         header = pedigree_rows.pop(0)
+        header = [re.sub(r'^[^a-zA-Z0-9]+', '', x) for x in header]
         data = [dict(zip(header, x)) for x in pedigree_rows]
         encoded = jsonable_encoder(data)
         return JSONResponse(content=encoded)
