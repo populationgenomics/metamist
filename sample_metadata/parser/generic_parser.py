@@ -6,7 +6,6 @@ import logging
 import os
 import re
 from abc import abstractmethod
-from asyncio import Future
 from collections import defaultdict
 from itertools import groupby
 from typing import (
@@ -22,7 +21,7 @@ from typing import (
     Iterator,
     Coroutine,
 )
-from functools import update_wrapper
+from functools import wraps
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
@@ -49,6 +48,7 @@ if sys.version_info >= (3, 8):
 else:
     from typing_extensions import Literal
 
+logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
@@ -58,7 +58,13 @@ CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
 VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
 
-ALL_EXTENSIONS = FASTQ_EXTENSIONS + CRAM_EXTENSIONS + BAM_EXTENSIONS + GVCF_EXTENSIONS + VCF_EXTENSIONS
+ALL_EXTENSIONS = (
+    FASTQ_EXTENSIONS
+    + CRAM_EXTENSIONS
+    + BAM_EXTENSIONS
+    + GVCF_EXTENSIONS
+    + VCF_EXTENSIONS
+)
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
 GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
@@ -75,7 +81,7 @@ def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
     Chunk a sequence by yielding lists of `chunk_size`
     """
     for i in range(0, len(iterable), chunk_size):
-        yield iterable[i: i + chunk_size]
+        yield iterable[i : i + chunk_size]
 
 
 def run_as_sync(f):
@@ -90,25 +96,26 @@ def run_as_sync(f):
         return await awaitable_function(**kwargs)
     """
 
+    @wraps(f)
     def wrapper(*args, **kwargs):
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(f(*args, **kwargs))
 
-    return update_wrapper(wrapper, f)
+    return wrapper
 
 
 class GenericParser:  # pylint: disable=too-many-public-methods
     """Parser for VCGS manifest"""
 
     def __init__(
-            self,
-            path_prefix: Optional[str],
-            sample_metadata_project: str,
-            default_sequence_type='wgs',
-            default_sequence_status='uploaded',
-            default_sample_type='blood',
-            skip_checking_gcs_objects=False,
-            verbose=True,
+        self,
+        path_prefix: Optional[str],
+        sample_metadata_project: str,
+        default_sequence_type='wgs',
+        default_sequence_status='uploaded',
+        default_sample_type='blood',
+        skip_checking_gcs_objects=False,
+        verbose=True,
     ):
 
         self.path_prefix = path_prefix
@@ -150,7 +157,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             return filename
 
         if not self.path_prefix:
-            raise FileNotFoundError(f"Can't form full path to '{filename}' as no path_prefix was defined")
+            raise FileNotFoundError(
+                f"Can't form full path to '{filename}' as no path_prefix was defined"
+            )
 
         if self.client and not filename.startswith('/'):
             assert self.default_bucket
@@ -236,12 +245,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     @abstractmethod
     async def get_sequence_meta(
-            self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: GroupedRow
     ) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
 
     async def get_analyses(
-            self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get analysis objects from row. Optionally, a CPG ID can be passed for
@@ -250,35 +259,35 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return []
 
     async def get_qc_meta(
-            self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: GroupedRow
     ) -> Optional[Dict[str, Any]]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
         return None
 
     def get_sample_type(
-            self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: GroupedRow
     ) -> Union[str, SampleType]:
         """Get sample type from row"""
         return self.default_sample_type
 
     def get_sequence_type(
-            self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: GroupedRow
     ) -> Union[str, SequenceType]:
         """Get sequence type from row"""
         return self.default_sequence_type
 
     def get_sequence_status(
-            self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: GroupedRow
     ) -> Union[str, SequenceStatus]:
         """Get sequence status from row"""
         return self.default_sequence_status
 
     async def process_group(
-            self,
-            rows: GroupedRow,
-            external_sample_id: str,
-            cpg_sample_id: Optional[str],
-            sequence_id: Optional[str],
+        self,
+        rows: GroupedRow,
+        external_sample_id: str,
+        cpg_sample_id: Optional[str],
+        sequence_id: Optional[str],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -371,7 +380,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def parse_manifest(  # pylint: disable=too-many-branches
-            self, file_pointer, delimiter=',', confirm=False, dry_run=False
+        self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
@@ -439,7 +448,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             processed_ex_sids = list(current_batch_promises.keys())
             batch_promises = list(current_batch_promises.values())
             resolved_promises = await asyncio.gather(*batch_promises)
-            for external_sample_id, resolved_promise in zip(processed_ex_sids, resolved_promises):
+            for external_sample_id, resolved_promise in zip(
+                processed_ex_sids, resolved_promises
+            ):
                 (
                     sample_to_add,
                     sample_to_update,
@@ -507,7 +518,7 @@ Updating {len(sequences_to_update)} sequences"""
                 )
 
             for external_id, sample_id in zip(
-                    ordered_external_sample_ids, await asyncio.gather(*sample_id_promises)
+                ordered_external_sample_ids, await asyncio.gather(*sample_id_promises)
             ):
                 added_ext_sample_to_internal_id[external_id] = sample_id
                 existing_external_id_to_cpgid[external_id] = sample_id
@@ -521,7 +532,9 @@ Updating {len(sequences_to_update)} sequences"""
             # wait for them to finish
             await asyncio.gather(*promises)
 
-        logger.info(f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples')
+        logger.info(
+            f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
+        )
         unwrapped_analysis_to_add = [
             (sample_id, a)
             for (sample_id, analyses) in analyses_to_add.items()
@@ -567,63 +580,93 @@ Updating {len(sequences_to_update)} sequences"""
         return added_ext_sample_to_internal_id
 
     async def parse_files(
-            self, sample_id: str, reads: List[str]
-    ) -> Dict[SUPPORTED_FILE_TYPE, Dict[
-        Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES], Union[List[List[Dict]], List[Dict]]]]:
+        self, sample_id: str, reads: List[str]
+    ) -> Dict[
+        SUPPORTED_FILE_TYPE,
+        Dict[
+            Union[SUPPORTED_READ_TYPES, SUPPORTED_VARIANT_TYPES],
+            Union[List[List[Dict]], List[Dict]],
+        ],
+    ]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
 
-        file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(lambda: defaultdict(list))
+        file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
+            lambda: defaultdict(list)
+        )
 
-        fastqs = [r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)]
+        fastqs = [
+            r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+        ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
-            fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []
+            fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
             for fastq_group in structured_fastqs:
-                fastq_files.append(
-                    asyncio.gather(*[self.create_file_object(f) for f in fastq_group])
-                )
+                create_file_futures: List[Coroutine] = [self.create_file_object(f) for f in fastq_group]
+                fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
             grouped_fastqs = list(await asyncio.gather(*fastq_files))  # type: ignore
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
-        crams = [r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)]
+        crams = [
+            r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
+        ]
         if crams:
             file_promises = []
             sec_format = ['.crai', '^.crai']
             for r in crams:
-                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
-                    r, sec_format
+                secondaries = (
+                    await self.create_secondary_file_objects_by_potential_pattern(
+                        r, sec_format
+                    )
                 )
-                file_promises.append(self.create_file_object(r, secondary_files=secondaries))
+                file_promises.append(
+                    self.create_file_object(r, secondary_files=secondaries)
+                )
             file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)
 
-        bams = [r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)]
+        bams = [
+            r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
+        ]
         if bams:
             file_promises = []
             sec_format = ['.bai', '^.bai']
             for r in bams:
-                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
-                    r, sec_format
+                secondaries = (
+                    await self.create_secondary_file_objects_by_potential_pattern(
+                        r, sec_format
+                    )
                 )
-                sec_format.append(self.create_file_object(r, secondary_files=secondaries))
+                sec_format.append(
+                    self.create_file_object(r, secondary_files=secondaries)
+                )
 
             file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)
 
-        gvcfs = [r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)]
-        vcfs = [r for r in reads if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs]
+        gvcfs = [
+            r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
+        ]
+        vcfs = [
+            r
+            for r in reads
+            if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs
+        ]
 
         if gvcfs:
             file_promises = []
             sec_format = ['.tbi']
             for r in vcfs:
-                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
-                    r, sec_format
+                secondaries = (
+                    await self.create_secondary_file_objects_by_potential_pattern(
+                        r, sec_format
+                    )
                 )
-                file_promises.append(self.create_file_object(r, secondary_files=secondaries))
+                file_promises.append(
+                    self.create_file_object(r, secondary_files=secondaries)
+                )
 
             file_by_type['variants']['gvcf'] = await asyncio.gather(*file_promises)
 
@@ -634,9 +677,15 @@ Updating {len(sequences_to_update)} sequences"""
 
             file_by_type['variants']['vcf'] = await asyncio.gather(*file_promises)
 
-        unhandled_files = [r for r in reads if not any(r.lower().endswith(ext) for ext in ALL_EXTENSIONS)]
+        unhandled_files = [
+            r
+            for r in reads
+            if not any(r.lower().endswith(ext) for ext in ALL_EXTENSIONS)
+        ]
         if unhandled_files:
-            joined_reads = ''.join(f'\n\t{i}: {r}' for i, r in enumerate(unhandled_files))
+            joined_reads = ''.join(
+                f'\n\t{i}: {r}' for i, r in enumerate(unhandled_files)
+            )
             logger.warning(
                 f'There were files with extensions that were skipped ({sample_id}): {joined_reads}'
             )
@@ -674,16 +723,16 @@ Updating {len(sequences_to_update)} sequences"""
 
         values = []
         for _, grouped in groupby(
-                sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
+            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
         ):
             values.append(sorted(grouped))
 
         return sorted(values, key=lambda el: el[0])
 
     async def create_file_object(
-            self,
-            filename: str,
-            secondary_files: List[Dict[str, Any]] = None,
+        self,
+        filename: str,
+        secondary_files: List[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
@@ -712,7 +761,7 @@ Updating {len(sequences_to_update)} sequences"""
         return d
 
     async def create_secondary_file_objects_by_potential_pattern(
-            self, filename, potential_secondary_patterns: List[str]
+        self, filename, potential_secondary_patterns: List[str]
     ) -> List[Dict[str, Any]]:
         """
         Take a base filename and potential secondary patterns:
@@ -749,7 +798,7 @@ Updating {len(sequences_to_update)} sequences"""
 
 
 def _apply_secondary_file_format_to_filename(
-        filepath: Optional[str], secondary_file: str
+    filepath: Optional[str], secondary_file: str
 ):
     """
     You can trust this function to do what you want
