@@ -3,13 +3,13 @@ import io
 import re
 import csv
 import codecs
-from typing import List, Optional
+from enum import Enum
 from datetime import date
+from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, File, Query
-from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from starlette.responses import StreamingResponse, JSONResponse
+from starlette.responses import StreamingResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
@@ -23,11 +23,14 @@ from models.models.family import Family
 
 router = APIRouter(prefix='/family', tags=['family'])
 
-from enum import Enum
+
 class ContentType(Enum):
+    """Enum for available content type options for get pedigree endpoint"""
+
     CSV = 'csv'
     TSV = 'tsv'
     JSON = 'json'
+
 
 class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
@@ -61,19 +64,22 @@ async def import_pedigree(
 
     return {
         'success': await family_layer.import_pedigree(
-            headers, rows, create_missing_participants=create_missing_participants
+            headers,
+            rows,
+            create_missing_participants=create_missing_participants,
         )
     }
 
 
 @router.get(
-    '/{project}/pedigree', operation_id='getPedigree',
+    '/{project}/pedigree',
+    operation_id='getPedigree',
 )
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
     response_type: ContentType = ContentType.JSON,
-    replace_with_participant_external_ids: bool = False,
-    replace_with_family_external_ids: bool = False,
+    replace_with_participant_external_ids: bool = True,
+    replace_with_family_external_ids: bool = True,
     include_header: bool = True,
     empty_participant_value: Optional[str] = '',
     connection: Connection = get_project_readonly_connection,
@@ -97,13 +103,13 @@ async def get_pedigree(
         include_header=True,
     )
 
-    if response_type == ContentType.CSV or response_type == ContentType.TSV:
+    if response_type in (ContentType.CSV, ContentType.TSV):
         delim = '\t' if response_type == ContentType.TSV else ','
         output = io.StringIO()
         writer = csv.writer(output, delimiter=delim)
 
         if not include_header:
-            next(pedigree_rows)
+            pedigree_rows.pop(0)
 
         writer.writerows(pedigree_rows)
 
@@ -117,12 +123,16 @@ async def get_pedigree(
             media_type=f'text/{response_type}',
             headers={'Content-Disposition': f'filename={basefn}.ped'},
         )
-    else:
-        header = pedigree_rows.pop(0)
-        header = [re.sub(r'^[^a-zA-Z0-9]+', '', x) for x in header]
-        data = [dict(zip(header, x)) for x in pedigree_rows]
-        encoded = jsonable_encoder(data)
-        return JSONResponse(content=encoded)
+
+    # Return json by default
+    def key_convert(string):
+        snake = string.lower().replace(' ', '_').replace('-', '_')
+        return re.sub(r'^[^a-zA-Z0-9]+', '', snake)
+
+    header = pedigree_rows.pop(0)
+    header = [key_convert(x) for x in header]
+    data = [dict(zip(header, x)) for x in pedigree_rows]
+    return data
 
 
 @router.get('/{project}/', operation_id='getFamilies')
@@ -136,7 +146,8 @@ async def get_families(
 
 @router.post('/', operation_id='updateFamily')
 async def update_family(
-    family: FamilyUpdateModel, connection: Connection = get_projectless_db_connection
+    family: FamilyUpdateModel,
+    connection: Connection = get_projectless_db_connection,
 ):
     """Update information for a single family"""
     family_layer = FamilyLayer(connection)
