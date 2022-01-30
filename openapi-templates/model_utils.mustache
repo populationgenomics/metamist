@@ -8,6 +8,8 @@ import os
 import pprint
 import re
 import tempfile
+import asyncio
+from functools import wraps, partial
 
 from dateutil.parser import parse
 
@@ -23,7 +25,6 @@ file_type = io.IOBase
 
 
 def convert_js_args_to_python_args(fn):
-    from functools import wraps
     @wraps(fn)
     def wrapped_init(_self, *args, **kwargs):
         """
@@ -1714,3 +1715,14 @@ def validate_get_composed_info(constant_args, model_args, self):
       additional_properties_model_instances,
       discarded_args
     ]
+
+
+def async_wrap(func):
+    @wraps(func)
+    async def run(*args, loop=None, executor=None, **kwargs):
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        pfunc = partial(func, *args, **kwargs)
+        return await loop.run_in_executor(executor, pfunc)
+
+    return run

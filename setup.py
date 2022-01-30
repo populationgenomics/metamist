@@ -36,6 +36,7 @@ setup(
         'python-dateutil',
         'requests',
         'click',
+        'typing-extensions',
     ],
     include_package_data=True,
     zip_safe=False,
