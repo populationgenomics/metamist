@@ -13,7 +13,7 @@ interface ProjectSelectorProps {
 
 export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onChange }) => {
 
-    // store project in global settings 
+    // store project in global settings
     const globalContext = React.useContext(AppContext)
 
     let [searchParams, setSearchParams] = useSearchParams()

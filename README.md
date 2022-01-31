@@ -203,7 +203,7 @@ We could now place breakpoints on the sample route (ie: `api/routes/sample.py`),
 #### Developing the UI
 
 ```shell
-# Ensure you have started sm locally on your computer already, then in another tab open the UI. 
+# Ensure you have started sm locally on your computer already, then in another tab open the UI.
 # This will automatically proxy request to the server.
 cd web
 npm install
