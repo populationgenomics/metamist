@@ -246,6 +246,14 @@ The web API exposes this schema in two ways:
 
 The installable API is automatically generated through the `condarise.yml` GitHub action and uploaded to the [CPG conda organisation](https://anaconda.org/cpg).
 
+
+To generate the python api you'll need to install openapi generator v5.x.x
+
+```bash
+brew install openapi-generator
+```
+
+
 You could generate the installable API and install it with pip by running:
 
 ```bash
