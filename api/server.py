@@ -23,7 +23,7 @@ from api.utils.exceptions import determine_code_from_error
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '4.2.0'
+_VERSION = '4.3.0'
 
 logger = get_logger()
 
@@ -37,6 +37,7 @@ class SPAStaticFiles(StaticFiles):
     """
 
     async def get_response(self, path: str, scope):
+        """get response"""
         response = await super().get_response(path, scope)
         if response.status_code == 404 and not path.startswith('api'):
             # server index.html if can't find existing resource
