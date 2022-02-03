@@ -6,9 +6,10 @@ import click
 from sample_metadata.apis import ParticipantApi
 
 
-
 @click.command()
-@click.option('--participant-id-json', help='json map (string) of {old_external: new_external}')
+@click.option(
+    '--participant-id-json', help='json map (string) of {old_external: new_external}'
+)
 @click.option('--project')
 def main(participant_id_json: str, project: str):
     """Update participant IDs by external ID with map {old_external: new_external}"""
@@ -23,6 +24,6 @@ def main(participant_id_json: str, project: str):
         if prev_id in internal_pid_map
     }
 
-    if click.confirm(f'Updating {len(update_map)} participants: {update_map}\n')
+    if click.confirm(f'Updating {len(update_map)} participants: {update_map}\n'):
         new_map = {str(k): str(v) for k, v in update_map.items()}
         papi.update_many_participants(request_body=new_map)

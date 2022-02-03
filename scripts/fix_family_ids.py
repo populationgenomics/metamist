@@ -8,9 +8,12 @@ from sample_metadata.model.family_update_model import FamilyUpdateModel
 
 
 @click.command()
-@click.option('--family-id-json', help='json map (string) of {old_external: new_external}')
+@click.option(
+    '--family-id-json', help='json map (string) of {old_external: new_external}'
+)
 @click.option('--project')
 def main(family_id_json: str, project: str):
+    """Rename family external IDs with map {old_external: new_external}"""
     fid_map = json.loads(family_id_json)
     fapi = FamilyApi()
     families = fapi.get_families(project=project)
