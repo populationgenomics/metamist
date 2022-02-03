@@ -210,6 +210,9 @@ class ParticipantLayer(BaseLayer):
             project=self.connection.project,
             allow_missing=True,
         )
+        if not unlinked_participants:
+            return '0 participants updated'
+
         external_participant_ids_to_add = set(
             external_sample_map_with_no_pid.keys()
         ) - set(unlinked_participants.keys())

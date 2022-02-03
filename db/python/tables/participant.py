@@ -138,6 +138,9 @@ RETURNING id
         """Get map of {external_id: internal_participant_id}"""
         assert project
 
+        if len(external_participant_ids) == 0:
+            return {}
+
         _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
             _query,
