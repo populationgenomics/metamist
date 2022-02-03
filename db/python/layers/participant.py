@@ -401,7 +401,7 @@ class ParticipantLayer(BaseLayer):
         """Get seqr individual level metadata template as List[List[str]]"""
 
         # avoid circular imports
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,cyclic-import
         from db.python.layers.family import FamilyLayer
 
         ppttable = ParticipantPhenotypeTable(self.connection)

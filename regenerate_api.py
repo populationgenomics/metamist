@@ -158,9 +158,7 @@ def copy_typescript_files_from(tmpdir):
     dir_to_copy_from = tmpdir
 
     if not os.path.exists(dir_to_copy_to):
-        raise FileNotFoundError(
-            f"Directory to copy to doesn't exist ({dir_to_copy_to})"
-        )
+        os.makedirs(dir_to_copy_to)
     if not os.path.exists(dir_to_copy_from):
         raise FileNotFoundError(
             f"Directory to copy from doesn't exist ({dir_to_copy_from})"
