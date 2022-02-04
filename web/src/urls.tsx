@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 
 import DocumentationArticle from './docs/Documentation'
 import SwaggerUI from 'swagger-ui-react'

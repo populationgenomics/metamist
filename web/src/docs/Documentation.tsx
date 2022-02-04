@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import * as React from 'react'
 import {
     useParams, Link
 } from "react-router-dom";
@@ -33,7 +33,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
 
     const match = useParams()
 
-    useEffect(() => {
+    React.useEffect(() => {
         console.log('Loading data')
         async function fetchData() {
             const articleId = props.articleId || match.id || 'README';
