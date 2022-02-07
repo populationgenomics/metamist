@@ -96,31 +96,36 @@ async def batch_upsert_samples(
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
+
+    def upsert_sample(sample):
+        if not sample.id:
+            return create_new_sample(sample, connection)
+        return update_sample(sample.id, sample, connection)
+
+    def upsert_sequence(sid, sequence):
+        sequence.sample_id = sid
+        if not sequence.id:
+            return create_sequence(sequence, connection)
+        return update_sequence(sequence.id, sequence, connection)
+
+    async def upsert_sequences(sid, sequences):
+        upserts = [upsert_sequence(sid, s) for s in sequences]
+        return await asyncio.gather(*upserts)
+
     async with connection.connection.transaction():
         # Create or update samples
-        samps = []
-        seqs = []
-        for sample in samples.samples:
-            if not sample.id:
-                samps.append(create_new_sample(sample, connection))
-            else:
-                samps.append(update_sample(sample.id, sample, connection))
+        upserts = [upsert_sample(s) for s in samples.samples]
+        runs = await asyncio.gather(*upserts)
+        sids = [sample_id_format(s) for s in runs]
 
-            samp_seqs = []
-            for sequence in sample.sequences:
-                if not sequence.id:
-                    samp_seqs.append(create_sequence(sequence))
-                else:
-                    samp_seqs.append(update_sequence(sequence.id, sequence, connection))
+        # Upsert all sequences with paired sids
+        sequences = zip(sids, [x.sequences for x in samples.samples])
+        seqs = [upsert_sequences(sid, seqs) for sid, seqs in sequences]
+        results = await asyncio.gather(*seqs)
 
-            seqs.append(asyncio.gather(*samp_seqs))
-
-        upserts = await asyncio.gather(*samps)
-        sids = [sample_id_format(s) for s in upserts]
-        seqs = await asyncio.gather(*seqs)
-        result = dict(zip(sids, seqs))
-
-        return result
+        # Upsert sequences
+        print(results)
+        return dict(zip(sids, results))
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')

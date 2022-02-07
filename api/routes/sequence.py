@@ -38,6 +38,7 @@ class NewSequence(Sequence):
 class SequenceUpdateModel(BaseModel):
     """Update analysis model"""
 
+    sample_id: Optional[str] = None
     status: Optional[SequenceStatus] = None
     meta: Optional[Dict] = None
     type: Optional[SequenceType] = None
