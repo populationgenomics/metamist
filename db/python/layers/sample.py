@@ -4,6 +4,8 @@ from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from db.python.tables.sequence import SampleSequencingTable
+
 from models.enums import SampleType
 from models.models.sample import Sample, sample_id_format_list
 
@@ -14,6 +16,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
+        self.seqt: SampleSequencingTable = SampleSequencingTable(connection)
 
     # GETS
     async def get_single_by_external_id(

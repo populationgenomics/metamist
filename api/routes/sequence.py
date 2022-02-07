@@ -21,13 +21,18 @@ from models.models.sample import (
 router = APIRouter(prefix='/sequence', tags=['sequence'])
 
 
-class NewSequence(BaseModel):
+class Sequence(BaseModel):
     """Model for creating new sequence"""
 
-    sample_id: str
     status: SequenceStatus
     meta: Dict
     type: SequenceType
+
+
+class NewSequence(Sequence):
+    """Model for creating new sequence"""
+
+    sample_id: str
 
 
 class SequenceUpdateModel(BaseModel):
@@ -35,6 +40,7 @@ class SequenceUpdateModel(BaseModel):
 
     status: Optional[SequenceStatus] = None
     meta: Optional[Dict] = None
+    type: Optional[SequenceType] = None
 
 
 @router.put('/', operation_id='createNewSequence')
@@ -63,7 +69,7 @@ async def update_sequence(
         sequence_id, status=sequence.status, meta=sequence.meta
     )
 
-    return {'success': True}
+    return sequence_id
 
 
 @router.get('/{sequence_id}/details', operation_id='getSequenceByID')

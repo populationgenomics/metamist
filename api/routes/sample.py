@@ -1,4 +1,6 @@
-from typing import Optional, List, Dict
+import asyncio
+
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
@@ -11,6 +13,12 @@ from models.models.sample import (
 )
 from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
+
+from api.routes.sequence import (
+    SequenceUpdateModel,
+    create_sequence,
+    update_sequence,
+)
 
 from api.utils.db import (
     get_project_write_connection,
@@ -32,10 +40,30 @@ class NewSample(BaseModel):
 class SampleUpdateModel(BaseModel):
     """Update model for Sample"""
 
-    meta: Optional[Dict] = {}
+    external_id: Optional[str]
     type: Optional[SampleType] = None
+    meta: Optional[Dict] = {}
     participant_id: Optional[int] = None
     active: Optional[bool] = None
+
+
+class SequenceUpdateModelId(SequenceUpdateModel):
+    """Update model for Sequence with internal id"""
+
+    id: Optional[int]
+
+
+class SampleUpsertSequencesModel(SampleUpdateModel):
+    """Update model for sample with sequences list"""
+
+    id: Optional[str]
+    sequences: List[SequenceUpdateModelId]
+
+
+class SampleUpsertBatchModel(BaseModel):
+    """Upsert model for batch Samples"""
+
+    samples: List[SampleUpsertSequencesModel]
 
 
 router = APIRouter(prefix='/sample', tags=['sample'])
@@ -58,6 +86,41 @@ async def create_new_sample(
             check_project_id=False,
         )
         return sample_id_format(internal_id)
+
+
+@router.put(
+    '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
+)
+async def batch_upsert_samples(
+    samples: SampleUpsertBatchModel,
+    connection: Connection = get_project_write_connection,
+) -> Dict[str, Any]:
+    """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
+    async with connection.connection.transaction():
+        # Create or update samples
+        samps = []
+        seqs = []
+        for sample in samples.samples:
+            if not sample.id:
+                samps.append(create_new_sample(sample, connection))
+            else:
+                samps.append(update_sample(sample.id, sample, connection))
+
+            samp_seqs = []
+            for sequence in sample.sequences:
+                if not sequence.id:
+                    samp_seqs.append(create_sequence(sequence))
+                else:
+                    samp_seqs.append(update_sequence(sequence.id, sequence, connection))
+
+            seqs.append(asyncio.gather(*samp_seqs))
+
+        upserts = await asyncio.gather(*samps)
+        sids = [sample_id_format(s) for s in upserts]
+        seqs = await asyncio.gather(*seqs)
+        result = dict(zip(sids, seqs))
+
+        return result
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')

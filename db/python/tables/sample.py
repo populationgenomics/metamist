@@ -95,7 +95,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         fields_str = ', '.join(fields)
         _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
         await self.connection.execute(_query, {**values, 'id': id_})
-        return True
+        return id_
 
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int]
