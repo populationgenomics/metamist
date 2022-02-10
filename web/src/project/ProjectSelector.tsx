@@ -31,6 +31,9 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
         new ProjectApi().getMyProjects()
             .then(projects => setProjects(projects.data))
             .catch(er => setError(er.message))
+
+        // empty array means only do the on first load,
+        //no props change should cause this to retrigger
     }, [])
 
     if (error) {
