@@ -29,7 +29,7 @@ export const ProjectSummary = () => {
     const [error, setError] = React.useState<string | undefined>()
     const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[0])
 
-    async function getProjectSummary(token: any, addToPageToken: boolean) {
+    const getProjectSummary = React.useCallback(async (token: any, addToPageToken: boolean) => {
         if (!globalContext.project) return
         let sanitisedToken = !!token ? token : undefined
         setIsLoading(true)
@@ -45,9 +45,10 @@ export const ProjectSummary = () => {
                 setIsLoading(false)
                 setError(er.message)
             })
-    }
+    }, [globalContext.project, pageLimit, pageTokens])
 
-    function setPageLimit(e: React.ChangeEvent<HTMLInputElement>) {
+
+    const setPageLimit = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.currentTarget.value
 
         if (!suppliedDirectToken) {
@@ -59,15 +60,15 @@ export const ProjectSummary = () => {
             setSearchParams(searchParams)
         }
         _setPageLimit(parseInt(value))
-    }
+    }, [suppliedDirectToken])
 
-    // eslint:
     React.useEffect(() => {
         if (_.isUndefined(suppliedDirectToken)) {
             setSuppliedDirectToken(!!directToken)
         }
         getProjectSummary(directToken, false)
 
+        // retrigger if project changes, or pageLimit changes
     }, [globalContext.project, pageLimit])
 
     let table: React.ReactElement = <></>
