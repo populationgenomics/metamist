@@ -1,11 +1,31 @@
+import asyncio
+
 from typing import Dict, List, Optional, Any
+
+from pydantic import BaseModel
 
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SequenceStatus, SequenceType
+from models.models.sample import sample_id_transform_to_raw
 from models.models.sequence import SampleSequencing
+
+
+class SequenceUpdateModel(BaseModel):
+    """Update analysis model"""
+
+    sample_id: Optional[str] = None
+    status: Optional[SequenceStatus] = None
+    meta: Optional[Dict] = None
+    type: Optional[SequenceType] = None
+
+
+class SequenceUpsert(SequenceUpdateModel):
+    """Update model for Sequence with internal id"""
+
+    id: Optional[int]
 
 
 class SampleSequenceLayer(BaseLayer):
@@ -200,3 +220,26 @@ class SampleSequenceLayer(BaseLayer):
             project=project, external_sample_id=external_sample_id
         )
         return await self.update_status(seq_id, status, check_project_id=False)
+
+    # UPSERT
+    async def upsert_sequence(self, sid: str, sequence: SequenceUpsert):
+        """Upsert a single sequence to the given sample_id (sid)"""
+        sequence.sample_id = sid
+        if not sequence.id:
+            return await self.insert_sequencing(
+                sample_id=sample_id_transform_to_raw(sequence.sample_id),
+                sequence_type=sequence.type,
+                sequence_meta=sequence.meta,
+                status=sequence.status,
+            )
+
+        # Otherwise update
+        await self.update_sequence(
+            sequence.id, status=sequence.status, meta=sequence.meta
+        )
+        return sequence.id
+
+    async def upsert_sequences(self, sid: str, sequences: List[SequenceUpsert]):
+        """Upsert multiple sequences to the given sample (sid)"""
+        upserts = [self.upsert_sequence(sid, s) for s in sequences]
+        return await asyncio.gather(*upserts)

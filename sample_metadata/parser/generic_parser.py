@@ -507,6 +507,8 @@ Updating {len(sequences_to_update)} sequences"""
         #   We're a lot quicker, and I hope to move this to a batch
         #   update endpoint soon anyway.
 
+        print(chunk(samples_to_add))
+
         for chunked_samples in chunk(samples_to_add):
             ordered_external_sample_ids = [s.external_id for s in chunked_samples]
             sample_id_promises = []

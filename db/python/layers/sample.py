@@ -1,4 +1,6 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+
+from pydantic import BaseModel
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
@@ -7,7 +9,22 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.sequence import SampleSequencingTable
 
 from models.enums import SampleType
-from models.models.sample import Sample, sample_id_format_list
+from models.models.sample import (
+    Sample,
+    sample_id_format,
+    sample_id_format_list,
+    sample_id_transform_to_raw,
+)
+
+
+class SampleUpsert(BaseModel):
+    """Update model for Sample"""
+
+    external_id: Optional[str]
+    type: Optional[SampleType] = None
+    meta: Optional[Dict] = {}
+    participant_id: Optional[int] = None
+    active: Optional[bool] = None
 
 
 class SampleLayer(BaseLayer):
@@ -173,6 +190,29 @@ class SampleLayer(BaseLayer):
             author=author,
             active=active,
         )
+
+    async def upsert_sample(self, sample: SampleUpsert):
+        """Upsert a sample"""
+        if not sample.id:
+            internal_id = await self.insert_sample(
+                external_id=sample.external_id,
+                sample_type=sample.type,
+                active=True,
+                meta=sample.meta,
+                participant_id=sample.participant_id,
+                check_project_id=False,
+            )
+            return sample_id_format(internal_id)
+
+        # Otherwise update
+        internal_id = await self.update_sample(
+            id_=sample_id_transform_to_raw(sample.id),
+            meta=sample.meta,
+            participant_id=sample.participant_id,
+            type_=sample.type,
+            active=sample.active,
+        )
+        return sample_id_format(internal_id)
 
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int], check_sample_ids=True

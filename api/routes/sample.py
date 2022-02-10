@@ -11,14 +11,10 @@ from models.models.sample import (
     sample_id_format,
     sample_id_transform_to_raw_list,
 )
-from db.python.layers.sample import SampleLayer
-from db.python.tables.project import ProjectPermissionsTable
 
-from api.routes.sequence import (
-    SequenceUpdateModel,
-    create_sequence,
-    update_sequence,
-)
+from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
+from db.python.layers.sample import SampleLayer, SampleUpsert
+from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
     get_project_write_connection,
@@ -37,33 +33,17 @@ class NewSample(BaseModel):
     participant_id: Optional[int] = None
 
 
-class SampleUpdateModel(BaseModel):
-    """Update model for Sample"""
-
-    external_id: Optional[str]
-    type: Optional[SampleType] = None
-    meta: Optional[Dict] = {}
-    participant_id: Optional[int] = None
-    active: Optional[bool] = None
-
-
-class SequenceUpdateModelId(SequenceUpdateModel):
-    """Update model for Sequence with internal id"""
-
-    id: Optional[int]
-
-
-class SampleUpsertSequencesModel(SampleUpdateModel):
+class SampleBatchUpsertItem(SampleUpsert):
     """Update model for sample with sequences list"""
 
     id: Optional[str]
-    sequences: List[SequenceUpdateModelId]
+    sequences: List[SequenceUpsert]
 
 
-class SampleUpsertBatchModel(BaseModel):
+class SampleBatchUpsert(BaseModel):
     """Upsert model for batch Samples"""
 
-    samples: List[SampleUpsertSequencesModel]
+    samples: List[SampleBatchUpsertItem]
 
 
 router = APIRouter(prefix='/sample', tags=['sample'])
@@ -92,39 +72,26 @@ async def create_new_sample(
     '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
 )
 async def batch_upsert_samples(
-    samples: SampleUpsertBatchModel,
+    samples: SampleBatchUpsert,
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
 
-    def upsert_sample(sample):
-        if not sample.id:
-            return create_new_sample(sample, connection)
-        return update_sample(sample.id, sample, connection)
-
-    def upsert_sequence(sid, sequence):
-        sequence.sample_id = sid
-        if not sequence.id:
-            return create_sequence(sequence, connection)
-        return update_sequence(sequence.id, sequence, connection)
-
-    async def upsert_sequences(sid, sequences):
-        upserts = [upsert_sequence(sid, s) for s in sequences]
-        return await asyncio.gather(*upserts)
+    # Table interfaces
+    st = SampleLayer(connection)
+    seqt = SampleSequenceLayer(connection)
 
     async with connection.connection.transaction():
         # Create or update samples
-        upserts = [upsert_sample(s) for s in samples.samples]
-        runs = await asyncio.gather(*upserts)
-        sids = [sample_id_format(s) for s in runs]
+        upserts = [st.upsert_sample(s) for s in samples.samples]
+        sids = await asyncio.gather(*upserts)
 
         # Upsert all sequences with paired sids
         sequences = zip(sids, [x.sequences for x in samples.samples])
-        seqs = [upsert_sequences(sid, seqs) for sid, seqs in sequences]
+        seqs = [seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
         results = await asyncio.gather(*seqs)
 
-        # Upsert sequences
-        print(results)
+        # Format and return response
         return dict(zip(sids, results))
 
 
@@ -227,7 +194,7 @@ async def get_samples_by_criteria(
 @router.patch('/{id_}', operation_id='updateSample')
 async def update_sample(
     id_: str,
-    model: SampleUpdateModel,
+    model: SampleUpsert,
     connection: Connection = get_projectless_db_connection,
 ):
     """Update sample with id"""

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List
+from typing import Dict, List
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from db.python.layers.sequence import (
     SequenceType,
     SequenceStatus,
     SampleSequenceLayer,
+    SequenceUpdateModel,
 )
 from models.models.sample import (
     sample_id_transform_to_raw,
@@ -33,15 +34,6 @@ class NewSequence(Sequence):
     """Model for creating new sequence"""
 
     sample_id: str
-
-
-class SequenceUpdateModel(BaseModel):
-    """Update analysis model"""
-
-    sample_id: Optional[str] = None
-    status: Optional[SequenceStatus] = None
-    meta: Optional[Dict] = None
-    type: Optional[SequenceType] = None
 
 
 @router.put('/', operation_id='createNewSequence')
