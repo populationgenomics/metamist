@@ -11,7 +11,6 @@ from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SampleType
 from models.models.sample import (
     Sample,
-    sample_id_format,
     sample_id_format_list,
     sample_id_transform_to_raw,
 )
@@ -202,7 +201,7 @@ class SampleLayer(BaseLayer):
                 participant_id=sample.participant_id,
                 check_project_id=False,
             )
-            return sample_id_format(internal_id)
+            return int(internal_id)
 
         # Otherwise update
         internal_id = await self.update_sample(
@@ -212,7 +211,7 @@ class SampleLayer(BaseLayer):
             type_=sample.type,
             active=sample.active,
         )
-        return sample_id_format(internal_id)
+        return int(internal_id)
 
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int], check_sample_ids=True

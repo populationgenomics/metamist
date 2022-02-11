@@ -81,14 +81,22 @@ async def batch_upsert_samples(
 
     async with connection.connection.transaction():
         # Create or update samples
-        sids = [await st.upsert_sample(s) for s in samples.samples]
+        iids = [await st.upsert_sample(s) for s in samples.samples]
+        sids = [sample_id_format(x) for x in iids]
+
+        print(iids)
 
         # Upsert all sequences with paired sids
         sequences = zip(sids, [x.sequences for x in samples.samples])
-        results = [await seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
+        seqs = [await seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
 
         # Format and return response
-        return dict(zip(sids, results))
+        seqs_w_ids = dict(zip(iids, seqs))
+        results = [
+            {'sample_id': sample_id_format(k), 'sequences': v}
+            for k, v in seqs_w_ids.items()
+        ]
+        return dict(zip(iids, results))
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')

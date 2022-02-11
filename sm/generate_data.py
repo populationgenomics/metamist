@@ -1,3 +1,4 @@
+from pprint import pprint
 import random
 import argparse
 import datetime
@@ -105,7 +106,8 @@ def main(
             samples.append(sample)
 
     batch_samples = SampleBatchUpsert(samples=samples)
-    SampleApi().batch_upsert_samples(project, batch_samples)
+    response = SampleApi().batch_upsert_samples(project, batch_samples)
+    pprint(response)
 
 
 if __name__ == '__main__':
