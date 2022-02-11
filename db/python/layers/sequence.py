@@ -1,5 +1,3 @@
-import asyncio
-
 from typing import Dict, List, Optional, Any
 
 from pydantic import BaseModel
@@ -241,5 +239,5 @@ class SampleSequenceLayer(BaseLayer):
 
     async def upsert_sequences(self, sid: str, sequences: List[SequenceUpsert]):
         """Upsert multiple sequences to the given sample (sid)"""
-        upserts = [self.upsert_sequence(sid, s) for s in sequences]
-        return await asyncio.gather(*upserts)
+        upserts = [await self.upsert_sequence(sid, s) for s in sequences]
+        return upserts

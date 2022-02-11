@@ -1,5 +1,3 @@
-import asyncio
-
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Body
@@ -83,13 +81,11 @@ async def batch_upsert_samples(
 
     async with connection.connection.transaction():
         # Create or update samples
-        upserts = [st.upsert_sample(s) for s in samples.samples]
-        sids = await asyncio.gather(*upserts)
+        sids = [await st.upsert_sample(s) for s in samples.samples]
 
         # Upsert all sequences with paired sids
         sequences = zip(sids, [x.sequences for x in samples.samples])
-        seqs = [seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
-        results = await asyncio.gather(*seqs)
+        results = [await seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
 
         # Format and return response
         return dict(zip(sids, results))

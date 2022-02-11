@@ -113,12 +113,12 @@ if __name__ == '__main__':
         description='Script for generating data in the greek-myth project'
     )
     parser.add_argument(
-        '--ped_path',
+        '--ped-path',
         type=str,
         default='greek-myth-forgeneration.ped',
         help='Path to the pedigree file',
     )
     parser.add_argument('--project', type=str, default='greek-myth')
-    parser.add_argument('--create_project', action='store_true')
+    parser.add_argument('--create-project', action='store_true')
     args = vars(parser.parse_args())
     main(**args)
