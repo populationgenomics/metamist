@@ -93,8 +93,6 @@ async def batch_upsert_samples(
         iids = [await st.upsert_sample(s) for s in samples.samples]
         sids = [sample_id_format(x) for x in iids]
 
-        print(iids)
-
         # Upsert all sequences with paired sids
         sequences = zip(sids, [x.sequences for x in samples.samples])
         seqs = [await seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
