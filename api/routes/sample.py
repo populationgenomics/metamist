@@ -31,6 +31,15 @@ class NewSample(BaseModel):
     participant_id: Optional[int] = None
 
 
+class SampleUpdateModel(BaseModel):
+    """Update model for Sample"""
+
+    meta: Optional[Dict] = {}
+    type: Optional[SampleType] = None
+    participant_id: Optional[int] = None
+    active: Optional[bool] = None
+
+
 class SampleBatchUpsertItem(SampleUpsert):
     """Update model for sample with sequences list"""
 
@@ -198,7 +207,7 @@ async def get_samples_by_criteria(
 @router.patch('/{id_}', operation_id='updateSample')
 async def update_sample(
     id_: str,
-    model: SampleUpsert,
+    model: SampleUpdateModel,
     connection: Connection = get_projectless_db_connection,
 ):
     """Update sample with id"""
