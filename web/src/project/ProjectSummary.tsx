@@ -62,14 +62,18 @@ export const ProjectSummary = () => {
         _setPageLimit(parseInt(value))
     }, [suppliedDirectToken])
 
-    React.useEffect(() => {
+    const _updateProjectSummary = React.useCallback(() => {
         if (_.isUndefined(suppliedDirectToken)) {
             setSuppliedDirectToken(!!directToken)
         }
         getProjectSummary(directToken, false)
+    }, [getProjectSummary, suppliedDirectToken, directToken])
 
-        // retrigger if project changes, or pageLimit changes
-    }, [globalContext.project, pageLimit])
+    // retrigger if project changes, or pageLimit changes
+    React.useEffect(
+        _updateProjectSummary,
+        [globalContext.project, pageLimit]
+    )
 
     let table: React.ReactElement = <></>
 
