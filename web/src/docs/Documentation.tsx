@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import * as React from 'react'
 import {
     useParams, Link
 } from "react-router-dom";
@@ -33,7 +33,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
 
     const match = useParams()
 
-    useEffect(() => {
+    React.useEffect(() => {
         console.log('Loading data')
         async function fetchData() {
             const articleId = props.articleId || match.id || 'README';
@@ -44,7 +44,9 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
             try {
                 // this line turns ./static/sm_docs/{filename} into the bundled path
                 // eg: /static/media/README.e3454f58.md
-                const file = require(`./static/sm_docs/${filename}`);
+
+                // eslint-disable-next-line
+                const file = require(`../static/sm_docs/${filename}`);
                 const response = await fetch(file.default);
                 let text = await response.text();
                 // Do some URL rewriting, because the openapi generator

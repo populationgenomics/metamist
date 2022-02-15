@@ -202,7 +202,7 @@ class SampleLayer(BaseLayer):
         if check_sample_ids:
             project_ids = set(r.project for r in rows)
             await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
+                self.author, project_ids, readonly=True
             )
 
         return rows
