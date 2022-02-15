@@ -39,6 +39,9 @@ from sample_metadata.models import (
     AnalysisType,
     SequenceStatus,
     AnalysisStatus,
+    SampleBatchUpsertItem,
+    SampleBatchUpsert,
+    SequenceUpsert
 )
 
 
@@ -288,6 +291,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         external_sample_id: str,
         cpg_sample_id: Optional[str],
         sequence_id: Optional[str],
+        upsert: Optional[bool]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -326,21 +330,20 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         sample_type = self.get_sample_type(external_sample_id, rows)
         sequence_status = self.get_sequence_status(external_sample_id, rows)
 
-        if cpg_sample_id:
-            # it already exists
-            sample_to_update = SampleUpdateModel(
-                meta=collapsed_sample_meta,
-            )
-        else:
-            sample_to_add = NewSample(
-                external_id=external_sample_id,
-                type=SampleType(sample_type),
-                meta=collapsed_sample_meta,
-            )
-
         # should we add or update sequencing
         if collapsed_sequencing_meta:
-            if sequence_id:
+            if upsert:
+                seq = SequenceUpsert(
+                    id=sequence_id,
+                    meta=collapsed_sequencing_meta,
+                    type=SequenceType('wgs'),
+                    status=SequenceStatus(sequence_status),
+                )
+                if sequence_id:
+                    sequence_to_update = (sequence_id, seq)
+                else:
+                    sequence_to_add = seq
+            elif sequence_id:
                 # update, we have a cpg sample ID AND a sequencing ID
                 sequence_to_update = (
                     sequence_id,
@@ -357,6 +360,31 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     type=SequenceType('wgs'),
                     status=SequenceStatus(sequence_status),
                 )
+
+        # Should we add or update sample
+        if upsert:
+            sample = SampleBatchUpsertItem(
+                id=cpg_sample_id,
+                meta=collapsed_sample_meta,
+                external_id=external_sample_id,
+                type=SampleType(sample_type),
+                sequences=[seq]
+            )
+            if cpg_sample_id:
+                sample_to_update = sample
+            else:
+                sample_to_add = sample
+        elif cpg_sample_id:
+            # it already exists
+            sample_to_update = SampleUpdateModel(
+                meta=collapsed_sample_meta,
+            )
+        else:
+            sample_to_add = NewSample(
+                external_id=external_sample_id,
+                type=SampleType(sample_type),
+                meta=collapsed_sample_meta,
+            )
 
         if collapsed_analyses:
             analysis_to_add.extend(collapsed_analyses)
@@ -443,11 +471,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     external_sample_id=external_sample_id,
                     cpg_sample_id=cpg_sample_id,
                     sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
+                    upsert=True
                 )
                 current_batch_promises[external_sample_id] = promise
             processed_ex_sids = list(current_batch_promises.keys())
             batch_promises = list(current_batch_promises.values())
             resolved_promises = await asyncio.gather(*batch_promises)
+
+            all_samples = []
+
             for external_sample_id, resolved_promise in zip(
                 processed_ex_sids, resolved_promises
             ):
@@ -471,6 +503,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
                 if analysis_to_add:
                     analyses_to_add[external_sample_id] = analysis_to_add
+
+                # Extract Upsert items and add to an array
+                # Also joins sequences to corresponding sequence
+                if sample_to_add:
+                    all_samples.append(sample_to_add)
+
+                if sample_to_update:
+                    all_samples.append(sample_to_update)
 
         message = f"""\
 {proj}: Processing samples: {', '.join(sample_map.keys())}
@@ -499,40 +539,17 @@ Updating {len(sequences_to_update)} sequences"""
         else:
             logger.info(message)
 
-        logger.info(f'{proj}: Adding {len(samples_to_add)} samples to SM-DB database')
-        added_ext_sample_to_internal_id = {}
-
         # 2022-01-25 mfranklin: I've removed the sample specific verbose
         #   logging, because it doesn't make sense in the batching sense.
         #   We're a lot quicker, and I hope to move this to a batch
         #   update endpoint soon anyway.
 
-        print(chunk(samples_to_add))
-
-        for chunked_samples in chunk(samples_to_add):
-            ordered_external_sample_ids = [s.external_id for s in chunked_samples]
-            sample_id_promises = []
-            for new_sample in chunked_samples:
-                sample_id_promises.append(
-                    sapi.create_new_sample_async(
-                        project=self.sample_metadata_project, new_sample=new_sample
-                    )
-                )
-
-            for external_id, sample_id in zip(
-                ordered_external_sample_ids, await asyncio.gather(*sample_id_promises)
-            ):
-                added_ext_sample_to_internal_id[external_id] = sample_id
-                existing_external_id_to_cpgid[external_id] = sample_id
-
+        # Batch update
+        logger.info(f'{proj}: Adding {len(samples_to_add)} samples to SM-DB database')
         logger.info(f'{proj}: Adding {len(sequences_to_add)} sequence entries')
-        for chunked_sequences in chunk(list(sequences_to_add.items())):
-            promises = []
-            for sample_id, seq in chunked_sequences:
-                seq.sample_id = existing_external_id_to_cpgid[sample_id]
-                promises.append(seqapi.create_new_sequence_async(new_sequence=seq))
-            # wait for them to finish
-            await asyncio.gather(*promises)
+        logger.info(f'{proj}: Updating {len(samples_to_update)} samples')
+        logger.info(f'{proj}: Updating {len(sequences_to_update)} sequences')
+        result = sapi.batch_upsert_samples(self.sample_metadata_project, SampleBatchUpsert(samples=all_samples))
 
         logger.info(
             f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
@@ -553,33 +570,7 @@ Updating {len(sequences_to_update)} sequences"""
                 )
             await asyncio.gather(*promises)
 
-        logger.info(f'{proj}: Updating {len(samples_to_update)} samples')
-        for chunked_samples in chunk(list(samples_to_update.items())):
-            promises = []
-            for internal_sample_id, sample_update in chunked_samples:
-                promises.append(
-                    sapi.update_sample_async(
-                        id_=internal_sample_id,
-                        sample_update_model=sample_update,
-                    )
-                )
-            await asyncio.gather(*promises)
-
-        logger.info(f'{proj}: Updating {len(sequences_to_update)} sequences')
-        for chunked_update_sequences in chunk(
-            list(enumerate(sequences_to_update.items()))
-        ):
-            promises = []
-            for _, (seq_id, seq_update) in chunked_update_sequences:
-                promises.append(
-                    seqapi.update_sequence_async(
-                        sequence_id=seq_id,
-                        sequence_update_model=seq_update,
-                    )
-                )
-            await asyncio.gather(*promises)
-
-        return added_ext_sample_to_internal_id
+        return result
 
     async def parse_files(
         self, sample_id: str, reads: List[str]
