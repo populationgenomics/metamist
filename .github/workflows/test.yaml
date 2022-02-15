@@ -28,6 +28,7 @@ jobs:
       - name: Setup build env
         run: |
           conda install pip conda-build anaconda-client requests
+          pip install -r requirements.txt
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
       - name: "build image"

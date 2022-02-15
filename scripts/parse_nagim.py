@@ -105,7 +105,7 @@ from sample_metadata.models import (
 )
 from sample_metadata.apis import SampleApi
 from sample_metadata.models import SampleUpdateModel
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
 
 
 logger = logging.getLogger(__file__)
@@ -704,7 +704,8 @@ def transfer(
     help='Remove all existing samples in "test" before prior to parsing',
 )
 @click.option('--test', 'test', is_flag=True)
-def parse(  # pylint: disable=too-many-locals
+@run_as_sync
+async def parse(  # pylint: disable=too-many-locals
     tmp_dir,
     confirm: bool,
     dry_run: bool,
@@ -813,7 +814,7 @@ def parse(  # pylint: disable=too-many-locals
             multiqc_json_path=multiqc_json_path,
         )
         with open(sample_tsv_file) as f:
-            parser.parse_manifest(f, dry_run=dry_run, confirm=confirm)
+            await parser.parse_manifest(f, dry_run=dry_run, confirm=confirm)
 
 
 def _add_qc(
@@ -1134,7 +1135,7 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         if isinstance(row, dict):
             row = [row]
         meta = {}
@@ -1158,7 +1159,7 @@ class NagimParser(GenericParser):
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
 
-    def get_analyses(
+    async def get_analyses(
         self,
         sample_id: str,
         row: GroupedRow,
@@ -1202,7 +1203,9 @@ class NagimParser(GenericParser):
             )
         return results
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Optional[Dict[str, Any]]:
         """
         Create a QC analysis entry for found QC files.
         """
@@ -1228,7 +1231,9 @@ class NagimParser(GenericParser):
             'project': row.get('project'),
         }
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sequence_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Dict[str, Any]:
         if isinstance(row, list):
             row = row[0]
 

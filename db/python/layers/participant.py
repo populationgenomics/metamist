@@ -210,6 +210,9 @@ class ParticipantLayer(BaseLayer):
             project=self.connection.project,
             allow_missing=True,
         )
+        if not unlinked_participants:
+            return '0 participants updated'
+
         external_participant_ids_to_add = set(
             external_sample_map_with_no_pid.keys()
         ) - set(unlinked_participants.keys())
@@ -398,7 +401,7 @@ class ParticipantLayer(BaseLayer):
         """Get seqr individual level metadata template as List[List[str]]"""
 
         # avoid circular imports
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,cyclic-import
         from db.python.layers.family import FamilyLayer
 
         ppttable = ParticipantPhenotypeTable(self.connection)

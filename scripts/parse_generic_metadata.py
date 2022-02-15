@@ -5,7 +5,10 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
+from sample_metadata.parser.generic_metadata_parser import (
+    GenericMetadataParser,
+    run_as_sync,
+)
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.
@@ -106,7 +109,8 @@ logger.setLevel(logging.INFO)
 )
 @click.option('--search-path', multiple=True, required=True)
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     search_path: List[str],
     sample_metadata_project,
@@ -157,7 +161,7 @@ def main(
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
 
-        parser.from_manifest_path(manifest=manifest, confirm=confirm)
+        await parser.from_manifest_path(manifest=manifest, confirm=confirm)
 
 
 if __name__ == '__main__':

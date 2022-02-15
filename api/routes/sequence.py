@@ -57,7 +57,7 @@ async def update_sequence(
     sequence: SequenceUpdateModel,
     connection: Connection = get_projectless_db_connection,
 ):
-    """Get sample by external ID"""
+    """Update sequence by ID"""
     sequence_layer = SampleSequenceLayer(connection)
     _ = await sequence_layer.update_sequence(
         sequence_id, status=sequence.status, meta=sequence.meta
