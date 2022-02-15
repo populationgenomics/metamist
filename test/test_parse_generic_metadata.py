@@ -11,7 +11,7 @@ class TestParseGenericMetadata(unittest.TestCase):
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
-    def test_single_row(
+    async def test_single_row(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
     ):
         """
@@ -48,7 +48,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             gvcf_column='GVCF',
         )
         file_contents = '\n'.join(rows)
-        resp = parser.parse_manifest(
+        resp = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 

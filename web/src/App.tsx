@@ -1,54 +1,16 @@
 import React from 'react';
-import DocumentationArticle from './Documentation'
-import SwaggerUI from 'swagger-ui-react'
-import "swagger-ui-react/swagger-ui.css"
 
 
 import {
   BrowserRouter as Router,
-  Routes as Switch,
-  Route,
   Link
 } from "react-router-dom";
 
+import "swagger-ui-react/swagger-ui.css"
+// this wasn't working, so added import to HTML
+// import 'bootstrap/dist/css/bootstrap.min.css'
+import { Routes } from './urls'
 
-const Index = () => {
-
-  return (<div>
-    <h2>Sample metadata server</h2>
-    <ul>
-      <li><Link to="documentation">Python API documentation</Link></li>
-      <li><Link to="swagger">Swagger page</Link></li>
-    </ul>
-
-    <DocumentationArticle articleId="index" />
-
-  </div>)
-}
-
-const Routes = () => {
-
-  return <>
-    <Switch>
-      <Route
-        path="/documentation"
-      >
-        <Route path="" element={<DocumentationArticle />} />
-        <Route path=":id" element={<DocumentationArticle />} />
-      </Route>
-
-      <Route
-        path="/swagger"
-        element={<SwaggerUI url="/openapi.json" />}
-      />
-
-      <Route
-        path="/"
-        element={<Index />}
-      />
-    </Switch>
-  </>
-}
 
 function App() {
   return (

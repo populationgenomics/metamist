@@ -70,10 +70,16 @@ class TestDatabaseBackup(unittest.TestCase):
         self.timestamp = get_timestamp(backup_folder)
 
         self.local_conn = mysql.connector.connect(
-            user=LOCAL_USER, host=LOCAL_HOST, password=LOCAL_PASSWORD, database=DATABASE
+            user=LOCAL_USER,
+            host=LOCAL_HOST,
+            password=LOCAL_PASSWORD,
+            database=DATABASE,
         )
         self.prod_conn = mysql.connector.connect(
-            host=PROD_HOST, user=PROD_USER, password=PROD_PASSWORD, database=DATABASE
+            host=PROD_HOST,
+            user=PROD_USER,
+            password=PROD_PASSWORD,
+            database=DATABASE,
         )
 
     def test_database_exists(self):

@@ -5,6 +5,7 @@ import logging
 
 import click
 
+from sample_metadata.parser.generic_parser import run_as_sync
 from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 __DOC = """
@@ -48,7 +49,8 @@ logger.setLevel(logging.INFO)
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
 )
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     search_path: List[str],
     sample_metadata_project,
@@ -73,7 +75,7 @@ def main(
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = parser.from_manifest_path(
+        resp = await parser.from_manifest_path(
             manifest=manifest,
             confirm=confirm,
             dry_run=dry_run,
