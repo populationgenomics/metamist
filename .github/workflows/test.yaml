@@ -4,7 +4,7 @@ on: [push, pull_request]
 jobs:
   build-publish:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-#    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -33,7 +33,7 @@ jobs:
 
       - name: "build image"
         run: |
-          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+          docker build --build-arg SM_ENVIRONMENT=local --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
       - name: "build deployable API"
         run: |
