@@ -12,6 +12,14 @@ import { Input, Button } from 'reactstrap'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
+const sanitiseValue = (value: any) => {
+    const tvalue = typeof value
+    if (tvalue === 'string' || tvalue === 'number') return value
+    if (tvalue === 'boolean') return value ? 'true' : 'false'
+    if (value === undefined || value === null) return ''
+    return JSON.stringify(value)
+}
+
 
 export const ProjectSummary = () => {
 
@@ -145,8 +153,8 @@ export const ProjectSummary = () => {
                             return <tr key={`${p.external_id}-${s.id}-${seq.id}`}>
                                 {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.families.map(f => f.external_id).join(', ')}</td>}
                                 {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.external_id}</td>}
-                                {seqidx === 0 && summary.sample_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sample.' + k} rowSpan={s.sequences.length}>{_.get(s, k)}</td>)}
-                                {seq && summary.sequence_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sequence.' + k}>{_.get(seq, k)}</td>)}
+                                {seqidx === 0 && summary.sample_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sample.' + k} rowSpan={s.sequences.length}>{sanitiseValue(_.get(s, k))}</td>)}
+                                {seq && summary.sequence_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sequence.' + k}>{sanitiseValue(_.get(seq, k))}</td>)}
                             </tr>
                         })
 
