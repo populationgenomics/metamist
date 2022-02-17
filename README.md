@@ -267,7 +267,7 @@ Or you can build the docker file, and specify that
 ```bash
 # SM_DOCKER is a known env variable to regenerate_api.py
 export SM_DOCKER="cpg/sample-metadata-server:dev"
-docker build -t $SM_DOCKER -f deploy/api/Dockerfile .
+docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_apy.py
 ```
 

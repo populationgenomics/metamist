@@ -1,9 +1,11 @@
 FROM debian:buster-slim
 
+ARG SM_ENVIRONMENT
+
 ENV MAMBA_ROOT_PREFIX /root/micromamba
 ENV PATH $MAMBA_ROOT_PREFIX/bin:$PATH
 ENV PORT 8000
-ENV SM_ENVIRONMENT "development"
+ENV SM_ENVIRONMENT ${SM_ENVIRONMENT}
 # Allow statements and log messages to immediately appear in the Knative logs.
 ENV PYTHONUNBUFFERED 1
 
