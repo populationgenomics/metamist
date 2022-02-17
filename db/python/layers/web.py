@@ -258,8 +258,8 @@ WHERE fp.participant_id in :pids
             for p in participant_rows
         ]
 
-        ignore_sample_meta_keys = {'reads', 'vcfs'}
-        ignore_sequence_meta_keys = {'reads', 'vcfs'}
+        ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
+        ignore_sequence_meta_keys = {'reads', 'vcfs', 'gvcf'}
         sample_meta_keys = set(
             sk
             for p in pmodels
