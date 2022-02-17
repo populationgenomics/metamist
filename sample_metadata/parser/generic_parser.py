@@ -291,15 +291,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         external_sample_id: str,
         cpg_sample_id: Optional[str],
         sequence_id: Optional[str],
-        upsert: Optional[bool]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
             (
-                sample_to_add,
-                sample_to_update,
-                sequence_to_add,
-                sequence_to_update,
+                sample_to_upsert,
+                sequence_to_upsert,
                 analysis_to_add,
             )
 
@@ -321,10 +318,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
         )
 
-        sample_to_add = None
-        sample_to_update = None
-        sequence_to_add = None
-        sequence_to_update = None
+        sample_to_upsert = None
+        sequence_to_upsert = None
         analysis_to_add = []
 
         sample_type = self.get_sample_type(external_sample_id, rows)
@@ -332,59 +327,31 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # should we add or update sequencing
         if collapsed_sequencing_meta:
-            if upsert:
-                seq = SequenceUpsert(
-                    id=sequence_id,
-                    meta=collapsed_sequencing_meta,
-                    type=SequenceType('wgs'),
-                    status=SequenceStatus(sequence_status),
-                )
-                if sequence_id:
-                    sequence_to_update = (sequence_id, seq)
-                else:
-                    sequence_to_add = seq
-            elif sequence_id:
-                # update, we have a cpg sample ID AND a sequencing ID
-                sequence_to_update = (
-                    sequence_id,
-                    SequenceUpdateModel(
-                        meta=collapsed_sequencing_meta,
-                        status=SequenceStatus(sequence_status),
-                    ),
-                )
-            else:
-                # the internal sample ID gets mapped back later
-                sequence_to_add = NewSequence(
-                    sample_id='<None>',  # keep the type initialisation happy
-                    meta=collapsed_sequencing_meta,
-                    type=SequenceType('wgs'),
-                    status=SequenceStatus(sequence_status),
-                )
+            args = {
+                'id': sequence_id,
+                'meta': collapsed_sequencing_meta,
+                'type': SequenceType('wgs'),
+                'status': SequenceStatus(sequence_status),
+            }
+
+            if not sequence_id:
+                del args['id']
+
+            sequence_to_upsert = SequenceUpsert(**args)
 
         # Should we add or update sample
-        if upsert:
-            sample = SampleBatchUpsertItem(
-                id=cpg_sample_id,
-                meta=collapsed_sample_meta,
-                external_id=external_sample_id,
-                type=SampleType(sample_type),
-                sequences=[seq]
-            )
-            if cpg_sample_id:
-                sample_to_update = sample
-            else:
-                sample_to_add = sample
-        elif cpg_sample_id:
-            # it already exists
-            sample_to_update = SampleUpdateModel(
-                meta=collapsed_sample_meta,
-            )
-        else:
-            sample_to_add = NewSample(
-                external_id=external_sample_id,
-                type=SampleType(sample_type),
-                meta=collapsed_sample_meta,
-            )
+        args = {
+            'id': cpg_sample_id,
+            'meta': collapsed_sample_meta,
+            'external_id': external_sample_id,
+            'type': SampleType(sample_type),
+            'sequences': [sequence_to_upsert]
+        }
+
+        if not cpg_sample_id:
+            del args['id']
+
+        sample_to_upsert = SampleBatchUpsertItem(**args)
 
         if collapsed_analyses:
             analysis_to_add.extend(collapsed_analyses)
@@ -400,10 +367,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             )
 
         return (
-            sample_to_add,
-            sample_to_update,
-            sequence_to_add,
-            sequence_to_update,
+            sample_to_upsert,
+            sequence_to_upsert,
             analysis_to_add,
         )
 
@@ -461,6 +426,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(ex_sample_ids)}')
 
+            samples_to_add = []
+            samples_to_update = []
+            sequences_to_add = []
+            sequences_to_update = []
+
             for external_sample_id in ex_sample_ids:
                 rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
                     external_sample_id
@@ -471,7 +441,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     external_sample_id=external_sample_id,
                     cpg_sample_id=cpg_sample_id,
                     sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
-                    upsert=True
                 )
                 current_batch_promises[external_sample_id] = promise
             processed_ex_sids = list(current_batch_promises.keys())
@@ -484,33 +453,29 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 processed_ex_sids, resolved_promises
             ):
                 (
-                    sample_to_add,
-                    sample_to_update,
-                    sequence_to_add,
-                    sequence_to_update,
+                    sample_to_upsert,
+                    sequence_to_upsert,
                     analysis_to_add,
                 ) = resolved_promise
                 cpg_sample_id = existing_external_id_to_cpgid.get(external_sample_id)
-                if sample_to_add:
-                    samples_to_add.append(sample_to_add)
-                if sample_to_update:
-                    samples_to_update[cpg_sample_id] = sample_to_update
-                if sequence_to_add:
-                    sequences_to_add[external_sample_id] = sequence_to_add
-                if sequence_to_update:
-                    seq_id, update_model = sequence_to_update
-                    sequences_to_update[seq_id] = update_model
 
                 if analysis_to_add:
                     analyses_to_add[external_sample_id] = analysis_to_add
 
                 # Extract Upsert items and add to an array
                 # Also joins sequences to corresponding sequence
-                if sample_to_add:
-                    all_samples.append(sample_to_add)
+                if sample_to_upsert:
+                    all_samples.append(sample_to_upsert)
+                    if hasattr(sample_to_upsert, 'id'):
+                        samples_to_update.append(sample_to_upsert)
+                    else:
+                        samples_to_add.append(sample_to_upsert)
 
-                if sample_to_update:
-                    all_samples.append(sample_to_update)
+                if sequence_to_upsert:
+                    if hasattr(sequence_to_upsert, 'id'):
+                        sequences_to_update.append(sample_to_upsert)
+                    else:
+                        sequences_to_add.append(sample_to_upsert)
 
         message = f"""\
 {proj}: Processing samples: {', '.join(sample_map.keys())}
@@ -519,15 +484,15 @@ Adding {len(samples_to_add)} samples
 Adding {len(sequences_to_add)} sequences
 Adding {len(analyses_to_add)} analysis results
 
-Updating {len(samples_to_update)} sample
+Updating {len(samples_to_update)} samples
 Updating {len(sequences_to_update)} sequences"""
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
             return (
                 samples_to_add,
-                sequences_to_add,
                 samples_to_update,
+                sequences_to_add,
                 sequences_to_update,
                 analyses_to_add,
             )
@@ -539,16 +504,7 @@ Updating {len(sequences_to_update)} sequences"""
         else:
             logger.info(message)
 
-        # 2022-01-25 mfranklin: I've removed the sample specific verbose
-        #   logging, because it doesn't make sense in the batching sense.
-        #   We're a lot quicker, and I hope to move this to a batch
-        #   update endpoint soon anyway.
-
         # Batch update
-        logger.info(f'{proj}: Adding {len(samples_to_add)} samples to SM-DB database')
-        logger.info(f'{proj}: Adding {len(sequences_to_add)} sequence entries')
-        logger.info(f'{proj}: Updating {len(samples_to_update)} samples')
-        logger.info(f'{proj}: Updating {len(sequences_to_update)} sequences')
         result = sapi.batch_upsert_samples(self.sample_metadata_project, SampleBatchUpsert(samples=all_samples))
 
         logger.info(
