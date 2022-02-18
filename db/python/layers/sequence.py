@@ -7,14 +7,13 @@ from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SequenceStatus, SequenceType
-from models.models.sample import sample_id_transform_to_raw
 from models.models.sequence import SampleSequencing
 
 
 class SequenceUpdateModel(BaseModel):
     """Update analysis model"""
 
-    sample_id: Optional[str] = None
+    sample_id: Optional[int] = None
     status: Optional[SequenceStatus] = None
     meta: Optional[Dict] = None
     type: Optional[SequenceType] = None
@@ -220,12 +219,12 @@ class SampleSequenceLayer(BaseLayer):
         return await self.update_status(seq_id, status, check_project_id=False)
 
     # UPSERT
-    async def upsert_sequence(self, sid: str, sequence: SequenceUpsert):
+    async def upsert_sequence(self, iid: int, sequence: SequenceUpsert):
         """Upsert a single sequence to the given sample_id (sid)"""
-        sequence.sample_id = sid
+        sequence.sample_id = iid
         if not sequence.id:
             return await self.insert_sequencing(
-                sample_id=sample_id_transform_to_raw(sequence.sample_id),
+                sample_id=sequence.sample_id,
                 sequence_type=sequence.type,
                 sequence_meta=sequence.meta,
                 status=sequence.status,
@@ -237,7 +236,7 @@ class SampleSequenceLayer(BaseLayer):
         )
         return sequence.id
 
-    async def upsert_sequences(self, sid: str, sequences: List[SequenceUpsert]):
+    async def upsert_sequences(self, iid: int, sequences: List[SequenceUpsert]):
         """Upsert multiple sequences to the given sample (sid)"""
-        upserts = [await self.upsert_sequence(sid, s) for s in sequences]
+        upserts = [await self.upsert_sequence(iid, s) for s in sequences]
         return upserts

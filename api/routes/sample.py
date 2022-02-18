@@ -10,8 +10,8 @@ from models.models.sample import (
     sample_id_transform_to_raw_list,
 )
 
-from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
-from db.python.layers.sample import SampleLayer, SampleUpsert
+from db.python.layers.sequence import SampleSequenceLayer
+from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
@@ -38,19 +38,6 @@ class SampleUpdateModel(BaseModel):
     type: Optional[SampleType] = None
     participant_id: Optional[int] = None
     active: Optional[bool] = None
-
-
-class SampleBatchUpsertItem(SampleUpsert):
-    """Update model for sample with sequences list"""
-
-    id: Optional[str]
-    sequences: List[SequenceUpsert]
-
-
-class SampleBatchUpsert(BaseModel):
-    """Upsert model for batch Samples"""
-
-    samples: List[SampleBatchUpsertItem]
 
 
 router = APIRouter(prefix='/sample', tags=['sample'])
@@ -84,26 +71,24 @@ async def batch_upsert_samples(
 ) -> Dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
 
-    # Table interfaces
-    st = SampleLayer(connection)
-    seqt = SampleSequenceLayer(connection)
+    # Convert id in samples to int
+    for sample in samples.samples:
+        sample.id = sample_id_transform_to_raw(sample.id)
 
     async with connection.connection.transaction():
-        # Create or update samples
-        iids = [await st.upsert_sample(s) for s in samples.samples]
-        sids = [sample_id_format(x) for x in iids]
+        # Table interfaces
+        st = SampleLayer(connection)
+        seqt = SampleSequenceLayer(connection)
 
-        # Upsert all sequences with paired sids
-        sequences = zip(sids, [x.sequences for x in samples.samples])
-        seqs = [await seqt.upsert_sequences(sid, seqs) for sid, seqs in sequences]
+        results = await st.batch_upsert_samples(samples, seqt)
+        print(results)
 
-        # Format and return response
-        seqs_w_ids = dict(zip(iids, seqs))
-        results = [
-            {'sample_id': sample_id_format(k), 'sequences': v}
-            for k, v in seqs_w_ids.items()
-        ]
-        return dict(zip(iids, results))
+        # Map sids back from ints to strs
+        for iid, seqs in results.items():
+            data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
+            results[iid] = data
+
+        return results
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')

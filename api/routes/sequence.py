@@ -14,9 +14,9 @@ from db.python.layers.sequence import (
     SequenceUpdateModel,
 )
 from models.models.sample import (
+    sample_id_format,
     sample_id_transform_to_raw,
     sample_id_transform_to_raw_list,
-    sample_id_format,
 )
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
