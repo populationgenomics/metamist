@@ -134,7 +134,7 @@ async def update_sample_sequence_by_type(
     sequence_type: SequenceType,
     connection: Connection = get_projectless_db_connection,
 ):
-    """Update sequence by sample ID & type"""
+    """Update the most recent sequence of a given type"""
     sequence_layer = SampleSequenceLayer(connection)
     _ = await sequence_layer.update_sample_sequence_status_by_type(
         sample_id, status=sequence.status, sequence_type=sequence_type

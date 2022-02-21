@@ -191,7 +191,7 @@ class SampleSequenceLayer(BaseLayer):
     async def update_sample_sequence_status_by_type(
         self, sample_id: int, status: SequenceStatus, sequence_type: SequenceType
     ):
-        """Update the sequencing status from the internal sample id"""
+        """Update the sequencing status of a given type from the internal sample id"""
         seq_id = await self.seqt.get_latest_sequence_id_by_type(
             sample_id, sequence_type
         )
