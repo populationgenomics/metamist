@@ -29,11 +29,7 @@ from google.cloud import storage
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
 from sample_metadata.models import (
-    NewSample,
-    NewSequence,
     SequenceType,
-    SequenceUpdateModel,
-    SampleUpdateModel,
     AnalysisModel,
     SampleType,
     AnalysisType,
@@ -411,12 +407,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 )
             )
 
-        samples_to_add: List[NewSample] = []
         # all dicts indexed by external_sample_id
-        sequences_to_add: Dict[str, NewSequence] = {}
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-        samples_to_update: Dict[str, SampleUpdateModel] = {}
-        sequences_to_update: Dict[str, SequenceUpdateModel] = {}
+        samples_to_add: List[SampleBatchUpsertItem] = []
+        samples_to_update: List[SampleBatchUpsertItem] = []
+        sequences_to_add: List[SequenceUpsert] = []
+        sequences_to_update: List[SequenceUpsert] = []
 
         # we'll batch process the samples as not to open too many threads
 
@@ -425,11 +421,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             current_batch_promises = {}
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(ex_sample_ids)}')
-
-            samples_to_add = []
-            samples_to_update = []
-            sequences_to_add = []
-            sequences_to_update = []
 
             for external_sample_id in ex_sample_ids:
                 rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
