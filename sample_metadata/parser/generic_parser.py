@@ -370,7 +370,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
-    ) -> Union[Dict[str, str], Tuple[List, Dict, Dict, Dict, Dict]]:
+    ) -> Union[Dict[str, Dict], Tuple[List, List, List, List, Dict]]:
         """
         Parse manifest from iterable (file pointer / String.IO)
 
