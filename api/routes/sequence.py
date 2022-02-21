@@ -123,3 +123,21 @@ async def get_sequence_ids_from_sample_ids(
         sample_ids_raw
     )
     return {sample_id_format(k): v for k, v in sequence_id_map.items()}
+
+
+@router.patch(
+    '/sample-sequence-by-type/{sample_id}', operation_id='updateSampleSequenceByType'
+)
+async def update_sample_sequence_by_type(
+    sample_id: int,
+    sequence: SequenceUpdateModel,
+    sequence_type: SequenceType,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update sequence by sample ID & type"""
+    sequence_layer = SampleSequenceLayer(connection)
+    _ = await sequence_layer.update_sample_sequence_status_by_type(
+        sample_id, status=sequence.status, sequence_type=sequence_type
+    )
+
+    return {'success': True}

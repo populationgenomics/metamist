@@ -188,6 +188,16 @@ class SampleSequenceLayer(BaseLayer):
         seq_id = self.get_latest_sequence_id_for_sample_id(sample_id)
         return self.update_status(seq_id, status, check_project_id=False)
 
+    async def update_sample_sequence_status_by_type(
+        self, sample_id: int, status: SequenceStatus, sequence_type: SequenceType
+    ):
+        """Update the sequencing status from the internal sample id"""
+        seq_id = await self.seqt.get_latest_sequence_id_by_type(
+            sample_id, sequence_type
+        )
+
+        return await self.update_status(seq_id, status, check_project_id=False)
+
     async def update_sequencing_status_from_external_sample_id(
         self, project: ProjectId, external_sample_id: str, status: SequenceStatus
     ):

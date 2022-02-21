@@ -135,6 +135,27 @@ LIMIT 1
 
         return result['project'], result['id']
 
+    async def get_latest_sequence_id_by_type(
+        self, sample_id: int, sequence_type=SequenceType
+    ) -> int:
+        """
+        Get latest added sequence ID from internal sample_id and type
+        """
+        _query = """\
+SELECT sq.id, s.project FROM sample_sequencing sq
+INNER JOIN sample s ON sq.sample_id = s.id
+WHERE sample_id = :sample_id and sq.type = :type
+ORDER by sq.id DESC
+LIMIT 1
+"""
+        result = await self.connection.fetch_one(
+            _query, {'sample_id': sample_id, 'type': sequence_type.value}
+        )
+        if not result:
+            raise NotFoundError
+
+        return result['id']
+
     async def get_latest_sequence_id_for_external_sample_id(
         self, project: ProjectId, external_sample_id
     ) -> int:
