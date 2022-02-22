@@ -97,6 +97,34 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         await self.connection.execute(_query, {**values, 'id': id_})
         return id_
 
+    async def merge_samples(
+        self,
+        id_keep: int = None,
+        id_merge: int = None,
+        author: str = None,
+    ):
+        """Merge two samples together"""
+        _, sample_keep = await self.get_single_by_id(id_keep)
+        _, sample_merge = await self.get_single_by_id(id_merge)
+
+        values: Dict[str, Any] = {
+            'id': id_keep,
+            'author': author or self.author,
+            'meta1': to_db_json(sample_keep.meta),
+            'meta2': to_db_json(sample_merge.meta),
+        }
+
+        fields = [
+            'author = :author',
+            'meta = JSON_MERGE(:meta1, :meta2, \'{"merged_from": "old_sample_to_delete"}\')',
+        ]
+
+        fields_str = ', '.join(fields)
+        _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
+        result = await self.connection.execute(_query, {**values})
+        print(result)
+        return result
+
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int]
     ):
