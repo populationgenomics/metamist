@@ -53,15 +53,17 @@ You can configure the MariaDB connection with environment variables.
 
 ### Creating the environment
 
-You should use `conda` to manage the SM environment, as some of the required
-packages are only available on Conda.
+Dependencies for the `sample-metadata` API package are listed in `setup.py`.
+Additional dev requirements are listed in `requirements-dev.txt`, and packages for the sever-side code are listed in `requirements-server.txt`.
 
-The conda env defines the development dependencies, and the pure API deps
-are defined in `requirements.txt`.
+To create the full dev environment, run:
 
 ```shell
-conda env create -f environment-dev.yml
-conda activate sample-metadata
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements-server.txt
+pip install -r requirements-dev.txt
+pip install --editable .
 ```
 
 ### Default DB set-up
@@ -244,7 +246,7 @@ The web API exposes this schema in two ways:
 
 #### Generating the installable API
 
-The installable API is automatically generated through the `condarise.yml` GitHub action and uploaded to the [CPG conda organisation](https://anaconda.org/cpg).
+The installable API is automatically generated through the `package.yml` GitHub action and uploaded to PyPI.
 
 
 To generate the python api you'll need to install openapi generator v5.x.x

@@ -153,7 +153,7 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
 4. Ensure all the dependencies are installed
 
    > ```bash
-   > pip3 install -r requirements.txt
+   > pip3 install -r requirements-server.txt
    > ```
 
 5. Run the validation script

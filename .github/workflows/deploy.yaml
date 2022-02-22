@@ -1,14 +1,16 @@
 name: Deploy
 on:
+  # Building on pull-requests, manual dispatch, and pushes to main. But restricting
+  # publishing only to main pushes and manual dispatch with `if`s in specific steps
+  pull_request:
+  workflow_dispatch:
   push:
     branches:
       - main
       - dev
 
 jobs:
-  build-publish:
-    # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
-    #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
+  deploy:
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -33,12 +35,9 @@ jobs:
         run: |
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: actions/setup-python@v2
         with:
-          activate-environment: buildenv
-          channels: conda-forge,bioconda,defaults
-          channel-priority: true
-          python-version: 3.7
+          python-version: '3.10'
 
       - uses: actions/setup-java@v2
         with:
@@ -47,8 +46,10 @@ jobs:
 
       - name: Setup build env
         run: |
-          conda install pip conda-build anaconda-client requests
-          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
+          pip install -r requirements-dev.txt
+          pip install -r requirements-server.txt
+          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar \
+          -O openapi-generator-cli.jar
 
       - name: prepare-deployment
         run: |
@@ -64,6 +65,7 @@ jobs:
               --no-commit --allow-dirty \
               --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
           fi
+
       # we have to build the image first without the web files to
       # generate the openapi file to then generate the documentation
       - name: "build image"
@@ -94,14 +96,16 @@ jobs:
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
-      - name: Build sample-metadata API conda package
-        run: conda build conda/$(basename $GITHUB_REPOSITORY)
+      - name: Build python package
+        run: python setup.py sdist
 
       - name: "push server image"
+        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
         run: |
           docker push $SM_DOCKER
 
       - name: "deploy to Cloud Run"
+        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             gcloud_deploy_name=sample-metadata-api
@@ -113,12 +117,16 @@ jobs:
             --region australia-southeast1 --no-allow-unauthenticated \
             --platform managed
 
-      - name: Upload to anaconda package repository
-        run: |
-          anaconda -t ${{ secrets.ANACONDA_TOKEN }} \
-            upload ${CONDA_PREFIX}/conda-bld/**/*.tar.bz2
+      - name: Publish package
+        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: dist/
 
       - name: Build and push sample-metadata API docker image
+        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
         run: |
           version=$(cat deploy/python/version.txt)
           docker build \
