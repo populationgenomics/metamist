@@ -203,6 +203,15 @@ class SampleLayer(BaseLayer):
             active=active,
         )
 
+    async def merge_samples(
+        self,
+        id_keep: int,
+        id_merge: int,
+    ):
+        """Merge two samples into one another"""
+        print(self)
+        return {'response': f'Merging {id_merge} into {id_keep}'}
+
     async def upsert_sample(self, sample: SampleUpsert):
         """Upsert a sample"""
         if not sample.id:
