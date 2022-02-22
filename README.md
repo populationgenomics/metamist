@@ -54,14 +54,15 @@ You can configure the MariaDB connection with environment variables.
 ### Creating the environment
 
 Dependencies for the `sample-metadata` API package are listed in `setup.py`.
-Additional dev requirements are listed in `requirements-dev.txt`, and packages for the sever-side code are listed in `requirements-server.txt`.
+Additional dev requirements are listed in `requirements-dev.txt`, and packages for
+the sever-side code are listed in `requirements.txt`.
 
 To create the full dev environment, run:
 
 ```shell
 virtualenv venv
 source venv/bin/activate
-pip install -r requirements-server.txt
+pip install -r requirements.txt
 pip install -r requirements-dev.txt
 pip install --editable .
 ```

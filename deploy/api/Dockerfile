@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED 1
 EXPOSE $PORT
 
 WORKDIR /app/sample_metadata/
-COPY requirements-server.txt requirements-server.txt
+COPY requirements.txt requirements.txt
 
 RUN apt-get update && \
     apt-get install -y wget bash bzip2 zip && \
@@ -21,7 +21,7 @@ RUN apt-get update && \
     mkdir $MAMBA_ROOT_PREFIX && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c conda-forge \
         python=3.10 pip && \
-    pip install -r requirements-server.txt && \
+    pip install -r requirements.txt && \
     rm -r /root/micromamba/pkgs
 
 COPY api api

@@ -2,7 +2,7 @@
 
 """
 Setup script for the Python package. Dependencies for server are listed separately
-in requirements-server.txt, dev dependencies are listed in requirements-dev.txt.
+in requirements.txt, dev dependencies are listed in requirements-dev.txt.
 """
 
 from setuptools import setup, find_packages
