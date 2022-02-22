@@ -1,8 +1,8 @@
 #!/usr/bin/env python
+
 """
-Setup script for the analysis_runner python API
-- Used for development setup with `pip install --editable .`
-- Parsed by conda-build to extract version and metainfo
+Setup script for the Python package. Dependencies for server are listed separately
+in requirements.txt, dev dependencies are listed in requirements-dev.txt.
 """
 
 from setuptools import setup, find_packages
@@ -29,13 +29,14 @@ setup(
     license='MIT',
     packages=all_packages,
     install_requires=[
+        'click',
+        'cpg-utils',
         'google-auth',
         'google-api-core',  # dependency to google-auth that however is not
         # pulled automatically: https://github.com/googleapis/google-auth-library-python/blob/main/setup.py#L22-L27
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',
-        'click',
         'typing-extensions',
     ],
     include_package_data=True,

@@ -20,11 +20,12 @@ For more information, please visit [{{{infoUrl}}}]({{{infoUrl}}})
 Python >= 3.6
 
 ## Installation & Usage
-### conda install
+### pip install
 
 ```sh
-conda create --name myenv
-conda install -c cpg {{{packageName}}}
+virtualenv venv
+source venv/bin/activate
+pip install {{{packageName}}}
 ```
 
 Then import the package:
