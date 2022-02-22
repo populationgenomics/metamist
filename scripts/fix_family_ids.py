@@ -12,7 +12,8 @@ from sample_metadata.model.family_update_model import FamilyUpdateModel
     '--family-id-json', help='json map (string) of {old_external: new_external}'
 )
 @click.option('--project')
-def main(family_id_json: str, project: str):
+@click.option('--force', is_flag=True, help='Do not confirm updates')
+def main(family_id_json: str, project: str, force=False):
     """Rename family external IDs with map {old_external: new_external}"""
     fid_map = json.loads(family_id_json)
     fapi = FamilyApi()
@@ -23,8 +24,18 @@ def main(family_id_json: str, project: str):
         for prev_id, new_id in fid_map.items()
         if prev_id in internal_fid_map
     }
-    print('Updating with', update_map)
-    new_map = list(update_map.items())
-    for fid, new_eid in new_map:
+
+    new_map = {str(k): str(v) for k, v in update_map.items()}
+    message = f'Updating {len(update_map)} families: {new_map}'
+    if force:
+        print(message)
+    elif not click.confirm(message, default=False):
+        raise click.Abort()
+
+    for fid, new_eid in update_map.items():
         print(f'Updating {fid}: {new_eid}')
         fapi.update_family(FamilyUpdateModel(id=fid, external_id=new_eid))
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=no-value-for-parameter

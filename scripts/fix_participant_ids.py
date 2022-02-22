@@ -11,7 +11,8 @@ from sample_metadata.apis import ParticipantApi
     '--participant-id-json', help='json map (string) of {old_external: new_external}'
 )
 @click.option('--project')
-def main(participant_id_json: str, project: str):
+@click.option('--force', is_flag=True, help='Do not confirm updates')
+def main(participant_id_json: str, project: str, force: bool = False):
     """Update participant IDs by external ID with map {old_external: new_external}"""
     pid_map = json.loads(participant_id_json)
     papi = ParticipantApi()
@@ -24,6 +25,16 @@ def main(participant_id_json: str, project: str):
         if prev_id in internal_pid_map
     }
 
-    if click.confirm(f'Updating {len(update_map)} participants: {update_map}\n'):
-        new_map = {str(k): str(v) for k, v in update_map.items()}
-        papi.update_many_participants(request_body=new_map)
+    message = f'Updating {len(update_map)} participants: {update_map}'
+
+    if force:
+        print(message)
+    elif not click.confirm(message, default=False):
+        raise click.Abort()
+
+    new_map = {str(k): str(v) for k, v in update_map.items()}
+    papi.update_many_participants(request_body=new_map)
+
+
+if __name__ == '__main__':
+    main()  # pylint: disable=no-value-for-parameter
