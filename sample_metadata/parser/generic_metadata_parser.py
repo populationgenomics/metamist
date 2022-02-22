@@ -257,12 +257,13 @@ class GenericMetadataParser(GenericParser):
         dry_run=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
+        file = self.file_path(manifest)
 
         _delimiter = delimiter or GenericMetadataParser.guess_delimiter_from_filename(
-            manifest
+            file
         )
 
-        file_contents = await self.file_contents(manifest)
+        file_contents = await self.file_contents(file)
         return await self.parse_manifest(
             StringIO(file_contents),
             delimiter=_delimiter,

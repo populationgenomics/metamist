@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List
+from typing import Dict, List
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -11,30 +11,29 @@ from db.python.layers.sequence import (
     SequenceType,
     SequenceStatus,
     SampleSequenceLayer,
+    SequenceUpdateModel,
 )
 from models.models.sample import (
+    sample_id_format,
     sample_id_transform_to_raw,
     sample_id_transform_to_raw_list,
-    sample_id_format,
 )
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
 
 
-class NewSequence(BaseModel):
+class Sequence(BaseModel):
     """Model for creating new sequence"""
 
-    sample_id: str
     status: SequenceStatus
     meta: Dict
     type: SequenceType
 
 
-class SequenceUpdateModel(BaseModel):
-    """Update analysis model"""
+class NewSequence(Sequence):
+    """Model for creating new sequence"""
 
-    status: Optional[SequenceStatus] = None
-    meta: Optional[Dict] = None
+    sample_id: str
 
 
 @router.put('/', operation_id='createNewSequence')
@@ -63,7 +62,7 @@ async def update_sequence(
         sequence_id, status=sequence.status, meta=sequence.meta
     )
 
-    return {'success': True}
+    return sequence_id
 
 
 @router.get('/{sequence_id}/details', operation_id='getSequenceByID')

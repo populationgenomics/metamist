@@ -1,11 +1,42 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Union
+
+from pydantic import BaseModel
 
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
+from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from db.python.tables.sequence import SampleSequencingTable
+
 from models.enums import SampleType
-from models.models.sample import Sample, sample_id_format_list
+from models.models.sample import (
+    Sample,
+    sample_id_format_list,
+)
+
+
+class SampleUpsert(BaseModel):
+    """Update model for Sample"""
+
+    external_id: Optional[str]
+    type: Optional[SampleType] = None
+    meta: Optional[Dict] = {}
+    participant_id: Optional[int] = None
+    active: Optional[bool] = None
+
+
+class SampleBatchUpsertItem(SampleUpsert):
+    """Update model for sample with sequences list"""
+
+    id: Optional[Union[str, int]]
+    sequences: List[SequenceUpsert]
+
+
+class SampleBatchUpsert(BaseModel):
+    """Upsert model for batch Samples"""
+
+    samples: List[SampleBatchUpsertItem]
 
 
 class SampleLayer(BaseLayer):
@@ -14,6 +45,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
+        self.seqt: SampleSequencingTable = SampleSequencingTable(connection)
 
     # GETS
     async def get_single_by_external_id(
@@ -171,6 +203,29 @@ class SampleLayer(BaseLayer):
             active=active,
         )
 
+    async def upsert_sample(self, sample: SampleUpsert):
+        """Upsert a sample"""
+        if not sample.id:
+            internal_id = await self.insert_sample(
+                external_id=sample.external_id,
+                sample_type=sample.type,
+                active=True,
+                meta=sample.meta,
+                participant_id=sample.participant_id,
+                check_project_id=False,
+            )
+            return int(internal_id)
+
+        # Otherwise update
+        internal_id = await self.update_sample(
+            id_=sample.id,
+            meta=sample.meta,
+            participant_id=sample.participant_id,
+            type_=sample.type,
+            active=sample.active,
+        )
+        return int(internal_id)
+
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int], check_sample_ids=True
     ) -> bool:
@@ -206,3 +261,17 @@ class SampleLayer(BaseLayer):
             )
 
         return rows
+
+    async def batch_upsert_samples(
+        self, samples: SampleBatchUpsert, seqt: SampleSequenceLayer
+    ):
+        """Batch upsert a list of samples with sequences"""
+        # Create or update samples
+        iids = [await self.upsert_sample(s) for s in samples.samples]
+
+        # Upsert all sequences with paired sids
+        sequences = zip(iids, [x.sequences for x in samples.samples])
+        seqs = [await seqt.upsert_sequences(iid, seqs) for iid, seqs in sequences]
+
+        # Format and return response
+        return dict(zip(iids, seqs))

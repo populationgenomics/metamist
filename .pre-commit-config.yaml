@@ -26,6 +26,7 @@ repos:
     args: [.]
     pass_filenames: false
     always_run: true
+    exclude: ^sample_metadata/
 
 - repo: https://gitlab.com/pycqa/flake8
   rev: '3.9.2'
