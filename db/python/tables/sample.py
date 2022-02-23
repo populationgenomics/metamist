@@ -164,7 +164,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             await self.connection.execute(_query_analyses)
             await self.connection.execute(_del_sample)
 
-        _, new_sample = await self.get_single_by_id(id_keep)
+        project, new_sample = await self.get_single_by_id(id_keep)
+        new_sample.project = project
 
         return new_sample
 
