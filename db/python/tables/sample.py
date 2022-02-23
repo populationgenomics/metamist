@@ -128,7 +128,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
                 d[key] = list_merge(meta1[key], value)
 
-            return d  # {"data": "here's some data", "num": 42, "specimen": "blood"}
+            return d
 
         values: Dict[str, Any] = {
             'id': id_keep,
