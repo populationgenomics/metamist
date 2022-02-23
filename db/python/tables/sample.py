@@ -3,7 +3,7 @@ from typing import List, Dict, Tuple, Iterable, Set, Any
 from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import SampleType
-from models.models.sample import Sample
+from models.models.sample import Sample, sample_id_format
 
 
 class SampleTable(DbBase):
@@ -104,26 +104,69 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         author: str = None,
     ):
         """Merge two samples together"""
+        sid_merge = sample_id_format(id_merge)
         _, sample_keep = await self.get_single_by_id(id_keep)
         _, sample_merge = await self.get_single_by_id(id_merge)
+        merged_from = to_db_json({'merged_from': sid_merge})
+
+        def list_merge(l1: Any, l2: Any) -> List:
+            lst: List = [l1, l2]
+            if isinstance(l1, list) and isinstance(l2, list):
+                lst = l1 + l2
+            elif isinstance(l1, list):
+                lst = l1 + [l2]
+            elif isinstance(l2, list):
+                lst = [l1] + l2
+            return lst
+
+        def dict_merge(meta1, meta2):
+            d = dict(meta1)
+            d.update(meta2)
+            for key, value in meta2.items():
+                if key not in meta1.keys() or meta1[key] is None or value is None:
+                    continue
+
+                d[key] = list_merge(meta1[key], value)
+
+            return d  # {"data": "here's some data", "num": 42, "specimen": "blood"}
 
         values: Dict[str, Any] = {
             'id': id_keep,
             'author': author or self.author,
-            'meta1': to_db_json(sample_keep.meta),
-            'meta2': to_db_json(sample_merge.meta),
+            'meta': to_db_json(dict_merge(sample_keep.meta, sample_merge.meta)),
+            'merged_from': merged_from,
         }
 
-        fields = [
-            'author = :author',
-            'meta = JSON_MERGE(:meta1, :meta2, \'{"merged_from": "old_sample_to_delete"}\')',
-        ]
+        _query = """
+            UPDATE sample
+            SET author = :author,
+                meta = JSON_MERGE_PATCH(:meta, :merged_from)
+            WHERE id = :id
+        """
+        _query_seqs = f"""
+            UPDATE sample_sequencing
+            SET sample_id = {id_keep}
+            WHERE sample_id = {id_merge}
+        """
+        _query_analyses = f"""
+            UPDATE analysis_sample
+            SET sample_id = {id_keep}
+            WHERE sample_id = {id_merge}
+        """
+        _del_sample = f"""
+            DELETE FROM sample
+            WHERE id = {id_merge}
+        """
 
-        fields_str = ', '.join(fields)
-        _query = f'UPDATE sample SET {fields_str} WHERE id = :id'
-        result = await self.connection.execute(_query, {**values})
-        print(result)
-        return result
+        async with self.connection.transaction():
+            await self.connection.execute(_query, {**values})
+            await self.connection.execute(_query_seqs)
+            await self.connection.execute(_query_analyses)
+            await self.connection.execute(_del_sample)
+
+        _, new_sample = await self.get_single_by_id(id_keep)
+
+        return new_sample
 
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int]
@@ -154,7 +197,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         sample_row = await self.connection.fetch_one(_query, {'id': internal_id})
 
         if sample_row is None:
-            raise NotFoundError(f'Couldn\'t find sample with internal id {internal_id}')
+            raise NotFoundError(
+                f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
+            )
 
         d = dict(sample_row)
         project = d.pop('project')
