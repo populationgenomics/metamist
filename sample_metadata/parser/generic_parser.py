@@ -390,7 +390,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
 
-        await self.validate_rows(sample_map)
+        await self.validate_rows(sample_map)    # type: ignore
 
         if len(sample_map) == 0:
             raise ValueError(f'{proj}: The manifest file contains no records')

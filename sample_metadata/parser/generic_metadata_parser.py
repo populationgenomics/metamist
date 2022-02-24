@@ -6,10 +6,7 @@ from io import StringIO
 from functools import reduce
 
 
-from sample_metadata.parser.generic_parser import (
-    GenericParser,
-    GroupedRow,
-)  # noqa
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync     # noqa
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -32,6 +29,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='wgs',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
+        allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             path_prefix=path_prefix,
@@ -52,6 +50,7 @@ class GenericMetadataParser(GenericParser):
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
+        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
     async def validate_rows(
         self, sample_map: Dict[str, Union[dict, List[dict]]]
@@ -59,6 +58,15 @@ class GenericMetadataParser(GenericParser):
         if not self.reads_column:
             return True
 
+        if not self.allow_extra_files_in_search_path:
+            return self.check_files_covered_by_file_map(sample_map)
+
+        return True
+
+    def check_files_covered_by_file_map(self, sample_map: Union[dict, List[dict]]) -> bool:
+        """
+        Check that the files in the search_paths are completely covered by the sample_map
+        """
         filenames = []
         for rows in sample_map.values():
             if isinstance(rows, list):

@@ -48,6 +48,12 @@ logger.setLevel(logging.INFO)
 @click.option(
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
 )
+@click.option(
+    '--allow-extra-files-in-search_path',
+    is_flag=True,
+    help='By default, this parser will fail if there are crams, bams, fastqs '
+    'in the search path that are not covered by the sample map.',
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -58,6 +64,7 @@ async def main(
     default_sequence_type='wgs',
     confirm=False,
     dry_run=False,
+    allow_extra_files_in_search_path=False,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -72,6 +79,7 @@ async def main(
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,
+        allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
