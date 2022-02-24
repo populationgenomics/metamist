@@ -8,6 +8,7 @@ from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
+from db.python.tables.sample import SampleTable
 
 
 class PedRow:
@@ -232,12 +233,32 @@ class FamilyLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
+        self.stable = SampleTable(connection)
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
-    async def get_families(self, project: int = None):
+    async def get_families(
+        self,
+        project: int = None,
+        participant_ids: List[int] = None,
+        sample_ids: List[int] = None,
+    ):
         """Get all families for a project"""
-        return await self.ftable.get_families(project=project)
+
+        # Merge sample_id and participant_ids into a single list
+        all_participants = participant_ids if participant_ids else []
+
+        # Find the participants from the given samples
+        _, sid_participants = await self.stable.get_samples_by(
+            project_ids=[project], sample_ids=sample_ids
+        )
+
+        all_participants += [int(s.participant_id) for s in sid_participants]
+        all_participants = list(set(all_participants))
+
+        return await self.ftable.get_families(
+            project=project, participant_ids=participant_ids
+        )
 
     async def update_family(
         self,
