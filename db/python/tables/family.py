@@ -38,6 +38,7 @@ class FamilyTable(DbBase):
             FROM family
         """
 
+        values: Dict[str, Any] = {'project': project or self.project}
         where: List[str] = []
 
         if participant_ids:
@@ -45,16 +46,22 @@ class FamilyTable(DbBase):
                 JOIN family_participant
                 ON family.id = family_participant.family_id
             """
-            pids = ', '.join([str(x) for x in participant_ids])
+
+            placeholders = []
+            for i, pid in enumerate(participant_ids):
+                values[str(i)] = pid
+                placeholders.append(f':{i}')
+
+            pids = ', '.join(placeholders)
             where.append(f'participant_id IN ({pids})')
 
-        if project:
-            where.append(f'project = {project or self.project}')
+        if project or self.project:
+            where.append('project = :project')
 
         if where:
             _query += 'WHERE ' + ' AND '.join(where)
 
-        rows = await self.connection.fetch_all(_query)
+        rows = await self.connection.fetch_all(_query, {**values})
         families = [Family.from_db(dict(r)) for r in rows]
         return families
 
