@@ -105,25 +105,24 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     ):
         """Merge two samples together"""
         sid_merge = sample_id_format(id_merge)
-        _, sample_keep = await self.get_single_by_id(id_keep)
-        _, sample_merge = await self.get_single_by_id(id_merge)
+        _, samples = await self.get_samples_by(sample_ids=[id_keep, id_merge])
+        meta_map = {s.id: s.meta for s in samples}
         merged_from = to_db_json({'merged_from': sid_merge})
 
         def list_merge(l1: Any, l2: Any) -> List:
-            lst: List = [l1, l2]
             if isinstance(l1, list) and isinstance(l2, list):
-                lst = l1 + l2
-            elif isinstance(l1, list):
-                lst = l1 + [l2]
-            elif isinstance(l2, list):
-                lst = [l1] + l2
-            return lst
+                return l1 + l2
+            if isinstance(l1, list):
+                return l1 + [l2]
+            if isinstance(l2, list):
+                return [l1] + l2
+            return [l1, l2]
 
         def dict_merge(meta1, meta2):
             d = dict(meta1)
             d.update(meta2)
             for key, value in meta2.items():
-                if key not in meta1.keys() or meta1[key] is None or value is None:
+                if key not in meta1 or meta1[key] is None or value is None:
                     continue
 
                 d[key] = list_merge(meta1[key], value)
@@ -131,10 +130,13 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             return d
 
         values: Dict[str, Any] = {
-            'id': id_keep,
-            'author': author or self.author,
-            'meta': to_db_json(dict_merge(sample_keep.meta, sample_merge.meta)),
-            'merged_from': merged_from,
+            'sample': {
+                'id': id_keep,
+                'author': author or self.author,
+                'meta': to_db_json(dict_merge(meta_map[id_keep], meta_map[id_merge])),
+                'merged_from': merged_from,
+            },
+            'ids': {'id_keep': id_keep, 'id_merge': id_merge},
         }
 
         _query = """
@@ -145,24 +147,24 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """
         _query_seqs = f"""
             UPDATE sample_sequencing
-            SET sample_id = {id_keep}
-            WHERE sample_id = {id_merge}
+            SET sample_id = :id_keep
+            WHERE sample_id = :id_merge
         """
         _query_analyses = f"""
             UPDATE analysis_sample
-            SET sample_id = {id_keep}
-            WHERE sample_id = {id_merge}
+            SET sample_id = :id_keep
+            WHERE sample_id = :id_merge
         """
         _del_sample = f"""
             DELETE FROM sample
-            WHERE id = {id_merge}
+            WHERE id = :id_merge
         """
 
         async with self.connection.transaction():
-            await self.connection.execute(_query, {**values})
-            await self.connection.execute(_query_seqs)
-            await self.connection.execute(_query_analyses)
-            await self.connection.execute(_del_sample)
+            await self.connection.execute(_query, {**values['sample']})
+            await self.connection.execute(_query_seqs, {**values['ids']})
+            await self.connection.execute(_query_analyses, {**values['ids']})
+            await self.connection.execute(_del_sample, id_merge=id_merge)
 
         project, new_sample = await self.get_single_by_id(id_keep)
         new_sample.project = project

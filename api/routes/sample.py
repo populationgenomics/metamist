@@ -211,7 +211,12 @@ async def merge_samples(
     id_merge: str,
     connection: Connection = get_projectless_db_connection,
 ):
-    """Merge two samples"""
+    """
+    Merge one sample into another, this function achieves the merge
+    by rewriting all sample_ids of {id_merge} with {id_keep}. You must
+    carefully consider if analysis objects need to be deleted, or other
+    implications BEFORE running this method.
+    """
     st = SampleLayer(connection)
     result = await st.merge_samples(
         id_keep=sample_id_transform_to_raw(id_keep),
