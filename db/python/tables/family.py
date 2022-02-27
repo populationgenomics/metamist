@@ -15,9 +15,9 @@ class FamilyTable(DbBase):
     async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
-        SELECT project FROM family
-        WHERE id in :family_ids
-        GROUP BY project
+            SELECT project FROM family
+            WHERE id in :family_ids
+            GROUP BY project
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
@@ -46,14 +46,8 @@ class FamilyTable(DbBase):
                 JOIN family_participant
                 ON family.id = family_participant.family_id
             """
-
-            placeholders = []
-            for i, pid in enumerate(participant_ids):
-                values[str(i)] = pid
-                placeholders.append(f':{i}')
-
-            pids = ', '.join(placeholders)
-            where.append(f'participant_id IN ({pids})')
+            where.append(f'participant_id IN (:pids)')
+            values['pids'] = participant_ids
 
         if project or self.project:
             where.append('project = :project')
