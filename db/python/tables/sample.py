@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Dict, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
@@ -105,11 +106,18 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     ):
         """Merge two samples together"""
         sid_merge = sample_id_format(id_merge)
-        _, samples = await self.get_samples_by(sample_ids=[id_keep, id_merge])
-        meta_map = {s.id: s.meta for s in samples}
-        merged_from = to_db_json({'merged_from': sid_merge})
+        (_, sample_keep), (_, sample_merge) = await asyncio.gather(
+            self.get_single_by_id(id_keep),
+            self.get_single_by_id(id_merge),
+        )
 
         def list_merge(l1: Any, l2: Any) -> List:
+            if l1 is None:
+                return l2
+            if l2 is None:
+                return l1
+            if l1 == l2:
+                return l1
             if isinstance(l1, list) and isinstance(l2, list):
                 return l1 + l2
             if isinstance(l1, list):
@@ -129,12 +137,18 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
             return d
 
+        # this handles merging a sample that has already been merged
+        meta_original = sample_keep.meta
+        meta_original['merged_from'] = list_merge(
+            meta_original.get('merged_from'), sid_merge
+        )
+        meta: Dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
+
         values: Dict[str, Any] = {
             'sample': {
                 'id': id_keep,
                 'author': author or self.author,
-                'meta': to_db_json(dict_merge(meta_map[id_keep], meta_map[id_merge])),
-                'merged_from': merged_from,
+                'meta': to_db_json(meta),
             },
             'ids': {'id_keep': id_keep, 'id_merge': id_merge},
         }
@@ -142,7 +156,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         _query = """
             UPDATE sample
             SET author = :author,
-                meta = JSON_MERGE_PATCH(:meta, :merged_from)
+                meta = :meta
             WHERE id = :id
         """
         _query_seqs = f"""
@@ -164,10 +178,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             await self.connection.execute(_query, {**values['sample']})
             await self.connection.execute(_query_seqs, {**values['ids']})
             await self.connection.execute(_query_analyses, {**values['ids']})
-            await self.connection.execute(_del_sample, id_merge=id_merge)
+            await self.connection.execute(_del_sample, {'id_merge': id_merge})
 
         project, new_sample = await self.get_single_by_id(id_keep)
         new_sample.project = project
+        new_sample.author = author or self.author
 
         return new_sample
 
