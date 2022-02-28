@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
@@ -9,7 +9,8 @@ from models.models.sample import (
     sample_id_format,
     sample_id_transform_to_raw_list,
 )
-from db.python.layers.sample import SampleLayer
+
+from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
@@ -58,6 +59,33 @@ async def create_new_sample(
             check_project_id=False,
         )
         return sample_id_format(internal_id)
+
+
+@router.put(
+    '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
+)
+async def batch_upsert_samples(
+    samples: SampleBatchUpsert,
+    connection: Connection = get_project_write_connection,
+) -> Dict[str, Any]:
+    """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
+
+    # Convert id in samples to int
+    for sample in samples.samples:
+        sample.id = sample_id_transform_to_raw(sample.id)
+
+    async with connection.connection.transaction():
+        # Table interfaces
+        st = SampleLayer(connection)
+
+        results = await st.batch_upsert_samples(samples)
+
+        # Map sids back from ints to strs
+        for iid, seqs in results.items():
+            data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
+            results[iid] = data
+
+        return results
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')

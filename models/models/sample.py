@@ -4,6 +4,7 @@ from typing import Optional, Dict, Union, List, Sequence, Type
 
 from models.base import SMBase
 from models.enums.sample import SampleType
+from models.models.sequence import SampleSequencing
 
 SAMPLE_PREFIX = os.getenv('SM_SAMPLEPREFIX', 'CPGLCL').upper()
 CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
@@ -42,6 +43,12 @@ class Sample(SMBase):
 
 
 SampleIdRaw = Union[str, int]
+
+
+class SampleSequences(Sample):
+    """Model for a Sample with list of sequences"""
+
+    sequences: Optional[List[SampleSequencing]] = []
 
 
 def sample_id_transform_to_raw_list(

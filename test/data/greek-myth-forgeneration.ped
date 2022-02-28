@@ -1,0 +1,635 @@
+#Family	Individual ID	Paternal ID	Maternal ID	Sex	Affected
+GRKMYTH	Eurydice-2			2	2
+GRKMYTH	Chloris-2			2	2
+GRKMYTH	Alcidice			2	2
+GRKMYTH	Gaea			2	2
+GRKMYTH	Pontus			1	2
+GRKMYTH	Uranus			1	2
+GRKMYTH	Phoebe	Uranus	Gaea	2	2
+GRKMYTH	Coeus	Uranus	Gaea	1	2
+GRKMYTH	Hyperion	Uranus	Gaea	1	2
+GRKMYTH	Thea	Uranus	Gaea	2	2
+GRKMYTH	Oceanus	Uranus	Gaea	1	2
+GRKMYTH	Tethys	Uranus	Gaea	2	2
+GRKMYTH	Iapetus	Uranus	Gaea	1	2
+GRKMYTH	Pleione	Oceanus	Tethys	2	2
+GRKMYTH	Mnemnosyne	Uranus	Gaea	2	2
+GRKMYTH	Dione	Uranus	Gaea	2	2
+GRKMYTH	Themis	Uranus	Gaea	2	2
+GRKMYTH	Unknown-Woman-0001			2	2
+GRKMYTH	Idomene			2	2
+GRKMYTH	Cretheus			1	2
+GRKMYTH	Periclymene			2	2
+GRKMYTH	Enarete			2	2
+GRKMYTH	Aeolus			1	2
+GRKMYTH	Anaxibia			2	2
+GRKMYTH	Amata			2	2
+GRKMYTH	Dryope			2	2
+GRKMYTH	Clymene-1	Oceanus	Tethys	2	2
+GRKMYTH	Rhea-Silvia			2	2
+GRKMYTH	Hersilia			2	2
+GRKMYTH	Nereus	Pontus	Gaea	1	2
+GRKMYTH	Telacleia			2	2
+GRKMYTH	Andromache			2	2
+GRKMYTH	Leonassa			2	2
+GRKMYTH	Strymo			2	2
+GRKMYTH	Eos	Hyperion	Thea	2	2
+GRKMYTH	Selene	Hyperion	Thea	2	2
+GRKMYTH	Helios	Hyperion	Thea	1	2
+GRKMYTH	Household-servants-of-Priam			2	2
+GRKMYTH	Arisbe-2			2	2
+GRKMYTH	Eurydice-3			2	2
+GRKMYTH	Aesyetes			1	2
+GRKMYTH	Callirrhoe			2	2
+GRKMYTH	Capys-1			1	2
+GRKMYTH	Scamander	Oceanus	Tethys	1	2
+GRKMYTH	Doris-1	Oceanus	Tethys	2	2
+GRKMYTH	Metis	Oceanus	Tethys	0	2
+GRKMYTH	Astyoche-2			2	2
+GRKMYTH	Anticlea			2	2
+GRKMYTH	Arcisius			1	2
+GRKMYTH	Chalcomedusa			2	2
+GRKMYTH	Periboea-4			2	2
+GRKMYTH	Icarius-2			1	2
+GRKMYTH	Oebalus			1	2
+GRKMYTH	Perse			2	2
+GRKMYTH	Circe	Helios	Perse	2	2
+GRKMYTH	Pasiphae	Helios	Perse	2	2
+GRKMYTH	Oenone			2	2
+GRKMYTH	Leda			2	2
+GRKMYTH	Hypermnestra-1			2	2
+GRKMYTH	Batea			2	2
+GRKMYTH	a-slave			2	2
+GRKMYTH	Aerope			2	2
+GRKMYTH	Hippodamia			2	2
+GRKMYTH	Periboea-2			2	2
+GRKMYTH	Telamon			1	2
+GRKMYTH	Pelopia			2	2
+GRKMYTH	Asteria	Coeus	Phoebe	2	2
+GRKMYTH	Leto	Coeus	Phoebe	2	2
+GRKMYTH	Amphitryon			1	2
+GRKMYTH	Megara			2	2
+GRKMYTH	Deianira			2	2
+GRKMYTH	Laothoe			2	2
+GRKMYTH	Epione			2	2
+GRKMYTH	Thetis	Nereus	Doris-1	2	2
+GRKMYTH	Psamanthe	Nereus	Doris-1	2	2
+GRKMYTH	Amphitrite	Nereus	Doris-1	2	2
+GRKMYTH	Galatea	Nereus	Doris-1	2	2
+GRKMYTH	15-other-Nereids	Nereus	Doris-1	2	2
+GRKMYTH	Endeis			2	2
+GRKMYTH	Aegina			2	2
+GRKMYTH	Eune			2	2
+GRKMYTH	Astyoche-1			2	2
+GRKMYTH	Myrmidon			1	2
+GRKMYTH	Pasidice			2	2
+GRKMYTH	Deidamia-1			2	2
+GRKMYTH	Tartarus			1	2
+GRKMYTH	Erebus			1	2
+GRKMYTH	Nyx			2	2
+GRKMYTH	Hypnos	Erebus	Nyx	1	2
+GRKMYTH	Thanatos	Tartarus	Gaea	1	2
+GRKMYTH	Moros	Erebus	Nyx	0	2
+GRKMYTH	Cer	Erebus	Nyx	2	2
+GRKMYTH	Dreams	Erebus	Nyx	0	2
+GRKMYTH	Momus	Erebus	Nyx	1	2
+GRKMYTH	Oizys	Erebus	Nyx	0	2
+GRKMYTH	Nemesis	Erebus	Nyx	2	2
+GRKMYTH	Aether	Erebus	Nyx	0	2
+GRKMYTH	Hemera	Erebus	Nyx	2	2
+GRKMYTH	Prometheus	Iapetus	Themis	1	2
+GRKMYTH	Epimetheus	Iapetus	Clymene-1	1	2
+GRKMYTH	Aethra			2	2
+GRKMYTH	Psyche			2	2
+GRKMYTH	a-nymph			2	2
+GRKMYTH	sea-foam			2	2
+GRKMYTH	Typhoeus	Tartarus	Gaea	1	2
+GRKMYTH	the-Eagle-of-Zeus	Tartarus	Gaea	0	2
+GRKMYTH	Phorcys	Pontus	Gaea	1	2
+GRKMYTH	Ceto	Pontus	Gaea	2	2
+GRKMYTH	Evippe			2	2
+GRKMYTH	Stheno	Phorcys	Ceto	2	2
+GRKMYTH	Euryale	Phorcys	Ceto	2	2
+GRKMYTH	Medusa	Phorcys	Ceto	2	2
+GRKMYTH	Eurybia			2	2
+GRKMYTH	Creus			1	2
+GRKMYTH	Pallas-1	Creus	Eurybia	1	2
+GRKMYTH	Styx	Oceanus	Tethys	2	2
+GRKMYTH	Zelus	Pallas-1	Styx	0	2
+GRKMYTH	Nike	Pallas-1	Styx	2	2
+GRKMYTH	Cratus	Pallas-1	Styx	0	2
+GRKMYTH	Bia	Pallas-1	Styx	0	2
+GRKMYTH	Chryse			2	2
+GRKMYTH	Hesperis			2	2
+GRKMYTH	Aegle	Erebus	Nyx	2	2
+GRKMYTH	Erythea	Phorcys	Ceto	2	2
+GRKMYTH	Hestia	Erebus	Nyx	2	2
+GRKMYTH	other-Hesperides	Phorcys	Ceto	2	2
+GRKMYTH	Hippocoon	Oebalus	Batea	1	2
+GRKMYTH	Icarius	Oebalus	Batea	1	2
+GRKMYTH	Dino	Phorcys	Ceto	2	2
+GRKMYTH	Pephredo	Phorcys	Ceto	2	2
+GRKMYTH	Enyo	Phorcys	Ceto	2	2
+GRKMYTH	Electra-1	Oceanus	Tethys	2	2
+GRKMYTH	Thaumas	Pontus	Gaea	1	2
+GRKMYTH	Astraeus			1	2
+GRKMYTH	Aello	Thaumas	Electra-1	2	2
+GRKMYTH	Ocypete	Thaumas	Electra-1	2	2
+GRKMYTH	Podarge	Thaumas	Electra-1	2	2
+GRKMYTH	Nicothoe	Thaumas	Electra-1	2	2
+GRKMYTH	Chloris-1			2	2
+GRKMYTH	Agenor-1			1	2
+GRKMYTH	Telephassa			2	2
+GRKMYTH	Phoenix-1	Agenor-1	Telephassa	1	2
+GRKMYTH	Cilix	Agenor-1	Telephassa	0	2
+GRKMYTH	the-bull-sent-to-Minos-by-Poseidon			1	2
+GRKMYTH	Minotaurus	the-bull-sent-to-Minos-by-Poseidon	Pasiphae	1	2
+GRKMYTH	Pandora			2	2
+GRKMYTH	Menoetius-1	Iapetus	Clymene-1	1	2
+GRKMYTH	Deipyle			2	2
+GRKMYTH	Cyrene			2	2
+GRKMYTH	Pluto			2	2
+GRKMYTH	Oeneus			1	2
+GRKMYTH	Periboea-3			2	2
+GRKMYTH	Telaus			1	2
+GRKMYTH	Unknown-Woman-0003			2	2
+GRKMYTH	Eriphyle	Telaus	Unknown-Woman-0003	2	2
+GRKMYTH	Amphiaraus			1	2
+GRKMYTH	Achelous	Oceanus	Tethys	1	2
+GRKMYTH	Sisyphus			1	2
+GRKMYTH	Eurymeda			2	2
+GRKMYTH	Antea			2	2
+GRKMYTH	Cleomestra			2	2
+GRKMYTH	Antenor	Aesyetes	Cleomestra	1	2
+GRKMYTH	Oileus			1	2
+GRKMYTH	Eriopis-2			2	2
+GRKMYTH	Ajax-1	Oileus	Eriopis-2	1	2
+GRKMYTH	Cisseus			1	2
+GRKMYTH	Periboea-5			2	2
+GRKMYTH	Axius			1	2
+GRKMYTH	Pelegon	Axius	Periboea-5	1	2
+GRKMYTH	Amyntor			1	2
+GRKMYTH	Phoenix-2	Amyntor	Hippodamia	1	2
+GRKMYTH	Anaxo			2	2
+GRKMYTH	Cepheus			1	2
+GRKMYTH	Cassiopea			2	2
+GRKMYTH	Lybia			2	2
+GRKMYTH	Danae			2	2
+GRKMYTH	Lynceus			1	2
+GRKMYTH	Jason			1	2
+GRKMYTH	Hypsipyle			2	2
+GRKMYTH	Medea			2	2
+GRKMYTH	Aeetes	Helios	Perse	1	2
+GRKMYTH	children-of-Jason-and-Medea	Jason	Medea	0	2
+GRKMYTH	Pandion			1	2
+GRKMYTH	Pylia			2	2
+GRKMYTH	Aethra-2			2	2
+GRKMYTH	Antiope-2			2	2
+GRKMYTH	Dia			2	2
+GRKMYTH	Agrius-2			1	2
+GRKMYTH	Thersites	Agrius-2	Dia	1	2
+GRKMYTH	Glauce-2	Nereus	Doris-1	2	2
+GRKMYTH	Thalia-2	Nereus	Doris-1	2	2
+GRKMYTH	Cymodoce	Nereus	Doris-1	2	2
+GRKMYTH	Nesaia	Nereus	Doris-1	2	2
+GRKMYTH	Speo	Nereus	Doris-1	2	2
+GRKMYTH	Thoe	Nereus	Doris-1	2	2
+GRKMYTH	Halie	Nereus	Doris-1	2	2
+GRKMYTH	Cymothoe	Nereus	Doris-1	2	2
+GRKMYTH	Actaea	Nereus	Doris-1	2	2
+GRKMYTH	Limnorea	Nereus	Doris-1	2	2
+GRKMYTH	Melite	Nereus	Doris-1	2	2
+GRKMYTH	Iaera	Nereus	Doris-1	2	2
+GRKMYTH	Amphitoe	Nereus	Doris-1	2	2
+GRKMYTH	Agave	Nereus	Doris-1	2	2
+GRKMYTH	Doto	Nereus	Doris-1	2	2
+GRKMYTH	Proto	Nereus	Doris-1	2	2
+GRKMYTH	Pherusa	Nereus	Doris-1	2	2
+GRKMYTH	Dynamene	Nereus	Doris-1	2	2
+GRKMYTH	Dexamine	Nereus	Doris-1	2	2
+GRKMYTH	Amphinome	Nereus	Doris-1	2	2
+GRKMYTH	Callianeira	Nereus	Doris-1	2	2
+GRKMYTH	Doris-2	Nereus	Doris-1	2	2
+GRKMYTH	Namertes	Nereus	Doris-1	2	2
+GRKMYTH	Apseudes	Nereus	Doris-1	2	2
+GRKMYTH	Callianassa	Nereus	Doris-1	2	2
+GRKMYTH	Clymene	Nereus	Doris-1	2	2
+GRKMYTH	Ianeira	Nereus	Doris-1	2	2
+GRKMYTH	Ianassa	Nereus	Doris-1	2	2
+GRKMYTH	Maera	Nereus	Doris-1	2	2
+GRKMYTH	Oreithuia	Nereus	Doris-1	2	2
+GRKMYTH	Amatheia	Nereus	Doris-1	2	2
+GRKMYTH	Charon	Erebus	Styx	1	2
+GRKMYTH	Periboea-6			2	2
+GRKMYTH	Alcinous			1	2
+GRKMYTH	Arete			2	2
+GRKMYTH	Nausicaa	Alcinous	Arete	2	2
+GRKMYTH	Laodamas	Alcinous	Arete	1	2
+GRKMYTH	Elara			2	2
+GRKMYTH	Thoosa			2	2
+GRKMYTH	Iphthene	Icarius-2	Periboea-4	2	2
+GRKMYTH	Ino			2	2
+GRKMYTH	Aegaeon	Uranus	Gaea	1	2
+GRKMYTH	Gyges	Uranus	Gaea	1	2
+GRKMYTH	Cottus	Uranus	Gaea	1	2
+GRKMYTH	Halios	Alcinous	Arete	1	2
+GRKMYTH	Clytoneus	Alcinous	Arete	1	2
+GRKMYTH	Nycteus			1	2
+GRKMYTH	Eupheme			2	2
+GRKMYTH	Jocasta			2	2
+GRKMYTH	Laius			1	2
+GRKMYTH	Polydorus-2			1	2
+GRKMYTH	Oedipus	Laius	Jocasta	1	2
+GRKMYTH	Ladon	Phorcys	Ceto	1	2
+GRKMYTH	Helice			2	2
+GRKMYTH	Automedusa			2	2
+GRKMYTH	sister-of-Megara			2	2
+GRKMYTH	Athamas			1	2
+GRKMYTH	Learcus	Athamas	Ino	0	2
+GRKMYTH	Melicertes	Athamas	Ino	0	2
+GRKMYTH	Nephele			2	2
+GRKMYTH	Helle	Athamas	Nephele	2	2
+GRKMYTH	Inachus			1	2
+GRKMYTH	Eurygenia			2	2
+GRKMYTH	Ixion			1	2
+GRKMYTH	A-cloud-image-of-Hera			2	2
+GRKMYTH	the-Centaurs	Ixion	A-cloud-image-of-Hera	0	2
+GRKMYTH	Iphimedia			2	2
+GRKMYTH	Praxithea			2	2
+GRKMYTH	Arsinoe			2	2
+GRKMYTH	Amphilochus	Amphiaraus	Eriphyle	1	2
+GRKMYTH	Nisus-1	Pandion	Pylia	1	2
+GRKMYTH	Hyrtaeus			1	2
+GRKMYTH	Ida			2	2
+GRKMYTH	Egesta			2	2
+GRKMYTH	Crimisus			1	2
+GRKMYTH	Pygmalion-2			1	2
+GRKMYTH	a-statue			2	2
+GRKMYTH	Metanira			2	2
+GRKMYTH	Celeus			1	2
+GRKMYTH	Alcmaeon			1	2
+GRKMYTH	Acarnan	Alcmaeon	Callirrhoe	1	2
+GRKMYTH	Amphoterus	Alcmaeon	Callirrhoe	1	2
+GRKMYTH	Hippolyte			2	2
+GRKMYTH	Symaethis			2	2
+GRKMYTH	Aristaeus			1	2
+GRKMYTH	Autonoe			2	2
+GRKMYTH	Tecmessa			2	2
+GRKMYTH	Oxylus			1	2
+GRKMYTH	Hamadryas			2	2
+GRKMYTH	Karya	Oxylus	Hamadryas	2	2
+GRKMYTH	Balanos	Oxylus	Hamadryas	2	2
+GRKMYTH	Kraneia	Oxylus	Hamadryas	2	2
+GRKMYTH	Aigeiros	Oxylus	Hamadryas	2	2
+GRKMYTH	Ptelea	Oxylus	Hamadryas	2	2
+GRKMYTH	Morea	Oxylus	Hamadryas	2	2
+GRKMYTH	Ampelos	Oxylus	Hamadryas	2	2
+GRKMYTH	Syke	Oxylus	Hamadryas	2	2
+GRKMYTH	Oeagrus			1	2
+GRKMYTH	Echo			2	2
+GRKMYTH	Ananke			2	2
+GRKMYTH	Itone			2	2
+GRKMYTH	Chrysothemis			2	2
+GRKMYTH	Gordias			1	2
+GRKMYTH	Cybele			2	2
+GRKMYTH	Cronos	Uranus	Gaea	1	2
+GRKMYTH	Rhea	Uranus	Gaea	2	2
+GRKMYTH	Salmoneus	Aeolus	Enarete	1	2
+GRKMYTH	Zeus	Cronos	Rhea	1	2
+GRKMYTH	Hera	Cronos	Rhea	2	2
+GRKMYTH	Hades	Cronos	Rhea	1	2
+GRKMYTH	Aphrodite	Cronos	sea-foam	2	2
+GRKMYTH	Anchises	Capys-1	Themis	1	2
+GRKMYTH	Aeneas	Anchises	Aphrodite	1	2
+GRKMYTH	Hippolameia	Anchises	Unknown-Woman-0001	2	2
+GRKMYTH	Ares	Zeus	Hera	1	2
+GRKMYTH	Hephaestus	Zeus	Hera	1	2
+GRKMYTH	Atlas	Iapetus	Clymene-1	1	2
+GRKMYTH	Remus	Ares	Rhea-Silvia	1	2
+GRKMYTH	Romulus	Ares	Rhea-Silvia	1	2
+GRKMYTH	Julian-Kings-of-Rome	Romulus	Hersilia	1	2
+GRKMYTH	Hecuba	Cisseus	Telacleia	2	2
+GRKMYTH	Erichthonius	Hephaestus	Gaea	1	2
+GRKMYTH	Laertes	Arcisius	Chalcomedusa	1	2
+GRKMYTH	Odysseus	Laertes	Anticlea	1	2
+GRKMYTH	Penelope	Icarius-2	Periboea-4	2	2
+GRKMYTH	Telemachus	Odysseus	Penelope	1	2
+GRKMYTH	Perses	Creus	Eurybia	2	2
+GRKMYTH	Telegonus	Odysseus	Circe	1	2
+GRKMYTH	Helen	Zeus	Leda	2	2
+GRKMYTH	Tyndareus	Oebalus	Batea	1	2
+GRKMYTH	Castor	Zeus	Leda	1	2
+GRKMYTH	Polydeuces	Zeus	Leda	1	2
+GRKMYTH	Clytaemnestra	Tyndareus	Leda	2	2
+GRKMYTH	Ajax-2	Telamon	Periboea-2	1	2
+GRKMYTH	Tantalus	Zeus	Pluto	1	2
+GRKMYTH	Apollo	Zeus	Leto	1	2
+GRKMYTH	Artemis	Zeus	Leto	1	2
+GRKMYTH	Europa	Agenor-1	Telephassa	2	2
+GRKMYTH	Sarpedon	Zeus	Europa	1	2
+GRKMYTH	Rhadamanthus	Zeus	Europa	1	2
+GRKMYTH	Hebe	Zeus	Hera	2	2
+GRKMYTH	Thestor	Apollo	Laothoe	1	2
+GRKMYTH	Phlegyas	Ares	Chryse	1	2
+GRKMYTH	Asclepius	Apollo	Arsinoe	1	2
+GRKMYTH	Machaon	Asclepius	Epione	1	2
+GRKMYTH	Podalirius	Asclepius	Epione	1	2
+GRKMYTH	Aeacus	Zeus	Aegina	1	2
+GRKMYTH	Phocus	Aeacus	Psamanthe	1	2
+GRKMYTH	Crisius	Phocus	Asteria	0	2
+GRKMYTH	Penopeus	Phocus	Asteria	0	2
+GRKMYTH	Polyxo	Atlas	Aethra	2	2
+GRKMYTH	Actor	Myrmidon	Pasidice	1	2
+GRKMYTH	Cteatus	Actor	Aegina	1	2
+GRKMYTH	Philomela	Actor	Aegina	2	2
+GRKMYTH	Eurytus-2	Actor	Aegina	1	2
+GRKMYTH	Taygete	Atlas	Aethra	2	2
+GRKMYTH	Clotho	Zeus	Ananke	2	2
+GRKMYTH	Lachesis	Zeus	Ananke	2	2
+GRKMYTH	Atropos	Zeus	Ananke	2	2
+GRKMYTH	Hyas	Atlas	Aethra	1	2
+GRKMYTH	Scylla	Phorcys	Ceto	2	2
+GRKMYTH	Euryalus-2	Odysseus	Evippe	1	2
+GRKMYTH	Ambrosia	Atlas	Aethra	2	2
+GRKMYTH	Eudora	Atlas	Aethra	2	2
+GRKMYTH	Pedile	Atlas	Aethra	2	2
+GRKMYTH	Coronis-3	Atlas	Aethra	2	2
+GRKMYTH	Phyto	Atlas	Aethra	2	2
+GRKMYTH	Thyene	Atlas	Aethra	2	2
+GRKMYTH	Arethusa	Atlas	Aethra	2	2
+GRKMYTH	Hesperia	Atlas	Hesperis	2	2
+GRKMYTH	Electra-2	Atlas	Aethra	2	2
+GRKMYTH	Alcyone	Atlas	Aethra	2	2
+GRKMYTH	Sterope	Atlas	Aethra	2	2
+GRKMYTH	Celaeno	Atlas	Aethra	2	2
+GRKMYTH	Merope-1	Atlas	Aethra	2	2
+GRKMYTH	Iris	Thaumas	Electra-1	2	2
+GRKMYTH	Zephyrus	Astraeus	Eos	1	2
+GRKMYTH	Xanthus	Zephyrus	Podarge	1	2
+GRKMYTH	Carpus	Zephyrus	Chloris-1	1	2
+GRKMYTH	Enceladus	Cronos	Gaea	1	2
+GRKMYTH	Alcyoneus	Cronos	Gaea	1	2
+GRKMYTH	Porphyrion	Cronos	Gaea	1	2
+GRKMYTH	Ephialtes	Cronos	Gaea	1	2
+GRKMYTH	Eurytus-3	Cronos	Gaea	1	2
+GRKMYTH	Polybates	Cronos	Gaea	1	2
+GRKMYTH	Hippolytus-1	Cronos	Gaea	1	2
+GRKMYTH	Agrius-1	Cronos	Gaea	1	2
+GRKMYTH	Thoon	Cronos	Gaea	1	2
+GRKMYTH	Cadmus	Agenor-1	Telephassa	1	2
+GRKMYTH	Harmonia	Ares	Aphrodite	2	2
+GRKMYTH	Demeter	Cronos	Rhea	2	2
+GRKMYTH	Pyrrha	Epimetheus	Pandora	2	2
+GRKMYTH	Tydeus	Oeneus	Periboea-3	1	2
+GRKMYTH	Diomedes-1	Ares	Cyrene	1	2
+GRKMYTH	Adrastus	Telaus	Unknown-Woman-0003	1	2
+GRKMYTH	Glaucus-1	Sisyphus	Merope-1	1	2
+GRKMYTH	Bellerophon	Glaucus-1	Eurymeda	1	2
+GRKMYTH	Isander	Bellerophon	Antea	0	2
+GRKMYTH	Hippolochus	Bellerophon	Antea	0	2
+GRKMYTH	Laodamia	Bellerophon	Antea	0	2
+GRKMYTH	Pirithous	Ixion	Dia	1	2
+GRKMYTH	Polypoetes	Pirithous	Hippodamia	1	2
+GRKMYTH	Theano-1	Cisseus	Telacleia	2	2
+GRKMYTH	Demolion	Antenor	Theano-1	1	2
+GRKMYTH	Agenor-2	Antenor	Theano-1	1	2
+GRKMYTH	Coon	Antenor	Theano-1	0	2
+GRKMYTH	Iphidameis	Antenor	Theano-1	0	2
+GRKMYTH	Perseus	Zeus	Danae	1	2
+GRKMYTH	Andromeda	Cepheus	Cassiopea	2	2
+GRKMYTH	Abas-1	Lynceus	Hypermnestra-1	1	2
+GRKMYTH	Euneas	Jason	Hypsipyle	1	2
+GRKMYTH	Thoas-2	Jason	Hypsipyle	1	2
+GRKMYTH	Aegeus	Pandion	Pylia	1	2
+GRKMYTH	Medus	Aegeus	Medea	1	2
+GRKMYTH	Phrixus	Athamas	Nephele	1	2
+GRKMYTH	Tityus	Zeus	Elara	1	2
+GRKMYTH	Eirene	Zeus	Themis	2	2
+GRKMYTH	Dike	Zeus	Themis	2	2
+GRKMYTH	Eunomia	Zeus	Themis	2	2
+GRKMYTH	Antiope-1	Nycteus	Polyxo	2	2
+GRKMYTH	Amphion	Zeus	Antiope-1	1	2
+GRKMYTH	Zethus	Zeus	Antiope-1	1	2
+GRKMYTH	Nycteis	Nycteus	Polyxo	2	2
+GRKMYTH	Eteocles	Oedipus	Eurygenia	1	2
+GRKMYTH	Polynices	Oedipus	Eurygenia	1	2
+GRKMYTH	Antigone	Oedipus	Eurygenia	2	2
+GRKMYTH	Ismene	Oedipus	Eurygenia	2	2
+GRKMYTH	Erechtheus	Hephaestus	Gaea	1	2
+GRKMYTH	Eriopis-1	Apollo	Arsinoe	2	2
+GRKMYTH	Nisus-2	Hyrtaeus	Ida	1	2
+GRKMYTH	Acestes	Crimisus	Egesta	1	2
+GRKMYTH	Paphus	Pygmalion-2	a-statue	1	2
+GRKMYTH	Ardeus	Odysseus	Circe	1	2
+GRKMYTH	Abas-2	Celeus	Metanira	1	2
+GRKMYTH	Actaeon	Aristaeus	Autonoe	1	2
+GRKMYTH	Eurytion	Actor	Aegina	0	2
+GRKMYTH	Eurysaces	Ajax-2	Tecmessa	0	2
+GRKMYTH	Melia-individual-representation-of-the-Meliae	Uranus	Rhea	2	2
+GRKMYTH	Phoroneus	Inachus	Melia-individual-representation-of-the-Meliae	1	2
+GRKMYTH	Aegialeus	Inachus	Melia-individual-representation-of-the-Meliae	0	2
+GRKMYTH	Nilodice	Inachus	Melia-individual-representation-of-the-Meliae	0	2
+GRKMYTH	Thallo	Zeus	Themis	2	2
+GRKMYTH	Auxo	Zeus	Themis	2	2
+GRKMYTH	Carpo	Zeus	Themis	2	2
+GRKMYTH	Eris-1	Cronos	Nyx	2	2
+GRKMYTH	Eris-2	Zeus	Hera	2	2
+GRKMYTH	Lacedemon	Zeus	Taygete	0	2
+GRKMYTH	Midas	Gordias	Cybele	1	2
+GRKMYTH	Poseidon	Cronos	Rhea	1	2
+GRKMYTH	Tyro	Salmoneus	Alcidice	2	2
+GRKMYTH	Amythaon	Cretheus	Tyro	1	2
+GRKMYTH	Melampus	Amythaon	Idomene	1	2
+GRKMYTH	Pelias	Poseidon	Tyro	1	2
+GRKMYTH	Aeson	Cretheus	Tyro	1	2
+GRKMYTH	Pheres	Cretheus	Tyro	1	2
+GRKMYTH	Admetus	Pheres	Periclymene	1	2
+GRKMYTH	Lycurgus	Pheres	Periclymene	0	2
+GRKMYTH	Eidomene	Pheres	Periclymene	0	2
+GRKMYTH	Periopis	Pheres	Periclymene	0	2
+GRKMYTH	Acestus	Pelias	Anaxibia	0	2
+GRKMYTH	Hippothoe	Pelias	Anaxibia	0	2
+GRKMYTH	Alcestis	Pelias	Anaxibia	2	2
+GRKMYTH	Pelopia-2	Pelias	Anaxibia	0	2
+GRKMYTH	Latinus	Odysseus	Circe	1	2
+GRKMYTH	Maia	Atlas	Aethra	2	2
+GRKMYTH	Laodocus	Antenor	Theano-1	1	2
+GRKMYTH	Tros	Erichthonius	Astyoche-2	1	2
+GRKMYTH	Assaracus	Tros	Callirrhoe	1	2
+GRKMYTH	Ganymedes	Tros	Callirrhoe	1	2
+GRKMYTH	Cleopatra	Tros	Callirrhoe	2	2
+GRKMYTH	Pelops	Tantalus	Dione	1	2
+GRKMYTH	Thyestes	Pelops	Hippodamia	1	2
+GRKMYTH	Alcathous	Pelops	Hippodamia	1	2
+GRKMYTH	Aegisthus	Thyestes	Pelopia	1	2
+GRKMYTH	Oenomaus	Ares	Sterope	1	2
+GRKMYTH	Minos	Zeus	Europa	1	2
+GRKMYTH	Catreus	Minos	Pasiphae	1	2
+GRKMYTH	Deucalion	Minos	Pasiphae	1	2
+GRKMYTH	Antaeus	Poseidon	Gaea	1	2
+GRKMYTH	Peleus	Aeacus	Endeis	1	2
+GRKMYTH	Achilles	Peleus	Thetis	1	2
+GRKMYTH	Acastus	Pelias	Anaxibia	1	2
+GRKMYTH	Sthenele	Acastus	Hippolyte	2	2
+GRKMYTH	Menoetius-2	Actor	Aegina	1	2
+GRKMYTH	Patroclus	Menoetius-2	Sthenele	1	2
+GRKMYTH	Eros	Zephyrus	Iris	1	2
+GRKMYTH	Chrysippus	Pelops	a-nymph	1	2
+GRKMYTH	Balius	Zephyrus	Podarge	1	2
+GRKMYTH	Voluptas	Eros	Psyche	2	2
+GRKMYTH	Melete	Cadmus	Harmonia	2	2
+GRKMYTH	Mneme	Cadmus	Harmonia	2	2
+GRKMYTH	Aoide	Cadmus	Harmonia	2	2
+GRKMYTH	Clio	Cadmus	Harmonia	2	2
+GRKMYTH	Euterpe	Cadmus	Harmonia	2	2
+GRKMYTH	Thalia	Cadmus	Harmonia	2	2
+GRKMYTH	Melpomene	Cadmus	Harmonia	2	2
+GRKMYTH	Terpsichore	Cadmus	Harmonia	2	2
+GRKMYTH	Erato	Cadmus	Harmonia	2	2
+GRKMYTH	Polyhymnia	Cadmus	Harmonia	2	2
+GRKMYTH	Calliope	Cadmus	Harmonia	2	2
+GRKMYTH	Urania	Cadmus	Harmonia	2	2
+GRKMYTH	Semele	Cadmus	Harmonia	2	2
+GRKMYTH	Dionysus	Zeus	Semele	1	2
+GRKMYTH	Ariadne	Minos	Pasiphae	2	2
+GRKMYTH	Persephone	Zeus	Demeter	2	2
+GRKMYTH	Hellen	Deucalion	Pyrrha	1	2
+GRKMYTH	Protogenes	Deucalion	Pyrrha	1	2
+GRKMYTH	Amphictyon	Deucalion	Pyrrha	0	2
+GRKMYTH	Diomedes-2	Tydeus	Deipyle	1	2
+GRKMYTH	Triton	Poseidon	Amphitrite	1	2
+GRKMYTH	Arion	Poseidon	Demeter	0	2
+GRKMYTH	Glaucus-3	Minos	Pasiphae	1	2
+GRKMYTH	Electryon	Perseus	Andromeda	1	2
+GRKMYTH	Androgeus	Minos	Pasiphae	1	2
+GRKMYTH	Belus	Poseidon	Lybia	1	2
+GRKMYTH	Theseus	Poseidon	Aethra-2	1	2
+GRKMYTH	Hippolytus-2	Theseus	Antiope-2	1	2
+GRKMYTH	Charybdis	Poseidon	Gaea	2	2
+GRKMYTH	Chrysaor	Poseidon	Medusa	1	2
+GRKMYTH	Geryon	Chrysaor	Callirrhoe	1	2
+GRKMYTH	Nausithous	Poseidon	Periboea-6	1	2
+GRKMYTH	Polyphemus	Poseidon	Thoosa	1	2
+GRKMYTH	Eumelus	Admetus	Alcestis	1	2
+GRKMYTH	Lamia	Belus	Lybia	2	2
+GRKMYTH	Labdacus	Polydorus-2	Nycteis	1	2
+GRKMYTH	Oenopion	Dionysus	Ariadne	1	2
+GRKMYTH	Merope-2	Oenopion	Helice	2	2
+GRKMYTH	Io	Inachus	Melia-individual-representation-of-the-Meliae	2	2
+GRKMYTH	Epaphus	Zeus	Io	1	2
+GRKMYTH	Otus	Poseidon	Iphimedia	1	2
+GRKMYTH	Procris	Erechtheus	Praxithea	2	2
+GRKMYTH	Phaedra	Minos	Pasiphae	2	2
+GRKMYTH	Acamas	Theseus	Phaedra	1	2
+GRKMYTH	Demophoon	Theseus	Phaedra	1	2
+GRKMYTH	Acacallis	Minos	Pasiphae	2	2
+GRKMYTH	Orpheus	Oeagrus	Calliope	1	2
+GRKMYTH	Hyrieus	Poseidon	Alcyone	0	2
+GRKMYTH	Lycus	Poseidon	Celaeno	0	2
+GRKMYTH	Eurypylus	Poseidon	Celaeno	0	2
+GRKMYTH	Lycastus	Minos	Itone	1	2
+GRKMYTH	Staphylus	Dionysus	Ariadne	1	2
+GRKMYTH	Thoas-1	Theseus	Ariadne	1	2
+GRKMYTH	Latramys	Dionysus	Ariadne	1	2
+GRKMYTH	Euanthes	Oenopion	Helice	1	2
+GRKMYTH	Tauropolus	Dionysus	Ariadne	1	2
+GRKMYTH	Rhoeo	Staphylus	Chrysothemis	2	2
+GRKMYTH	Anius	Apollo	Rhoeo	1	2
+GRKMYTH	Talos	Oenopion	Helice	1	2
+GRKMYTH	Melas	Oenopion	Helice	1	2
+GRKMYTH	Salagas	Oenopion	Helice	1	2
+GRKMYTH	Neleus	Poseidon	Tyro	1	2
+GRKMYTH	Pero	Neleus	Chloris-2	2	2
+GRKMYTH	11-other-sons-of-Neleus	Neleus	Chloris-2	1	2
+GRKMYTH	Bias	Amythaon	Idomene	1	2
+GRKMYTH	Lavinia	Latinus	Amata	2	2
+GRKMYTH	Hermes	Zeus	Maia	1	2
+GRKMYTH	Silvius	Aeneas	Lavinia	1	2
+GRKMYTH	Neoptolemus	Achilles	Deidamia-1	1	2
+GRKMYTH	Molossus	Neoptolemus	Andromache	1	2
+GRKMYTH	Pielus	Neoptolemus	Andromache	0	2
+GRKMYTH	Pergamus	Neoptolemus	Andromache	0	2
+GRKMYTH	8-children-of-Neoptolemus-and-Leonassa	Neoptolemus	Leonassa	0	2
+GRKMYTH	Ilus	Tros	Callirrhoe	1	2
+GRKMYTH	Atreus	Pelops	Hippodamia	1	2
+GRKMYTH	Agamemnon	Atreus	Aerope	1	2
+GRKMYTH	Orestes	Agamemnon	Clytaemnestra	1	2
+GRKMYTH	Iphigenia	Agamemnon	Clytaemnestra	2	2
+GRKMYTH	Electra-3	Agamemnon	Clytaemnestra	2	2
+GRKMYTH	Crysothemis	Agamemnon	Clytaemnestra	2	2
+GRKMYTH	Alcmene	Electryon	Anaxo	2	2
+GRKMYTH	Heracles	Zeus	Alcmene	1	2
+GRKMYTH	Priam	Amphitryon	Alcmene	1	2
+GRKMYTH	2-children-of-Heracles-and-Megara	Heracles	Megara	0	2
+GRKMYTH	Iolaus	Iphicles	Automedusa	1	2
+GRKMYTH	Hyllus	Heracles	Deianira	1	2
+GRKMYTH	Alexiares	Heracles	Hebe	1	2
+GRKMYTH	Anicetus	Heracles	Hebe	1	2
+GRKMYTH	Tleptolemus	Heracles	Astyoche-1	1	2
+GRKMYTH	Echidna	Chrysaor	Callirrhoe	2	2
+GRKMYTH	the-Chimera	Typhoeus	Echidna	0	2
+GRKMYTH	the-Sphinx	Typhoeus	Echidna	0	2
+GRKMYTH	Cerberus	Typhoeus	Echidna	0	2
+GRKMYTH	Gorgon	Typhoeus	Echidna	0	2
+GRKMYTH	the-Sirens	Phorcys	Melpomene	2	2
+GRKMYTH	children-of-Iphicles	Iphicles	sister-of-Megara	0	2
+GRKMYTH	Chromius	Neleus	Chloris-2	0	2
+GRKMYTH	Periclymenus	Neleus	Chloris-2	0	2
+GRKMYTH	Nestor	Pheres	Chloris-2	1	2
+GRKMYTH	Pan	Hermes	Dryope	1	2
+GRKMYTH	Laomedon	Ilus	Eurydice-3	1	2
+GRKMYTH	Hikataeon	Laomedon	Strymo	0	2
+GRKMYTH	Clytius	Laomedon	Strymo	0	2
+GRKMYTH	Lampus	Laomedon	Strymo	0	2
+GRKMYTH	Hesione	Laomedon	Strymo	2	2
+GRKMYTH	Tithonus	Laomedon	Strymo	1	2
+GRKMYTH	other-children-of-Laomedon-and-Strymo	Laomedon	Strymo	0	2
+GRKMYTH	Menelaus	Atreus	Aerope	1	2
+GRKMYTH	Hermione	Menelaus	Helen	2	2
+GRKMYTH	Emalthion	Tithonus	Eos	1	2
+GRKMYTH	Memnon	Tithonus	Eos	1	2
+GRKMYTH	Nicostratus	Menelaus	a-slave	1	2
+GRKMYTH	Megapenthes	Menelaus	a-slave	1	2
+GRKMYTH	Tisamenus	Orestes	Hermione	1	2
+GRKMYTH	Teucer	Telamon	Hesione	1	2
+GRKMYTH	Kings-of-Cyprus	Teucer	Eune	1	2
+GRKMYTH	Thracymedes	Nestor	Eurydice-2	0	2
+GRKMYTH	Echephron	Nestor	Eurydice-2	0	2
+GRKMYTH	Stratius	Nestor	Eurydice-2	0	2
+GRKMYTH	Perseus-2	Nestor	Eurydice-2	1	2
+GRKMYTH	Aretus	Nestor	Eurydice-2	0	2
+GRKMYTH	Pisistratus	Nestor	Eurydice-2	0	2
+GRKMYTH	Crotus	Pan	Eupheme	1	2
+GRKMYTH	Polycaste	Nestor	Eurydice-2	2	2
+GRKMYTH	Acis	Pan	Symaethis	1	2
+GRKMYTH	Iambe	Pan	Echo	2	2
+GRKMYTH	Iynx	Pan	Echo	0	2
+GRKMYTH	Antilochus	Nestor	Eurydice-2	0	2
+GRKMYTH	Iphicles	Laomedon	Strymo	1	2
+GRKMYTH	Troilus	Priam	Hecuba	1	2
+GRKMYTH	Laodice	Priam	Hecuba	2	2
+GRKMYTH	Cassandra	Priam	Hecuba	2	2
+GRKMYTH	Polyxena	Priam	Hecuba	2	2
+GRKMYTH	Deiphobus	Priam	Hecuba	1	2
+GRKMYTH	Hector	Priam	Hecuba	1	2
+GRKMYTH	Helenus	Priam	Hecuba	1	2
+GRKMYTH	Paris	Priam	Hecuba	1	2
+GRKMYTH	Polites	Priam	Hecuba	0	2
+GRKMYTH	8-other-children-of-Priam-and-Hecuba	Priam	Hecuba	0	2
+GRKMYTH	Astynax	Hector	Andromache	1	2
+GRKMYTH	Cestrinus	Helenus	Andromache	0	2
+GRKMYTH	Gorgythion	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Pammon	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Isus	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Agathon	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Dius	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Cebriones	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Hippothous	Priam	Household-servants-of-Priam	0	2
+GRKMYTH	Antiphus	Priam	Hecuba	0	2
+GRKMYTH	Aesacus	Priam	Arisbe-2	0	2
+GRKMYTH	Lycaon	Priam	Laothoe	1	2
+GRKMYTH	Polydorus	Priam	Laothoe	1	2
+GRKMYTH	Corythus-2	Paris	Oenone	1	2
+GRKMYTH	Munitus	Acamas	Laodice	1	2
+GRKMYTH	Creusa	Priam	Hecuba	2	2
+GRKMYTH	Ascaneus	Aeneas	Creusa	1	2
