@@ -17,7 +17,7 @@ from api.utils.exceptions import determine_code_from_error
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '4.3.0'
+_VERSION = '4.4.0'
 
 logger = get_logger()
 
@@ -116,4 +116,10 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host='0.0.0.0', port=int(os.getenv('PORT', '8000')), debug=True)
+    uvicorn.run(
+        'api.server:app',
+        host='0.0.0.0',
+        port=int(os.getenv('PORT', '8000')),
+        debug=True,
+        reload=True,
+    )

@@ -15,3 +15,5 @@ api/public
 web/src/static/sm_docs
 sm/
 web/src/sm-api/
+dist/
+build/
