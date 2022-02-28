@@ -7,7 +7,6 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequence import SampleSequencingTable
 
 from models.enums import SampleType
 from models.models.sample import (
@@ -45,7 +44,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
-        self.seqt: SampleSequencingTable = SampleSequencingTable(connection)
+        self.connection = connection
 
     # GETS
     async def get_single_by_external_id(
@@ -262,10 +261,10 @@ class SampleLayer(BaseLayer):
 
         return rows
 
-    async def batch_upsert_samples(
-        self, samples: SampleBatchUpsert, seqt: SampleSequenceLayer
-    ):
+    async def batch_upsert_samples(self, samples: SampleBatchUpsert):
         """Batch upsert a list of samples with sequences"""
+        seqt: SampleSequenceLayer = SampleSequenceLayer(self.connection)
+
         # Create or update samples
         iids = [await self.upsert_sample(s) for s in samples.samples]
 
