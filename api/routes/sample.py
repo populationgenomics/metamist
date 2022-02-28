@@ -72,7 +72,8 @@ async def batch_upsert_samples(
 
     # Convert id in samples to int
     for sample in samples.samples:
-        sample.id = sample_id_transform_to_raw(sample.id)
+        if sample.id:
+            sample.id = sample_id_transform_to_raw(sample.id)
 
     async with connection.connection.transaction():
         # Table interfaces
