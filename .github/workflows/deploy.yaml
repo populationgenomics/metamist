@@ -1,8 +1,6 @@
 name: Deploy
 on:
-  # Building on pull-requests, manual dispatch, and pushes to main. But restricting
-  # publishing only to main pushes and manual dispatch with `if`s in specific steps
-  pull_request:
+  # Building on manual dispatch, and pushes to dev / main. But restricting
   workflow_dispatch:
   push:
     branches:
