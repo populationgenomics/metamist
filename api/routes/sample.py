@@ -10,7 +10,6 @@ from models.models.sample import (
     sample_id_transform_to_raw_list,
 )
 
-from db.python.layers.sequence import SampleSequenceLayer
 from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
@@ -78,10 +77,8 @@ async def batch_upsert_samples(
     async with connection.connection.transaction():
         # Table interfaces
         st = SampleLayer(connection)
-        seqt = SampleSequenceLayer(connection)
 
-        results = await st.batch_upsert_samples(samples, seqt)
-        print(results)
+        results = await st.batch_upsert_samples(samples)
 
         # Map sids back from ints to strs
         for iid, seqs in results.items():
