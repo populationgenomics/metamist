@@ -6,7 +6,10 @@ from io import StringIO
 from functools import reduce
 
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync    # noqa
+from sample_metadata.parser.generic_parser import (
+    GenericParser,
+    GroupedRow,
+)  # noqa
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -19,12 +22,14 @@ class GenericMetadataParser(GenericParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_name_column: str,
         sample_meta_map: Dict[str, str],
         sequence_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
         sample_metadata_project: str,
+        sample_name_column: str,
+        individual_column: Optional[str] = None,
         reads_column: Optional[str] = None,
+        type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
@@ -44,6 +49,8 @@ class GenericMetadataParser(GenericParser):
             raise ValueError('A sample name column MUST be provided')
 
         self.sample_name_column = sample_name_column
+        self.individual_column = individual_column
+        self.type_column = type_column
         self.sample_meta_map = sample_meta_map or {}
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
@@ -83,12 +90,20 @@ class GenericMetadataParser(GenericParser):
             return filename
 
         sps = ', '.join(self.search_locations)
-        raise FileNotFoundError(f"Couldn't find file '{filename}' in search_paths: {sps}")
+        raise FileNotFoundError(
+            f"Couldn't find file '{filename}' in search_paths: {sps}"
+        )
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         return external_id
+
+    def get_individual_id(self, row: Dict[str, Any]) -> str:
+        """Get individual ID from row"""
+        if self.individual_column and self.individual_column in row:
+            return row[self.individual_column]
+        return None
 
     @staticmethod
     def merge_dicts(a: Dict, b: Dict):
@@ -185,7 +200,9 @@ class GenericMetadataParser(GenericParser):
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    async def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sequence_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
@@ -213,7 +230,9 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-        file_types: Dict[str, Dict[str, List]] = await self.parse_files(sample_id, full_filenames)
+        file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+            sample_id, full_filenames
+        )
         reads: Dict[str, List] = file_types.get('reads')
         variants: Dict[str, List] = file_types.get('variants')
         if reads:
@@ -221,7 +240,9 @@ class GenericMetadataParser(GenericParser):
             if len(keys) > 1:
                 # 2021-12-14 mfranklin: In future we should return multiple
                 #       sequence meta, and handle that in the generic parser
-                raise ValueError(f'Multiple types of reads found ({", ".join(keys)}), currently not supported')
+                raise ValueError(
+                    f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
+                )
 
             reads_type = keys[0]
             collapsed_sequence_meta['reads_type'] = reads_type
@@ -238,7 +259,9 @@ class GenericMetadataParser(GenericParser):
 
         return collapsed_sequence_meta
 
-    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Optional[Dict[str, Any]]:
         """Get collapsed qc meta"""
         if not self.qc_meta_map:
             return None
@@ -268,5 +291,5 @@ class GenericMetadataParser(GenericParser):
             StringIO(file_contents),
             delimiter=_delimiter,
             confirm=confirm,
-            dry_run=dry_run
+            dry_run=dry_run,
         )

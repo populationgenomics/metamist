@@ -37,7 +37,7 @@ from sample_metadata.models import (
     AnalysisStatus,
     SampleBatchUpsertItem,
     SampleBatchUpsert,
-    SequenceUpsert
+    SequenceUpsert,
 )
 
 
@@ -341,7 +341,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             'meta': collapsed_sample_meta,
             'external_id': external_sample_id,
             'type': SampleType(sample_type),
-            'sequences': [sequence_to_upsert]
+            'sequences': [sequence_to_upsert],
         }
 
         if not cpg_sample_id:
@@ -496,7 +496,9 @@ Updating {len(sequences_to_update)} sequences"""
             logger.info(message)
 
         # Batch update
-        result = sapi.batch_upsert_samples(self.sample_metadata_project, SampleBatchUpsert(samples=all_samples))
+        result = sapi.batch_upsert_samples(
+            self.sample_metadata_project, SampleBatchUpsert(samples=all_samples)
+        )
 
         logger.info(
             f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'

@@ -7,6 +7,7 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 INDIVIDUAL_ID_COL_NAME = 'Individual ID'
 SAMPLE_ID_COL_NAME = 'Sample ID'
 READS_COL_NAME = 'Filenames'
+TYPE_COL_NAME = 'Type'
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
@@ -42,8 +43,10 @@ class SampleFileMapParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             sample_metadata_project=sample_metadata_project,
+            individual_column=INDIVIDUAL_ID_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
+            type_column=TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             sample_meta_map={},
