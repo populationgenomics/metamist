@@ -4,7 +4,8 @@ import logging
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
-SAMPLE_ID_COL_NAME = 'Individual ID'
+INDIVIDUAL_ID_COL_NAME = 'Individual ID'
+SAMPLE_ID_COL_NAME = 'Sample ID'
 READS_COL_NAME = 'Filenames'
 
 __DOC = """
