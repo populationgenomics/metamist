@@ -26,17 +26,17 @@ class SampleUpsert(BaseModel):
     active: Optional[bool] = None
 
 
-class SampleBatchUpsertItem(SampleUpsert):
+class SampleBatchUpsert(SampleUpsert):
     """Update model for sample with sequences list"""
 
     id: Optional[Union[str, int]]
     sequences: List[SequenceUpsert]
 
 
-class SampleBatchUpsert(BaseModel):
+class SampleBatchUpsertBody(BaseModel):
     """Upsert model for batch Samples"""
 
-    samples: List[SampleBatchUpsertItem]
+    samples: List[SampleBatchUpsert]
 
 
 class SampleLayer(BaseLayer):
@@ -263,7 +263,7 @@ class SampleLayer(BaseLayer):
         return rows
 
     async def batch_upsert_samples(
-        self, samples: SampleBatchUpsert, seqt: SampleSequenceLayer
+        self, samples: SampleBatchUpsertBody, seqt: SampleSequenceLayer
     ):
         """Batch upsert a list of samples with sequences"""
         # Create or update samples

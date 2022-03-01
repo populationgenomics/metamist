@@ -11,7 +11,7 @@ from models.models.sample import (
 )
 
 from db.python.layers.sequence import SampleSequenceLayer
-from db.python.layers.sample import SampleBatchUpsert, SampleLayer
+from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
@@ -66,7 +66,7 @@ async def create_new_sample(
     '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
 )
 async def batch_upsert_samples(
-    samples: SampleBatchUpsert,
+    samples: SampleBatchUpsertBody,
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""

@@ -6,8 +6,8 @@ import datetime
 from sample_metadata.models import (
     SampleType,
     SequenceStatus,
+    SampleBatchUpsertBody,
     SampleBatchUpsert,
-    SampleBatchUpsertItem,
     SequenceUpsert,
     SequenceType,
 )
@@ -62,7 +62,7 @@ def main(
 
         nsamples = generate_random_number_within_distribution()
         for _ in range(nsamples):
-            sample = SampleBatchUpsertItem(
+            sample = SampleBatchUpsert(
                 external_id=f'GRK{sample_id_index}',
                 type=SampleType('blood'),
                 meta={
@@ -105,7 +105,7 @@ def main(
             sample.sequences = sequences
             samples.append(sample)
 
-    batch_samples = SampleBatchUpsert(samples=samples)
+    batch_samples = SampleBatchUpsertBody(samples=samples)
     response = SampleApi().batch_upsert_samples(project, batch_samples)
     pprint(response)
 

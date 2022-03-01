@@ -35,8 +35,8 @@ from sample_metadata.models import (
     AnalysisType,
     SequenceStatus,
     AnalysisStatus,
-    SampleBatchUpsertItem,
     SampleBatchUpsert,
+    SampleBatchUpsertBody,
     SequenceUpsert,
 )
 
@@ -66,7 +66,8 @@ ALL_EXTENSIONS = (
 )
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
-GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
+SingleRow = Dict[str, Any]
+GroupedRow = Union[List[SingleRow], SingleRow]
 
 T = TypeVar('T')
 
@@ -134,7 +135,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_bucket = None
 
         self.client = None
-        self.bucket_clients: Dict[str, Any] = {}
+        self.bucket_clients: SingleRow = {}
 
         self.client = storage.Client()
 
@@ -235,19 +236,26 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
+    def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
     @abstractmethod
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    def get_individual_id(self, row: GroupedRow) -> Optional[str]:
+        """Get external participant ID from row"""
+
+    @abstractmethod
+    async def get_sample_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Optional[SingleRow]:
         """Get sample-metadata from row"""
 
     @abstractmethod
     async def get_sequence_meta(
         self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
+    ) -> Optional[SingleRow]:
         """Get sequence-metadata from row"""
 
+    # @abstractmethod
     async def get_analyses(
         self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
@@ -257,29 +265,24 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """
         return []
 
-    async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Optional[Dict[str, Any]]:
+    @abstractmethod
+    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[SingleRow]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
-        return None
 
-    def get_sample_type(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SampleType]:
+    # @abstractmethod
+    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
-        return self.default_sample_type
+        return SampleType(self.default_sample_type)
 
-    def get_sequence_type(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SequenceType]:
+    # @abstractmethod
+    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
         """Get sequence type from row"""
-        return self.default_sequence_type
+        return SequenceType(self.default_sequence_type)
 
-    def get_sequence_status(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SequenceStatus]:
+    @abstractmethod
+    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
-        return self.default_sequence_status
+        return SequenceStatus(self.default_sequence_status)
 
     async def process_group(
         self,
@@ -326,7 +329,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             args = {
                 'id': sequence_id,
                 'meta': collapsed_sequencing_meta,
-                'type': SequenceType('wgs'),
+                'type': self.get_sequence_type(external_sample_id, rows),
                 'status': SequenceStatus(sequence_status),
             }
 
@@ -347,7 +350,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         if not cpg_sample_id:
             del args['id']
 
-        sample_to_upsert = SampleBatchUpsertItem(**args)
+        sample_to_upsert = SampleBatchUpsert(**args)
 
         if collapsed_analyses:
             analysis_to_add.extend(collapsed_analyses)
@@ -409,8 +412,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # all dicts indexed by external_sample_id
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-        samples_to_add: List[SampleBatchUpsertItem] = []
-        samples_to_update: List[SampleBatchUpsertItem] = []
+        samples_to_add: List[SampleBatchUpsert] = []
+        samples_to_update: List[SampleBatchUpsert] = []
         sequences_to_add: List[SequenceUpsert] = []
         sequences_to_update: List[SequenceUpsert] = []
 
@@ -423,9 +426,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 logger.info(f'{proj}:Preparing {", ".join(ex_sample_ids)}')
 
             for external_sample_id in ex_sample_ids:
-                rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
-                    external_sample_id
-                ]
+                rows: GroupedRow = sample_map[external_sample_id]
                 cpg_sample_id = existing_external_id_to_cpgid.get(external_sample_id)
                 promise = self.process_group(
                     rows=rows,
@@ -497,7 +498,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         # Batch update
         result = sapi.batch_upsert_samples(
-            self.sample_metadata_project, SampleBatchUpsert(samples=all_samples)
+            self.sample_metadata_project, SampleBatchUpsertBody(samples=all_samples)
         )
 
         logger.info(
@@ -672,8 +673,8 @@ Updating {len(sequences_to_update)} sequences"""
     async def create_file_object(
         self,
         filename: str,
-        secondary_files: List[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        secondary_files: List[SingleRow] = None,
+    ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
         file_size = None
@@ -702,7 +703,7 @@ Updating {len(sequences_to_update)} sequences"""
 
     async def create_secondary_file_objects_by_potential_pattern(
         self, filename, potential_secondary_patterns: List[str]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SingleRow]:
         """
         Take a base filename and potential secondary patterns:
         - Try each secondary pattern, see if it works

@@ -9,6 +9,7 @@ from functools import reduce
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
+    SingleRow,
 )  # noqa
 
 logger = logging.getLogger(__file__)
@@ -31,6 +32,8 @@ class GenericMetadataParser(GenericParser):
         reads_column: Optional[str] = None,
         type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
+        meta_column: Optional[str] = None,
+        seq_meta_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
@@ -56,6 +59,40 @@ class GenericMetadataParser(GenericParser):
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
+        self.meta_column = meta_column
+        self.seq_meta_column = seq_meta_column
+
+    def get_sample_id(self, row: SingleRow) -> Optional[str]:
+        """Get external sample ID from row"""
+        return row.get(self.sample_name_column, None)
+
+    def get_individual_id(self, row: GroupedRow) -> Optional[str]:
+        """Get external participant ID from row"""
+        if isinstance(row, SingleRow):
+            return row.get(self.meta_column, {})
+
+        pids = set([x.get(self.individual_column, None) for x in row])
+
+        if len(pids) > 1:
+            raise ValueError(f'Same sample matches to multiple participants {pids}')
+
+        return pids.pop(0, '')
+
+    # async def get_sample_meta(
+    #     self, sample_id: str, row: GroupedRow
+    # ) -> Optional[SingleRow]:
+    #     """Get sample-metadata from row"""
+    #     if isinstance(row, SingleRow):
+    #         return row.get(self.meta_column, {})
+    #     return row[sample_id].get(self.meta_column, {})
+
+    # async def get_sequence_meta(
+    #     self, sample_id: str, row: GroupedRow
+    # ) -> Optional[SingleRow]:
+    #     """Get sequence-metadata from row"""
+    #     if isinstance(row, SingleRow):
+    #         return row.get(self.seq_meta_column, {})
+    #     return row[sample_id].get(self.seq_meta_column, {})
 
     def populate_filename_map(self, search_locations: List[str]):
         """
@@ -93,17 +130,6 @@ class GenericMetadataParser(GenericParser):
         raise FileNotFoundError(
             f"Couldn't find file '{filename}' in search_paths: {sps}"
         )
-
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
-        """Get external sample ID from row"""
-        external_id = row[self.sample_name_column]
-        return external_id
-
-    def get_individual_id(self, row: Dict[str, Any]) -> str:
-        """Get individual ID from row"""
-        if self.individual_column and self.individual_column in row:
-            return row[self.individual_column]
-        return None
 
     @staticmethod
     def merge_dicts(a: Dict, b: Dict):
