@@ -164,16 +164,32 @@ class SeqrMetadataKeys(Enum):
         )
 
     @staticmethod
-    def parse_hpo_terms(hpo_terms: str):
+    def parse_hpo_terms(hpo_terms: str) -> Optional[str]:
         """
         Validate that comma-separated HPO terms must start with 'HP:'
+
+        >>> SeqrMetadataKeys.parse_hpo_terms('')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(',')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' ,')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' ')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' HP12,  HP34 ')
+        'HP12,HP34'
+        >>> SeqrMetadataKeys.parse_hpo_terms('Clinical,Failure')
+        Traceback (most recent call last):
+        ValueError: HPO terms must start with "HP", found Clinical, Failure
         """
-        if not hpo_terms:
+        if not hpo_terms or not hpo_terms.strip():
             return None
-        terms = [t.strip() for t in hpo_terms.split(',')]
+        terms = [t.strip() for t in hpo_terms.split(',') if t.strip()]
+        if not terms:
+            return None
         # mfranklin (2021-09-06): There were no IDs that didn't start with HP
         # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
-        failing_terms = [term for term in terms if not term.startswith('HP')]
+        failing_terms = [term for term in terms if term and not term.startswith('HP')]
         if failing_terms:
             raise ValueError(
                 'HPO terms must start with "HP", found ' + ', '.join(failing_terms)

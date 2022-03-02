@@ -46,6 +46,7 @@ async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
     create_missing_participants: bool = False,
+    perform_sex_check: bool = True,
     connection: Connection = get_project_write_connection,
 ):
     """Import a pedigree"""
@@ -67,6 +68,7 @@ async def import_pedigree(
             headers,
             rows,
             create_missing_participants=create_missing_participants,
+            perform_sex_check=perform_sex_check,
         )
     }
 
