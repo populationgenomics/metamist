@@ -202,20 +202,30 @@ class PedRow:
         """
         keyed: Dict[str, PedRow] = {r.individual_id: r for r in rows}
         paternal_ids = [r.paternal_id for r in rows if r.paternal_id]
-        mismatched_pat_sex = [pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)]
+        mismatched_pat_sex = [
+            pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)
+        ]
         maternal_ids = [r.maternal_id for r in rows if r.maternal_id]
-        mismatched_mat_sex = [mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)]
+        mismatched_mat_sex = [
+            mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)
+        ]
 
         messages = []
         if mismatched_pat_sex:
-            actual_values = ', '.join(f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex)
+            actual_values = ', '.join(
+                f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex
+            )
             messages.append('(0, 1) as they are listed as fathers: ' + actual_values)
         if mismatched_mat_sex:
-            actual_values = ', '.join(f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex)
+            actual_values = ', '.join(
+                f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex
+            )
             messages.append('(0, 2) as they are listed as mothers: ' + actual_values)
 
         if messages:
-            message = 'Expected individuals have sex values:' + ''.join('\n\t' + m for m in messages)
+            message = 'Expected individuals have sex values:' + ''.join(
+                '\n\t' + m for m in messages
+            )
             if throws:
                 raise ValueError(message)
             logging.warning(message)
