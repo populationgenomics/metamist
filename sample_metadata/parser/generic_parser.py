@@ -25,6 +25,7 @@ from functools import wraps
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
+from pydantic import BaseModel
 
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
@@ -68,6 +69,14 @@ ALL_EXTENSIONS = (
 rmatch = re.compile(r'[_\.-][Rr]\d')
 SingleRow = Dict[str, Any]
 GroupedRow = Union[List[SingleRow], SingleRow]
+
+
+class ReadFile(BaseModel):
+    """File that also contains sequence type"""
+
+    type: SequenceType
+    file: str
+
 
 T = TypeVar('T')
 
@@ -114,6 +123,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         default_sequence_type='wgs',
         default_sequence_status='uploaded',
         default_sample_type='blood',
+        default_analysis_type='qc',
+        default_analysis_status='completed',
         skip_checking_gcs_objects=False,
         verbose=True,
     ):
@@ -130,6 +141,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
+        self.default_analysis_type: str = default_analysis_type
+        self.default_analysis_status: str = default_analysis_status
 
         # gs specific
         self.default_bucket = None
@@ -269,20 +282,35 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[SingleRow]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
 
-    # @abstractmethod
-    def get_sample_type(self, sample_id: str, row: GroupedRow) -> SampleType:
+    @abstractmethod
+    def get_sample_type(self, row: SingleRow) -> SampleType:
         """Get sample type from row"""
         return SampleType(self.default_sample_type)
 
-    # @abstractmethod
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> SequenceType:
-        """Get sequence type from row"""
+    @abstractmethod
+    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+        """Get sequence types from row"""
+        return List(SequenceType(self.default_sequence_type))
+
+    @abstractmethod
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
+        """Get sequence types from row"""
         return SequenceType(self.default_sequence_type)
 
     @abstractmethod
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> SequenceStatus:
+    def get_sequence_status(self, row: SingleRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
+
+    # @abstractmethod
+    def get_analysis_type(self, sample_id: str, row: GroupedRow) -> AnalysisType:
+        """Get analysis type from row"""
+        return AnalysisType(self.default_analysis_type)
+
+    # @abstractmethod
+    def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
+        """Get analysis status from row"""
+        return AnalysisStatus(self.default_analysis_status)
 
     async def process_group(
         self,
@@ -318,35 +346,31 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
         sample_to_upsert = None
-        sequence_to_upsert = None
+        sequences_to_upsert = []
         analysis_to_add = []
-
-        sample_type = self.get_sample_type(external_sample_id, rows)
-        sequence_status = self.get_sequence_status(external_sample_id, rows)
 
         # should we add or update sequencing
         if collapsed_sequencing_meta:
-            args = {
-                'id': sequence_id,
-                'meta': collapsed_sequencing_meta,
-                'type': self.get_sequence_type(external_sample_id, rows),
-                'status': SequenceStatus(sequence_status),
-            }
+            for seq in collapsed_sequencing_meta:
+                args = {
+                    'id': sequence_id,
+                    'meta': seq,
+                    'type': self.get_sequence_type(rows),
+                    'status': self.get_sequence_status(rows),
+                }
+                if not sequence_id:
+                    del args['id']
 
-            if not sequence_id:
-                del args['id']
-
-            sequence_to_upsert = SequenceUpsert(**args)
+                sequences_to_upsert.append(SequenceUpsert(**args))
 
         # Should we add or update sample
         args = {
             'id': cpg_sample_id,
             'meta': collapsed_sample_meta,
             'external_id': external_sample_id,
-            'type': SampleType(sample_type),
-            'sequences': [sequence_to_upsert],
+            'type': self.get_sample_type(rows),
+            'sequences': sequences_to_upsert,
         }
-
         if not cpg_sample_id:
             del args['id']
 
@@ -359,15 +383,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analysis_to_add.append(
                 AnalysisModel(
                     sample_ids=['<none>'],
-                    type=AnalysisType('qc'),
-                    status=AnalysisStatus('completed'),
+                    type=self.get_analysis_type(external_sample_id, rows),
+                    status=self.get_analysis_status(external_sample_id, rows),
                     meta=collapsed_qc,
                 )
             )
 
         return (
             sample_to_upsert,
-            sequence_to_upsert,
+            sequences_to_upsert,
             analysis_to_add,
         )
 
@@ -536,7 +560,9 @@ Updating {len(sequences_to_update)} sequences"""
         )
 
         fastqs = [
-            r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+            r
+            for r in reads
+            if any(r.file.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
@@ -649,7 +675,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         """
         # find last instance of R\d, and then group by prefix on that
-        sorted_fastqs = sorted(fastqs)
+        sorted_fastqs = sorted(fastqs, key=lambda x: x.file)
 
         r_matches: Dict[str, Tuple[str, Optional[Match[str]]]] = {
             r: (os.path.basename(r), rmatch.search(os.path.basename(r)))

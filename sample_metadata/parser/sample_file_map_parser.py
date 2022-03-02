@@ -12,11 +12,11 @@ TYPE_COL_NAME = 'Type'
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
 
-- 'Individual ID'
+- 'Sample ID'
 - 'Filenames'
 
 EG:
-    Individual ID   Filenames
+    Sample ID   Filenames
     <sample-id>     <sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz
     # OR
     <sample-id2>    <sample-id2>.filename-R1.fastq.gz
@@ -46,7 +46,7 @@ class SampleFileMapParser(GenericMetadataParser):
             individual_column=INDIVIDUAL_ID_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
-            type_column=TYPE_COL_NAME,
+            seq_type_column=TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             sample_meta_map={},

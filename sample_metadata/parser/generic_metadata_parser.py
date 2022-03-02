@@ -1,13 +1,18 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
+from collections import defaultdict
 from typing import Dict, List, Optional, Any
 import os
 import logging
 from io import StringIO
 from functools import reduce
+from sample_metadata.model.sample_type import SampleType
+from sample_metadata.model.sequence_status import SequenceStatus
+from sample_metadata.model.sequence_type import SequenceType
 
 
 from sample_metadata.parser.generic_parser import (
     GenericParser,
+    ReadFile,
     GroupedRow,
     SingleRow,
 )  # noqa
@@ -30,11 +35,12 @@ class GenericMetadataParser(GenericParser):
         sample_name_column: str,
         individual_column: Optional[str] = None,
         reads_column: Optional[str] = None,
-        type_column: Optional[str] = None,
+        seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
         default_sequence_type='wgs',
+        default_sequence_status='uploaded',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
     ):
@@ -53,7 +59,7 @@ class GenericMetadataParser(GenericParser):
 
         self.sample_name_column = sample_name_column
         self.individual_column = individual_column
-        self.type_column = type_column
+        self.seq_type_column = seq_type_column
         self.sample_meta_map = sample_meta_map or {}
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
@@ -66,6 +72,27 @@ class GenericMetadataParser(GenericParser):
         """Get external sample ID from row"""
         return row.get(self.sample_name_column, None)
 
+    def get_sample_type(self, row: SingleRow) -> SampleType:
+        """Get sample type from row"""
+        return SampleType(self.default_sample_type)
+
+    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+        """Get sequence type from row"""
+        if isinstance(row, SingleRow):
+            return List(self.get_sequence_type(row))
+        return [
+            SequenceType(r.get(self.seq_type_column, self.default_sequence_type))
+            for r in row
+        ]
+
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
+        """Get sequence type from row"""
+        return row.get(self.seq_type_column, self.default_sequence_type)
+
+    def get_sequence_status(self, row: SingleRow) -> SequenceStatus:
+        """Get sequence status from row"""
+        return SequenceStatus(self.default_sequence_status)
+
     def get_individual_id(self, row: GroupedRow) -> Optional[str]:
         """Get external participant ID from row"""
         if isinstance(row, SingleRow):
@@ -77,22 +104,6 @@ class GenericMetadataParser(GenericParser):
             raise ValueError(f'Same sample matches to multiple participants {pids}')
 
         return pids.pop(0, '')
-
-    # async def get_sample_meta(
-    #     self, sample_id: str, row: GroupedRow
-    # ) -> Optional[SingleRow]:
-    #     """Get sample-metadata from row"""
-    #     if isinstance(row, SingleRow):
-    #         return row.get(self.meta_column, {})
-    #     return row[sample_id].get(self.meta_column, {})
-
-    # async def get_sequence_meta(
-    #     self, sample_id: str, row: GroupedRow
-    # ) -> Optional[SingleRow]:
-    #     """Get sequence-metadata from row"""
-    #     if isinstance(row, SingleRow):
-    #         return row.get(self.seq_meta_column, {})
-    #     return row[sample_id].get(self.seq_meta_column, {})
 
     def populate_filename_map(self, search_locations: List[str]):
         """
@@ -228,29 +239,33 @@ class GenericMetadataParser(GenericParser):
 
     async def get_sequence_meta(
         self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
         )
 
-        read_filenames = []
+        read_filenames = defaultdict(list)
         gvcf_filenames = []
         if isinstance(row, list):
             for r in row:
+                sequence_type = self.get_sequence_type(r)
                 if self.reads_column and self.reads_column in r:
-                    read_filenames.extend(r[self.reads_column].split(','))
+                    read_filenames[sequence_type].extend(
+                        r[self.reads_column].split(',')
+                    )
                 if self.gvcf_column and self.gvcf_column in r:
-                    gvcf_filenames.extend(r[self.gvcf_column].split(','))
+                    gvcf_filenames[sequence_type].extend(r[self.gvcf_column].split(','))
 
         else:
+            sequence_type = self.get_sequence_type(row)
             if self.reads_column and self.reads_column in row:
-                read_filenames.extend(row[self.reads_column].split(','))
+                read_filenames[sequence_type].extend(row[self.reads_column].split(','))
             if self.gvcf_column and self.gvcf_column in row:
-                gvcf_filenames.extend(row[self.gvcf_column].split(','))
+                gvcf_filenames[sequence_type].extend(row[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
-        full_filenames: List[str] = []
+        full_filenames: List[ReadFile] = []
         if read_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
         if gvcf_filenames:
@@ -283,7 +298,7 @@ class GenericMetadataParser(GenericParser):
                 collapsed_sequence_meta['vcfs'] = variants['vcf']
                 collapsed_sequence_meta['vcf_type'] = 'vcf'
 
-        return collapsed_sequence_meta
+        return [collapsed_sequence_meta]
 
     async def get_qc_meta(
         self, sample_id: str, row: GroupedRow
@@ -293,10 +308,6 @@ class GenericMetadataParser(GenericParser):
             return None
 
         return self.collapse_arbitrary_meta(self.qc_meta_map, row)
-
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
-        """Get sequence status from row"""
-        return 'uploaded'
 
     async def from_manifest_path(
         self,
