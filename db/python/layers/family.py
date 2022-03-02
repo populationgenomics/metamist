@@ -1,5 +1,6 @@
 # pylint: disable=used-before-assignment
-from typing import List, Union, Optional
+import logging
+from typing import List, Union, Optional, Dict
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -187,6 +188,42 @@ class PedRow:
         return ordered
 
     @staticmethod
+    def validate_sexes(rows: List['PedRow'], throws=True) -> bool:
+        """
+        Validate that individuals listed as mothers and fathers
+        have either unknown sex, male if paternal, and female if maternal.
+
+        Future note: The pedigree has a simplified view of sex, especially
+        how it relates families together. This function might not handle
+        more complex cases around intersex disorders within families. The
+        best advice is either to skip this check, or provide sex as 0 (unknown)
+
+        :param throws: If True is provided (default), raise a ValueError, else just return False
+        """
+        keyed: Dict[str, PedRow] = {r.individual_id: r for r in rows}
+        paternal_ids = [r.paternal_id for r in rows if r.paternal_id]
+        mismatched_pat_sex = [pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)]
+        maternal_ids = [r.maternal_id for r in rows if r.maternal_id]
+        mismatched_mat_sex = [mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)]
+
+        messages = []
+        if mismatched_pat_sex:
+            actual_values = ', '.join(f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex)
+            messages.append('(0, 1) as they are listed as fathers: ' + actual_values)
+        if mismatched_mat_sex:
+            actual_values = ', '.join(f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex)
+            messages.append('(0, 2) as they are listed as mothers: ' + actual_values)
+
+        if messages:
+            message = 'Expected individuals have sex values:' + ''.join('\n\t' + m for m in messages)
+            if throws:
+                raise ValueError(message)
+            logging.warning(message)
+            return False
+
+        return True
+
+    @staticmethod
     def parse_header_order(header: List[str]):
         """
         Takes a list of unformatted headers, and returns a list of ordered init_keys
@@ -352,6 +389,7 @@ class FamilyLayer(BaseLayer):
         header: Optional[List[str]],
         rows: List[List[str]],
         create_missing_participants=False,
+        perform_sex_check=True,
     ):
         """
         Import pedigree file
@@ -378,6 +416,8 @@ class FamilyLayer(BaseLayer):
         ]
         # this validates a lot of the pedigree too
         pedrows = PedRow.order(pedrows)
+        if perform_sex_check:
+            PedRow.validate_sexes(pedrows, throws=True)
 
         external_family_ids = set(r.family_id for r in pedrows)
         # get set of all individual, paternal, maternal participant ids
