@@ -19,7 +19,6 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import Analysis
 from models.models.sample import (
-    sample_id_format,
     sample_id_transform_to_raw_list,
     sample_id_format_list,
 )
