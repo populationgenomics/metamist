@@ -244,20 +244,21 @@ class FamilyLayer(BaseLayer):
         sample_ids: List[int] = None,
     ):
         """Get all families for a project"""
+        project = project or self.connection.project
 
         # Merge sample_id and participant_ids into a single list
         all_participants = participant_ids if participant_ids else []
 
         # Find the participants from the given samples
-        _, sid_participants = await self.stable.get_samples_by(
+        _, samples = await self.stable.get_samples_by(
             project_ids=[project], sample_ids=sample_ids
         )
 
-        all_participants += [int(s.participant_id) for s in sid_participants]
+        all_participants += [int(s.participant_id) for s in samples if s.participant_id]
         all_participants = list(set(all_participants))
 
         return await self.ftable.get_families(
-            project=project, participant_ids=participant_ids
+            project=project, participant_ids=all_participants
         )
 
     async def update_family(

@@ -46,7 +46,7 @@ class FamilyTable(DbBase):
                 JOIN family_participant
                 ON family.id = family_participant.family_id
             """
-            where.append(f'participant_id IN (:pids)')
+            where.append(f'participant_id IN :pids')
             values['pids'] = participant_ids
 
         if project or self.project:
@@ -55,8 +55,13 @@ class FamilyTable(DbBase):
         if where:
             _query += 'WHERE ' + ' AND '.join(where)
 
-        rows = await self.connection.fetch_all(_query, {**values})
-        families = [Family.from_db(dict(r)) for r in rows]
+        rows = await self.connection.fetch_all(_query, values)
+        seen = set()
+        families = []
+        for r in rows:
+            if r.id not in seen:
+                families.append(Family.from_db(dict(r)))
+                seen.add(r.id)
         return families
 
     async def update_family(
