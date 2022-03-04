@@ -299,10 +299,6 @@ async def get_sample_reads_map_for_seqr(
     assert connection.project
     rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
 
-    # remap sample ids
-    for row in rows:
-        row[2] = sample_id_format(int(row[2]))
-
     output = io.StringIO()
     writer = csv.writer(output, delimiter='\t')
     writer.writerows(rows)
