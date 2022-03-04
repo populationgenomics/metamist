@@ -70,19 +70,23 @@ rmatch = re.compile(r'[_\.-][Rr]\d')
 SingleRow = Dict[str, Any]
 GroupedRow = Union[List[SingleRow], SingleRow]
 
-
-class ReadFile(BaseModel):
-    """File that also contains sequence type"""
-
-    type: SequenceType
-    file: str
-
-
 T = TypeVar('T')
 
 SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
+
+
+class SequenceMetaGroup(BaseModel):
+    """Class for holding sequence metadata grouped by type"""
+
+    rows: GroupedRow
+    sequence_type: SequenceType
+    meta: Dict[str, Any]
+
+    class Config:
+        """Config"""
+        arbitrary_types_allowed = True
 
 
 def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
@@ -317,7 +321,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         rows: GroupedRow,
         external_sample_id: str,
         cpg_sample_id: Optional[str],
-        sequence_id: Optional[str],
+        sequence_ids: Optional[Dict[str, int]],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -353,12 +357,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         if collapsed_sequencing_meta:
             for seq in collapsed_sequencing_meta:
                 args = {
-                    'id': sequence_id,
-                    'meta': seq,
-                    'type': self.get_sequence_type(rows),
-                    'status': self.get_sequence_status(rows),
+                    'id': sequence_ids.get(str(seq.sequence_type), None),
+                    'meta': seq.meta,
+                    'type': seq.sequence_type,
+                    'status': self.get_sequence_status(seq.rows),
                 }
-                if not sequence_id:
+                if not args['id']:
                     del args['id']
 
                 sequences_to_upsert.append(SequenceUpsert(**args))
@@ -429,7 +433,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         if len(existing_external_id_to_cpgid) > 0:
             existing_cpgid_to_seq_id = (
-                await seqapi.get_sequence_ids_from_sample_ids_async(
+                await seqapi.get_all_sequences_by_sample_ids_async(
                     request_body=list(existing_external_id_to_cpgid.values()),
                 )
             )
@@ -456,7 +460,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     rows=rows,
                     external_sample_id=external_sample_id,
                     cpg_sample_id=cpg_sample_id,
-                    sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
+                    sequence_ids=existing_cpgid_to_seq_id.get(cpg_sample_id),
                 )
                 current_batch_promises[external_sample_id] = promise
             processed_ex_sids = list(current_batch_promises.keys())
@@ -560,9 +564,7 @@ Updating {len(sequences_to_update)} sequences"""
         )
 
         fastqs = [
-            r
-            for r in reads
-            if any(r.file.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+            r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
@@ -675,7 +677,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         """
         # find last instance of R\d, and then group by prefix on that
-        sorted_fastqs = sorted(fastqs, key=lambda x: x.file)
+        sorted_fastqs = sorted(fastqs)
 
         r_matches: Dict[str, Tuple[str, Optional[Match[str]]]] = {
             r: (os.path.basename(r), rmatch.search(os.path.basename(r)))

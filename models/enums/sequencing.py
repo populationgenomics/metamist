@@ -5,6 +5,7 @@ class SequenceType(Enum):
     """Type of sequencing"""
 
     WGS = 'wgs'
+    WES = 'wes'
     EXOME = 'exome'
     SINGLE_CELL = 'single-cell'
 
