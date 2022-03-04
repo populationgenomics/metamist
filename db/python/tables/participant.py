@@ -1,6 +1,6 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, Optional
 
-from db.python.connect import DbBase, NotFoundError
+from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.utils import ProjectId
 
 
@@ -20,14 +20,21 @@ class ParticipantTable(DbBase):
         return set(r['project'] for r in rows)
 
     async def create_participant(
-        self, external_id: str, author: str = None, project: ProjectId = None
+        self,
+        external_id: str,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author: str = None,
+        project: ProjectId = None,
     ) -> int:
         """
         Create a new sample, and add it to database
         """
         _query = f"""
-INSERT INTO participant (external_id, author, project)
-VALUES (:external_id, :author, :project)
+INSERT INTO participant (external_id, reported_sex, reported_gender, karyotype, meta, author, project)
+VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :author, :project)
 RETURNING id
         """
 
@@ -35,17 +42,105 @@ RETURNING id
             _query,
             {
                 'external_id': external_id,
+                'reported_sex': reported_sex,
+                'reported_gender': reported_gender,
+                'karyotype': karyotype,
+                'meta': to_db_json(meta or {}),
                 'author': author or self.author,
                 'project': project or self.project,
             },
         )
 
+    async def update_participants(
+        self,
+        participant_ids: List[int],
+        reported_sexes: List[int] = None,
+        reported_genders: List[str] = None,
+        karyotypes: List[str] = None,
+        metas: List[Dict] = None,
+        author=None,
+    ):
+        """
+        Update many participants, expects that all lists contain the same number of values.
+        You can't update selective fields on selective samples, if you provide metas, this
+        function will update EVERY participant with the provided meta values.
+        """
+        _author = author or self.author
+        updaters = ['author = :author']
+        values: Dict[str, List[Any]] = {
+            'pid': participant_ids,
+            'author': [_author] * len(participant_ids),
+        }
+        if reported_sexes:
+            updaters.append('reported_sex = :reported_sex')
+            values['reported_sex'] = reported_sexes
+        if reported_genders:
+            updaters.append('reported_gender = :reported_gender')
+            values['reported_gender'] = reported_genders
+        if karyotypes:
+            updaters.append('karyotype = :karyotype')
+            values['karyotype'] = karyotypes
+        if metas:
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta')
+            values['meta'] = metas
+
+        keys = list(values.keys())
+        list_values = [
+            {k: l[idx] for k, l in values.items()}
+            for idx in range(len(values[keys[0]]))
+        ]
+
+        updaters_str = ', '.join(updaters)
+        _query = f'UPDATE participant SET {updaters_str} WHERE id = :pid'
+        await self.connection.execute_many(_query, list_values)
+
+    async def update_participant(
+        self,
+        participant_id: int,
+        reported_sex: int = None,
+        reported_gender: str = None,
+        karyotype: str = None,
+        meta: Dict = None,
+        author=None,
+    ):
+        """
+        Update participant
+        """
+        updaters = ['author = :author']
+        fields = {'pid': participant_id, 'author': author or self.author}
+
+        if reported_sex:
+            updaters.append('reported_sex = :reported_sex')
+            fields['reported_sex'] = reported_sex
+
+        if reported_gender:
+            updaters.append('reported_gender = :reported_gender')
+            fields['reported_gender'] = reported_gender
+
+        if karyotype:
+            updaters.append('karyotype = :karyotype')
+            fields['karyotype'] = karyotype
+
+        if meta:
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            fields['meta'] = to_db_json(meta)
+
+        _query = f'UPDATE participant SET {", ".join(updaters)} WHERE id = :pid'
+        await self.connection.execute(_query, fields)
+
+        return True
+
     async def get_id_map_by_external_ids(
         self,
         external_participant_ids: List[str],
-        project: ProjectId,
+        project: Optional[ProjectId],
     ) -> Dict[str, int]:
         """Get map of {external_id: internal_participant_id}"""
+        assert project
+
+        if len(external_participant_ids) == 0:
+            return {}
+
         _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
             _query,

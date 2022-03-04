@@ -1,14 +1,16 @@
 import csv
 import codecs
+from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File
 
-from models.models.sample import sample_id_format
+from models.models.sample import sample_id_format_list
 from db.python.layers.imports import ImportLayer
 from db.python.layers.participant import (
     ParticipantLayer,
     ExtraParticipantImporterHandler,
 )
+from api.utils.extensions import guess_delimiter_by_filename
 from api.utils.db import get_project_write_connection, Connection
 
 router = APIRouter(prefix='/import', tags=['import'])
@@ -18,13 +20,13 @@ router = APIRouter(prefix='/import', tags=['import'])
 async def import_airtable_manifest(
     file: UploadFile = File(...), connection: Connection = get_project_write_connection
 ):
-    """Get sample by external ID"""
+    """Import CSV from airtable"""
     import_layer = ImportLayer(connection)
     csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
     headers = next(csvreader)
 
     sample_ids = await import_layer.import_airtable_manifest_csv(headers, csvreader)
-    return {'success': True, 'sample_ids': sample_id_format(sample_ids)}
+    return {'success': True, 'sample_ids': sample_id_format_list(sample_ids)}
 
 
 @router.post(
@@ -33,6 +35,7 @@ async def import_airtable_manifest(
 )
 async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
+    delimiter: Optional[str] = None,
     extra_participants_method: ExtraParticipantImporterHandler = ExtraParticipantImporterHandler.FAIL,
     connection: Connection = get_project_write_connection,
 ):
@@ -42,8 +45,13 @@ async def import_individual_metadata_manifest(
     :param extra_participants_method: If extra participants are in the uploaded file,
         add a PARTICIPANT entry for them
     """
+
+    delimiter = guess_delimiter_by_filename(file.filename, default_delimiter=delimiter)
+
     player = ParticipantLayer(connection)
-    csvreader = csv.reader(codecs.iterdecode(file.file, 'utf-8-sig'))
+    csvreader = csv.reader(
+        codecs.iterdecode(file.file, 'utf-8-sig'), delimiter=delimiter
+    )
     headers = next(csvreader)
 
     await player.generic_individual_metadata_importer(

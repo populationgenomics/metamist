@@ -1,67 +1,108 @@
 # Sample Metadata
 
-An API to manage sample + other related metadata.
+The sample-metadata system is database that stores **de-identified** metadata.
 
-## Environment variables
+There are three components to the sample-metadata system:
 
-Sample-metadata API uses environment variables to manage it's configuration.
+- System-versioned MariaDB database,
+- Python web API to manage permissions, and store frequently used queries,
+- An installable python library that wraps the Python web API (using OpenAPI generator)
 
-### Running the web server
+Every resource in sample-metadata belongs to a project. All resources are access
+controlled through membership of the google groups:
+`$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
+are cached in a secret as group-membership identity checks are slow.
 
-The default behaviour for the web server is to:
 
-- Use a GCP secret for the DB credentials
+## Structure
 
-You can configure this with:
+![Database structure](resources/2021-10-27_db-diagram.png)
+
+### Sample IDs
+
+In an effort to reduce our dependency on potentially mutable external sample IDs with inconsistent format,
+the sample-metadata server generates an internal sample id for every sample. Internally they're an
+incrementing integer, but they're transformed externally to have a prefix, and checksum - this allows durability
+when transcribing sample IDs to reduce mistypes, and allow to quickly check whether a sample ID is valid.
+
+> NB: The prefix and checksums are modified per environment (production, development, local) to avoid duplicates from these environments.
+
+For example, let's consider the production environment which uses the prefix of `CPG` and a checksum offset of 0:
+
+> A sample is given the internal ID `12345`, we calculate the Luhn checksum to be `5` (with no offset applied).
+> We can then concatenate the results, for the final sample ID to be `CPG123455`.
+
+### Reporting sex
+
+To avoid ambiguity in reporting of gender, sex and karyotype - the sample metadata system
+stores these values separately on the `participant` as:
+
+- `reported_gender` (string, expected `male` | `female` | _other values_)
+- `reported_sex` (follows pedigree convention: `unknown=0 | null`, `male=1`, `female=2`)
+- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes)
+
+If you import a pedigree, the sex value is written to the `reported_sex` attribute.
+
+## Local develompent of SM
+
+The recommended way to develop the sample-metadata system is to run a local copy of SM.
+> There have been some reported issues of running a local SM environment on an M1 mac.
+
+You can run MariaDB with a locally installed docker, or from within a docker container.
+You can configure the MariaDB connection with environment variables.
+
+### Creating the environment
+
+Dependencies for the `sample-metadata` API package are listed in `setup.py`.
+Additional dev requirements are listed in `requirements-dev.txt`, and packages for
+the sever-side code are listed in `requirements.txt`.
+
+To create the full dev environment, run:
 
 ```shell
-# use credentials defined in db/python/connect.py:dev_config
-export SM_ENVIRONMENT=LOCAL
-# use specific mysql settings
-export SM_DEV_DB_PROJECT=sm_dev
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install --editable .
+```
+
+### Default DB set-up
+
+These are the default values for the SM database connection.
+Please alter them if you use any different values when setting up the database.
+
+```shell
 export SM_DEV_DB_USER=root
-export SM_DEV_DB_PORT=3307
+export SM_DEV_DB_PASSWORD= # empty password
 export SM_DEV_DB_HOST=127.0.0.1
-export SM_DEV_DB_PASSWORD=root
+export SM_DEV_DB_PORT=3306 # default mariadb port
 ```
 
-### Using the Python API
+Create the database in MariaDB (by default, we call it `sm_dev`):
 
-The default behaviour for the installable Python API is to:
-
-- Use the production server
-- With a service account
-
-You can configure these separately with:
+> Sample-metadata stores all metadata in one database (_previously: one database per project_).
 
 ```shell
-# use localhost:8000
-export SM_ENVIRONMENT=LOCAL
- # use a local account to generate identity-token for auth
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
+mysql -u root --execute 'CREATE DATABASE sm_dev'
 ```
 
-
-## Database
-
-Sample-metadata DB uses MariaDB (for the system-versioned-tables) to store metadata.
-
-There are two dbs you'll need to initialise:
-
-- `sm_admin`: Stores project-independent metadata (like the internal_sample_id to project map)
-- `sm_<project>`: Stores project specicic information.
-
-In development, we recommend `sm_dev`, as [there is a default dev_config](https://github.com/populationgenomics/sample-metadata/blob/8b122453d1cd26c09966b8e54909bf712da5263e/db/python/connect.py#L78-L85).
-
-Schema is managed with _liquibase_ with the `project.xml` and `global.xml` changelogs. To use liquibase, you'll need to download the `mariadb` driver:
+Download the `mariadb-java-client` and create the schema using liquibase:
 
 ```shell
 pushd db/
 wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+liquibase \
+    --changeLogFile project.xml \
+    --url jdbc:mariadb://localhost/sm_dev \
+    --driver org.mariadb.jdbc.Driver \
+    --classpath mariadb-java-client-2.7.2.jar \
+    --username root \
+    update
 popd
 ```
 
-### Using Maria DB docker image
+#### Using Maria DB docker image
 
 Pull mariadb image
 
@@ -74,59 +115,75 @@ Run a mariadb container that will server your database. `-p 3307:3306` remaps th
 ```bash
 docker stop mysql-p3307  # stop and remove if the container already exists
 docker rm mysql-p3307
-docker run -p 3307:3306 --name mysql-p3307 -e MYSQL_ROOT_PASSWORD=root -d mariadb
+# run with an empty root password
+docker run -p 3307:3306 --name mysql-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=true -d mariadb
 ```
 
-Initialize databases (you may need to enter the password on each command).
-
 ```bash
-mysql --host=127.0.0.1 --port=3307 -u root -p -e 'CREATE DATABASE sm_dev;'
-mysql --host=127.0.0.1 --port=3307 -u root -p -e 'CREATE DATABASE sm_admin;'
-mysql --host=127.0.0.1 --port=3307 -u root -p -e 'show databases;'
+mysql --host=127.0.0.1 --port=3307 -u root -e 'CREATE DATABASE sm_dev;'
+mysql --host=127.0.0.1 --port=3307 -u root -e 'show databases;'
 ```
 
-Download [`mariadb-java-client-2.7.2.jar`](https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar) into the `db/` folder.
-
-Then create the database schemas.
+Go into the `db/` subdirectory, download the `mariadb-java-client` and create the schema using liquibase:
 
 ```bash
+
 pushd db/
-liquibase  --headless=true --url jdbc:mariadb://127.0.0.1:3307/sm_admin --username=root --password=root --classpath mariadb-java-client-2.7.2.jar --changelog-file=global.xml update
-liquibase  --headless=true --url jdbc:mariadb://127.0.0.1:3307/sm_dev --username=root --password=root --classpath mariadb-java-client-2.7.2.jar --changelog-file=project.xml update
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+liquibase \
+    --changeLogFile project.xml \
+    --url jdbc:mariadb://127.0.0.1:3307/sm_dev \
+    --driver org.mariadb.jdbc.Driver \
+    --classpath mariadb-java-client-2.7.2.jar \
+    --username root \
+    update
+popd
 ```
 
-Finally, start the server, making use of the environment variables to point it to your local Maria DB server
+Finally, make sure you configure the server (making use of the environment variables) to point it to your local Maria DB server
 
 ```bash
-export SM_DEV_DB_PROJECT=sm_dev
-export SM_DEV_DB_USER=root
 export SM_DEV_DB_PORT=3307
-export SM_DEV_DB_HOST=127.0.0.1
-export SM_DEV_DB_PASSWORD=root
+```
+
+
+### Running the server
+
+You'll want to set the following environment variables (permanently) in your
+local development environment.
+
+```shell
+# ensures the SWAGGER page (localhost:8000/docs) points to your local environment
 export SM_ENVIRONMENT=LOCAL
+# skips permission checks in your local environment
+export SM_ALLOWALLACCESS=true
+
+# start the server
 python3 -m api.server
+# OR
+# uvicorn --port 8000 --host 0.0.0.0 api.server:app
 ```
 
-## Debugging
+In a different terminal, execute the following
+request to create a new project called 'dev'
 
-### Start the server
-
-```bash
-python3 -m api.server
-# or
-gunicorn --bind :$PORT --worker-class aiohttp.GunicornWebWorker api.main:start_app
+```shell
+curl -X 'PUT' \
+  'http://localhost:8000/api/v1/project/?name=dev&dataset=dev&gcp_id=dev&create_test_project=false' \
+  -H 'accept: application/json' \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)"
 ```
 
-### Running a file directly
+#### Quickstart: Generate and install the installable API
 
-Due to the way python imports work, you're unable to run files directly. To run files, you must run them as a module, for example, to run the `db/python/layers/sample.py` file directly (in case you put an `if __name__ == "__main__"` block in there), you could use the following:
+It's best to do this with an already running server:
 
-```bash
-# convert '/' to '.' and drop the '.py'
-python -m db.python.layers.sample
+```shell
+python3 regenerate_api.py \
+    && pip install .
 ```
 
-### VSCode
+#### Debugging the server in VSCode
 
 VSCode allows you to debug python modules, we could debug the web API at `api/server.py` by considering the following `launch.json`:
 
@@ -135,7 +192,7 @@ VSCode allows you to debug python modules, we could debug the web API at `api/se
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: SampleLayer",
+            "name": "API server",
             "type": "python",
             "request": "launch",
             "module": "api.server"
@@ -145,6 +202,26 @@ VSCode allows you to debug python modules, we could debug the web API at `api/se
 ```
 
 We could now place breakpoints on the sample route (ie: `api/routes/sample.py`), and debug requests as they come in.
+
+#### Developing the UI
+
+```shell
+# Ensure you have started sm locally on your computer already, then in another tab open the UI.
+# This will automatically proxy request to the server.
+cd web
+npm install
+npm start
+```
+
+
+#### Unauthenticated access
+
+You'll want to set the `SM_LOCALONLY_DEFAULTUSER` environment variable along with `ALLOWALLACCESS` to allow access to a local sample-metadata server without providing a bearer token. This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
+
+```shell
+export SM_ALLOWALLACCESS=1
+export SM_LOCALONLY_DEFAULTUSER=$(whoami)
+```
 
 ### OpenAPI and Swagger
 
@@ -170,7 +247,15 @@ The web API exposes this schema in two ways:
 
 #### Generating the installable API
 
-The installable API is automatically generated through the `condarise.yml` GitHub action and uploaded to the [CPG conda organisation](https://anaconda.org/cpg).
+The installable API is automatically generated through the `package.yml` GitHub action and uploaded to PyPI.
+
+
+To generate the python api you'll need to install openapi generator v5.x.x
+
+```bash
+brew install openapi-generator
+```
+
 
 You could generate the installable API and install it with pip by running:
 
@@ -185,24 +270,15 @@ Or you can build the docker file, and specify that
 ```bash
 # SM_DOCKER is a known env variable to regenerate_api.py
 export SM_DOCKER="cpg/sample-metadata-server:dev"
-docker build -t $SM_DOCKER -f deploy/api/Dockerfile .
+docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_apy.py
 ```
 
 
-## Adding a new project
-
-```shell
-curl --location --request POST 'https://create-project-service-mnrpw3mdza-ts.a.run.app/project' \
---header "Authorization: Bearer $(gcloud auth print-identity-token)" \
---header 'Content-Type: application/json' \
---data-raw '{
-    "project_name": "<project-name>"
-}'
-```
-
 
 ## Deployment
+
+The sample-metadata server
 
 You'll want to complete the following steps:
 

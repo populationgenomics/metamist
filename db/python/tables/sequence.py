@@ -1,5 +1,5 @@
 from itertools import groupby
-from typing import Optional, Dict, List, Tuple, Iterable, Set
+from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, to_db_json, NotFoundError
 from db.python.tables.project import ProjectId
@@ -21,11 +21,18 @@ class SampleSequencingTable(DbBase):
         _query = """
 SELECT s.project FROM sample_sequencing sq
 INNER JOIN sample s ON s.id = sq.sample_id
-WHERE s.id in :sequence_ids
+WHERE sq.id in :sequence_ids
 GROUP BY s.project
 """
+        if len(sequence_ids) == 0:
+            raise ValueError('Received no sequence IDs to get project ids for')
         rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
-        return set(r['project'] for r in rows)
+        projects = set(r['project'] for r in rows)
+        if not projects:
+            raise ValueError(
+                'No projects were found for given sequences, this is likely an error'
+            )
+        return projects
 
     async def insert_many_sequencing(
         self,
@@ -58,8 +65,8 @@ VALUES (:sample_id, :type, :meta, :status, :author);"""
         sample_id,
         sequence_type: SequenceType,
         status: SequenceStatus,
-        sequence_meta: Dict[str, any] = None,
-        author=None,
+        sequence_meta: Optional[Dict[str, Any]] = None,
+        author: Optional[str] = None,
     ) -> int:
         """
         Create a new sequence for a sample, and add it to database
@@ -123,6 +130,9 @@ ORDER by sq.id DESC
 LIMIT 1
 """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
+        if not result:
+            raise NotFoundError
+
         return result['project'], result['id']
 
     async def get_latest_sequence_id_for_external_sample_id(

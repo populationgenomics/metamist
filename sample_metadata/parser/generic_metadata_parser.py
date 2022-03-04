@@ -1,11 +1,12 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from typing import Dict, List, Optional, Any
 import os
 import logging
 from io import StringIO
 from functools import reduce
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow
+
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync    # noqa
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -27,19 +28,16 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         default_sequence_type='wgs',
         default_sample_type='blood',
-        confirm=False,
+        path_prefix: Optional[str] = None,
     ):
-        path_prefix = search_locations[0] if search_locations else None
-
         super().__init__(
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            confirm=confirm,
         )
         self.search_locations = search_locations
-        self.filename_map = {}
+        self.filename_map: Dict[str, str] = {}
         self.populate_filename_map(self.search_locations)
 
         if not sample_name_column:
@@ -81,9 +79,13 @@ class GenericMetadataParser(GenericParser):
         if filename in self.filename_map:
             return self.filename_map[filename]
 
-        return super().file_path(filename)
+        if filename.startswith('gs://') or filename.startswith('/'):
+            return filename
 
-    def get_sample_id(self, row: Dict[str, any]) -> str:
+        sps = ', '.join(self.search_locations)
+        raise FileNotFoundError(f"Couldn't find file '{filename}' in search_paths: {sps}")
+
+    def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
         external_id = row[self.sample_name_column]
         return external_id
@@ -157,10 +159,9 @@ class GenericMetadataParser(GenericParser):
                 return {key_parts[0]: val}
             return {key_parts[0]: prepare_dict_from_keys(key_parts[1:], val)}
 
-        is_list = isinstance(row, list)
         dicts = []
         for row_key, dict_key in key_map.items():
-            if is_list:
+            if isinstance(row, list):
                 inner_values = [r[row_key] for r in row if r.get(row_key) is not None]
                 if any(isinstance(inner, list) for inner in inner_values):
                     # lists are unhashable
@@ -180,11 +181,11 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, any]:
+    async def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
@@ -206,23 +207,38 @@ class GenericMetadataParser(GenericParser):
                 gvcf_filenames.extend(row[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
+        full_filenames: List[str] = []
         if read_filenames:
-            full_filenames = [self.file_path(f.strip()) for f in read_filenames]
-            reads, reads_type = self.parse_file(full_filenames)
-
-            collapsed_sequence_meta['reads'] = reads
-            collapsed_sequence_meta['reads_type'] = reads_type
-
+            full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
         if gvcf_filenames:
-            full_filenames = [self.file_path(f.strip()) for f in gvcf_filenames]
-            gvcfs, gvcf_types = self.parse_file(full_filenames)
+            full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-            collapsed_sequence_meta['gvcfs'] = gvcfs
-            collapsed_sequence_meta['gvcf_types'] = gvcf_types
+        file_types: Dict[str, Dict[str, List]] = await self.parse_files(sample_id, full_filenames)
+        reads: Dict[str, List] = file_types.get('reads')
+        variants: Dict[str, List] = file_types.get('variants')
+        if reads:
+            keys = list(reads.keys())
+            if len(keys) > 1:
+                # 2021-12-14 mfranklin: In future we should return multiple
+                #       sequence meta, and handle that in the generic parser
+                raise ValueError(f'Multiple types of reads found ({", ".join(keys)}), currently not supported')
+
+            reads_type = keys[0]
+            collapsed_sequence_meta['reads_type'] = reads_type
+            collapsed_sequence_meta['reads'] = reads[reads_type]
+
+        if variants:
+            if 'gvcf' in variants:
+                collapsed_sequence_meta['gvcfs'] = variants.get('gvcf')
+                collapsed_sequence_meta['gvcf_types'] = 'gvcf'
+
+            if 'vcf' in variants:
+                collapsed_sequence_meta['vcfs'] = variants['vcf']
+                collapsed_sequence_meta['vcf_type'] = 'vcf'
 
         return collapsed_sequence_meta
 
-    def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
         """Get collapsed qc meta"""
         if not self.qc_meta_map:
             return None
@@ -233,38 +249,24 @@ class GenericMetadataParser(GenericParser):
         """Get sequence status from row"""
         return 'uploaded'
 
-    @staticmethod
-    def from_manifest_path(
+    async def from_manifest_path(
+        self,
         manifest: str,
-        sample_metadata_project: str,
-        sample_name_column: str,
-        sample_meta_map: Dict[str, str],
-        sequence_meta_map: Dict[str, str],
-        qc_meta_map: Dict[str, str],
-        reads_column: Optional[str] = None,
-        gvcf_column: Optional[str] = None,
-        default_sequence_type='wgs',
-        default_sample_type='blood',
-        search_paths=None,
         confirm=False,
-        delimiter=',',
+        delimiter=None,
+        dry_run=False,
     ):
         """Parse manifest from path, and return result of parsing manifest"""
-        parser = GenericMetadataParser(
-            search_locations=search_paths,
-            sample_metadata_project=sample_metadata_project,
-            sample_name_column=sample_name_column,
-            sample_meta_map=sample_meta_map,
-            sequence_meta_map=sequence_meta_map,
-            qc_meta_map=qc_meta_map,
-            reads_column=reads_column,
-            gvcf_column=gvcf_column,
-            default_sequence_type=default_sequence_type,
-            default_sample_type=default_sample_type,
-            confirm=confirm,
+        file = self.file_path(manifest)
+
+        _delimiter = delimiter or GenericMetadataParser.guess_delimiter_from_filename(
+            file
         )
 
-        delimiter = GenericMetadataParser.guess_delimiter_from_filename(manifest)
-
-        file_contents = parser.file_contents(manifest)
-        return parser.parse_manifest(StringIO(file_contents), delimiter=delimiter)
+        file_contents = await self.file_contents(file)
+        return await self.parse_manifest(
+            StringIO(file_contents),
+            delimiter=_delimiter,
+            confirm=confirm,
+            dry_run=dry_run
+        )

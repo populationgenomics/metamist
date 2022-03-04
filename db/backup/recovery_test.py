@@ -11,7 +11,7 @@ import json
 import os
 from typing import Tuple, Optional
 from collections import namedtuple
-from google.cloud import secretmanager
+import google.cloud.secretmanager
 import mysql.connector
 from parameterized import parameterized
 from restore import pull_latest_backup, restore
@@ -36,7 +36,7 @@ FIELDS = [
 
 TABLES = [field[0] for field in FIELDS]
 
-secret_manager = secretmanager.SecretManagerServiceClient()
+secret_manager = google.cloud.secretmanager.SecretManagerServiceClient()
 
 SECRET_NAME = 'projects/sample-metadata/secrets/db-validate-backup/versions/latest'
 config_str = secret_manager.access_secret_version(
@@ -56,11 +56,11 @@ LOCAL_PASSWORD = os.environ.get('local_password', '')
 
 
 class TestDatabaseBackup(unittest.TestCase):
-    """ Testing validity of DB backup"""
+    """Testing validity of DB backup"""
 
     @classmethod
     def setUpClass(cls):
-        """ Pull the backup file, and restore the database."""
+        """Pull the backup file, and restore the database."""
 
         backup_folder = pull_latest_backup(BACKUP_BUCKET)
         restore(backup_folder)
@@ -70,10 +70,16 @@ class TestDatabaseBackup(unittest.TestCase):
         self.timestamp = get_timestamp(backup_folder)
 
         self.local_conn = mysql.connector.connect(
-            user=LOCAL_USER, host=LOCAL_HOST, password=LOCAL_PASSWORD, database=DATABASE
+            user=LOCAL_USER,
+            host=LOCAL_HOST,
+            password=LOCAL_PASSWORD,
+            database=DATABASE,
         )
         self.prod_conn = mysql.connector.connect(
-            host=PROD_HOST, user=PROD_USER, password=PROD_PASSWORD, database=DATABASE
+            host=PROD_HOST,
+            user=PROD_USER,
+            password=PROD_PASSWORD,
+            database=DATABASE,
         )
 
     def test_database_exists(self):
@@ -85,7 +91,7 @@ class TestDatabaseBackup(unittest.TestCase):
 
     @parameterized.expand(TABLES)
     def test_row_number(self, table):
-        """ Tests that the count of rows for each table matches """
+        """Tests that the count of rows for each table matches"""
 
         restored_count = get_results(
             self.local_conn,
@@ -100,7 +106,7 @@ class TestDatabaseBackup(unittest.TestCase):
 
     @parameterized.expand(TABLES)
     def test_rows_top(self, table):
-        """ Validates the top 10 rows in each table match """
+        """Validates the top 10 rows in each table match"""
         restored_results = get_results(
             self.local_conn,
             f'SELECT * FROM {table} LIMIT 10;',
@@ -142,19 +148,19 @@ WHERE {wheres_str};"""
 
     @classmethod
     def tearDownClass(cls):
-        """ Delete test database following testing """
+        """Delete test database following testing"""
         subprocess.run(['rm', '-r', LOCAL_BACKUP_FOLDER], check=True)
         subprocess.run(['sudo', 'rm', '-r', '/var/lib/mysql'], check=True)
 
 
 def get_timestamp(folder: str):
-    """Returns timestamp in format YYYY-MM-DD HH:MM:SS """
+    """Returns timestamp in format YYYY-MM-DD HH:MM:SS"""
     timestamp = f'{folder[13:17]}-{folder[10:12]}-{folder[7:9]} {folder[18:20]}:{folder[21:23]}:{folder[24:26]}'
     return timestamp
 
 
 def get_results(conn, query: str, values: Optional[Tuple] = None):
-    """ Returns the results from a provided query at a given connection """
+    """Returns the results from a provided query at a given connection"""
     cursor = conn.cursor()
     cursor.execute(query, values)
     results = list(cursor)

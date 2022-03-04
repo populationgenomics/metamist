@@ -5,9 +5,11 @@ Clone the repo and install the env
 ```bash
 git clone https://github.com/populationgenomics/sample-metadata
 cd sample-metadata
-conda env create -n sample-metadata --file environment-dev.yml
-conda activate sample-metadata
+virtualenv venv
+source venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install --editable .
 ```
 
 Configure required environment variables

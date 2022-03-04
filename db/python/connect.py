@@ -86,7 +86,7 @@ class SMConnections:
     # _connections: Dict[str, databases.Database] = {}
     # _admin_db: databases.Database = None
 
-    _credentials: DatabaseConfiguration = None
+    _credentials: Optional[DatabaseConfiguration] = None
 
     @staticmethod
     def _get_config():

@@ -5,7 +5,10 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
+from sample_metadata.parser.generic_metadata_parser import (
+    GenericMetadataParser,
+    run_as_sync,
+)
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.
@@ -106,7 +109,8 @@ logger.setLevel(logging.INFO)
 )
 @click.option('--search-path', multiple=True, required=True)
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     search_path: List[str],
     sample_metadata_project,
@@ -131,7 +135,8 @@ def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     sample_meta_map, sequence_meta_map = {}, {}
-    qc_meta_map = dict(qc_meta_field_map)
+
+    qc_meta_map = dict(qc_meta_field_map or {})
     if sample_meta_field_map:
         sample_meta_map.update(dict(sample_meta_field_map))
     if sample_meta_field:
@@ -141,23 +146,22 @@ def main(
     if sequence_meta_field:
         sequence_meta_map.update({k: k for k in sequence_meta_field})
 
+    parser = GenericMetadataParser(
+        sample_metadata_project=sample_metadata_project,
+        sample_name_column=sample_name_column,
+        sample_meta_map=sample_meta_map,
+        sequence_meta_map=sequence_meta_map,
+        qc_meta_map=qc_meta_map,
+        reads_column=reads_column,
+        gvcf_column=gvcf_column,
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
+        search_locations=search_path,
+    )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
 
-        GenericMetadataParser.from_manifest_path(
-            manifest=manifest,
-            sample_metadata_project=sample_metadata_project,
-            sample_name_column=sample_name_column,
-            sample_meta_map=sample_meta_map,
-            sequence_meta_map=sequence_meta_map,
-            qc_meta_map=qc_meta_map,
-            reads_column=reads_column,
-            gvcf_column=gvcf_column,
-            default_sample_type=default_sample_type,
-            default_sequence_type=default_sequence_type,
-            confirm=confirm,
-            search_paths=search_path,
-        )
+        await parser.from_manifest_path(manifest=manifest, confirm=confirm)
 
 
 if __name__ == '__main__':

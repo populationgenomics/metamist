@@ -5,6 +5,7 @@ import logging
 
 import click
 
+from sample_metadata.parser.generic_parser import run_as_sync
 from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 __DOC = """
@@ -44,14 +45,19 @@ logger.setLevel(logging.INFO)
     required=True,
     help='Search path to search for files within',
 )
+@click.option(
+    '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
+)
 @click.argument('manifests', nargs=-1)
-def main(
+@run_as_sync
+async def main(
     manifests,
     search_path: List[str],
     sample_metadata_project,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
+    dry_run=False,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -61,15 +67,18 @@ def main(
     if extra_seach_paths:
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
+    parser = SampleFileMapParser(
+        sample_metadata_project=sample_metadata_project,
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
+        search_locations=search_path,
+    )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
-        resp = SampleFileMapParser.from_manifest_path(
+        resp = await parser.from_manifest_path(
             manifest=manifest,
-            sample_metadata_project=sample_metadata_project,
-            default_sample_type=default_sample_type,
-            default_sequence_type=default_sequence_type,
             confirm=confirm,
-            search_paths=search_path,
+            dry_run=dry_run,
         )
         print(resp)
 

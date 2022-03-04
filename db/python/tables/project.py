@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List, Set, Iterable, Optional, Tuple
 
 import os
@@ -43,8 +44,8 @@ class ProjectPermissionsTable:
     _cached_client = None
 
     _cache_expiry = None
-    _cached_project_names: Dict[str, ProjectId] = None
-    _cached_project_by_id: Dict[ProjectId, ProjectRow] = None
+    _cached_project_names: Dict[str, ProjectId] = {}
+    _cached_project_by_id: Dict[ProjectId, ProjectRow] = {}
 
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
@@ -149,6 +150,7 @@ class ProjectPermissionsTable:
 
             try:
                 start = datetime.utcnow()
+                assert project.gcp_id is not None
                 response = self._read_secret(project.gcp_id, secret_name)
                 logger.debug(
                     f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
@@ -265,6 +267,28 @@ class ProjectPermissionsTable:
         _query = 'SELECT id, name, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
+
+    async def get_projects_accessible_by_user(self, author: str, readonly=True):
+        """
+        Get projects that are accessible by the specified user
+        """
+        assert author
+
+        _query = 'SELECT id, name FROM project'
+        project_id_map = {p[0]: p[1] for p in await self.connection.fetch_all(_query)}
+
+        promises = [
+            self.check_access_to_project_id(author, pid, readonly=readonly)
+            for pid in project_id_map.keys()
+        ]
+        has_access_to_project = await asyncio.gather(*promises)
+        relevant_project_names = [
+            name
+            for name, has_access in zip(project_id_map.values(), has_access_to_project)
+            if has_access
+        ]
+
+        return relevant_project_names
 
     async def create_project(
         self,

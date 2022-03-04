@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
-from typing import Optional
+import re
+from typing import Optional, List
 
 import os
 import signal
@@ -14,6 +15,7 @@ import requests
 
 DOCKER_IMAGE = os.getenv('SM_DOCKER')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', 'http://localhost:8000/openapi.json')
+OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
 MODULE_NAME = 'sample_metadata'
 
 logging.basicConfig(level=logging.DEBUG)
@@ -56,6 +58,7 @@ def start_server() -> Optional[subprocess.Popen]:
         preexec_fn=os.setsid,
     )
 
+    assert _process.stdout
     for c in iter(_process.stdout.readline, 'b'):
         line = None
         if c:
@@ -81,22 +84,44 @@ def start_server() -> Optional[subprocess.Popen]:
     return None
 
 
-def generate_api_and_copy():
-    """Get JSON from server"""
+def check_openapi_version():
+    """
+    Check compatible OpenAPI version
+    """
+    command = [*OPENAPI_COMMAND, '--version']
+    out = subprocess.check_output(command).decode().split('\n', maxsplit=1)[0].strip()
+    version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
+    if not version_match:
+        raise Exception(f'Could not detect version of openapi-generator from "{out}"')
+
+    version = version_match.group()
+    major = version.split('.')[0]
+    if int(major) != 5:
+        raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
+
+
+def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] = None):
+    """
+    Use OpenApiGenerator to generate the installable API
+    """
+    check_openapi_version()
+    with open('deploy/python/version.txt', encoding='utf-8') as f:
+        version = f.read().strip()
+
     tmpdir = tempfile.mkdtemp()
     command = [
-        'openapi-generator',
+        *OPENAPI_COMMAND,
         'generate',
-        '-i',
-        SCHEMA_URL,
-        '-g',
-        'python',
-        '-o',
-        tmpdir,
-        '--package-name',
-        MODULE_NAME,
+        *('-i', SCHEMA_URL),
+        *('-g', output_type),
+        *('-o', tmpdir),
+        *('--package-name', MODULE_NAME),
+        *(extra_commands or []),
+        *('--artifact-version', version),
         '--skip-validate-spec',
     ]
+    jcom = ' '.join(f"'{c}'" for c in command)
+    logger.info('Generating with command: ' + jcom)
     # 5 attempts
     n_attempts = 1
     succeeded = False
@@ -114,12 +139,57 @@ def generate_api_and_copy():
     if not succeeded:
         return
 
-    copy_files_from(tmpdir)
-
+    output_copyer(tmpdir)
     shutil.rmtree(tmpdir)
 
 
-def copy_files_from(tmpdir):
+def copy_typescript_files_from(tmpdir):
+    """Copy typescript files to web/src/sm-api/"""
+    files_to_ignore = {
+        'README.md',
+        '.gitignore',
+        '.npmignore',
+        '.openapi-generator',
+        '.openapi-generator-ignore',
+        'git_push.sh',
+    }
+
+    dir_to_copy_to = 'web/src/sm-api/'  # should be relative to this script
+    dir_to_copy_from = tmpdir
+
+    if not os.path.exists(dir_to_copy_to):
+        os.makedirs(dir_to_copy_to)
+    if not os.path.exists(dir_to_copy_from):
+        raise FileNotFoundError(
+            f"Directory to copy from doesn't exist ({dir_to_copy_from})"
+        )
+
+    # remove everything from dir_to_copy_to except those in files_to_ignore
+    logger.info('Removing files from dest directory ' + dir_to_copy_to)
+    for file_to_remove in os.listdir(dir_to_copy_to):
+        if file_to_remove in files_to_ignore:
+            continue
+        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)
+        if os.path.isdir(path_to_remove):
+            shutil.rmtree(path_to_remove)
+        else:
+            os.remove(path_to_remove)
+
+    files_to_copy = os.listdir(dir_to_copy_from)
+    logger.info(f'Copying {len(files_to_copy)} files / directories to {dir_to_copy_to}')
+    for file_to_copy in files_to_copy:
+        if file_to_copy in files_to_ignore:
+            continue
+
+        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)
+        output_path = os.path.join(dir_to_copy_to, file_to_copy)
+        if os.path.isdir(path_to_copy):
+            shutil.copytree(path_to_copy, output_path)
+        else:
+            shutil.copy(path_to_copy, output_path)
+
+
+def copy_python_files_from(tmpdir):
     """
     Copy a selection of API files generated from openapi-generator:
 
@@ -129,7 +199,7 @@ def copy_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'configuration.py', 'README.md', 'model_utils.py', 'parser'}
+    files_to_ignore = {'README.md', 'parser'}
 
     module_dir = MODULE_NAME.replace('.', '/')
     dir_to_copy_to = module_dir  # should be relative to this script
@@ -168,6 +238,19 @@ def copy_files_from(tmpdir):
         else:
             shutil.copy(path_to_copy, output_path)
 
+    docs_dir = os.path.join(tmpdir, 'docs')
+    static_dir = 'web/src/static'
+    output_docs_dir = os.path.join(static_dir, 'sm_docs')
+    if os.path.exists(output_docs_dir):
+        shutil.rmtree(output_docs_dir)
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    shutil.copytree(docs_dir, output_docs_dir)
+    shutil.copy(
+        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'README.md')
+    )
+    shutil.copy('README.md', os.path.join(output_docs_dir, 'index.md'))
+
 
 def main():
     """
@@ -186,7 +269,12 @@ def main():
         process = start_server()
 
     try:
-        generate_api_and_copy()
+        generate_api_and_copy(
+            'python',
+            copy_python_files_from,
+            ['--template-dir', 'openapi-templates'],
+        )
+        generate_api_and_copy('typescript-axios', copy_typescript_files_from)
     # pylint: disable=broad-except
     except BaseException as e:
         logger.error(str(e))

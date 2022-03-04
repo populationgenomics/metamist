@@ -1,21 +1,60 @@
+from os import getenv
+import logging
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 from db.python.connect import SMConnections, Connection
+from db.python.tables.project import ALLOW_FULL_ACCESS
+
 from api.utils.gcp import email_from_id_token
 
-auth = HTTPBearer()
+EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
+DEFAULT_USER = None
+_default_user = getenv('SM_LOCALONLY_DEFAULTUSER')
+if ALLOW_FULL_ACCESS and _default_user:
+    DEFAULT_USER = _default_user
+
+
+def get_jwt_from_request(request: Request) -> Optional[str]:
+    """
+    Get google JWT value, capture it like this instead of using
+        x_goog_iap_jwt_assertion = Header(None)
+    so it doesn't show up in the swagger parameters section
+    """
+    return request.headers.get('x-goog-iap-jwt-assertion')
 
 
 def authenticate(
-    token: Optional[HTTPAuthorizationCredentials] = Depends(auth),
-) -> Optional[str]:
-    """If a token is provided, return the email, else return None"""
+    token: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
+    x_goog_iap_jwt_assertion: Optional[str] = Depends(get_jwt_from_request),
+) -> str:
+    """
+    If a token (OR Google IAP auth jwt) is provided,
+    return the email, else raise an Exception
+    """
+    if x_goog_iap_jwt_assertion:
+        # We have to PREFER the IAP's identity, otherwise you could have a case where
+        # the JWT is forged, but IAP lets it through and authenticates, but then we take
+        # the identity then without checking.
+        return validate_iap_jwt_and_get_email(
+            x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
+        )
+
     if token:
         return email_from_id_token(token.credentials)
-    return None
+
+    if DEFAULT_USER is not None:
+        # this should only happen in LOCAL environments
+        logging.info(f'Using {DEFAULT_USER} as authenticated user')
+        return DEFAULT_USER
+
+    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
@@ -39,6 +78,28 @@ async def dependable_get_readonly_project_connection(
 async def dependable_get_connection(author: str = Depends(authenticate)):
     """FastAPI handler for getting connection withOUT project"""
     return await SMConnections.get_connection_no_project(author)
+
+
+def validate_iap_jwt_and_get_email(iap_jwt, audience):
+    """
+    Validate an IAP JWT and return email
+    Source: https://cloud.google.com/iap/docs/signed-headers-howto
+
+    :param iap_jwt: The contents of the X-Goog-IAP-JWT-Assertion header.
+    :param audience: The audience to validate against
+    """
+
+    try:
+        decoded_jwt = id_token.verify_token(
+            iap_jwt,
+            requests.Request(),
+            audience=audience,
+            certs_url='https://www.gstatic.com/iap/verify/public_key',
+        )
+        return decoded_jwt['email']
+    except Exception as e:
+        logging.error(f'JWT validation error {e}')
+        raise e
 
 
 get_author = Depends(authenticate)

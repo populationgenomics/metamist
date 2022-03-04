@@ -287,4 +287,40 @@
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('wgs', 'single-cell', 'exome');</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2021-11-01_sex-clarification">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<addColumn
+			tableName="participant">
+			<column
+				name="reported_sex"
+				type="int"
+			/>
+			<column
+				name="reported_gender"
+				type="VARCHAR(255)"
+			/>
+			<column
+				name="karyotype"
+				type="VARCHAR(255)"
+			/>
+			<column
+				name="meta"
+				type="json"
+				defaultValue="{}"
+			/>
+		</addColumn>
+		<sql>
+			UPDATE participant p, family_participant fp
+			SET p.reported_sex = fp.sex, p.author="michael.franklin@populationgenomics.org.au"
+			WHERE p.id = fp.participant_id;
+		</sql>
+		<dropColumn
+			tableName="family_participant"
+			columnName="sex"
+		/>
+	</changeSet>
+		<changeSet author="michael.franklin" id="2022-01-19_expand-family-coded-phenotype-column">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<sql>ALTER TABLE family MODIFY COLUMN coded_phenotype TEXT;</sql>
+	</changeSet>
 </databaseChangeLog>

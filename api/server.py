@@ -1,32 +1,54 @@
-from os import getenv
+import os
 import time
 import traceback
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from db.python.connect import SMConnections
+from db.python.tables.project import ALLOW_FULL_ACCESS
 from db.python.utils import get_logger
 
-from api.routes import (
-    sample_router,
-    import_router,
-    analysis_router,
-    sequence_router,
-    participant_router,
-    family_router,
-    project_router,
-)
+from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 
+
 # This tag is automatically updated by bump2version
-_VERSION = '3.3.0'
+_VERSION = '4.4.0'
 
 logger = get_logger()
 
-SKIP_DATABASE_CONNECTION = bool(getenv('SM_SKIP_DATABASE_CONNECTION'))
+SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()
+
+if ALLOW_FULL_ACCESS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=['*'],
+        allow_credentials=True,
+        allow_methods=['*'],
+        allow_headers=['*'],
+    )
+
+
+class SPAStaticFiles(StaticFiles):
+    """
+    https://stackoverflow.com/a/68363904
+    """
+
+    async def get_response(self, path: str, scope):
+        """
+        Overide get response to server index.html if file isn't found
+        (to make single-page-app work correctly)
+        """
+        response = await super().get_response(path, scope)
+        if response.status_code == 404 and not path.startswith('api'):
+            # server index.html if can't find existing resource
+            response = await super().get_response('index.html', scope)
+        return response
 
 
 @app.on_event('startup')
@@ -78,18 +100,26 @@ async def exception_handler(_: Request, e: Exception):
     )
 
 
-app.include_router(sample_router, prefix='/api/v1')
-app.include_router(import_router, prefix='/api/v1')
-app.include_router(analysis_router, prefix='/api/v1')
-app.include_router(sequence_router, prefix='/api/v1')
-app.include_router(participant_router, prefix='/api/v1')
-app.include_router(family_router, prefix='/api/v1')
-app.include_router(project_router, prefix='/api/v1')
+for route in routes.__dict__.values():
+    if not isinstance(route, APIRouter):
+        continue
+    app.include_router(route, prefix='/api/v1')
 
-app.openapi = get_openapi_schema_func(app, _VERSION)
+static_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
+if os.path.exists(static_dir):
+    # only allow static files if the static files are available
+    app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
+
+app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host='0.0.0.0', port=int(getenv('PORT', '8000')), debug=True)
+    uvicorn.run(
+        'api.server:app',
+        host='0.0.0.0',
+        port=int(os.getenv('PORT', '8000')),
+        debug=True,
+        reload=True,
+    )

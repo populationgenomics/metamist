@@ -1,32 +1,47 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
 
-import os
-import subprocess
-from typing import Dict, List
-import random
+from typing import Dict, List, Optional, Tuple
 import logging
+import os
+import random
+import subprocess
+import traceback
+import typing
+from collections import Counter
+
 import click
 from google.cloud import storage
-from sample_metadata import (
+from peddy import Ped
+
+from sample_metadata import exceptions
+from sample_metadata.apis import (
     AnalysisApi,
     SequenceApi,
     SampleApi,
+    FamilyApi,
+    ParticipantApi,
+)
+from sample_metadata.configuration import _get_google_auth_token
+from sample_metadata.models import (
+    AnalysisType,
     NewSequence,
     NewSample,
     AnalysisModel,
     SampleUpdateModel,
-    exceptions,
 )
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
 
-
 sapi = SampleApi()
 aapi = AnalysisApi()
 seqapi = SequenceApi()
+fapi = FamilyApi()
+papi = ParticipantApi()
+
+DEFAULT_SAMPLES_N = 10
 
 
 @click.command()
@@ -37,47 +52,82 @@ seqapi = SequenceApi()
 )
 @click.option(
     '-n',
-    required=True,
+    '--samples',
+    'samples_n',
     type=int,
-    default=10,
     help='Number of samples to subset',
+)
+@click.option(
+    '--families',
+    'families_n',
+    type=int,
+    help='Minimal number of families to include',
 )
 def main(
     project: str,
-    n: int,
+    samples_n: Optional[int],
+    families_n: Optional[int],
 ):
     """
     Script creates a test subset for a given project.
     A new project with a prefix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
-    if n < 1:
-        raise click.BadParameter('Please specify n higher than 0')
+    samples_n, families_n = _validate_opts(samples_n, families_n)
 
-    if n >= 100:
-        resp = str(
-            input(f'You requested a subset of {n} samples. Please confirm (y): ')
-        )
-        if resp.lower() != 'y':
-            raise SystemExit()
-
-    samples = sapi.get_samples(
+    all_samples = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
             'project_ids': [project],
             'active': True,
         }
     )
-    logger.info(f'Found {len(samples)} samples')
+    logger.info(f'Found {len(all_samples)} samples')
+    if samples_n and samples_n >= len(all_samples):
+        resp = str(
+            input(
+                f'Requesting {samples_n} samples which is >= '
+                f'than the number of available samples ({len(all_samples)}). '
+                f'The test project will be a copy of the production project. '
+                f'Please confirm (y): '
+            )
+        )
+        if resp.lower() != 'y':
+            raise SystemExit()
+
     random.seed(42)  # for reproducibility
-    samples = random.sample(samples, n)
-    sample_ids = [s['id'] for s in samples]
+
+    pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
+    sample_id_by_participant_id = dict(pid_sid)
+
+    ped_lines = export_ped_file(project, replace_with_participant_external_ids=True)
+    if families_n is not None:
+        ped = Ped(ped_lines)
+        families = list(ped.families.values())
+        logger.info(f'Found {len(families)} families, by size:')
+        _print_fam_stats(families)
+        families = random.sample(families, families_n)
+        logger.info(f'After subsetting to {len(families)} families:')
+        _print_fam_stats(families)
+        sample_ids = []
+        for fam in families:
+            for s in fam.samples:
+                sample_ids.append(sample_id_by_participant_id[s.sample_id])
+        samples = [s for s in all_samples if s['id'] in sample_ids]
+
+    else:
+        assert samples_n
+        samples = random.sample(all_samples, samples_n)
+        sample_ids = [s['id'] for s in samples]
+
     logger.info(
         f'Subset to {len(samples)} samples (internal ID / external ID): '
-        f'{_pretty(samples)}'
+        f'{_pretty_format_samples(samples)}'
     )
 
-    # Checking existing test samples in the target test project
+    # Populating test project
     target_project = project + '-test'
+    logger.info('Checking any existing test samples in the target test project')
+
     test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
 
     try:
@@ -87,27 +137,27 @@ def main(
     else:
         seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
 
-    analysis_by_sid_by_type = {}
-    for a_type in ['cram', 'gvcf']:
+    analysis_by_sid_by_type: Dict[str, Dict] = {'cram': {}, 'gvcf': {}}
+    for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
             analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
-                analysis_type=a_type,
+                analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
             )
         except exceptions.ApiException:
-            analysis_by_sid_by_type[a_type] = {}
+            traceback.print_exc()
         else:
-            analysis_by_sid_by_type[a_type] = dict(zip(sample_ids, analyses))
-            logger.info(
-                f'Will copy {a_type} analysis entries: {analysis_by_sid_by_type[a_type]}'
-            )
+            for a in analyses:
+                analysis_by_sid[a['sample_ids'][0]] = a
+        logger.info(f'Will copy {a_type} analysis entries: {analysis_by_sid}')
 
     for s in samples:
         logger.info(f'Processing sample {s["id"]}')
 
         if s['external_id'] in test_sample_by_external_id:
-            new_s_id = test_sample_by_external_id.get(s['external_id'])['id']
+            new_s_id = test_sample_by_external_id[s['external_id']]['id']
+            logger.info(f'Sample already in test project, with ID {new_s_id}')
         else:
             logger.info('Creating test sample entry')
             new_s_id = sapi.create_new_sample(
@@ -118,20 +168,19 @@ def main(
                     meta=_copy_files_in_dict(s['meta'], project),
                 ),
             )
-
-        seq_info = seq_info_by_s_id.get(s['id'])
-        if seq_info:
-            logger.info('Processing sequence entry')
-            new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
-            logger.info('Creating sequence entry in test')
-            seqapi.create_new_sequence(
-                new_sequence=NewSequence(
-                    sample_id=new_s_id,
-                    meta=new_meta,
-                    type=seq_info['type'],
-                    status=seq_info['status'],
+            seq_info = seq_info_by_s_id.get(s['id'])
+            if seq_info:
+                logger.info('Processing sequence entry')
+                new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
+                logger.info('Creating sequence entry in test')
+                seqapi.create_new_sequence(
+                    new_sequence=NewSequence(
+                        sample_id=new_s_id,
+                        meta=new_meta,
+                        type=seq_info['type'],
+                        status=seq_info['status'],
+                    )
                 )
-            )
 
         for a_type in ['cram', 'gvcf']:
             analysis = analysis_by_sid_by_type[a_type].get(s['id'])
@@ -146,6 +195,61 @@ def main(
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
+
+
+def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
+    if samples_n is not None and families_n is not None:
+        raise click.BadParameter('Please specify only one of --samples or --families')
+
+    if samples_n is None and families_n is None:
+        samples_n = DEFAULT_SAMPLES_N
+        logger.info(
+            f'Neither --samples nor --families specified, defaulting to selecting '
+            f'{samples_n} samples'
+        )
+
+    if samples_n is not None and samples_n < 1:
+        raise click.BadParameter('Please specify --samples higher than 0')
+
+    if families_n is not None and families_n < 1:
+        raise click.BadParameter('Please specify --families higher than 0')
+
+    if families_n is not None and families_n >= 30:
+        resp = str(
+            input(
+                f'You requested a subset of {families_n} families. '
+                f'Please confirm (y): '
+            )
+        )
+        if resp.lower() != 'y':
+            raise SystemExit()
+
+    if samples_n is not None and samples_n >= 100:
+        resp = str(
+            input(
+                f'You requested a subset of {samples_n} samples. '
+                f'Please confirm (y): '
+            )
+        )
+        if resp.lower() != 'y':
+            raise SystemExit()
+    return samples_n, families_n
+
+
+def _print_fam_stats(families: List):
+    fam_by_size: typing.Counter[int] = Counter()
+    for fam in families:
+        fam_by_size[len(fam.samples)] += 1
+    for fam_size in sorted(fam_by_size):
+        if fam_size == 1:
+            label = 'singles'
+        elif fam_size == 2:
+            label = 'duos'
+        elif fam_size == 3:
+            label = 'trios'
+        else:
+            label = f'{fam_size} members'
+        logger.info(f'  {label}: {fam_by_size[fam_size]}')
 
 
 def _copy_files_in_dict(d, dataset: str):
@@ -166,12 +270,17 @@ def _copy_files_in_dict(d, dataset: str):
             f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
         )
         if not file_exists(new_path):
-            cmd = f'gsutil -u {dataset} cp "{old_path}" "{new_path}"'
+            cmd = f'gsutil cp "{old_path}" "{new_path}"'
             logger.info(f'Copying file in metadata: {cmd}')
             subprocess.run(cmd, check=False, shell=True)
-        for suf in ['.tbi', '.md5']:
-            if file_exists(old_path + suf) and not file_exists(new_path + suf):
-                cmd = f'gsutil -u {dataset} cp "{old_path + suf}" "{new_path + suf}"'
+        extra_exts = ['.md5']
+        if new_path.endswith('.vcf.gz'):
+            extra_exts.append('.tbi')
+        if new_path.endswith('.cram'):
+            extra_exts.append('.crai')
+        for ext in extra_exts:
+            if file_exists(old_path + ext) and not file_exists(new_path + ext):
+                cmd = f'gsutil cp "{old_path + ext}" "{new_path + ext}"'
                 logger.info(f'Copying extra file in metadata: {cmd}')
                 subprocess.run(cmd, check=False, shell=True)
         return new_path
@@ -182,11 +291,14 @@ def _copy_files_in_dict(d, dataset: str):
     return d
 
 
-def _pretty(samples: List[Dict]) -> str:
-    return ', '.join('/'.join([s['id'], s['external_id']]) for s in samples)
+def _pretty_format_samples(samples: List[Dict]) -> str:
+    return ', '.join(f"{s['id']}/{s['external_id']}" for s in samples)
 
 
 def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
+    """
+    Removes samples that need to be removed and returns those that need to be kept
+    """
     test_samples = sapi.get_samples(
         body_get_samples_by_criteria_api_v1_sample_post={
             'project_ids': [test_project],
@@ -199,12 +311,16 @@ def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
     ]
     test_samples_to_keep = [s for s in test_samples if s['external_id'] in external_ids]
     if test_samples_to_remove:
-        logger.info(f'Removing test samples: {_pretty(test_samples_to_remove)}')
+        logger.info(
+            f'Removing test samples: {_pretty_format_samples(test_samples_to_remove)}'
+        )
         for s in test_samples_to_remove:
             sapi.update_sample(s['id'], SampleUpdateModel(active=False))
 
     if test_samples_to_keep:
-        logger.info(f'Test samples already exist: {_pretty(test_samples_to_keep)}')
+        logger.info(
+            f'Test samples already exist: {_pretty_format_samples(test_samples_to_keep)}'
+        )
 
     return {s['external_id']: s for s in test_samples_to_keep}
 
@@ -224,6 +340,33 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
+
+
+def export_ped_file(  # pylint: disable=invalid-name
+    project: str,
+    replace_with_participant_external_ids: bool = False,
+    replace_with_family_external_ids: bool = False,
+) -> List[str]:
+    """
+    Generates a PED file for the project, returs PED file lines in a list
+    """
+    route = f'/api/v1/family/{project}/pedigree'
+    opts = []
+    if replace_with_participant_external_ids:
+        opts.append('replace_with_participant_external_ids=true')
+    if replace_with_family_external_ids:
+        opts.append('replace_with_family_external_ids=true')
+    if opts:
+        route += '?' + '&'.join(opts)
+
+    cmd = f"""\
+        curl --location --request GET \
+        'https://sample-metadata.populationgenomics.org.au{route}' \
+        --header "Authorization: Bearer {_get_google_auth_token()}"
+        """
+
+    lines = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
+    return lines
 
 
 if __name__ == '__main__':

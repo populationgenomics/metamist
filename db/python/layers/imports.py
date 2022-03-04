@@ -1,4 +1,4 @@
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Any, Optional
 
 from models.enums import SampleType, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
@@ -12,7 +12,7 @@ from db.python.layers.base import BaseLayer
 class ImportLayer(BaseLayer):
     """Layer for import logic"""
 
-    async def import_airtable_manifest(self, rows: Iterable[Dict[str, any]]):
+    async def import_airtable_manifest(self, rows: Iterable[Dict[str, Any]]):
         """
         Import airtable manifest from formed row objects,
         where the key is the header. Imports to a combination
@@ -82,8 +82,11 @@ class ImportLayer(BaseLayer):
         return await self.import_airtable_manifest(drows)
 
     @staticmethod
-    def parse_specimen_type_to_sample_type(specimen_type: str) -> SampleType:
+    def parse_specimen_type_to_sample_type(specimen_type: Optional[str]) -> SampleType:
         """Take the airtable 'Specimen Type' and return a SampleType"""
+        if not specimen_type:
+            raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
+
         if 'blood' in specimen_type.lower():
             return SampleType.BLOOD
 
@@ -93,8 +96,10 @@ class ImportLayer(BaseLayer):
         raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
 
     @staticmethod
-    def parse_row_status(row_status: str) -> SequenceStatus:
+    def parse_row_status(row_status: Optional[str]) -> SequenceStatus:
         """Take the airtable 'Status' and return a SequencingStatus"""
+        if not row_status:
+            return SequenceStatus.UNKNOWN
         row_status_lower = row_status.lower()
         if row_status_lower == 'sequencing complete':
             return SequenceStatus.COMPLETED_SEQUENCING
