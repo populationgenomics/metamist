@@ -19,7 +19,6 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import Analysis
 from models.models.sample import (
-    sample_id_format,
     sample_id_transform_to_raw_list,
     sample_id_format_list,
 )
@@ -298,10 +297,6 @@ async def get_sample_reads_map_for_seqr(
     at = AnalysisLayer(connection)
     assert connection.project
     rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
-
-    # remap sample ids
-    for row in rows:
-        row[2] = sample_id_format(int(row[2]))
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter='\t')
