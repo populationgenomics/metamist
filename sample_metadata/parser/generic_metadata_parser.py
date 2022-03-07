@@ -88,6 +88,13 @@ class GenericMetadataParser(GenericParser):
     def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """Get sequence type from row"""
         value = row.get(self.seq_type_column, None) or self.default_sequence_type
+        value = value.lower()
+
+        if value == 'wgs':
+            value = 'genome'
+        elif value == 'wes':
+            value = 'exome'
+
         return SequenceType(value.lower())
 
     def get_sequence_status(self, row: SingleRow) -> SequenceStatus:
