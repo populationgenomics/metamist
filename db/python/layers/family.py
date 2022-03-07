@@ -250,12 +250,15 @@ class FamilyLayer(BaseLayer):
         all_participants = participant_ids if participant_ids else []
 
         # Find the participants from the given samples
-        _, samples = await self.stable.get_samples_by(
-            project_ids=[project], sample_ids=sample_ids
-        )
+        if sample_ids is not None and len(sample_ids) > 0:
+            _, samples = await self.stable.get_samples_by(
+                project_ids=[project], sample_ids=sample_ids
+            )
 
-        all_participants += [int(s.participant_id) for s in samples if s.participant_id]
-        all_participants = list(set(all_participants))
+            all_participants += [
+                int(s.participant_id) for s in samples if s.participant_id
+            ]
+            all_participants = list(set(all_participants))
 
         return await self.ftable.get_families(
             project=project, participant_ids=all_participants
