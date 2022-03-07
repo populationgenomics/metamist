@@ -70,11 +70,8 @@ class GenericMetadataParser(GenericParser):
         filenames = []
         for sm in (sample_map if isinstance(sample_map, list) else [sample_map]):
             for rows in sm.values():
-                if isinstance(rows, list):
-                    for r in rows:
-                        filenames.extend(r.get(self.reads_column, '').split(','))
-                else:
-                    filenames.extend(rows.get(self.reads_column, '').split(','))
+                for r in (rows if if isinstance(rows, list) else [rows]):
+                    filenames.extend(r.get(self.reads_column, '').split(','))
 
         fs = set(f for f in filenames if f)
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
