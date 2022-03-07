@@ -111,7 +111,7 @@ class GenericMetadataParser(GenericParser):
         if len(pids) > 1:
             raise ValueError(f'Same sample matches to multiple participants {pids}')
 
-        return pids.pop(0, '')
+        return pids.pop(0) or ''
 
     def populate_filename_map(self, search_locations: List[str]):
         """
