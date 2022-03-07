@@ -202,6 +202,26 @@ class SampleLayer(BaseLayer):
             active=active,
         )
 
+    async def merge_samples(
+        self,
+        id_keep: int,
+        id_merge: int,
+        author=None,
+        check_project_id=True,
+    ):
+        """Merge two samples into one another"""
+        if check_project_id:
+            projects = await self.st.get_project_ids_for_sample_ids([id_keep, id_merge])
+            await self.ptable.check_access_to_project_ids(
+                user=author or self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.st.merge_samples(
+            id_keep=id_keep,
+            id_merge=id_merge,
+            author=author,
+        )
+
     async def upsert_sample(self, sample: SampleUpsert):
         """Upsert a sample"""
         if not sample.id:

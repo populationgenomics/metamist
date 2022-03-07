@@ -72,7 +72,8 @@ async def batch_upsert_samples(
 
     # Convert id in samples to int
     for sample in samples.samples:
-        sample.id = sample_id_transform_to_raw(sample.id) if sample.id else None
+        if sample.id:
+            sample.id = sample_id_transform_to_raw(sample.id)
 
     async with connection.connection.transaction():
         # Table interfaces
@@ -198,6 +199,26 @@ async def update_sample(
         participant_id=model.participant_id,
         type_=model.type,
         active=model.active,
+    )
+    return result
+
+
+@router.patch('/{id_keep}/{id_merge}', operation_id='mergeSamples')
+async def merge_samples(
+    id_keep: str,
+    id_merge: str,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Merge one sample into another, this function achieves the merge
+    by rewriting all sample_ids of {id_merge} with {id_keep}. You must
+    carefully consider if analysis objects need to be deleted, or other
+    implications BEFORE running this method.
+    """
+    st = SampleLayer(connection)
+    result = await st.merge_samples(
+        id_keep=sample_id_transform_to_raw(id_keep),
+        id_merge=sample_id_transform_to_raw(id_merge),
     )
     return result
 

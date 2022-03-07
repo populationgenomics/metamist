@@ -164,16 +164,32 @@ class SeqrMetadataKeys(Enum):
         )
 
     @staticmethod
-    def parse_hpo_terms(hpo_terms: str):
+    def parse_hpo_terms(hpo_terms: str) -> Optional[str]:
         """
         Validate that comma-separated HPO terms must start with 'HP:'
+
+        >>> SeqrMetadataKeys.parse_hpo_terms('')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(',')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' ,')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' ')
+
+        >>> SeqrMetadataKeys.parse_hpo_terms(' HP12,  HP34 ')
+        'HP12,HP34'
+        >>> SeqrMetadataKeys.parse_hpo_terms('Clinical,Failure')
+        Traceback (most recent call last):
+        ValueError: HPO terms must start with "HP", found Clinical, Failure
         """
-        if not hpo_terms:
+        if not hpo_terms or not hpo_terms.strip():
             return None
-        terms = [t.strip() for t in hpo_terms.split(',')]
+        terms = [t.strip() for t in hpo_terms.split(',') if t.strip()]
+        if not terms:
+            return None
         # mfranklin (2021-09-06): There were no IDs that didn't start with HP
         # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
-        failing_terms = [term for term in terms if not term.startswith('HP')]
+        failing_terms = [term for term in terms if term and not term.startswith('HP')]
         if failing_terms:
             raise ValueError(
                 'HPO terms must start with "HP", found ' + ', '.join(failing_terms)
@@ -210,12 +226,14 @@ class ParticipantLayer(BaseLayer):
             project=self.connection.project,
             allow_missing=True,
         )
-        if not unlinked_participants:
-            return '0 participants updated'
 
         external_participant_ids_to_add = set(
             external_sample_map_with_no_pid.keys()
         ) - set(unlinked_participants.keys())
+
+        if not external_participant_ids_to_add:
+            # if there are no participants to add, skip the next step
+            return '0 participants updated'
 
         async with self.connection.connection.transaction():
             sample_ids_to_update = {

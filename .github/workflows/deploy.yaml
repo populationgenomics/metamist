@@ -1,8 +1,6 @@
 name: Deploy
 on:
-  # Building on pull-requests, manual dispatch, and pushes to main. But restricting
-  # publishing only to main pushes and manual dispatch with `if`s in specific steps
-  pull_request:
+  # Building on manual dispatch, and pushes to dev / main. But restricting
   workflow_dispatch:
   push:
     branches:
@@ -99,12 +97,10 @@ jobs:
         run: python setup.py sdist
 
       - name: "push server image"
-        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
         run: |
           docker push $SM_DOCKER
 
       - name: "deploy to Cloud Run"
-        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             gcloud_deploy_name=sample-metadata-api
@@ -117,7 +113,7 @@ jobs:
             --platform managed
 
       - name: Publish package
-        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
+        if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -125,7 +121,7 @@ jobs:
           packages_dir: dist/
 
       - name: Build and push sample-metadata API docker image
-        if: "${{ startsWith(github.event.head_commit.message, 'Bump version:') || github.event_name == 'workflow_dispatch' }}"
+        if: github.ref == 'refs/heads/main'
         run: |
           version=$(cat deploy/python/version.txt)
           docker build \
