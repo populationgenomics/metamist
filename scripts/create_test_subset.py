@@ -202,10 +202,7 @@ def main(
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
 
-    logger.info(f'Populating Participants')
     papi.fill_in_missing_participants(target_project)
-    logger.info(f'Populating Families')
-    logger.info(test_sample_by_external_id.keys())
     participant_map = papi.get_participant_id_map_by_external_ids(
         target_project, list(test_sample_by_external_id.keys())
     )
@@ -219,6 +216,7 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
     families = fapi.get_families(initial_project)
     tmp_family_tsv = 'tmp_families.tsv'
     family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
+    # Work-around as import_families takes a file.
     with open(tmp_family_tsv, 'wt') as tmp_families:
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
@@ -243,6 +241,7 @@ def transfer_ped(initial_project, target_project, family_ids):
         internal_family_ids=family_ids,
     )
     tmp_ped_tsv = 'tmp_ped.tsv'
+    # Work-around as import_pedigree takes a file.
     with open(tmp_ped_tsv, 'w') as tmp_ped:
         tmp_ped.write(ped)
 
