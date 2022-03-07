@@ -9,6 +9,7 @@ import subprocess
 import traceback
 import typing
 from collections import Counter
+import csv
 
 import click
 from google.cloud import storage
@@ -29,6 +30,11 @@ from sample_metadata.models import (
     NewSample,
     AnalysisModel,
     SampleUpdateModel,
+    SequenceType,
+    SampleType,
+    SequenceStatus,
+    AnalysisStatus,
+    ContentType,
 )
 
 logger = logging.getLogger(__file__)
@@ -164,7 +170,7 @@ def main(
                 project=target_project,
                 new_sample=NewSample(
                     external_id=s['external_id'],
-                    type=s['type'],
+                    type=SampleType(s['type']),
                     meta=_copy_files_in_dict(s['meta'], project),
                 ),
             )
@@ -177,8 +183,8 @@ def main(
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
-                        type=seq_info['type'],
-                        status=seq_info['status'],
+                        type=SequenceType(seq_info['type']),
+                        status=SequenceStatus(seq_info['status']),
                     )
                 )
 
@@ -187,14 +193,61 @@ def main(
             if analysis:
                 logger.info(f'Processing {a_type} analysis entry')
                 am = AnalysisModel(
-                    type=a_type,
+                    type=AnalysisType(a_type),
                     output=_copy_files_in_dict(analysis['output'], project),
-                    status=analysis['status'],
+                    status=AnalysisStatus(analysis['status']),
                     sample_ids=[s['id']],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
+
+    logger.info(f'Populating Participants')
+    papi.fill_in_missing_participants(target_project)
+    logger.info(f'Populating Families')
+    logger.info(test_sample_by_external_id.keys())
+    participant_map = papi.get_participant_id_map_by_external_ids(
+        target_project, list(test_sample_by_external_id.keys())
+    )
+    participant_ids = list(participant_map.values())
+    family_ids = transfer_families(project, target_project, participant_ids)
+    transfer_ped(project, target_project, family_ids)
+
+
+def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
+    """Pull relevant families from the input project, and copy to target_project"""
+    families = fapi.get_families(initial_project)
+    tmp_family_tsv = 'tmp_families.tsv'
+    family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
+    with open(tmp_family_tsv, 'wt') as tmp_families:
+        tsv_writer = csv.writer(tmp_families, delimiter='\t')
+        tsv_writer.writerow(family_tsv_headers)
+        for family in families:
+            del family['id']
+            del family['project']
+            tsv_writer.writerow(list(family.values()))
+
+    with open(tmp_family_tsv) as families:
+        fapi.import_families(file=families, project=target_project)
+
+    family_ids = [family['id'] for family in families]
+
+    return family_ids
+
+
+def transfer_ped(initial_project, target_project, family_ids):
+    """Pull pedigree from the input project, and copy to target_project"""
+    ped = fapi.get_pedigree(
+        initial_project,
+        response_type=ContentType('tsv'),
+        internal_family_ids=family_ids,
+    )
+    tmp_ped_tsv = 'tmp_ped.tsv'
+    with open(tmp_ped_tsv, 'w') as tmp_ped:
+        tmp_ped.write(ped)
+
+    with open(tmp_ped_tsv) as ped_file:
+        fapi.import_pedigree(file=ped_file, has_header=True, project=target_project)
 
 
 def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
