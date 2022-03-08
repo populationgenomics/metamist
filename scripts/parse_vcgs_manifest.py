@@ -74,6 +74,7 @@ class VcgsManifestParser(GenericMetadataParser):
         search_locations: List[str],
         default_sequence_type='wgs',
         default_sample_type='blood',
+        allow_extra_files_in_search_path=False,
     ):
 
         super().__init__(
@@ -86,6 +87,7 @@ class VcgsManifestParser(GenericMetadataParser):
             sample_meta_map=Columns.sample_meta_map(),
             sequence_meta_map=Columns.sequence_meta_map(),
             qc_meta_map={},
+            allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
@@ -143,6 +145,12 @@ class VcgsManifestParser(GenericMetadataParser):
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
 @click.option('--search-path', multiple=True, required=False)
+@click.option(
+    '--allow-extra-files-in-search_path',
+    is_flag=True,
+    help='By default, this parser will fail if there are crams, bams, fastqs '
+    'in the search path that are not covered by the sample map.',
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -152,6 +160,7 @@ async def main(
     default_sequence_type='wgs',
     confirm=False,
     search_path: List[str] = None,
+    allow_extra_files_in_search_path=False,
 ):
     """Run script from CLI arguments"""
     _search_locations = search_path or list(set(os.path.basename(s) for s in manifests))
@@ -160,6 +169,7 @@ async def main(
         default_sequence_type=default_sequence_type,
         sample_metadata_project=sample_metadata_project,
         search_locations=_search_locations,
+        allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')

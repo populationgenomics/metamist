@@ -368,6 +368,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analysis_to_add,
         )
 
+    async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]) -> bool:
+        """Validate sample id rows"""
+        return True
+
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, Dict], Tuple[List, List, List, List, Dict]]:
@@ -385,6 +389,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
+
+        await self.validate_rows(sample_map)    # type: ignore
 
         if len(sample_map) == 0:
             raise ValueError(f'{proj}: The manifest file contains no records')
