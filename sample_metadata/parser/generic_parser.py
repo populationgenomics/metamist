@@ -86,6 +86,7 @@ class SequenceMetaGroup(BaseModel):
 
     class Config:
         """Config"""
+
         arbitrary_types_allowed = True
 
 
@@ -269,7 +270,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     @abstractmethod
     async def get_sequence_meta(
         self, sample_id: str, row: GroupedRow
-    ) -> Optional[SingleRow]:
+    ) -> Optional[List[SequenceMetaGroup]]:
         """Get sequence-metadata from row"""
 
     # @abstractmethod
