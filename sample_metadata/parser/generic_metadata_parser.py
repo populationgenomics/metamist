@@ -1,12 +1,12 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 import os
 import logging
 from io import StringIO
 from functools import reduce
 
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync    # noqa
+from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync     # noqa
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -29,6 +29,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='wgs',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
+        allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             path_prefix=path_prefix,
@@ -49,6 +50,46 @@ class GenericMetadataParser(GenericParser):
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
+        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
+
+    async def validate_rows(
+        self, sample_map: Dict[str, Union[dict, List[dict]]]
+    ) -> bool:
+        if not self.reads_column:
+            return True
+
+        if not self.allow_extra_files_in_search_path:
+            return self.check_files_covered_by_file_map(sample_map)
+
+        return True
+
+    def check_files_covered_by_file_map(self, sample_map: Union[dict, List[dict]]) -> bool:
+        """
+        Check that the files in the search_paths are completely covered by the sample_map
+        """
+        filenames = []
+        for sm in (sample_map if isinstance(sample_map, list) else [sample_map]):
+            for rows in sm.values():
+                for r in (rows if isinstance(rows, list) else [rows]):
+                    filenames.extend(r.get(self.reads_column, '').split(','))
+
+        fs = set(f for f in filenames if f)
+        relevant_extensions = ('.cram', '.fastq.gz', '.bam')
+        filename_filter = lambda f: any(f.endswith(ext) for ext in relevant_extensions)     # noqa: E731
+        relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
+        files_in_search_path_not_in_map = relevant_mapped_files - fs
+        potentially_missing_files = fs - relevant_mapped_files
+        if potentially_missing_files:
+            logger.warning(
+                f'Potentially non-existent files found in file map: {", ".join(potentially_missing_files)}'
+            )
+        if files_in_search_path_not_in_map:
+            raise ValueError(
+                'There are files in the search path that are NOT covered by the file map: '
+                f'{files_in_search_path_not_in_map}'
+            )
+
+        return True
 
     def populate_filename_map(self, search_locations: List[str]):
         """
@@ -83,7 +124,9 @@ class GenericMetadataParser(GenericParser):
             return filename
 
         sps = ', '.join(self.search_locations)
-        raise FileNotFoundError(f"Couldn't find file '{filename}' in search_paths: {sps}")
+        raise FileNotFoundError(
+            f"Couldn't find file '{filename}' in search_paths: {sps}"
+        )
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         """Get external sample ID from row"""
@@ -185,7 +228,9 @@ class GenericMetadataParser(GenericParser):
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    async def get_sequence_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_sequence_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Dict[str, Any]:
         """Get sequence-metadata from row"""
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, row
@@ -213,7 +258,9 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-        file_types: Dict[str, Dict[str, List]] = await self.parse_files(sample_id, full_filenames)
+        file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+            sample_id, full_filenames
+        )
         reads: Dict[str, List] = file_types.get('reads')
         variants: Dict[str, List] = file_types.get('variants')
         if reads:
@@ -221,7 +268,9 @@ class GenericMetadataParser(GenericParser):
             if len(keys) > 1:
                 # 2021-12-14 mfranklin: In future we should return multiple
                 #       sequence meta, and handle that in the generic parser
-                raise ValueError(f'Multiple types of reads found ({", ".join(keys)}), currently not supported')
+                raise ValueError(
+                    f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
+                )
 
             reads_type = keys[0]
             collapsed_sequence_meta['reads_type'] = reads_type
@@ -238,7 +287,9 @@ class GenericMetadataParser(GenericParser):
 
         return collapsed_sequence_meta
 
-    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[Dict[str, Any]]:
+    async def get_qc_meta(
+        self, sample_id: str, row: GroupedRow
+    ) -> Optional[Dict[str, Any]]:
         """Get collapsed qc meta"""
         if not self.qc_meta_map:
             return None
@@ -268,5 +319,5 @@ class GenericMetadataParser(GenericParser):
             StringIO(file_contents),
             delimiter=_delimiter,
             confirm=confirm,
-            dry_run=dry_run
+            dry_run=dry_run,
         )

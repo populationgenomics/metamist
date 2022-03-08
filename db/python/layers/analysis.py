@@ -98,7 +98,7 @@ class AnalysisLayer(BaseLayer):
     async def get_sample_cram_path_map_for_seqr(
         self, project: ProjectId
     ) -> List[List[str]]:
-        """Get (ext_sample_id, cram_path, internal_id) map"""
+        """Get (ext_participant_id, cram_path, internal_id) map"""
         return await self.at.get_sample_cram_path_map_for_seqr(project=project)
 
     async def query_analysis(

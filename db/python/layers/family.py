@@ -1,5 +1,6 @@
 # pylint: disable=used-before-assignment
-from typing import List, Union, Optional
+import logging
+from typing import List, Union, Optional, Dict
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -8,6 +9,7 @@ from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
+from db.python.tables.sample import SampleTable
 
 
 class PedRow:
@@ -187,6 +189,52 @@ class PedRow:
         return ordered
 
     @staticmethod
+    def validate_sexes(rows: List['PedRow'], throws=True) -> bool:
+        """
+        Validate that individuals listed as mothers and fathers
+        have either unknown sex, male if paternal, and female if maternal.
+
+        Future note: The pedigree has a simplified view of sex, especially
+        how it relates families together. This function might not handle
+        more complex cases around intersex disorders within families. The
+        best advice is either to skip this check, or provide sex as 0 (unknown)
+
+        :param throws: If True is provided (default), raise a ValueError, else just return False
+        """
+        keyed: Dict[str, PedRow] = {r.individual_id: r for r in rows}
+        paternal_ids = [r.paternal_id for r in rows if r.paternal_id]
+        mismatched_pat_sex = [
+            pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)
+        ]
+        maternal_ids = [r.maternal_id for r in rows if r.maternal_id]
+        mismatched_mat_sex = [
+            mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)
+        ]
+
+        messages = []
+        if mismatched_pat_sex:
+            actual_values = ', '.join(
+                f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex
+            )
+            messages.append('(0, 1) as they are listed as fathers: ' + actual_values)
+        if mismatched_mat_sex:
+            actual_values = ', '.join(
+                f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex
+            )
+            messages.append('(0, 2) as they are listed as mothers: ' + actual_values)
+
+        if messages:
+            message = 'Expected individuals have sex values:' + ''.join(
+                '\n\t' + m for m in messages
+            )
+            if throws:
+                raise ValueError(message)
+            logging.warning(message)
+            return False
+
+        return True
+
+    @staticmethod
     def parse_header_order(header: List[str]):
         """
         Takes a list of unformatted headers, and returns a list of ordered init_keys
@@ -232,12 +280,36 @@ class FamilyLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
+        self.stable = SampleTable(connection)
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
-    async def get_families(self, project: int = None):
+    async def get_families(
+        self,
+        project: int = None,
+        participant_ids: List[int] = None,
+        sample_ids: List[int] = None,
+    ):
         """Get all families for a project"""
-        return await self.ftable.get_families(project=project)
+        project = project or self.connection.project
+
+        # Merge sample_id and participant_ids into a single list
+        all_participants = participant_ids if participant_ids else []
+
+        # Find the participants from the given samples
+        if sample_ids is not None and len(sample_ids) > 0:
+            _, samples = await self.stable.get_samples_by(
+                project_ids=[project], sample_ids=sample_ids
+            )
+
+            all_participants += [
+                int(s.participant_id) for s in samples if s.participant_id
+            ]
+            all_participants = list(set(all_participants))
+
+        return await self.ftable.get_families(
+            project=project, participant_ids=all_participants
+        )
 
     async def update_family(
         self,
@@ -352,6 +424,7 @@ class FamilyLayer(BaseLayer):
         header: Optional[List[str]],
         rows: List[List[str]],
         create_missing_participants=False,
+        perform_sex_check=True,
     ):
         """
         Import pedigree file
@@ -378,6 +451,8 @@ class FamilyLayer(BaseLayer):
         ]
         # this validates a lot of the pedigree too
         pedrows = PedRow.order(pedrows)
+        if perform_sex_check:
+            PedRow.validate_sexes(pedrows, throws=True)
 
         external_family_ids = set(r.family_id for r in pedrows)
         # get set of all individual, paternal, maternal participant ids
