@@ -161,7 +161,7 @@ class SampleSequencingTable(DbBase):
 
         return result['project'], result['id']
 
-    async def get_sequence_ids_from_sample_id(self, sample_id: int):
+    async def get_all_sequence_id_for_sample_id(self, sample_id: int):
         """
         Get the sequence IDs from internal sample_id and sequence type
         Map them to be keyed on sequence type

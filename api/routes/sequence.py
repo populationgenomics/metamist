@@ -117,10 +117,10 @@ async def get_sequence_id_from_sample_id(
 )
 async def get_sequence_id_from_sample_id_and_type(
     sample_id: str,
-    sequence_type: str,
+    sequence_type: SequenceType,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
-    """Get sequence by internal Sample ID and sequence type"""
+    """Get sequence ID by internal Sample ID and sequence type"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)
     sequence_id = await sequence_layer.get_sequence_id_from_sample_id_and_type(
@@ -131,30 +131,30 @@ async def get_sequence_id_from_sample_id_and_type(
 
 
 @router.get(
-    '/all-by-sample-id/{sample_id}/',
-    operation_id='getAllSequencesBySampleId',
+    '/all-for-sample-id/{sample_id}',
+    operation_id='getAllSequencesForSampleId',
 )
-async def get_all_sequence_id_from_sample_id(
+async def get_all_sequence_id_for_sample_id(
     sample_id: str,
     connection: Connection = get_projectless_db_connection,
 ) -> Dict[str, int]:
-    """Get all sequences by internal Sample ID"""
+    """Get all sequences for internal Sample ID"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)
-    sequence_ids_map = await sequence_layer.get_sequence_ids_from_sample_id(
+    sequence_ids_map = await sequence_layer.get_all_sequence_id_for_sample_id(
         sample_id_raw
     )
     return sequence_ids_map
 
 
 @router.post(
-    '/all-ids-by-sample-ids/',
+    '/all-ids-by-sample-ids',
     operation_id='getAllSequencesBySampleIds',
 )
 async def get_sequence_ids_from_sample_ids(
     sample_ids: List[str],
     connection: Connection = get_projectless_db_connection,
-) -> Dict[str, Dict[str, int]]:
+) -> Dict[str, Dict[SequenceType, int]]:
     """Get all sequences by internal Sample IDs list"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)

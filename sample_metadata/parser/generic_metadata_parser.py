@@ -39,7 +39,7 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
-        default_sequence_type='wgs',
+        default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
@@ -79,7 +79,11 @@ class GenericMetadataParser(GenericParser):
         return SampleType(self.default_sample_type)
 
     def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
-        """Get sequence type from row"""
+        """
+        Get sequence types from grouped row
+        if SingleRow: return sequence type
+        if GroupedRow: return sequence types for all rows
+        """
         if isinstance(row, dict):
             return [self.get_sequence_type(row)]
         return [

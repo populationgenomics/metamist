@@ -25,7 +25,6 @@ from functools import wraps
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
-from pydantic import BaseModel
 
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
@@ -68,7 +67,7 @@ ALL_EXTENSIONS = (
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
 SingleRow = Dict[str, Any]
-GroupedRow = Union[List[SingleRow], SingleRow]
+GroupedRow = List[SingleRow]
 
 T = TypeVar('T')
 
@@ -77,7 +76,7 @@ SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
-class SequenceMetaGroup(BaseModel):
+class SequenceMetaGroup:
     """Class for holding sequence metadata grouped by type"""
 
     rows: GroupedRow
@@ -125,7 +124,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         path_prefix: Optional[str],
         sample_metadata_project: str,
-        default_sequence_type='wgs',
+        default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
         default_analysis_type='qc',
@@ -153,7 +152,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_bucket = None
 
         self.client = None
-        self.bucket_clients: SingleRow = {}
+        self.bucket_clients: Dict[str, Any] = {}
 
         self.client = storage.Client()
 
@@ -400,7 +399,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analysis_to_add,
         )
 
-    async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]) -> bool:
+    async def validate_rows(
+        self, sample_map: Dict[str, Union[dict, List[dict]]]
+    ) -> bool:
         """Validate sample id rows"""
         return True
 
@@ -422,7 +423,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
 
-        await self.validate_rows(sample_map)    # type: ignore
+        await self.validate_rows(sample_map)  # type: ignore
 
         if len(sample_map) == 0:
             raise ValueError(f'{proj}: The manifest file contains no records')

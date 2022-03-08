@@ -76,14 +76,14 @@ class SampleSequenceLayer(BaseLayer):
 
         return sequence_id
 
-    async def get_sequence_ids_from_sample_id(
+    async def get_all_sequence_id_for_sample_id(
         self, sample_id: int, check_project_id=True
     ) -> Dict[str, int]:
         """Get all sequence IDs for a sample id, returned as a map with key being sequence type"""
         (
             projects,
             sequence_id_map,
-        ) = await self.seqt.get_sequence_ids_from_sample_id(sample_id)
+        ) = await self.seqt.get_all_sequence_id_for_sample_id(sample_id)
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(

@@ -12,8 +12,10 @@ TYPE_COL_NAME = 'Type'
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
 
+- ['Individual ID']
 - 'Sample ID'
 - 'Filenames'
+- ['Type']
 
 EG:
     Sample ID   Filenames
@@ -37,9 +39,9 @@ class SampleFileMapParser(GenericMetadataParser):
         self,
         search_locations: List[str],
         sample_metadata_project: str,
-        default_sequence_type='wgs',
+        default_sequence_type='genome',
         default_sample_type='blood',
-            allow_extra_files_in_search_path=False,
+        allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             search_locations=search_locations,
