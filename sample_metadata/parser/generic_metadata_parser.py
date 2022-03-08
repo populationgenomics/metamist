@@ -70,7 +70,7 @@ class GenericMetadataParser(GenericParser):
         filenames = []
         for sm in (sample_map if isinstance(sample_map, list) else [sample_map]):
             for rows in sm.values():
-                for r in (rows if if isinstance(rows, list) else [rows]):
+                for r in (rows if isinstance(rows, list) else [rows]):
                     filenames.extend(r.get(self.reads_column, '').split(','))
 
         fs = set(f for f in filenames if f)
