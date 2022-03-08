@@ -39,6 +39,7 @@ class SampleFileMapParser(GenericMetadataParser):
         sample_metadata_project: str,
         default_sequence_type='wgs',
         default_sample_type='blood',
+            allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             search_locations=search_locations,
@@ -52,4 +53,5 @@ class SampleFileMapParser(GenericMetadataParser):
             sample_meta_map={},
             sequence_meta_map={},
             qc_meta_map={},
+            allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )

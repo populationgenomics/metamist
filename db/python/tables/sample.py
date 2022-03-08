@@ -48,9 +48,10 @@ class SampleTable(DbBase):
         cs_keys = ', '.join(keys)
         cs_id_keys = ', '.join(f':{k}' for k in keys)
         _query = f"""\
-INSERT INTO sample
-    ({cs_keys})
-VALUES ({cs_id_keys}) RETURNING id;"""
+            INSERT INTO sample
+                ({cs_keys})
+            VALUES ({cs_id_keys}) RETURNING id;
+        """
 
         id_of_new_sample = await self.connection.fetch_val(
             _query,
@@ -266,9 +267,10 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         wheres_str = ' AND '.join(wheres)
         _query = f"""\
-SELECT {", ".join(keys)} FROM sample
-WHERE {wheres_str}
-LIMIT 1;"""
+            SELECT {", ".join(keys)} FROM sample
+            WHERE {wheres_str}
+            LIMIT 1;
+        """
 
         sample_row = await self.connection.fetch_one(_query, values)
 
@@ -286,10 +288,10 @@ LIMIT 1;"""
     ) -> Dict[str, int]:
         """Get map of external sample id to internal id"""
         _query = """\
-SELECT id, external_id
-FROM sample
-WHERE external_id in :external_ids AND project = :project
-"""
+            SELECT id, external_id
+            FROM sample
+            WHERE external_id in :external_ids AND project = :project
+        """
         rows = await self.connection.fetch_all(
             _query, {'external_ids': external_ids, 'project': project or self.project}
         )
@@ -384,10 +386,10 @@ WHERE external_id in :external_ids AND project = :project
     ) -> Dict[int, str]:
         """Get samples with missing participants"""
         _query = """
-SELECT id, external_id
-FROM sample
-WHERE participant_id IS NULL AND project = :project
-"""
+            SELECT id, external_id
+            FROM sample
+            WHERE participant_id IS NULL AND project = :project
+        """
         rows = await self.connection.fetch_all(
             _query, {'project': project or self.project}
         )

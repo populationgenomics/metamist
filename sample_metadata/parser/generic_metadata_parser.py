@@ -1,6 +1,6 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from itertools import groupby
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 import os
 import logging
 from io import StringIO
@@ -43,6 +43,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_status='uploaded',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
+        allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             path_prefix=path_prefix,
@@ -67,6 +68,7 @@ class GenericMetadataParser(GenericParser):
         self.gvcf_column = gvcf_column
         self.meta_column = meta_column
         self.seq_meta_column = seq_meta_column
+        self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
@@ -112,6 +114,50 @@ class GenericMetadataParser(GenericParser):
             raise ValueError(f'Same sample matches to multiple participants {pids}')
 
         return pids.pop() or ''
+
+    async def validate_rows(
+        self, sample_map: Dict[str, Union[dict, List[dict]]]
+    ) -> bool:
+        if not self.reads_column:
+            return True
+
+        if not self.allow_extra_files_in_search_path:
+            return self.check_files_covered_by_file_map(sample_map)
+
+        return True
+
+    def check_files_covered_by_file_map(
+        self, sample_map: Union[dict, List[dict]]
+    ) -> bool:
+        """
+        Check that the files in the search_paths are completely covered by the sample_map
+        """
+        filenames = []
+        for sm in sample_map if isinstance(sample_map, list) else [sample_map]:
+            for rows in sm.values():
+                for r in rows if isinstance(rows, list) else [rows]:
+                    filenames.extend(r.get(self.reads_column, '').split(','))
+
+        fs = set(f for f in filenames if f)
+        relevant_extensions = ('.cram', '.fastq.gz', '.bam')
+
+        def filename_filter(f):
+            return any(f.endswith(ext) for ext in relevant_extensions)
+
+        relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
+        files_in_search_path_not_in_map = relevant_mapped_files - fs
+        potentially_missing_files = fs - relevant_mapped_files
+        if potentially_missing_files:
+            logger.warning(
+                f'Potentially non-existent files found in file map: {", ".join(potentially_missing_files)}'
+            )
+        if files_in_search_path_not_in_map:
+            raise ValueError(
+                'There are files in the search path that are NOT covered by the file map: '
+                f'{files_in_search_path_not_in_map}'
+            )
+
+        return True
 
     def populate_filename_map(self, search_locations: List[str]):
         """
