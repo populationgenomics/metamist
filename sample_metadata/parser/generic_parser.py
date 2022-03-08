@@ -257,7 +257,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    @abstractmethod
+    # @abstractmethod
     def get_individual_id(self, row: GroupedRow) -> Optional[str]:
         """Get external participant ID from row"""
 
@@ -287,22 +287,22 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[SingleRow]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
 
-    @abstractmethod
+    # @abstractmethod
     def get_sample_type(self, row: SingleRow) -> SampleType:
         """Get sample type from row"""
         return SampleType(self.default_sample_type)
 
-    @abstractmethod
+    # @abstractmethod
     def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
         """Get sequence types from row"""
         return List(SequenceType(self.default_sequence_type))
 
-    @abstractmethod
+    # @abstractmethod
     def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """Get sequence types from row"""
         return SequenceType(self.default_sequence_type)
 
-    @abstractmethod
+    # @abstractmethod
     def get_sequence_status(self, row: SingleRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
