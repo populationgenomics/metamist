@@ -288,7 +288,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get qc-meta from row, creates a Analysis object of type QC"""
 
     # @abstractmethod
-    def get_sample_type(self, row: SingleRow) -> SampleType:
+    def get_sample_type(self, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
         return SampleType(self.default_sample_type)
 
@@ -303,7 +303,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return SequenceType(self.default_sequence_type)
 
     # @abstractmethod
-    def get_sequence_status(self, row: SingleRow) -> SequenceStatus:
+    def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
 
