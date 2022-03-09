@@ -23,7 +23,6 @@ from sample_metadata.apis import (
     FamilyApi,
     ParticipantApi,
 )
-from sample_metadata.configuration import _get_google_auth_token
 from sample_metadata.models import (
     AnalysisType,
     NewSequence,
@@ -202,10 +201,12 @@ def main(
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
 
+    sample_external_ids = [sample['external_id'] for sample in samples]
     papi.fill_in_missing_participants(target_project)
     participant_map = papi.get_participant_id_map_by_external_ids(
-        target_project, list(test_sample_by_external_id.keys())
+        project, sample_external_ids
     )
+
     participant_ids = list(participant_map.values())
     family_ids = transfer_families(project, target_project, participant_ids)
     transfer_ped(project, target_project, family_ids)
@@ -213,7 +214,15 @@ def main(
 
 def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
     """Pull relevant families from the input project, and copy to target_project"""
-    families = fapi.get_families(initial_project)
+    families = fapi.get_families(
+        project=initial_project,
+        body_get_families_api_v1_family_project_post={
+            'participant_ids': participant_ids
+        },
+    )
+
+    family_ids = [family['id'] for family in families]
+
     tmp_family_tsv = 'tmp_families.tsv'
     family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
     # Work-around as import_families takes a file.
@@ -225,10 +234,8 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
             del family['project']
             tsv_writer.writerow(list(family.values()))
 
-    with open(tmp_family_tsv) as families:
-        fapi.import_families(file=families, project=target_project)
-
-    family_ids = [family['id'] for family in families]
+    with open(tmp_family_tsv) as family_file:
+        fapi.import_families(file=family_file, project=target_project)
 
     return family_ids
 
@@ -402,22 +409,14 @@ def export_ped_file(  # pylint: disable=invalid-name
     """
     Generates a PED file for the project, returs PED file lines in a list
     """
-    route = f'/api/v1/family/{project}/pedigree'
-    opts = []
-    if replace_with_participant_external_ids:
-        opts.append('replace_with_participant_external_ids=true')
-    if replace_with_family_external_ids:
-        opts.append('replace_with_family_external_ids=true')
-    if opts:
-        route += '?' + '&'.join(opts)
 
-    cmd = f"""\
-        curl --location --request GET \
-        'https://sample-metadata.populationgenomics.org.au{route}' \
-        --header "Authorization: Bearer {_get_google_auth_token()}"
-        """
-
-    lines = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
+    ped_out = fapi.get_pedigree(
+        project,
+        response_type=ContentType('tsv'),
+        replace_with_family_external_ids=replace_with_family_external_ids,
+        replace_with_participant_external_ids=replace_with_participant_external_ids,
+    )
+    lines = ped_out.strip().split('\n')
     return lines
 
 
