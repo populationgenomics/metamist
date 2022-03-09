@@ -107,7 +107,6 @@ async def main(
         sample_meta_map=SAMPLE_META_MAP,
         qc_meta_map={},
         sequence_meta_map=SEQUENCE_META_MAP,
-        
     )
     for manifest_path in manifests:
         logger.info(f'Importing {manifest_path}')
@@ -117,14 +116,14 @@ async def main(
             confirm=confirm,
             dry_run=dry_run,
         )
-        
+
     add_participant_meta(sample_metadata_project)
 
 
 def add_participant_meta(sample_metadata_project: str):
     """
-    Fill in Participant entries. We don't have pedigree data, so we 
-    only need to add the reported_gender field.
+    Fill in Participant entries. We don't have pedigree data, we only
+    need to add the reported_gender field, similar to tob-wgs.
     """
     papi = ParticipantApi()
     papi.fill_in_missing_participants(sample_metadata_project)
@@ -140,11 +139,11 @@ def add_participant_meta(sample_metadata_project: str):
     id_map = papi.get_participant_id_map_by_external_ids(
         sample_metadata_project, [s['external_id'] for s in samples]
     )
-    
+
     for sample in samples:
         updated_participant = ParticipantUpdateModel()
         updated_participant['reported_gender'] = sample['meta'].get('sex')
-        participant_id = id_map[sample['external_id']], 
+        participant_id = id_map[sample['external_id']]
         try:
             papi.update_participant(
                 participant_id=participant_id,
