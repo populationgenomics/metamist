@@ -133,22 +133,30 @@ async def get_external_participant_id_to_internal_sample_id(
 
 @router.get(
     '/{project}/external-pid-to-internal-sample-id/{export_type}',
-    operation_id='getExternalParticipantIdToInternalSampleId',
+    operation_id='getExternalParticipantIdToInternalSampleIdExport',
     response_class=StreamingResponse,
 )
 async def get_external_participant_id_to_internal_sample_id_export(
     project: str,
     export_type: FileExtension,
+    flip_columns: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get csv / tsv export of external_participant_id to internal_sample_id"""
+    """
+    Get csv / tsv export of external_participant_id to internal_sample_id
+
+    :param flip_columns: Set to True when exporting for seqr
+    """
     player = ParticipantLayer(connection)
     # this wants project ID (connection.project)
     assert connection.project
     m = await player.get_external_participant_id_to_internal_sample_id_map(
         project=connection.project
     )
+
     rows = [[pid, sample_id_format(sid)] for pid, sid in m]
+    if flip_columns:
+        rows = [r[::-1] for r in rows]
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=export_type.get_delimiter())

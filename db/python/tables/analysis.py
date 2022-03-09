@@ -363,10 +363,11 @@ WHERE a.id = :analysis_id
     ) -> List[List[str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
         _query = """
-SELECT s.external_id, a.output, s.id
+SELECT p.external_id, a.output, s.id
 FROM analysis a
 INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
+INNER JOIN participant p ON s.participant_id = p.id
 WHERE
     a.active AND
     a.type = 'cram' AND

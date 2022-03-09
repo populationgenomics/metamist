@@ -20,6 +20,7 @@ from api.utils.db import (
 from api.utils.extensions import guess_delimiter_by_filename
 from db.python.layers.family import FamilyLayer
 from models.models.family import Family
+from models.models.sample import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
 
@@ -46,6 +47,7 @@ async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
     create_missing_participants: bool = False,
+    perform_sex_check: bool = True,
     connection: Connection = get_project_write_connection,
 ):
     """Import a pedigree"""
@@ -67,6 +69,7 @@ async def import_pedigree(
             headers,
             rows,
             create_missing_participants=create_missing_participants,
+            perform_sex_check=perform_sex_check,
         )
     }
 
@@ -135,13 +138,19 @@ async def get_pedigree(
     return data
 
 
-@router.get('/{project}/', operation_id='getFamilies')
+@router.post('/{project}/', operation_id='getFamilies')
 async def get_families(
+    participant_ids: List[int] = None,
+    sample_ids: List[str] = None,
     connection: Connection = get_project_readonly_connection,
 ) -> List[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)
-    return await family_layer.get_families()
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
+
+    return await family_layer.get_families(
+        participant_ids=participant_ids, sample_ids=sample_ids_raw
+    )
 
 
 @router.post('/', operation_id='updateFamily')

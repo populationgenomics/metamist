@@ -203,6 +203,26 @@ async def update_sample(
     return result
 
 
+@router.patch('/{id_keep}/{id_merge}', operation_id='mergeSamples')
+async def merge_samples(
+    id_keep: str,
+    id_merge: str,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Merge one sample into another, this function achieves the merge
+    by rewriting all sample_ids of {id_merge} with {id_keep}. You must
+    carefully consider if analysis objects need to be deleted, or other
+    implications BEFORE running this method.
+    """
+    st = SampleLayer(connection)
+    result = await st.merge_samples(
+        id_keep=sample_id_transform_to_raw(id_keep),
+        id_merge=sample_id_transform_to_raw(id_merge),
+    )
+    return result
+
+
 @router.get('/{id_}/history', operation_id='getHistoryOfSample')
 async def get_history_of_sample(
     id_: str, connection: Connection = get_projectless_db_connection

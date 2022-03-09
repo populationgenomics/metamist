@@ -113,6 +113,7 @@ jobs:
             --platform managed
 
       - name: Publish package
+        if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -120,6 +121,7 @@ jobs:
           packages_dir: dist/
 
       - name: Build and push sample-metadata API docker image
+        if: github.ref == 'refs/heads/main'
         run: |
           version=$(cat deploy/python/version.txt)
           docker build \
