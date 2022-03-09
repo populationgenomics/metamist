@@ -43,9 +43,9 @@ class NestedFamily(BaseModel):
 class NestedParticipant(BaseModel):
     """Participant with nested family and sampels"""
 
-    id: int
-    external_id: str
-    meta: Dict
+    id: Optional[int]
+    external_id: Optional[str]
+    meta: Optional[Dict]
     families: List[NestedFamily]
     samples: List[NestedSample]
 
@@ -122,33 +122,25 @@ class WebDb(DbBase):
         return seq_models_by_sample_id
 
     @staticmethod
-    def _project_summary_process_sample_rows_by_pid(
+    def _project_summary_process_sample_rows(
         sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, str]
-    ) -> Dict[int, List[NestedSample]]:
+    ) -> List[NestedSample]:
         """
         Process the returned sample rows into nested samples + sequences
         """
-        sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
 
         smodels = [
             NestedSample(
                 id=s['id'],
                 external_id=s['external_id'],
                 type=s['type'],
-                meta=json.loads(s['meta']),
+                meta=json.loads(s['meta']) or {},
                 created_date=sample_id_start_times.get(s['id'], ''),
-                sequences=seq_models_by_sample_id.get(s['id'], []),
+                sequences=seq_models_by_sample_id.get(s['id'], []) or [],
             )
             for s in sample_rows
         ]
-        # the pydantic model is casting to the id to a str, as that makes sense on the front end
-        # but cast back here to do the lookup
-        smodels_by_pid = {
-            k: list(v)
-            for k, v in (groupby(smodels, key=lambda s: sid_to_pid[int(s.id)]))
-        }
-
-        return smodels_by_pid
+        return smodels
 
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
@@ -242,21 +234,46 @@ WHERE fp.participant_id in :pids
         seq_models_by_sample_id = (
             self._project_summary_process_sequence_rows_by_sample_id(sequence_rows)
         )
-        smodels_by_pid = self._project_summary_process_sample_rows_by_pid(
+        smodels = self._project_summary_process_sample_rows(
             sample_rows, seq_models_by_sample_id, sample_id_start_times
         )
-        pid_to_families = self._project_summary_process_family_rows_by_pid(family_rows)
+        # the pydantic model is casting to the id to a str, as that makes sense on the front end
+        # but cast back here to do the lookup
+        sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
+        smodels_by_pid = {
+            k: list(v)
+            for k, v in (groupby(smodels, key=lambda s: sid_to_pid[int(s.id)]))
+        }
 
-        pmodels = [
-            NestedParticipant(
-                id=p['id'],
-                external_id=p['external_id'],
-                meta=json.loads(p['meta']),
-                families=pid_to_families.get(p['id'], []),
-                samples=list(smodels_by_pid.get(p['id'])),
-            )
-            for p in participant_rows
-        ]
+        pid_to_families = self._project_summary_process_family_rows_by_pid(family_rows)
+        participant_map = {p['id']: p for p in participant_rows}
+
+        # we need to specifically handle the empty participant case,
+        # we'll accomplish this using an hash set
+
+        pid_seen = set()
+        pmodels = []
+
+        for s, srow in zip(smodels, sample_rows):
+            pid = srow['participant_id']
+            if pid is None:
+                pmodels.append(
+                    NestedParticipant(
+                        id=None, external_id=None, meta=None, families=[], samples=[s]
+                    )
+                )
+            elif pid not in pid_seen:
+                pid_seen.add(pid)
+                p = participant_map[pid]
+                pmodels.append(
+                    NestedParticipant(
+                        id=p['id'],
+                        external_id=p['external_id'],
+                        meta=json.loads(p['meta']),
+                        families=pid_to_families.get(p['id'], []),
+                        samples=list(smodels_by_pid.get(p['id'])),
+                    )
+                )
 
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         ignore_sequence_meta_keys = {'reads', 'vcfs', 'gvcf'}

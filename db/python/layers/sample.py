@@ -7,7 +7,6 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequence import SampleSequencingTable
 
 from models.enums import SampleType
 from models.models.sample import (
@@ -45,7 +44,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
-        self.seqt: SampleSequencingTable = SampleSequencingTable(connection)
+        self.connection = connection
 
     # GETS
     async def get_single_by_external_id(
@@ -203,6 +202,26 @@ class SampleLayer(BaseLayer):
             active=active,
         )
 
+    async def merge_samples(
+        self,
+        id_keep: int,
+        id_merge: int,
+        author=None,
+        check_project_id=True,
+    ):
+        """Merge two samples into one another"""
+        if check_project_id:
+            projects = await self.st.get_project_ids_for_sample_ids([id_keep, id_merge])
+            await self.ptable.check_access_to_project_ids(
+                user=author or self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.st.merge_samples(
+            id_keep=id_keep,
+            id_merge=id_merge,
+            author=author,
+        )
+
     async def upsert_sample(self, sample: SampleUpsert):
         """Upsert a sample"""
         if not sample.id:
@@ -262,10 +281,10 @@ class SampleLayer(BaseLayer):
 
         return rows
 
-    async def batch_upsert_samples(
-        self, samples: SampleBatchUpsert, seqt: SampleSequenceLayer
-    ):
+    async def batch_upsert_samples(self, samples: SampleBatchUpsert):
         """Batch upsert a list of samples with sequences"""
+        seqt: SampleSequenceLayer = SampleSequenceLayer(self.connection)
+
         # Create or update samples
         iids = [await self.upsert_sample(s) for s in samples.samples]
 

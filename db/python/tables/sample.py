@@ -1,9 +1,10 @@
+import asyncio
 from typing import List, Dict, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, NotFoundError, to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import SampleType
-from models.models.sample import Sample
+from models.models.sample import Sample, sample_id_format
 
 
 class SampleTable(DbBase):
@@ -98,6 +99,94 @@ class SampleTable(DbBase):
         await self.connection.execute(_query, {**values, 'id': id_})
         return id_
 
+    async def merge_samples(
+        self,
+        id_keep: int = None,
+        id_merge: int = None,
+        author: str = None,
+    ):
+        """Merge two samples together"""
+        sid_merge = sample_id_format(id_merge)
+        (_, sample_keep), (_, sample_merge) = await asyncio.gather(
+            self.get_single_by_id(id_keep),
+            self.get_single_by_id(id_merge),
+        )
+
+        def list_merge(l1: Any, l2: Any) -> List:
+            if l1 is None:
+                return l2
+            if l2 is None:
+                return l1
+            if l1 == l2:
+                return l1
+            if isinstance(l1, list) and isinstance(l2, list):
+                return l1 + l2
+            if isinstance(l1, list):
+                return l1 + [l2]
+            if isinstance(l2, list):
+                return [l1] + l2
+            return [l1, l2]
+
+        def dict_merge(meta1, meta2):
+            d = dict(meta1)
+            d.update(meta2)
+            for key, value in meta2.items():
+                if key not in meta1 or meta1[key] is None or value is None:
+                    continue
+
+                d[key] = list_merge(meta1[key], value)
+
+            return d
+
+        # this handles merging a sample that has already been merged
+        meta_original = sample_keep.meta
+        meta_original['merged_from'] = list_merge(
+            meta_original.get('merged_from'), sid_merge
+        )
+        meta: Dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
+
+        values: Dict[str, Any] = {
+            'sample': {
+                'id': id_keep,
+                'author': author or self.author,
+                'meta': to_db_json(meta),
+            },
+            'ids': {'id_keep': id_keep, 'id_merge': id_merge},
+        }
+
+        _query = """
+            UPDATE sample
+            SET author = :author,
+                meta = :meta
+            WHERE id = :id
+        """
+        _query_seqs = f"""
+            UPDATE sample_sequencing
+            SET sample_id = :id_keep
+            WHERE sample_id = :id_merge
+        """
+        _query_analyses = f"""
+            UPDATE analysis_sample
+            SET sample_id = :id_keep
+            WHERE sample_id = :id_merge
+        """
+        _del_sample = f"""
+            DELETE FROM sample
+            WHERE id = :id_merge
+        """
+
+        async with self.connection.transaction():
+            await self.connection.execute(_query, {**values['sample']})
+            await self.connection.execute(_query_seqs, {**values['ids']})
+            await self.connection.execute(_query_analyses, {**values['ids']})
+            await self.connection.execute(_del_sample, {'id_merge': id_merge})
+
+        project, new_sample = await self.get_single_by_id(id_keep)
+        new_sample.project = project
+        new_sample.author = author or self.author
+
+        return new_sample
+
     async def update_many_participant_ids(
         self, ids: List[int], participant_ids: List[int]
     ):
@@ -127,7 +216,9 @@ class SampleTable(DbBase):
         sample_row = await self.connection.fetch_one(_query, {'id': internal_id})
 
         if sample_row is None:
-            raise NotFoundError(f'Couldn\'t find sample with internal id {internal_id}')
+            raise NotFoundError(
+                f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
+            )
 
         d = dict(sample_row)
         project = d.pop('project')

@@ -47,6 +47,7 @@ async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
     create_missing_participants: bool = False,
+    perform_sex_check: bool = True,
     connection: Connection = get_project_write_connection,
 ):
     """Import a pedigree"""
@@ -68,6 +69,7 @@ async def import_pedigree(
             headers,
             rows,
             create_missing_participants=create_missing_participants,
+            perform_sex_check=perform_sex_check,
         )
     }
 
@@ -136,7 +138,7 @@ async def get_pedigree(
     return data
 
 
-@router.get('/{project}/', operation_id='getFamilies')
+@router.post('/{project}/', operation_id='getFamilies')
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
