@@ -138,7 +138,7 @@ async def get_pedigree(
     return data
 
 
-@router.post('/{project}/', operation_id='getFamilies')
+@router.get('/{project}/', operation_id='getFamilies')
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
