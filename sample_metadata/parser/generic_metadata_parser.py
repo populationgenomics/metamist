@@ -105,7 +105,7 @@ class GenericMetadataParser(GenericParser):
     def populate_filename_map(self, search_locations: List[str]):
         """
         FileMapParser uses search locations based on the filename,
-        so let's pre-populate that filename_map from the search_locations!
+        so let's prepopulate that filename_map from the search_locations!
         """
 
         self.filename_map = {}
