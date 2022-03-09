@@ -23,9 +23,6 @@ SEQUENCE_MAP = {
     'Sample Concentration (ng/ul)': 'concentration',
     'Volume (uL)': 'volume',
 }
-SAMPLE_META_MAP = {
-    'Sex': 'sex',
-}
 
 PROJECT = 'prophecy-test'
 
