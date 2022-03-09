@@ -372,9 +372,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     async def validate_rows(
         self, sample_map: Dict[str, Union[dict, List[dict]]]
-    ) -> bool:
-        """Validate sample id rows"""
-        return True
+    ):
+        """
+        Validate sample rows:
+        - throw an exception if an error occurs
+        - log a warning for all other issues
+        """
+        return
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
