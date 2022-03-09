@@ -237,7 +237,7 @@ class GenericMetadataParser(GenericParser):
 
     async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
-        return self.collapse_arbitrary_meta(self.sample_meta_map, row)\
+        return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
     async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to reads from a row"""
