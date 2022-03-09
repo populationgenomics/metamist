@@ -4,9 +4,14 @@ Parser for prophecy metadata
 """
 
 import logging
+import traceback
 from typing import Any, List, Dict
 import click
 
+from sample_metadata import ApiException
+from sample_metadata.api.participant_api import ParticipantUpdateModel
+from sample_metadata.api.sample_api import SampleApi
+from sample_metadata.api.participant_api import ParticipantApi
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
@@ -17,11 +22,15 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-SEQUENCE_MAP = {
+SEQUENCE_META_MAP = {
     'Application': 'platform',
     'External ID': 'external_id',
     'Sample Concentration (ng/ul)': 'concentration',
     'Volume (uL)': 'volume',
+}
+
+SAMPLE_META_MAP = {
+    'Sex': 'sex',
 }
 
 PROJECT = 'prophecy-test'
@@ -95,9 +104,10 @@ async def main(
         sample_metadata_project=sample_metadata_project,
         search_locations=search_locations,
         sample_name_column='Sample/Name',
-        sample_meta_map={},
+        sample_meta_map=SAMPLE_META_MAP,
         qc_meta_map={},
-        sequence_meta_map=SEQUENCE_MAP,
+        sequence_meta_map=SEQUENCE_META_MAP,
+        
     )
     for manifest_path in manifests:
         logger.info(f'Importing {manifest_path}')
@@ -107,6 +117,42 @@ async def main(
             confirm=confirm,
             dry_run=dry_run,
         )
+        
+    add_participant_meta(sample_metadata_project)
+
+
+def add_participant_meta(sample_metadata_project: str):
+    """
+    Fill in Participant entries. We don't have pedigree data, so we 
+    only need to add the reported_gender field.
+    """
+    papi = ParticipantApi()
+    papi.fill_in_missing_participants(sample_metadata_project)
+
+    sapi = SampleApi()
+    samples = sapi.get_samples(
+        body_get_samples_by_criteria_api_v1_sample_post={
+            'project_ids': [sample_metadata_project],
+            'active': True,
+        }
+    )
+
+    id_map = papi.get_participant_id_map_by_external_ids(
+        sample_metadata_project, [s['external_id'] for s in samples]
+    )
+    
+    for sample in samples:
+        updated_participant = ParticipantUpdateModel()
+        updated_participant['reported_gender'] = sample['meta'].get('sex')
+        participant_id = id_map[sample['external_id']], 
+        try:
+            papi.update_participant(
+                participant_id=participant_id,
+                participant_update_model=updated_participant,
+            )
+        except ApiException:
+            traceback.print_exc()
+            print(f'Error updating participant {participant_id}, skipping.')
 
 
 if __name__ == '__main__':
