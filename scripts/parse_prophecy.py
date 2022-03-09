@@ -1,6 +1,11 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
 """
-Parser for prophecy metadata
+Parser for prophecy metadata.
+
+parse_prophecy.py \
+gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M001.csv \
+gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
+--search-location gs://cpg-prophecy-test-upload
 """
 
 import logging
