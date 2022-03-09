@@ -295,43 +295,39 @@ class GenericMetadataParser(GenericParser):
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
 
-    async def get_sequence_meta(
+    async def get_grouped_sequence_meta(
         self, sample_id: str, row: GroupedRow
     ) -> List[SequenceMetaGroup]:
-        if isinstance(row, dict):
-            stype = self.get_sequence_type(row)
-            meta = await self.get_sequence_meta_by_type(sample_id, row, stype)
-            return [meta]
-
+        """
+        Takes a collection of SingleRows and groups them by sequence type
+        For each sequence type, get_sequence_meta for that group and return the
+        resulting list of metadata
+        """
         sequence_meta = []
         for stype, row_group in groupby(row, self.get_sequence_type):
-            sequence_meta.append(
-                await self.get_sequence_meta_by_type(sample_id, list(row_group), stype)
+            seq_group = SequenceMetaGroup(
+                rows=row_group, sequence_type=stype, meta=None
             )
+            sequence_meta.append(await self.get_sequence_meta(sample_id, seq_group))
         return sequence_meta
 
-    async def get_sequence_meta_by_type(
-        self, sample_id: str, row: GroupedRow, stype: SequenceType
+    async def get_sequence_meta(
+        self, sample_id: str, seq_group: SequenceMetaGroup
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
+        rows = seq_group.rows
+
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
-            self.sequence_meta_map, row
+            self.sequence_meta_map, rows
         )
 
         read_filenames = []
         gvcf_filenames = []
-        if isinstance(row, list):
-            for r in row:
-                if self.reads_column and self.reads_column in r:
-                    read_filenames.extend(r[self.reads_column].split(','))
-                if self.gvcf_column and self.gvcf_column in r:
-                    gvcf_filenames.extend(r[self.gvcf_column].split(','))
-
-        else:
-            if self.reads_column and self.reads_column in row:
-                read_filenames.extend(row[self.reads_column].split(','))
-            if self.gvcf_column and self.gvcf_column in row:
-                gvcf_filenames.extend(row[self.gvcf_column].split(','))
+        for r in rows:
+            if self.reads_column and self.reads_column in r:
+                read_filenames.extend(r[self.reads_column].split(','))
+            if self.gvcf_column and self.gvcf_column in r:
+                gvcf_filenames.extend(r[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
         full_filenames: List[str] = []
@@ -367,9 +363,8 @@ class GenericMetadataParser(GenericParser):
                 collapsed_sequence_meta['vcfs'] = variants['vcf']
                 collapsed_sequence_meta['vcf_type'] = 'vcf'
 
-        return SequenceMetaGroup(
-            rows=row, sequence_type=stype, meta=collapsed_sequence_meta
-        )
+        seq_group.meta = collapsed_sequence_meta
+        return seq_group
 
     async def get_qc_meta(
         self, sample_id: str, row: GroupedRow

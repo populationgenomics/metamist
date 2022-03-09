@@ -79,14 +79,15 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 class SequenceMetaGroup:
     """Class for holding sequence metadata grouped by type"""
 
-    rows: GroupedRow
-    sequence_type: SequenceType
-    meta: Dict[str, Any]
-
-    class Config:
-        """Config"""
-
-        arbitrary_types_allowed = True
+    def __init__(
+        self,
+        rows: GroupedRow = None,
+        sequence_type: SequenceType = None,
+        meta: Dict[str, Any] = None,
+    ):
+        self.rows = rows
+        self.sequence_type = sequence_type
+        self.meta = meta
 
 
 def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
@@ -267,10 +268,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get sample-metadata from row"""
 
     @abstractmethod
-    async def get_sequence_meta(
+    async def get_grouped_sequence_meta(
         self, sample_id: str, row: GroupedRow
-    ) -> Optional[List[SequenceMetaGroup]]:
-        """Get sequence-metadata from row"""
+    ) -> List[SequenceMetaGroup]:
+        """Return list of grouped by type sequence metadata from the rows"""
+
+    @abstractmethod
+    async def get_sequence_meta(
+        self, sample_id: str, seq_group: SequenceMetaGroup
+    ) -> SequenceMetaGroup:
+        """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
 
     # @abstractmethod
     async def get_analyses(
@@ -333,8 +340,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Then the calling function does the (reduce).
         """
-        if isinstance(rows, list) and len(rows) == 1:
-            rows = rows[0]
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         (
@@ -343,7 +348,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             collapsed_qc,
             collapsed_analyses,
         ) = await asyncio.gather(
-            self.get_sequence_meta(external_sample_id, rows),
+            self.get_grouped_sequence_meta(external_sample_id, rows),
             self.get_sample_meta(external_sample_id, rows),
             self.get_qc_meta(external_sample_id, rows),
             self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
