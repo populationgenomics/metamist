@@ -15,9 +15,9 @@ class FamilyTable(DbBase):
     async def get_projects_by_family_ids(self, family_ids: List[int]) -> Set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
-        SELECT project FROM family
-        WHERE id in :family_ids
-        GROUP BY project
+            SELECT project FROM family
+            WHERE id in :family_ids
+            GROUP BY project
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
@@ -29,17 +29,39 @@ class FamilyTable(DbBase):
             )
         return projects
 
-    async def get_families(self, project: int = None) -> List[Family]:
+    async def get_families(
+        self, project: int = None, participant_ids: List[int] = None
+    ) -> List[Family]:
         """Get all families for some project"""
-        _query = """\
-SELECT id, external_id, description, coded_phenotype, project
-FROM family
-WHERE project = :project"""
+        _query = """
+            SELECT id, external_id, description, coded_phenotype, project
+            FROM family
+        """
 
-        rows = await self.connection.fetch_all(
-            _query, {'project': project or self.project}
-        )
-        families = [Family.from_db(dict(r)) for r in rows]
+        values: Dict[str, Any] = {'project': project or self.project}
+        where: List[str] = []
+
+        if participant_ids:
+            _query += """
+                JOIN family_participant
+                ON family.id = family_participant.family_id
+            """
+            where.append(f'participant_id IN :pids')
+            values['pids'] = participant_ids
+
+        if project or self.project:
+            where.append('project = :project')
+
+        if where:
+            _query += 'WHERE ' + ' AND '.join(where)
+
+        rows = await self.connection.fetch_all(_query, values)
+        seen = set()
+        families = []
+        for r in rows:
+            if r.id not in seen:
+                families.append(Family.from_db(dict(r)))
+                seen.add(r.id)
         return families
 
     async def update_family(
