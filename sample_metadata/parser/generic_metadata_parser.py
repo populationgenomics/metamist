@@ -54,16 +54,19 @@ class GenericMetadataParser(GenericParser):
 
     async def validate_rows(
         self, sample_map: Dict[str, Union[dict, List[dict]]]
-    ) -> bool:
+    ):
+        await super().validate_rows(sample_map)
+
         if not self.reads_column:
-            return True
+            return
 
-        if not self.allow_extra_files_in_search_path:
-            return self.check_files_covered_by_file_map(sample_map)
+        errors = []
+        errors.extend(self.check_files_covered_by_file_map(sample_map))
 
-        return True
+        if errors:
+            raise ValueError(', '.join(errors))
 
-    def check_files_covered_by_file_map(self, sample_map: Union[dict, List[dict]]) -> bool:
+    def check_files_covered_by_file_map(self, sample_map: Union[dict, List[dict]]) -> List[str]:
         """
         Check that the files in the search_paths are completely covered by the sample_map
         """
@@ -77,19 +80,27 @@ class GenericMetadataParser(GenericParser):
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
         filename_filter = lambda f: any(f.endswith(ext) for ext in relevant_extensions)     # noqa: E731
         relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
+
+        missing_files = fs - relevant_mapped_files
         files_in_search_path_not_in_map = relevant_mapped_files - fs
-        potentially_missing_files = fs - relevant_mapped_files
-        if potentially_missing_files:
-            logger.warning(
-                f'Potentially non-existent files found in file map: {", ".join(potentially_missing_files)}'
+
+        errors = []
+
+        if missing_files:
+            errors.append(
+                f'Non-existent files found in file map: {", ".join(missing_files)}'
             )
         if files_in_search_path_not_in_map:
-            raise ValueError(
+            m = (
                 'There are files in the search path that are NOT covered by the file map: '
-                f'{files_in_search_path_not_in_map}'
+                f'{", ".join(files_in_search_path_not_in_map)}'
             )
+            if self.allow_extra_files_in_search_path:
+                logger.warning(m)
+            else:
+                errors.append(m)
 
-        return True
+        return errors
 
     def populate_filename_map(self, search_locations: List[str]):
         """
