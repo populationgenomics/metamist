@@ -8,7 +8,7 @@ import traceback
 from typing import Any, List, Dict
 import click
 
-from sample_metadata import ApiException
+from sample_metadata.exceptions import ApiException
 from sample_metadata.api.participant_api import ParticipantUpdateModel
 from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.api.participant_api import ParticipantApi
