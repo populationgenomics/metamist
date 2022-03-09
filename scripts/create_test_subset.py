@@ -216,9 +216,7 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
     """Pull relevant families from the input project, and copy to target_project"""
     families = fapi.get_families(
         project=initial_project,
-        body_get_families_api_v1_family_project_post={
-            'participant_ids': participant_ids
-        },
+        participant_ids=participant_ids,
     )
 
     family_ids = [family['id'] for family in families]

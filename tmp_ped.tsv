@@ -1,0 +1,7 @@
+#Family ID	Individual ID	Paternal ID	Maternal ID	Sex	Affected
+FAMA	A1	A2	A3	2	1
+FAMA	A2			1	0
+FAMA	A3			2	0
+FAMC	A7	A8	A9	2	1
+FAMC	A9			2	0
+FAMC	A8			1	0
