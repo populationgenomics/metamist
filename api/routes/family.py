@@ -136,10 +136,10 @@ async def get_pedigree(
     return data
 
 
-@router.post('/{project}/', operation_id='getFamilies')
+@router.get('/{project}/', operation_id='getFamilies')
 async def get_families(
-    participant_ids: List[int] = None,
-    sample_ids: List[str] = None,
+    participant_ids: Optional[List[int]] = Query(None),
+    sample_ids: Optional[List[str]] = Query(None),
     connection: Connection = get_project_readonly_connection,
 ) -> List[Family]:
     """Get families for some project"""
