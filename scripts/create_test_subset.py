@@ -228,9 +228,13 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
         tsv_writer = csv.writer(tmp_families, delimiter='\t')
         tsv_writer.writerow(family_tsv_headers)
         for family in families:
-            del family['id']
-            del family['project']
-            tsv_writer.writerow(list(family.values()))
+            tsv_writer.writerow(
+                [
+                    family['external_id'],
+                    family['description'] or '',
+                    family['coded_phenotype'] or '',
+                ]
+            )
 
     with open(tmp_family_tsv) as family_file:
         fapi.import_families(file=family_file, project=target_project)
