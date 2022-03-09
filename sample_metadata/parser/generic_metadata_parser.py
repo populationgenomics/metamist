@@ -105,7 +105,7 @@ class GenericMetadataParser(GenericParser):
     def populate_filename_map(self, search_locations: List[str]):
         """
         FileMapParser uses search locations based on the filename,
-        so let's prepopulate that filename_map from the search_locations!
+        so let's pre-populate that filename_map from the search_locations!
         """
 
         self.filename_map = {}
@@ -237,7 +237,25 @@ class GenericMetadataParser(GenericParser):
 
     async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
-        return self.collapse_arbitrary_meta(self.sample_meta_map, row)
+        return self.collapse_arbitrary_meta(self.sample_meta_map, row)\
+
+    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+        """Get paths to reads from a row"""
+        read_filenames = []
+        for r in row if isinstance(row, list) else [row]:
+            if self.reads_column and self.reads_column in r:
+                read_filenames.extend(r[self.reads_column].split(','))
+
+        return read_filenames
+
+    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+        """Get paths to gvcfs from a row"""
+        gvcf_filenames = []
+        for r in row if isinstance(row, list) else [row]:
+            if self.gvcf_column and self.gvcf_column in r:
+                gvcf_filenames.extend(r[self.gvcf_column].split(','))
+
+        return gvcf_filenames
 
     async def get_sequence_meta(
         self, sample_id: str, row: GroupedRow
@@ -247,20 +265,8 @@ class GenericMetadataParser(GenericParser):
             self.sequence_meta_map, row
         )
 
-        read_filenames = []
-        gvcf_filenames = []
-        if isinstance(row, list):
-            for r in row:
-                if self.reads_column and self.reads_column in r:
-                    read_filenames.extend(r[self.reads_column].split(','))
-                if self.gvcf_column and self.gvcf_column in r:
-                    gvcf_filenames.extend(r[self.gvcf_column].split(','))
-
-        else:
-            if self.reads_column and self.reads_column in row:
-                read_filenames.extend(row[self.reads_column].split(','))
-            if self.gvcf_column and self.gvcf_column in row:
-                gvcf_filenames.extend(row[self.gvcf_column].split(','))
+        read_filenames = await self.get_read_filenames(sample_id, row)
+        gvcf_filenames = await self.get_gvcf_filenames(sample_id, row)
 
         # strip in case collaborator put "file1, file2"
         full_filenames: List[str] = []
