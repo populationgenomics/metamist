@@ -1,4 +1,5 @@
 import asyncio
+import os
 import socket
 import subprocess
 import unittest
@@ -14,6 +15,8 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
+
+am_i_in_test_environment = os.getcwd().endswith('test')
 
 
 def find_free_port():
@@ -64,16 +67,21 @@ class DbTest(unittest.TestCase):
                 db.start()
                 cls.dbs[cls.__name__] = db
 
+                db_prefix = 'db'
+                if am_i_in_test_environment:
+                    db_prefix = '../db'
+                    # db_prefix = os.path.join(*os.getcwd().split('/')[:-1], 'db')
+
                 con_string = db.get_connection_url()
                 con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
                 command = [
                     'liquibase',
-                    *('--changeLogFile', '../db/project.xml'),
-                    *('--defaultsFile', '../db/liquibase.properties'),
+                    *('--changeLogFile', db_prefix + '/project.xml'),
+                    *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
                     *('--driver', 'org.mariadb.jdbc.Driver'),
-                    *('--classpath', '../db/mariadb-java-client-2.7.2.jar'),
+                    *('--classpath', db_prefix + '/mariadb-java-client-2.7.2.jar'),
                     *('--username', db.MYSQL_USER),
                     *('--password', db.MYSQL_PASSWORD),
                     'update',
