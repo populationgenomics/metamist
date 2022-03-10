@@ -47,10 +47,6 @@ class ProphecyParser(GenericMetadataParser):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
-        """Get external sample ID from row"""
-        return row[self.sample_name_column]
-
     async def file_pointer_to_sample_map(
         self,
         file_pointer,
