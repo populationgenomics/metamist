@@ -74,7 +74,7 @@ class ProphecyParser(GenericMetadataParser):
 
     async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """
-        We don't ave fastq urls in a manifest, so overriding this method to take
+        We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
         """
         return [
