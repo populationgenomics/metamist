@@ -1,60 +1,31 @@
-from sample_metadata.apis import SampleApi, AnalysisApi
-from sample_metadata.models import NewSample, AnalysisModel
+from test.testbase import DbTest, run_as_sync
+
+from db.python.layers.sample import SampleLayer, SampleType
 
 
-PROJ = 'test_project'
+class TestSample(DbTest):
+    """Test sample class"""
 
+    # tests run in 'sorted by ascii' order
 
-def run_test():
-    """Run test"""
-    sapi = SampleApi()
-    aapi = AnalysisApi()
-
-    def _print_samples():
-        samples = sapi.get_samples(
-            body_get_samples_by_criteria_api_v1_sample_post={
-                'project_ids': [PROJ],
-                'active': True,
-            }
+    @run_as_sync
+    async def test_number_1(self):
+        """Test inserting a sample"""
+        sl = SampleLayer(self.connection)
+        s = await sl.insert_sample(
+            'Test01',
+            SampleType.BLOOD,
+            active=True,
+            meta={'meta': 'meta ;)'},
+            check_project_id=False,
+            project=1,
         )
-        for s in samples:
-            print(f'Found sample {s["id"]}: {s}')
-            print(f'Analyses for sample {s["id"]}:')
-            for t in ['cram', 'gvcf']:
-                a = aapi.get_latest_analysis_for_samples_and_type(
-                    project=PROJ,
-                    analysis_type=t,
-                    request_body=[s['id']],
-                )
-                print(f'   Type: {t}: {a}')
-            t = 'joint-calling'
-            a = aapi.get_latest_complete_analysis_for_type(
-                project=PROJ,
-                analysis_type=t,
-            )
-            print(f'   Type: {t}: {a}')
+        print(f'Inserted a sample with {s}')
 
-    _print_samples()
-    print()
+        print(await self.connection.connection.fetch_all('SELECT * FROM sample'))
 
-    new_sample = NewSample(
-        external_id='Test', type='blood', meta={'other-meta': 'value'}
-    )
-    sample_id = sapi.create_new_sample(PROJ, new_sample)
-    print(f'Inserted sample with ID: {sample_id}')
-
-    analysis = AnalysisModel(
-        sample_ids=[sample_id],
-        type='gvcf',
-        output='gs://output-path',
-        status='completed',
-    )
-    analysis_id = aapi.create_new_analysis(PROJ, analysis)
-    print(f'Inserted analysis with ID: {analysis_id}')
-
-    print()
-    _print_samples()
-
-
-if __name__ == '__main__':
-    run_test()
+    @run_as_sync
+    async def test_number_2(self):
+        """Test to see what's in the database"""
+        print('Running test 2')
+        print(await self.connection.connection.fetch_all('SELECT * FROM sample'))

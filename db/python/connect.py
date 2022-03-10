@@ -49,13 +49,19 @@ class Connection:
 class NotFoundError(Exception):
     """Custom error when you can't find something"""
 
+
 class DatabaseConfiguration(abc.ABC):
+    """Base class for DatabaseConfiguration"""
 
     @abc.abstractmethod
     def get_connection_string(self):
+        """Get connection string"""
         raise NotImplementedError
 
+
 class ConnectionStringDatabaseConfiguration(DatabaseConfiguration):
+    """Database Configuration that takes a literal DatabaseConfiguration"""
+
     def __init__(self, connection_string):
         self.connection_string = connection_string
 
@@ -92,9 +98,7 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
             port=os.environ.get('SM_DEV_DB_PORT', '3306'),
         )
 
-    def get_connection_string(
-        self
-    ):
+    def get_connection_string(self):
         """Prepares the connection string for mysql / mariadb"""
 
         _host = self.host or 'localhost'
@@ -141,9 +145,7 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(
-            config.get_connection_string()
-        )
+        return databases.Database(config.get_connection_string())
 
     @staticmethod
     async def connect():

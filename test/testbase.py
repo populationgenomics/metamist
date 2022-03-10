@@ -1,4 +1,10 @@
+import asyncio
+import socket
+import subprocess
 import unittest
+from functools import wraps
+
+from typing import Dict
 
 from testcontainers.mysql import MariaDbContainer
 
@@ -7,84 +13,118 @@ from db.python.connect import (
     Connection,
     SMConnections,
 )
-from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import SampleType
-from sample_metadata.parser.generic_parser import run_as_sync
 
 
-class DbTest(unittest.IsolatedAsyncioTestCase):
+def find_free_port():
+    """Find free port to run tests on"""
+    s = socket.socket()
+    s.bind(('', 0))  # Bind to a free port provided by the host.
+    return s.getsockname()[1]  # Return the port number assigned.
+
+
+loop = asyncio.new_event_loop()
+
+
+def run_as_sync(f):
+    """
+    Run an async function, synchronously.
+    """
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return loop.run_until_complete(f(*args, **kwargs))
+
+    return wrapper
+
+
+class DbTest(unittest.TestCase):
+    """Base class for database integration tests"""
+
+    # store connections here, so they can be created PER-CLASS
+    # and don't get reused.
+    dbs: Dict[str, MariaDbContainer] = {}
+    connections: Dict[str, Connection] = {}
+
     @classmethod
     def setUpClass(cls) -> None:
         @run_as_sync
         async def setup():
-            db = MariaDbContainer('mariadb:latest')
-            # db.port_to_expose = 3307
-            # db.with_exposed_ports(db.port_to_expose)
-            db.start()
-            DbTest._db = db
+            """
+            This starts a mariadb container, applies liquibase schema and inserts a project
+            MAYBE, the best way in the future would be to only ever create ONE connection
+            between all Test classes, and create a new database per test, new set of a connections
 
-            import subprocess
+            Then on tearDownClass, only tear down the instance once all tests have been completed.
+            """
             try:
+                db = MariaDbContainer('mariadb:latest')
+                port_to_expose = find_free_port()
+                db.with_bind_ports(db.port_to_expose, port_to_expose)
+                db.start()
+                cls.dbs[cls.__name__] = db
+
+                con_string = db.get_connection_url()
+                con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
+                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
                 command = [
-                        'liquibase',
-                        *('--changeLogFile', '../db/project.xml'),
-                        *(f'--url', f'jdbc:mariadb://127.0.0.1:{db.port_to_expose}/{db.MYSQL_DATABASE}'),
-                        *('--driver', 'org.mariadb.jdbc.Driver'),
-                        *('--classpath', '../db/mariadb-java-client-2.7.2.jar'),
-                        *('--username', db.MYSQL_USER),
-                        'update',
-                    ]
-                rc = subprocess.check_output(command)
+                    'liquibase',
+                    *('--changeLogFile', '../db/project.xml'),
+                    *('--defaultsFile', '../db/liquibase.properties'),
+                    *('--url', lcon_string),
+                    *('--driver', 'org.mariadb.jdbc.Driver'),
+                    *('--classpath', '../db/mariadb-java-client-2.7.2.jar'),
+                    *('--username', db.MYSQL_USER),
+                    *('--password', db.MYSQL_PASSWORD),
+                    'update',
+                ]
+                subprocess.check_output(command)
+
+                sm_db = SMConnections.make_connection(
+                    ConnectionStringDatabaseConfiguration(con_string)
+                )
+                await sm_db.connect()
+                connection = Connection(
+                    connection=sm_db,
+                    project=0,
+                    author='testuser',
+                )
+                cls.connections[cls.__name__] = connection
+
+                ppt = ProjectPermissionsTable(connection.connection)
+                await ppt.create_project(
+                    project_name='test',
+                    dataset_name='test',
+                    create_test_project=False,
+                    gcp_project_id='None',
+                    author='testuser',
+                    read_secret_name='None',
+                    write_secret_name='None',
+                    check_permissions=False,
+                )
+
             except subprocess.CalledProcessError as e:
                 print(e)
-                print(e.stderr)
-                print(e.stdout)
+                if e.stderr:
+                    print(e.stderr.decode().replace('\\n', '\n'))
+                if e.stdout:
+                    print(e.stdout.decode().replace('\\n', '\n'))
                 cls.tearDownClass()
                 raise e
+            except Exception as e:
+                print(f'FAILED WITH {e}')
+                print(e)
+                cls.tearDownClass()
 
-            con_string = db.get_connection_url()
-            con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
-            print('connecting with', con_string)
-            sm_db = SMConnections.make_connection(
-                ConnectionStringDatabaseConfiguration(con_string)
-            )
-            await sm_db.connect()
-            DbTest.connection = Connection(
-                connection=sm_db,
-                project=0,
-                author='testuser',
-            )
+                raise
 
-            p = await ProjectPermissionsTable(
-                DbTest.connection.connection
-            ).create_project(
-                project_name='test',
-                dataset_name='test',
-                create_test_project=False,
-                gcp_project_id='None',
-                author='testuser',
-                read_secret_name='None',
-                write_secret_name='None',
-                check_permissions=False,
-            )
-            print(f'Project created with ID: {p}')
-
-        setup()
+        return setup()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        DbTest._db.exec(f'DROP DATABASE {DbTest._db.MYSQL_DATABASE};')
-        DbTest._db.stop()
+        db = cls.dbs[cls.__name__]
+        db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+        db.stop()
 
-    async def test_number_one(self):
-        sl = SampleLayer(DbTest.connection)
-        s = await sl.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            active=True,
-            meta={'meta': 'meta ;)'},
-            check_project_id=False,
-        )
-
-        print(self._db.exec('SELECT * FROM samples'))
+    def setUp(self) -> None:
+        self.connection = self.connections[self.__class__.__name__]
