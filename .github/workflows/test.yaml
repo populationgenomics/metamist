@@ -22,6 +22,20 @@ jobs:
         with:
           python-version: '3.10'
 
+      - uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '17'
+
+      - name: "Set-up liquibase"
+        run: |
+          echo
+          echo "Liquibase latest version:"
+          VERSION=$(curl -s https://github.com/liquibase/liquibase/releases/latest | grep -o "v.*" | sed s/'>.*'//g |  sed s/'v'//g | sed 's/"//g')
+          curl -L https://github.com/liquibase/liquibase/releases/download/v${VERSION}/liquibase-${VERSION}.zip --output liquibase-${VERSION}.zip
+          unzip -o -d liquibase liquibase-${VERSION}.zip
+          echo "$(pwd)/liquibase" >> $GITHUB_PATH
+
       - name: Setup build env
         run: |
           pip install -r requirements-dev.txt
