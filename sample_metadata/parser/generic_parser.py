@@ -81,9 +81,9 @@ class SequenceMetaGroup:
 
     def __init__(
         self,
-        rows: GroupedRow = None,
-        sequence_type: SequenceType = None,
-        meta: Dict[str, Any] = None,
+        rows: GroupedRow,
+        sequence_type: SequenceType,
+        meta: Dict[str, Any],
     ):
         self.rows = rows
         self.sequence_type = sequence_type
@@ -267,7 +267,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Optional[SingleRow]:
         """Get sample-metadata from row"""
 
-    @abstractmethod
+    # @abstractmethod
     async def get_grouped_sequence_meta(
         self, sample_id: str, row: GroupedRow
     ) -> List[SequenceMetaGroup]:
@@ -281,7 +281,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     # @abstractmethod
     async def get_analyses(
-        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get analysis objects from row. Optionally, a CPG ID can be passed for
@@ -290,7 +290,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return []
 
     @abstractmethod
-    async def get_qc_meta(self, sample_id: str, row: GroupedRow) -> Optional[SingleRow]:
+    async def get_qc_meta(self, sample_id: str, row: SingleRow) -> Optional[SingleRow]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
 
     # @abstractmethod

@@ -7,7 +7,10 @@ import click
 from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    GroupedRow,
+)
+from sample_metadata.parser.generic_parser import (
+    SequenceMetaGroup,
+    SingleRow,
     run_as_sync,
 )
 
@@ -108,7 +111,7 @@ class TobWgsParser(GenericMetadataParser):
         return None
 
     async def get_analyses(
-        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get Analysis entries from a row.
@@ -145,17 +148,23 @@ class TobWgsParser(GenericMetadataParser):
             )
         return analyses
 
-    async def get_sequence_meta(self, sample_id: str, row: GroupedRow):
+    async def get_sequence_meta(self, sample_id: str, seq_group: SequenceMetaGroup):
         """Get sequence-metadata from row"""
-        assert not isinstance(row, list)
-        collapsed_sequence_meta = await super().get_sequence_meta(sample_id, row)
+        rows = seq_group.rows
+        if isinstance(rows, list):
+            row = rows[0]
+
+        result = await super().get_sequence_meta(sample_id, seq_group)
+        collapsed_sequence_meta = result.meta
+
         batch_number = int(row['batch.batch_name'][-3:])
         collapsed_sequence_meta['batch'] = batch_number
 
         batch_name = row['batch.batch_name'][:-5]
         collapsed_sequence_meta['batch_name'] = batch_name
 
-        return collapsed_sequence_meta
+        seq_group.meta = collapsed_sequence_meta
+        return seq_group
 
 
 @click.command(help='GCS path to manifest file')

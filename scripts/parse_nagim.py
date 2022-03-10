@@ -105,7 +105,13 @@ from sample_metadata.models import (
 )
 from sample_metadata.apis import SampleApi
 from sample_metadata.models import SampleUpdateModel
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
+from sample_metadata.parser.generic_parser import (
+    GenericParser,
+    GroupedRow,
+    SequenceMetaGroup,
+    SingleRow,
+    run_as_sync,
+)
 
 
 logger = logging.getLogger(__file__)
@@ -1162,13 +1168,12 @@ class NagimParser(GenericParser):
     async def get_analyses(
         self,
         sample_id: str,
-        row: GroupedRow,
+        row: SingleRow,
         cpg_id: Optional[str],
     ) -> List[AnalysisModel]:
         """
         Creating "staging" analyses for uploaded GVCFs and CRAMs.
         """
-        assert not isinstance(row, list)
         results = []
 
         for analysis_type in ['gvcf', 'cram']:
@@ -1204,13 +1209,11 @@ class NagimParser(GenericParser):
         return results
 
     async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: SingleRow
     ) -> Optional[Dict[str, Any]]:
         """
         Create a QC analysis entry for found QC files.
         """
-        assert not isinstance(row, list)
-
         if 'QC' not in SOURCES_TO_PROCESS:
             return None
 
@@ -1232,16 +1235,19 @@ class NagimParser(GenericParser):
         }
 
     async def get_sequence_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
-        if isinstance(row, list):
-            row = row[0]
+        self, sample_id: str, seq_group: SequenceMetaGroup
+    ) -> SequenceMetaGroup:
+        rows = seq_group.rows
+        if isinstance(rows, list):
+            row = rows[0]
 
         result = {}
         for metric, _ in QC_METRICS:
             if f'qc_value_{metric}' in row:
                 result[metric] = row[f'qc_value_{metric}']
-        return result
+
+        seq_group.meta = result
+        return seq_group
 
 
 def _cache_bucket_ls(
