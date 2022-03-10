@@ -9,6 +9,7 @@ import subprocess
 import traceback
 import typing
 from collections import Counter
+import csv
 
 import click
 from google.cloud import storage
@@ -22,13 +23,17 @@ from sample_metadata.apis import (
     FamilyApi,
     ParticipantApi,
 )
-from sample_metadata.configuration import _get_google_auth_token
 from sample_metadata.models import (
     AnalysisType,
     NewSequence,
     NewSample,
     AnalysisModel,
     SampleUpdateModel,
+    SequenceType,
+    SampleType,
+    SequenceStatus,
+    AnalysisStatus,
+    ContentType,
 )
 
 logger = logging.getLogger(__file__)
@@ -164,7 +169,7 @@ def main(
                 project=target_project,
                 new_sample=NewSample(
                     external_id=s['external_id'],
-                    type=s['type'],
+                    type=SampleType(s['type']),
                     meta=_copy_files_in_dict(s['meta'], project),
                 ),
             )
@@ -177,8 +182,8 @@ def main(
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
-                        type=seq_info['type'],
-                        status=seq_info['status'],
+                        type=SequenceType(seq_info['type']),
+                        status=SequenceStatus(seq_info['status']),
                     )
                 )
 
@@ -187,14 +192,70 @@ def main(
             if analysis:
                 logger.info(f'Processing {a_type} analysis entry')
                 am = AnalysisModel(
-                    type=a_type,
+                    type=AnalysisType(a_type),
                     output=_copy_files_in_dict(analysis['output'], project),
-                    status=analysis['status'],
+                    status=AnalysisStatus(analysis['status']),
                     sample_ids=[s['id']],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
+
+    sample_external_ids = [sample['external_id'] for sample in samples]
+    papi.fill_in_missing_participants(target_project)
+    participant_map = papi.get_participant_id_map_by_external_ids(
+        project, sample_external_ids
+    )
+
+    participant_ids = list(participant_map.values())
+    family_ids = transfer_families(project, target_project, participant_ids)
+    transfer_ped(project, target_project, family_ids)
+
+
+def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
+    """Pull relevant families from the input project, and copy to target_project"""
+    families = fapi.get_families(
+        project=initial_project,
+        participant_ids=participant_ids,
+    )
+
+    family_ids = [family['id'] for family in families]
+
+    tmp_family_tsv = 'tmp_families.tsv'
+    family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
+    # Work-around as import_families takes a file.
+    with open(tmp_family_tsv, 'wt') as tmp_families:
+        tsv_writer = csv.writer(tmp_families, delimiter='\t')
+        tsv_writer.writerow(family_tsv_headers)
+        for family in families:
+            tsv_writer.writerow(
+                [
+                    family['external_id'],
+                    family['description'] or '',
+                    family['coded_phenotype'] or '',
+                ]
+            )
+
+    with open(tmp_family_tsv) as family_file:
+        fapi.import_families(file=family_file, project=target_project)
+
+    return family_ids
+
+
+def transfer_ped(initial_project, target_project, family_ids):
+    """Pull pedigree from the input project, and copy to target_project"""
+    ped = fapi.get_pedigree(
+        initial_project,
+        response_type=ContentType('tsv'),
+        internal_family_ids=family_ids,
+    )
+    tmp_ped_tsv = 'tmp_ped.tsv'
+    # Work-around as import_pedigree takes a file.
+    with open(tmp_ped_tsv, 'w') as tmp_ped:
+        tmp_ped.write(ped)
+
+    with open(tmp_ped_tsv) as ped_file:
+        fapi.import_pedigree(file=ped_file, has_header=True, project=target_project)
 
 
 def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
@@ -350,22 +411,14 @@ def export_ped_file(  # pylint: disable=invalid-name
     """
     Generates a PED file for the project, returs PED file lines in a list
     """
-    route = f'/api/v1/family/{project}/pedigree'
-    opts = []
-    if replace_with_participant_external_ids:
-        opts.append('replace_with_participant_external_ids=true')
-    if replace_with_family_external_ids:
-        opts.append('replace_with_family_external_ids=true')
-    if opts:
-        route += '?' + '&'.join(opts)
 
-    cmd = f"""\
-        curl --location --request GET \
-        'https://sample-metadata.populationgenomics.org.au{route}' \
-        --header "Authorization: Bearer {_get_google_auth_token()}"
-        """
-
-    lines = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
+    ped_out = fapi.get_pedigree(
+        project,
+        response_type=ContentType('tsv'),
+        replace_with_family_external_ids=replace_with_family_external_ids,
+        replace_with_participant_external_ids=replace_with_participant_external_ids,
+    )
+    lines = ped_out.strip().split('\n')
     return lines
 
 
