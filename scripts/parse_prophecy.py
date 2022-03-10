@@ -10,7 +10,7 @@ gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
 
 import logging
 import traceback
-from typing import Any, List, Dict
+from typing import List, Dict
 import click
 
 from sample_metadata.exceptions import ApiException
