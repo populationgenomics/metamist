@@ -351,8 +351,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         ) = await asyncio.gather(
             self.get_grouped_sequence_meta(external_sample_id, rows),
             self.get_sample_meta(external_sample_id, rows),
-            self.get_qc_meta(external_sample_id, rows),
-            self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
+            self.get_qc_meta(external_sample_id, rows[0]),
+            self.get_analyses(external_sample_id, rows[0], cpg_id=cpg_sample_id),
         )
 
         sample_to_upsert = None
