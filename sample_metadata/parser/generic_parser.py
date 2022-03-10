@@ -377,7 +377,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, List]:
         """
         Parse manifest file into a list of dicts, indexed by sample name.
-        Override this method if you can't use the default implementation that simly
+        Override this method if you can't use the default implementation that simply
         calls csv.DictReader.
         """
         sample_map = defaultdict(list)
