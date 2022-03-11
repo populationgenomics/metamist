@@ -405,7 +405,24 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analysis_to_add,
         )
 
-    async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]):
+    async def file_pointer_to_sample_map(
+        self,
+        file_pointer,
+        delimiter: str,
+    ) -> Dict[str, List]:
+        """
+        Parse manifest file into a list of dicts, indexed by sample name.
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader.
+        """
+        sample_map = defaultdict(list)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        for row in reader:
+            sample_id = self.get_sample_id(row)
+            sample_map[sample_id].append(row)
+        return sample_map
+
+    async def validate_rows(self, sample_map: Dict[str, Union[Dict, List[Dict]]]):
         """
         Validate sample rows:
         - throw an exception if an error occurs
@@ -423,16 +440,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """
         proj = self.sample_metadata_project
 
-        # a sample has many rows
-        sample_map = defaultdict(list)
-
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
-        for row in reader:
-            sample_id = self.get_sample_id(row)
-            sample_map[sample_id].append(row)
-
-        await self.validate_rows(sample_map)  # type: ignore
-
+        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
         if len(sample_map) == 0:
             raise ValueError(f'{proj}: The manifest file contains no records')
 

@@ -300,6 +300,24 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
+    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+        """Get paths to reads from a row"""
+        read_filenames = []
+        for r in row if isinstance(row, list) else [row]:
+            if self.reads_column and self.reads_column in r:
+                read_filenames.extend(r[self.reads_column].split(','))
+
+        return read_filenames
+
+    async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+        """Get paths to gvcfs from a row"""
+        gvcf_filenames = []
+        for r in row if isinstance(row, list) else [row]:
+            if self.gvcf_column and self.gvcf_column in r:
+                gvcf_filenames.extend(r[self.gvcf_column].split(','))
+
+        return gvcf_filenames
+
     async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
         """Get sample-metadata from row"""
         return self.collapse_arbitrary_meta(self.sample_meta_map, row)
