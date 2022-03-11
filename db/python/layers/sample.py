@@ -281,7 +281,7 @@ class SampleLayer(BaseLayer):
 
         return rows
 
-    async def batch_upsert_samples(self, samples: SampleBatchUpsert):
+    async def batch_upsert_samples(self, samples: SampleBatchUpsertBody):
         """Batch upsert a list of samples with sequences"""
         seqt: SampleSequenceLayer = SampleSequenceLayer(self.connection)
 

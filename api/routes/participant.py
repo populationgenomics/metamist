@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
 
 import io
 import csv
@@ -7,7 +7,6 @@ from datetime import date
 from fastapi import APIRouter
 from fastapi.params import Query
 from starlette.responses import StreamingResponse
-from pydantic import BaseModel
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
@@ -16,19 +15,14 @@ from api.utils.db import (
     Connection,
 )
 from api.utils.extensions import FileExtension
-from db.python.layers.participant import ParticipantLayer
-from models.models.sample import sample_id_format
+from db.python.layers.participant import (
+    ParticipantLayer,
+    ParticipantUpdateModel,
+    ParticipantUpsertBody,
+)
+from models.models.sample import sample_id_format, sample_id_transform_to_raw
 
 router = APIRouter(prefix='/participant', tags=['participant'])
-
-
-class ParticipantUpdateModel(BaseModel):
-    """Update participant model"""
-
-    reported_sex: Optional[int] = None
-    reported_gender: Optional[str] = None
-    karyotype: Optional[str] = None
-    meta: Optional[Dict] = None
 
 
 @router.post(
@@ -189,3 +183,38 @@ async def update_participant(
             meta=participant.meta,
         )
     }
+
+
+@router.put(
+    '/{project}/batch',
+    response_model=Dict[str, Any],
+    operation_id='batchUpsertParticipants',
+)
+async def batch_upsert_samples(
+    participants: ParticipantUpsertBody,
+    connection: Connection = get_project_write_connection,
+) -> Dict[str, Any]:
+    """
+    Upserts a list of participants with samples and sequences
+    Returns the list of internal sample IDs
+    """
+
+    # Convert id in samples to int
+    for participant in participants.participants:
+        for sample in participant.samples:
+            if sample.id:
+                sample.id = sample_id_transform_to_raw(sample.id)
+
+    async with connection.connection.transaction():
+        # Table interfaces
+        pt = ParticipantLayer(connection)
+
+        results = await pt.batch_upsert_participants(participants)
+
+        # Map sids back from ints to strs
+        for pid, samples in results.items():
+            for iid, seqs in samples.items():
+                data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
+                results[pid][iid] = data
+
+        return results
