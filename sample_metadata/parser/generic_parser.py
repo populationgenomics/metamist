@@ -29,6 +29,7 @@ from google.cloud import storage
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
 from sample_metadata.models import (
+    # ParticipantUpsert,
     SequenceType,
     AnalysisModel,
     SampleType,
@@ -36,6 +37,7 @@ from sample_metadata.models import (
     SequenceStatus,
     AnalysisStatus,
     SampleBatchUpsert,
+    SampleBatchUpsertBody,
     SequenceUpsert,
 )
 
@@ -258,9 +260,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    # @abstractmethod
-    def get_individual_id(self, row: GroupedRow) -> Optional[str]:
+    @abstractmethod
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
+
+    @abstractmethod
+    def has_participants(self, file_pointer, delimiter: str) -> bool:
+        """Returns True if the file has a Participants column"""
 
     @abstractmethod
     async def get_sample_meta(
@@ -422,6 +428,30 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_map[sample_id].append(row)
         return sample_map
 
+    async def file_pointer_to_participant_map(
+        self,
+        file_pointer,
+        delimiter: str,
+    ) -> Dict[str, List]:
+        """
+        Parse manifest file into a list of dicts, indexed by participant id.
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader.
+        """
+
+        participant_map = defaultdict(lambda: defaultdict(list))
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        for row in reader:
+            pid = self.get_participant_id(row)
+
+            if not pid:
+                raise ValueError(f'Participant not found in row: {row}')
+
+            sid = self.get_sample_id(row)
+            participant_map[pid][sid].append(row)
+
+        return participant_map
+
     async def validate_rows(self, sample_map: Dict[str, Union[Dict, List[Dict]]]):
         """
         Validate sample rows:
@@ -432,17 +462,52 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
-    ) -> Union[Dict[str, Dict], Tuple[List, List, List, List, Dict]]:
+    ) -> Dict[str, Dict]:
         """
         Parse manifest from iterable (file pointer / String.IO)
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-        proj = self.sample_metadata_project
 
-        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
-        if len(sample_map) == 0:
-            raise ValueError(f'{proj}: The manifest file contains no records')
+        sample_map: Dict[str, Any] = {}
+        participant_map: Dict[str, Any] = {}
+
+        if self.has_participants(file_pointer, delimiter):
+            participant_map = await self.file_pointer_to_participant_map(
+                file_pointer, delimiter
+            )
+        else:
+            sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
+
+        if len(sample_map) == 0 and len(participant_map) == 0:
+            raise ValueError(
+                f'{self.sample_metadata_project}: The manifest file contains no records'
+            )
+
+        if len(sample_map) != 0:
+            return await self.parse_manifest_by_samples(
+                sample_map, confirm=confirm, dry_run=dry_run
+            )
+
+        return await self.parse_manifest_by_participants(
+            participant_map, confirm=confirm, dry_run=dry_run
+        )
+
+    async def parse_manifest_by_participants(
+        self,
+        participant_map: Dict[str, Any],
+        confirm: bool = False,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Parses a manifest of data that is keyed on participant id and sample id"""
+        return {}
+
+    async def parse_manifest_by_samples(
+        self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """Parses a manifest of data that is keyed on sample id"""
+
+        proj = self.sample_metadata_project
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -451,7 +516,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # determine if any samples exist
         existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
-            self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
+            proj, list(sample_map.keys()), allow_missing=True
         )
         existing_cpgid_to_seq_id = {}
 
@@ -550,7 +615,7 @@ Updating {len(sequences_to_update)} sequences"""
 
         # Batch update
         result = sapi.batch_upsert_samples(
-            self.sample_metadata_project, SampleBatchUpsert(samples=all_samples)
+            proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
         logger.info(
@@ -567,7 +632,7 @@ Updating {len(sequences_to_update)} sequences"""
                 analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
                 promises.append(
                     analysisapi.create_new_analysis_async(
-                        project=self.sample_metadata_project, analysis_model=analysis
+                        project=proj, analysis_model=analysis
                     )
                 )
             await asyncio.gather(*promises)

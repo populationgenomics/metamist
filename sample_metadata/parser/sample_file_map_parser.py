@@ -8,10 +8,10 @@ import click
 from sample_metadata.parser.generic_parser import run_as_sync
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
-INDIVIDUAL_ID_COL_NAME = 'Individual ID'
+PARTICIPANT_COL_NAME = 'Individual ID'
 SAMPLE_ID_COL_NAME = 'Sample ID'
 READS_COL_NAME = 'Filenames'
-TYPE_COL_NAME = 'Type'
+SEQ_TYPE_COL_NAME = 'Type'
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
@@ -50,12 +50,13 @@ class SampleFileMapParser(GenericMetadataParser):
         super().__init__(
             search_locations=search_locations,
             sample_metadata_project=sample_metadata_project,
-            individual_column=INDIVIDUAL_ID_COL_NAME,
+            participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
-            seq_type_column=TYPE_COL_NAME,
+            seq_type_column=SEQ_TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map={},
             qc_meta_map={},
@@ -95,7 +96,7 @@ async def main(
     search_path: List[str],
     sample_metadata_project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequence_type='genome',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,

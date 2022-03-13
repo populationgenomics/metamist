@@ -2,6 +2,7 @@
 from itertools import groupby
 from typing import Dict, List, Optional, Any, Union
 import os
+import csv
 import logging
 from io import StringIO
 from functools import reduce
@@ -28,12 +29,13 @@ class GenericMetadataParser(GenericParser):
     def __init__(
         self,
         search_locations: List[str],
+        participant_meta_map: Dict[str, str],
         sample_meta_map: Dict[str, str],
         sequence_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
         sample_metadata_project: str,
         sample_name_column: str,
-        individual_column: Optional[str] = None,
+        participant_column: Optional[str] = None,
         reads_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
@@ -49,6 +51,7 @@ class GenericMetadataParser(GenericParser):
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
+            default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
         )
         self.search_locations = search_locations
@@ -59,8 +62,9 @@ class GenericMetadataParser(GenericParser):
             raise ValueError('A sample name column MUST be provided')
 
         self.sample_name_column = sample_name_column
-        self.individual_column = individual_column
+        self.participant_column = participant_column
         self.seq_type_column = seq_type_column
+        self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
@@ -107,17 +111,19 @@ class GenericMetadataParser(GenericParser):
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
 
-    def get_individual_id(self, row: GroupedRow) -> Optional[str]:
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
-        if isinstance(row, dict):
-            return row.get(self.meta_column, {})
+        if not self.participant_column:
+            raise ValueError('Participant column does not exist')
+        return row.get(self.participant_column, None)
 
-        pids = set([x.get(self.individual_column, None) for x in row])
-
-        if len(pids) > 1:
-            raise ValueError(f'Same sample matches to multiple participants {pids}')
-
-        return pids.pop() or ''
+    def has_participants(self, file_pointer, delimiter: str) -> bool:
+        """Returns True if the file has a Participants column"""
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        first_line = next(reader)
+        has_participants = self.participant_column in first_line
+        file_pointer.seek(0)
+        return has_participants
 
     async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]):
         await super().validate_rows(sample_map)
