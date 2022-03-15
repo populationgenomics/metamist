@@ -108,6 +108,7 @@ def main(
         all_families = [family['id'] for family in fams]
         families = random.sample(all_families, families_n)
         pedigree = fapi.get_pedigree(project=project, internal_family_ids=families)
+        _print_fam_stats(pedigree)
         p_ids = [ped['individual_id'] for ped in pedigree]
         sample_ids = [
             sample
@@ -295,9 +296,10 @@ def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]
 
 
 def _print_fam_stats(families: List):
+    family_sizes = Counter([fam['family_id'] for fam in families])
     fam_by_size: typing.Counter[int] = Counter()
-    for fam in families:
-        fam_by_size[len(fam.samples)] += 1
+    for fam in family_sizes:
+        fam_by_size[family_sizes[fam]] += 1
     for fam_size in sorted(fam_by_size):
         if fam_size == 1:
             label = 'singles'
