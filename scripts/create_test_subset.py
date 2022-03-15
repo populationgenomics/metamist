@@ -115,7 +115,8 @@ def main(
             for (participant, sample) in sample_id_by_participant_id.items()
             if participant in p_ids
         ]
-        samples = [s for s in all_samples if s['id'] in sample_ids]
+        sample_set = set(sample_ids)
+        samples = [s for s in all_samples if s['id'] in sample_set]
 
     else:
         assert samples_n
