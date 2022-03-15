@@ -1,8 +1,9 @@
-from db.python.layers.analysis import AnalysisLayer
-from models.enums import AnalysisType, AnalysisStatus
-from test.testbase import DbTest, DbIsolatedTest, run_as_sync
+# pylint: disable=invalid-overridden-method
+from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer, SampleType
+from models.enums import AnalysisType, AnalysisStatus
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -24,6 +25,9 @@ class TestAnalysis(DbIsolatedTest):
 
     @run_as_sync
     async def test_add_cram(self):
+        """
+        Test adding an analysis of type CRAM
+        """
         await self.al.insert_analysis(
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
@@ -32,10 +36,12 @@ class TestAnalysis(DbIsolatedTest):
         )
 
         analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        analysis_samples = await self.connection.connection.fetch_all('SELECT * FROM analysis_sample')
+        analysis_samples = await self.connection.connection.fetch_all(
+            'SELECT * FROM analysis_sample'
+        )
         print(analyses, analysis_samples)
 
-        self.assertTrue(1, len(analyses))
+        self.assertEqual(1, len(analyses))
 
-        self.assertTrue(1, analysis_samples[0]['sample_id'])
-        self.assertTrue(analyses[0]['id'], analysis_samples[0]['analysis_id'])
+        self.assertEqual(1, analysis_samples[0]['sample_id'])
+        self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])

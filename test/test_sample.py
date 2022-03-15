@@ -1,4 +1,4 @@
-from test.testbase import DbTest, DbIsolatedTest, run_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.sample import SampleLayer, SampleType
 
@@ -19,10 +19,12 @@ class TestSample(DbIsolatedTest):
             meta={'meta': 'meta ;)'},
         )
 
-        samples = await self.connection.connection.fetch_all('SELECT id, type, meta, project FROM sample')
-        self.assertTrue(1, len(samples))
+        samples = await self.connection.connection.fetch_all(
+            'SELECT id, type, meta, project FROM sample'
+        )
+        self.assertEqual(1, len(samples))
         s = samples[0]
-        self.assertTrue(1, s['id'])
+        self.assertEqual(1, s['id'])
 
     @run_as_sync
     async def test_update_sample(self):

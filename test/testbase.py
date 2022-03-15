@@ -1,3 +1,5 @@
+# pylint: disable=invalid-overridden-method
+
 import asyncio
 import os
 import socket
@@ -13,7 +15,8 @@ import nest_asyncio
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
     Connection,
-    SMConnections, TABLES_ORDERED_BY_FK_DEPS,
+    SMConnections,
+    TABLES_ORDERED_BY_FK_DEPS,
 )
 from db.python.tables.project import ProjectPermissionsTable, set_full_access
 
@@ -107,7 +110,9 @@ class DbTest(unittest.TestCase):
                 )
                 cls.connections[cls.__name__] = connection
 
-                ppt = ProjectPermissionsTable(connection.connection, allow_full_access=True)
+                ppt = ProjectPermissionsTable(
+                    connection.connection, allow_full_access=True
+                )
                 await ppt.create_project(
                     project_name='test',
                     dataset_name='test',
@@ -147,6 +152,10 @@ class DbTest(unittest.TestCase):
 
 
 class DbIsolatedTest(DbTest):
+    """
+    Database integration tests that performs clean-up at the start of each test
+    """
+
     @run_as_sync
     async def tearDown(self) -> None:
         super().tearDown()

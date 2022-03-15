@@ -163,7 +163,9 @@ class SampleLayer(BaseLayer):
         """Insert sample into SM database"""
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
-                author or self.author, [project or self.connection.project], readonly=False
+                author or self.author,
+                [project or self.connection.project],
+                readonly=False,
             )
 
         return await self.st.insert_sample(
