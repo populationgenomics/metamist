@@ -1,15 +1,15 @@
-from test.testbase import DbTest, run_as_sync
+from test.testbase import DbTest, DbIsolatedTest, run_as_sync
 
 from db.python.layers.sample import SampleLayer, SampleType
 
 
-class TestSample(DbTest):
+class TestSample(DbIsolatedTest):
     """Test sample class"""
 
     # tests run in 'sorted by ascii' order
 
     @run_as_sync
-    async def test_number_1(self):
+    async def test_add_sample(self):
         """Test inserting a sample"""
         sl = SampleLayer(self.connection)
         s = await sl.insert_sample(
@@ -17,15 +17,15 @@ class TestSample(DbTest):
             SampleType.BLOOD,
             active=True,
             meta={'meta': 'meta ;)'},
-            check_project_id=False,
-            project=1,
         )
-        print(f'Inserted a sample with {s}')
 
-        print(await self.connection.connection.fetch_all('SELECT * FROM sample'))
+        samples = await self.connection.connection.fetch_all('SELECT id, type, meta, project FROM sample')
+        self.assertTrue(1, len(samples))
+        s = samples[0]
+        self.assertTrue(1, s['id'])
 
     @run_as_sync
-    async def test_number_2(self):
+    async def test_update_sample(self):
         """Test to see what's in the database"""
         print('Running test 2')
         print(await self.connection.connection.fetch_all('SELECT * FROM sample'))
