@@ -8,15 +8,21 @@ from functools import wraps
 from typing import Dict
 
 from testcontainers.mysql import MariaDbContainer
+import nest_asyncio
 
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
     Connection,
-    SMConnections,
+    SMConnections, TABLES_ORDERED_BY_FK_DEPS,
 )
-from db.python.tables.project import ProjectPermissionsTable
+from db.python.tables.project import ProjectPermissionsTable, set_full_access
 
 am_i_in_test_environment = os.getcwd().endswith('test')
+
+# This monkey patches the asyncio event loop and allows it to be re-entrant
+# (you can call run_until_complete while run_until_complete is already on the stack)
+# Source: https://stackoverflow.com/a/56434301
+nest_asyncio.apply()
 
 
 def find_free_port():
@@ -61,6 +67,8 @@ class DbTest(unittest.TestCase):
             Then on tearDownClass, only tear down the instance once all tests have been completed.
             """
             try:
+                os.environ['SM_ALLOWALLACCESS'] = '1'
+                set_full_access(True)
                 db = MariaDbContainer('mariadb:latest')
                 port_to_expose = find_free_port()
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
@@ -94,12 +102,12 @@ class DbTest(unittest.TestCase):
                 await sm_db.connect()
                 connection = Connection(
                     connection=sm_db,
-                    project=0,
+                    project=1,
                     author='testuser',
                 )
                 cls.connections[cls.__name__] = connection
 
-                ppt = ProjectPermissionsTable(connection.connection)
+                ppt = ProjectPermissionsTable(connection.connection, allow_full_access=True)
                 await ppt.create_project(
                     project_name='test',
                     dataset_name='test',
@@ -136,3 +144,15 @@ class DbTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.connection = self.connections[self.__class__.__name__]
+
+
+class DbIsolatedTest(DbTest):
+    @run_as_sync
+    async def tearDown(self) -> None:
+        super().tearDown()
+
+        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project'}
+        for table in TABLES_ORDERED_BY_FK_DEPS:
+            if table in ignore:
+                continue
+            await self.connection.connection.execute(f'DELETE FROM {table}')

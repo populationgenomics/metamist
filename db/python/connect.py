@@ -17,6 +17,18 @@ from db.python.tables.project import ProjectPermissionsTable
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+TABLES_ORDERED_BY_FK_DEPS = [
+    'project',
+    'analysis',
+    'sample',
+    'analysis_sample',
+    'sample_sequencing',
+    'family',
+    'family_participant',
+    'participant',
+    'participant_phenotypes',
+][::-1]
+
 
 def to_db_json(val):
     """Convert val to json for DB"""
