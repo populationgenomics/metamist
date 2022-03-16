@@ -13,7 +13,6 @@ import csv
 
 import click
 from google.cloud import storage
-from peddy import Ped
 
 from sample_metadata import exceptions
 from sample_metadata.apis import (
@@ -104,20 +103,20 @@ def main(
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
     sample_id_by_participant_id = dict(pid_sid)
 
-    ped_lines = export_ped_file(project, replace_with_participant_external_ids=True)
     if families_n is not None:
-        ped = Ped(ped_lines)
-        families = list(ped.families.values())
-        logger.info(f'Found {len(families)} families, by size:')
-        _print_fam_stats(families)
-        families = random.sample(families, families_n)
-        logger.info(f'After subsetting to {len(families)} families:')
-        _print_fam_stats(families)
-        sample_ids = []
-        for fam in families:
-            for s in fam.samples:
-                sample_ids.append(sample_id_by_participant_id[s.sample_id])
-        samples = [s for s in all_samples if s['id'] in sample_ids]
+        fams = fapi.get_families(project)
+        all_families = [family['id'] for family in fams]
+        families = random.sample(all_families, families_n)
+        pedigree = fapi.get_pedigree(project=project, internal_family_ids=families)
+        _print_fam_stats(pedigree)
+        p_ids = [ped['individual_id'] for ped in pedigree]
+        sample_ids = [
+            sample
+            for (participant, sample) in sample_id_by_participant_id.items()
+            if participant in p_ids
+        ]
+        sample_set = set(sample_ids)
+        samples = [s for s in all_samples if s['id'] in sample_set]
 
     else:
         assert samples_n
@@ -298,9 +297,11 @@ def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]
 
 
 def _print_fam_stats(families: List):
+    family_sizes = Counter([fam['family_id'] for fam in families])
     fam_by_size: typing.Counter[int] = Counter()
-    for fam in families:
-        fam_by_size[len(fam.samples)] += 1
+    # determine number of singles, duos, trios, etc
+    for fam in family_sizes:
+        fam_by_size[family_sizes[fam]] += 1
     for fam_size in sorted(fam_by_size):
         if fam_size == 1:
             label = 'singles'
@@ -401,25 +402,6 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
-
-
-def export_ped_file(  # pylint: disable=invalid-name
-    project: str,
-    replace_with_participant_external_ids: bool = False,
-    replace_with_family_external_ids: bool = False,
-) -> List[str]:
-    """
-    Generates a PED file for the project, returs PED file lines in a list
-    """
-
-    ped_out = fapi.get_pedigree(
-        project,
-        response_type=ContentType('tsv'),
-        replace_with_family_external_ids=replace_with_family_external_ids,
-        replace_with_participant_external_ids=replace_with_participant_external_ids,
-    )
-    lines = ped_out.strip().split('\n')
-    return lines
 
 
 if __name__ == '__main__':
