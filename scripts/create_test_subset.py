@@ -299,6 +299,7 @@ def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]
 def _print_fam_stats(families: List):
     family_sizes = Counter([fam['family_id'] for fam in families])
     fam_by_size: typing.Counter[int] = Counter()
+    # determine number of singles, duos, trios, etc
     for fam in family_sizes:
         fam_by_size[family_sizes[fam]] += 1
     for fam_size in sorted(fam_by_size):
