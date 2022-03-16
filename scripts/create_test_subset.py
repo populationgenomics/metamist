@@ -200,13 +200,7 @@ def main(
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
 
-    sample_external_ids = [sample['external_id'] for sample in samples]
-    papi.fill_in_missing_participants(target_project)
-    participant_map = papi.get_participant_id_map_by_external_ids(
-        project, sample_external_ids
-    )
-
-    participant_ids = list(participant_map.values())
+    participant_ids = [int(sample['participant_id']) for sample in samples]
     family_ids = transfer_families(project, target_project, participant_ids)
     transfer_ped(project, target_project, family_ids)
 
@@ -254,7 +248,12 @@ def transfer_ped(initial_project, target_project, family_ids):
         tmp_ped.write(ped)
 
     with open(tmp_ped_tsv) as ped_file:
-        fapi.import_pedigree(file=ped_file, has_header=True, project=target_project)
+        fapi.import_pedigree(
+            file=ped_file,
+            has_header=True,
+            project=target_project,
+            create_missing_participants=True,
+        )
 
 
 def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
