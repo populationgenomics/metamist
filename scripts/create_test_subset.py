@@ -161,50 +161,6 @@ def main(
     family_ids = transfer_families(project, target_project, participant_ids)
     external_participant_ids = transfer_ped(project, target_project, family_ids)
 
-    # # get_map_ipid_esid()
-
-    # # Acronyms
-    # # ep : external participant id
-    # # ip : internal participant id
-    # # es : external sample id
-    # # is : internal sample id
-
-    # # Intermediate steps to determine the mapping of esid to ipid
-
-    # # External PID: Internal PID
-    # ep_ip_map = papi.get_participant_id_map_by_external_ids(
-    #     target_project, request_body=external_participant_ids
-    # )
-
-    # # External PID : Internal SID
-    # ep_is_map = papi.get_external_participant_id_to_internal_sample_id(project)
-
-    # # Internal PID : Internal SID
-    # ip_is_map = []
-    # for ep_is_pair in ep_is_map:
-    #     if ep_is_pair[0] in ep_ip_map:
-    #         ep_is_pair[0] = ep_ip_map[ep_is_pair[0]]
-    #         ip_is_map.append(ep_is_pair)
-
-    # # Internal PID : External SID
-    # is_es_map = sapi.get_all_sample_id_map_by_internal(project)
-
-    # ip_es_map = []
-    # for ip_is_pair in ip_is_map:
-    #     samples_per_participant = []
-    #     samples_per_participant.append(ip_is_pair[0])
-    #     for isid in ip_is_pair[1:]:
-    #         if isid in is_es_map:
-    #             samples_per_participant.append(is_es_map[isid])
-    #     ip_es_map.append(samples_per_participant)
-
-    # # External SID : Internal PID (Normalised)
-    # external_sample_internal_participant_map = _normalise_map(ip_es_map)
-    # # for ip_es_group in ip_es_map:
-    # #     participant = ip_es_group[0]
-    # #     for esid in ip_es_group[1:]:
-    # #         external_sample_internal_participant_map[esid] = participant
-
     external_sample_internal_participant_map = get_map_ipid_esid(
         project, target_project, external_participant_ids
     )
