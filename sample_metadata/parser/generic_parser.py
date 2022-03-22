@@ -37,7 +37,7 @@ from sample_metadata.models import (
     AnalysisStatus,
     SampleBatchUpsertItem,
     SampleBatchUpsert,
-    SequenceUpsert
+    SequenceUpsert,
 )
 
 
@@ -193,7 +193,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         if path.startswith('gs://'):
             bucket_name, *components = directory_name[5:].split('/')
             assert self.client
-            blobs = self.client.list_blobs(bucket_name, prefix='/'.join(components))
+            blobs = self.client.list_blobs(
+                bucket_name, prefix='/'.join(components), delimiter='/'
+            )
             return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
 
         return [os.path.join(path, f) for f in os.listdir(path)]
@@ -341,7 +343,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             'meta': collapsed_sample_meta,
             'external_id': external_sample_id,
             'type': SampleType(sample_type),
-            'sequences': [sequence_to_upsert]
+            'sequences': [sequence_to_upsert],
         }
 
         if not cpg_sample_id:
@@ -368,6 +370,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analysis_to_add,
         )
 
+    async def validate_rows(
+        self, sample_map: Dict[str, Union[dict, List[dict]]]
+    ):
+        """
+        Validate sample rows:
+        - throw an exception if an error occurs
+        - log a warning for all other issues
+        """
+        return
+
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
     ) -> Union[Dict[str, Dict], Tuple[List, List, List, List, Dict]]:
@@ -385,6 +397,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for row in reader:
             sample_id = self.get_sample_id(row)
             sample_map[sample_id].append(row)
+
+        await self.validate_rows(sample_map)  # type: ignore
 
         if len(sample_map) == 0:
             raise ValueError(f'{proj}: The manifest file contains no records')
@@ -496,7 +510,9 @@ Updating {len(sequences_to_update)} sequences"""
             logger.info(message)
 
         # Batch update
-        result = sapi.batch_upsert_samples(self.sample_metadata_project, SampleBatchUpsert(samples=all_samples))
+        result = sapi.batch_upsert_samples(
+            self.sample_metadata_project, SampleBatchUpsert(samples=all_samples)
+        )
 
         logger.info(
             f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
