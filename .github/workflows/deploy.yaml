@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@main
 
       - name: "gcloud setup"
-        uses: google-github-actions/setup-gcloud@main
+        uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: sample-metadata
           service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
