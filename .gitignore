@@ -6,7 +6,9 @@ __pycache__/
 .DS_Store
 .idea/
 db/mariadb-java-client-*.jar
-sample_metadata
+!sample_metadata/
+sample_metadata/*
+!sample_metadata/parser/
 *.egg-info/
 db/liquibase.jar
 node_modules/
