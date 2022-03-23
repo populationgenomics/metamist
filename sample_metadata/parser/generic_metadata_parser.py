@@ -409,7 +409,7 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-        sample_id = await self.get_cpg_sample_id(rows[0])
+        sample_id = self.get_cpg_sample_id(rows[0])
         file_types: Dict[str, Dict[str, List]] = await self.parse_files(
             sample_id, full_filenames
         )
