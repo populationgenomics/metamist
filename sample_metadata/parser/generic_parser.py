@@ -500,13 +500,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 rows, sample_id, cpg_id
             )
             samples_to_upsert.append(sample)
-            sequences_to_upsert.append(seqs)
+            sequences_to_upsert.extend(seqs)
             analyses_to_add.append(analyses)
 
         # Construct participant to upsert
         papi = ParticipantApi()
         existing_participant_ids = papi.get_participant_id_map_by_external_ids(
-            self.sample_metadata_project, list(participant_id), allow_missing=True
+            self.sample_metadata_project, [participant_id], allow_missing=True
         )
 
         internal_id = existing_participant_ids.get(participant_id, None)
@@ -516,7 +516,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             # 'reported_sex': None,
             # 'reported_gender': None,
             # 'karyotype': None,
-            'meta': collapsed_participant_meta,
+            'meta': collapsed_participant_meta.meta,
             'samples': samples_to_upsert,
         }
         if not internal_id:
@@ -683,13 +683,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # now we can start adding!!
         papi = ParticipantApi()
 
-        # Map external sids into cpg ids
-        existing_external_id_to_cpgid = (
-            await papi.get_participant_id_map_by_external_ids_async(
-                proj, list(participant_map.keys()), allow_missing=True
-            )
-        )
-
         # all dicts indexed by external_sample_id
         summary = None
         all_participants: List[ParticipantUpsert] = []
@@ -704,8 +697,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
-                cpg_id = existing_external_id_to_cpgid.get(external_pid, None)
-                promise = self.process_participant_group(cpg_id, sample_map)
+                promise = self.process_participant_group(external_pid, sample_map)
                 current_batch_promises[external_pid] = promise
 
             processed_ex_pids = list(current_batch_promises.keys())
@@ -770,17 +762,18 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # Batch update
         result = papi.batch_upsert_participants(
-            proj, ParticipantUpsertBody(pariticpants=all_participants)
+            proj, ParticipantUpsertBody(participants=all_participants)
         )
 
+        # TODO: analyses adding is in batch by sample, not yet done for batch by participant
         # Add analyses
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = (
-            await papi.get_participant_id_map_by_external_ids(
-                proj, list(participant_map.keys()), allow_missing=True
-            )
-        )
-        _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
+        # existing_external_id_to_cpgid = (
+        #     await papi.get_participant_id_map_by_external_ids_async(
+        #         proj, list(participant_map.keys()), allow_missing=True
+        #     )
+        # )
+        # _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
 
         return result
 
@@ -850,7 +843,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             Adding {len(summary['samples']['insert'])} samples
             Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(analyses_to_add)} analysis results
 
             Updating {len(summary['samples']['update'])} samples
             Updating {len(summary['sequences']['update'])} sequences

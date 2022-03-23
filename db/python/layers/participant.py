@@ -699,7 +699,8 @@ class ParticipantLayer(BaseLayer):
                 user=self.author, project_ids=projects, readonly=False
             )
 
-        return await self.pttable.update_participant(**d)
+        _ = await self.pttable.update_participant(**d)
+        return participant_id
 
     async def upsert_participant(self, participant: ParticipantUpsert):
         """Upsert a participant"""

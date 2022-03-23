@@ -190,7 +190,7 @@ async def update_participant(
     response_model=Dict[str, Any],
     operation_id='batchUpsertParticipants',
 )
-async def batch_upsert_samples(
+async def batch_upsert_participants(
     participants: ParticipantUpsertBody,
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
@@ -205,16 +205,20 @@ async def batch_upsert_samples(
             if sample.id:
                 sample.id = sample_id_transform_to_raw(sample.id)
 
+    external_pids = [p.external_id for p in participants.participants]
+
     async with connection.connection.transaction():
         # Table interfaces
         pt = ParticipantLayer(connection)
 
         results = await pt.batch_upsert_participants(participants)
+        pid_key = dict(zip(results.keys(), external_pids))
 
         # Map sids back from ints to strs
         for pid, samples in results.items():
             for iid, seqs in samples.items():
                 data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
                 results[pid][iid] = data
+            results[pid]['participant_id'] = pid_key[pid]
 
         return results
