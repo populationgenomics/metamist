@@ -1321,7 +1321,9 @@ fi"""
 
         logger.info(f'{proj}: adding jobs to move CRAM uploads')
         new_bucket = SOURCES['CRAM'].get_final_bucket(stack, namespace)
-        for s in [s for s in samples if s.project_id == proj]:
+        for s in samples:
+            if s.project_id != proj:
+                continue
             if s.cram:
                 j = _add_batch_job(hbatch, f'{smdb_proj}/{s.cpg_id}: Move CRAM uploads')
                 s.cram.moved_path = join(new_bucket, f'{s.cpg_id}.cram')
@@ -1333,7 +1335,9 @@ fi"""
 
         logger.info(f'{proj}: adding jobs to move GVCF uploads')
         new_bucket = SOURCES['GVCF'].get_staging_bucket(stack, namespace)
-        for s in [s for s in samples if s.project_id == proj]:
+        for s in samples:
+            if s.project_id != proj:
+                continue
             if s.gvcf:
                 j = _add_batch_job(hbatch, f'{smdb_proj}/{s.cpg_id}: Move GVCF uploads')
                 s.gvcf.moved_path = join(new_bucket, f'{s.cpg_id}.g.vcf.gz')
