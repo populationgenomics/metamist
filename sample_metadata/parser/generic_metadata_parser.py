@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
+# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from itertools import groupby
 from typing import Dict, List, Optional, Any, Union
 import os
@@ -6,6 +6,7 @@ import csv
 import logging
 from io import StringIO
 from functools import reduce
+from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
@@ -14,6 +15,8 @@ from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
+    ParticipantMetaGroup,
+    SampleMetaGroup,
     SequenceMetaGroup,
     SingleRow,
 )  # noqa
@@ -61,6 +64,8 @@ class GenericMetadataParser(GenericParser):
         if not sample_name_column:
             raise ValueError('A sample name column MUST be provided')
 
+        self.cpg_id_column = 'Internal CPG Sample ID'
+
         self.sample_name_column = sample_name_column
         self.participant_column = participant_column
         self.seq_type_column = seq_type_column
@@ -77,6 +82,22 @@ class GenericMetadataParser(GenericParser):
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
         return row.get(self.sample_name_column, None)
+
+    def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+        """Get internal cpg id from a row using get_sample_id and an api call"""
+        cpg_id = row.get(self.cpg_id_column, None)
+
+        if not cpg_id:
+            sapi = SampleApi()
+            external_id = self.get_sample_id(row)
+            id_map = sapi.get_sample_by_external_id(
+                external_id, self.sample_metadata_project
+            )
+            cpg_id = id_map.get(external_id, None)
+            row[self.cpg_id_column] = cpg_id
+            return cpg_id
+
+        return cpg_id
 
     def get_sample_type(self, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
@@ -324,12 +345,30 @@ class GenericMetadataParser(GenericParser):
 
         return gvcf_filenames
 
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
+        """Return list of grouped by sample metadata from the rows"""
+        sample_metadata = []
+        for sid, row_group in groupby(rows, self.get_sample_id):
+            sample_group = SampleMetaGroup(sample_id=sid, rows=row_group, meta=None)
+            sample_metadata.append(await self.get_sample_meta(sample_group))
+        return sample_metadata
+
+    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
         """Get sample-metadata from row"""
-        return self.collapse_arbitrary_meta(self.sample_meta_map, row)
+        rows = sample_group.rows
+        meta = self.collapse_arbitrary_meta(self.sample_meta_map, rows)
+        sample_group.meta = meta
+        return sample_group
+
+    async def get_participant_meta(
+        self, participant_id: int, rows: GroupedRow
+    ) -> ParticipantMetaGroup:
+        """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
+        meta = self.collapse_arbitrary_meta(self.participant_meta_map, rows)
+        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta=meta)
 
     async def get_grouped_sequence_meta(
-        self, sample_id: str, row: GroupedRow
+        self, sample_id: str, rows: GroupedRow
     ) -> List[SequenceMetaGroup]:
         """
         Takes a collection of SingleRows and groups them by sequence type
@@ -337,15 +376,16 @@ class GenericMetadataParser(GenericParser):
         resulting list of metadata
         """
         sequence_meta = []
-        for stype, row_group in groupby(row, self.get_sequence_type):
+        for stype, row_group in groupby(rows, self.get_sequence_type):
             seq_group = SequenceMetaGroup(
-                rows=row_group, sequence_type=stype, meta=None
+                rows=list(row_group),
+                sequence_type=stype,
             )
-            sequence_meta.append(await self.get_sequence_meta(sample_id, seq_group))
+            sequence_meta.append(await self.get_sequence_meta(seq_group))
         return sequence_meta
 
     async def get_sequence_meta(
-        self, sample_id: str, seq_group: SequenceMetaGroup
+        self, seq_group: SequenceMetaGroup
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
@@ -369,6 +409,7 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
+        sample_id = await self.get_cpg_sample_id(rows[0])
         file_types: Dict[str, Dict[str, List]] = await self.parse_files(
             sample_id, full_filenames
         )
