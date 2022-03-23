@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
+# pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
 import sys
 import asyncio
 import csv
@@ -25,6 +25,7 @@ from functools import wraps
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
+from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
 from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi, ParticipantApi
@@ -321,7 +322,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
 
     @abstractmethod
-    async def get_participant_meta(self, rows: GroupedRow) -> ParticipantMetaGroup:
+    async def get_participant_meta(
+        self, participant_id: int, rows: GroupedRow
+    ) -> ParticipantMetaGroup:
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
 
     # @abstractmethod
@@ -378,8 +381,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
             (
                 sample_to_upsert,
-                sequence_to_upsert,
-                analysis_to_add,
+                sequences_to_upsert,
+                analyses_to_add,
             )
 
         Then the calling function does the (reduce).
@@ -407,7 +410,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         sample_to_upsert = None
         sequences_to_upsert = []
-        analysis_to_add = []
+        analyses_to_add = []
 
         # should we add or update sequencing
         if collapsed_sequencing_meta:
@@ -437,10 +440,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         sample_to_upsert = SampleBatchUpsert(**args)
 
         if collapsed_analyses:
-            analysis_to_add.extend(collapsed_analyses)
+            analyses_to_add.extend(collapsed_analyses)
 
         if collapsed_qc:
-            analysis_to_add.append(
+            analyses_to_add.append(
                 AnalysisModel(
                     sample_ids=['<none>'],
                     type=self.get_analysis_type(external_sample_id, rows),
@@ -452,7 +455,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return (
             sample_to_upsert,
             sequences_to_upsert,
-            analysis_to_add,
+            analyses_to_add,
         )
 
     async def process_participant_group(
@@ -462,9 +465,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
             (
                 participants_to_upsert,
-                sample_to_upsert,
-                sequence_to_upsert,
-                analysis_to_add,
+                samples_to_upsert,
+                sequences_to_upsert,
+                analyses_to_add,
             )
 
         Then the calling function does the (reduce).
@@ -473,7 +476,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         all_rows = [r for row in sample_map.values() for r in row]
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
-        collapsed_participant_meta = await self.get_participant_meta(all_rows)
+        collapsed_participant_meta = await self.get_participant_meta(
+            participant_id, all_rows
+        )
 
         # Get external sid to cpg map
         existing_external_id_to_cpgid = (
@@ -562,7 +567,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if not pid:
                 raise ValueError(f'Participant not found in row: {row}')
 
-            sid = await self.get_sample_id(row)
+            sid = self.get_sample_id(row)
             participant_map[pid][sid].append(row)
 
         return participant_map
@@ -608,6 +613,63 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             participant_map, confirm=confirm, dry_run=dry_run
         )
 
+    def upsert_summary(
+        self,
+        existing_summary: Dict[str, Dict[str, List[Any]]],
+        participants_to_upsert: List[ParticipantUpsert],
+        samples_to_upsert: List[SampleBatchUpsert],
+        sequences_to_upsert: List[SequenceUpsert],
+    ) -> Dict[str, Dict[str, int]]:
+        """Given lists of values to upsert return grouped summary of updates and inserts"""
+
+        def upsert_type(item: Dict[str, Any]) -> str:
+            return 'update' if hasattr(item, 'id') else 'insert'
+
+        # Set initial dictionary value
+        if existing_summary:
+            summary = existing_summary.copy()
+        else:
+            summary: Dict[str, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
+
+        for participant in participants_to_upsert:
+            summary['participants'][upsert_type(participant)].append(participant)
+
+        for sample in samples_to_upsert:
+            summary['samples'][upsert_type(sample)].append(sample)
+
+        for sequence in sequences_to_upsert:
+            summary['sequences'][upsert_type(sequence)].append(sequence)
+
+        return summary
+
+    async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
+        """Given an analyses dictionary add analyses"""
+        proj = self.sample_metadata_project
+        analysisapi = AnalysisApi()
+
+        logger.info(
+            f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
+        )
+        unwrapped_analysis_to_add = [
+            (sample_id, a)
+            for (sample_id, analyses) in analyses_to_add.items()
+            for a in analyses
+        ]
+
+        results = []
+        for chunked_analysis in chunk(unwrapped_analysis_to_add):
+            promises = []
+            for external_id, analysis in chunked_analysis:
+                analysis.sample_ids = [external_to_internal_id_map[external_id]]
+                promises.append(
+                    analysisapi.create_new_analysis_async(
+                        project=proj, analysis_model=analysis
+                    )
+                )
+            results.append(await asyncio.gather(*promises))
+
+        return results
+
     async def parse_manifest_by_participants(
         self,
         participant_map: Dict[str, Any],
@@ -615,7 +677,112 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on participant id and sample id"""
-        return {}
+
+        proj = self.sample_metadata_project
+
+        # now we can start adding!!
+        papi = ParticipantApi()
+
+        # Map external sids into cpg ids
+        existing_external_id_to_cpgid = (
+            await papi.get_participant_id_map_by_external_ids_async(
+                proj, list(participant_map.keys()), allow_missing=True
+            )
+        )
+
+        # all dicts indexed by external_sample_id
+        summary = None
+        all_participants: List[ParticipantUpsert] = []
+        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
+
+        # we'll batch process the samples as not to open too many threads
+        for external_pids in chunk(list(participant_map.keys())):
+
+            current_batch_promises = {}
+            if self.verbose:
+                logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
+
+            for external_pid in external_pids:
+                sample_map = participant_map[external_pid]
+                cpg_id = existing_external_id_to_cpgid.get(external_pid, None)
+                promise = self.process_participant_group(cpg_id, sample_map)
+                current_batch_promises[external_pid] = promise
+
+            processed_ex_pids = list(current_batch_promises.keys())
+            batch_promises = list(current_batch_promises.values())
+            resolved_promises = await asyncio.gather(*batch_promises)
+
+            for external_pid, resolved_promise in zip(
+                processed_ex_pids, resolved_promises
+            ):
+                (
+                    participant_to_upsert,
+                    samples_to_upsert,
+                    sequences_to_upsert,
+                    analysis_to_add,
+                ) = resolved_promise
+
+                if analysis_to_add:
+                    analyses_to_add[external_pid] = analysis_to_add
+
+                if participant_to_upsert:
+                    all_participants.append(participant_to_upsert)
+
+                # Get summary information
+                summary = self.upsert_summary(
+                    summary,
+                    [participant_to_upsert],
+                    samples_to_upsert,
+                    sequences_to_upsert,
+                )
+
+        message = f"""\
+            {proj}: Processing samples: {', '.join(sample_map.keys())}
+
+            Adding {len(summary['participants']['insert'])} participants
+            Adding {len(summary['samples']['insert'])} samples
+            Adding {len(summary['sequences']['insert'])} sequences
+            Adding {len(analyses_to_add)} analysis results
+
+            Updating {len(summary['participants']['update'])} participants
+            Updating {len(summary['samples']['update'])} samples
+            Updating {len(summary['sequences']['update'])} sequences
+        """
+
+        if dry_run:
+            logger.info('Dry run, so returning without inserting / updating metadata')
+            return (
+                summary['participants']['insert'],
+                summary['participants']['update'],
+                summary['samples']['insert'],
+                summary['samples']['update'],
+                summary['sequences']['insert'],
+                summary['sequences']['update'],
+                analyses_to_add,
+            )
+
+        if confirm:
+            resp = str(input(message + '\n\nConfirm (y): '))
+            if resp.lower() != 'y':
+                raise SystemExit()
+        else:
+            logger.info(message)
+
+        # Batch update
+        result = papi.batch_upsert_participants(
+            proj, ParticipantUpsertBody(pariticpants=all_participants)
+        )
+
+        # Add analyses
+        # Map external sids into cpg ids
+        existing_external_id_to_cpgid = (
+            await papi.get_participant_id_map_by_external_ids(
+                proj, list(participant_map.keys()), allow_missing=True
+            )
+        )
+        _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
+
+        return result
 
     async def parse_manifest_by_samples(
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
@@ -626,7 +793,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # now we can start adding!!
         sapi = SampleApi()
-        analysisapi = AnalysisApi()
 
         # Map external sids into cpg ids
         existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
@@ -634,11 +800,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
         # all dicts indexed by external_sample_id
+        summary = None
+        all_samples: List[SampleBatchUpsert] = []
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-        samples_to_add: List[SampleBatchUpsert] = []
-        samples_to_update: List[SampleBatchUpsert] = []
-        sequences_to_add: List[SequenceUpsert] = []
-        sequences_to_update: List[SequenceUpsert] = []
 
         # we'll batch process the samples as not to open too many threads
         for external_sids in chunk(list(sample_map.keys())):
@@ -657,14 +821,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             batch_promises = list(current_batch_promises.values())
             resolved_promises = await asyncio.gather(*batch_promises)
 
-            all_samples = []
-
             for external_sid, resolved_promise in zip(
                 processed_ex_sids, resolved_promises
             ):
                 (
                     sample_to_upsert,
-                    sequence_to_upsert,
+                    sequences_to_upsert,
                     analysis_to_add,
                 ) = resolved_promise
 
@@ -672,38 +834,35 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     analyses_to_add[external_sid] = analysis_to_add
 
                 # Extract Upsert items and add to an array
-                # Also joins sequences to corresponding sequence
+                if analysis_to_add:
+                    analyses_to_add[external_sid] = analysis_to_add
+
                 if sample_to_upsert:
                     all_samples.append(sample_to_upsert)
-                    if hasattr(sample_to_upsert, 'id'):
-                        samples_to_update.append(sample_to_upsert)
-                    else:
-                        samples_to_add.append(sample_to_upsert)
 
-                if sequence_to_upsert:
-                    if hasattr(sequence_to_upsert, 'id'):
-                        sequences_to_update.append(sample_to_upsert)
-                    else:
-                        sequences_to_add.append(sample_to_upsert)
+                # Get summary information
+                summary = self.upsert_summary(
+                    summary, [], [sample_to_upsert], sequences_to_upsert
+                )
 
         message = f"""\
             {proj}: Processing samples: {', '.join(sample_map.keys())}
 
-            Adding {len(samples_to_add)} samples
-            Adding {len(sequences_to_add)} sequences
+            Adding {len(summary['samples']['insert'])} samples
+            Adding {len(summary['sequences']['insert'])} sequences
             Adding {len(analyses_to_add)} analysis results
 
-            Updating {len(samples_to_update)} samples
-            Updating {len(sequences_to_update)} sequences
+            Updating {len(summary['samples']['update'])} samples
+            Updating {len(summary['sequences']['update'])} sequences
         """
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
             return (
-                samples_to_add,
-                samples_to_update,
-                sequences_to_add,
-                sequences_to_update,
+                summary['samples']['insert'],
+                summary['samples']['update'],
+                summary['sequences']['insert'],
+                summary['sequences']['update'],
                 analyses_to_add,
             )
 
@@ -719,30 +878,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
-        logger.info(
-            f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
-        )
-        unwrapped_analysis_to_add = [
-            (sample_id, a)
-            for (sample_id, analyses) in analyses_to_add.items()
-            for a in analyses
-        ]
-
+        # Add analyses
         # Map external sids into cpg ids
         existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
             proj, list(sample_map.keys()), allow_missing=True
         )
-
-        for chunked_analysis in chunk(unwrapped_analysis_to_add):
-            promises = []
-            for external_sid, analysis in chunked_analysis:
-                analysis.sample_ids = [existing_external_id_to_cpgid[external_sid]]
-                promises.append(
-                    analysisapi.create_new_analysis_async(
-                        project=proj, analysis_model=analysis
-                    )
-                )
-            await asyncio.gather(*promises)
+        _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
 
         return result
 
