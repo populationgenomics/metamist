@@ -29,6 +29,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         parser = GenericMetadataParser(
             search_locations=[],
             sample_name_column='SampleId',
+            participant_meta_map={},
             sample_meta_map={'sample.centre': 'centre'},
             sequence_meta_map={
                 'raw_data.FREEMIX': 'qc.freemix',

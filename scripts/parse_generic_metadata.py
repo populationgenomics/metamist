@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 import click
 
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    run_as_sync,
 )
+from sample_metadata.parser.generic_parser import run_as_sync
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.
@@ -86,6 +86,12 @@ logger.setLevel(logging.INFO)
     help='Single argument, key to pull out of row to put in sample.meta',
 )
 @click.option(
+    '--participant-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --participant-meta-field-map "name-in-manifest" "name-in-participant.meta"',
+)
+@click.option(
     '--sample-meta-field-map',
     nargs=2,
     multiple=True,
@@ -116,6 +122,7 @@ async def main(
     sample_metadata_project,
     sample_name_column: str,
     sample_meta_field: List[str],
+    participant_meta_field_map: List[Tuple[str, str]],
     sample_meta_field_map: List[Tuple[str, str]],
     sequence_meta_field: List[str],
     sequence_meta_field_map: List[Tuple[str, str]],
@@ -134,9 +141,13 @@ async def main(
     if extra_seach_paths:
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
-    sample_meta_map, sequence_meta_map = {}, {}
+    participant_meta_map: Dict[Any, Any] = {}
+    sample_meta_map: Dict[Any, Any] = {}
+    sequence_meta_map: Dict[Any, Any] = {}
 
     qc_meta_map = dict(qc_meta_field_map or {})
+    if participant_meta_field_map:
+        participant_meta_map.update(dict(participant_meta_map))
     if sample_meta_field_map:
         sample_meta_map.update(dict(sample_meta_field_map))
     if sample_meta_field:
@@ -149,6 +160,7 @@ async def main(
     parser = GenericMetadataParser(
         sample_metadata_project=sample_metadata_project,
         sample_name_column=sample_name_column,
+        participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
         sequence_meta_map=sequence_meta_map,
         qc_meta_map=qc_meta_map,

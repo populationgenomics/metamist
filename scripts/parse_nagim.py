@@ -1,4 +1,4 @@
-# pylint: disable=too-many-lines
+# pylint: disable=W0237,too-many-lines
 """
 Taking Terra results, populate sample-metadata for NAGIM project.
 
@@ -107,7 +107,7 @@ from sample_metadata.apis import SampleApi
 from sample_metadata.models import SampleUpdateModel
 from sample_metadata.parser.generic_parser import (
     GenericParser,
-    GroupedRow,
+    SampleMetaGroup,
     SequenceMetaGroup,
     SingleRow,
     run_as_sync,
@@ -1141,10 +1141,21 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
+        super().__init__(**kwargs)
+        self.multiqc_html_path = multiqc_html_path
+        self.multiqc_json_path = multiqc_json_path
+
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+        return None
+
+    async def get_sample_meta(
+        self, sample_meta_group: SampleMetaGroup
+    ) -> SampleMetaGroup:
+        row = sample_meta_group.rows
         if isinstance(row, dict):
             row = [row]
-        meta = {}
+        meta = sample_meta_group.meta or {}
         for r in row:
             meta['project'] = r['project']
             for key in [
@@ -1155,12 +1166,9 @@ class NagimParser(GenericParser):
                 val = r.get(f'meta_{key}')
                 if val:
                     meta[key] = val
-        return meta
 
-    def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
-        super().__init__(**kwargs)
-        self.multiqc_html_path = multiqc_html_path
-        self.multiqc_json_path = multiqc_json_path
+        sample_meta_group.meta = meta
+        return sample_meta_group
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']

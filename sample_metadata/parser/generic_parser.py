@@ -289,7 +289,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    @abstractmethod
+    # @abstractmethod
     def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get internal cpg sample ID from row"""
 
@@ -297,7 +297,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
 
-    @abstractmethod
+    # @abstractmethod
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
 
@@ -321,7 +321,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
 
-    @abstractmethod
+    # @abstractmethod
     async def get_participant_meta(
         self, participant_id: int, rows: GroupedRow
     ) -> ParticipantMetaGroup:

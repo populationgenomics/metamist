@@ -126,7 +126,7 @@ class GenericMetadataParser(GenericParser):
         elif value == 'wes':
             value = 'exome'
 
-        return SequenceType(value.lower())
+        return SequenceType(value)
 
     def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
