@@ -133,10 +133,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # gs specific
         self.default_bucket = None
 
-        self.client = None
+        self._client = None
         self.bucket_clients: Dict[str, Any] = {}
 
-        self.client = storage.Client()
+    @property
+    def client(self):
+        """Get GCP storage client"""
+        if not self._client:
+            self._client = storage.Client()
+        return self._client
 
     def get_bucket(self, bucket_name):
         """Get cached bucket client from optional bucket name"""
