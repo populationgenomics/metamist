@@ -1,6 +1,7 @@
 # pylint: disable=invalid-overridden-method
 
 import asyncio
+import logging
 import os
 import socket
 import subprocess
@@ -20,6 +21,8 @@ from db.python.connect import (
 )
 from db.python.tables.project import ProjectPermissionsTable, set_full_access
 
+# use this to determine where the db directory is relatively,
+# as pycharm runs in "test/" folder, and GH runs them in git root
 am_i_in_test_environment = os.getcwd().endswith('test')
 
 # This monkey patches the asyncio event loop and allows it to be re-entrant
@@ -38,9 +41,10 @@ def find_free_port():
 loop = asyncio.new_event_loop()
 
 
-def run_as_sync(f):
+def run_test_as_sync(f):
     """
-    Run an async function, synchronously.
+    Decorate your async function to run is synchronously
+    This runs on the testing event loop
     """
 
     @wraps(f)
@@ -54,26 +58,28 @@ class DbTest(unittest.TestCase):
     """Base class for database integration tests"""
 
     # store connections here, so they can be created PER-CLASS
-    # and don't get reused.
+    # and don't get recreated per test.
     dbs: Dict[str, MariaDbContainer] = {}
     connections: Dict[str, Connection] = {}
 
     @classmethod
     def setUpClass(cls) -> None:
-        @run_as_sync
+        @run_test_as_sync
         async def setup():
             """
             This starts a mariadb container, applies liquibase schema and inserts a project
             MAYBE, the best way in the future would be to only ever create ONE connection
-            between all Test classes, and create a new database per test, new set of a connections
+            between all Test classes, and create a new database per test, new set of a connections,
+            but that certaintly has a host of it's own problems
 
-            Then on tearDownClass, only tear down the instance once all tests have been completed.
+            Then you can destroy the database within tearDownClass as all tests have been completed.
             """
             try:
                 os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
                 db = MariaDbContainer('mariadb:latest')
                 port_to_expose = find_free_port()
+                # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
                 db.start()
                 cls.dbs[cls.__name__] = db
@@ -81,11 +87,11 @@ class DbTest(unittest.TestCase):
                 db_prefix = 'db'
                 if am_i_in_test_environment:
                     db_prefix = '../db'
-                    # db_prefix = os.path.join(*os.getcwd().split('/')[:-1], 'db')
 
                 con_string = db.get_connection_url()
                 con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
+                # apply the liquibase schema
                 command = [
                     'liquibase',
                     *('--changeLogFile', db_prefix + '/project.xml'),
@@ -125,16 +131,16 @@ class DbTest(unittest.TestCase):
                 )
 
             except subprocess.CalledProcessError as e:
-                print(e)
+                logging.exception(e)
                 if e.stderr:
-                    print(e.stderr.decode().replace('\\n', '\n'))
+                    logging.error(e.stderr.decode().replace('\\n', '\n'))
                 if e.stdout:
-                    print(e.stdout.decode().replace('\\n', '\n'))
+                    logging.error(e.stdout.decode().replace('\\n', '\n'))
                 cls.tearDownClass()
                 raise e
             except Exception as e:
-                print(f'FAILED WITH {e}')
-                print(e)
+                logging.error(f'FAILED WITH {e}')
+                logging.exception(e)
                 cls.tearDownClass()
 
                 raise
@@ -156,9 +162,9 @@ class DbIsolatedTest(DbTest):
     Database integration tests that performs clean-up at the start of each test
     """
 
-    @run_as_sync
-    async def tearDown(self) -> None:
-        super().tearDown()
+    @run_test_as_sync
+    async def setUp(self) -> None:
+        super().setUp()
 
         ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project'}
         for table in TABLES_ORDERED_BY_FK_DEPS:

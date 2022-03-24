@@ -1,7 +1,7 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
-from test.testbase import run_as_sync
+from test.testbase import run_test_as_sync
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
@@ -9,7 +9,7 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
-    @run_as_sync
+    @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
@@ -103,7 +103,6 @@ class TestParseGenericMetadata(unittest.TestCase):
             ],
             'gvcf_types': 'gvcf',
         }
-        self.maxDiff = None
         self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
         analysis = analyses_to_add['<sample-id>'][0]
         self.assertDictEqual(

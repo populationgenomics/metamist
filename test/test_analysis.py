@@ -1,5 +1,5 @@
 # pylint: disable=invalid-overridden-method
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.testbase import DbIsolatedTest, run_test_as_sync
 
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer, SampleType
@@ -9,7 +9,7 @@ from models.enums import AnalysisType, AnalysisStatus
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
 
-    @run_as_sync
+    @run_test_as_sync
     async def setUp(self) -> None:
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
@@ -23,7 +23,7 @@ class TestAnalysis(DbIsolatedTest):
             active=True,
         )
 
-    @run_as_sync
+    @run_test_as_sync
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
