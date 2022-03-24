@@ -746,15 +746,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
-            return (
-                summary['participants']['insert'],
-                summary['participants']['update'],
-                summary['samples']['insert'],
-                summary['samples']['update'],
-                summary['sequences']['insert'],
-                summary['sequences']['update'],
-                analyses_to_add,
-            )
+            return summary
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
@@ -796,7 +788,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
         # all dicts indexed by external_sample_id
-        summary = None
+        summary: Dict[str, Dict[str, List[Any]]] = None
         all_samples: List[SampleBatchUpsert] = []
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
@@ -853,13 +845,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
-            return (
-                summary['samples']['insert'],
-                summary['samples']['update'],
-                summary['sequences']['insert'],
-                summary['sequences']['update'],
-                analyses_to_add,
-            )
+            return summary
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
