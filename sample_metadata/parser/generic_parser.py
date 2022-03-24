@@ -459,7 +459,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def process_participant_group(
-        self, participant_id: int, sample_map: Dict[str, Any]
+        self, participant_id: str, sample_map: Dict[str, Any]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -552,14 +552,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         file_pointer,
         delimiter: str,
-    ) -> Dict[str, Dict[str, Dict]]:
+    ) -> Dict[Any, Dict[Any, List[Any]]]:
         """
         Parse manifest file into a list of dicts, indexed by participant id.
         Override this method if you can't use the default implementation that simply
         calls csv.DictReader.
         """
 
-        participant_map = defaultdict(lambda: defaultdict(list))
+        participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
         reader = csv.DictReader(file_pointer, delimiter=delimiter)
         for row in reader:
             pid = self.get_participant_id(row)
@@ -626,10 +628,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             return 'update' if hasattr(item, 'id') else 'insert'
 
         # Set initial dictionary value
-        if existing_summary:
-            summary = existing_summary.copy()
-        else:
-            summary: Dict[str, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
+        summary: Dict[str, Dict[str, List[Any]]] = (
+            existing_summary.copy()
+            if existing_summary
+            else defaultdict(lambda: defaultdict(list))
+        )
 
         for participant in participants_to_upsert:
             summary['participants'][upsert_type(participant)].append(participant)
