@@ -317,7 +317,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     @abstractmethod
     async def get_sequence_meta(
-        self, sample_id: str, seq_group: SequenceMetaGroup
+        self, seq_group: SequenceMetaGroup
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
 

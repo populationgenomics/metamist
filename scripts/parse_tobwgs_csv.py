@@ -7,8 +7,6 @@ import click
 from sample_metadata.models import AnalysisType, AnalysisStatus, AnalysisModel
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-)
-from sample_metadata.parser.generic_parser import (
     SequenceMetaGroup,
     SingleRow,
     run_as_sync,
@@ -53,6 +51,7 @@ class TobWgsParser(GenericMetadataParser):
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             sample_name_column='sample.sample_name',
+            participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map=SEQUENCE_MAP,
             qc_meta_map={},
@@ -148,13 +147,15 @@ class TobWgsParser(GenericMetadataParser):
             )
         return analyses
 
-    async def get_sequence_meta(self, sample_id: str, seq_group: SequenceMetaGroup):
+    async def get_sequence_meta(
+        self, seq_group: SequenceMetaGroup
+    ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
         if isinstance(rows, list):
             row = rows[0]
 
-        result = await super().get_sequence_meta(sample_id, seq_group)
+        result = await super().get_sequence_meta(seq_group)
         collapsed_sequence_meta = result.meta
 
         batch_number = int(row['batch.batch_name'][-3:])

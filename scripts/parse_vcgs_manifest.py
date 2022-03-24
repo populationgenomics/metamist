@@ -9,9 +9,9 @@ from sample_metadata.model.sequence_type import SequenceType
 
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
+    run_as_sync,
     SingleRow,
 )
-from sample_metadata.parser.generic_parser import run_as_sync
 
 rmatch = re.compile(r'_[Rr]\d')
 

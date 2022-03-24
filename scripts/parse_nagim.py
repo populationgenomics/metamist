@@ -1243,7 +1243,7 @@ class NagimParser(GenericParser):
         }
 
     async def get_sequence_meta(
-        self, sample_id: str, seq_group: SequenceMetaGroup
+        self, seq_group: SequenceMetaGroup
     ) -> SequenceMetaGroup:
         rows = seq_group.rows
         if isinstance(rows, list):
