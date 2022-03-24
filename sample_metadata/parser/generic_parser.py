@@ -687,7 +687,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         papi = ParticipantApi()
 
         # all dicts indexed by external_sample_id
-        summary = None
+        summary: Dict[str, Dict[str, List[Any]]] = None
         all_participants: List[ParticipantUpsert] = []
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
 
