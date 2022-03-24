@@ -9,10 +9,10 @@ import subprocess
 import traceback
 import typing
 from collections import Counter
+import csv
 
 import click
 from google.cloud import storage
-from peddy import Ped
 
 from sample_metadata import exceptions
 from sample_metadata.apis import (
@@ -22,13 +22,17 @@ from sample_metadata.apis import (
     FamilyApi,
     ParticipantApi,
 )
-from sample_metadata.configuration import _get_google_auth_token
 from sample_metadata.models import (
     AnalysisType,
     NewSequence,
     NewSample,
     AnalysisModel,
     SampleUpdateModel,
+    SequenceType,
+    SampleType,
+    SequenceStatus,
+    AnalysisStatus,
+    ContentType,
 )
 
 logger = logging.getLogger(__file__)
@@ -99,20 +103,20 @@ def main(
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
     sample_id_by_participant_id = dict(pid_sid)
 
-    ped_lines = export_ped_file(project, replace_with_participant_external_ids=True)
     if families_n is not None:
-        ped = Ped(ped_lines)
-        families = list(ped.families.values())
-        logger.info(f'Found {len(families)} families, by size:')
-        _print_fam_stats(families)
-        families = random.sample(families, families_n)
-        logger.info(f'After subsetting to {len(families)} families:')
-        _print_fam_stats(families)
-        sample_ids = []
-        for fam in families:
-            for s in fam.samples:
-                sample_ids.append(sample_id_by_participant_id[s.sample_id])
-        samples = [s for s in all_samples if s['id'] in sample_ids]
+        fams = fapi.get_families(project)
+        all_families = [family['id'] for family in fams]
+        families = random.sample(all_families, families_n)
+        pedigree = fapi.get_pedigree(project=project, internal_family_ids=families)
+        _print_fam_stats(pedigree)
+        p_ids = [ped['individual_id'] for ped in pedigree]
+        sample_ids = [
+            sample
+            for (participant, sample) in sample_id_by_participant_id.items()
+            if participant in p_ids
+        ]
+        sample_set = set(sample_ids)
+        samples = [s for s in all_samples if s['id'] in sample_set]
 
     else:
         assert samples_n
@@ -152,6 +156,15 @@ def main(
                 analysis_by_sid[a['sample_ids'][0]] = a
         logger.info(f'Will copy {a_type} analysis entries: {analysis_by_sid}')
 
+    # Parse Families & Participants
+    participant_ids = [int(sample['participant_id']) for sample in samples]
+    family_ids = transfer_families(project, target_project, participant_ids)
+    external_participant_ids = transfer_ped(project, target_project, family_ids)
+
+    external_sample_internal_participant_map = get_map_ipid_esid(
+        project, target_project, external_participant_ids
+    )
+
     for s in samples:
         logger.info(f'Processing sample {s["id"]}')
 
@@ -164,8 +177,11 @@ def main(
                 project=target_project,
                 new_sample=NewSample(
                     external_id=s['external_id'],
-                    type=s['type'],
+                    type=SampleType(s['type']),
                     meta=_copy_files_in_dict(s['meta'], project),
+                    participant_id=external_sample_internal_participant_map[
+                        s['external_id']
+                    ],
                 ),
             )
             seq_info = seq_info_by_s_id.get(s['id'])
@@ -177,8 +193,8 @@ def main(
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
-                        type=seq_info['type'],
-                        status=seq_info['status'],
+                        type=SequenceType(seq_info['type']),
+                        status=SequenceStatus(seq_info['status']),
                     )
                 )
 
@@ -187,14 +203,131 @@ def main(
             if analysis:
                 logger.info(f'Processing {a_type} analysis entry')
                 am = AnalysisModel(
-                    type=a_type,
+                    type=AnalysisType(a_type),
                     output=_copy_files_in_dict(analysis['output'], project),
-                    status=analysis['status'],
+                    status=AnalysisStatus(analysis['status']),
                     sample_ids=[s['id']],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
         logger.info(f'-')
+
+
+def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
+    """Pull relevant families from the input project, and copy to target_project"""
+    families = fapi.get_families(
+        project=initial_project,
+        participant_ids=participant_ids,
+    )
+
+    family_ids = [family['id'] for family in families]
+
+    tmp_family_tsv = 'tmp_families.tsv'
+    family_tsv_headers = ['Family ID', 'Description', 'Coded Phenotype', 'Display Name']
+    # Work-around as import_families takes a file.
+    with open(tmp_family_tsv, 'wt') as tmp_families:
+        tsv_writer = csv.writer(tmp_families, delimiter='\t')
+        tsv_writer.writerow(family_tsv_headers)
+        for family in families:
+            tsv_writer.writerow(
+                [
+                    family['external_id'],
+                    family['description'] or '',
+                    family['coded_phenotype'] or '',
+                ]
+            )
+
+    with open(tmp_family_tsv) as family_file:
+        fapi.import_families(file=family_file, project=target_project)
+
+    return family_ids
+
+
+def transfer_ped(initial_project, target_project, family_ids):
+    """Pull pedigree from the input project, and copy to target_project"""
+    ped_tsv = fapi.get_pedigree(
+        initial_project,
+        response_type=ContentType('tsv'),
+        internal_family_ids=family_ids,
+    )
+    ped_json = fapi.get_pedigree(
+        initial_project,
+        response_type=ContentType('json'),
+        internal_family_ids=family_ids,
+    )
+
+    external_participant_ids = [ped['individual_id'] for ped in ped_json]
+    tmp_ped_tsv = 'tmp_ped.tsv'
+    # Work-around as import_pedigree takes a file.
+    with open(tmp_ped_tsv, 'w') as tmp_ped:
+        tmp_ped.write(ped_tsv)
+
+    with open(tmp_ped_tsv) as ped_file:
+        fapi.import_pedigree(
+            file=ped_file,
+            has_header=True,
+            project=target_project,
+            create_missing_participants=True,
+        )
+
+    return external_participant_ids
+
+
+def get_map_ipid_esid(
+    project: str, target_project: str, external_participant_ids: List[str]
+) -> Dict[str, str]:
+    """Intermediate steps to determine the mapping of esid to ipid
+    Acronyms
+    ep : external participant id
+    ip : internal participant id
+    es : external sample id
+    is : internal sample id
+    """
+
+    # External PID: Internal PID
+    ep_ip_map = papi.get_participant_id_map_by_external_ids(
+        target_project, request_body=external_participant_ids
+    )
+
+    # External PID : Internal SID
+    ep_is_map = papi.get_external_participant_id_to_internal_sample_id(project)
+
+    # Internal PID : Internal SID
+    ip_is_map = []
+    for ep_is_pair in ep_is_map:
+        if ep_is_pair[0] in ep_ip_map:
+            ep_is_pair[0] = ep_ip_map[ep_is_pair[0]]
+            ip_is_map.append(ep_is_pair)
+
+    # Internal PID : External SID
+    is_es_map = sapi.get_all_sample_id_map_by_internal(project)
+
+    ip_es_map = []
+    for ip_is_pair in ip_is_map:
+        samples_per_participant = []
+        samples_per_participant.append(ip_is_pair[0])
+        for isid in ip_is_pair[1:]:
+            if isid in is_es_map:
+                samples_per_participant.append(is_es_map[isid])
+        ip_es_map.append(samples_per_participant)
+
+    # External SID : Internal PID (Normalised)
+    external_sample_internal_participant_map = _normalise_map(ip_es_map)
+
+    return external_sample_internal_participant_map
+
+
+def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
+    """Input format: [[value1,key1,key2],[value2,key4]]
+    Output format: {key1:value1, key2: value1, key3:value2}"""
+
+    normalised_map = {}
+    for group in unformatted_map:
+        value = group[0]
+        for key in group[1:]:
+            normalised_map[key] = value
+
+    return normalised_map
 
 
 def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
@@ -237,9 +370,11 @@ def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]
 
 
 def _print_fam_stats(families: List):
+    family_sizes = Counter([fam['family_id'] for fam in families])
     fam_by_size: typing.Counter[int] = Counter()
-    for fam in families:
-        fam_by_size[len(fam.samples)] += 1
+    # determine number of singles, duos, trios, etc
+    for fam in family_sizes:
+        fam_by_size[family_sizes[fam]] += 1
     for fam_size in sorted(fam_by_size):
         if fam_size == 1:
             label = 'singles'
@@ -340,33 +475,6 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
-
-
-def export_ped_file(  # pylint: disable=invalid-name
-    project: str,
-    replace_with_participant_external_ids: bool = False,
-    replace_with_family_external_ids: bool = False,
-) -> List[str]:
-    """
-    Generates a PED file for the project, returs PED file lines in a list
-    """
-    route = f'/api/v1/family/{project}/pedigree'
-    opts = []
-    if replace_with_participant_external_ids:
-        opts.append('replace_with_participant_external_ids=true')
-    if replace_with_family_external_ids:
-        opts.append('replace_with_family_external_ids=true')
-    if opts:
-        route += '?' + '&'.join(opts)
-
-    cmd = f"""\
-        curl --location --request GET \
-        'https://sample-metadata.populationgenomics.org.au{route}' \
-        --header "Authorization: Bearer {_get_google_auth_token()}"
-        """
-
-    lines = subprocess.check_output(cmd, shell=True).decode().strip().split('\n')
-    return lines
 
 
 if __name__ == '__main__':
