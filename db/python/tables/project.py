@@ -117,9 +117,16 @@ class ProjectPermissionsTable:
         if not readonly:
             # validate write privileges here connection
             pass
-        users = await self.get_allowed_users_for_project_id(
-            project_id, readonly=readonly
-        )
+        try:
+            users = await self.get_allowed_users_for_project_id(
+                project_id, readonly=readonly
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            if raise_exception:
+                raise e
+
+            return False
+
         has_access = users is None or user in users
         if not has_access and raise_exception:
             project_name = (await self.get_project_id_map())[project_id].name

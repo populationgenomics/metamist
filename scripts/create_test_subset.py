@@ -165,6 +165,8 @@ def main(
         project, target_project, external_participant_ids
     )
 
+    new_sample_map = {}
+
     for s in samples:
         logger.info(f'Processing sample {s["id"]}')
 
@@ -184,6 +186,8 @@ def main(
                     ],
                 ),
             )
+            new_sample_map[s['id']] = new_s_id
+
             seq_info = seq_info_by_s_id.get(s['id'])
             if seq_info:
                 logger.info('Processing sequence entry')
@@ -204,9 +208,13 @@ def main(
                 logger.info(f'Processing {a_type} analysis entry')
                 am = AnalysisModel(
                     type=AnalysisType(a_type),
-                    output=_copy_files_in_dict(analysis['output'], project),
+                    output=_copy_files_in_dict(
+                        analysis['output'],
+                        project,
+                        (s['id'], new_sample_map[s['id']]),
+                    ),
                     status=AnalysisStatus(analysis['status']),
-                    sample_ids=[s['id']],
+                    sample_ids=[new_sample_map[s['id']]],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
@@ -387,7 +395,7 @@ def _print_fam_stats(families: List):
         logger.info(f'  {label}: {fam_by_size[fam_size]}')
 
 
-def _copy_files_in_dict(d, dataset: str):
+def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
@@ -397,6 +405,7 @@ def _copy_files_in_dict(d, dataset: str):
     if not d:
         return d
     if isinstance(d, str) and d.startswith(f'gs://cpg-{dataset}-main'):
+        logger.info(f'Looking for analysis file {d}')
         old_path = d
         if not file_exists(old_path):
             logger.warning(f'File {old_path} does not exist')
@@ -404,6 +413,11 @@ def _copy_files_in_dict(d, dataset: str):
         new_path = old_path.replace(
             f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
         )
+        # Replace the internal sample ID from the original project
+        # With the new internal sample ID from the test project
+        if sid_replacement is not None:
+            new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
+
         if not file_exists(new_path):
             cmd = f'gsutil cp "{old_path}" "{new_path}"'
             logger.info(f'Copying file in metadata: {cmd}')
