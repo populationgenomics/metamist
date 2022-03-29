@@ -138,7 +138,7 @@ class SampleSequencingTable(DbBase):
 
         return result['project'], result['id']
 
-    async def get_sequence_id_from_sample_id_and_type(
+    async def get_latest_sequence_id_from_sample_id_and_type(
         self, sample_id: int, stype: SequenceType
     ) -> Tuple[ProjectId, int]:
         """

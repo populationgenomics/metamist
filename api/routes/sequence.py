@@ -115,7 +115,7 @@ async def get_sequence_id_from_sample_id(
     '/by-sample-id-and-type/{sample_id}/{sequence_type}',
     operation_id='getSequenceBySampleIdAndType',
 )
-async def get_sequence_id_from_sample_id_and_type(
+async def get_latest_sequence_id_from_sample_id_and_type(
     sample_id: str,
     sequence_type: SequenceType,
     connection: Connection = get_projectless_db_connection,
@@ -123,7 +123,7 @@ async def get_sequence_id_from_sample_id_and_type(
     """Get sequence ID by internal Sample ID and sequence type"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_id_raw = sample_id_transform_to_raw(sample_id)
-    sequence_id = await sequence_layer.get_sequence_id_from_sample_id_and_type(
+    sequence_id = await sequence_layer.get_latest_sequence_id_from_sample_id_and_type(
         sample_id_raw, SequenceType(sequence_type)
     )
 
