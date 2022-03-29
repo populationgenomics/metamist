@@ -23,12 +23,26 @@ The SampleFileMapParser is used for parsing files with format:
 - 'Filenames'
 - ['Type']
 
-EG:
-    Sample ID   Filenames
+e.g.
+    Sample ID       Filenames
     <sample-id>     <sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz
     # OR
     <sample-id2>    <sample-id2>.filename-R1.fastq.gz
     <sample-id2>    <sample-id2>.filename-R2.fastq.gz
+
+Example with optional columns
+Note: Individual ID column must contain values in every row
+Note: Any missing values in Type will default to the default_sequence_type ('genome')
+e.g.
+    Individual ID	Sample ID	    Filenames	                                                                    Type
+    Demeter	        sample_id001	sample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz	            WGS
+    Demeter	        sample_id001	sample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz	WES
+    Apollo	        sample_id002	sample_id002.filename-R1.fastq.gz	                                            WGS
+    Apollo	        sample_id002	sample_id002.filename-R2.fastq.gz	                                            WGS
+    Athena	        sample_id003	sample_id003.filename-R1.fastq.gz
+    Athena	        sample_id003	sample_id003.filename-R2.fastq.gz
+    Apollo	        sample_id004	sample_id004.filename-R1.fastq.gz
+    Apollo	        sample_id004	sample_id004.filename-R2.fastq.gz
 
 This format is useful for ingesting filenames for the seqr loading pipeline
 """
