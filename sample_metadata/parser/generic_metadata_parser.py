@@ -429,11 +429,11 @@ class GenericMetadataParser(GenericParser):
                 rows=list(row_group),
                 sequence_type=stype,
             )
-            sequence_meta.append(await self.get_sequence_meta(seq_group))
+            sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta
 
     async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup
+        self, seq_group: SequenceMetaGroup, sample_id: Optional[str]
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
@@ -457,7 +457,9 @@ class GenericMetadataParser(GenericParser):
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
 
-        sample_id = self.get_cpg_sample_id(rows[0])
+        if not sample_id:
+            sample_id = self.get_cpg_sample_id(rows[0])
+
         file_types: Dict[str, Dict[str, List]] = await self.parse_files(
             sample_id, full_filenames
         )
