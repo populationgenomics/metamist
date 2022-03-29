@@ -332,7 +332,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self, participant_id: int, rows: GroupedRow
     ) -> ParticipantMetaGroup:
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
-        return {}
+        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta={})
 
     # @abstractmethod
     async def get_analyses(
@@ -482,11 +482,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         all_rows = [r for row in sample_map.values() for r in row]
 
-        # now we have sample / sequencing meta across 4 different rows, so collapse them
-        collapsed_participant_meta = await self.get_participant_meta(
-            participant_id, all_rows
-        )
-
         # Get external sid to cpg map
         existing_external_id_to_cpgid = (
             await SampleApi().get_sample_id_map_by_external_async(
@@ -516,6 +511,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
         internal_id = existing_participant_ids.get(participant_id, None)
+
+        # now we have sample / sequencing meta across 4 different rows, so collapse them
+        collapsed_participant_meta = await self.get_participant_meta(
+            internal_id, all_rows
+        )
+
         args = {
             'id': internal_id,  # noqa: E501
             'external_id': participant_id,
@@ -627,7 +628,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         participants_to_upsert: List[ParticipantUpsert],
         samples_to_upsert: List[SampleBatchUpsert],
         sequences_to_upsert: List[SequenceUpsert],
-    ) -> Dict[str, Dict[str, int]]:
+    ) -> Dict[str, Dict[str, List[Any]]]:
         """Given lists of values to upsert return grouped summary of updates and inserts"""
 
         def upsert_type(item: Dict[str, Any]) -> str:
