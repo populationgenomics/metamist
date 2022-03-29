@@ -544,15 +544,20 @@ class GenericMetadataParser(GenericParser):
     help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
 )
 @click.option(
-    '--sample-meta-field',
+    '--participant-meta-field',
     multiple=True,
-    help='Single argument, key to pull out of row to put in sample.meta',
+    help='Single argument, key to pull out of row to put in participant.meta',
 )
 @click.option(
     '--participant-meta-field-map',
     nargs=2,
     multiple=True,
     help='Two arguments per listing, eg: --participant-meta-field-map "name-in-manifest" "name-in-participant.meta"',
+)
+@click.option(
+    '--sample-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in sample.meta',
 )
 @click.option(
     '--sample-meta-field-map',
@@ -584,8 +589,9 @@ async def main(
     search_path: List[str],
     sample_metadata_project,
     sample_name_column: str,
-    sample_meta_field: List[str],
+    participant_meta_field: List[str],
     participant_meta_field_map: List[Tuple[str, str]],
+    sample_meta_field: List[str],
     sample_meta_field_map: List[Tuple[str, str]],
     sequence_meta_field: List[str],
     sequence_meta_field_map: List[Tuple[str, str]],
@@ -611,6 +617,8 @@ async def main(
     qc_meta_map = dict(qc_meta_field_map or {})
     if participant_meta_field_map:
         participant_meta_map.update(dict(participant_meta_map))
+    if participant_meta_field:
+        participant_meta_map.update({k: k for k in participant_meta_field})
     if sample_meta_field_map:
         sample_meta_map.update(dict(sample_meta_field_map))
     if sample_meta_field:
