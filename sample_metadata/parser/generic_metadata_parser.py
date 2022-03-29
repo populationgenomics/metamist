@@ -433,7 +433,7 @@ class GenericMetadataParser(GenericParser):
         return sequence_meta
 
     async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup, sample_id: Optional[str]
+        self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
