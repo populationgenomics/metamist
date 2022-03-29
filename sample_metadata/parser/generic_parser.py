@@ -763,16 +763,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             proj, ParticipantUpsertBody(participants=all_participants)
         )
 
-        # TODO: analyses adding is in batch by sample, not yet done for batch by participant
-        # Add analyses
-        # Map external sids into cpg ids
-        # existing_external_id_to_cpgid = (
-        #     await papi.get_participant_id_map_by_external_ids_async(
-        #         proj, list(participant_map.keys()), allow_missing=True
-        #     )
-        # )
-        # _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
-
         return result
 
     async def parse_manifest_by_samples(
