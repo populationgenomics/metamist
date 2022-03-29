@@ -187,6 +187,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         self.client = storage.Client()
 
+        self.seqapi = SequenceApi()
+
     def get_bucket(self, bucket_name):
         """Get cached bucket client from optional bucket name"""
         assert bucket_name
@@ -290,7 +292,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """Get external sample ID from row"""
 
     # @abstractmethod
-    def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get internal cpg sample ID from row"""
 
     @abstractmethod
@@ -391,7 +393,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # Get all the sequence ids for this sample
         sequence_ids = {}
         if cpg_sample_id is not None:
-            sequence_ids = await SequenceApi().get_all_sequences_for_sample_id_async(
+            sequence_ids = await self.seqapi.get_all_sequences_for_sample_id_async(
                 sample_id=cpg_sample_id
             )
 

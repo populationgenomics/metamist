@@ -126,18 +126,19 @@ class GenericMetadataParser(GenericParser):
         self.seq_meta_column = seq_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
+        self.sapi = SampleApi()
+
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
         return row.get(self.sample_name_column, None)
 
-    def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get internal cpg id from a row using get_sample_id and an api call"""
         cpg_id = row.get(self.cpg_id_column, None)
 
         if not cpg_id:
-            sapi = SampleApi()
             external_id = self.get_sample_id(row)
-            id_map = sapi.get_sample_by_external_id(
+            id_map = await self.sapi.get_sample_by_external_id_async(
                 external_id, self.sample_metadata_project
             )
             cpg_id = id_map.get(external_id, None)
@@ -181,9 +182,9 @@ class GenericMetadataParser(GenericParser):
 
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
-        if not self.participant_column:
+        if not self.participant_column or self.participant_column not in row:
             raise ValueError('Participant column does not exist')
-        return row.get(self.participant_column, None)
+        return row[self.participant_column]
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""

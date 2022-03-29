@@ -177,10 +177,10 @@ class SampleSequencingTable(DbBase):
         if not result:
             raise NotFoundError
 
-        seq_map: Dict[str, int] = defaultdict(int)
+        seq_map: Dict[str, List[int]] = defaultdict(list)
         projects: List[str] = []
         for sid, pid, stype in result:
-            seq_map[stype] = sid
+            seq_map[stype].append(sid)
             projects.append(pid)
 
         return projects, seq_map
