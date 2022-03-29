@@ -148,14 +148,14 @@ class TobWgsParser(GenericMetadataParser):
         return analyses
 
     async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup
+        self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
         if isinstance(rows, list):
             row = rows[0]
 
-        result = await super().get_sequence_meta(seq_group)
+        result = await super().get_sequence_meta(seq_group, sample_id=sample_id)
         collapsed_sequence_meta = result.meta
 
         batch_number = int(row['batch.batch_name'][-3:])
