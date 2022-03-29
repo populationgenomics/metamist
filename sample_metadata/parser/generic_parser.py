@@ -187,6 +187,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         self.client = storage.Client()
 
+        self.papi = ParticipantApi()
         self.seqapi = SequenceApi()
 
     def get_bucket(self, bucket_name):
@@ -322,12 +323,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self, seq_group: SequenceMetaGroup
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
+        return SequenceMetaGroup(
+            rows=[], sequence_type=self.default_sequence_type, meta={}
+        )
 
     # @abstractmethod
     async def get_participant_meta(
         self, participant_id: int, rows: GroupedRow
     ) -> ParticipantMetaGroup:
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
+        return {}
 
     # @abstractmethod
     async def get_analyses(
@@ -506,8 +511,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             analyses_to_add.append(analyses)
 
         # Construct participant to upsert
-        papi = ParticipantApi()
-        existing_participant_ids = papi.get_participant_id_map_by_external_ids(
+        existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
             self.sample_metadata_project, [participant_id], allow_missing=True
         )
 
@@ -685,9 +689,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         proj = self.sample_metadata_project
 
-        # now we can start adding!!
-        papi = ParticipantApi()
-
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
         all_participants: List[ParticipantUpsert] = []
@@ -758,7 +759,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             logger.info(message)
 
         # Batch update
-        result = papi.batch_upsert_participants(
+        result = self.papi.batch_upsert_participants(
             proj, ParticipantUpsertBody(participants=all_participants)
         )
 
