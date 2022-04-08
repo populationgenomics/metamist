@@ -133,10 +133,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # gs specific
         self.default_bucket = None
 
-        self.client = None
+        self._client = None
         self.bucket_clients: Dict[str, Any] = {}
 
-        self.client = storage.Client()
+    @property
+    def client(self):
+        """Get GCP storage client"""
+        if not self._client:
+            self._client = storage.Client()
+        return self._client
 
     def get_bucket(self, bucket_name):
         """Get cached bucket client from optional bucket name"""
@@ -486,9 +491,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
                 if sequence_to_upsert:
                     if hasattr(sequence_to_upsert, 'id'):
-                        sequences_to_update.append(sample_to_upsert)
+                        sequences_to_update.append(sequence_to_upsert)
                     else:
-                        sequences_to_add.append(sample_to_upsert)
+                        sequences_to_add.append(sequence_to_upsert)
 
         message = f"""\
 {proj}: Processing samples: {', '.join(sample_map.keys())}
@@ -620,7 +625,7 @@ Updating {len(sequences_to_update)} sequences"""
         if gvcfs:
             file_promises = []
             sec_format = ['.tbi']
-            for r in vcfs:
+            for r in gvcfs:
                 secondaries = (
                     await self.create_secondary_file_objects_by_potential_pattern(
                         r, sec_format

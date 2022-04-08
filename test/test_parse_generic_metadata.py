@@ -1,6 +1,7 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
+from test.testbase import run_test_as_sync
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
@@ -8,6 +9,7 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
+    @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
@@ -43,10 +45,16 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='dev',
+            sample_metadata_project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
+
+        parser.filename_map = {
+            '<sample-id>.g.vcf.gz': '/path/to/<sample-id>.g.vcf.gz',
+            '<sample-id>.cram': '/path/to/<sample-id>.cram',
+        }
+
         file_contents = '\n'.join(rows)
         resp = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
@@ -54,16 +62,16 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         (
             samples_to_add,
-            sequencing_to_add,
             samples_to_update,
-            sequencing_to_update,
+            sequences_to_add,
+            sequences_to_update,
             analyses_to_add,
         ) = resp
 
         self.assertEqual(1, len(samples_to_add))
-        self.assertEqual(1, len(sequencing_to_add))
+        self.assertEqual(1, len(sequences_to_add))
         self.assertEqual(0, len(samples_to_update))
-        self.assertEqual(0, len(sequencing_to_update))
+        self.assertEqual(0, len(sequences_to_update))
         self.assertEqual(1, len(analyses_to_add))
 
         self.assertDictEqual({'centre': 'KCCG'}, samples_to_add[0].meta)
@@ -76,7 +84,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             },
             'reads': [
                 {
-                    'location': '<sample-id>.cram',
+                    'location': '/path/to/<sample-id>.cram',
                     'basename': '<sample-id>.cram',
                     'class': 'File',
                     'checksum': None,
@@ -86,7 +94,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'reads_type': 'cram',
             'gvcfs': [
                 {
-                    'location': '<sample-id>.g.vcf.gz',
+                    'location': '/path/to/<sample-id>.g.vcf.gz',
                     'basename': '<sample-id>.g.vcf.gz',
                     'class': 'File',
                     'checksum': None,
@@ -95,9 +103,8 @@ class TestParseGenericMetadata(unittest.TestCase):
             ],
             'gvcf_types': 'gvcf',
         }
-        self.assertDictEqual(
-            expected_sequence_dict, sequencing_to_add['<sample-id>'].meta
-        )
+        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
+        analysis = analyses_to_add['<sample-id>'][0]
         self.assertDictEqual(
             {
                 'median_insert_size': '400',
@@ -105,5 +112,5 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'freemix': '0.01',
                 'pct_chimeras': '0.01',
             },
-            analyses_to_add['<sample-id>'][0].meta,
+            analysis.meta,
         )

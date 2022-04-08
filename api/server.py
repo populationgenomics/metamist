@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.python.connect import SMConnections
-from db.python.tables.project import ALLOW_FULL_ACCESS
+from db.python.tables.project import is_full_access
 from db.python.utils import get_logger
 
 from api import routes
@@ -24,7 +24,7 @@ logger = get_logger()
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 app = FastAPI()
 
-if ALLOW_FULL_ACCESS:
+if is_full_access():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

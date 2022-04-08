@@ -3,6 +3,7 @@
 """
 Code for connecting to Postgres database
 """
+import abc
 import json
 import logging
 import os
@@ -15,6 +16,18 @@ from db.python.tables.project import ProjectPermissionsTable
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+TABLES_ORDERED_BY_FK_DEPS = [
+    'project',
+    'analysis',
+    'sample',
+    'analysis_sample',
+    'sample_sequencing',
+    'family',
+    'family_participant',
+    'participant',
+    'participant_phenotypes',
+][::-1]
 
 
 def to_db_json(val):
@@ -49,7 +62,26 @@ class NotFoundError(Exception):
     """Custom error when you can't find something"""
 
 
-class DatabaseConfiguration:
+class DatabaseConfiguration(abc.ABC):
+    """Base class for DatabaseConfiguration"""
+
+    @abc.abstractmethod
+    def get_connection_string(self):
+        """Get connection string"""
+        raise NotImplementedError
+
+
+class ConnectionStringDatabaseConfiguration(DatabaseConfiguration):
+    """Database Configuration that takes a literal DatabaseConfiguration"""
+
+    def __init__(self, connection_string):
+        self.connection_string = connection_string
+
+    def get_connection_string(self):
+        return self.connection_string
+
+
+class CredentialedDatabaseConfiguration(DatabaseConfiguration):
     """Class to hold information about a MySqlConfiguration"""
 
     def __init__(
@@ -67,16 +99,34 @@ class DatabaseConfiguration:
         self.password = password
 
     @staticmethod
-    def dev_config() -> 'DatabaseConfiguration':
+    def dev_config() -> 'CredentialedDatabaseConfiguration':
         """Dev config for local database with name 'sm_dev'"""
         # consider pulling from env variables
-        return DatabaseConfiguration(
+        return CredentialedDatabaseConfiguration(
             dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
             username=os.environ.get('SM_DEV_DB_USER', 'root'),
             password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
             host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
             port=os.environ.get('SM_DEV_DB_PORT', '3306'),
         )
+
+    def get_connection_string(self):
+        """Prepares the connection string for mysql / mariadb"""
+
+        _host = self.host or 'localhost'
+        u_p = self.username
+
+        if self.password:
+            u_p += f':{self.password}'
+        if self.port:
+            _host += f':{self.port}'
+
+        options = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
+        _options = '&'.join(f'{k}={v}' for k, v in options.items())
+
+        url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'
+
+        return url
 
 
 class SMConnections:
@@ -93,10 +143,10 @@ class SMConnections:
         if SMConnections._credentials:
             return SMConnections._credentials
 
-        config = DatabaseConfiguration.dev_config()
+        config = CredentialedDatabaseConfiguration.dev_config()
         creds_from_env = os.getenv('SM_DBCREDS')
         if creds_from_env is not None:
-            config = DatabaseConfiguration(**json.loads(creds_from_env))
+            config = CredentialedDatabaseConfiguration(**json.loads(creds_from_env))
             logger.info(f'Using supplied SM DB CREDS: {config.host}')
 
         SMConnections._credentials = config
@@ -107,42 +157,7 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(
-            SMConnections.prepare_connection_string(
-                host=config.host,
-                database=config.dbname,
-                username=config.username,
-                password=config.password,
-                port=config.port,
-            )
-        )
-
-    @staticmethod
-    def prepare_connection_string(
-        host,
-        database,
-        username,
-        password=None,
-        port=None,
-        # min_pool_size=5,
-        # max_pool_size=20,
-    ):
-        """Prepares the connection string for mysql / mariadb"""
-
-        _host = host or 'localhost'
-        u_p = username
-
-        if password:
-            u_p += f':{password}'
-        if port:
-            _host += f':{port}'
-
-        options = {}  # {'min_size': min_pool_size, 'max_size': max_pool_size}
-        _options = '&'.join(f'{k}={v}' for k, v in options.items())
-
-        url = f'mysql://{u_p}@{_host}/{database}?{_options}'
-
-        return url
+        return databases.Database(config.get_connection_string())
 
     @staticmethod
     async def connect():
