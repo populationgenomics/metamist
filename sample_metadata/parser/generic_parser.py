@@ -800,7 +800,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             for external_sid in external_sids:
                 rows: GroupedRow = sample_map[external_sid]
-                cpg_id = existing_external_id_to_cpgid[external_sid]
+                cpg_id = existing_external_id_to_cpgid.get(external_sid, None)
                 promise = self.process_sample_group(rows, external_sid, cpg_id)
                 current_batch_promises[external_sid] = promise
 
