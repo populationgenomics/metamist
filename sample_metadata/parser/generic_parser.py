@@ -742,7 +742,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     [participant_to_upsert],
                     samples_to_upsert,
                     sequences_to_upsert,
-                    analyses_to_add.values(),
+                    sum(analysis_to_add.values(), []),
                 )
 
         message = f"""\
@@ -835,7 +835,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     [],
                     [sample_to_upsert],
                     sequences_to_upsert,
-                    analyses_to_add.values(),
+                    sum(analysis_to_add.values(), []),
                 )
 
         message = f"""\
