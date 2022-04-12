@@ -61,19 +61,15 @@ class TestParseGenericMetadata(unittest.TestCase):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        (
-            samples_to_add,
-            samples_to_update,
-            sequences_to_add,
-            sequences_to_update,
-            analyses_to_add,
-        ) = resp
+        self.assertEqual(1, len(resp['samples']['insert']))
+        self.assertEqual(1, len(resp['sequences']['insert']))
+        self.assertEqual(0, len(resp['samples']['update']))
+        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(1, len(resp['analyses']['insert']))
 
-        self.assertEqual(1, len(samples_to_add))
-        self.assertEqual(1, len(sequences_to_add))
-        self.assertEqual(0, len(samples_to_update))
-        self.assertEqual(0, len(sequences_to_update))
-        self.assertEqual(1, len(analyses_to_add))
+        samples_to_add = resp['samples']['insert']
+        sequences_to_add = resp['sequences']['insert']
+        analyses_to_add = resp['analyses']['insert']
 
         self.assertDictEqual({'centre': 'KCCG'}, samples_to_add[0].meta)
         expected_sequence_dict = {
