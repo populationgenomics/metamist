@@ -325,14 +325,13 @@
 	</changeSet>
 	<changeSet author="sabrina.yan" id="2022-03-07_standardise-sequence-type">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type VARCHAR(30);</sql>
+		<!-- True values 'genome', 'exome', 'single-cell' but maintaining old 'wgs' for system version tables -->
+		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'wgs');</sql>
 		<sql>
 			UPDATE sample_sequencing seq
 			SET seq.type = 'genome', seq.author="sabrina.yan@populationgenomics.org.au"
 			WHERE seq.type = 'wgs';
 		</sql>
 
-		<!-- True values 'genome', 'exome', 'single-cell' but maintaining old 'wgs' for system version tables -->
-		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'wgs');</sql>
 	</changeSet>
 </databaseChangeLog>

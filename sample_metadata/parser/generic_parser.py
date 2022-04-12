@@ -471,7 +471,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def process_participant_group(
-        self, participant_id: str, sample_map: Dict[str, Any]
+        self, participant_name: str, sample_map: Dict[str, Any]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -502,20 +502,20 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         analyses_to_add = []
 
         for sample_id, rows in sample_map.items():
-            cpg_id = existing_external_id_to_cpgid[sample_id]
+            cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
                 rows, sample_id, cpg_id
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
-            analyses_to_add.append(analyses)
+            analyses_to_add.extend(analyses)
 
         # Construct participant to upsert
         existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-            self.sample_metadata_project, [participant_id], allow_missing=True
+            self.sample_metadata_project, [participant_name], allow_missing=True
         )
 
-        internal_id = existing_participant_ids.get(participant_id, None)
+        internal_id = existing_participant_ids.get(participant_name, None)
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         collapsed_participant_meta = await self.get_participant_meta(
@@ -524,7 +524,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         args = {
             'id': internal_id,  # noqa: E501
-            'external_id': participant_id,
+            'external_id': participant_name,
             # 'reported_sex': None,
             # 'reported_gender': None,
             # 'karyotype': None,
@@ -741,12 +741,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 )
 
         message = f"""\
-            {proj}: Processing samples: {', '.join(sample_map.keys())}
+            {proj}: Processing participants: {', '.join(participant_map.keys())}
 
             Adding {len(summary['participants']['insert'])} participants
             Adding {len(summary['samples']['insert'])} samples
             Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(analyses_to_add)} analysis results
+            Adding {sum(len(a) for a in analyses_to_add.values())} analysis results
 
             Updating {len(summary['participants']['update'])} participants
             Updating {len(summary['samples']['update'])} samples
@@ -816,9 +816,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     sequences_to_upsert,
                     analysis_to_add,
                 ) = resolved_promise
-
-                if analysis_to_add:
-                    analyses_to_add[external_sid] = analysis_to_add
 
                 # Extract Upsert items and add to an array
                 if analysis_to_add:

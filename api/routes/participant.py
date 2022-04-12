@@ -218,7 +218,7 @@ async def batch_upsert_participants(
         for pid, samples in results.items():
             for iid, seqs in samples.items():
                 data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
-                results[pid][iid] = data
+                results[pid][sample_id_format(iid)] = data
             results[pid]['participant_id'] = pid_key[pid]
 
         return results
