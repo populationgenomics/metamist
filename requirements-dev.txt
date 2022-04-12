@@ -5,3 +5,5 @@ flake8-bugbear
 pre-commit
 pylint
 bump2version
+testcontainers[mariadb]
+nest-asyncio
