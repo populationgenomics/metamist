@@ -633,7 +633,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         participants_to_upsert: List[ParticipantUpsert],
         samples_to_upsert: List[SampleBatchUpsert],
         sequences_to_upsert: List[SequenceUpsert],
-        analyses_to_add: List[AnalysisModel],
+        analyses_to_add: Dict[str, List[AnalysisModel]],
     ) -> Dict[str, Dict[str, List[Any]]]:
         """Given lists of values to upsert return grouped summary of updates and inserts"""
 
@@ -656,8 +656,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for sequence in sequences_to_upsert:
             summary['sequences'][upsert_type(sequence)].append(sequence)
 
-        for analysis in analyses_to_add:
-            summary['analyses']['insert'].append(analysis)
+        for sid, analyses in analyses_to_add.items():
+            summary['analyses'][sid].extend(analyses)
 
         return summary
 
@@ -742,7 +742,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     [participant_to_upsert],
                     samples_to_upsert,
                     sequences_to_upsert,
-                    sum(analysis_to_add.values(), []),
+                    {external_pid: analysis_to_add},
                 )
 
         message = f"""\
@@ -835,7 +835,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                     [],
                     [sample_to_upsert],
                     sequences_to_upsert,
-                    sum(analysis_to_add.values(), []),
+                    {external_sid: analysis_to_add},
                 )
 
         message = f"""\

@@ -10,7 +10,7 @@ from functools import wraps
 
 from typing import Dict
 
-from testcontainers.mysql import MariaDbContainer
+from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
 from db.python.connect import (
@@ -59,7 +59,7 @@ class DbTest(unittest.TestCase):
 
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
-    dbs: Dict[str, MariaDbContainer] = {}
+    dbs: Dict[str, MySqlContainer] = {}
     connections: Dict[str, Connection] = {}
 
     @classmethod
@@ -74,14 +74,17 @@ class DbTest(unittest.TestCase):
 
             Then you can destroy the database within tearDownClass as all tests have been completed.
             """
+            logger = logging.getLogger()
             try:
                 os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
-                db = MariaDbContainer('mariadb:latest')
+                db = MySqlContainer('mariadb:latest')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
+                logger.disabled = True
                 db.start()
+                logger.disabled = False
                 cls.dbs[cls.__name__] = db
 
                 db_prefix = 'db'
