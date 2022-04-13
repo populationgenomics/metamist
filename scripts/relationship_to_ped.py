@@ -102,8 +102,15 @@ def main(file):
     conflicts.extend(mutating_check_children(relations, participant_map))
 
     # we can check grandparents
-    warnings = check_grandparents(relations, participant_map)
-    warnings.extend(check_siblings(relations, participant_map))
+    bad_grandparents = check_grandparents(relations, participant_map)
+    if bad_grandparents:
+        print(f'{len(bad_grandparents)} ambiguous grandparent relationships')
+
+    bad_siblings = check_siblings(relations, participant_map)
+    if bad_siblings:
+        print(
+            f'{len(bad_siblings) // 2}ish missing sibling relationships that can be synthesized'
+        )
 
     sex_conflicts = check_sexes(relations, participant_map)
 
@@ -114,8 +121,9 @@ def main(file):
         print('\n'.join(conflicts))
         raise ValueError(str(conflicts))
 
-    if warnings:
-        print('\n'.join(warnings))
+    # warnings = bad_grandparents + bad_siblings
+    # if warnings:
+    #     print('\n'.join(warnings))
 
     pedrows = PedRow.order(list(participant_map.values()))
 
@@ -193,12 +201,9 @@ def mutating_check_children(
 
     for rule in relations:
         if rule.relationship in (Relationship.DAUGHTER, Relationship.SON):
-            child = participant_map[rule.participant_2]
+            # A's daughter is B
             parent = participant_map[rule.participant_1]
-
-            if not parent:
-                conflicts.append(f'{rule.participant_1} does not exist')
-                continue
+            child = participant_map[rule.participant_2]
 
             if parent.sex == 1:
                 # male
@@ -229,6 +234,7 @@ def check_siblings(
     relations: List[Relation], participant_map: Dict[Any, PedRowRules]
 ) -> List[str]:
     warnings = []
+    confirmations = 0
     for rule in relations:
 
         if rule.relationship not in (Relationship.BROTHER, Relationship.SISTER):
@@ -258,6 +264,10 @@ def check_siblings(
             elif not have_fathers:
                 message += f', do not have fathers'
             warnings.append(message)
+        else:
+            confirmations += 1
+
+    print(f'Confirmed {confirmations} siblings')
 
     return warnings
 
