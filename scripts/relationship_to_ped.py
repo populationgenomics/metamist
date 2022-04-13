@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring,missing-class-docstring
+# pylint: disable=global-statement,missing-function-docstring,missing-class-docstring
 
 import csv
 import json
@@ -8,6 +8,21 @@ from collections import defaultdict
 from enum import Enum
 
 from db.python.layers.family import PedRow
+
+
+SYNTHETIC_ID_COUNTER = 1
+SYNTHETIC_ID_PREFIX = 'SYNTH'
+FAMILY_ID_PREFIX = 'FAM'
+SYNTHESISE_PARENTS = True
+DEFAULT_AFFECTED_STATUS = 0
+EMPTY_PARENT_VALUE = 0
+
+
+def get_new_synthetic_id():
+    global SYNTHETIC_ID_COUNTER
+    value_to_return = SYNTHETIC_ID_COUNTER
+    SYNTHETIC_ID_COUNTER += 1
+    return f'{SYNTHETIC_ID_PREFIX}{str(value_to_return).zfill(3)}'
 
 
 class Relationship(Enum):
@@ -92,7 +107,7 @@ def main(file):
                     paternal_id=None,
                     maternal_id=None,
                     sex=sex,
-                    affected=-9,
+                    affected=DEFAULT_AFFECTED_STATUS,
                 )
                 participant_map[pedrow.individual_id] = pedrow
 
@@ -132,9 +147,36 @@ def main(file):
     )
 
     rows = [PedRow.row_header()] + [
-        [str(s) for s in r.as_row(empty_participant_value=0)] for r in pedrows
+        [str(s) for s in r.as_row(empty_participant_value=EMPTY_PARENT_VALUE)]
+        for r in pedrows
     ]
+    print(f'{len(pedrows)} individuals')
+    print_family_stats(pedrows)
+
     print('\n'.join('\t'.join(r) for r in rows))
+
+
+def print_family_stats(rows: List[PedRow]):
+    d: Dict[str, int] = defaultdict(int)
+    families_with_fuzzy_individual = set()
+
+    for r in rows:
+        d[r.family_id] += 1
+        if str(r.individual_id).startswith(SYNTHETIC_ID_PREFIX):
+            families_with_fuzzy_individual.add(r.family_id)
+
+    reversed_counts: Dict[int, int] = defaultdict(int)
+    for nmembers in d.values():
+        reversed_counts[nmembers] += 1
+    sorted_counts = sorted(reversed_counts.items(), key=lambda k: k[0], reverse=True)
+    print(f'{len(d)} distinct families')
+    print(f'{len(families_with_fuzzy_individual)} families with synthetic individuals')
+    print(
+        '\n'.join(
+            f'\tsize={family_size}: count={n_families}'
+            for family_size, n_families in sorted_counts
+        )
+    )
 
 
 def mutating_build_direct_parent_relationship(
@@ -231,10 +273,13 @@ def mutating_check_children(
 
 
 def check_siblings(
-    relations: List[Relation], participant_map: Dict[Any, PedRowRules]
+    relations: List[Relation],
+    participant_map: Dict[Any, PedRowRules],
+    synthesise_parents: bool = SYNTHESISE_PARENTS,
 ) -> List[str]:
     warnings = []
     confirmations = 0
+
     for rule in relations:
 
         if rule.relationship not in (Relationship.BROTHER, Relationship.SISTER):
@@ -248,6 +293,9 @@ def check_siblings(
         fathers_match = p1.paternal_id == p2.paternal_id
         have_mothers = p1.maternal_id and p2.maternal_id
         have_fathers = p1.paternal_id and p2.paternal_id
+        one_parent_matches = (have_mothers and mothers_match) or (
+            have_fathers and fathers_match
+        )
 
         if not (mothers_match and fathers_match and have_mothers and have_fathers):
             message = f'Expected {rule.participant_1} and {rule.participant_2} parents to match'
@@ -255,19 +303,61 @@ def check_siblings(
                 message += (
                     f', mothers do not match ({p1.maternal_id} != {p2.maternal_id})'
                 )
+                # non_null_id = filter_falsey(p1.maternal_id, p2.maternal_id)[0]
+                # p1.maternal_id = non_null_id
+                # p2.maternal_id = non_null_id
+
             elif not have_mothers:
-                message += f', do not have mothers'
+                message += ', do not have mothers'
+                if synthesise_parents and not one_parent_matches:
+                    new_mother = PedRowRules(
+                        family_id='',
+                        individual_id=get_new_synthetic_id(),
+                        paternal_id=None,
+                        maternal_id=None,
+                        sex=2,
+                        affected=-9,
+                    )
+                    participant_map[new_mother.individual_id] = new_mother
+                    p1.maternal_id = new_mother.individual_id
+                    p2.maternal_id = new_mother.individual_id
+
+            else:
+                message += ', mothers match'
+
             if not fathers_match:
                 message += (
                     f', fathers do not match ({p1.paternal_id} != {p2.paternal_id})'
                 )
+                non_null_id = filter_falsey(p1.paternal_id, p2.paternal_id)[0]
+                p1.paternal_id = non_null_id
+                p2.paternal_id = non_null_id
             elif not have_fathers:
-                message += f', do not have fathers'
-            warnings.append(message)
+                message += ', do not have fathers'
+                # we're only going to synthesize a mum, why synthesize both parents :shrug:
+                # if synthesise_parents:
+                #     new_father = PedRowRules(
+                #         family_id='',
+                #         individual_id=get_new_synthetic_id(),
+                #         paternal_id=None,
+                #         maternal_id=None,
+                #         sex=1,
+                #         affected=-9,
+                #     )
+                #     participant_map[new_father.individual_id] = new_father
+                #     p1.paternal_id = new_father.individual_id
+                #     p2.paternal_id = new_father.individual_id
+            else:
+                message += ', fathers match'
+
+            if not synthesise_parents:
+                warnings.append(message)
         else:
             confirmations += 1
 
     print(f'Confirmed {confirmations} siblings')
+    if synthesise_parents:
+        print(f'Synthesised {SYNTHETIC_ID_COUNTER - 1} parents')
 
     return warnings
 
@@ -324,7 +414,7 @@ def filter_falsey(*args: List[Any]):
 def mutating_synthesize_family_ids(
     ordered_individuals: List[PedRowRules],
     individuals_map: Dict[Any, PedRowRules],
-    prefix: str = 'FAM',
+    prefix: str = FAMILY_ID_PREFIX,
 ):
     individual_to_family_map: Dict[Any, int] = {}
     family_id_to_individuals = defaultdict(list)
