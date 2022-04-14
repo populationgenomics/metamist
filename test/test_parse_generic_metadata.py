@@ -31,6 +31,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         parser = GenericMetadataParser(
             search_locations=[],
             sample_name_column='SampleId',
+            participant_meta_map={},
             sample_meta_map={'sample.centre': 'centre'},
             sequence_meta_map={
                 'raw_data.FREEMIX': 'qc.freemix',
@@ -60,19 +61,15 @@ class TestParseGenericMetadata(unittest.TestCase):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        (
-            samples_to_add,
-            samples_to_update,
-            sequences_to_add,
-            sequences_to_update,
-            analyses_to_add,
-        ) = resp
+        self.assertEqual(1, len(resp['samples']['insert']))
+        self.assertEqual(1, len(resp['sequences']['insert']))
+        self.assertEqual(0, len(resp['samples']['update']))
+        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(1, len(sum(resp['analyses'].values(), [])))
 
-        self.assertEqual(1, len(samples_to_add))
-        self.assertEqual(1, len(sequences_to_add))
-        self.assertEqual(0, len(samples_to_update))
-        self.assertEqual(0, len(sequences_to_update))
-        self.assertEqual(1, len(analyses_to_add))
+        samples_to_add = resp['samples']['insert']
+        sequences_to_add = resp['sequences']['insert']
+        analyses_to_add = resp['analyses']
 
         self.assertDictEqual({'centre': 'KCCG'}, samples_to_add[0].meta)
         expected_sequence_dict = {
@@ -114,3 +111,110 @@ class TestParseGenericMetadata(unittest.TestCase):
             },
             analysis.meta,
         )
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('os.path.getsize')
+    async def test_rows_with_participants(
+        self,
+        mock_stat_size,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
+        mock_get_participant_id_map_by_external_ids,
+    ):
+        """
+        Test importing a single row with a participant id, forms objects and checks response
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        """
+        mock_get_sample_id.return_value = {}
+        mock_get_sequence_ids.return_value = {}
+        mock_stat_size.return_value = 111
+        mock_get_participant_id_map_by_external_ids.return_value = {}
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS',
+            'Demeter\tsample_id001\tsample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz\tWES',
+            'Apollo\tsample_id002\tsample_id002.filename-R1.fastq.gz\tWGS',
+            'Apollo\tsample_id002\tsample_id002.filename-R2.fastq.gz\tWGS',
+            'Athena\tsample_id003\tsample_id003.filename-R1.fastq.gz',
+            'Athena\tsample_id003\tsample_id003.filename-R2.fastq.gz',
+            'Apollo\tsample_id004\tsample_id004.filename-R1.fastq.gz',
+            'Apollo\tsample_id004\tsample_id004.filename-R2.fastq.gz',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_column='Individual ID',
+            sample_name_column='Sample ID',
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            sample_metadata_project='devdev',
+        )
+
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+            'sample_id001.exome.filename-R1.fastq.gz': '/path/to/sample_id001.exome.filename-R1.fastq.gz',
+            'sample_id001.exome.filename-R2.fastq.gz': '/path/to/sample_id001.exome.filename-R2.fastq.gz',
+            'sample_id002.filename-R1.fastq.gz': '/path/to/sample_id002.filename-R1.fastq.gz',
+            'sample_id002.filename-R2.fastq.gz': '/path/to/sample_id002.filename-R2.fastq.gz',
+            'sample_id003.filename-R1.fastq.gz': '/path/to/sample_id003.filename-R1.fastq.gz',
+            'sample_id003.filename-R2.fastq.gz': '/path/to/sample_id003.filename-R2.fastq.gz',
+            'sample_id004.filename-R1.fastq.gz': '/path/to/sample_id004.filename-R1.fastq.gz',
+            'sample_id004.filename-R2.fastq.gz': '/path/to/sample_id004.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        resp = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        self.assertEqual(3, len(resp['participants']['insert']))
+        self.assertEqual(0, len(resp['participants']['update']))
+        self.assertEqual(4, len(resp['samples']['insert']))
+        self.assertEqual(0, len(resp['samples']['update']))
+        self.assertEqual(5, len(resp['sequences']['insert']))
+        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(0, len(sum(resp['analyses'].values(), [])))
+
+        participants_to_add = resp['participants']['insert']
+        sequences_to_add = resp['sequences']['insert']
+
+        expected_sequence_dict = {
+            'reads': [
+                [
+                    {
+                        'basename': 'sample_id001.filename-R1.fastq.gz',
+                        'checksum': None,
+                        'class': 'File',
+                        'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                        'size': 111,
+                    },
+                    {
+                        'basename': 'sample_id001.filename-R2.fastq.gz',
+                        'checksum': None,
+                        'class': 'File',
+                        'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                        'size': 111,
+                    },
+                ]
+            ],
+            'reads_type': 'fastq',
+        }
+        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
+
+        # Check that both of Demeter's sequences are there
+        self.assertEqual(participants_to_add[0].external_id, 'Demeter')
+        self.assertEqual(len(participants_to_add[0].samples), 1)
+        self.assertEqual(len(participants_to_add[0].samples[0].sequences), 2)
+
+        return

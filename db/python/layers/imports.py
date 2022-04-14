@@ -60,7 +60,7 @@ class ImportLayer(BaseLayer):
                 sequence = SampleSequencing(
                     id_=None,
                     sample_id=internal_sample_id,
-                    type=SequenceType.WGS,
+                    type=SequenceType.GENOME,
                     meta=sequence_meta,
                     status=sequence_status,
                 )

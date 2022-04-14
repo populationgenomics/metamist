@@ -1,12 +1,72 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
-from typing import Dict, List, Optional, Any, Union
+# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
+from itertools import groupby
+from typing import Dict, List, Optional, Any, Tuple, Union
 import os
+import csv
 import logging
 from io import StringIO
 from functools import reduce
 
+import click
+from sample_metadata.api.sample_api import SampleApi
+from sample_metadata.model.sample_type import SampleType
+from sample_metadata.model.sequence_status import SequenceStatus
+from sample_metadata.model.sequence_type import SequenceType
 
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync     # noqa
+from sample_metadata.parser.generic_parser import (
+    GenericParser,
+    GroupedRow,
+    ParticipantMetaGroup,
+    SampleMetaGroup,
+    SequenceMetaGroup,
+    SingleRow,
+    run_as_sync,
+)  # noqa
+
+__DOC = """
+Parse CSV / TSV manifest of arbitrary format.
+This script allows you to specify HOW you want the manifest
+to be mapped onto individual data.
+
+This script loads the WHOLE file into memory
+
+It groups rows by the sample ID, and collapses metadata from rows.
+
+EG:
+    Sample ID       sample-collection-date  depth  qc_quality  Fastqs
+
+    <sample-id>     2021-09-16              30x    0.997       <sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz
+
+    # OR
+
+    <sample-id2>    2021-09-16              30x    0.997       <sample-id2>.filename-R1.fastq.gz
+
+    <sample-id2>    2021-09-16              30x    0.997       <sample-id2>.filename-R2.fastq.gz
+
+Given the files are in a bucket called 'gs://cpg-upload-bucket/collaborator',
+and we want to achieve the following:
+
+- Import this manifest into the "$dataset" project of SM
+- Map the following to `sample.meta`:
+    - "sample-collection-date" -> "collection_date"
+- Map the following to `sequence.meta`:
+    - "depth" -> "depth"
+    - "qc_quality" -> "qc.quality" (ie: {"qc": {"quality": 0.997}})
+- Add a qc analysis object with the following mapped `analysis.meta`:
+    - "qc_quality" -> "quality"
+
+python parse_generic_metadata.py \
+    --sample-metadata-project $dataset \
+    --sample-name-column "Sample ID" \
+    --reads-column "Fastqs" \
+    --sample-meta-field-map "sample-collection-date" "collection_date" \
+    --sequence-meta-field "depth" \
+    --sequence-meta-field-map "qc_quality" "qc.quality" \
+    --qc-meta-field-map "qc_quality" "quality" \
+    --search-path "gs://cpg-upload-bucket/collaborator" \
+    <manifest-path>
+"""
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -19,14 +79,20 @@ class GenericMetadataParser(GenericParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_name_column: str,
+        participant_meta_map: Dict[str, str],
         sample_meta_map: Dict[str, str],
         sequence_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
         sample_metadata_project: str,
+        sample_name_column: str,
+        participant_column: Optional[str] = None,
         reads_column: Optional[str] = None,
+        seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
-        default_sequence_type='wgs',
+        meta_column: Optional[str] = None,
+        seq_meta_column: Optional[str] = None,
+        default_sequence_type='genome',
+        default_sequence_status='uploaded',
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
         allow_extra_files_in_search_path=False,
@@ -35,6 +101,7 @@ class GenericMetadataParser(GenericParser):
             path_prefix=path_prefix,
             sample_metadata_project=sample_metadata_project,
             default_sequence_type=default_sequence_type,
+            default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
         )
         self.search_locations = search_locations
@@ -44,17 +111,90 @@ class GenericMetadataParser(GenericParser):
         if not sample_name_column:
             raise ValueError('A sample name column MUST be provided')
 
+        self.cpg_id_column = 'Internal CPG Sample ID'
+
         self.sample_name_column = sample_name_column
+        self.participant_column = participant_column
+        self.seq_type_column = seq_type_column
+        self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.gvcf_column = gvcf_column
+        self.meta_column = meta_column
+        self.seq_meta_column = seq_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
 
-    async def validate_rows(
-        self, sample_map: Dict[str, Union[dict, List[dict]]]
-    ):
+        self.sapi = SampleApi()
+
+    def get_sample_id(self, row: SingleRow) -> Optional[str]:
+        """Get external sample ID from row"""
+        return row.get(self.sample_name_column, None)
+
+    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+        """Get internal cpg id from a row using get_sample_id and an api call"""
+        cpg_id = row.get(self.cpg_id_column, None)
+
+        if not cpg_id:
+            external_id = self.get_sample_id(row)
+            id_map = await self.sapi.get_sample_by_external_id_async(
+                external_id, self.sample_metadata_project
+            )
+            cpg_id = id_map.get(external_id, None)
+            row[self.cpg_id_column] = cpg_id
+            return cpg_id
+
+        return cpg_id
+
+    def get_sample_type(self, row: GroupedRow) -> SampleType:
+        """Get sample type from row"""
+        return SampleType(self.default_sample_type)
+
+    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+        """
+        Get sequence types from grouped row
+        if SingleRow: return sequence type
+        if GroupedRow: return sequence types for all rows
+        """
+        if isinstance(row, dict):
+            return [self.get_sequence_type(row)]
+        return [
+            SequenceType(r.get(self.seq_type_column, self.default_sequence_type))
+            for r in row
+        ]
+
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
+        """Get sequence type from row"""
+        value = row.get(self.seq_type_column, None) or self.default_sequence_type
+        value = value.lower()
+
+        if value == 'wgs':
+            value = 'genome'
+        elif value == 'wes':
+            value = 'exome'
+
+        return SequenceType(value)
+
+    def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
+        """Get sequence status from row"""
+        return SequenceStatus(self.default_sequence_status)
+
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+        """Get external participant ID from row"""
+        if not self.participant_column or self.participant_column not in row:
+            raise ValueError('Participant column does not exist')
+        return row[self.participant_column]
+
+    def has_participants(self, file_pointer, delimiter: str) -> bool:
+        """Returns True if the file has a Participants column"""
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        first_line = next(reader)
+        has_participants = self.participant_column in first_line
+        file_pointer.seek(0)
+        return has_participants
+
+    async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]):
         await super().validate_rows(sample_map)
 
         if not self.reads_column:
@@ -66,19 +206,24 @@ class GenericMetadataParser(GenericParser):
         if errors:
             raise ValueError(', '.join(errors))
 
-    def check_files_covered_by_file_map(self, sample_map: Union[dict, List[dict]]) -> List[str]:
+    def check_files_covered_by_file_map(
+        self, sample_map: Union[dict, List[dict]]
+    ) -> List[str]:
         """
         Check that the files in the search_paths are completely covered by the sample_map
         """
         filenames = []
-        for sm in (sample_map if isinstance(sample_map, list) else [sample_map]):
+        for sm in sample_map if isinstance(sample_map, list) else [sample_map]:
             for rows in sm.values():
-                for r in (rows if isinstance(rows, list) else [rows]):
+                for r in rows if isinstance(rows, list) else [rows]:
                     filenames.extend(r.get(self.reads_column, '').split(','))
 
         fs = set(f for f in filenames if f)
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
-        filename_filter = lambda f: any(f.endswith(ext) for ext in relevant_extensions)     # noqa: E731
+
+        def filename_filter(f):
+            return any(f.endswith(ext) for ext in relevant_extensions)
+
         relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
 
         missing_files = fs - relevant_mapped_files
@@ -138,11 +283,6 @@ class GenericMetadataParser(GenericParser):
         raise FileNotFoundError(
             f"Couldn't find file '{filename}' in search_paths: {sps}"
         )
-
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
-        """Get external sample ID from row"""
-        external_id = row[self.sample_name_column]
-        return external_id
 
     @staticmethod
     def merge_dicts(a: Dict, b: Dict):
@@ -235,10 +375,6 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
-        """Get sample-metadata from row"""
-        return self.collapse_arbitrary_meta(self.sample_meta_map, row)
-
     async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to reads from a row"""
         read_filenames = []
@@ -257,16 +393,62 @@ class GenericMetadataParser(GenericParser):
 
         return gvcf_filenames
 
+    async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
+        """Return list of grouped by sample metadata from the rows"""
+        sample_metadata = []
+        for sid, row_group in groupby(rows, self.get_sample_id):
+            sample_group = SampleMetaGroup(sample_id=sid, rows=row_group, meta=None)
+            sample_metadata.append(await self.get_sample_meta(sample_group))
+        return sample_metadata
+
+    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
+        """Get sample-metadata from row"""
+        rows = sample_group.rows
+        meta = self.collapse_arbitrary_meta(self.sample_meta_map, rows)
+        sample_group.meta = meta
+        return sample_group
+
+    async def get_participant_meta(
+        self, participant_id: int, rows: GroupedRow
+    ) -> ParticipantMetaGroup:
+        """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
+        meta = self.collapse_arbitrary_meta(self.participant_meta_map, rows)
+        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta=meta)
+
+    async def get_grouped_sequence_meta(
+        self, sample_id: str, rows: GroupedRow
+    ) -> List[SequenceMetaGroup]:
+        """
+        Takes a collection of SingleRows and groups them by sequence type
+        For each sequence type, get_sequence_meta for that group and return the
+        resulting list of metadata
+        """
+        sequence_meta = []
+        for stype, row_group in groupby(rows, self.get_sequence_type):
+            seq_group = SequenceMetaGroup(
+                rows=list(row_group),
+                sequence_type=stype,
+            )
+            sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
+        return sequence_meta
+
     async def get_sequence_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
+        self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
+    ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
+        rows = seq_group.rows
+
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
-            self.sequence_meta_map, row
+            self.sequence_meta_map, rows
         )
 
-        read_filenames = await self.get_read_filenames(sample_id, row)
-        gvcf_filenames = await self.get_gvcf_filenames(sample_id, row)
+        read_filenames = []
+        gvcf_filenames = []
+        for r in rows:
+            if self.reads_column and self.reads_column in r:
+                read_filenames.extend(r[self.reads_column].split(','))
+            if self.gvcf_column and self.gvcf_column in r:
+                gvcf_filenames.extend(r[self.gvcf_column].split(','))
 
         # strip in case collaborator put "file1, file2"
         full_filenames: List[str] = []
@@ -274,6 +456,9 @@ class GenericMetadataParser(GenericParser):
             full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
         if gvcf_filenames:
             full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
+
+        if not sample_id:
+            sample_id = await self.get_cpg_sample_id(rows[0])
 
         file_types: Dict[str, Dict[str, List]] = await self.parse_files(
             sample_id, full_filenames
@@ -302,7 +487,8 @@ class GenericMetadataParser(GenericParser):
                 collapsed_sequence_meta['vcfs'] = variants['vcf']
                 collapsed_sequence_meta['vcf_type'] = 'vcf'
 
-        return collapsed_sequence_meta
+        seq_group.meta = collapsed_sequence_meta
+        return seq_group
 
     async def get_qc_meta(
         self, sample_id: str, row: GroupedRow
@@ -312,10 +498,6 @@ class GenericMetadataParser(GenericParser):
             return None
 
         return self.collapse_arbitrary_meta(self.qc_meta_map, row)
-
-    def get_sequence_status(self, sample_id: str, row: GroupedRow) -> str:
-        """Get sequence status from row"""
-        return 'uploaded'
 
     async def from_manifest_path(
         self,
@@ -338,3 +520,133 @@ class GenericMetadataParser(GenericParser):
             confirm=confirm,
             dry_run=dry_run,
         )
+
+
+@click.command(help=__DOC)
+@click.option(
+    '--sample-metadata-project',
+    required=True,
+    help='The sample-metadata project ($DATASET) to import manifest into',
+)
+@click.option('--sample-name-column', required=True)
+@click.option(
+    '--reads-column',
+    help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--gvcf-column',
+    help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--qc-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
+)
+@click.option(
+    '--participant-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in participant.meta',
+)
+@click.option(
+    '--participant-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --participant-meta-field-map "name-in-manifest" "name-in-participant.meta"',
+)
+@click.option(
+    '--sample-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in sample.meta',
+)
+@click.option(
+    '--sample-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --sample-meta-field-map "name-in-manifest" "name-in-sample.meta"',
+)
+@click.option(
+    '--sequence-meta-field',
+    multiple=True,
+    help='Single argument, key to pull out of row to put in sample.meta',
+)
+@click.option(
+    '--sequence-meta-field-map',
+    nargs=2,
+    multiple=True,
+    help='Two arguments per listing, eg: --sequence-meta-field "name-in-manifest" "name-in-sequence.meta"',
+)
+@click.option('--default-sample-type', default='blood')
+@click.option('--default-sequence-type', default='wgs')
+@click.option(
+    '--confirm', is_flag=True, help='Confirm with user input before updating server'
+)
+@click.option('--search-path', multiple=True, required=True)
+@click.argument('manifests', nargs=-1)
+@run_as_sync
+async def main(
+    manifests,
+    search_path: List[str],
+    sample_metadata_project,
+    sample_name_column: str,
+    participant_meta_field: List[str],
+    participant_meta_field_map: List[Tuple[str, str]],
+    sample_meta_field: List[str],
+    sample_meta_field_map: List[Tuple[str, str]],
+    sequence_meta_field: List[str],
+    sequence_meta_field_map: List[Tuple[str, str]],
+    qc_meta_field_map: List[Tuple[str, str]] = None,
+    reads_column: Optional[str] = None,
+    gvcf_column: Optional[str] = None,
+    default_sample_type='blood',
+    default_sequence_type='wgs',
+    confirm=False,
+):
+    """Run script from CLI arguments"""
+    if not manifests:
+        raise ValueError('Expected at least 1 manifest')
+
+    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_seach_paths:
+        search_path = list(set(search_path).union(set(extra_seach_paths)))
+
+    participant_meta_map: Dict[Any, Any] = {}
+    sample_meta_map: Dict[Any, Any] = {}
+    sequence_meta_map: Dict[Any, Any] = {}
+
+    qc_meta_map = dict(qc_meta_field_map or {})
+    if participant_meta_field_map:
+        participant_meta_map.update(dict(participant_meta_map))
+    if participant_meta_field:
+        participant_meta_map.update({k: k for k in participant_meta_field})
+    if sample_meta_field_map:
+        sample_meta_map.update(dict(sample_meta_field_map))
+    if sample_meta_field:
+        sample_meta_map.update({k: k for k in sample_meta_field})
+    if sequence_meta_field_map:
+        sequence_meta_map.update(dict(sequence_meta_field_map))
+    if sequence_meta_field:
+        sequence_meta_map.update({k: k for k in sequence_meta_field})
+
+    parser = GenericMetadataParser(
+        sample_metadata_project=sample_metadata_project,
+        sample_name_column=sample_name_column,
+        participant_meta_map=participant_meta_map,
+        sample_meta_map=sample_meta_map,
+        sequence_meta_map=sequence_meta_map,
+        qc_meta_map=qc_meta_map,
+        reads_column=reads_column,
+        gvcf_column=gvcf_column,
+        default_sample_type=default_sample_type,
+        default_sequence_type=default_sequence_type,
+        search_locations=search_path,
+    )
+    for manifest in manifests:
+        logger.info(f'Importing {manifest}')
+
+        await parser.from_manifest_path(manifest=manifest, confirm=confirm)
+
+
+if __name__ == '__main__':
+    # pylint: disable=no-value-for-parameter
+    main()

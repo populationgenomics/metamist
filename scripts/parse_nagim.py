@@ -1,4 +1,4 @@
-# pylint: disable=too-many-lines
+# pylint: disable=W0237,too-many-lines
 """
 Taking Terra results, populate sample-metadata for NAGIM project.
 
@@ -105,7 +105,13 @@ from sample_metadata.models import (
 )
 from sample_metadata.apis import SampleApi
 from sample_metadata.models import SampleUpdateModel
-from sample_metadata.parser.generic_parser import GenericParser, GroupedRow, run_as_sync
+from sample_metadata.parser.generic_parser import (
+    GenericParser,
+    SampleMetaGroup,
+    SequenceMetaGroup,
+    SingleRow,
+    run_as_sync,
+)
 
 
 logger = logging.getLogger(__file__)
@@ -1135,10 +1141,21 @@ class NagimParser(GenericParser):
     logic specific to the NAGIM project.
     """
 
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
+        super().__init__(**kwargs)
+        self.multiqc_html_path = multiqc_html_path
+        self.multiqc_json_path = multiqc_json_path
+
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+        return None
+
+    async def get_sample_meta(
+        self, sample_meta_group: SampleMetaGroup
+    ) -> SampleMetaGroup:
+        row = sample_meta_group.rows
         if isinstance(row, dict):
             row = [row]
-        meta = {}
+        meta = sample_meta_group.meta or {}
         for r in row:
             meta['project'] = r['project']
             for key in [
@@ -1149,12 +1166,9 @@ class NagimParser(GenericParser):
                 val = r.get(f'meta_{key}')
                 if val:
                     meta[key] = val
-        return meta
 
-    def __init__(self, multiqc_html_path, multiqc_json_path, **kwargs):
-        super().__init__(**kwargs)
-        self.multiqc_html_path = multiqc_html_path
-        self.multiqc_json_path = multiqc_json_path
+        sample_meta_group.meta = meta
+        return sample_meta_group
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
@@ -1162,13 +1176,12 @@ class NagimParser(GenericParser):
     async def get_analyses(
         self,
         sample_id: str,
-        row: GroupedRow,
+        row: SingleRow,
         cpg_id: Optional[str],
     ) -> List[AnalysisModel]:
         """
         Creating "staging" analyses for uploaded GVCFs and CRAMs.
         """
-        assert not isinstance(row, list)
         results = []
 
         for analysis_type in ['gvcf', 'cram']:
@@ -1204,13 +1217,11 @@ class NagimParser(GenericParser):
         return results
 
     async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
+        self, sample_id: str, row: SingleRow
     ) -> Optional[Dict[str, Any]]:
         """
         Create a QC analysis entry for found QC files.
         """
-        assert not isinstance(row, list)
-
         if 'QC' not in SOURCES_TO_PROCESS:
             return None
 
@@ -1232,16 +1243,19 @@ class NagimParser(GenericParser):
         }
 
     async def get_sequence_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
-        if isinstance(row, list):
-            row = row[0]
+        self, seq_group: SequenceMetaGroup
+    ) -> SequenceMetaGroup:
+        rows = seq_group.rows
+        if isinstance(rows, list):
+            row = rows[0]
 
         result = {}
         for metric, _ in QC_METRICS:
             if f'qc_value_{metric}' in row:
                 result[metric] = row[f'qc_value_{metric}']
-        return result
+
+        seq_group.meta = result
+        return seq_group
 
 
 def _cache_bucket_ls(

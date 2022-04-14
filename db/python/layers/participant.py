@@ -4,14 +4,44 @@ from typing import Dict, List, Tuple, Optional, Any
 from collections import defaultdict
 from enum import Enum
 
+from pydantic import BaseModel
+
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer
+from db.python.layers.sample import (
+    SampleBatchUpsert,
+    SampleBatchUpsertBody,
+    SampleLayer,
+)
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId
+
+
+class ParticipantUpdateModel(BaseModel):
+    """Update participant model"""
+
+    external_id: Optional[str] = None
+    reported_sex: Optional[int] = None
+    reported_gender: Optional[str] = None
+    karyotype: Optional[str] = None
+    meta: Optional[Dict] = None
+
+
+class ParticipantUpsert(ParticipantUpdateModel):
+    """Update model for sample with sequences list"""
+
+    id: Optional[int]
+    samples: List[SampleBatchUpsert]
+
+
+class ParticipantUpsertBody(BaseModel):
+    """Upsert model for batch Participants"""
+
+    participants: List[ParticipantUpsert]
 
 
 class ExtraParticipantImporterHandler(Enum):
@@ -646,6 +676,7 @@ class ParticipantLayer(BaseLayer):
     async def update_single_participant(
         self,
         participant_id: int,
+        external_id: str = None,
         reported_sex: int = None,
         reported_gender: str = None,
         karyotype: str = None,
@@ -668,4 +699,48 @@ class ParticipantLayer(BaseLayer):
                 user=self.author, project_ids=projects, readonly=False
             )
 
-        return await self.pttable.update_participant(**d)
+        _ = await self.pttable.update_participant(**d)
+        return participant_id
+
+    async def upsert_participant(self, participant: ParticipantUpsert):
+        """Upsert a participant"""
+        if not participant.id:
+            internal_id = await self.create_participant(
+                external_id=participant.external_id,
+                reported_sex=participant.reported_sex,
+                reported_gender=participant.reported_gender,
+                karyotype=participant.karyotype,
+                meta=participant.meta,
+                author=self.connection.author,
+                project=self.connection.project,
+            )
+            return int(internal_id)
+
+        # Otherwise update
+        internal_id = await self.update_single_participant(
+            participant_id=participant.id,
+            external_id=participant.external_id,
+            reported_sex=participant.reported_sex,
+            reported_gender=participant.reported_gender,
+            karyotype=participant.karyotype,
+            meta=participant.meta,
+            author=self.connection.author,
+            check_project_ids=False,
+        )
+        return int(internal_id)
+
+    async def batch_upsert_participants(self, participants: ParticipantUpsertBody):
+        """Batch upsert a list of participants with sequences"""
+        all_participants = participants.participants
+
+        sampt: SampleLayer = SampleLayer(self.connection)
+
+        # Create or update participants
+        pids = [await self.upsert_participant(p) for p in all_participants]
+
+        # Upsert all samples with sequences for each participant
+        samples = [SampleBatchUpsertBody(samples=p.samples) for p in all_participants]
+        results = [await sampt.batch_upsert_samples(s) for s in samples]
+
+        # Format and return response
+        return dict(zip(pids, results))

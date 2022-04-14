@@ -4,7 +4,7 @@ from enum import Enum
 class SequenceType(Enum):
     """Type of sequencing"""
 
-    WGS = 'wgs'
+    GENOME = 'genome'
     EXOME = 'exome'
     SINGLE_CELL = 'single-cell'
 

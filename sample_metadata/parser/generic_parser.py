@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
+# pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,assignment-from-none,invalid-name,ungrouped-imports
 import sys
 import asyncio
 import csv
@@ -25,18 +25,20 @@ from functools import wraps
 
 from google.api_core.exceptions import Forbidden
 from google.cloud import storage
+from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
 from sample_metadata.model_utils import async_wrap
-from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
+from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi, ParticipantApi
 from sample_metadata.models import (
+    ParticipantUpsert,
     SequenceType,
     AnalysisModel,
     SampleType,
     AnalysisType,
     SequenceStatus,
     AnalysisStatus,
-    SampleBatchUpsertItem,
     SampleBatchUpsert,
+    SampleBatchUpsertBody,
     SequenceUpsert,
 )
 
@@ -66,13 +68,56 @@ ALL_EXTENSIONS = (
 )
 
 rmatch = re.compile(r'[_\.-][Rr]\d')
-GroupedRow = Union[List[Dict[str, Any]], Dict[str, Any]]
+SingleRow = Dict[str, Any]
+GroupedRow = List[SingleRow]
 
 T = TypeVar('T')
 
 SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
+
+
+class ParticipantMetaGroup:
+    """Class for holding participant metadata grouped by id"""
+
+    def __init__(
+        self,
+        participant_id: int,
+        rows: GroupedRow,
+        meta: Dict[str, Any],
+    ):
+        self.id = participant_id
+        self.rows = rows
+        self.meta = meta
+
+
+class SampleMetaGroup:
+    """Class for holding sample metadata grouped by id"""
+
+    def __init__(
+        self,
+        sample_id: str,
+        rows: GroupedRow,
+        meta: Dict[str, Any] = None,
+    ):
+        self.id = sample_id
+        self.rows = rows
+        self.meta = meta
+
+
+class SequenceMetaGroup:
+    """Class for holding sequence metadata grouped by type"""
+
+    def __init__(
+        self,
+        rows: GroupedRow,
+        sequence_type: SequenceType,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
+        self.rows = rows
+        self.sequence_type = sequence_type
+        self.meta = meta
 
 
 def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
@@ -110,9 +155,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         path_prefix: Optional[str],
         sample_metadata_project: str,
-        default_sequence_type='wgs',
+        default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
+        default_analysis_type='qc',
+        default_analysis_status='completed',
         skip_checking_gcs_objects=False,
         verbose=True,
     ):
@@ -129,12 +176,17 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
+        self.default_analysis_type: str = default_analysis_type
+        self.default_analysis_status: str = default_analysis_status
 
         # gs specific
         self.default_bucket = None
 
         self._client = None
         self.bucket_clients: Dict[str, Any] = {}
+
+        self.papi = ParticipantApi()
+        self.seqapi = SequenceApi()
 
     @property
     def client(self):
@@ -242,21 +294,54 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return os.path.getsize(path)
 
     @abstractmethod
-    def get_sample_id(self, row: Dict[str, Any]) -> str:
+    def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
+    # @abstractmethod
+    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+        """Get internal cpg sample ID from row"""
+
     @abstractmethod
-    async def get_sample_meta(self, sample_id: str, row: GroupedRow) -> Dict[str, Any]:
+    def get_participant_id(self, row: SingleRow) -> Optional[str]:
+        """Get external participant ID from row"""
+
+    # @abstractmethod
+    def has_participants(self, file_pointer, delimiter: str) -> bool:
+        """Returns True if the file has a Participants column"""
+
+    # @abstractmethod
+    async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
+        """Return list of grouped by sample metadata from the rows"""
+
+    @abstractmethod
+    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
         """Get sample-metadata from row"""
+
+    # @abstractmethod
+    async def get_grouped_sequence_meta(
+        self, sample_id: str, rows: GroupedRow
+    ) -> List[SequenceMetaGroup]:
+        """Return list of grouped by type sequence metadata from the rows"""
 
     @abstractmethod
     async def get_sequence_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Dict[str, Any]:
-        """Get sequence-metadata from row"""
+        self, seq_group: SequenceMetaGroup
+    ) -> SequenceMetaGroup:
+        """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
+        return SequenceMetaGroup(
+            rows=[], sequence_type=self.default_sequence_type, meta={}
+        )
 
+    # @abstractmethod
+    async def get_participant_meta(
+        self, participant_id: int, rows: GroupedRow
+    ) -> ParticipantMetaGroup:
+        """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
+        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta={})
+
+    # @abstractmethod
     async def get_analyses(
-        self, sample_id: str, row: GroupedRow, cpg_id: Optional[str]
+        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
     ) -> List[AnalysisModel]:
         """
         Get analysis objects from row. Optionally, a CPG ID can be passed for
@@ -264,49 +349,63 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         """
         return []
 
-    async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Optional[Dict[str, Any]]:
+    @abstractmethod
+    async def get_qc_meta(self, sample_id: str, row: SingleRow) -> Optional[SingleRow]:
         """Get qc-meta from row, creates a Analysis object of type QC"""
-        return None
 
-    def get_sample_type(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SampleType]:
+    # @abstractmethod
+    def get_sample_type(self, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
-        return self.default_sample_type
+        return SampleType(self.default_sample_type)
 
-    def get_sequence_type(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SequenceType]:
-        """Get sequence type from row"""
-        return self.default_sequence_type
+    # @abstractmethod
+    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+        """Get sequence types from row"""
+        return List(SequenceType(self.default_sequence_type))
 
-    def get_sequence_status(
-        self, sample_id: str, row: GroupedRow
-    ) -> Union[str, SequenceStatus]:
+    # @abstractmethod
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
+        """Get sequence types from row"""
+        return SequenceType(self.default_sequence_type)
+
+    # @abstractmethod
+    def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
-        return self.default_sequence_status
+        return SequenceStatus(self.default_sequence_status)
 
-    async def process_group(
+    # @abstractmethod
+    def get_analysis_type(self, sample_id: str, row: GroupedRow) -> AnalysisType:
+        """Get analysis type from row"""
+        return AnalysisType(self.default_analysis_type)
+
+    # @abstractmethod
+    def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
+        """Get analysis status from row"""
+        return AnalysisStatus(self.default_analysis_status)
+
+    async def process_sample_group(
         self,
         rows: GroupedRow,
         external_sample_id: str,
         cpg_sample_id: Optional[str],
-        sequence_id: Optional[str],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
             (
                 sample_to_upsert,
-                sequence_to_upsert,
-                analysis_to_add,
+                sequences_to_upsert,
+                analyses_to_add,
             )
 
         Then the calling function does the (reduce).
         """
-        if isinstance(rows, list) and len(rows) == 1:
-            rows = rows[0]
+
+        # Get all the sequence ids for this sample
+        sequence_ids = {}
+        if cpg_sample_id is not None:
+            sequence_ids = await self.seqapi.get_all_sequences_for_sample_id_async(
+                sample_id=cpg_sample_id
+            )
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         (
@@ -315,64 +414,133 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             collapsed_qc,
             collapsed_analyses,
         ) = await asyncio.gather(
-            self.get_sequence_meta(external_sample_id, rows),
-            self.get_sample_meta(external_sample_id, rows),
-            self.get_qc_meta(external_sample_id, rows),
-            self.get_analyses(external_sample_id, rows, cpg_id=cpg_sample_id),
+            self.get_grouped_sequence_meta(external_sample_id, rows),
+            self.get_sample_meta(SampleMetaGroup(sample_id=cpg_sample_id, rows=rows)),
+            self.get_qc_meta(external_sample_id, rows[0]),
+            self.get_analyses(external_sample_id, rows[0], cpg_id=cpg_sample_id),
         )
 
         sample_to_upsert = None
-        sequence_to_upsert = None
-        analysis_to_add = []
-
-        sample_type = self.get_sample_type(external_sample_id, rows)
-        sequence_status = self.get_sequence_status(external_sample_id, rows)
+        sequences_to_upsert = []
+        analyses_to_add = []
 
         # should we add or update sequencing
         if collapsed_sequencing_meta:
-            args = {
-                'id': sequence_id,
-                'meta': collapsed_sequencing_meta,
-                'type': SequenceType('wgs'),
-                'status': SequenceStatus(sequence_status),
-            }
+            for seq in collapsed_sequencing_meta:
+                args = {
+                    'id': sequence_ids.get(str(seq.sequence_type), None),
+                    'meta': seq.meta,
+                    'type': seq.sequence_type,
+                    'status': self.get_sequence_status(seq.rows),
+                }
+                if not args['id']:
+                    del args['id']
 
-            if not sequence_id:
-                del args['id']
-
-            sequence_to_upsert = SequenceUpsert(**args)
+                sequences_to_upsert.append(SequenceUpsert(**args))
 
         # Should we add or update sample
         args = {
             'id': cpg_sample_id,
-            'meta': collapsed_sample_meta,
+            'meta': collapsed_sample_meta.meta,
             'external_id': external_sample_id,
-            'type': SampleType(sample_type),
-            'sequences': [sequence_to_upsert] if sequence_to_upsert else [],
+            'type': self.get_sample_type(rows),
+            'sequences': sequences_to_upsert,
         }
-
         if not cpg_sample_id:
             del args['id']
 
-        sample_to_upsert = SampleBatchUpsertItem(**args)
+        sample_to_upsert = SampleBatchUpsert(**args)
 
         if collapsed_analyses:
-            analysis_to_add.extend(collapsed_analyses)
+            analyses_to_add.extend(collapsed_analyses)
 
         if collapsed_qc:
-            analysis_to_add.append(
+            analyses_to_add.append(
                 AnalysisModel(
                     sample_ids=['<none>'],
-                    type=AnalysisType('qc'),
-                    status=AnalysisStatus('completed'),
+                    type=self.get_analysis_type(external_sample_id, rows),
+                    status=self.get_analysis_status(external_sample_id, rows),
                     meta=collapsed_qc,
                 )
             )
 
         return (
             sample_to_upsert,
-            sequence_to_upsert,
-            analysis_to_add,
+            sequences_to_upsert,
+            analyses_to_add,
+        )
+
+    async def process_participant_group(
+        self, participant_name: str, sample_map: Dict[str, Any]
+    ):
+        """
+        ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
+            (
+                participants_to_upsert,
+                samples_to_upsert,
+                sequences_to_upsert,
+                analyses_to_add,
+            )
+
+        Then the calling function does the (reduce).
+        """
+
+        all_rows = [r for row in sample_map.values() for r in row]
+
+        # Get external sid to cpg map
+        existing_external_id_to_cpgid = (
+            await SampleApi().get_sample_id_map_by_external_async(
+                self.sample_metadata_project,
+                list(sample_map.keys()),
+                allow_missing=True,
+            )
+        )
+
+        # Get all the samples and sequences to upsert first
+        samples_to_upsert = []
+        sequences_to_upsert = []
+        analyses_to_add = []
+
+        for sample_id, rows in sample_map.items():
+            cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
+            sample, seqs, analyses = await self.process_sample_group(
+                rows, sample_id, cpg_id
+            )
+            samples_to_upsert.append(sample)
+            sequences_to_upsert.extend(seqs)
+            analyses_to_add.extend(analyses)
+
+        # Construct participant to upsert
+        existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
+            self.sample_metadata_project, [participant_name], allow_missing=True
+        )
+
+        internal_id = existing_participant_ids.get(participant_name, None)
+
+        # now we have sample / sequencing meta across 4 different rows, so collapse them
+        collapsed_participant_meta = await self.get_participant_meta(
+            internal_id, all_rows
+        )
+
+        args = {
+            'id': internal_id,  # noqa: E501
+            'external_id': participant_name,
+            # 'reported_sex': None,
+            # 'reported_gender': None,
+            # 'karyotype': None,
+            'meta': collapsed_participant_meta.meta,
+            'samples': samples_to_upsert,
+        }
+        if not internal_id:
+            del args['id']
+
+        participant_to_upsert = ParticipantUpsert(**args)
+
+        return (
+            participant_to_upsert,
+            samples_to_upsert,
+            sequences_to_upsert,
+            analyses_to_add,
         )
 
     async def file_pointer_to_sample_map(
@@ -388,13 +556,37 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         sample_map = defaultdict(list)
         reader = csv.DictReader(file_pointer, delimiter=delimiter)
         for row in reader:
-            sample_id = self.get_sample_id(row)
-            sample_map[sample_id].append(row)
+            sid = self.get_sample_id(row)
+            sample_map[sid].append(row)
         return sample_map
 
-    async def validate_rows(
-        self, sample_map: Dict[str, Union[Dict, List[Dict]]]
-    ):
+    async def file_pointer_to_participant_map(
+        self,
+        file_pointer,
+        delimiter: str,
+    ) -> Dict[Any, Dict[Any, List[Any]]]:
+        """
+        Parse manifest file into a list of dicts, indexed by participant id.
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader.
+        """
+
+        participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        for row in reader:
+            pid = self.get_participant_id(row)
+
+            if not pid:
+                raise ValueError(f'Participant not found in row: {row}')
+
+            sid = self.get_sample_id(row)
+            participant_map[pid][sid].append(row)
+
+        return participant_map
+
+    async def validate_rows(self, sample_map: Dict[str, Union[Dict, List[Dict]]]):
         """
         Validate sample rows:
         - throw an exception if an error occurs
@@ -404,116 +596,262 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
-    ) -> Union[Dict[str, Dict], Tuple[List, List, List, List, Dict]]:
+    ) -> Dict[str, Dict]:
         """
         Parse manifest from iterable (file pointer / String.IO)
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-        proj = self.sample_metadata_project
 
-        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
-        if len(sample_map) == 0:
-            raise ValueError(f'{proj}: The manifest file contains no records')
+        sample_map: Dict[str, Any] = {}
+        participant_map: Dict[str, Any] = {}
 
-        # now we can start adding!!
-        sapi = SampleApi()
-        seqapi = SequenceApi()
-        analysisapi = AnalysisApi()
+        if self.has_participants(file_pointer, delimiter):
+            participant_map = await self.file_pointer_to_participant_map(
+                file_pointer, delimiter
+            )
+        else:
+            sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
 
-        # determine if any samples exist
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
-            self.sample_metadata_project, list(sample_map.keys()), allow_missing=True
-        )
-        existing_cpgid_to_seq_id = {}
-
-        if len(existing_external_id_to_cpgid) > 0:
-            existing_cpgid_to_seq_id = (
-                await seqapi.get_sequence_ids_from_sample_ids_async(
-                    request_body=list(existing_external_id_to_cpgid.values()),
-                )
+        if len(sample_map) == 0 and len(participant_map) == 0:
+            raise ValueError(
+                f'{self.sample_metadata_project}: The manifest file contains no records'
             )
 
+        if len(sample_map) != 0:
+            return await self.parse_manifest_by_samples(
+                sample_map, confirm=confirm, dry_run=dry_run
+            )
+
+        return await self.parse_manifest_by_participants(
+            participant_map, confirm=confirm, dry_run=dry_run
+        )
+
+    def upsert_summary(
+        self,
+        existing_summary: Dict[str, Dict[str, List[Any]]],
+        participants_to_upsert: List[ParticipantUpsert],
+        samples_to_upsert: List[SampleBatchUpsert],
+        sequences_to_upsert: List[SequenceUpsert],
+        analyses_to_add: Dict[str, List[AnalysisModel]],
+    ) -> Dict[str, Dict[str, List[Any]]]:
+        """Given lists of values to upsert return grouped summary of updates and inserts"""
+
+        def upsert_type(item: Dict[str, Any]) -> str:
+            return 'update' if hasattr(item, 'id') else 'insert'
+
+        # Set initial dictionary value
+        summary: Dict[str, Dict[str, List[Any]]] = (
+            existing_summary.copy()
+            if existing_summary
+            else defaultdict(lambda: defaultdict(list))
+        )
+
+        for participant in participants_to_upsert:
+            summary['participants'][upsert_type(participant)].append(participant)
+
+        for sample in samples_to_upsert:
+            summary['samples'][upsert_type(sample)].append(sample)
+
+        for sequence in sequences_to_upsert:
+            summary['sequences'][upsert_type(sequence)].append(sequence)
+
+        for sid, analyses in analyses_to_add.items():
+            summary['analyses'][sid].extend(analyses)
+
+        return summary
+
+    async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
+        """Given an analyses dictionary add analyses"""
+        proj = self.sample_metadata_project
+        analysisapi = AnalysisApi()
+
+        logger.info(
+            f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
+        )
+        unwrapped_analysis_to_add = [
+            (sample_id, a)
+            for (sample_id, analyses) in analyses_to_add.items()
+            for a in analyses
+        ]
+
+        results = []
+        for chunked_analysis in chunk(unwrapped_analysis_to_add):
+            promises = []
+            for external_id, analysis in chunked_analysis:
+                analysis.sample_ids = [external_to_internal_id_map[external_id]]
+                promises.append(
+                    analysisapi.create_new_analysis_async(
+                        project=proj, analysis_model=analysis
+                    )
+                )
+            results.append(await asyncio.gather(*promises))
+
+        return results
+
+    async def parse_manifest_by_participants(
+        self,
+        participant_map: Dict[str, Any],
+        confirm: bool = False,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Parses a manifest of data that is keyed on participant id and sample id"""
+
+        proj = self.sample_metadata_project
+
         # all dicts indexed by external_sample_id
+        summary: Dict[str, Dict[str, List[Any]]] = None
+        all_participants: List[ParticipantUpsert] = []
         analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-        samples_to_add: List[SampleBatchUpsertItem] = []
-        samples_to_update: List[SampleBatchUpsertItem] = []
-        sequences_to_add: List[SequenceUpsert] = []
-        sequences_to_update: List[SequenceUpsert] = []
 
         # we'll batch process the samples as not to open too many threads
-
-        for ex_sample_ids in chunk(list(sample_map.keys())):
+        for external_pids in chunk(list(participant_map.keys())):
 
             current_batch_promises = {}
             if self.verbose:
-                logger.info(f'{proj}:Preparing {", ".join(ex_sample_ids)}')
+                logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
-            for external_sample_id in ex_sample_ids:
-                rows: Union[Dict[str, str], List[Dict[str, str]]] = sample_map[
-                    external_sample_id
-                ]
-                cpg_sample_id = existing_external_id_to_cpgid.get(external_sample_id)
-                promise = self.process_group(
-                    rows=rows,
-                    external_sample_id=external_sample_id,
-                    cpg_sample_id=cpg_sample_id,
-                    sequence_id=existing_cpgid_to_seq_id.get(cpg_sample_id),
+            for external_pid in external_pids:
+                sample_map = participant_map[external_pid]
+                promise = self.process_participant_group(external_pid, sample_map)
+                current_batch_promises[external_pid] = promise
+
+            processed_ex_pids = list(current_batch_promises.keys())
+            batch_promises = list(current_batch_promises.values())
+            resolved_promises = await asyncio.gather(*batch_promises)
+
+            for external_pid, resolved_promise in zip(
+                processed_ex_pids, resolved_promises
+            ):
+                (
+                    participant_to_upsert,
+                    samples_to_upsert,
+                    sequences_to_upsert,
+                    analysis_to_add,
+                ) = resolved_promise
+
+                if analysis_to_add:
+                    analyses_to_add[external_pid] = analysis_to_add
+
+                if participant_to_upsert:
+                    all_participants.append(participant_to_upsert)
+
+                # Get summary information
+                summary = self.upsert_summary(
+                    summary,
+                    [participant_to_upsert],
+                    samples_to_upsert,
+                    sequences_to_upsert,
+                    {external_pid: analysis_to_add},
                 )
-                current_batch_promises[external_sample_id] = promise
+
+        message = f"""\
+            {proj}: Processing participants: {', '.join(participant_map.keys())}
+
+            Adding {len(summary['participants']['insert'])} participants
+            Adding {len(summary['samples']['insert'])} samples
+            Adding {len(summary['sequences']['insert'])} sequences
+            Adding {len(summary['analyses']['insert'])} analysis
+
+            Updating {len(summary['participants']['update'])} participants
+            Updating {len(summary['samples']['update'])} samples
+            Updating {len(summary['sequences']['update'])} sequences
+        """
+
+        if dry_run:
+            logger.info('Dry run, so returning without inserting / updating metadata')
+            return summary
+
+        if confirm:
+            resp = str(input(message + '\n\nConfirm (y): '))
+            if resp.lower() != 'y':
+                raise SystemExit()
+        else:
+            logger.info(message)
+
+        # Batch update
+        result = self.papi.batch_upsert_participants(
+            proj, ParticipantUpsertBody(participants=all_participants)
+        )
+
+        return result
+
+    async def parse_manifest_by_samples(
+        self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """Parses a manifest of data that is keyed on sample id"""
+
+        proj = self.sample_metadata_project
+
+        # now we can start adding!!
+        sapi = SampleApi()
+
+        # Map external sids into cpg ids
+        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+            proj, list(sample_map.keys()), allow_missing=True
+        )
+
+        # all dicts indexed by external_sample_id
+        summary: Dict[str, Dict[str, List[Any]]] = None
+        all_samples: List[SampleBatchUpsert] = []
+        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
+
+        # we'll batch process the samples as not to open too many threads
+        for external_sids in chunk(list(sample_map.keys())):
+
+            current_batch_promises = {}
+            if self.verbose:
+                logger.info(f'{proj}:Preparing {", ".join(external_sids)}')
+
+            for external_sid in external_sids:
+                rows: GroupedRow = sample_map[external_sid]
+                cpg_id = existing_external_id_to_cpgid.get(external_sid, None)
+                promise = self.process_sample_group(rows, external_sid, cpg_id)
+                current_batch_promises[external_sid] = promise
+
             processed_ex_sids = list(current_batch_promises.keys())
             batch_promises = list(current_batch_promises.values())
             resolved_promises = await asyncio.gather(*batch_promises)
 
-            all_samples = []
-
-            for external_sample_id, resolved_promise in zip(
+            for external_sid, resolved_promise in zip(
                 processed_ex_sids, resolved_promises
             ):
                 (
                     sample_to_upsert,
-                    sequence_to_upsert,
+                    sequences_to_upsert,
                     analysis_to_add,
                 ) = resolved_promise
-                cpg_sample_id = existing_external_id_to_cpgid.get(external_sample_id)
-
-                if analysis_to_add:
-                    analyses_to_add[external_sample_id] = analysis_to_add
 
                 # Extract Upsert items and add to an array
-                # Also joins sequences to corresponding sequence
+                if analysis_to_add:
+                    analyses_to_add[external_sid] = analysis_to_add
+
                 if sample_to_upsert:
                     all_samples.append(sample_to_upsert)
-                    if hasattr(sample_to_upsert, 'id'):
-                        samples_to_update.append(sample_to_upsert)
-                    else:
-                        samples_to_add.append(sample_to_upsert)
 
-                if sequence_to_upsert:
-                    if hasattr(sequence_to_upsert, 'id'):
-                        sequences_to_update.append(sequence_to_upsert)
-                    else:
-                        sequences_to_add.append(sequence_to_upsert)
+                # Get summary information
+                summary = self.upsert_summary(
+                    summary,
+                    [],
+                    [sample_to_upsert],
+                    sequences_to_upsert,
+                    {external_sid: analysis_to_add},
+                )
 
         message = f"""\
-{proj}: Processing samples: {', '.join(sample_map.keys())}
+            {proj}: Processing samples: {', '.join(sample_map.keys())}
 
-Adding {len(samples_to_add)} samples
-Adding {len(sequences_to_add)} sequences
-Adding {len(analyses_to_add)} analysis results
+            Adding {len(summary['samples']['insert'])} samples
+            Adding {len(summary['sequences']['insert'])} sequences
+            Adding {len(summary['analyses']['insert'])} analyses
 
-Updating {len(samples_to_update)} samples
-Updating {len(sequences_to_update)} sequences"""
+            Updating {len(summary['samples']['update'])} samples
+            Updating {len(summary['sequences']['update'])} sequences
+        """
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
-            return (
-                samples_to_add,
-                samples_to_update,
-                sequences_to_add,
-                sequences_to_update,
-                analyses_to_add,
-            )
+            return summary
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
@@ -524,27 +862,15 @@ Updating {len(sequences_to_update)} sequences"""
 
         # Batch update
         result = sapi.batch_upsert_samples(
-            self.sample_metadata_project, SampleBatchUpsert(samples=all_samples)
+            proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
-        logger.info(
-            f'{proj}: Adding analysis entries for {len(analyses_to_add)} samples'
+        # Add analyses
+        # Map external sids into cpg ids
+        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+            proj, list(sample_map.keys()), allow_missing=True
         )
-        unwrapped_analysis_to_add = [
-            (sample_id, a)
-            for (sample_id, analyses) in analyses_to_add.items()
-            for a in analyses
-        ]
-        for chunked_analysis in chunk(unwrapped_analysis_to_add):
-            promises = []
-            for sample_id, analysis in chunked_analysis:
-                analysis.sample_ids = [existing_external_id_to_cpgid[sample_id]]
-                promises.append(
-                    analysisapi.create_new_analysis_async(
-                        project=self.sample_metadata_project, analysis_model=analysis
-                    )
-                )
-            await asyncio.gather(*promises)
+        _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
 
         return result
 
@@ -699,8 +1025,8 @@ Updating {len(sequences_to_update)} sequences"""
     async def create_file_object(
         self,
         filename: str,
-        secondary_files: List[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        secondary_files: List[SingleRow] = None,
+    ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
         checksum = None
         file_size = None
@@ -729,7 +1055,7 @@ Updating {len(sequences_to_update)} sequences"""
 
     async def create_secondary_file_objects_by_potential_pattern(
         self, filename, potential_secondary_patterns: List[str]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[SingleRow]:
         """
         Take a base filename and potential secondary patterns:
         - Try each secondary pattern, see if it works

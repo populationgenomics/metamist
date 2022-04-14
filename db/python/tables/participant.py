@@ -97,6 +97,7 @@ RETURNING id
     async def update_participant(
         self,
         participant_id: int,
+        external_id: str = None,
         reported_sex: int = None,
         reported_gender: str = None,
         karyotype: str = None,
@@ -108,6 +109,10 @@ RETURNING id
         """
         updaters = ['author = :author']
         fields = {'pid': participant_id, 'author': author or self.author}
+
+        if external_id:
+            updaters.append('external_id = :external_id')
+            fields['external_id'] = external_id
 
         if reported_sex:
             updaters.append('reported_sex = :reported_sex')
