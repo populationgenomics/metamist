@@ -334,4 +334,17 @@
 		</sql>
 
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-04-19_secrets-to-groups">
+
+		<renameColumn
+            newColumnName="read_secret_name"
+            oldColumnName="read_group_name"
+            tableName="project"
+		/>
+		<renameColumn
+			newColumnName="write_secret_name"
+            oldColumnName="write_group_name"
+            tableName="project"
+		/>
+	</changeSet>
 </databaseChangeLog>
