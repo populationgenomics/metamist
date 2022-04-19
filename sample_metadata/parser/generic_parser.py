@@ -602,10 +602,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-
         sample_map: Dict[str, Any] = {}
         participant_map: Dict[str, Any] = {}
-
         if self.has_participants(file_pointer, delimiter):
             participant_map = await self.file_pointer_to_participant_map(
                 file_pointer, delimiter
@@ -780,7 +778,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on sample id"""
-
         proj = self.sample_metadata_project
 
         # now we can start adding!!

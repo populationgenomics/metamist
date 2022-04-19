@@ -198,7 +198,6 @@ async def batch_upsert_participants(
     Upserts a list of participants with samples and sequences
     Returns the list of internal sample IDs
     """
-
     # Convert id in samples to int
     for participant in participants.participants:
         for sample in participant.samples:
@@ -214,11 +213,12 @@ async def batch_upsert_participants(
         results = await pt.batch_upsert_participants(participants)
         pid_key = dict(zip(results.keys(), external_pids))
 
-        # Map sids back from ints to strs
+        mapped_results: Dict[str, Any] = {}
         for pid, samples in results.items():
             for iid, seqs in samples.items():
                 data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
-                results[pid][sample_id_format(iid)] = data
-            results[pid]['participant_id'] = pid_key[pid]
+                mapped_results[pid] = {}
+                mapped_results[pid][sample_id_format(iid)] = data
+            mapped_results[pid]['participant_id'] = pid_key[pid]
 
-        return results
+        return mapped_results
