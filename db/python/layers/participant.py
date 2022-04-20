@@ -738,6 +738,23 @@ class ParticipantLayer(BaseLayer):
         # Create or update participants
         pids = [await self.upsert_participant(p) for p in all_participants]
 
+        # Pull a list of external pids
+        epids = [str(participant.external_id) for participant in all_participants]
+
+        # Get map of external pids to internal pids
+        epid_ipid_map = await self.get_id_map_by_external_ids(
+            epids,
+            project=self.connection.project,
+            allow_missing=False,
+        )
+
+        for participant in all_participants:
+            epid = participant.external_id
+            ipid = epid_ipid_map[epid]
+
+            for sample in participant.samples:
+                sample.participant_id = ipid
+
         # Upsert all samples with sequences for each participant
         samples = [SampleBatchUpsertBody(samples=p.samples) for p in all_participants]
         results = [await sampt.batch_upsert_samples(s) for s in samples]
