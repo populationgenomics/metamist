@@ -61,6 +61,40 @@ class SampleSequenceLayer(BaseLayer):
 
         return sequence_id
 
+    async def get_latest_sequence_id_from_sample_id_and_type(
+        self, sample_id: int, stype: SequenceType, check_project_id=True
+    ) -> int:
+        """Get latest added sequence ID from internal sample_id"""
+        (
+            project,
+            sequence_id,
+        ) = await self.seqt.get_latest_sequence_id_from_sample_id_and_type(
+            sample_id, stype
+        )
+
+        if check_project_id:
+            await self.ptable.check_access_to_project_id(
+                self.author, project, readonly=True
+            )
+
+        return sequence_id
+
+    async def get_all_sequence_id_for_sample_id(
+        self, sample_id: int, check_project_id=True
+    ) -> Dict[str, int]:
+        """Get all sequence IDs for a sample id, returned as a map with key being sequence type"""
+        (
+            projects,
+            sequence_id_map,
+        ) = await self.seqt.get_all_sequence_id_for_sample_id(sample_id)
+
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids=projects, readonly=True
+            )
+
+        return sequence_id_map
+
     async def get_sequences_for_sample_ids(
         self,
         sample_ids: List[int],
@@ -80,6 +114,27 @@ class SampleSequenceLayer(BaseLayer):
             )
 
         return sequences
+
+    async def get_sequence_ids_from_sample_ids(
+        self, sample_ids: List[int], check_project_ids=True
+    ):
+        """
+        Get the IDs of of all sequences for a sample, keyed by the internal sample ID
+        """
+        (
+            project_ids,
+            sample_sequence_map,
+        ) = await self.seqt.get_sequence_ids_from_sample_ids(sample_ids=sample_ids)
+
+        if not sample_sequence_map:
+            return sample_sequence_map
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=True
+            )
+
+        return sample_sequence_map
 
     async def get_latest_sequence_ids_for_sample_ids(
         self, sample_ids: List[int], check_project_ids=True
