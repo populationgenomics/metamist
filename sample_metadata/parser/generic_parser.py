@@ -529,11 +529,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         internal_id = existing_participant_ids.get(participant_name, None)
 
-        # now we have sample / sequencing meta across 4 different rows, so collapse them
+        # pull relevant participant fields
         reported_sex = self.get_reported_sex(all_rows)
         reported_gender = self.get_reported_gender(all_rows)
         karyotype = self.get_karyotype(all_rows)
 
+        # now we have sample / sequencing meta across 4 different rows, so collapse them
         collapsed_participant_meta = await self.get_participant_meta(
             internal_id, all_rows
         )
