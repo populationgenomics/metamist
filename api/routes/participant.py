@@ -1,4 +1,5 @@
 from typing import Any, List, Optional, Dict
+from collections import defaultdict
 
 import io
 import csv
@@ -213,11 +214,10 @@ async def batch_upsert_participants(
         results = await pt.batch_upsert_participants(participants)
         pid_key = dict(zip(results.keys(), external_pids))
 
-        mapped_results: Dict[str, Any] = {}
+        mapped_results: Dict[str, Any] = defaultdict(dict)
         for pid, samples in results.items():
             for iid, seqs in samples.items():
                 data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
-                mapped_results[pid] = {}
                 mapped_results[pid][sample_id_format(iid)] = data
             mapped_results[pid]['participant_id'] = pid_key[pid]
 
