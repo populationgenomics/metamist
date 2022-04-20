@@ -199,23 +199,20 @@ class GenericMetadataParser(GenericParser):
             return None
 
         reported_sex = row[0].get(self.reported_sex_column, None)
-        match reported_sex.lower():
-            case None:
-                return 0
-            case 'female':
-                return 2
-            case 'male':
-                return 1
-    
+
+        if reported_sex.lower() == 'female':
+            return 2
+        if reported_sex.lower() == 'male':
+            return 1
+        return 0
+
     def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
         """Get reported gender from grouped row"""
         return row[0].get(self.reported_gender_column, None)
-        
 
     def get_karyotype(self, row: GroupedRow) -> Optional[str]:
         """Get karyotype from grouped row"""
         return row[0].get(self.karyotype_column, None)
-
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""

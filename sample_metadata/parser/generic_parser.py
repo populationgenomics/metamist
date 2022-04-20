@@ -718,8 +718,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on participant id and sample id"""
-        # print("We're paresing manifest by participants")
-        # print(participant_map)
 
         proj = self.sample_metadata_project
 
