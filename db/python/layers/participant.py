@@ -745,12 +745,12 @@ class ParticipantLayer(BaseLayer):
         epid_ipid_map = await self.get_id_map_by_external_ids(
             epids,
             project=self.connection.project,
-            allow_missing=True,
+            allow_missing=False,
         )
 
         for participant in all_participants:
-            pid = participant.external_id
-            ipid = epid_ipid_map[pid]
+            epid = participant.external_id
+            ipid = epid_ipid_map[epid]
 
             for sample in participant.samples:
                 sample.participant_id = ipid
