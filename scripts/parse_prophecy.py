@@ -9,14 +9,9 @@ gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
 """
 
 import logging
-import traceback
 from typing import List, Dict, Any
 import click
 
-from sample_metadata.exceptions import ApiException
-from sample_metadata.api.participant_api import ParticipantUpdateModel
-from sample_metadata.api.sample_api import SampleApi
-from sample_metadata.api.participant_api import ParticipantApi
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     GroupedRow,
@@ -35,10 +30,6 @@ SEQUENCE_META_MAP = {
 }
 
 SAMPLE_META_MAP = {
-    'Sex': 'sex',
-}
-
-PARTICIPANT_META_MAP = {
     'Sex': 'sex',
 }
 
@@ -139,7 +130,7 @@ async def main(
         search_locations=search_locations,
         sample_name_column='External ID',
         participant_column='External ID',
-        participant_meta_map=PARTICIPANT_META_MAP,
+        reported_gender_column='Sex',
         sample_meta_map=SAMPLE_META_MAP,
         qc_meta_map={},
         sequence_meta_map=SEQUENCE_META_MAP,
@@ -153,42 +144,6 @@ async def main(
             confirm=confirm,
             dry_run=dry_run,
         )
-
-    # add_participant_meta(sample_metadata_project)
-
-
-def add_participant_meta(sample_metadata_project: str):
-    """
-    Fill in Participant entries. We don't have pedigree data, we only
-    need to add the reported_gender field, similar to tob-wgs.
-    """
-    papi = ParticipantApi()
-    papi.fill_in_missing_participants(sample_metadata_project)
-
-    sapi = SampleApi()
-    samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': [sample_metadata_project],
-            'active': True,
-        }
-    )
-
-    id_map = papi.get_participant_id_map_by_external_ids(
-        sample_metadata_project, [s['external_id'] for s in samples]
-    )
-
-    for sample in samples:
-        updated_participant = ParticipantUpdateModel()
-        updated_participant['reported_gender'] = sample['meta'].get('sex')
-        participant_id = id_map[sample['external_id']]
-        try:
-            papi.update_participant(
-                participant_id=participant_id,
-                participant_update_model=updated_participant,
-            )
-        except ApiException:
-            traceback.print_exc()
-            print(f'Error updating participant {participant_id}, skipping.')
 
 
 if __name__ == '__main__':
