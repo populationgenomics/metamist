@@ -748,14 +748,12 @@ class ParticipantLayer(BaseLayer):
             allow_missing=True,
         )
 
-        esid_ipid_map: Dict[str, str] = {}
         for participant in all_participants:
             pid = participant.external_id
             ipid = epid_ipid_map[pid]
 
             for sample in participant.samples:
                 sample.participant_id = ipid
-                esid_ipid_map[sample.external_id] = pid
 
         # Upsert all samples with sequences for each participant
         samples = [SampleBatchUpsertBody(samples=p.samples) for p in all_participants]
