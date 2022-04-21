@@ -1,3 +1,4 @@
+# pylint: disable=global-statement
 import asyncio
 from typing import Dict, List, Set, Iterable, Optional, Tuple
 
@@ -13,7 +14,19 @@ from models.models.project import ProjectRow
 # minutes
 PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
-ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
+_ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
+
+
+def is_full_access():
+    """Does SM have full access"""
+    return _ALLOW_FULL_ACCESS
+
+
+def set_full_access(access):
+    """Set full_access for future use"""
+    global _ALLOW_FULL_ACCESS
+    _ALLOW_FULL_ACCESS = access
+
 
 logger = get_logger()
 
@@ -49,10 +62,12 @@ class ProjectPermissionsTable:
 
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
-    def __init__(self, connection: Database, allow_full_access=ALLOW_FULL_ACCESS):
+    def __init__(self, connection: Database, allow_full_access=None):
 
         self.connection: Database = connection
-        self.allow_full_access = allow_full_access
+        self.allow_full_access = (
+            allow_full_access if allow_full_access is not None else is_full_access()
+        )
 
     def _get_secret_manager_client(self):
         if not self._cached_client:
@@ -117,9 +132,16 @@ class ProjectPermissionsTable:
         if not readonly:
             # validate write privileges here connection
             pass
-        users = await self.get_allowed_users_for_project_id(
-            project_id, readonly=readonly
-        )
+        try:
+            users = await self.get_allowed_users_for_project_id(
+                project_id, readonly=readonly
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            if raise_exception:
+                raise e
+
+            return False
+
         has_access = users is None or user in users
         if not has_access and raise_exception:
             project_name = (await self.get_project_id_map())[project_id].name

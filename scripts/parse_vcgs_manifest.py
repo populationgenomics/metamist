@@ -5,11 +5,12 @@ import re
 from typing import Dict, List, Any
 
 import click
+from sample_metadata.model.sequence_type import SequenceType
 
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    GroupedRow,
     run_as_sync,
+    SingleRow,
 )
 
 rmatch = re.compile(r'_[Rr]\d')
@@ -39,6 +40,11 @@ class Columns:
     REVERSE_READ_LENGTH = 'reverse_read_length'
     FILETYPE = 'filetype'
     FILENAME = 'filename'
+
+    @staticmethod
+    def participant_meta_map():
+        """Participant meta map, default return nothing for vcgs"""
+        return {}
 
     @staticmethod
     def sequence_meta_map():
@@ -84,6 +90,7 @@ class VcgsManifestParser(GenericMetadataParser):
             default_sample_type=default_sample_type,
             sample_name_column=Columns.SAMPLE_NAME,
             reads_column=Columns.FILENAME,
+            participant_meta_map=Columns.participant_meta_map(),
             sample_meta_map=Columns.sample_meta_map(),
             sequence_meta_map=Columns.sequence_meta_map(),
             qc_meta_map={},
@@ -97,16 +104,13 @@ class VcgsManifestParser(GenericMetadataParser):
             external_id = external_id.split('-')[0]
         return external_id
 
-    def get_sequence_type(self, sample_id: str, row: GroupedRow) -> str:
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
-        if not isinstance(row, list):
-            row = [row]
+        sample_id = self.get_sample_id(row)
 
-        types = list(
-            set(r[Columns.LIBRARY_STRATEGY] for r in row if r[Columns.LIBRARY_STRATEGY])
-        )
+        types = row.get(Columns.LIBRARY_STRATEGY, None)
         if len(types) <= 0:
             if (
                 self.default_sequence_type is None
@@ -116,7 +120,7 @@ class VcgsManifestParser(GenericMetadataParser):
                     f"Couldn't detect sequence type for sample {sample_id}, and "
                     'no default was available.'
                 )
-            return self.default_sequence_type
+            return SequenceType(self.default_sequence_type)
         if len(types) > 1:
             raise ValueError(
                 f'Multiple library types for same sample {sample_id}, '
@@ -127,9 +131,9 @@ class VcgsManifestParser(GenericMetadataParser):
 
         type_ = types[0].lower()
         if type_ == 'wgs':
-            return 'wgs'
+            return SequenceType('genome')
         if type_ in ('single-cell', 'ss'):
-            return 'single-cell'
+            return SequenceType('single-cell')
 
         raise ValueError(f'Unrecognised sequencing type {type_}')
 
