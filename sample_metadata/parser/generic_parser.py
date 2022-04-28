@@ -305,17 +305,17 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
 
-    @abstractmethod
     def get_reported_sex(self, row: GroupedRow) -> Optional[int]:
         """Get reported sex from grouped row"""
+        return None
 
-    @abstractmethod
     def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
         """Get reported gender from grouped row"""
+        return None
 
-    @abstractmethod
     def get_karyotype(self, row: GroupedRow) -> Optional[str]:
         """Get karyotype from grouped row"""
+        return None
 
     # @abstractmethod
     def has_participants(self, file_pointer, delimiter: str) -> bool:
