@@ -28,3 +28,5 @@ web/src/sm-api/
 dist/
 build/
 test/*.sh
+.coverage
+coverage.xml
