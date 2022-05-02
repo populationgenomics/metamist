@@ -19,6 +19,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId
+from models.models.participant import ParticipantModel
 
 
 class ParticipantUpdateModel(BaseModel):
@@ -235,6 +236,27 @@ class ParticipantLayer(BaseLayer):
     def __init__(self, connection):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
+
+    async def get_participants(
+        self,
+        project: int,
+        external_participant_ids: List[str] = None,
+        internal_participant_ids: List[int] = None,
+    ):
+        """
+        Get participants for a project
+        """
+        internal_ids = set(internal_participant_ids or [])
+        if external_participant_ids:
+            id_map = await self.get_id_map_by_external_ids(
+                external_participant_ids, project, allow_missing=False
+            )
+            internal_ids.update(set(id_map.values()))
+
+        ps = await self.pttable.get_participants(
+            project=project, internal_participant_ids=list(internal_ids)
+        )
+        return [ParticipantModel(**p) for p in ps]
 
     async def fill_in_missing_participants(self):
         """Update the sequencing status from the internal sample id"""
