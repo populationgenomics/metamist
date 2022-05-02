@@ -102,14 +102,16 @@ ON DUPLICATE KEY UPDATE
         return True
 
     async def get_rows(
-        self, project: ProjectId, family_ids: Optional[List[int]] = None
+        self, project: ProjectId, family_ids: Optional[List[int]] = None, include_participants_not_in_families=False,
     ):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
+        If family_ids is not specified, and `include_participants_not_in_families` is True,
+            Get all participants from project and include them in pedigree
         """
         keys = [
             'fp.family_id',
-            'fp.participant_id',
+            'p.id as participant_id',
             'fp.paternal_participant_id',
             'fp.maternal_participant_id',
             'p.reported_sex as sex',
@@ -118,22 +120,43 @@ ON DUPLICATE KEY UPDATE
         keys_str = ', '.join(keys)
 
         values: Dict[str, Any] = {'project': project or self.project}
-        wheres = ['f.project = :project']
+        wheres = ['p.project = :project']
         if family_ids:
             wheres.append('family_id in :family_ids')
             values['family_ids'] = family_ids
 
+        if not include_participants_not_in_families:
+            wheres.append('f.project = :project')
+
         conditions = ' AND '.join(wheres)
 
         _query = f"""
-SELECT {keys_str} FROM family_participant fp
-INNER JOIN family f ON f.id = fp.family_id
-INNER JOIN participant p on fp.participant_id = p.id
-WHERE {conditions}
-        """
+            SELECT {keys_str} FROM family_participant fp
+            INNER JOIN family f ON f.id = fp.family_id
+            INNER JOIN participant p on fp.participant_id = p.id
+            WHERE {conditions}"""
+        if not family_ids and include_participants_not_in_families:
+            # rewrite the query to LEFT join from participants
+            # to include all participants
+            _query = f"""
+                SELECT {keys_str} FROM participant p
+                LEFT JOIN family_participant fp ON fp.participant_id = p.id
+                LEFT JOIN family f ON f.id = fp.family_id
+                WHERE {conditions}"""
 
         rows = await self.connection.fetch_all(_query, values)
-        return rows
+
+        ordered_keys = [
+            'family_id',
+            'participant_id',
+            'paternal_id',
+            'maternal_id',
+            'sex',
+            'affected',
+        ]
+        ds = [{k: r for k, r in zip(ordered_keys, row)} for row in rows]
+
+        return ds
 
     async def get_participant_family_map(
         self, participant_ids: List[int]
