@@ -427,8 +427,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # should we add or update sequencing
         if collapsed_sequencing_meta:
             for seq in collapsed_sequencing_meta:
+                sequence_id = sequence_ids.get(str(seq.sequence_type), None)
+                if isinstance(sequence_id, list):
+                    if len(sequence_id) > 1:
+                        raise ValueError(f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}')
+                    sequence_id = sequence_id[0]
                 args = {
-                    'id': sequence_ids.get(str(seq.sequence_type), None),
+                    'id': sequence_id,
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),

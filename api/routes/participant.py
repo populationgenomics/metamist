@@ -215,10 +215,16 @@ async def batch_upsert_participants(
         pid_key = dict(zip(results.keys(), external_pids))
 
         # Map sids back from ints to strs
+        outputs: Dict[str, Dict[str, Any]] = {}
         for pid, samples in results.items():
+            samples_output: Dict[str, Any] = {}
             for iid, seqs in samples.items():
-                data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
-                results[pid][sample_id_format(iid)] = data
-            results[pid]['participant_id'] = pid_key[pid]
+                data = {'sequences': seqs}
+                samples_output[sample_id_format(iid)] = data
+            outputs[pid_key[pid]] = {
+                'id': pid,
+                'external_id': pid_key[pid],
+                'samples': samples_output,
+            }
 
-        return results
+        return outputs
