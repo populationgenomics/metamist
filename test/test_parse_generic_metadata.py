@@ -223,10 +223,8 @@ class TestParseGenericMetadata(unittest.TestCase):
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('os.path.getsize')
-    async def test_rows_with_participant_meta(
+    async def test_rows_with_valid_participant_meta(
         self,
-        mock_stat_size,
         mock_get_sequence_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
@@ -239,22 +237,19 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
-        mock_stat_size.return_value = 111
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
         rows = [
-            'Individual ID\tSample ID\tFilenames\tType\tSex\tKaryotype',
-            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS\tFemale\tXX',
-            'Apollo\tsample_id002\tsample_id002.filename-R2.fastq.gz\tWGS\tMale\tXY',
-            'Athena\tsample_id003\tsample_id003.filename-R1.fastq.gz\t',
+            'Individual ID\tSample ID\tSex\tKaryotype',
+            'Demeter\tsample_id001\tFemale\tXX',
+            'Apollo\tsample_id002\tMale\tXY',
+            'Athena\tsample_id003',
         ]
 
         parser = GenericMetadataParser(
             search_locations=[],
             participant_column='Individual ID',
             sample_name_column='Sample ID',
-            reads_column='Filenames',
-            seq_type_column='Type',
             participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map={},
@@ -265,13 +260,6 @@ class TestParseGenericMetadata(unittest.TestCase):
             # doesn't matter, we're going to mock the call anyway
             sample_metadata_project='devdev',
         )
-
-        parser.filename_map = {
-            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
-            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
-            'sample_id002.filename-R2.fastq.gz': '/path/to/sample_id002.filename-R2.fastq.gz',
-            'sample_id003.filename-R1.fastq.gz': '/path/to/sample_id003.filename-R1.fastq.gz',
-        }
 
         # Call generic parser
         file_contents = '\n'.join(rows)
@@ -290,4 +278,49 @@ class TestParseGenericMetadata(unittest.TestCase):
         self.assertEqual(participants_to_add[2].get('reported_sex'), None)
         self.assertEqual(participants_to_add[2].get('reported_gender'), None)
         self.assertEqual(participants_to_add[2].get('karyotype'), None)
+        return
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    async def test_rows_with_invalid_participant_meta(
+        self,
+        mock_get_sample_id,
+        mock_get_participant_id_map_by_external_ids,
+    ):
+        """
+        Test importing a single rows with invalid participant metadata,
+        forms objects and checks response
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        """
+
+        mock_get_sample_id.return_value = {}
+        mock_get_participant_id_map_by_external_ids.return_value = {}
+
+        rows = [
+            'Individual ID\tSample ID\tSex\tKaryotype',
+            'Demeter\tsample_id001\tFemalee\tXX',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_column='Individual ID',
+            sample_name_column='Sample ID',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            reported_sex_column='Sex',
+            reported_gender_column='Sex',
+            karyotype_column='Karyotype',
+            # doesn't matter, we're going to mock the call anyway
+            sample_metadata_project='devdev',
+        )
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        with self.assertRaises(ValueError):
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
         return

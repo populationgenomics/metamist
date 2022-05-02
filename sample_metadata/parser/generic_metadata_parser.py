@@ -207,7 +207,9 @@ class GenericMetadataParser(GenericParser):
         if reported_sex.lower() == 'male':
             return 1
 
-        return None
+        raise ValueError(
+            f'{reported_sex} could not be identified as an input for reported_sex'
+        )
 
     def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
         """Get reported gender from grouped row"""
