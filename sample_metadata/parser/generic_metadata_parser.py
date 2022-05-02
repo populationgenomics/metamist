@@ -200,11 +200,14 @@ class GenericMetadataParser(GenericParser):
 
         reported_sex = row[0].get(self.reported_sex_column, None)
 
+        if reported_sex is None:
+            return None
         if reported_sex.lower() == 'female':
             return 2
         if reported_sex.lower() == 'male':
             return 1
-        return 0
+
+        return None
 
     def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
         """Get reported gender from grouped row"""
