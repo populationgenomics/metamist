@@ -7,3 +7,4 @@ pylint
 bump2version
 testcontainers[mariadb]
 nest-asyncio
+coverage

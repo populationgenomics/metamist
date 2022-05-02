@@ -21,11 +21,11 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'project',
     'analysis',
     'sample',
+    'participant',
     'analysis_sample',
     'sample_sequencing',
     'family',
     'family_participant',
-    'participant',
     'participant_phenotypes',
 ][::-1]
 
