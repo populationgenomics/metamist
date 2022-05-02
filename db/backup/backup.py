@@ -23,8 +23,13 @@ def perform_backup():
     utc_now = pytz.utc.localize(datetime.utcnow())
     timestamp_str = utc_now.strftime('%d_%m_%Y_%H-%M-%S')
 
-    # Export SQL Data
+    # Set up tmp dir
     tmp_dir = f'backup_{timestamp_str}'
+    subprocess.run(['mkdir', tmp_dir], check=True)
+    # grant permissions, so that mariadb can read ib_logfile0
+    subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
+
+    # Export SQL Data
     try:
         subprocess.run(
             [

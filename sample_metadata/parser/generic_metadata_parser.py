@@ -279,6 +279,10 @@ class GenericMetadataParser(GenericParser):
         if filename.startswith('gs://') or filename.startswith('/'):
             return filename
 
+        expanded_local_path = os.path.expanduser(filename)
+        if os.path.exists(expanded_local_path):
+            return expanded_local_path
+
         sps = ', '.join(self.search_locations)
         raise FileNotFoundError(
             f"Couldn't find file '{filename}' in search_paths: {sps}"
