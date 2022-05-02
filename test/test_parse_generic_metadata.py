@@ -232,7 +232,8 @@ class TestParseGenericMetadata(unittest.TestCase):
         """
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external,  get_participant_id_map_by_external_ids,
+        get_sequence_ids_from_sample_ids
         """
 
         mock_get_sample_id.return_value = {}
@@ -295,7 +296,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         """
         Test importing a single rows with invalid participant metadata,
         forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
         mock_get_sample_id.return_value = {}
