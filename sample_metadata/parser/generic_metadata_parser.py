@@ -86,6 +86,9 @@ class GenericMetadataParser(GenericParser):
         sample_metadata_project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
+        reported_sex_column: Optional[str] = None,
+        reported_gender_column: Optional[str] = None,
+        karyotype_column: Optional[str] = None,
         reads_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
@@ -115,6 +118,9 @@ class GenericMetadataParser(GenericParser):
 
         self.sample_name_column = sample_name_column
         self.participant_column = participant_column
+        self.reported_sex_column = reported_sex_column
+        self.reported_gender_column = reported_gender_column
+        self.karyotype_column = karyotype_column
         self.seq_type_column = seq_type_column
         self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
@@ -185,6 +191,35 @@ class GenericMetadataParser(GenericParser):
         if not self.participant_column or self.participant_column not in row:
             raise ValueError('Participant column does not exist')
         return row[self.participant_column]
+
+    def get_reported_sex(self, row: GroupedRow) -> Optional[int]:
+        """Get reported sex from grouped row"""
+
+        if not self.reported_sex_column:
+            return None
+
+        reported_sex = row[0].get(self.reported_sex_column, None)
+
+        if reported_sex is None:
+            return None
+        if reported_sex == '':
+            return None
+        if reported_sex.lower() == 'female':
+            return 2
+        if reported_sex.lower() == 'male':
+            return 1
+
+        raise ValueError(
+            f'{reported_sex} could not be identified as an input for reported_sex'
+        )
+
+    def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
+        """Get reported gender from grouped row"""
+        return row[0].get(self.reported_gender_column, None)
+
+    def get_karyotype(self, row: GroupedRow) -> Optional[str]:
+        """Get karyotype from grouped row"""
+        return row[0].get(self.karyotype_column, None)
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
