@@ -305,6 +305,18 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
 
+    def get_reported_sex(self, row: GroupedRow) -> Optional[int]:
+        """Get reported sex from grouped row"""
+        return None
+
+    def get_reported_gender(self, row: GroupedRow) -> Optional[str]:
+        """Get reported gender from grouped row"""
+        return None
+
+    def get_karyotype(self, row: GroupedRow) -> Optional[str]:
+        """Get karyotype from grouped row"""
+        return None
+
     # @abstractmethod
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
@@ -522,6 +534,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         internal_id = existing_participant_ids.get(participant_name, None)
 
+        # pull relevant participant fields
+        reported_sex = self.get_reported_sex(all_rows)
+        reported_gender = self.get_reported_gender(all_rows)
+        karyotype = self.get_karyotype(all_rows)
+
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         collapsed_participant_meta = await self.get_participant_meta(
             internal_id, all_rows
@@ -536,6 +553,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             'meta': collapsed_participant_meta.meta,
             'samples': samples_to_upsert,
         }
+
+        if reported_sex:
+            args['reported_sex'] = reported_sex
+        if reported_gender:
+            args['reported_gender'] = reported_gender
+        if karyotype:
+            args['karyotype'] = karyotype
+
         if not internal_id:
             del args['id']
 
@@ -607,10 +632,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-
         sample_map: Dict[str, Any] = {}
         participant_map: Dict[str, Any] = {}
-
         if self.has_participants(file_pointer, delimiter):
             participant_map = await self.file_pointer_to_participant_map(
                 file_pointer, delimiter
@@ -785,7 +808,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on sample id"""
-
         proj = self.sample_metadata_project
 
         # now we can start adding!!
