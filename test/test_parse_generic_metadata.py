@@ -244,6 +244,8 @@ class TestParseGenericMetadata(unittest.TestCase):
             'Demeter\tsample_id001\tMale\tNon-binary\tXY',
             'Apollo\tsample_id002\tFemale\tFemale\tXX',
             'Athena\tsample_id003\tFEMalE',
+            'Dionysus\tsample_id00x\t\tMale\tXX',
+            'Pluto\tsample_id00y',
         ]
 
         parser = GenericMetadataParser(
@@ -278,6 +280,8 @@ class TestParseGenericMetadata(unittest.TestCase):
         self.assertEqual(participants_to_add[2].reported_sex, 2)
         self.assertEqual(participants_to_add[2].get('reported_gender'), None)
         self.assertEqual(participants_to_add[2].get('karyotype'), None)
+        self.assertEqual(participants_to_add[3].reported_gender, 'Male')
+        self.assertEqual(participants_to_add[3].karyotype, 'XX')
         return
 
     @run_test_as_sync
@@ -299,7 +303,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         rows = [
             'Individual ID\tSample ID\tSex\tKaryotype',
-            'Demeter\tsample_id001\tFemalee\tXX',
+            'Athena\tsample_id003\tFemalee\tXX',
         ]
 
         parser = GenericMetadataParser(

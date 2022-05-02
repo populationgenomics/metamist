@@ -202,6 +202,8 @@ class GenericMetadataParser(GenericParser):
 
         if reported_sex is None:
             return None
+        if reported_sex == '':
+            return None
         if reported_sex.lower() == 'female':
             return 2
         if reported_sex.lower() == 'male':
