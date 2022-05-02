@@ -48,6 +48,9 @@ class NestedParticipant(BaseModel):
     meta: Optional[Dict]
     families: List[NestedFamily]
     samples: List[NestedSample]
+    reported_sex: Optional[int]
+    reported_gender: Optional[str]
+    karyotype: Optional[str]
 
 
 @dataclasses.dataclass
@@ -56,6 +59,7 @@ class ProjectSummary:
 
     total_samples: int
     participants: List[NestedParticipant]
+    participant_keys: List[str]
     sample_keys: List[str]
     sequence_keys: List[str]
 
@@ -204,7 +208,7 @@ class WebDb(DbBase):
         sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
 
         # participant
-        p_query = 'SELECT id, external_id, meta FROM participant WHERE id in :pids'
+        p_query = 'SELECT id, external_id, meta, reported_sex, reported_gender, karyotype FROM participant WHERE id in :pids'
         participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
 
         # family
@@ -259,7 +263,7 @@ WHERE fp.participant_id in :pids
             if pid is None:
                 pmodels.append(
                     NestedParticipant(
-                        id=None, external_id=None, meta=None, families=[], samples=[s]
+                        id=None, external_id=None, meta=None, families=[], samples=[s], reported_sex=None, reported_gender=None, karyotype=None
                     )
                 )
             elif pid not in pid_seen:
@@ -272,11 +276,22 @@ WHERE fp.participant_id in :pids
                         meta=json.loads(p['meta']),
                         families=pid_to_families.get(p['id'], []),
                         samples=list(smodels_by_pid.get(p['id'])),
+                        reported_sex=p['reported_sex'],
+                        reported_gender=p['reported_gender'],
+                        karyotype=p['karyotype'],
                     )
                 )
 
+        ignore_participant_keys = set()
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         ignore_sequence_meta_keys = {'reads', 'vcfs', 'gvcf'}
+
+        participant_meta_keys = set(
+            pk
+            for p in pmodels
+            for pk in p.meta.keys()
+            if pk not in ignore_participant_keys
+        )
         sample_meta_keys = set(
             sk
             for p in pmodels
@@ -293,6 +308,20 @@ WHERE fp.participant_id in :pids
             if (sk not in ignore_sequence_meta_keys)
         )
 
+        has_reported_sex = any(p.reported_sex for p in pmodels)
+        has_reported_gender = any(p.reported_gender for p in pmodels)
+        has_karyotype = any(p.karyotype for p in pmodels)
+
+        participant_keys = ['external_id']
+
+        if has_reported_sex:
+            participant_keys.append('reported_sex')
+        if has_reported_gender:
+            participant_keys.append('reported_gender')
+        if has_karyotype:
+            participant_keys.append('karyotype')
+
+        participant_keys.extend('meta.' + k for k in participant_meta_keys)
         sample_keys = ['id', 'external_id', 'created_date'] + [
             'meta.' + k for k in sample_meta_keys
         ]
@@ -300,6 +329,7 @@ WHERE fp.participant_id in :pids
 
         return ProjectSummary(
             participants=pmodels,
+            participant_keys=participant_keys,
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
             total_samples=total_samples,
