@@ -240,10 +240,10 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
         rows = [
-            'Individual ID\tSample ID\tSex\tKaryotype',
-            'Demeter\tsample_id001\tFemale\tXX',
-            'Apollo\tsample_id002\tMale\tXY',
-            'Athena\tsample_id003',
+            'Individual ID\tSample ID\tSex\tGender\tKaryotype',
+            'Demeter\tsample_id001\tMale\tNon-binary\tXY',
+            'Apollo\tsample_id002\tFemale\tFemale\tXX',
+            'Athena\tsample_id003\tFEMalE',
         ]
 
         parser = GenericMetadataParser(
@@ -255,7 +255,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
-            reported_gender_column='Sex',
+            reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
             sample_metadata_project='devdev',
@@ -269,13 +269,13 @@ class TestParseGenericMetadata(unittest.TestCase):
         participants_to_add = resp['participants']['insert']
 
         # Assert that the participant meta is there.
-        self.assertEqual(participants_to_add[0].reported_gender, 'Female')
-        self.assertEqual(participants_to_add[0].reported_sex, 2)
-        self.assertEqual(participants_to_add[0].karyotype, 'XX')
-        self.assertEqual(participants_to_add[1].reported_gender, 'Male')
-        self.assertEqual(participants_to_add[1].reported_sex, 1)
-        self.assertEqual(participants_to_add[1].karyotype, 'XY')
-        self.assertEqual(participants_to_add[2].get('reported_sex'), None)
+        self.assertEqual(participants_to_add[0].reported_gender, 'Non-binary')
+        self.assertEqual(participants_to_add[0].reported_sex, 1)
+        self.assertEqual(participants_to_add[0].karyotype, 'XY')
+        self.assertEqual(participants_to_add[1].reported_gender, 'Female')
+        self.assertEqual(participants_to_add[1].reported_sex, 2)
+        self.assertEqual(participants_to_add[1].karyotype, 'XX')
+        self.assertEqual(participants_to_add[2].reported_sex, 2)
         self.assertEqual(participants_to_add[2].get('reported_gender'), None)
         self.assertEqual(participants_to_add[2].get('karyotype'), None)
         return
@@ -311,7 +311,6 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
-            reported_gender_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
             sample_metadata_project='devdev',
