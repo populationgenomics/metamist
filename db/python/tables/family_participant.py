@@ -102,7 +102,10 @@ ON DUPLICATE KEY UPDATE
         return True
 
     async def get_rows(
-        self, project: ProjectId, family_ids: Optional[List[int]] = None, include_participants_not_in_families=False,
+        self,
+        project: ProjectId,
+        family_ids: Optional[List[int]] = None,
+        include_participants_not_in_families=False,
     ):
         """
         Get rows from database, return ALL rows unless family_ids is specified.
@@ -154,7 +157,7 @@ ON DUPLICATE KEY UPDATE
             'sex',
             'affected',
         ]
-        ds = [{k: r for k, r in zip(ordered_keys, row)} for row in rows]
+        ds = [dict(zip(ordered_keys, row)) for row in rows]
 
         return ds
 

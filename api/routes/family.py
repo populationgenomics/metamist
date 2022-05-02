@@ -1,6 +1,5 @@
 # pylint: disable=invalid-name
 import io
-import re
 import csv
 import codecs
 from enum import Enum
@@ -86,7 +85,7 @@ async def get_pedigree(
     include_header: bool = True,
     empty_participant_value: Optional[str] = None,
     connection: Connection = get_project_readonly_connection,
-    include_participants_not_in_families: bool=False,
+    include_participants_not_in_families: bool = False,
 ):
     """
     Generate tab-separated Pedigree file for ALL families

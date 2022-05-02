@@ -1,6 +1,5 @@
-from db.python.layers.family import FamilyLayer
-from db.python.layers.participant import ParticipantLayer
 from test.testbase import DbIsolatedTest, run_test_as_sync
+from db.python.layers.participant import ParticipantLayer
 
 
 class TestParticipant(DbIsolatedTest):
@@ -12,16 +11,10 @@ class TestParticipant(DbIsolatedTest):
 
         pl = ParticipantLayer(self.connection)
         await pl.create_participant(
-            external_id='EX01',
-            reported_sex=2,
-            karyotype='XX',
-            meta={'field': 1}
+            external_id='EX01', reported_sex=2, karyotype='XX', meta={'field': 1}
         )
         await pl.create_participant(
-            external_id='EX02',
-            reported_sex=1,
-            karyotype='XY',
-            meta={'field': 2}
+            external_id='EX02', reported_sex=1, karyotype='XY', meta={'field': 2}
         )
 
     @run_test_as_sync

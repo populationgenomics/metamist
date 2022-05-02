@@ -18,4 +18,3 @@ class ParticipantModel(BaseModel):
             data['meta'] = json.loads(data['meta'])
 
         super().__init__(**data)
-

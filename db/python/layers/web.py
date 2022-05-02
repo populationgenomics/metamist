@@ -4,7 +4,7 @@ import dataclasses
 import json
 from collections import defaultdict
 from itertools import groupby
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel
 
@@ -196,7 +196,11 @@ class WebDb(DbBase):
 
         if len(sample_rows) == 0:
             return ProjectSummary(
-                participants=[], sample_keys=[], sequence_keys=[], total_samples=0
+                participants=[],
+                participant_keys=[],
+                sample_keys=[],
+                sequence_keys=[],
+                total_samples=0,
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -263,7 +267,14 @@ WHERE fp.participant_id in :pids
             if pid is None:
                 pmodels.append(
                     NestedParticipant(
-                        id=None, external_id=None, meta=None, families=[], samples=[s], reported_sex=None, reported_gender=None, karyotype=None
+                        id=None,
+                        external_id=None,
+                        meta=None,
+                        families=[],
+                        samples=[s],
+                        reported_sex=None,
+                        reported_gender=None,
+                        karyotype=None,
                     )
                 )
             elif pid not in pid_seen:
@@ -282,7 +293,7 @@ WHERE fp.participant_id in :pids
                     )
                 )
 
-        ignore_participant_keys = set()
+        ignore_participant_keys: Set[str] = set()
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
         ignore_sequence_meta_keys = {'reads', 'vcfs', 'gvcf'}
 

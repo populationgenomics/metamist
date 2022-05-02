@@ -46,6 +46,7 @@ async def get_participants(
     internal_participant_ids: List[int] = None,
     connection: Connection = get_project_readonly_connection,
 ):
+    """Get participants, default ALL participants in project"""
     player = ParticipantLayer(connection)
     return await player.get_participants(
         project=connection.project,
