@@ -19,6 +19,20 @@ class ParticipantTable(DbBase):
         )
         return set(r['project'] for r in rows)
 
+    async def get_participants(
+        self, project: int, internal_participant_ids: List[int] = None
+    ):
+        """
+        Get participants for a project
+        """
+        values: Dict[str, Any] = {'project': project}
+        if internal_participant_ids:
+            _query = 'SELECT * FROM participant WHERE project = :project AND id in :ids'
+            values['ids'] = internal_participant_ids
+        else:
+            _query = 'SELECT * FROM participant WHERE project = :project'
+        return await self.connection.fetch_all(_query, values)
+
     async def create_participant(
         self,
         external_id: str,

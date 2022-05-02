@@ -133,7 +133,7 @@ export const ProjectSummary = () => {
 
             const headers = [
                 'Family ID',
-                'Participant',
+                ...(summary.participant_keys.map(pk => pk.replace(".meta", ""))),
                 ...(summary.sample_keys.map(sk => sk.replace(".meta", ""))),
                 ...(summary.sequence_keys.map(sk => "sequence." + sk.replace(".meta", ""))),
             ]
@@ -150,9 +150,10 @@ export const ProjectSummary = () => {
                         const backgroundColor = pidx % 2 === 0 ? 'white' : 'var(--bs-table-striped-bg)'
                         const lengthOfParticipant = p.samples.map(s => s.sequences.length).reduce((a, b) => a + b, 0)
                         return s.sequences.map((seq, seqidx) => {
+                            const isFirstOfGroup = sidx === 0 && seqidx === 0
                             return <tr key={`${p.external_id}-${s.id}-${seq.id}`}>
-                                {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.families.map(f => f.external_id).join(', ')}</td>}
-                                {sidx === 0 && seqidx === 0 && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.external_id}</td>}
+                                {isFirstOfGroup && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.families.map(f => f.external_id).join(', ')}</td>}
+                                {isFirstOfGroup && summary.participant_keys.map(k => <td style={{ backgroundColor }} key={p.id + 'participant.' + k} rowSpan={lengthOfParticipant}>{sanitiseValue(_.get(p, k))}</td>)}
                                 {seqidx === 0 && summary.sample_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sample.' + k} rowSpan={s.sequences.length}>{sanitiseValue(_.get(s, k))}</td>)}
                                 {seq && summary.sequence_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sequence.' + k}>{sanitiseValue(_.get(seq, k))}</td>)}
                             </tr>

@@ -1,6 +1,5 @@
 # pylint: disable=invalid-name
 import io
-import re
 import csv
 import codecs
 from enum import Enum
@@ -18,7 +17,7 @@ from api.utils.db import (
     Connection,
 )
 from api.utils.extensions import guess_delimiter_by_filename
-from db.python.layers.family import FamilyLayer
+from db.python.layers.family import FamilyLayer, PedRow
 from models.models.family import Family
 from models.models.sample import sample_id_transform_to_raw_list
 
@@ -84,8 +83,9 @@ async def get_pedigree(
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     include_header: bool = True,
-    empty_participant_value: Optional[str] = '',
+    empty_participant_value: Optional[str] = None,
     connection: Connection = get_project_readonly_connection,
+    include_participants_not_in_families: bool = False,
 ):
     """
     Generate tab-separated Pedigree file for ALL families
@@ -97,13 +97,13 @@ async def get_pedigree(
 
     family_layer = FamilyLayer(connection)
     assert connection.project
-    pedigree_rows = await family_layer.get_pedigree(
+    pedigree_dicts = await family_layer.get_pedigree(
         project=connection.project,
         family_ids=internal_family_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
         replace_with_family_external_ids=replace_with_family_external_ids,
         empty_participant_value=empty_participant_value,
-        include_header=True,
+        include_participants_not_in_families=include_participants_not_in_families,
     )
 
     if response_type in (ContentType.CSV, ContentType.TSV):
@@ -111,9 +111,18 @@ async def get_pedigree(
         output = io.StringIO()
         writer = csv.writer(output, delimiter=delim)
 
-        if not include_header:
-            pedigree_rows.pop(0)
+        if include_header:
+            writer.writerow(PedRow.row_header())
 
+        keys = [
+            'family_id',
+            'participant_id',
+            'paternal_id',
+            'maternal_id',
+            'sex',
+            'affected',
+        ]
+        pedigree_rows = [[(row[k] or '') for k in keys] for row in pedigree_dicts]
         writer.writerows(pedigree_rows)
 
         basefn = f'{connection.project}-{date.today().isoformat()}'
@@ -121,21 +130,15 @@ async def get_pedigree(
         if internal_family_ids:
             basefn += '-'.join(str(fm) for fm in internal_family_ids)
 
+        extension = 'ped' if response_type == ContentType.TSV else 'csv'
+
         return StreamingResponse(
             iter(output.getvalue()),
             media_type=f'text/{response_type}',
-            headers={'Content-Disposition': f'filename={basefn}.ped'},
+            headers={'Content-Disposition': f'filename={basefn}.{extension}'},
         )
 
-    # Return json by default
-    def key_convert(string):
-        snake = string.lower().replace(' ', '_').replace('-', '_')
-        return re.sub(r'^[^a-zA-Z0-9]+', '', snake)
-
-    header = pedigree_rows.pop(0)
-    header = [key_convert(x) for x in header]
-    data = [dict(zip(header, x)) for x in pedigree_rows]
-    return data
+    return pedigree_dicts
 
 
 @router.get('/{project}/', operation_id='getFamilies')

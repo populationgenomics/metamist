@@ -40,6 +40,21 @@ async def fill_in_missing_participants(
     return {'success': await participant_layer.fill_in_missing_participants()}
 
 
+@router.post('/{project}', operation_id='getParticipants')
+async def get_participants(
+    external_participant_ids: List[str] = None,
+    internal_participant_ids: List[int] = None,
+    connection: Connection = get_project_readonly_connection,
+):
+    """Get participants, default ALL participants in project"""
+    player = ParticipantLayer(connection)
+    return await player.get_participants(
+        project=connection.project,
+        external_participant_ids=external_participant_ids,
+        internal_participant_ids=internal_participant_ids,
+    )
+
+
 @router.get(
     '/{project}/individual-metadata-seqr/{export_type}',
     operation_id='getIndividualMetadataForSeqr',
