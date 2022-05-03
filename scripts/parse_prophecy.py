@@ -43,7 +43,7 @@ class ProphecyParser(GenericMetadataParser):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_dict_reader(self, file_pointer, delimiter: str):
+    def _get_dict_reader(self, file_pointer, delimiter: str):
         # Skipping header metadata lines
         for line in file_pointer:
             if line.strip() == '""':
@@ -68,15 +68,6 @@ class ProphecyParser(GenericMetadataParser):
             for filename, path in self.filename_map.items()
             if self.fastq_file_name_to_sample_id(filename) == sample_id
         ]
-
-    def has_participants(self, file_pointer, delimiter: str) -> bool:
-        """Returns True if the file has a Participants column"""
-        # Skipping header metadata lines
-        for line in file_pointer:
-            if line.strip() == '""':
-                break
-
-        return super().has_participants(file_pointer, delimiter)
 
 
 @click.command(help='GCS path to manifest file')

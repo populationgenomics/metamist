@@ -2,7 +2,6 @@
 from itertools import groupby
 from typing import Dict, List, Optional, Any, Tuple, Union
 import os
-import csv
 import logging
 from io import StringIO
 from functools import reduce
@@ -223,7 +222,7 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         first_line = next(reader)
         has_participants = self.participant_column in first_line
         file_pointer.seek(0)

@@ -582,18 +582,20 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, List]:
         """
         Parse manifest file into a list of dicts, indexed by sample name.
-        Override this method if you can't use the default implementation that simply
-        calls csv.DictReader.
         """
         sample_map = defaultdict(list)
-        reader = self.get_dict_reader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             sid = self.get_sample_id(row)
             sample_map[sid].append(row)
         return sample_map
 
-    def get_dict_reader(self, file_pointer, delimiter: str):
-        """Return a DictReader from file_pointer"""
+    def _get_dict_reader(self, file_pointer, delimiter: str):
+        """
+        Return a DictReader from file_pointer
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader
+        """
         reader = csv.DictReader(file_pointer, delimiter=delimiter)
         return reader
 
@@ -604,14 +606,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Dict[Any, Dict[Any, List[Any]]]:
         """
         Parse manifest file into a list of dicts, indexed by participant id.
-        Override this method if you can't use the default implementation that simply
-        calls csv.DictReader.
         """
 
         participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
-        reader = self.get_dict_reader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             pid = self.get_participant_id(row)
 
