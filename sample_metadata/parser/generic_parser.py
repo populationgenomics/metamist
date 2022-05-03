@@ -442,7 +442,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 sequence_id = sequence_ids.get(str(seq.sequence_type), None)
                 if isinstance(sequence_id, list):
                     if len(sequence_id) > 1:
-                        raise ValueError(f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}')
+                        raise ValueError(
+                            f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
+                        )
                     sequence_id = sequence_id[0]
                 args = {
                     'id': sequence_id,
@@ -580,15 +582,22 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, List]:
         """
         Parse manifest file into a list of dicts, indexed by sample name.
-        Override this method if you can't use the default implementation that simply
-        calls csv.DictReader.
         """
         sample_map = defaultdict(list)
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             sid = self.get_sample_id(row)
             sample_map[sid].append(row)
         return sample_map
+
+    def _get_dict_reader(self, file_pointer, delimiter: str):
+        """
+        Return a DictReader from file_pointer
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader
+        """
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        return reader
 
     async def file_pointer_to_participant_map(
         self,
@@ -597,14 +606,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     ) -> Dict[Any, Dict[Any, List[Any]]]:
         """
         Parse manifest file into a list of dicts, indexed by participant id.
-        Override this method if you can't use the default implementation that simply
-        calls csv.DictReader.
         """
 
         participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             pid = self.get_participant_id(row)
 
