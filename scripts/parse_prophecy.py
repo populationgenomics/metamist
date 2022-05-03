@@ -70,18 +70,6 @@ class ProphecyParser(GenericMetadataParser):
 
         return await super().file_pointer_to_participant_map(file_pointer, delimiter)
 
-    def get_sample_id(self, row) -> str:
-        """Get sample ID from row"""
-        id_fluidx = row.get(self.sample_name_column, None)
-        sample_id = id_fluidx.split('_')
-        return sample_id
-
-    def get_participant_id(self, row) -> str:
-        """Get external participant ID from row"""
-        if not self.participant_column or self.participant_column not in row:
-            raise ValueError('Participant column does not exist')
-        return row[self.participant_column][:-4]
-
     def fastq_file_name_to_sample_id(self, filename: str) -> str:
         """
         HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
@@ -134,8 +122,8 @@ async def main(
     parser = ProphecyParser(
         sample_metadata_project=sample_metadata_project,
         search_locations=search_locations,
-        sample_name_column='Sample/Name',
-        participant_column='Sample/Name',
+        sample_name_column='External ID',
+        participant_column='External ID',
         reported_gender_column='Sex',
         sample_meta_map=SAMPLE_META_MAP,
         qc_meta_map={},
