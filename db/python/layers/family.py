@@ -341,9 +341,9 @@ class FamilyLayer(BaseLayer):
         replace_with_participant_external_ids=False,
         # pylint: disable=invalid-name
         replace_with_family_external_ids=False,
-        empty_participant_value='',
-        include_header=False,
-    ) -> List[List[Optional[str]]]:
+        empty_participant_value=None,
+        include_participants_not_in_families=False,
+    ) -> List[Dict[str, str]]:
         """
         Generate pedigree file for ALL families in project
         (unless internal_family_ids is specified).
@@ -352,22 +352,19 @@ class FamilyLayer(BaseLayer):
         """
 
         # this is important because a PED file MUST be ordered like this
-        ordered_keys = [
-            'family_id',
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-            'sex',
-            'affected',
-        ]
+
         pid_fields = {
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
+            'individual_id',
+            'paternal_id',
+            'maternal_id',
         }
 
-        rows = await self.fptable.get_rows(project=project, family_ids=family_ids)
-        pmap, fmap = {}, {}
+        rows = await self.fptable.get_rows(
+            project=project,
+            family_ids=family_ids,
+            include_participants_not_in_families=include_participants_not_in_families,
+        )
+        pmap = {}
         if replace_with_participant_external_ids:
             participant_ids = set(
                 s
@@ -378,31 +375,19 @@ class FamilyLayer(BaseLayer):
             ptable = ParticipantTable(connection=self.connection)
             pmap = await ptable.get_id_map_by_internal_ids(list(participant_ids))
 
+        for r in rows:
+            for pfield in pid_fields:
+                r[pfield] = pmap.get(r[pfield], r[pfield]) or empty_participant_value
+
         if replace_with_family_external_ids:
             family_ids = list(
                 set(r['family_id'] for r in rows if r['family_id'] is not None)
             )
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
+            for r in rows:
+                r['family_id'] = fmap.get(r['family_id'], r['family_id'])
 
-        formatted_rows = []
-        if include_header:
-            formatted_rows.append(PedRow.row_header())
-
-        for row in rows:
-            formatted_row = []
-            for field in ordered_keys:
-                value = row[field]
-                if field == 'family_id':
-                    formatted_row.append(fmap.get(value, value))
-                elif field in pid_fields:
-                    formatted_row.append(
-                        pmap.get(value, value) or empty_participant_value
-                    )
-                else:
-                    formatted_row.append(value)
-            formatted_rows.append(formatted_row)
-
-        return formatted_rows
+        return rows
 
     async def get_participant_family_map(
         self, participant_ids: List[int], check_project_ids=False

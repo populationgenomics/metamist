@@ -28,6 +28,7 @@ class ProjectSummaryResponse(BaseModel):
 
     participants: List[NestedParticipant]
     total_samples: int
+    participant_keys: List[str]
     sample_keys: List[str]
     sequence_keys: List[str]
 
@@ -61,6 +62,7 @@ async def get_project_summary(
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
             participants=[],
+            participant_keys=[],
             sample_keys=[],
             sequence_keys=[],
             _links=None,
@@ -89,6 +91,7 @@ async def get_project_summary(
     return ProjectSummaryResponse(
         participants=participants,
         total_samples=summary.total_samples,
+        participant_keys=summary.participant_keys,
         sample_keys=summary.sample_keys,
         sequence_keys=summary.sequence_keys,
         _links=links,
