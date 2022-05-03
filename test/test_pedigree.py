@@ -28,7 +28,7 @@ class TestPedigree(DbIsolatedTest):
             replace_with_family_external_ids=True,
         )
 
-        by_key = {r['participant_id']: r for r in pedigree_dicts}
+        by_key = {r['individual_id']: r for r in pedigree_dicts}
 
         self.assertEqual(3, len(pedigree_dicts))
         father = by_key['EX01_father']
@@ -60,7 +60,7 @@ class TestPedigree(DbIsolatedTest):
             replace_with_participant_external_ids=True,
         )
 
-        by_id = {r['participant_id']: r for r in rows}
+        by_id = {r['individual_id']: r for r in rows}
         self.assertEqual(2, len(rows))
         self.assertEqual(1, by_id['EX01']['sex'])
         self.assertIsNone(by_id['EX02']['sex'])

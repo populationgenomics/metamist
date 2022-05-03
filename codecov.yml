@@ -1,0 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        # basic
+        target: auto
+        threshold: 0%
+        paths:
+          - "db"
+          - "scripts"
+          - "sample_metadata/parser"
