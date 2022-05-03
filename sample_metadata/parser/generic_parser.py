@@ -442,7 +442,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 sequence_id = sequence_ids.get(str(seq.sequence_type), None)
                 if isinstance(sequence_id, list):
                     if len(sequence_id) > 1:
-                        raise ValueError(f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}')
+                        raise ValueError(
+                            f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
+                        )
                     sequence_id = sequence_id[0]
                 args = {
                     'id': sequence_id,
@@ -584,11 +586,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         calls csv.DictReader.
         """
         sample_map = defaultdict(list)
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self.get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             sid = self.get_sample_id(row)
             sample_map[sid].append(row)
         return sample_map
+
+    def get_dict_reader(self, file_pointer, delimiter: str):
+        """Return a DictReader from file_pointer"""
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        return reader
 
     async def file_pointer_to_participant_map(
         self,
@@ -604,7 +611,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self.get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
             pid = self.get_participant_id(row)
 

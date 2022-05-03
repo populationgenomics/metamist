@@ -9,7 +9,8 @@ gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
 """
 
 import logging
-from typing import List, Dict, Any
+import csv
+from typing import List
 import click
 
 from sample_metadata.parser.generic_metadata_parser import (
@@ -42,33 +43,13 @@ class ProphecyParser(GenericMetadataParser):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    async def file_pointer_to_sample_map(
-        self,
-        file_pointer,
-        delimiter: str,
-    ) -> Dict[str, List]:
-        """Parse manifest into a dict"""
-
+    def get_dict_reader(self, file_pointer, delimiter: str):
         # Skipping header metadata lines
         for line in file_pointer:
             if line.strip() == '""':
                 break
-
-        return await super().file_pointer_to_sample_map(file_pointer, delimiter)
-
-    async def file_pointer_to_participant_map(
-        self,
-        file_pointer,
-        delimiter: str,
-    ) -> Dict[Any, Dict[Any, List[Any]]]:
-        """Parse manifest into a dict"""
-
-        # Skipping header metadata lines
-        for line in file_pointer:
-            if line.strip() == '""':
-                break
-
-        return await super().file_pointer_to_participant_map(file_pointer, delimiter)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        return reader
 
     def fastq_file_name_to_sample_id(self, filename: str) -> str:
         """
@@ -127,6 +108,7 @@ async def main(
         reported_gender_column='Sex',
         sample_meta_map=SAMPLE_META_MAP,
         qc_meta_map={},
+        participant_meta_map={},
         sequence_meta_map=SEQUENCE_META_MAP,
     )
 
