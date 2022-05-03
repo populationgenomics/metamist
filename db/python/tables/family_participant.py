@@ -114,7 +114,7 @@ ON DUPLICATE KEY UPDATE
         """
         keys = [
             'fp.family_id',
-            'p.id as participant_id',
+            'p.id as individual_id',
             'fp.paternal_participant_id',
             'fp.maternal_participant_id',
             'p.reported_sex as sex',
@@ -151,7 +151,7 @@ ON DUPLICATE KEY UPDATE
 
         ordered_keys = [
             'family_id',
-            'participant_id',
+            'individual_id',
             'paternal_id',
             'maternal_id',
             'sex',

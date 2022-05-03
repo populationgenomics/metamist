@@ -354,7 +354,7 @@ class FamilyLayer(BaseLayer):
         # this is important because a PED file MUST be ordered like this
 
         pid_fields = {
-            'participant_id',
+            'individual_id',
             'paternal_id',
             'maternal_id',
         }
