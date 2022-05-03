@@ -179,6 +179,8 @@ class GenericMetadataParser(GenericParser):
             value = 'genome'
         elif value == 'wes':
             value = 'exome'
+        elif 'mt' in value:
+            value = 'mtseq'
 
         return SequenceType(value)
 
