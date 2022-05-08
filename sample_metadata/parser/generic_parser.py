@@ -501,7 +501,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def process_participant_group(
-        self, participant_name: str, sample_map: Dict[str, Any]
+        self, participant_name: str, sample_map: Dict[str, Any], internal_pid: Optional[int]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -540,13 +540,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sequences_to_upsert.extend(seqs)
             analyses_to_add.extend(analyses)
 
-        # Construct participant to upsert
-        existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-            self.sample_metadata_project, [participant_name], allow_missing=True
-        )
-
-        internal_id = existing_participant_ids.get(participant_name, None)
-
         # pull relevant participant fields
         reported_sex = self.get_reported_sex(all_rows)
         reported_gender = self.get_reported_gender(all_rows)
@@ -554,11 +547,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         collapsed_participant_meta = await self.get_participant_meta(
-            internal_id, all_rows
+            internal_pid, all_rows
         )
 
         args = {
-            'id': internal_id,  # noqa: E501
             'external_id': participant_name,
             # 'reported_sex': None,
             # 'reported_gender': None,
@@ -566,6 +558,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             'meta': collapsed_participant_meta.meta,
             'samples': samples_to_upsert,
         }
+        if internal_pid:
+            args['id'] = internal_pid
 
         if reported_sex:
             args['reported_sex'] = reported_sex
@@ -573,9 +567,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             args['reported_gender'] = reported_gender
         if karyotype:
             args['karyotype'] = karyotype
-
-        if not internal_id:
-            del args['id']
 
         participant_to_upsert = ParticipantUpsert(**args)
 
@@ -761,9 +752,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
+            # Construct participant to upsert
+            existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
+                self.sample_metadata_project, external_pids, allow_missing=True
+            )
+
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
-                promise = self.process_participant_group(external_pid, sample_map)
+                promise = self.process_participant_group(external_pid, sample_map, existing_participant_ids.get(external_pid))
                 current_batch_promises[external_pid] = promise
 
             processed_ex_pids = list(current_batch_promises.keys())
