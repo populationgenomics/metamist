@@ -581,7 +581,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         file_pointer,
         delimiter: str,
-    ) -> Dict[str, List]:
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Parse manifest file into a list of dicts, indexed by sample name.
         Override this method if you can't use the default implementation that simply
@@ -598,14 +598,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         file_pointer,
         delimiter: str,
-    ) -> Dict[Any, Dict[Any, List[Any]]]:
+    ) -> Dict[Any, Dict[str, List[Dict[str, Any]]]]:
         """
         Parse manifest file into a list of dicts, indexed by participant id.
         Override this method if you can't use the default implementation that simply
         calls csv.DictReader.
         """
 
-        participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
+        participant_map: Dict[str, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
         reader = CustomDictReader(file_pointer, delimiter=delimiter)
@@ -646,8 +646,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-        sample_map: Dict[str, Any] = {}
-        participant_map: Dict[str, Any] = {}
         if self.has_participants(file_pointer, delimiter):
             participant_map = await self.file_pointer_to_participant_map(
                 file_pointer, delimiter
@@ -664,9 +662,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sample_map, confirm=confirm, dry_run=dry_run
         )
 
-        return await self.parse_manifest_by_participants(
-            participant_map, confirm=confirm, dry_run=dry_run
-        )
 
     def upsert_summary(
         self,
