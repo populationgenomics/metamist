@@ -67,7 +67,7 @@ ALL_EXTENSIONS = (
     + VCF_EXTENSIONS
 )
 
-rmatch = re.compile(r'[_\.-][Rr]\d')
+rmatch = re.compile(r'[_\.-][Rr]?[12]')
 SingleRow = Dict[str, Any]
 GroupedRow = List[SingleRow]
 
