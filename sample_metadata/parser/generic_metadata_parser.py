@@ -509,8 +509,8 @@ class GenericMetadataParser(GenericParser):
             self.sequence_meta_map, rows
         )
 
-        read_filenames = []
-        gvcf_filenames = []
+        read_filenames: List[str] = []
+        gvcf_filenames: List[str] = []
         for r in rows:
             if self.reads_column and self.reads_column in r:
                 read_filenames.extend(f for f in r[self.reads_column].split(',') if f)
