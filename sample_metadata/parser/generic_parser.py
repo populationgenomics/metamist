@@ -616,13 +616,23 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         return participant_map
 
-    async def validate_rows(self, sample_map: Dict[str, Union[Dict, List[Dict]]]):
+    async def validate_participant_map(self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]):
         """
         Validate sample rows:
         - throw an exception if an error occurs
         - log a warning for all other issues
         """
-        return
+        if len(participant_map) == 0:
+            raise ValueError('The manifest contains no records')
+
+    async def validate_sample_map(self, sample_map: Dict[str, List[Dict[str, Any]]]):
+        """
+        Validate sample rows:
+        - throw an exception if an error occurs
+        - log a warning for all other issues
+        """
+        if len(sample_map) == 0:
+            raise ValueError('The manifest contains no records')
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
@@ -638,18 +648,17 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             participant_map = await self.file_pointer_to_participant_map(
                 file_pointer, delimiter
             )
-        else:
-            sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
-
-        if len(sample_map) == 0 and len(participant_map) == 0:
-            raise ValueError(
-                f'{self.sample_metadata_project}: The manifest file contains no records'
+            await self.validate_participant_map(participant_map)
+            return await self.parse_manifest_by_participants(
+                participant_map, confirm=confirm, dry_run=dry_run
             )
 
-        if len(sample_map) != 0:
-            return await self.parse_manifest_by_samples(
-                sample_map, confirm=confirm, dry_run=dry_run
-            )
+        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
+        await self.validate_sample_map(sample_map)
+
+        return await self.parse_manifest_by_samples(
+            sample_map, confirm=confirm, dry_run=dry_run
+        )
 
         return await self.parse_manifest_by_participants(
             participant_map, confirm=confirm, dry_run=dry_run
