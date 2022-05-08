@@ -467,27 +467,25 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                             f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
                         )
                     sequence_id = sequence_id[0]
-                args = {
-                    'id': sequence_id,
+                args: Dict[str, Any] = {
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
                 }
-                if not args['id']:
-                    del args['id']
+                if sequence_id:
+                    args['id'] = sequence_id
 
                 sequences_to_upsert.append(SequenceUpsert(**args))
 
         # Should we add or update sample
-        args = {
-            'id': cpg_sample_id,
+        args: Dict[str, Any] = {
             'meta': collapsed_sample_meta.meta,
             'external_id': external_sample_id,
             'type': self.get_sample_type(rows),
             'sequences': sequences_to_upsert,
         }
-        if not cpg_sample_id:
-            del args['id']
+        if cpg_sample_id:
+            args['id'] = cpg_sample_id
 
         sample_to_upsert = SampleBatchUpsert(**args)
 
@@ -560,11 +558,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             internal_pid, all_rows
         )
 
-        args = {
+        args: Dict[str, Any] = {
             'external_id': participant_name,
-            # 'reported_sex': None,
-            # 'reported_gender': None,
-            # 'karyotype': None,
             'meta': collapsed_participant_meta.meta,
             'samples': samples_to_upsert,
         }
