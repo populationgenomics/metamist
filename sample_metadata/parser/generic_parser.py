@@ -120,7 +120,7 @@ class SequenceMetaGroup:
         self.meta = meta
 
 
-def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
+def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[Sequence[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
