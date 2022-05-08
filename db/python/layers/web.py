@@ -300,6 +300,7 @@ WHERE fp.participant_id in :pids
         participant_meta_keys = set(
             pk
             for p in pmodels
+            if p
             for pk in p.meta.keys()
             if pk not in ignore_participant_keys
         )
