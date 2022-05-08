@@ -78,6 +78,19 @@ SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
+class CustomDictReader(csv.DictReader):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._custom_cached_fieldnames = None
+
+    @property
+    def fieldnames(self):
+        if not self._custom_cached_fieldnames:
+            fs = super().fieldnames
+            self._custom_cached_fieldnames = [f.strip() for f in fs]
+        return self._custom_cached_fieldnames
+
+
 class ParticipantMetaGroup:
     """Class for holding participant metadata grouped by id"""
 
@@ -584,7 +597,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         calls csv.DictReader.
         """
         sample_map = defaultdict(list)
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(file_pointer, delimiter=delimiter)
         for row in reader:
             sid = self.get_sample_id(row)
             sample_map[sid].append(row)
@@ -604,7 +617,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(file_pointer, delimiter=delimiter)
         for row in reader:
             pid = self.get_participant_id(row)
 
