@@ -79,6 +79,7 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 
 class CustomDictReader(csv.DictReader):
+    """csv.DictReader that strips whitespace off headers"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._custom_cached_fieldnames = None
@@ -87,8 +88,15 @@ class CustomDictReader(csv.DictReader):
     def fieldnames(self):
         if not self._custom_cached_fieldnames:
             fs = super().fieldnames
-            self._custom_cached_fieldnames = [f.strip() for f in fs]
+            self._custom_cached_fieldnames = list(map(self.process_fieldname, fs))
         return self._custom_cached_fieldnames
+
+    def process_fieldname(self, fieldname: str) -> str:
+        """
+        Process the fieldname
+        (default: strip leading / trailing whitespace)
+        """
+        return fieldname.strip()
 
 
 class ParticipantMetaGroup:
@@ -661,7 +669,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         return await self.parse_manifest_by_samples(
             sample_map, confirm=confirm, dry_run=dry_run
         )
-
 
     def upsert_summary(
         self,

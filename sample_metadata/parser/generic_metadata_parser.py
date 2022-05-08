@@ -1,6 +1,6 @@
 # pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from itertools import groupby
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 import os
 import csv
 import logging
