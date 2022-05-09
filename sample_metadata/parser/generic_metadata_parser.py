@@ -484,11 +484,8 @@ class GenericMetadataParser(GenericParser):
         read_filenames = []
         gvcf_filenames = []
         for r in rows:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(r[self.reads_column].split(','))
-            if self.reads_column is None:
-                filenames = await self.get_read_filenames(sample_id=sample_id, row=r)
-                read_filenames.extend(filenames)
+            filenames = await self.get_read_filenames(sample_id=sample_id, row=r)
+            read_filenames.extend(filenames)
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(r[self.gvcf_column].split(','))
 
