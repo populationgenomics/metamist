@@ -415,12 +415,11 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
         """Get paths to reads from a row"""
         read_filenames = []
-        for r in row if isinstance(row, list) else [row]:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(r[self.reads_column].split(','))
+        if self.reads_column and self.reads_column in row:
+            read_filenames.extend(row[self.reads_column].split(','))
 
         return read_filenames
 
@@ -487,6 +486,9 @@ class GenericMetadataParser(GenericParser):
         for r in rows:
             if self.reads_column and self.reads_column in r:
                 read_filenames.extend(r[self.reads_column].split(','))
+            if self.reads_column is None:
+                filenames = await self.get_read_filenames(sample_id=sample_id, row=r)
+                read_filenames.extend(filenames)
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(r[self.gvcf_column].split(','))
 

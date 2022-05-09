@@ -15,7 +15,7 @@ import click
 
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    GroupedRow,
+    SingleRow,
     run_as_sync,
 )
 
@@ -58,7 +58,7 @@ class ProphecyParser(GenericMetadataParser):
         """
         return '_'.join(filename.split('_')[2:4])
 
-    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
         """
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
@@ -66,7 +66,7 @@ class ProphecyParser(GenericMetadataParser):
         return [
             path
             for filename, path in self.filename_map.items()
-            if self.fastq_file_name_to_sample_id(filename) == sample_id
+            if self.fastq_file_name_to_sample_id(filename) == row['Sample/Name']
         ]
 
 
