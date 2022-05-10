@@ -47,11 +47,6 @@ class Columns:
     SAMPLE_NAME = 'Sample/Name'
 
     @staticmethod
-    def participant_meta_map():
-        """Participant meta map"""
-        return {}
-
-    @staticmethod
     def sequence_meta_map():
         """Columns that will be put into sequence.meta"""
         fields = [
@@ -59,12 +54,6 @@ class Columns:
             Columns.CONCENTRATION,
             Columns.VOLUME,
         ]
-        return {k: COLUMN_MAP[k] for k in fields}
-
-    @staticmethod
-    def sample_meta_map():
-        """Columns that will be put into sample.meta"""
-        fields = [Columns.SEX]
         return {k: COLUMN_MAP[k] for k in fields}
 
 
@@ -83,7 +72,7 @@ class ProphecyParser(GenericMetadataParser):
             sample_name_column=Columns.EXTERNAL_ID,
             participant_column=Columns.EXTERNAL_ID,
             reported_gender_column=Columns.SEX,
-            sample_meta_map=Columns.sample_meta_map(),
+            sample_meta_map={},
             qc_meta_map={},
             participant_meta_map={},
             sequence_meta_map=Columns.sequence_meta_map(),
