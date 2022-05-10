@@ -23,25 +23,71 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-SEQUENCE_META_MAP = {
+PROJECT = 'prophecy-test'
+
+COLUMN_MAP = {
     'Application': 'platform',
     'External ID': 'external_id',
     'Sample Concentration (ng/ul)': 'concentration',
     'Volume (uL)': 'volume',
-}
-
-SAMPLE_META_MAP = {
     'Sex': 'sex',
 }
 
-PROJECT = 'prophecy-test'
+
+class Columns:
+    """Column keys for Prophecy manifest"""
+
+    EXTERNAL_ID = 'External ID'
+    PLATFORM = 'Application'
+    CONCENTRATION = 'Sample Concentration (ng/ul)'
+    VOLUME = 'Volume (uL)'
+    SEX = 'Sex'
+    # SAMPLE_NAME != External Sample ID
+    # Follows XXXXXX_FLUIDX convention.
+    SAMPLE_NAME = 'Sample/Name'
+
+    @staticmethod
+    def participant_meta_map():
+        """Participant meta map"""
+        return {}
+
+    @staticmethod
+    def sequence_meta_map():
+        """Columns that will be put into sequence.meta"""
+        fields = [
+            Columns.PLATFORM,
+            Columns.CONCENTRATION,
+            Columns.VOLUME,
+        ]
+        return {k: COLUMN_MAP[k] for k in fields}
+
+    @staticmethod
+    def sample_meta_map():
+        """Columns that will be put into sample.meta"""
+        fields = [Columns.SEX]
+        return {k: COLUMN_MAP[k] for k in fields}
 
 
 class ProphecyParser(GenericMetadataParser):
     """Parser for Prophecy manifests"""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(
+        self,
+        sample_metadata_project,
+        search_locations,
+    ):
+
+        super().__init__(
+            sample_metadata_project=sample_metadata_project,
+            search_locations=search_locations,
+            sample_name_column=Columns.EXTERNAL_ID,
+            participant_column=Columns.EXTERNAL_ID,
+            reported_gender_column=Columns.SEX,
+            sample_meta_map=Columns.sample_meta_map(),
+            qc_meta_map={},
+            participant_meta_map={},
+            sequence_meta_map=Columns.sequence_meta_map(),
+        )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         # Skipping header metadata lines
@@ -66,7 +112,7 @@ class ProphecyParser(GenericMetadataParser):
         return [
             path
             for filename, path in self.filename_map.items()
-            if self.fastq_file_name_to_sample_id(filename) == row['Sample/Name']
+            if self.fastq_file_name_to_sample_id(filename) == row[Columns.SAMPLE_NAME]
         ]
 
 
@@ -91,16 +137,10 @@ async def main(
     dry_run=False,
 ):
     """Run script from CLI arguments"""
+
     parser = ProphecyParser(
         sample_metadata_project=sample_metadata_project,
         search_locations=search_locations,
-        sample_name_column='External ID',
-        participant_column='External ID',
-        reported_gender_column='Sex',
-        sample_meta_map=SAMPLE_META_MAP,
-        qc_meta_map={},
-        participant_meta_map={},
-        sequence_meta_map=SEQUENCE_META_MAP,
     )
 
     for manifest_path in manifests:
