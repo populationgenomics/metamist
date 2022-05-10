@@ -2,7 +2,6 @@
 from itertools import groupby
 from typing import Dict, List, Optional, Any, Tuple, Union
 import os
-import csv
 import logging
 from io import StringIO
 from functools import reduce
@@ -225,7 +224,7 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         first_line = next(reader)
         has_participants = self.participant_column in first_line
         file_pointer.seek(0)
@@ -416,14 +415,12 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
         """Get paths to reads from a row"""
-        read_filenames = []
-        for r in row if isinstance(row, list) else [row]:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(r[self.reads_column].split(','))
-
-        return read_filenames
+        if not self.reads_column or self.reads_column not in row:
+            return []
+        # more post processing
+        return [f.strip() for f in row[self.reads_column].split(',') if f.strip()]
 
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to gvcfs from a row"""
@@ -486,8 +483,9 @@ class GenericMetadataParser(GenericParser):
         read_filenames = []
         gvcf_filenames = []
         for r in rows:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(r[self.reads_column].split(','))
+            read_filenames.extend(
+                await self.get_read_filenames(sample_id=sample_id, row=r)
+            )
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(r[self.gvcf_column].split(','))
 

@@ -213,7 +213,6 @@ async def batch_upsert_participants(
     Upserts a list of participants with samples and sequences
     Returns the list of internal sample IDs
     """
-
     # Convert id in samples to int
     for participant in participants.participants:
         for sample in participant.samples:

@@ -9,17 +9,13 @@ gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
 """
 
 import logging
-import traceback
-from typing import List, Dict
+import csv
+from typing import List
 import click
 
-from sample_metadata.exceptions import ApiException
-from sample_metadata.api.participant_api import ParticipantUpdateModel
-from sample_metadata.api.sample_api import SampleApi
-from sample_metadata.api.participant_api import ParticipantApi
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    GroupedRow,
+    SingleRow,
     run_as_sync,
 )
 
@@ -27,39 +23,68 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-SEQUENCE_META_MAP = {
+PROJECT = 'prophecy-test'
+
+COLUMN_MAP = {
     'Application': 'platform',
     'External ID': 'external_id',
     'Sample Concentration (ng/ul)': 'concentration',
     'Volume (uL)': 'volume',
-}
-
-SAMPLE_META_MAP = {
     'Sex': 'sex',
 }
 
-PROJECT = 'prophecy-test'
+
+class Columns:
+    """Column keys for Prophecy manifest"""
+
+    EXTERNAL_ID = 'External ID'
+    PLATFORM = 'Application'
+    CONCENTRATION = 'Sample Concentration (ng/ul)'
+    VOLUME = 'Volume (uL)'
+    SEX = 'Sex'
+    # SAMPLE_NAME != External Sample ID
+    # Follows XXXXXX_FLUIDX convention.
+    SAMPLE_NAME = 'Sample/Name'
+
+    @staticmethod
+    def sequence_meta_map():
+        """Columns that will be put into sequence.meta"""
+        fields = [
+            Columns.PLATFORM,
+            Columns.CONCENTRATION,
+            Columns.VOLUME,
+        ]
+        return {k: COLUMN_MAP[k] for k in fields}
 
 
 class ProphecyParser(GenericMetadataParser):
     """Parser for Prophecy manifests"""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    async def file_pointer_to_sample_map(
+    def __init__(
         self,
-        file_pointer,
-        delimiter: str,
-    ) -> Dict[str, List]:
-        """Parse manifest into a dict"""
+        sample_metadata_project,
+        search_locations,
+    ):
 
+        super().__init__(
+            sample_metadata_project=sample_metadata_project,
+            search_locations=search_locations,
+            sample_name_column=Columns.EXTERNAL_ID,
+            participant_column=Columns.EXTERNAL_ID,
+            reported_gender_column=Columns.SEX,
+            sample_meta_map={},
+            qc_meta_map={},
+            participant_meta_map={},
+            sequence_meta_map=Columns.sequence_meta_map(),
+        )
+
+    def _get_dict_reader(self, file_pointer, delimiter: str):
         # Skipping header metadata lines
         for line in file_pointer:
             if line.strip() == '""':
                 break
-
-        return await super().file_pointer_to_sample_map(file_pointer, delimiter)
+        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        return reader
 
     def fastq_file_name_to_sample_id(self, filename: str) -> str:
         """
@@ -68,7 +93,7 @@ class ProphecyParser(GenericMetadataParser):
         """
         return '_'.join(filename.split('_')[2:4])
 
-    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
         """
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
@@ -76,7 +101,7 @@ class ProphecyParser(GenericMetadataParser):
         return [
             path
             for filename, path in self.filename_map.items()
-            if self.fastq_file_name_to_sample_id(filename) == sample_id
+            if self.fastq_file_name_to_sample_id(filename) == row[Columns.SAMPLE_NAME]
         ]
 
 
@@ -97,18 +122,16 @@ async def main(
     manifests: List[str],
     sample_metadata_project: str,
     search_locations: List[str],
-    confirm=False,
+    confirm=True,
     dry_run=False,
 ):
     """Run script from CLI arguments"""
+
     parser = ProphecyParser(
         sample_metadata_project=sample_metadata_project,
         search_locations=search_locations,
-        sample_name_column='Sample/Name',
-        sample_meta_map=SAMPLE_META_MAP,
-        qc_meta_map={},
-        sequence_meta_map=SEQUENCE_META_MAP,
     )
+
     for manifest_path in manifests:
         logger.info(f'Importing {manifest_path}')
 
@@ -117,42 +140,6 @@ async def main(
             confirm=confirm,
             dry_run=dry_run,
         )
-
-    add_participant_meta(sample_metadata_project)
-
-
-def add_participant_meta(sample_metadata_project: str):
-    """
-    Fill in Participant entries. We don't have pedigree data, we only
-    need to add the reported_gender field, similar to tob-wgs.
-    """
-    papi = ParticipantApi()
-    papi.fill_in_missing_participants(sample_metadata_project)
-
-    sapi = SampleApi()
-    samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
-            'project_ids': [sample_metadata_project],
-            'active': True,
-        }
-    )
-
-    id_map = papi.get_participant_id_map_by_external_ids(
-        sample_metadata_project, [s['external_id'] for s in samples]
-    )
-
-    for sample in samples:
-        updated_participant = ParticipantUpdateModel()
-        updated_participant['reported_gender'] = sample['meta'].get('sex')
-        participant_id = id_map[sample['external_id']]
-        try:
-            papi.update_participant(
-                participant_id=participant_id,
-                participant_update_model=updated_participant,
-            )
-        except ApiException:
-            traceback.print_exc()
-            print(f'Error updating participant {participant_id}, skipping.')
 
 
 if __name__ == '__main__':
