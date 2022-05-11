@@ -442,14 +442,12 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    async def get_read_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
+    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
         """Get paths to reads from a row"""
-        read_filenames: List[str] = []
-        for r in row if isinstance(row, list) else [row]:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(r[self.reads_column].split(','))
-
-        return read_filenames
+        if not self.reads_column or self.reads_column not in row:
+            return []
+        # more post processing
+        return [f.strip() for f in row[self.reads_column].split(',') if f.strip()]
 
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to gvcfs from a row"""
@@ -512,8 +510,9 @@ class GenericMetadataParser(GenericParser):
         read_filenames: List[str] = []
         gvcf_filenames: List[str] = []
         for r in rows:
-            if self.reads_column and self.reads_column in r:
-                read_filenames.extend(f for f in r[self.reads_column].split(',') if f)
+            read_filenames.extend(
+                await self.get_read_filenames(sample_id=sample_id, row=r)
+            )
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(f for f in r[self.gvcf_column].split(',') if f)
 
