@@ -284,7 +284,11 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         if path.startswith('gs://'):
             blob = await self.get_blob(path)
             try:
-                retval = blob.download_as_bytes()
+                try:
+                    retval = blob.download_as_bytes()
+                except AttributeError:
+                    retval = blob.download_as_string()
+
                 if isinstance(retval, bytes):
                     retval = retval.decode()
                 return retval
