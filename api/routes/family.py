@@ -116,7 +116,7 @@ async def get_pedigree(
 
         keys = [
             'family_id',
-            'participant_id',
+            'individual_id',
             'paternal_id',
             'maternal_id',
             'sex',
