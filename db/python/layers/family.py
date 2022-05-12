@@ -26,7 +26,14 @@ class PedRow:
         'paternal_id': {'paternal_id', 'paternal id', 'paternalid', 'father'},
         'maternal_id': {'maternal_id', 'maternal id', 'maternalid', 'mother'},
         'sex': {'sex', 'gender'},
-        'affected': {'phenotype', 'affected', 'phenotypes', 'affected status'},
+        'affected': {
+            'phenotype',
+            'affected',
+            'phenotypes',
+            'affected status',
+            'affection',
+            'affection status',
+        },
         'notes': {'notes'},
     }
 
