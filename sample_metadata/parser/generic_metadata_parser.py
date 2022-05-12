@@ -1,6 +1,6 @@
 # pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
 from itertools import groupby
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 import os
 import logging
 from io import StringIO
@@ -230,31 +230,58 @@ class GenericMetadataParser(GenericParser):
         file_pointer.seek(0)
         return has_participants
 
-    async def validate_rows(self, sample_map: Dict[str, Union[dict, List[dict]]]):
-        await super().validate_rows(sample_map)
+    async def validate_participant_map(self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]):
+        await super().validate_participant_map(participant_map)
+        if not self.reads_column:
+            return
+
+        ungrouped_rows: List[Dict[str, Any]] = []
+        for sample_map in participant_map.values():
+            for row in sample_map.values():
+                if isinstance(row, list):
+                    ungrouped_rows.extend(row)
+                elif isinstance(row, dict):
+                    ungrouped_rows.append(row)
+                else:
+                    raise ValueError(f'Unexpected type {type(row)} {row}')
+
+        errors = []
+        errors.extend(self.check_files_covered_by_rows(ungrouped_rows))
+        if errors:
+            raise ValueError(', '.join(errors))
+
+    async def validate_sample_map(self, sample_map: Dict[str, List[Dict[str, Any]]]):
+        await super().validate_sample_map(sample_map)
 
         if not self.reads_column:
             return
 
-        errors = []
-        errors.extend(self.check_files_covered_by_file_map(sample_map))
+        ungrouped_rows: List[Dict[str, Any]] = []
+        for row in sample_map.values():
+            if isinstance(row, list):
+                ungrouped_rows.extend(row)
+            elif isinstance(row, dict):
+                ungrouped_rows.append(row)
+            else:
+                raise ValueError(f'Unexpected type {type(row)} {row}')
 
+        errors = []
+        errors.extend(self.check_files_covered_by_rows(ungrouped_rows))
         if errors:
             raise ValueError(', '.join(errors))
 
-    def check_files_covered_by_file_map(
-        self, sample_map: Union[dict, List[dict]]
+    def check_files_covered_by_rows(
+        self, rows: List[Dict[str, Any]]
     ) -> List[str]:
         """
         Check that the files in the search_paths are completely covered by the sample_map
         """
         filenames = []
-        for sm in sample_map if isinstance(sample_map, list) else [sample_map]:
-            for rows in sm.values():
-                for r in rows if isinstance(rows, list) else [rows]:
-                    filenames.extend(r.get(self.reads_column, '').split(','))
+        for grp in rows:
+            for r in grp if isinstance(grp, list) else [grp]:
+                filenames.extend(r.get(self.reads_column, '').split(','))
 
-        fs = set(f for f in filenames if f)
+        fs = set(f.strip() for f in filenames if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
         def filename_filter(f):
@@ -424,7 +451,7 @@ class GenericMetadataParser(GenericParser):
 
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to gvcfs from a row"""
-        gvcf_filenames = []
+        gvcf_filenames: List[str] = []
         for r in row if isinstance(row, list) else [row]:
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(r[self.gvcf_column].split(','))
@@ -480,21 +507,21 @@ class GenericMetadataParser(GenericParser):
             self.sequence_meta_map, rows
         )
 
-        read_filenames = []
-        gvcf_filenames = []
+        read_filenames: List[str] = []
+        gvcf_filenames: List[str] = []
         for r in rows:
             read_filenames.extend(
                 await self.get_read_filenames(sample_id=sample_id, row=r)
             )
             if self.gvcf_column and self.gvcf_column in r:
-                gvcf_filenames.extend(r[self.gvcf_column].split(','))
+                gvcf_filenames.extend(f for f in r[self.gvcf_column].split(',') if f)
 
         # strip in case collaborator put "file1, file2"
         full_filenames: List[str] = []
         if read_filenames:
-            full_filenames.extend(self.file_path(f.strip()) for f in read_filenames)
+            full_filenames.extend(self.file_path(f.strip()) for f in read_filenames if f.strip())
         if gvcf_filenames:
-            full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames)
+            full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames if f.strip())
 
         if not sample_id:
             sample_id = await self.get_cpg_sample_id(rows[0])

@@ -67,7 +67,7 @@ ALL_EXTENSIONS = (
     + VCF_EXTENSIONS
 )
 
-rmatch = re.compile(r'[_\.-][Rr]\d')
+rmatch = re.compile(r'[_\.-][Rr]?[12]')
 SingleRow = Dict[str, Any]
 GroupedRow = List[SingleRow]
 
@@ -76,6 +76,27 @@ T = TypeVar('T')
 SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
+
+
+class CustomDictReader(csv.DictReader):
+    """csv.DictReader that strips whitespace off headers"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._custom_cached_fieldnames = None
+
+    @property
+    def fieldnames(self):
+        if not self._custom_cached_fieldnames:
+            fs = super().fieldnames
+            self._custom_cached_fieldnames = list(map(self.process_fieldname, fs))
+        return self._custom_cached_fieldnames
+
+    def process_fieldname(self, fieldname: str) -> str:
+        """
+        Process the fieldname
+        (default: strip leading / trailing whitespace)
+        """
+        return fieldname.strip()
 
 
 class ParticipantMetaGroup:
@@ -120,7 +141,7 @@ class SequenceMetaGroup:
         self.meta = meta
 
 
-def chunk(iterable: Sequence[T], chunk_size=500) -> Iterator[Sequence[T]]:
+def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[Sequence[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
@@ -450,29 +471,27 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                             f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
                         )
                     sequence_id = sequence_id[0]
-                args = {
-                    'id': sequence_id,
+                seq_args: Dict[str, Any] = {
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
                 }
-                if not args['id']:
-                    del args['id']
+                if sequence_id:
+                    seq_args['id'] = sequence_id
 
-                sequences_to_upsert.append(SequenceUpsert(**args))
+                sequences_to_upsert.append(SequenceUpsert(**seq_args))
 
         # Should we add or update sample
-        args = {
-            'id': cpg_sample_id,
+        sample_args: Dict[str, Any] = {
             'meta': collapsed_sample_meta.meta,
             'external_id': external_sample_id,
             'type': self.get_sample_type(rows),
             'sequences': sequences_to_upsert,
         }
-        if not cpg_sample_id:
-            del args['id']
+        if cpg_sample_id:
+            sample_args['id'] = cpg_sample_id
 
-        sample_to_upsert = SampleBatchUpsert(**args)
+        sample_to_upsert = SampleBatchUpsert(**sample_args)
 
         if collapsed_analyses:
             analyses_to_add.extend(collapsed_analyses)
@@ -494,7 +513,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def process_participant_group(
-        self, participant_name: str, sample_map: Dict[str, Any]
+        self, participant_name: str, sample_map: Dict[str, Any], internal_pid: Optional[int]
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -533,13 +552,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sequences_to_upsert.extend(seqs)
             analyses_to_add.extend(analyses)
 
-        # Construct participant to upsert
-        existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-            self.sample_metadata_project, [participant_name], allow_missing=True
-        )
-
-        internal_id = existing_participant_ids.get(participant_name, None)
-
         # pull relevant participant fields
         reported_sex = self.get_reported_sex(all_rows)
         reported_gender = self.get_reported_gender(all_rows)
@@ -547,18 +559,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         collapsed_participant_meta = await self.get_participant_meta(
-            internal_id, all_rows
+            internal_pid, all_rows
         )
 
-        args = {
-            'id': internal_id,  # noqa: E501
+        args: Dict[str, Any] = {
             'external_id': participant_name,
-            # 'reported_sex': None,
-            # 'reported_gender': None,
-            # 'karyotype': None,
             'meta': collapsed_participant_meta.meta,
             'samples': samples_to_upsert,
         }
+        if internal_pid:
+            args['id'] = internal_pid
 
         if reported_sex:
             args['reported_sex'] = reported_sex
@@ -566,9 +576,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             args['reported_gender'] = reported_gender
         if karyotype:
             args['karyotype'] = karyotype
-
-        if not internal_id:
-            del args['id']
 
         participant_to_upsert = ParticipantUpsert(**args)
 
@@ -583,7 +590,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         self,
         file_pointer,
         delimiter: str,
-    ) -> Dict[str, List]:
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Parse manifest file into a list of dicts, indexed by sample name.
         """
@@ -600,19 +607,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         Override this method if you can't use the default implementation that simply
         calls csv.DictReader
         """
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(file_pointer, delimiter=delimiter)
         return reader
 
     async def file_pointer_to_participant_map(
         self,
         file_pointer,
         delimiter: str,
-    ) -> Dict[Any, Dict[Any, List[Any]]]:
+    ) -> Dict[Any, Dict[str, List[Dict[str, Any]]]]:
         """
         Parse manifest file into a list of dicts, indexed by participant id.
         """
 
-        participant_map: Dict[Any, Dict[Any, List[Any]]] = defaultdict(
+        participant_map: Dict[str, Dict[Any, List[Any]]] = defaultdict(
             lambda: defaultdict(list)
         )
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
@@ -627,13 +634,23 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         return participant_map
 
-    async def validate_rows(self, sample_map: Dict[str, Union[Dict, List[Dict]]]):
+    async def validate_participant_map(self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]):
         """
         Validate sample rows:
         - throw an exception if an error occurs
         - log a warning for all other issues
         """
-        return
+        if len(participant_map) == 0:
+            raise ValueError('The manifest contains no records')
+
+    async def validate_sample_map(self, sample_map: Dict[str, List[Dict[str, Any]]]):
+        """
+        Validate sample rows:
+        - throw an exception if an error occurs
+        - log a warning for all other issues
+        """
+        if len(sample_map) == 0:
+            raise ValueError('The manifest contains no records')
 
     async def parse_manifest(  # pylint: disable=too-many-branches
         self, file_pointer, delimiter=',', confirm=False, dry_run=False
@@ -643,27 +660,20 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Returns a dict mapping external sample ID to CPG sample ID
         """
-        sample_map: Dict[str, Any] = {}
-        participant_map: Dict[str, Any] = {}
         if self.has_participants(file_pointer, delimiter):
             participant_map = await self.file_pointer_to_participant_map(
                 file_pointer, delimiter
             )
-        else:
-            sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
-
-        if len(sample_map) == 0 and len(participant_map) == 0:
-            raise ValueError(
-                f'{self.sample_metadata_project}: The manifest file contains no records'
+            await self.validate_participant_map(participant_map)
+            return await self.parse_manifest_by_participants(
+                participant_map, confirm=confirm, dry_run=dry_run
             )
 
-        if len(sample_map) != 0:
-            return await self.parse_manifest_by_samples(
-                sample_map, confirm=confirm, dry_run=dry_run
-            )
+        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
+        await self.validate_sample_map(sample_map)
 
-        return await self.parse_manifest_by_participants(
-            participant_map, confirm=confirm, dry_run=dry_run
+        return await self.parse_manifest_by_samples(
+            sample_map, confirm=confirm, dry_run=dry_run
         )
 
     def upsert_summary(
@@ -750,9 +760,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
+            # Construct participant to upsert
+            existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
+                self.sample_metadata_project, external_pids, allow_missing=True
+            )
+
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
-                promise = self.process_participant_group(external_pid, sample_map)
+                promise = self.process_participant_group(external_pid, sample_map, existing_participant_ids.get(external_pid))
                 current_batch_promises[external_pid] = promise
 
             processed_ex_pids = list(current_batch_promises.keys())

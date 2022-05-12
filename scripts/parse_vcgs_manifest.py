@@ -111,6 +111,8 @@ class VcgsManifestParser(GenericMetadataParser):
         sample_id = self.get_sample_id(row)
 
         types = row.get(Columns.LIBRARY_STRATEGY, None)
+        if isinstance(types, str):
+            types = [types]
         if len(types) <= 0:
             if (
                 self.default_sequence_type is None
