@@ -67,7 +67,7 @@ ALL_EXTENSIONS = (
     + VCF_EXTENSIONS
 )
 
-rmatch = re.compile(r'[_\.-][Rr]?[12]')
+rmatch = re.compile(r'[_\.-][Rr]?[12]\.fastq(\.gz)?$')
 SingleRow = Dict[str, Any]
 GroupedRow = List[SingleRow]
 
@@ -1052,6 +1052,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         >>> GenericParser.parse_fastqs_structure(['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz'])
         [['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz', 'Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz'])
+        [['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz'], ['Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz']]
         """
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
