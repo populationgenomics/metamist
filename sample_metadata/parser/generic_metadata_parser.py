@@ -93,6 +93,7 @@ class GenericMetadataParser(GenericParser):
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
+        batch_number: Optional[str] = None,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
@@ -130,6 +131,7 @@ class GenericMetadataParser(GenericParser):
         self.meta_column = meta_column
         self.seq_meta_column = seq_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
+        self.batch_number = batch_number
 
         self.sapi = SampleApi()
 
@@ -481,7 +483,9 @@ class GenericMetadataParser(GenericParser):
         return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta=meta)
 
     async def get_grouped_sequence_meta(
-        self, sample_id: str, rows: GroupedRow
+        self,
+        sample_id: str,
+        rows: GroupedRow,
     ) -> List[SequenceMetaGroup]:
         """
         Takes a collection of SingleRows and groups them by sequence type
@@ -498,7 +502,9 @@ class GenericMetadataParser(GenericParser):
         return sequence_meta
 
     async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
+        self,
+        seq_group: SequenceMetaGroup,
+        sample_id: Optional[str] = None,
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row"""
         rows = seq_group.rows
@@ -552,6 +558,9 @@ class GenericMetadataParser(GenericParser):
             if 'vcf' in variants:
                 collapsed_sequence_meta['vcfs'] = variants['vcf']
                 collapsed_sequence_meta['vcf_type'] = 'vcf'
+
+        if self.batch_number is not None:
+            collapsed_sequence_meta['batch'] = self.batch_number
 
         seq_group.meta = collapsed_sequence_meta
         return seq_group
