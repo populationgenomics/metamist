@@ -67,7 +67,9 @@ ALL_EXTENSIONS = (
     + VCF_EXTENSIONS
 )
 
-rmatch = re.compile(r'[_\.-][Rr]?[12]\.fastq(\.gz)?$')
+# construct rmatch string to capture all fastq patterns
+rmatch_str = r'[_\.-][Rr]?[12](' + '|'.join(s.replace(".", "\\.") for s in FASTQ_EXTENSIONS)+')$'
+rmatch = re.compile(rmatch_str)
 SingleRow = Dict[str, Any]
 GroupedRow = List[SingleRow]
 
@@ -1054,6 +1056,18 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         >>> GenericParser.parse_fastqs_structure(['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz', 'Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz'])
         [['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz'], ['Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz']]
+
+        >>> GenericParser.parse_fastqs_structure(['File_1.fastq', 'File_2.fastq'])
+        [['File_1.fastq', 'File_2.fastq']]
+
+        >>> GenericParser.parse_fastqs_structure(['File_1.fq', 'File_2.fq'])
+        [['File_1.fq', 'File_2.fq']]
+
+        >>> GenericParser.parse_fastqs_structure(['File_1.fq.gz', 'File_2.fq.gz'])
+        [['File_1.fq.gz', 'File_2.fq.gz']]
+
+
+
         """
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
@@ -1074,6 +1088,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
         ):
             values.append(sorted(grouped))
+        invalid_fastq_groups = [grp for grp in values if len(grp) != 2]
+        if invalid_fastq_groups:
+            raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
         return sorted(values, key=lambda el: el[0])
 
