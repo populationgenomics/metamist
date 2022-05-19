@@ -68,7 +68,11 @@ ALL_EXTENSIONS = (
 )
 
 # construct rmatch string to capture all fastq patterns
-rmatch_str = r'[_\.-][Rr]?[12](' + '|'.join(s.replace(".", "\\.") for s in FASTQ_EXTENSIONS)+')$'
+rmatch_str = (
+    r'[_\.-][Rr]?[12]('
+    + '|'.join(s.replace(".", "\\.") for s in FASTQ_EXTENSIONS)
+    + ')$'
+)
 rmatch = re.compile(rmatch_str)
 SingleRow = Dict[str, Any]
 GroupedRow = List[SingleRow]
@@ -82,6 +86,7 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
 class CustomDictReader(csv.DictReader):
     """csv.DictReader that strips whitespace off headers"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._custom_cached_fieldnames = None
@@ -515,7 +520,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
 
     async def process_participant_group(
-        self, participant_name: str, sample_map: Dict[str, Any], internal_pid: Optional[int]
+        self,
+        participant_name: str,
+        sample_map: Dict[str, Any],
+        internal_pid: Optional[int],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -636,7 +644,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         return participant_map
 
-    async def validate_participant_map(self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]):
+    async def validate_participant_map(
+        self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
+    ):
         """
         Validate sample rows:
         - throw an exception if an error occurs
@@ -769,7 +779,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
-                promise = self.process_participant_group(external_pid, sample_map, existing_participant_ids.get(external_pid))
+                promise = self.process_participant_group(
+                    external_pid, sample_map, existing_participant_ids.get(external_pid)
+                )
                 current_batch_promises[external_pid] = promise
 
             processed_ex_pids = list(current_batch_promises.keys())
