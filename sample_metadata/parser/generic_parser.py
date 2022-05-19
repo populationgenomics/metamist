@@ -1077,9 +1077,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         >>> GenericParser.parse_fastqs_structure(['File_1.fq.gz', 'File_2.fq.gz'])
         [['File_1.fq.gz', 'File_2.fq.gz']]
-
-
-
         """
         # find last instance of R\d, and then group by prefix on that
         sorted_fastqs = sorted(fastqs)
