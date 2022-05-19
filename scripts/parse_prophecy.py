@@ -10,7 +10,7 @@ gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
 
 import logging
 import csv
-from typing import List
+from typing import List, Optional
 import click
 
 from sample_metadata.parser.generic_metadata_parser import (
@@ -64,6 +64,7 @@ class ProphecyParser(GenericMetadataParser):
         self,
         sample_metadata_project,
         search_locations,
+        batch_number,
     ):
 
         super().__init__(
@@ -76,6 +77,7 @@ class ProphecyParser(GenericMetadataParser):
             qc_meta_map={},
             participant_meta_map={},
             sequence_meta_map=Columns.sequence_meta_map(),
+            batch_number=batch_number,
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -115,6 +117,7 @@ class ProphecyParser(GenericMetadataParser):
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
+@click.option('--batch-number', 'batch_number')
 @click.option('--dry-run', 'dry_run', is_flag=True)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
@@ -122,6 +125,7 @@ async def main(
     manifests: List[str],
     sample_metadata_project: str,
     search_locations: List[str],
+    batch_number: Optional[str],
     confirm=True,
     dry_run=False,
 ):
@@ -130,6 +134,7 @@ async def main(
     parser = ProphecyParser(
         sample_metadata_project=sample_metadata_project,
         search_locations=search_locations,
+        batch_number=batch_number,
     )
 
     for manifest_path in manifests:
