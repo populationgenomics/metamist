@@ -66,6 +66,7 @@ async def main(project: str):
         print(f'{project} :: Updating {len(promises)}: {seq_ids}')
         await asyncio.gather(*promises)
 
+
 async def for_all_projects():
     """
     Fix fastqs for all of MY projects
