@@ -24,7 +24,7 @@ seqapi = SequenceApi()
 
 def get_bucket_name_from_path(path_input):
     """
-    >>> get_bucket_name_from_path("gs://my-bucket/path")
+    >>> get_bucket_name_from_path('gs://my-bucket/path')
     'my-bucket'
     """
 
@@ -45,11 +45,23 @@ def get_filenames_from_sequences(sequences: List[Dict[str, Any]]) -> Set[str]:
         reads = sequence['meta'].get('reads')
         if not reads:
             continue
+        if isinstance(reads, dict):
+            all_filenames.add(reads['location'])
+            continue
+        if not isinstance(reads, list):
+            logging.error(f'Invalid read type: {type(reads)}: {reads}')
+            continue
         for read in reads:
             if isinstance(read, list):
                 for r in read:
+                    if isinstance(r, str):
+                        logging.error(f'Got string read: {r}')
+                        continue
                     all_filenames.add(r['location'])
             else:
+                if isinstance(read, str):
+                    logging.error(f'Got string read: {r}')
+                    continue
                 all_filenames.add(read['location'])
 
     return all_filenames
@@ -77,11 +89,21 @@ async def get_sm_sequences():
     """
     Get all the sequences across all the projects from sample_metadata
     """
-    my_projects = set(projapi.get_my_projects())
-    all_projects = projapi.get_all_projects()
+    my_projects_raw, all_projects_raw = await asyncio.gather(
+        projapi.get_my_projects_async(), projapi.get_all_projects_async()
+    )
 
-    projects = [proj for proj in all_projects if proj['name'] in my_projects]
-    names = sorted(list(set([proj['dataset'] for proj in projects])))
+    projects = set(p.replace('-test', '') for p in my_projects_raw)
+    all_projects = set(p['dataset'] for p in all_projects_raw)
+    missing_projects = all_projects - projects
+    if missing_projects:
+        logging.info(
+            f'FYI, you are missing ({len(missing_projects)}) projects from this count: '
+            + ', '.join(missing_projects)
+        )
+
+    names = sorted(projects)
+    print(names)
 
     jobs = [get_all_sequence_files(p) for p in names]
     sequences = await asyncio.gather(*jobs)
