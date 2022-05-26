@@ -290,7 +290,7 @@ class GenericMetadataParser(GenericParser):
             for r in grp if isinstance(grp, list) else [grp]:
                 filename_promises.append(self.get_read_filenames('TEST', r))
 
-        filenames = sum(await asyncio.gather(*filename_promises), [])
+        filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
         fs = set(f.strip() for f in filenames if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
