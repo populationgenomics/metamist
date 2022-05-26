@@ -329,10 +329,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    # @abstractmethod
-    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
-        """Get internal cpg sample ID from row"""
-
     @abstractmethod
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
@@ -447,6 +443,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         # Get all the sequence ids for this sample
         sequence_ids = {}
         if cpg_sample_id is not None:
+            # TODO: this is doing a call per sample, can we avoid doing this in the future?
             sequence_ids = await self.seqapi.get_all_sequences_for_sample_id_async(
                 sample_id=cpg_sample_id
             )
@@ -556,7 +553,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for sample_id, rows in sample_map.items():
             cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
-                rows, sample_id, cpg_id
+                rows=rows, external_sample_id=sample_id, cpg_sample_id=cpg_id
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -634,13 +631,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
-            pid = self.get_participant_id(row)
+            participant_eid = self.get_participant_id(row)
 
-            if not pid:
+            if not participant_eid:
                 raise ValueError(f'Participant not found in row: {row}')
 
-            sid = self.get_sample_id(row)
-            participant_map[pid][sid].append(row)
+            # business rule to default sample ID to participant ID if not provided
+            sid = self.get_sample_id(row) or participant_eid
+            participant_map[participant_eid][sid].append(row)
 
         return participant_map
 
