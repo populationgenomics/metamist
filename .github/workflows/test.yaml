@@ -2,7 +2,7 @@ name: Unittests
 on: push
 
 jobs:
-  build-publish:
+  run-unittests:
     # Run on merge to main, where the commit name starts with "Bump version:" (for bump2version)
     #    if: "startsWith(github.event.head_commit.message, 'Bump version:')"
     runs-on: ubuntu-latest
@@ -29,6 +29,8 @@ jobs:
 
       - name: Setup build env
         run: |
+          set -euxo pipefail
+
           pip install -r requirements-dev.txt
           pip install -r requirements.txt
 
@@ -40,7 +42,7 @@ jobs:
           wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
           popd
           # liquibase
-          VERSION=$(curl -s https://github.com/liquibase/liquibase/releases/latest | grep -o "v.*" | sed s/'>.*'//g |  sed s/'v'//g | sed 's/"//g')
+          VERSION=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/liquibase/liquibase/releases/latest | grep -o "v.*" | sed s/'>.*'//g |  sed s/'v'//g | sed 's/"//g')
           curl -L https://github.com/liquibase/liquibase/releases/download/v${VERSION}/liquibase-${VERSION}.zip --output liquibase-${VERSION}.zip
           unzip -o -d liquibase liquibase-${VERSION}.zip
           echo "$(pwd)/liquibase" >> $GITHUB_PATH

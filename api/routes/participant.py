@@ -39,6 +39,7 @@ async def fill_in_missing_participants(
 
     return {'success': await participant_layer.fill_in_missing_participants()}
 
+
 @router.get(
     '/{project}/individual-metadata-seqr/{export_type}',
     operation_id='getIndividualMetadataForSeqr',
