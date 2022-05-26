@@ -11,13 +11,20 @@ class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
     @run_test_as_sync
+    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
-    async def test_single_row_fastq(self, mock_get_sequence_ids, mock_get_sample_id):
+    async def test_simple_sheet(
+        self, mock_get_sequence_ids, mock_get_sample_id, mock_get_participant_id
+    ):
         """
-        Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        Test importing a two rows, forms objects and checks response
+        - MOCKS:
+            - get_participant_id_map_by_external_ids
+            - get_sample_id_map_by_external
+            - get_sequence_ids_from_sample_ids
         """
+        mock_get_participant_id.return_value = {'Sample01': 1}
         mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
         mock_get_sequence_ids.return_value = {}
 
@@ -42,16 +49,43 @@ class TestOntSampleSheetParser(unittest.TestCase):
             StringIO(file_contents), delimiter=',', dry_run=True
         )
 
-        (
-            samples_to_add,
-            sequencing_to_add,
-            samples_to_update,
-            sequencing_to_update,
-            analyses_to_add,
-        ) = resp
+        participants_to_add = resp['participants']['insert']
+        participants_to_update = resp['participants']['update']
+        samples_to_add = resp['samples']['insert']
+        samples_to_update = resp['samples']['update']
+        sequencing_to_add = resp['sequences']['insert']
+        sequencing_to_update = resp['sequences']['update']
 
+        self.assertEqual(1, len(participants_to_add))
+        self.assertEqual(1, len(participants_to_update))
         self.assertEqual(1, len(samples_to_add))
         self.assertEqual(2, len(sequencing_to_add))
         self.assertEqual(1, len(samples_to_update))
         self.assertEqual(0, len(sequencing_to_update))
-        self.assertEqual(0, len(analyses_to_add))
+
+        meta_dict = {
+            'barcoding': 'None',
+            'basecalling': '4.0.11+f1071ce',
+            'device': 'PromethION',
+            'experiment_name': 'PBXP_Awesome',
+            'failed_fastqs': 'Sample01_fail.fastq.gz',
+            'flow_cell': 'PRO002',
+            'flowcell_id': 'XYZ1',
+            'mux_total': '7107',
+            'protocol': 'LSK1',
+            'reads': [
+                [
+                    {
+                        'basename': 'Sample01_pass.fastq.gz',
+                        'checksum': None,
+                        'class': 'File',
+                        'location': 'gs://BUCKET/FAKE/Sample01_pass.fastq.gz',
+                        'size': None,
+                    }
+                ]
+            ],
+            'reads_type': 'fastq',
+            'sequencing_date': '10/12/2034',
+        }
+
+        self.assertDictEqual(meta_dict, sequencing_to_add[0].meta)
