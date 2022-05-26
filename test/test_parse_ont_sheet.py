@@ -1,11 +1,10 @@
-
-
 import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from scripts.parse_ont_sheet import OntParser
 from test.testbase import run_test_as_sync
+
+from scripts.parse_ont_sheet import OntParser
 
 
 class TestOntSampleSheetParser(unittest.TestCase):
@@ -14,9 +13,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
     @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
-    async def test_single_row_fastq(
-        self, mock_get_sequence_ids, mock_get_sample_id
-    ):
+    async def test_single_row_fastq(self, mock_get_sequence_ids, mock_get_sample_id):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
@@ -36,7 +33,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
         )
 
         parser.skip_checking_gcs_objects = True
-        fs = ['Sample01_pass.fastq.gz','Sample02_pass.fastq.gz']
+        fs = ['Sample01_pass.fastq.gz', 'Sample02_pass.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
         parser.skip_checking_gcs_objects = True
 
@@ -58,5 +55,3 @@ class TestOntSampleSheetParser(unittest.TestCase):
         self.assertEqual(1, len(samples_to_update))
         self.assertEqual(0, len(sequencing_to_update))
         self.assertEqual(0, len(analyses_to_add))
-
-

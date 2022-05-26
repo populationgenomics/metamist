@@ -2,8 +2,9 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 from test.testbase import run_test_as_sync
+
+from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 
 class TestSampleMapParser(unittest.TestCase):
@@ -33,7 +34,7 @@ class TestSampleMapParser(unittest.TestCase):
             # doesn't matter, we're going to mock the call anyway
             sample_metadata_project='dev',
         )
-        fs = ['<sample-id>.filename-R1.fastq.gz','<sample-id>.filename-R2.fastq.gz']
+        fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
         parser.skip_checking_gcs_objects = True
 
@@ -78,6 +79,4 @@ class TestSampleMapParser(unittest.TestCase):
             ],
             'reads_type': 'fastq',
         }
-        self.assertDictEqual(
-            expected_sequence_dict, sequencing_to_add[0].meta
-        )
+        self.assertDictEqual(expected_sequence_dict, sequencing_to_add[0].meta)

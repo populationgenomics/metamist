@@ -18,22 +18,24 @@ logger.setLevel(logging.INFO)
 
 class Columns:
     """Columns for ONT data sheet from Garvan"""
-    SEQUENCING_DATE = "Sequencing_date"
-    EXPERIMENT_NAME = "Experiment name"
-    SAMPLE_ID = "Sample ID"
-    PROTOCOL = "Protocol"
-    FLOW_CELL = "Flow cell"
-    BARCODING = "Barcoding"
-    DEVICE = "Device"
-    FLOWCELL_ID = "Flowcell ID"
-    MUX_TOTAL = "MUX total"
-    BASECALLING = "Basecalling"
-    FAIL_FASTQ_FILENAME = "Fail FASTQ filename"
-    PASS_FASTQ_FILENAME = "Pass FASTQ filename"
+
+    SEQUENCING_DATE = 'Sequencing_date'
+    EXPERIMENT_NAME = 'Experiment name'
+    SAMPLE_ID = 'Sample ID'
+    PROTOCOL = 'Protocol'
+    FLOW_CELL = 'Flow cell'
+    BARCODING = 'Barcoding'
+    DEVICE = 'Device'
+    FLOWCELL_ID = 'Flowcell ID'
+    MUX_TOTAL = 'MUX total'
+    BASECALLING = 'Basecalling'
+    FAIL_FASTQ_FILENAME = 'Fail FASTQ filename'
+    PASS_FASTQ_FILENAME = 'Pass FASTQ filename'
 
 
 class OntParser(GenericMetadataParser):
     """Parser for ONT sheet data - provided by Garvan"""
+
     def __init__(
         self,
         search_locations: List[str],
