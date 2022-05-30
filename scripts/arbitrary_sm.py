@@ -48,9 +48,9 @@ def run_sm(
     modified_kwargs = {**kwargs}
     for k in params_to_open:
         potential_path = kwargs.get(k)
-        if potential_path and os.path.exists(potential_path):
+        if potential_path and AnyPath(potential_path).exists():
             logging.info(f'Opening "{k}": {potential_path}')
-            files_to_close.append(open(potential_path))
+            files_to_close.append(AnyPath(potential_path).open())
             modified_kwargs[k] = files_to_close[-1]
         else:
             logging.info(f'Skipping opening {k}')
@@ -74,25 +74,12 @@ def from_args(args):
     if json_str:
         kwargs = json.loads(json_str)
 
-    files_to_close: List = []
-    if args.list_of_inputs_to_localise:
-        for inp in args.list_of_inputs_to_localise:
-            value = kwargs[inp]
-            if isinstance(value, list):
-                kwargs[inp] = [AnyPath(f).open() for f in value]
-                files_to_close.extend(kwargs[inp])
-            else:
-                kwargs[inp] = AnyPath(value).open()
-
     retval = run_sm(
         api_name=args.api_name,
         method_name=args.method_name,
         args=positional_args,
         kwargs=kwargs,
     )
-
-    for f in files_to_close:
-        f.close()
 
     return retval
 
