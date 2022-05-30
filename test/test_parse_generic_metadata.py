@@ -16,6 +16,9 @@ class TestParseGenericMetadata(unittest.TestCase):
     async def test_key_map(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
     ):
+        """
+        Test the flexible key map + other options
+        """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
         mock_stat_size.return_value = 111
