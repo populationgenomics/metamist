@@ -203,7 +203,7 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods
+class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
     def __init__(
