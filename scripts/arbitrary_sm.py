@@ -11,7 +11,6 @@ For example:
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
 """
-import os.path
 import logging
 import argparse
 import json
