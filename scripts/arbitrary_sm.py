@@ -90,9 +90,6 @@ def main(args=None):
     parser = argparse.ArgumentParser('Arbitrary sample-metadata script')
     parser.add_argument('api_name')
     parser.add_argument('method_name')
-    parser.add_argument(
-        '--list-of-inputs-to-localise', action='append', help='List of files within the JSON to open'
-    )
     parser.add_argument('--json', help='JSON encoded dictionary for kwargs')
     parser.add_argument(
         '--args',
