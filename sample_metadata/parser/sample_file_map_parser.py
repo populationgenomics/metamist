@@ -10,10 +10,19 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
 )
 
-PARTICIPANT_COL_NAME = 'Individual ID'
-SAMPLE_ID_COL_NAME = 'Sample ID'
-READS_COL_NAME = 'Filenames'
-SEQ_TYPE_COL_NAME = 'Type'
+PARTICIPANT_COL_NAME = 'individual_id'
+SAMPLE_ID_COL_NAME = 'sample_id'
+READS_COL_NAME = 'filenames'
+SEQ_TYPE_COL_NAME = 'type'
+
+KeyMap = {
+    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id'],
+    SAMPLE_ID_COL_NAME: ['sample id', 'sample', 'sample id'],
+    READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
+    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type']
+}
+
+required_keys = [SAMPLE_ID_COL_NAME, READS_COL_NAME]
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
@@ -77,6 +86,7 @@ class SampleFileMapParser(GenericMetadataParser):
             sequence_meta_map={},
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
+            key_map=KeyMap
         )
 
 
