@@ -288,7 +288,9 @@ class GenericMetadataParser(GenericParser):
         filename_promises = []
         for grp in rows:
             for r in grp if isinstance(grp, list) else [grp]:
-                filename_promises.append(self.get_read_filenames('TEST', r))
+                filename_promises.append(
+                    self.get_read_filenames(self.get_sample_id(r), r)
+                )
 
         filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
         fs = set(f.strip() for f in filenames if f and f.strip())
@@ -492,7 +494,9 @@ class GenericMetadataParser(GenericParser):
 
         return filenames
 
-    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
+    async def get_read_filenames(
+        self, sample_id: Optional[str], row: SingleRow
+    ) -> List[str]:
         """Get paths to reads from a row"""
         if not self.reads_column or self.reads_column not in row:
             return []
