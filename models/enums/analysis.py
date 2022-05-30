@@ -9,6 +9,7 @@ class AnalysisType(Enum):
     GVCF = 'gvcf'
     CRAM = 'cram'
     CUSTOM = 'custom'
+    ES_INDEX = 'es-index'
 
 
 class AnalysisStatus(Enum):

@@ -220,9 +220,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_test_as_sync
+    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     async def test_rows_with_valid_participant_meta(
         self,
         mock_get_sequence_ids,
@@ -286,10 +286,12 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_test_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     async def test_rows_with_invalid_participant_meta(
         self,
+        mock_get_sequence_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
     ):
@@ -299,6 +301,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
+        mock_get_sequence_ids.return_value = {}
         mock_get_sample_id.return_value = {}
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
