@@ -73,14 +73,12 @@ def from_args(args):
     if json_str:
         kwargs = json.loads(json_str)
 
-    retval = run_sm(
+    return run_sm(
         api_name=args.api_name,
         method_name=args.method_name,
         args=positional_args,
         kwargs=kwargs,
     )
-
-    return retval
 
 
 def main(args=None):
