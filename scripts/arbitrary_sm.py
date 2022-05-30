@@ -11,13 +11,12 @@ For example:
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
 """
-from typing import List
 import os.path
 import logging
-import subprocess
-
 import argparse
 import json
+from typing import List
+from cloudpathlib import AnyPath
 
 from sample_metadata import apis
 from sample_metadata.model_utils import file_type
@@ -71,20 +70,31 @@ def from_args(args):
     positional_args: List[str] = args.args
     kwargs = {}
 
-    if args.file_to_localise:
-        for file in args.file_to_localise:
-            subprocess.check_output(['gsutil', 'cp', file, '.'])
-
     json_str = args.json
     if json_str:
         kwargs = json.loads(json_str)
 
-    return run_sm(
+    files_to_close: List = []
+    if args.list_of_inputs_to_localise:
+        for inp in args.list_of_inputs_to_localise:
+            value = kwargs[inp]
+            if isinstance(value, list):
+                kwargs[inp] = [AnyPath(f).open() for f in value]
+                files_to_close.extend(kwargs[inp])
+            else:
+                kwargs[inp] = AnyPath(value).open()
+
+    retval = run_sm(
         api_name=args.api_name,
         method_name=args.method_name,
         args=positional_args,
         kwargs=kwargs,
     )
+
+    for f in files_to_close:
+        f.close()
+
+    return retval
 
 
 def main(args=None):
@@ -94,7 +104,7 @@ def main(args=None):
     parser.add_argument('api_name')
     parser.add_argument('method_name')
     parser.add_argument(
-        '--file-to-localise', action='append', help='List of GS files to localise'
+        '--list-of-inputs-to-localise', action='append', help='List of files within the JSON to open'
     )
     parser.add_argument('--json', help='JSON encoded dictionary for kwargs')
     parser.add_argument(
