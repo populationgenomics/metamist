@@ -69,7 +69,9 @@ class TestParseGenericMetadata(unittest.TestCase):
                 StringIO('\n'.join(rows)), delimiter=',', dry_run=True
             )
         except ValueError as e:
-            self.assertEqual('Key "extra" not found in provided key map: fn, sample', str(e))
+            self.assertEqual(
+                'Key "extra" not found in provided key map: fn, sample', str(e)
+            )
 
     @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
