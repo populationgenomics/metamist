@@ -119,13 +119,3 @@ jobs:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages_dir: dist/
-
-      - name: Build and push sample-metadata API docker image
-        if: github.ref == 'refs/heads/main'
-        run: |
-          version=$(cat deploy/python/version.txt)
-          docker build \
-            -t $SM_API_DOCKER:$version \
-            --build-arg SM_VERSION=$version \
-            deploy/python
-          docker push $SM_API_DOCKER:$version
