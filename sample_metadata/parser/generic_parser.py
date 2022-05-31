@@ -20,6 +20,8 @@ from typing import (
     TypeVar,
     Iterator,
     Coroutine,
+    Set,
+    Iterable,
 )
 from functools import wraps
 
@@ -87,8 +89,18 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 class CustomDictReader(csv.DictReader):
     """csv.DictReader that strips whitespace off headers"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        key_map=None,
+        required_keys: Iterable[str] = None,
+        ignore_extra_keys=False,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+        self.key_map = key_map
+        self.ignore_extra_keys = ignore_extra_keys
+        self.required_keys = set(required_keys) if required_keys else None
         self._custom_cached_fieldnames = None
 
     @property
@@ -96,6 +108,11 @@ class CustomDictReader(csv.DictReader):
         if not self._custom_cached_fieldnames:
             fs = super().fieldnames
             self._custom_cached_fieldnames = list(map(self.process_fieldname, fs))
+
+            if self.required_keys:
+                missing_keys = self.required_keys - set(self._custom_cached_fieldnames)
+                if missing_keys:
+                    raise ValueError('Missing keys: ' + ','.join(missing_keys))
         return self._custom_cached_fieldnames
 
     def process_fieldname(self, fieldname: str) -> str:
@@ -103,6 +120,16 @@ class CustomDictReader(csv.DictReader):
         Process the fieldname
         (default: strip leading / trailing whitespace)
         """
+        if self.key_map:
+            for k, values in self.key_map.items():
+                if fieldname.lower() in values:
+                    return k
+
+            if not self.ignore_extra_keys:
+                raise ValueError(
+                    f'Key "{fieldname}" not found in provided key map: {", ".join(self.key_map.keys())}'
+                )
+
         return fieldname.strip()
 
 
@@ -176,7 +203,7 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods
+class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
     def __init__(
@@ -189,12 +216,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         default_analysis_type='qc',
         default_analysis_status='completed',
         skip_checking_gcs_objects=False,
+        key_map: Dict[str, str] = None,
+        ignore_extra_keys=False,
+        required_keys: Set[str] = None,
         verbose=True,
     ):
 
         self.path_prefix = path_prefix
         self.skip_checking_gcs_objects = skip_checking_gcs_objects
         self.verbose = verbose
+
+        self.key_map = key_map
+        self.required_keys = required_keys
+        self.ignore_extra_keys = ignore_extra_keys
 
         if not sample_metadata_project:
             raise ValueError('sample-metadata project is required')
@@ -329,10 +363,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    # @abstractmethod
-    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
-        """Get internal cpg sample ID from row"""
-
     @abstractmethod
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
@@ -405,7 +435,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
     # @abstractmethod
     def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
         """Get sequence types from row"""
-        return List(SequenceType(self.default_sequence_type))
+        return [SequenceType(self.default_sequence_type)]
 
     # @abstractmethod
     def get_sequence_type(self, row: SingleRow) -> SequenceType:
@@ -432,6 +462,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         rows: GroupedRow,
         external_sample_id: str,
         cpg_sample_id: Optional[str],
+        sequence_ids: Dict[Any, Any],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -443,13 +474,6 @@ class GenericParser:  # pylint: disable=too-many-public-methods
 
         Then the calling function does the (reduce).
         """
-
-        # Get all the sequence ids for this sample
-        sequence_ids = {}
-        if cpg_sample_id is not None:
-            sequence_ids = await self.seqapi.get_all_sequences_for_sample_id_async(
-                sample_id=cpg_sample_id
-            )
 
         # now we have sample / sequencing meta across 4 different rows, so collapse them
         (
@@ -478,6 +502,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                             f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
                         )
                     sequence_id = sequence_id[0]
+
                 seq_args: Dict[str, Any] = {
                     'meta': seq.meta,
                     'type': seq.sequence_type,
@@ -524,6 +549,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         participant_name: str,
         sample_map: Dict[str, Any],
         internal_pid: Optional[int],
+        sequence_ids: Dict[Any, Any] = None,
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -556,7 +582,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         for sample_id, rows in sample_map.items():
             cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
-                rows, sample_id, cpg_id
+                rows=rows,
+                external_sample_id=sample_id,
+                cpg_sample_id=cpg_id,
+                sequence_ids=sequence_ids,
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -617,7 +646,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         Override this method if you can't use the default implementation that simply
         calls csv.DictReader
         """
-        reader = CustomDictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(
+            file_pointer,
+            delimiter=delimiter,
+            key_map=self.key_map,
+            required_keys=self.required_keys,
+            ignore_extra_keys=self.ignore_extra_keys,
+        )
         return reader
 
     async def file_pointer_to_participant_map(
@@ -634,13 +669,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         )
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         for row in reader:
-            pid = self.get_participant_id(row)
+            participant_eid = self.get_participant_id(row)
 
-            if not pid:
+            if not participant_eid:
                 raise ValueError(f'Participant not found in row: {row}')
 
-            sid = self.get_sample_id(row)
-            participant_map[pid][sid].append(row)
+            # business rule to default sample ID to participant ID if not provided
+            sid = self.get_sample_id(row) or participant_eid
+            participant_map[participant_eid][sid].append(row)
 
         return participant_map
 
@@ -777,10 +813,20 @@ class GenericParser:  # pylint: disable=too-many-public-methods
                 self.sample_metadata_project, external_pids, allow_missing=True
             )
 
+            sample_ids = list(
+                set(k for s in participant_map.values() for k in s.keys())
+            )
+            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
+                sample_ids
+            )
+
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
                 promise = self.process_participant_group(
-                    external_pid, sample_map, existing_participant_ids.get(external_pid)
+                    external_pid,
+                    sample_map,
+                    existing_participant_ids.get(external_pid),
+                    sequence_ids=sequence_ids,
                 )
                 current_batch_promises[external_pid] = promise
 
@@ -870,10 +916,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(external_sids)}')
 
+            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
+                external_sids
+            )
+
             for external_sid in external_sids:
                 rows: GroupedRow = sample_map[external_sid]
                 cpg_id = existing_external_id_to_cpgid.get(external_sid, None)
-                promise = self.process_sample_group(rows, external_sid, cpg_id)
+                promise = self.process_sample_group(
+                    rows=rows,
+                    external_sample_id=external_sid,
+                    cpg_sample_id=cpg_id,
+                    sequence_ids=sequence_ids,
+                )
                 current_batch_promises[external_sid] = promise
 
             processed_ex_sids = list(current_batch_promises.keys())

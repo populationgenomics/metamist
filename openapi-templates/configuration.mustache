@@ -600,16 +600,43 @@ def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.
             credentials.refresh(auth_req)
             return credentials.token
 
-    else:
-        try:
-            creds, _ = google.auth.default()
-            auth_req = google.auth.transport.requests.Request()
-            creds.refresh(auth_req)
-            return creds.id_token
-        except google.auth.exceptions.RefreshError as e:
-            m = (
-                'Failed to refresh credentials, you might need to export '
-                f'"GOOGLE_APPLICATION_CREDENTIALS" due to {e}'
-            )
-            logging.critical(m)
-            raise Exception(m) from e
+    # try to see if we're on a VM
+    google_identity_message = ''
+    gurl = f'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={url}'
+    try:
+        r = urllib3.PoolManager().request(
+            'GET',
+            gurl,
+            headers={'Metadata-Flavor': 'Google'}
+        )
+        if r.status == 200:
+            token = r.data
+            if token:
+                return token.decode('utf-8')
+    except urllib3.exceptions.HTTPError as e:
+        # Not on a VM, might be useful for later
+        google_identity_message = str(e)
+
+    try:
+        creds, _ = google.auth.default()
+        auth_req = google.auth.transport.requests.Request()
+        creds.refresh(auth_req)
+        return creds.id_token
+    except google.auth.exceptions.RefreshError as e:
+        m = (
+            'Failed to refresh credentials, you might need to export '
+            f'"GOOGLE_APPLICATION_CREDENTIALS" due to {e}'
+        )
+        logging.critical(m)
+        raise Exception(m) from e
+    except AttributeError:
+        # mfranklin: I noticed this when running on a GCP VM, I don't really
+        #       know why this happens, but I assume this approach only works
+        #       for user-specific identities, not service-accounts.
+        raise RuntimeError(
+            'There was an error when getting an identity token, if you are '
+            'using a service-account, you should set the '
+            'GOOGLE_APPLICATION_CREDENTIALS environment variable to the path to your '
+            'credentials file, as the call to metadata.google.internal failed with '
+            f'{google_identity_message}.'
+        )

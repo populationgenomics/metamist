@@ -338,4 +338,20 @@
 		<!-- True values 'genome', 'exome', 'single-cell' and now 'mtseq' but maintaining old 'wgs' for system version tables -->
 		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'wgs');</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-05-18_add-es-index-ont-project.meta">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<!-- True values 'genome', 'exome', 'single-cell' and now 'mtseq' but maintaining old 'wgs' for system version tables -->
+		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'wgs', 'ont');</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index');</sql>
+		<addColumn
+			tableName="project">
+			<column
+				name="meta"
+				type="JSON"
+			/>
+		</addColumn>
+	</changeSet>
+
+
+
 </databaseChangeLog>

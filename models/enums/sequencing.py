@@ -8,6 +8,7 @@ class SequenceType(Enum):
     EXOME = 'exome'
     SINGLE_CELL = 'single-cell'
     MT = 'mtseq'
+    ONT = 'ont'
 
 
 class SequenceStatus(Enum):
