@@ -104,6 +104,7 @@ class GenericMetadataParser(GenericParser):
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
         allow_extra_files_in_search_path=False,
+        **kwargs
     ):
         super().__init__(
             path_prefix=path_prefix,
@@ -111,6 +112,7 @@ class GenericMetadataParser(GenericParser):
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
+            **kwargs
         )
         self.search_locations = search_locations
         self.filename_map: Dict[str, str] = {}
@@ -144,20 +146,9 @@ class GenericMetadataParser(GenericParser):
         """Get external sample ID from row"""
         return row.get(self.sample_name_column, None)
 
-    async def get_cpg_sample_id(self, row: SingleRow) -> Optional[str]:
+    async def get_cpg_sample_id_from_row(self, row: SingleRow) -> Optional[str]:
         """Get internal cpg id from a row using get_sample_id and an api call"""
-        cpg_id = row.get(self.cpg_id_column, None)
-
-        if not cpg_id:
-            external_id = self.get_sample_id(row)
-            id_map = await self.sapi.get_sample_by_external_id_async(
-                external_id, self.sample_metadata_project
-            )
-            cpg_id = id_map.get(external_id, None)
-            row[self.cpg_id_column] = cpg_id
-            return cpg_id
-
-        return cpg_id
+        return row.get(self.cpg_id_column, None)
 
     def get_sample_type(self, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
@@ -589,7 +580,7 @@ class GenericMetadataParser(GenericParser):
             )
 
         if not sample_id:
-            sample_id = await self.get_cpg_sample_id(rows[0])
+            sample_id = await self.get_cpg_sample_id_from_row(rows[0])
 
         file_types: Dict[str, Dict[str, List]] = await self.parse_files(
             sample_id, full_filenames
