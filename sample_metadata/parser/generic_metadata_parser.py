@@ -1,6 +1,9 @@
 # pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
+import asyncio
+import re
+import shlex
 from itertools import groupby
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Union
 import os
 import logging
 from io import StringIO
@@ -70,6 +73,8 @@ python parse_generic_metadata.py \
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
+RE_FILENAME_SPLITTER = re.compile('[,;]')
 
 
 class GenericMetadataParser(GenericParser):
@@ -223,7 +228,9 @@ class GenericMetadataParser(GenericParser):
         file_pointer.seek(0)
         return has_participants
 
-    async def validate_participant_map(self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]):
+    async def validate_participant_map(
+        self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
+    ):
         await super().validate_participant_map(participant_map)
         if not self.reads_column:
             return
@@ -239,7 +246,7 @@ class GenericMetadataParser(GenericParser):
                     raise ValueError(f'Unexpected type {type(row)} {row}')
 
         errors = []
-        errors.extend(self.check_files_covered_by_rows(ungrouped_rows))
+        errors.extend(await self.check_files_covered_by_rows(ungrouped_rows))
         if errors:
             raise ValueError(', '.join(errors))
 
@@ -259,21 +266,24 @@ class GenericMetadataParser(GenericParser):
                 raise ValueError(f'Unexpected type {type(row)} {row}')
 
         errors = []
-        errors.extend(self.check_files_covered_by_rows(ungrouped_rows))
+        errors.extend(await self.check_files_covered_by_rows(ungrouped_rows))
         if errors:
             raise ValueError(', '.join(errors))
 
-    def check_files_covered_by_rows(
+    async def check_files_covered_by_rows(
         self, rows: List[Dict[str, Any]]
     ) -> List[str]:
         """
         Check that the files in the search_paths are completely covered by the sample_map
         """
-        filenames = []
+        filename_promises = []
         for grp in rows:
             for r in grp if isinstance(grp, list) else [grp]:
-                filenames.extend(r.get(self.reads_column, '').split(','))
+                filename_promises.append(
+                    self.get_read_filenames(self.get_sample_id(r), r)
+                )
 
+        filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
         fs = set(f.strip() for f in filenames if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
@@ -435,19 +445,64 @@ class GenericMetadataParser(GenericParser):
 
         return reduce(GenericMetadataParser.merge_dicts, dicts)
 
-    async def get_read_filenames(self, sample_id: str, row: SingleRow) -> List[str]:
+    @staticmethod
+    def process_filename_value(string: Union[str, List[str]]) -> List[str]:
+        """
+        Split on multiple delimiters, ;,
+
+        >>> GenericMetadataParser.process_filename_value('Filename1-fastq.gz;Filename2.fastq.gz')
+        ['Filename1-fastq.gz', 'Filename2.fastq.gz']
+
+        >>> GenericMetadataParser.process_filename_value('Filename1-fastq.gz, Filename2.fastq.gz')
+        ['Filename1-fastq.gz', 'Filename2.fastq.gz']
+
+        >>> GenericMetadataParser.process_filename_value('Filename1 with spaces fastq.gz')
+        ['Filename1 with spaces fastq.gz']
+
+        >>> GenericMetadataParser.process_filename_value(['filename ;filename2, filename3', ' filename4'])
+        ['filename', 'filename2', 'filename3', 'filename4']
+        """
+        if not string:
+            return []
+        if isinstance(string, list):
+            return sorted(
+                set(
+                    r
+                    for f in string
+                    for r in GenericMetadataParser.process_filename_value(f)
+                )
+            )
+
+        filenames = [f.strip() for f in RE_FILENAME_SPLITTER.split(string)]
+        filenames = [f for f in filenames if f]
+
+        whitespace_filenames = [f for f in filenames if ' ' in f]
+        if whitespace_filenames:
+            logger.warning(
+                'Whitespace detected in filenames: '
+                + ','.join(shlex.quote(str(s)) for s in whitespace_filenames)
+            )
+
+        return filenames
+
+    async def get_read_filenames(
+        self, sample_id: Optional[str], row: SingleRow
+    ) -> List[str]:
         """Get paths to reads from a row"""
         if not self.reads_column or self.reads_column not in row:
             return []
         # more post processing
-        return [f.strip() for f in row[self.reads_column].split(',') if f.strip()]
+        return self.process_filename_value(row[self.reads_column])
 
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to gvcfs from a row"""
+        if not self.gvcf_column:
+            return []
+
         gvcf_filenames: List[str] = []
         for r in row if isinstance(row, list) else [row]:
-            if self.gvcf_column and self.gvcf_column in r:
-                gvcf_filenames.extend(r[self.gvcf_column].split(','))
+            if self.gvcf_column in r:
+                gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
         return gvcf_filenames
 
@@ -516,9 +571,13 @@ class GenericMetadataParser(GenericParser):
         # strip in case collaborator put "file1, file2"
         full_filenames: List[str] = []
         if read_filenames:
-            full_filenames.extend(self.file_path(f.strip()) for f in read_filenames if f.strip())
+            full_filenames.extend(
+                self.file_path(f.strip()) for f in read_filenames if f.strip()
+            )
         if gvcf_filenames:
-            full_filenames.extend(self.file_path(f.strip()) for f in gvcf_filenames if f.strip())
+            full_filenames.extend(
+                self.file_path(f.strip()) for f in gvcf_filenames if f.strip()
+            )
 
         if not sample_id:
             sample_id = await self.get_cpg_sample_id_from_row(rows[0])
