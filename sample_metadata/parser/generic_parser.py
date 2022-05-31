@@ -20,6 +20,8 @@ from typing import (
     TypeVar,
     Iterator,
     Coroutine,
+    Set,
+    Iterable,
 )
 from functools import wraps
 
@@ -87,8 +89,18 @@ SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 class CustomDictReader(csv.DictReader):
     """csv.DictReader that strips whitespace off headers"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        key_map=None,
+        required_keys: Iterable[str] = None,
+        ignore_extra_keys=False,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
+        self.key_map = key_map
+        self.ignore_extra_keys = ignore_extra_keys
+        self.required_keys = set(required_keys) if required_keys else None
         self._custom_cached_fieldnames = None
 
     @property
@@ -96,6 +108,11 @@ class CustomDictReader(csv.DictReader):
         if not self._custom_cached_fieldnames:
             fs = super().fieldnames
             self._custom_cached_fieldnames = list(map(self.process_fieldname, fs))
+
+            if self.required_keys:
+                missing_keys = self.required_keys - set(self._custom_cached_fieldnames)
+                if missing_keys:
+                    raise ValueError('Missing keys: ' + ','.join(missing_keys))
         return self._custom_cached_fieldnames
 
     def process_fieldname(self, fieldname: str) -> str:
@@ -103,6 +120,16 @@ class CustomDictReader(csv.DictReader):
         Process the fieldname
         (default: strip leading / trailing whitespace)
         """
+        if self.key_map:
+            for k, values in self.key_map.items():
+                if fieldname.lower() in values:
+                    return k
+
+            if not self.ignore_extra_keys:
+                raise ValueError(
+                    f'Key "{fieldname}" not found in provided key map: {", ".join(self.key_map.keys())}'
+                )
+
         return fieldname.strip()
 
 
@@ -176,7 +203,7 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods
+class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
     def __init__(
@@ -189,12 +216,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         default_analysis_type='qc',
         default_analysis_status='completed',
         skip_checking_gcs_objects=False,
+        key_map: Dict[str, str] = None,
+        ignore_extra_keys=False,
+        required_keys: Set[str] = None,
         verbose=True,
     ):
 
         self.path_prefix = path_prefix
         self.skip_checking_gcs_objects = skip_checking_gcs_objects
         self.verbose = verbose
+
+        self.key_map = key_map
+        self.required_keys = required_keys
+        self.ignore_extra_keys = ignore_extra_keys
 
         if not sample_metadata_project:
             raise ValueError('sample-metadata project is required')
@@ -612,7 +646,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods
         Override this method if you can't use the default implementation that simply
         calls csv.DictReader
         """
-        reader = CustomDictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(
+            file_pointer,
+            delimiter=delimiter,
+            key_map=self.key_map,
+            required_keys=self.required_keys,
+            ignore_extra_keys=self.ignore_extra_keys,
+        )
         return reader
 
     async def file_pointer_to_participant_map(

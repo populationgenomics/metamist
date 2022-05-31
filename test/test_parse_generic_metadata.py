@@ -13,6 +13,73 @@ class TestParseGenericMetadata(unittest.TestCase):
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
+    async def test_key_map(
+        self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
+    ):
+        """
+        Test the flexible key map + other options
+        """
+        mock_get_sample_id.return_value = {}
+        mock_get_sequence_ids.return_value = {}
+        mock_stat_size.return_value = 111
+
+        rows = [
+            'sample id,filenames',
+            '<sample-id>,<sample-id>-R1.fastq.gz',
+            '<sample-id>,<sample-id>-R2.fastq.gz',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=['.'],
+            key_map={
+                'fn': ['filenames', 'filename'],
+                'sample': ['sample id', 'sample_id'],
+            },
+            ignore_extra_keys=False,
+            reads_column='fn',
+            sample_name_column='sample',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            sample_metadata_project='devdev',
+        )
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            '<sample-id>-R1.fastq.gz': 'gs://<sample-id>-R1.fastq.gz',
+            '<sample-id>-R2.fastq.gz': 'gs://<sample-id>-R2.fastq.gz',
+        }
+
+        resp = await parser.parse_manifest(
+            StringIO('\n'.join(rows)), delimiter=',', dry_run=True
+        )
+
+        self.assertEqual(1, len(resp['samples']['insert']))
+        self.assertEqual(1, len(resp['sequences']['insert']))
+        self.assertEqual(0, len(resp['samples']['update']))
+        self.assertEqual(0, len(resp['sequences']['update']))
+
+        parser.ignore_extra_keys = False
+        rows = [
+            'sample id,filenames,extra',
+            '<sample-id>,<sample-id>-R1.fastq.gz,extra',
+            '<sample-id>,<sample-id>-R2.fastq.gz,read-all-about-it',
+        ]
+
+        try:
+            _ = await parser.parse_manifest(
+                StringIO('\n'.join(rows)), delimiter=',', dry_run=True
+            )
+        except ValueError as e:
+            self.assertEqual(
+                'Key "extra" not found in provided key map: fn, sample', str(e)
+            )
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('os.path.getsize')
     async def test_single_row(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
     ):
