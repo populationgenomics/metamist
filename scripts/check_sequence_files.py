@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # pylint: disable=W0703
 
-from collections import defaultdict
+import os
 import asyncio
 import logging
-
+from collections import defaultdict
 from typing import Set, Dict, Any, List
 
 from google.cloud import storage
@@ -119,7 +119,8 @@ async def get_sm_sequences():
     for k, v in filenames_by_buckets.items():
         logging.info(f'{k}, {len(v)}')
 
-    missing = set()
+    # filename to file path
+    missing = {}
     for bucket, files in filenames_by_buckets.items():
         missing.update(check_missing_file_names(bucket, files))
 
@@ -127,7 +128,7 @@ async def get_sm_sequences():
         logging.error(f'Missing files {len(missing)}')
 
         with open('missing_sequence_files.txt', 'w') as fout:
-            fout.write('\n'.join(missing))
+            fout.write('\n'.join(sorted(missing.values())))
 
     return sequences, missing
 
@@ -135,33 +136,34 @@ async def get_sm_sequences():
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
 
 
-def check_missing_file_names(bucket_name: str, filenames: Set[str]) -> Set[str]:
+def check_missing_file_names(bucket_name: str, filenames: Set[str]) -> Dict[str, str]:
     """
     Find set of missing files compared to list of filenames in a bucket
     """
     bucket = client.get_bucket(bucket_name)
     if not bucket_name.endswith('-main-upload'):
         logging.error(f'Got a non main-upload bucket? {bucket_name}')
-        return set([])
+        return {}
 
     logging.info(f'Loading {bucket_name}')
 
     # no prefix means it will get all blobs in the bucket (regardless of path)
     # this can be a dangerous call
-    files_in_bucket = set()
+    files_in_bucket = {}
     for blob in client.list_blobs(bucket):
         bl = blob.name.lower()
         if not any(bl.endswith(ext) for ext in EXTENSIONS):
             continue
-        files_in_bucket.add(f'gs://{bucket_name}/{blob.name}')
+        files_in_bucket[os.path.basename(blob.name)] = f'gs://{bucket_name}/{blob.name}'
 
-    files_not_in_sm = files_in_bucket - filenames
+    fns = set(os.path.basename(f) for f in filenames)
+    files_not_in_sm = set(files_in_bucket.keys()) - fns
     if files_not_in_sm:
         logging.error(
             f'{bucket_name} :: {len(files_not_in_sm)}/{len(filenames)} missing files'
         )
 
-    return set(files_not_in_sm)
+    return {name: files_in_bucket[name] for name in files_not_in_sm}
 
 
 def main():
