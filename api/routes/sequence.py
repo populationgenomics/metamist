@@ -65,6 +65,31 @@ async def update_sequence(
     return sequence_id
 
 
+@router.patch(
+    '/{sample_id}/{sequence_type}', operation_id='updateSequenceFromSampleAndType'
+)
+async def update_sequence_from_sample_and_type(
+    sample_id: str,
+    sequence_type: SequenceType,
+    sequence: SequenceUpdateModel,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update the latest sequence by sample_id and sequence type"""
+    sequence_layer = SampleSequenceLayer(connection)
+    sample_id_raw = sample_id_transform_to_raw(sample_id)
+
+    # Get sequence_id from sample_id and batch_id
+    sequence_id = await sequence_layer.get_latest_sequence_id_from_sample_id_and_type(
+        sample_id_raw, sequence_type
+    )
+
+    _ = await sequence_layer.update_sequence(
+        sequence_id, status=sequence.status, meta=sequence.meta
+    )
+
+    return sequence_id
+
+
 @router.get('/{sequence_id}/details', operation_id='getSequenceByID')
 async def get_sequence(
     sequence_id: int, connection: Connection = get_projectless_db_connection
@@ -134,7 +159,7 @@ async def get_latest_sequence_id_from_sample_id_and_type(
     '/all-for-sample-id/{sample_id}',
     operation_id='getAllSequencesForSampleId',
 )
-async def get_all_sequence_id_for_sample_id(
+async def get_all_sequences_id_for_sample_id(
     sample_id: str,
     connection: Connection = get_projectless_db_connection,
 ) -> Dict[str, int]:

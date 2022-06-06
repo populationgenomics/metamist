@@ -149,12 +149,12 @@ class SampleSequencingTable(DbBase):
             FROM sample_sequencing sq
             INNER JOIN sample s ON sq.sample_id = s.id
             WHERE sample_id = :sample_id
-            AND type = :type
+            AND sq.type = :stype
             ORDER by sq.id DESC
             LIMIT 1
         """
         result = await self.connection.fetch_one(
-            _query, {'sample_id': sample_id, 'type': stype}
+            _query, {'sample_id': sample_id, 'stype': stype.value}
         )
         if not result:
             raise NotFoundError
