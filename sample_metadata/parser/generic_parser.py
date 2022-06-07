@@ -24,12 +24,10 @@ from typing import (
     Iterable,
 )
 from functools import wraps
+from sample_metadata.parser.cloudhelper import CloudHelper
 
-from google.api_core.exceptions import Forbidden
-from google.cloud import storage
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
-from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi, ParticipantApi
 from sample_metadata.models import (
     ParticipantUpsert,
@@ -210,12 +208,15 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
+class GenericParser(
+    CloudHelper
+):  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         path_prefix: Optional[str],
+        search_paths: list[str],
         sample_metadata_project: str,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
@@ -257,22 +258,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self.papi = ParticipantApi()
         self.seqapi = SequenceApi()
 
-    @property
-    def client(self):
-        """Get GCP storage client"""
-        if not self._client:
-            self._client = storage.Client()
-        return self._client
+        super().__init__(search_paths)
 
-    def get_bucket(self, bucket_name):
-        """Get cached bucket client from optional bucket name"""
-        assert bucket_name
-        if bucket_name not in self.bucket_clients:
-            self.bucket_clients[bucket_name] = self.client.get_bucket(bucket_name)
-
-        return self.bucket_clients[bucket_name]
-
-    def file_path(self, filename: str) -> str:
+    def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
         """
         Get complete filepath of filename:
         - Includes gs://{bucket} if relevant
@@ -282,89 +270,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             return filename
 
         if not self.path_prefix:
-            raise FileNotFoundError(
-                f"Can't form full path to '{filename}' as no path_prefix was defined"
-            )
-
-        if self.client and not filename.startswith('/'):
-            assert self.default_bucket
-            return os.path.join(
-                'gs://',
-                self.default_bucket or '',
-                self.path_prefix or '',
-                filename or '',
-            )
+            fn = super().file_path(filename, raise_exception=raise_exception)
+            if not fn:
+                raise FileNotFoundError(
+                    f'Cannot form full path to "{filename}" as '
+                    'no path_prefix was defined'
+                )
+            return fn
 
         return os.path.join(self.path_prefix or '', filename)
-
-    @async_wrap
-    def get_blob(self, filename):
-        """Convenience function for getting blob from fully qualified GCS path"""
-        if not filename.startswith('gs://'):
-            raise ValueError('No blob available')
-
-        bucket_name, *components = filename[5:].split('/')
-        bucket = self.get_bucket(bucket_name)
-        path = '/'.join(components)
-
-        # the next few lines are equiv to `bucket.get_blob(path)`
-        # but without requiring storage.objects.get permission
-        blobs = list(self.client.list_blobs(bucket, prefix=path))
-        # first where r.name == path (or None)
-        return next((r for r in blobs if r.name == path), None)
-
-    def list_directory(self, directory_name) -> List[str]:
-        """List directory"""
-        path = self.file_path(directory_name)
-        if path.startswith('gs://'):
-            bucket_name, *components = directory_name[5:].split('/')
-            assert self.client
-            blobs = self.client.list_blobs(
-                bucket_name, prefix='/'.join(components), delimiter='/'
-            )
-            return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
-
-        return [os.path.join(path, f) for f in os.listdir(path)]
-
-    async def file_contents(self, filename) -> Optional[str]:
-        """Get contents of file (decoded as utf8)"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(path)
-            try:
-                try:
-                    retval = blob.download_as_bytes()
-                except AttributeError:
-                    retval = blob.download_as_string()
-
-                if isinstance(retval, bytes):
-                    retval = retval.decode()
-                return retval
-            except Forbidden:
-                logger.warning(f"FORBIDDEN: Can't download {filename}")
-                return None
-
-        with open(filename, encoding='utf-8') as f:
-            return f.read()
-
-    async def file_exists(self, filename: str) -> bool:
-        """Determines whether a file exists"""
-        path = self.file_path(filename)
-
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob is not None
-
-        return os.path.exists(path)
-
-    async def file_size(self, filename):
-        """Get size of file in bytes"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob.size
-
-        return os.path.getsize(path)
 
     @abstractmethod
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
@@ -1011,6 +925,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
+
+        if not isinstance(reads, list):
+            reads = [reads]
 
         file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
             lambda: defaultdict(list)
