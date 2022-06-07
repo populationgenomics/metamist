@@ -175,12 +175,19 @@ class SequenceMetaGroup:
         self.meta = meta
 
 
-def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[Sequence[T]]:
+def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[Sequence[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
-    for i in range(0, len(iterable), chunk_size):
-        yield iterable[i : i + chunk_size]
+    chnk = []
+    for element in iterable:
+        chnk.append(element)
+        if len(chnk) >= chunk_size:
+            yield chunk
+            chnk = []
+
+    if chnk:
+        yield chnk
 
 
 def run_as_sync(f):
