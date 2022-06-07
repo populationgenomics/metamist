@@ -57,7 +57,7 @@ and we want to achieve the following:
     - "qc_quality" -> "quality"
 
 python parse_generic_metadata.py \
-    --sample-metadata-project $dataset \
+    --project $dataset \
     --sample-name-column "Sample ID" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \
@@ -86,7 +86,7 @@ class GenericMetadataParser(GenericParser):
         sample_meta_map: Dict[str, str],
         sequence_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
-        sample_metadata_project: str,
+        project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
         reported_sex_column: Optional[str] = None,
@@ -107,7 +107,7 @@ class GenericMetadataParser(GenericParser):
         super().__init__(
             path_prefix=None,
             search_paths=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
@@ -627,7 +627,7 @@ class GenericMetadataParser(GenericParser):
 
 @click.command(help=__DOC)
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     required=True,
     help='The sample-metadata project ($DATASET) to import manifest into',
 )
@@ -690,7 +690,7 @@ class GenericMetadataParser(GenericParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project,
     sample_name_column: str,
     participant_meta_field: List[str],
     participant_meta_field_map: List[Tuple[str, str]],
@@ -732,7 +732,7 @@ async def main(
         sequence_meta_map.update({k: k for k in sequence_meta_field})
 
     parser = GenericMetadataParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         sample_name_column=sample_name_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,

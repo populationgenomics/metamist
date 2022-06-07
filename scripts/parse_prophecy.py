@@ -62,13 +62,13 @@ class ProphecyParser(GenericMetadataParser):
 
     def __init__(
         self,
-        sample_metadata_project,
+        project,
         search_locations,
         batch_number,
     ):
 
         super().__init__(
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             search_locations=search_locations,
             sample_name_column=Columns.EXTERNAL_ID,
             participant_column=Columns.EXTERNAL_ID,
@@ -111,7 +111,7 @@ class ProphecyParser(GenericMetadataParser):
 
 @click.command(help='GCS path to manifest file')
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
     default=PROJECT,
 )
@@ -125,7 +125,7 @@ class ProphecyParser(GenericMetadataParser):
 @run_as_sync
 async def main(
     manifests: List[str],
-    sample_metadata_project: str,
+    project: str,
     search_locations: List[str],
     batch_number: Optional[str],
     confirm=True,
@@ -134,7 +134,7 @@ async def main(
     """Run script from CLI arguments"""
 
     parser = ProphecyParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         search_locations=search_locations,
         batch_number=batch_number,
     )

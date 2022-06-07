@@ -217,7 +217,7 @@ class GenericParser(
         self,
         path_prefix: Optional[str],
         search_paths: list[str],
-        sample_metadata_project: str,
+        project: str,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
@@ -238,10 +238,10 @@ class GenericParser(
         self.required_keys = required_keys
         self.ignore_extra_keys = ignore_extra_keys
 
-        if not sample_metadata_project:
+        if not project:
             raise ValueError('sample-metadata project is required')
 
-        self.sample_metadata_project = sample_metadata_project
+        self.project = project
 
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_status: str = default_sequence_status
@@ -489,7 +489,7 @@ class GenericParser(
         # Get external sid to cpg map
         existing_external_id_to_cpgid = (
             await SampleApi().get_sample_id_map_by_external_async(
-                self.sample_metadata_project,
+                self.project,
                 list(sample_map.keys()),
                 allow_missing=True,
             )
@@ -681,7 +681,7 @@ class GenericParser(
 
     async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
         """Given an analyses dictionary add analyses"""
-        proj = self.sample_metadata_project
+        proj = self.project
         analysisapi = AnalysisApi()
 
         logger.info(
@@ -715,7 +715,7 @@ class GenericParser(
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on participant id and sample id"""
 
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
@@ -731,7 +731,7 @@ class GenericParser(
 
             # Construct participant to upsert
             existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-                self.sample_metadata_project, external_pids, allow_missing=True
+                self.project, external_pids, allow_missing=True
             )
 
             sample_ids = list(
@@ -815,7 +815,7 @@ class GenericParser(
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on sample id"""
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # now we can start adding!!
         sapi = SampleApi()

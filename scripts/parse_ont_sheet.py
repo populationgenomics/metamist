@@ -39,7 +39,7 @@ class OntParser(GenericMetadataParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_metadata_project: str,
+        project: str,
         default_sequence_type='ont',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
@@ -63,7 +63,7 @@ class OntParser(GenericMetadataParser):
 
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             participant_column=Columns.SAMPLE_ID,
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
@@ -87,7 +87,7 @@ class OntParser(GenericMetadataParser):
 
 @click.command()
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
@@ -115,7 +115,7 @@ class OntParser(GenericMetadataParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project: str,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
@@ -131,7 +131,7 @@ async def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     parser = OntParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

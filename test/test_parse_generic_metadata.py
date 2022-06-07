@@ -43,7 +43,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
@@ -116,7 +116,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
@@ -223,7 +223,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
         parser.skip_checking_gcs_objects = True
@@ -329,7 +329,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
         # Call generic parser
@@ -389,7 +389,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
         # Call generic parser

@@ -36,7 +36,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
         parser = OntParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='dev',
+            project='dev',
         )
 
         parser.skip_checking_gcs_objects = True
