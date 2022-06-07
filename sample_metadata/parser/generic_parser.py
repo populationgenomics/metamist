@@ -177,7 +177,7 @@ def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[Sequence[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
-    chnk = []
+    chnk: List[T] = []
     for element in iterable:
         chnk.append(element)
         if len(chnk) >= chunk_size:

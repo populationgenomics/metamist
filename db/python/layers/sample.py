@@ -127,7 +127,9 @@ class SampleLayer(BaseLayer):
             # project_ids were already checked when transformed to ints,
             # so no else required
             pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
-            self.ptable.check_access_to_project_ids(self.author, pjcts, readonly=True)
+            await self.ptable.check_access_to_project_ids(
+                self.author, pjcts, readonly=True
+            )
 
         _, samples = await self.st.get_samples_by(
             sample_ids=sample_ids,
