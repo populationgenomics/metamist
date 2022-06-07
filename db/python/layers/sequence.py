@@ -31,6 +31,7 @@ class SampleSequenceLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.seqt: SampleSequencingTable = SampleSequencingTable(connection)
+        self.sampt: SampleTable = SampleTable(connection)
 
     # GET
     async def get_sequence_by_id(
@@ -79,14 +80,14 @@ class SampleSequenceLayer(BaseLayer):
 
         return sequence_id
 
-    async def get_all_sequence_id_for_sample_id(
+    async def get_all_sequence_ids_for_sample_id(
         self, sample_id: int, check_project_id=True
     ) -> Dict[str, int]:
         """Get all sequence IDs for a sample id, returned as a map with key being sequence type"""
         (
             projects,
             sequence_id_map,
-        ) = await self.seqt.get_all_sequence_id_for_sample_id(sample_id)
+        ) = await self.seqt.get_all_sequence_ids_for_sample_id(sample_id)
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
@@ -295,3 +296,36 @@ class SampleSequenceLayer(BaseLayer):
         """Upsert multiple sequences to the given sample (sid)"""
         upserts = [await self.upsert_sequence(iid, s) for s in sequences]
         return upserts
+
+    async def update_sequence_from_sample_and_type(
+        self, sample_id, sequence_type, status, meta
+    ):
+        """Update a sequence from the sample_id and sequence_type"""
+
+        # Get sequence_id from sample_id and batch_id
+        sequence_id = await self.get_latest_sequence_id_from_sample_id_and_type(
+            sample_id, sequence_type
+        )
+
+        _ = await self.update_sequence(sequence_id, status=status, meta=meta)
+
+        return sequence_id
+
+    async def update_sequence_from_external_id_and_type(
+        self, external_id, sequence_type, status, meta
+    ):
+        """Update a sequence from the external_id and sequence_type"""
+
+        # Convert the external_id to an internal sample_id
+        sample_ids = await self.sampt.get_sample_id_map_by_external_ids(
+            [external_id], project=None
+        )
+        if not sample_ids:
+            raise ValueError(f'No sample found for external_id {external_id}')
+
+        sample_id = sample_ids[external_id]
+
+        # Get sequence_id from sample_id and batch_id
+        return await self.update_sequence_from_sample_and_type(
+            sample_id, sequence_type, status, meta
+        )

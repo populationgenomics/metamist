@@ -20,7 +20,7 @@
 # 9. consider-using-set-comprehension
 # 10. unspecified-encoding
 
-disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,C0330,C0326,
+disable=f-string-without-interpolation,inherit-non-class,too-few-public-methods,
         fixme,logging-fstring-interpolation,import-error,missing-module-docstring,line-too-long,
         too-many-return-statements,no-name-in-module,R0801,consider-using-set-comprehension,
         arguments-differ,unspecified-encoding,invalid-name,logging-not-lazy

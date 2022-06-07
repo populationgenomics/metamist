@@ -161,7 +161,7 @@ class SampleSequencingTable(DbBase):
 
         return result['project'], result['id']
 
-    async def get_all_sequence_id_for_sample_id(self, sample_id: int):
+    async def get_all_sequence_ids_for_sample_id(self, sample_id: int):
         """
         Get the sequence IDs from internal sample_id and sequence type
         Map them to be keyed on sequence type
@@ -322,7 +322,6 @@ class SampleSequencingTable(DbBase):
             updaters.append('status = :status')
             fields['status'] = status.value
         if meta is not None:
-
             updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
             fields['meta'] = to_db_json(meta)
 
