@@ -17,7 +17,7 @@ class CloudHelper:
     def __init__(self, search_paths: list[str] | None):
         # gs specific
         self._gcs_client = None
-        self.gcs_bucket_refs = {}
+        self.gcs_bucket_refs: dict[str, storage.Bucket] = {}
 
         self.search_paths = search_paths or []
         self.filename_map = self.populate_filename_map(self.search_paths)
