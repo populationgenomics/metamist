@@ -181,8 +181,8 @@ def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     for element in iterable:
         chnk.append(element)
         if len(chnk) >= chunk_size:
-            yield chunk
-            chnk: List[T] = []
+            yield chnk
+            chnk = []
 
     if chnk:
         yield chnk
