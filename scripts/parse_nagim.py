@@ -1,4 +1,4 @@
-# pylint: disable=W0237,too-many-lines
+# pylint: disable=too-many-lines
 """
 Taking Terra results, populate sample-metadata for NAGIM project.
 
