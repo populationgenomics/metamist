@@ -756,7 +756,7 @@ async def parse(  # pylint: disable=too-many-locals
         samples, namespace, overwrite_multiqc
     )
 
-    # Creating a parser for each project separately, because `sample_metadata_project`
+    # Creating a parser for each project separately, because `project`
     # is an initialization parameter, and we want to write to multiple projects.
     for proj in PROJECT_ID_MAP.values():
         sm_proj = _get_sm_proj_id(proj, namespace=namespace)
@@ -813,7 +813,7 @@ async def parse(  # pylint: disable=too-many-locals
 
         parser = NagimParser(
             path_prefix=None,
-            sample_metadata_project=sm_proj,
+            project=sm_proj,
             skip_checking_gcs_objects=skip_checking_objects,
             verbose=test,
             multiqc_html_path=multiqc_html_path,

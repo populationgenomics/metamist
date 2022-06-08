@@ -40,14 +40,14 @@ class TobWgsParser(GenericMetadataParser):
 
     def __init__(
         self,
-        sample_metadata_project: str,
+        project: str,
         search_locations: List[str],
         default_sequence_type='wgs',
         default_sample_type='blood',
     ):
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
             sample_name_column='sample.sample_name',
@@ -170,7 +170,7 @@ class TobWgsParser(GenericMetadataParser):
 
 @click.command(help='GCS path to manifest file')
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into (probably "seqr")',
 )
 @click.option('--default-sample-type', default='blood')
@@ -184,7 +184,7 @@ class TobWgsParser(GenericMetadataParser):
 @run_as_sync
 async def main(
     manifests,
-    sample_metadata_project,
+    project,
     default_sample_type='blood',
     default_sequence_type='wgs',
     path_prefix=None,
@@ -197,7 +197,7 @@ async def main(
     parser = TobWgsParser(
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         search_locations=_search_locations,
     )
     for manifest in manifests:

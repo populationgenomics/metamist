@@ -67,14 +67,14 @@ class SampleFileMapParser(GenericMetadataParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_metadata_project: str,
+        project: str,
         default_sequence_type='genome',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
@@ -92,7 +92,7 @@ class SampleFileMapParser(GenericMetadataParser):
 
 @click.command(help=__DOC)
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
@@ -120,7 +120,7 @@ class SampleFileMapParser(GenericMetadataParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project,
     default_sample_type='blood',
     default_sequence_type='genome',
     confirm=False,
@@ -136,7 +136,7 @@ async def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     parser = SampleFileMapParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

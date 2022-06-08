@@ -43,7 +43,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
@@ -79,9 +79,9 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
-    @patch('os.path.getsize')
+    @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_single_row(
-        self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
+        self, mock_any_path, mock_get_sequence_ids, mock_get_sample_id
     ):
         """
         Test importing a single row, forms objects and checks response
@@ -89,7 +89,10 @@ class TestParseGenericMetadata(unittest.TestCase):
         """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
-        mock_stat_size.return_value = 111
+
+        # new magic mocks across AnyPath
+        mock_any_path.return_value.stat.return_value.st_size = 111
+        mock_any_path.return_value.exists.return_value = False
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
@@ -113,7 +116,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
@@ -183,10 +186,8 @@ class TestParseGenericMetadata(unittest.TestCase):
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('os.path.getsize')
     async def test_rows_with_participants(
         self,
-        mock_stat_size,
         mock_get_sequence_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
@@ -197,7 +198,6 @@ class TestParseGenericMetadata(unittest.TestCase):
         """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
-        mock_stat_size.return_value = 111
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
         rows = [
@@ -223,9 +223,10 @@ class TestParseGenericMetadata(unittest.TestCase):
             sequence_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
+        parser.skip_checking_gcs_objects = True
         parser.filename_map = {
             'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
             'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
@@ -264,14 +265,14 @@ class TestParseGenericMetadata(unittest.TestCase):
                         'checksum': None,
                         'class': 'File',
                         'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                        'size': 111,
+                        'size': None,
                     },
                     {
                         'basename': 'sample_id001.filename-R2.fastq.gz',
                         'checksum': None,
                         'class': 'File',
                         'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                        'size': 111,
+                        'size': None,
                     },
                 ]
             ],
@@ -328,7 +329,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
         # Call generic parser
@@ -388,7 +389,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='devdev',
+            project='devdev',
         )
 
         # Call generic parser

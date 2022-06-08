@@ -24,12 +24,10 @@ from typing import (
     Iterable,
 )
 from functools import wraps
+from sample_metadata.parser.cloudhelper import CloudHelper
 
-from google.api_core.exceptions import Forbidden
-from google.cloud import storage
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
-from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi, ParticipantApi
 from sample_metadata.models import (
     ParticipantUpsert,
@@ -175,12 +173,19 @@ class SequenceMetaGroup:
         self.meta = meta
 
 
-def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[Sequence[T]]:
+def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
-    for i in range(0, len(iterable), chunk_size):
-        yield iterable[i : i + chunk_size]
+    chnk: List[T] = []
+    for element in iterable:
+        chnk.append(element)
+        if len(chnk) >= chunk_size:
+            yield chnk
+            chnk = []
+
+    if chnk:
+        yield chnk
 
 
 def run_as_sync(f):
@@ -203,13 +208,16 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
+class GenericParser(
+    CloudHelper
+):  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         path_prefix: Optional[str],
-        sample_metadata_project: str,
+        search_paths: list[str],
+        project: str,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
@@ -230,10 +238,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self.required_keys = required_keys
         self.ignore_extra_keys = ignore_extra_keys
 
-        if not sample_metadata_project:
+        if not project:
             raise ValueError('sample-metadata project is required')
 
-        self.sample_metadata_project = sample_metadata_project
+        self.project = project
 
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_status: str = default_sequence_status
@@ -250,22 +258,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self.papi = ParticipantApi()
         self.seqapi = SequenceApi()
 
-    @property
-    def client(self):
-        """Get GCP storage client"""
-        if not self._client:
-            self._client = storage.Client()
-        return self._client
+        super().__init__(search_paths)
 
-    def get_bucket(self, bucket_name):
-        """Get cached bucket client from optional bucket name"""
-        assert bucket_name
-        if bucket_name not in self.bucket_clients:
-            self.bucket_clients[bucket_name] = self.client.get_bucket(bucket_name)
-
-        return self.bucket_clients[bucket_name]
-
-    def file_path(self, filename: str) -> str:
+    def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
         """
         Get complete filepath of filename:
         - Includes gs://{bucket} if relevant
@@ -275,89 +270,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             return filename
 
         if not self.path_prefix:
-            raise FileNotFoundError(
-                f"Can't form full path to '{filename}' as no path_prefix was defined"
-            )
-
-        if self.client and not filename.startswith('/'):
-            assert self.default_bucket
-            return os.path.join(
-                'gs://',
-                self.default_bucket or '',
-                self.path_prefix or '',
-                filename or '',
-            )
+            fn = super().file_path(filename, raise_exception=raise_exception)
+            if not fn:
+                raise FileNotFoundError(
+                    f'Cannot form full path to "{filename}" as '
+                    'no path_prefix was defined'
+                )
+            return fn
 
         return os.path.join(self.path_prefix or '', filename)
-
-    @async_wrap
-    def get_blob(self, filename):
-        """Convenience function for getting blob from fully qualified GCS path"""
-        if not filename.startswith('gs://'):
-            raise ValueError('No blob available')
-
-        bucket_name, *components = filename[5:].split('/')
-        bucket = self.get_bucket(bucket_name)
-        path = '/'.join(components)
-
-        # the next few lines are equiv to `bucket.get_blob(path)`
-        # but without requiring storage.objects.get permission
-        blobs = list(self.client.list_blobs(bucket, prefix=path))
-        # first where r.name == path (or None)
-        return next((r for r in blobs if r.name == path), None)
-
-    def list_directory(self, directory_name) -> List[str]:
-        """List directory"""
-        path = self.file_path(directory_name)
-        if path.startswith('gs://'):
-            bucket_name, *components = directory_name[5:].split('/')
-            assert self.client
-            blobs = self.client.list_blobs(
-                bucket_name, prefix='/'.join(components), delimiter='/'
-            )
-            return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
-
-        return [os.path.join(path, f) for f in os.listdir(path)]
-
-    async def file_contents(self, filename) -> Optional[str]:
-        """Get contents of file (decoded as utf8)"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(path)
-            try:
-                try:
-                    retval = blob.download_as_bytes()
-                except AttributeError:
-                    retval = blob.download_as_string()
-
-                if isinstance(retval, bytes):
-                    retval = retval.decode()
-                return retval
-            except Forbidden:
-                logger.warning(f"FORBIDDEN: Can't download {filename}")
-                return None
-
-        with open(filename, encoding='utf-8') as f:
-            return f.read()
-
-    async def file_exists(self, filename: str) -> bool:
-        """Determines whether a file exists"""
-        path = self.file_path(filename)
-
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob is not None
-
-        return os.path.exists(path)
-
-    async def file_size(self, filename):
-        """Get size of file in bytes"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob.size
-
-        return os.path.getsize(path)
 
     @abstractmethod
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
@@ -568,7 +489,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         # Get external sid to cpg map
         existing_external_id_to_cpgid = (
             await SampleApi().get_sample_id_map_by_external_async(
-                self.sample_metadata_project,
+                self.project,
                 list(sample_map.keys()),
                 allow_missing=True,
             )
@@ -760,7 +681,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
 
     async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
         """Given an analyses dictionary add analyses"""
-        proj = self.sample_metadata_project
+        proj = self.project
         analysisapi = AnalysisApi()
 
         logger.info(
@@ -794,7 +715,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on participant id and sample id"""
 
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
@@ -810,7 +731,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
 
             # Construct participant to upsert
             existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-                self.sample_metadata_project, external_pids, allow_missing=True
+                self.project, external_pids, allow_missing=True
             )
 
             sample_ids = list(
@@ -894,7 +815,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on sample id"""
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # now we can start adding!!
         sapi = SampleApi()
@@ -1004,6 +925,9 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
+
+        if not isinstance(reads, list):
+            reads = [reads]
 
         file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
             lambda: defaultdict(list)

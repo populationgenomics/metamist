@@ -32,7 +32,7 @@ class TestSampleMapParser(unittest.TestCase):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='dev',
+            project='dev',
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}

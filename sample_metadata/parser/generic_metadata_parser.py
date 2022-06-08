@@ -1,20 +1,19 @@
 # pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import
 import asyncio
+import logging
 import re
 import shlex
+from functools import reduce
+from io import StringIO
 from itertools import groupby
 from typing import Dict, List, Optional, Any, Tuple, Union
-import os
-import logging
-from io import StringIO
-from functools import reduce
 
 import click
+
 from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
-
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
@@ -58,7 +57,7 @@ and we want to achieve the following:
     - "qc_quality" -> "quality"
 
 python parse_generic_metadata.py \
-    --sample-metadata-project $dataset \
+    --project $dataset \
     --sample-name-column "Sample ID" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \
@@ -87,7 +86,7 @@ class GenericMetadataParser(GenericParser):
         sample_meta_map: Dict[str, str],
         sequence_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
-        sample_metadata_project: str,
+        project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
         reported_sex_column: Optional[str] = None,
@@ -102,21 +101,18 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
-        path_prefix: Optional[str] = None,
         allow_extra_files_in_search_path=False,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
-            path_prefix=path_prefix,
-            sample_metadata_project=sample_metadata_project,
+            path_prefix=None,
+            search_paths=search_locations,
+            project=project,
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
-            **kwargs
+            **kwargs,
         )
-        self.search_locations = search_locations
-        self.filename_map: Dict[str, str] = {}
-        self.populate_filename_map(self.search_locations)
 
         if not sample_name_column:
             raise ValueError('A sample name column MUST be provided')
@@ -270,6 +266,29 @@ class GenericMetadataParser(GenericParser):
         if errors:
             raise ValueError(', '.join(errors))
 
+    @staticmethod
+    def flatten_irregular_list(irregular_list):
+        """
+        Flatten an irregular list: [1, [2, 3], 4]
+
+        >>> GenericMetadataParser.flatten_irregular_list([1, [2, 3], [4,5]])
+        [1, 2, 3, 4, 5]
+        """
+        return (
+            [
+                element
+                for item in irregular_list
+                for element in GenericMetadataParser.flatten_irregular_list(item)
+            ]
+            if isinstance(irregular_list, list)
+            else [irregular_list]
+        )
+
+    async def get_all_files_from_row(self, sample_id: str, row):
+        """Get all files from row, to allow subparsers to include other files"""
+        fns = await self.get_read_filenames(sample_id, row)
+        return self.flatten_irregular_list(fns)
+
     async def check_files_covered_by_rows(
         self, rows: List[Dict[str, Any]]
     ) -> List[str]:
@@ -280,7 +299,7 @@ class GenericMetadataParser(GenericParser):
         for grp in rows:
             for r in grp if isinstance(grp, list) else [grp]:
                 filename_promises.append(
-                    self.get_read_filenames(self.get_sample_id(r), r)
+                    self.get_all_files_from_row(self.get_sample_id(r), r)
                 )
 
         filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
@@ -312,47 +331,6 @@ class GenericMetadataParser(GenericParser):
                 errors.append(m)
 
         return errors
-
-    def populate_filename_map(self, search_locations: List[str]):
-        """
-        FileMapParser uses search locations based on the filename,
-        so let's prepopulate that filename_map from the search_locations!
-        """
-
-        self.filename_map = {}
-        for directory in search_locations:
-            directory_list = self.list_directory(directory)
-
-            for file in directory_list:
-                file = file.strip()
-                file_base = os.path.basename(file)
-                if file_base in self.filename_map:
-                    logger.warning(
-                        f'File "{file}" already exists in directory map: {self.filename_map[file_base]}'
-                    )
-                    continue
-                self.filename_map[file_base] = file
-
-    def file_path(self, filename: str) -> str:
-        """
-        Get complete filepath of filename:
-        - Includes gs://{bucket} if relevant
-        - Includes path_prefix decided early on
-        """
-        if filename in self.filename_map:
-            return self.filename_map[filename]
-
-        if filename.startswith('gs://') or filename.startswith('/'):
-            return filename
-
-        expanded_local_path = os.path.expanduser(filename)
-        if os.path.exists(expanded_local_path):
-            return expanded_local_path
-
-        sps = ', '.join(self.search_locations)
-        raise FileNotFoundError(
-            f"Couldn't find file '{filename}' in search_paths: {sps}"
-        )
 
     @staticmethod
     def merge_dicts(a: Dict, b: Dict):
@@ -649,7 +627,7 @@ class GenericMetadataParser(GenericParser):
 
 @click.command(help=__DOC)
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     required=True,
     help='The sample-metadata project ($DATASET) to import manifest into',
 )
@@ -712,7 +690,7 @@ class GenericMetadataParser(GenericParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project,
     sample_name_column: str,
     participant_meta_field: List[str],
     participant_meta_field_map: List[Tuple[str, str]],
@@ -754,7 +732,7 @@ async def main(
         sequence_meta_map.update({k: k for k in sequence_meta_field})
 
     parser = GenericMetadataParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         sample_name_column=sample_name_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
