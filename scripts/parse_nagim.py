@@ -1,4 +1,4 @@
-# pylint: disable=W0237,too-many-lines
+# pylint: disable=too-many-lines
 """
 Taking Terra results, populate sample-metadata for NAGIM project.
 
@@ -1149,13 +1149,11 @@ class NagimParser(GenericParser):
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         return None
 
-    async def get_sample_meta(
-        self, sample_meta_group: SampleMetaGroup
-    ) -> SampleMetaGroup:
-        row = sample_meta_group.rows
+    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
+        row = sample_group.rows
         if isinstance(row, dict):
             row = [row]
-        meta = sample_meta_group.meta or {}
+        meta = sample_group.meta or {}
         for r in row:
             meta['project'] = r['project']
             for key in [
@@ -1167,8 +1165,8 @@ class NagimParser(GenericParser):
                 if val:
                     meta[key] = val
 
-        sample_meta_group.meta = meta
-        return sample_meta_group
+        sample_group.meta = meta
+        return sample_group
 
     def get_sample_id(self, row: Dict[str, Any]) -> str:
         return row['ext_id']
