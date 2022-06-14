@@ -921,7 +921,7 @@ class GenericParser(
         return result
 
     async def parse_files(
-        self, sample_id: str, reads: List[str]
+        self, sample_id: str, reads: List[str], checksums: List[str] = None
     ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
         """
         Returns a tuple of:
@@ -931,6 +931,16 @@ class GenericParser(
 
         if not isinstance(reads, list):
             reads = [reads]
+
+        if not checksums:
+            checksums = [None] * len(reads)
+
+        if len(checksums) != len(reads):
+            raise ValueError(
+                'Expected length of reads to match length of provided checksums'
+            )
+
+        read_to_checksum = dict(zip(reads, checksums))
 
         file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
             lambda: defaultdict(list)
@@ -944,7 +954,8 @@ class GenericParser(
             fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
             for fastq_group in structured_fastqs:
                 create_file_futures: List[Coroutine] = [
-                    self.create_file_object(f) for f in fastq_group
+                    self.create_file_object(f, checksum=read_to_checksum.get(f))
+                    for f in fastq_group
                 ]
                 fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
@@ -1089,17 +1100,19 @@ class GenericParser(
         self,
         filename: str,
         secondary_files: List[SingleRow] = None,
+        checksum: Optional[str] = None,
     ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
-        checksum = None
+        checksum = checksum
         file_size = None
 
         if not self.skip_checking_gcs_objects:
-            md5_filename = self.file_path(filename + '.md5')
-            if await self.file_exists(md5_filename):
-                contents = await self.file_contents(md5_filename)
-                if contents:
-                    checksum = f'md5:{contents.strip()}'
+            if not checksum:
+                md5_filename = self.file_path(filename + '.md5')
+                if await self.file_exists(md5_filename):
+                    contents = await self.file_contents(md5_filename)
+                    if contents:
+                        checksum = f'md5:{contents.strip()}'
 
             file_size = await self.file_size(filename)
 
