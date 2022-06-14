@@ -1,5 +1,4 @@
 import os
-import csv
 import asyncio
 import logging
 from io import StringIO
@@ -10,7 +9,6 @@ from cpg_utils.hail_batch import dataset_path
 import click
 
 from sample_metadata.apis import SampleApi, AnalysisApi
-from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.model.analysis_model import AnalysisModel
 from sample_metadata.model.analysis_type import AnalysisType
 from sample_metadata.model.analysis_status import AnalysisStatus
@@ -19,7 +17,7 @@ from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
-from sample_metadata.parser.generic_parser import chunk
+from sample_metadata.parser.generic_parser import chunk, CustomDictReader
 
 OntAnalysesPreparer = namedtuple(
     'OntAnalysesPreparer',
@@ -47,10 +45,25 @@ class Columns:
     INDEL_INDEX = 'Indel_index'
     INDEL_SOFTWARE = 'Indel_software'
 
+    @staticmethod
+    def required_keys():
+        """Keys that are required for any parser"""
+        return {
+            Columns.EXPERIMENT_NAME,
+            Columns.SAMPLE_ID,
+            Columns.ALIGNMENT_FILE,
+            Columns.ALIGNMENT_SOFTWARE,
+            Columns.SV_FILE,
+            Columns.SV_SOFTWARE,
+            Columns.SNV_FILE,
+            Columns.SNV_SOFTWARE,
+            Columns.INDEL_FILE,
+            Columns.INDEL_SOFTWARE,
+        }
 
-class OntProductParser(
-    CloudHelper
-):  # pylint: disable=too-many-public-methods,too-many-arguments
+
+# pylint: disable=too-many-public-methods,too-many-arguments
+class OntProductParser(CloudHelper):
     """Parser for ONT products (BAMS / GVCFs)"""
 
     def __init__(
@@ -71,7 +84,12 @@ class OntProductParser(
 
     async def parse_manifest(self, file_pointer, delimiter):
         """Parse manifest"""
-        reader = csv.DictReader(file_pointer, delimiter=delimiter)
+        reader = CustomDictReader(
+            file_pointer,
+            delimiter=delimiter,
+            required_keys=Columns.required_keys(),
+            ignore_extra_keys=False,
+        )
 
         ds_by_ex_sample_id = {}
 
@@ -81,6 +99,13 @@ class OntProductParser(
         sid_map = self.sapi.get_sample_id_map_by_external(
             self.project, list(ds_by_ex_sample_id.keys())
         )
+
+        missing_samples = set(ds_by_ex_sample_id.keys()) - set(sid_map.keys())
+        if missing_samples:
+            raise ValueError(
+                'To use this parser, all samples must be pre-created in SM. '
+                f'Missing: {", ".join(missing_samples)}'
+            )
 
         analyses = []
         for grp in chunk(ds_by_ex_sample_id.items(), 20):
@@ -102,7 +127,10 @@ class OntProductParser(
         for grp in chunk(analyses, 10):
             logging.info(f'Inserting {len(grp)} analyses')
             await asyncio.gather(
-                *[self.aapi.create_new_analysis(self.project, a) for a in analyses]
+                *[
+                    self.aapi.create_new_analysis_async(self.project, a)
+                    for a in analyses
+                ]
             )
 
         return analyses
@@ -155,21 +183,28 @@ class OntProductParser(
             fn = row[preparer.fn_column]
             src = self.file_path(fn, raise_exception=False)
 
-            if not await self.file_exists(src):
-                logging.info(f'File {src} does not exist, skipping analysis item')
+            dest = os.path.join(dataset_path(preparer.output_path), fn)
+            if not src:
+                logging.info(
+                    f'File for key "{preparer.fn_column}" at source "{src}" '
+                    'does not exist, skipping analysis item'
+                )
                 continue
 
-            dest = os.path.join(dataset_path(preparer.output_path), fn)
-            secondaries = self.get_secondaries_from_filename(fn)
-            file_size = await self.file_size(src)
+            if not await self.file_exists(dest):
+                # file already exists
+                logging.info(f'File already exists at destination, skipping: {dest}')
+                continue
 
-            self.move_gcs_file(src, dest)
+            secondaries = self.get_secondaries_from_filename(src)
+            await self.move_gcs_file(src, dest)
             for secondary in secondaries:
-                self.move_gcs_file(src + secondary, dest + secondary)
+                await self.move_gcs_file(src + secondary, dest + secondary)
 
+            file_size = await self.file_size(dest)
             meta = {
                 'size': file_size,
-                'sequence_type': SequenceType('ont'),
+                'sequence_type': 'ont',
                 **preparer.meta,
             }
 
@@ -179,6 +214,7 @@ class OntProductParser(
                     meta=meta,
                     status=AnalysisStatus('completed'),
                     sample_ids=[cpg_sample_id],
+                    output=dest,
                 )
             )
 
@@ -203,17 +239,22 @@ class OntProductParser(
 
         return []
 
-    def move_gcs_file(self, src: str, dest: str):
+    async def move_gcs_file(self, src: str, dest: str):
         """Move GCS file by first copying, then deleting"""
         assert src.startswith('gs://') and dest.startswith('gs://')
+
+        if src == dest:
+            print(f'Not moving any file {src} -> {dest}')
+            return self.get_gcs_blob(dest)
 
         if self.dry_run:
             return logging.info(f'DRY_RUN: Moving {src} -> {dest}')
 
-        src_blob = self.get_gcs_blob(src)
-        src_bucket_name, src_rest = src.split('/', maxsplit=1)
-        dest_bucket_name, dest_rest = src.split('/', maxsplit=1)
+        src_blob = await self.get_gcs_blob(src)
+        src_bucket_name, src_rest = src[len('gs://') :].split('/', maxsplit=1)
+        dest_bucket_name, dest_rest = dest[len('gs://') :].split('/', maxsplit=1)
         src_bucket = self.get_gcs_bucket(src_bucket_name)
+        print('Copying blob')
         dest_blob = src_bucket.copy_blob(
             src_blob, self.get_gcs_bucket(dest_bucket_name), dest_rest
         )

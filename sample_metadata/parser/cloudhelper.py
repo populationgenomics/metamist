@@ -5,8 +5,6 @@ import logging
 from cloudpathlib import AnyPath
 from google.cloud import storage
 
-from sample_metadata.model_utils import async_wrap
-
 
 class CloudHelper:
     """General CloudHelper for parsers"""
@@ -20,7 +18,9 @@ class CloudHelper:
         self.gcs_bucket_refs: dict[str, storage.Bucket] = {}
 
         self.search_paths = search_paths or []
-        self.filename_map = self.populate_filename_map(self.search_paths)
+
+        self.filename_map: dict[str, str] = self.populate_filename_map(self.search_paths)
+        # pylint: disable
 
     @staticmethod
     def guess_delimiter_from_filename(filename: str):
@@ -74,6 +74,10 @@ class CloudHelper:
     def list_directory(self, directory_name) -> list[str]:
         """List directory"""
         path = self.file_path(directory_name)
+
+        # this was super slow to perform, do don't do this atm
+        # return [os.path.join(path, p.name) for p in AnyPath(path).iterdir()]
+
         if path.startswith('gs://'):
             return self._list_gcs_directory(path)
 
@@ -96,7 +100,9 @@ class CloudHelper:
         """Get size of file in bytes"""
         return AnyPath(self.file_path(filename)).stat().st_size
 
-    def populate_filename_map(self, search_locations: list[str]) -> dict[str, str]:
+    def populate_filename_map(
+        self, search_locations: list[str]
+    ) -> dict[str, str]:
         """
         FileMapParser uses search locations based on the filename,
         so let's prepopulate that filename_map from the search_locations!
@@ -105,7 +111,6 @@ class CloudHelper:
         fn_map = {}
         for directory in search_locations:
             directory_list = self.list_directory(directory)
-
             for file in directory_list:
                 file = file.strip()
                 file_base = os.path.basename(file)
@@ -130,14 +135,11 @@ class CloudHelper:
         """Get cached bucket client from optional bucket name"""
         assert bucket_name
         if bucket_name not in self.gcs_bucket_refs:
-            self.gcs_bucket_refs[bucket_name] = self.gcs_client.get_bucket(
-                bucket_name
-            )
+            self.gcs_bucket_refs[bucket_name] = self.gcs_client.get_bucket(bucket_name)
 
         return self.gcs_bucket_refs[bucket_name]
 
-    @async_wrap
-    def get_gcs_blob(self, filename: str) -> storage.Blob:
+    async def get_gcs_blob(self, filename: str) -> storage.Blob:
         """Convenience function for getting blob from fully qualified GCS path"""
         if not filename.startswith(self.GCS_PREFIX):
             raise ValueError('No blob available')
