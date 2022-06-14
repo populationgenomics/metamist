@@ -783,17 +783,24 @@ class GenericParser(
                     {external_pid: analysis_to_add},
                 )
 
+        sequences_count = defaultdict(int)
+        for s in (summary['sequences']['insert'] + summary['sequences']['update']):
+            sequences_count[str(s['type'])] += 1
+
+        str_seq_count = ', '.join(f'{k}={v}' for k,v in sequences_count.items())
         message = f"""\
-            {proj}: Processing participants: {', '.join(participant_map.keys())}
+    {proj}: Processing participants: {', '.join(participant_map.keys())}
+    
+    Sequence types: {str_seq_count}
 
-            Adding {len(summary['participants']['insert'])} participants
-            Adding {len(summary['samples']['insert'])} samples
-            Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(summary['analyses']['insert'])} analysis
+    Adding {len(summary['participants']['insert'])} participants
+    Adding {len(summary['samples']['insert'])} samples 
+    Adding {len(summary['sequences']['insert'])} sequences
+    Adding {len(summary['analyses']['insert'])} analysis
 
-            Updating {len(summary['participants']['update'])} participants
-            Updating {len(summary['samples']['update'])} samples
-            Updating {len(summary['sequences']['update'])} sequences
+    Updating {len(summary['participants']['update'])} participants
+    Updating {len(summary['samples']['update'])} samples
+    Updating {len(summary['sequences']['update'])} sequences
         """
 
         if dry_run:
