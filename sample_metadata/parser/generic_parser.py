@@ -259,6 +259,7 @@ class GenericParser(
         self.bucket_clients: Dict[str, Any] = {}
 
         self.papi = ParticipantApi()
+        self.sapi = SampleApi()
         self.seqapi = SequenceApi()
 
         super().__init__(search_paths)
@@ -471,9 +472,10 @@ class GenericParser(
     async def process_participant_group(
         self,
         participant_name: str,
-        sample_map: Dict[str, Any],
+        sample_map,
+        external_to_internal_sample_id_map: Dict[str, Any],
         internal_pid: Optional[int],
-        sequence_ids: Dict[Any, Any] = None,
+        sequence_map: Dict[str, Dict[str, int]] = None,
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -489,27 +491,18 @@ class GenericParser(
 
         all_rows = [r for row in sample_map.values() for r in row]
 
-        # Get external sid to cpg map
-        existing_external_id_to_cpgid = (
-            await SampleApi().get_sample_id_map_by_external_async(
-                self.project,
-                list(sample_map.keys()),
-                allow_missing=True,
-            )
-        )
-
         # Get all the samples and sequences to upsert first
         samples_to_upsert = []
         sequences_to_upsert = []
         analyses_to_add = []
 
         for sample_id, rows in sample_map.items():
-            cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
+            cpg_id = external_to_internal_sample_id_map.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
                 rows=rows,
                 external_sample_id=sample_id,
                 cpg_sample_id=cpg_id,
-                sequence_ids=sequence_ids,
+                sequence_ids=sequence_map.get(cpg_id, {}),
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -733,24 +726,40 @@ class GenericParser(
                 logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
             # Construct participant to upsert
-            existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-                self.project, external_pids, allow_missing=True
+            existing_participant_ids = (
+                await self.papi.get_participant_id_map_by_external_ids_async(
+                    self.project, external_pids, allow_missing=True
+                )
             )
 
             sample_ids = list(
                 set(k for s in participant_map.values() for k in s.keys())
             )
-            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
-                sample_ids
+
+            external_to_internal_sample_id_map = (
+                await self.sapi.get_sample_id_map_by_external_async(
+                    self.project, sample_ids, allow_missing=True
+                )
             )
+
+            sequences = []
+            if external_to_internal_sample_id_map:
+                sequences = await self.seqapi.get_sequences_by_sample_ids(
+                    list(external_to_internal_sample_id_map.values()),
+                    get_latest_sequence_only=False,
+                )
+            sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
+            for seq in sequences:
+                sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
                 promise = self.process_participant_group(
-                    external_pid,
-                    sample_map,
-                    existing_participant_ids.get(external_pid),
-                    sequence_ids=sequence_ids,
+                    participant_name=external_pid,
+                    sample_map=sample_map,
+                    internal_pid=existing_participant_ids.get(external_pid),
+                    sequence_map=sequence_map,
+                    external_to_internal_sample_id_map=external_to_internal_sample_id_map,
                 )
                 current_batch_promises[external_pid] = promise
 
