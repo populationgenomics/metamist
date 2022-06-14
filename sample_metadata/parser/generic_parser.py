@@ -24,6 +24,9 @@ from typing import (
     Iterable,
 )
 from functools import wraps
+
+from cloudpathlib import AnyPath
+
 from sample_metadata.parser.cloudhelper import CloudHelper
 
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
@@ -1146,6 +1149,15 @@ class GenericParser(
         )
         if relevant_delimiter:
             return relevant_delimiter
+
+        with AnyPath(filename).open("r") as f:
+            first_line = f.readline()
+            delimiter = csv.Sniffer().sniff(first_line).delimiter
+            if delimiter:
+                logger.info(
+                    f'Guessing delimiter based on first line, got "{delimiter}"'
+                )
+                return delimiter
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
 
