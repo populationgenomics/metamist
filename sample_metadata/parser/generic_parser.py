@@ -744,10 +744,11 @@ class GenericParser(
 
             sequences = []
             if external_to_internal_sample_id_map:
-                sequences = await self.seqapi.get_sequences_by_sample_ids(
+                sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                     list(external_to_internal_sample_id_map.values()),
                     get_latest_sequence_only=False,
                 )
+                
             sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
             for seq in sequences:
                 sequence_map[seq['sample_id']][seq['type']] = seq['id']

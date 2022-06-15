@@ -568,7 +568,7 @@ class GenericMetadataParser(GenericParser):
                     checksums = [None] * len(_rfilenames)
                 read_checksums.extend(checksums)
             if self.gvcf_column and self.gvcf_column in r:
-                gvcf_filenames.extend(self.process_filename_value([self.gvcf_column]))
+                gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: List[str] = []
