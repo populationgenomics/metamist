@@ -793,7 +793,7 @@ class GenericParser(
                     {external_pid: analysis_to_add},
                 )
 
-        sequences_count = defaultdict(int)
+        sequences_count: Dict[str, int] = defaultdict(int)
         for s in summary['sequences']['insert'] + summary['sequences']['update']:
             sequences_count[str(s['type'])] += 1
 
@@ -923,13 +923,13 @@ class GenericParser(
             logger.info(message)
 
         # Batch update
-        result = sapi.batch_upsert_samples(
+        result = await self.sapi.batch_upsert_samples_async(
             proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
         # Add analyses
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
             proj, list(sample_map.keys()), allow_missing=True
         )
         _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
