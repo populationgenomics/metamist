@@ -118,10 +118,13 @@ class PedRow:
             )
 
         sl = sex.lower()
-        if sl == 'm':
+        if sl in ('m', 'male'):
             return 1
-        if sl == 'f':
+        if sl in ('f', 'female'):
             return 2
+        if sl in ('u', 'unknown'):
+            return 0
+
         if sl == 'sex':
             raise ValueError(
                 f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'

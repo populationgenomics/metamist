@@ -1,5 +1,7 @@
 # Sample Metadata
 
+[![codecov](https://codecov.io/gh/populationgenomics/sample-metadata/branch/dev/graph/badge.svg?token=OI3XZYR9HK)](https://codecov.io/gh/populationgenomics/sample-metadata)
+
 The sample-metadata system is database that stores **de-identified** metadata.
 
 There are three components to the sample-metadata system:

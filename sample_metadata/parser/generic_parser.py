@@ -24,6 +24,9 @@ from typing import (
     Iterable,
 )
 from functools import wraps
+
+from cloudpathlib import AnyPath
+
 from sample_metadata.parser.cloudhelper import CloudHelper
 
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
@@ -256,6 +259,7 @@ class GenericParser(
         self.bucket_clients: Dict[str, Any] = {}
 
         self.papi = ParticipantApi()
+        self.sapi = SampleApi()
         self.seqapi = SequenceApi()
 
         super().__init__(search_paths)
@@ -468,9 +472,10 @@ class GenericParser(
     async def process_participant_group(
         self,
         participant_name: str,
-        sample_map: Dict[str, Any],
+        sample_map,
+        external_to_internal_sample_id_map: Dict[str, Any],
         internal_pid: Optional[int],
-        sequence_ids: Dict[Any, Any] = None,
+        sequence_map: Dict[str, Dict[str, int]] = None,
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -486,27 +491,18 @@ class GenericParser(
 
         all_rows = [r for row in sample_map.values() for r in row]
 
-        # Get external sid to cpg map
-        existing_external_id_to_cpgid = (
-            await SampleApi().get_sample_id_map_by_external_async(
-                self.project,
-                list(sample_map.keys()),
-                allow_missing=True,
-            )
-        )
-
         # Get all the samples and sequences to upsert first
         samples_to_upsert = []
         sequences_to_upsert = []
         analyses_to_add = []
 
         for sample_id, rows in sample_map.items():
-            cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
+            cpg_id = external_to_internal_sample_id_map.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
                 rows=rows,
                 external_sample_id=sample_id,
                 cpg_sample_id=cpg_id,
-                sequence_ids=sequence_ids,
+                sequence_ids=sequence_map.get(cpg_id, {}),
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -730,24 +726,41 @@ class GenericParser(
                 logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
             # Construct participant to upsert
-            existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-                self.project, external_pids, allow_missing=True
+            existing_participant_ids = (
+                await self.papi.get_participant_id_map_by_external_ids_async(
+                    self.project, external_pids, allow_missing=True
+                )
             )
 
             sample_ids = list(
                 set(k for s in participant_map.values() for k in s.keys())
             )
-            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
-                sample_ids
+
+            external_to_internal_sample_id_map = (
+                await self.sapi.get_sample_id_map_by_external_async(
+                    self.project, sample_ids, allow_missing=True
+                )
             )
+
+            sequences = []
+            if external_to_internal_sample_id_map:
+                sequences = await self.seqapi.get_sequences_by_sample_ids_async(
+                    list(external_to_internal_sample_id_map.values()),
+                    get_latest_sequence_only=False,
+                )
+
+            sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
+            for seq in sequences:
+                sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
                 promise = self.process_participant_group(
-                    external_pid,
-                    sample_map,
-                    existing_participant_ids.get(external_pid),
-                    sequence_ids=sequence_ids,
+                    participant_name=external_pid,
+                    sample_map=sample_map,
+                    internal_pid=existing_participant_ids.get(external_pid),
+                    sequence_map=sequence_map,
+                    external_to_internal_sample_id_map=external_to_internal_sample_id_map,
                 )
                 current_batch_promises[external_pid] = promise
 
@@ -780,17 +793,24 @@ class GenericParser(
                     {external_pid: analysis_to_add},
                 )
 
+        sequences_count: Dict[str, int] = defaultdict(int)
+        for s in summary['sequences']['insert'] + summary['sequences']['update']:
+            sequences_count[str(s['type'])] += 1
+
+        str_seq_count = ', '.join(f'{k}={v}' for k, v in sequences_count.items())
         message = f"""\
-            {proj}: Processing participants: {', '.join(participant_map.keys())}
+    {proj}: Processing participants: {', '.join(participant_map.keys())}
 
-            Adding {len(summary['participants']['insert'])} participants
-            Adding {len(summary['samples']['insert'])} samples
-            Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(summary['analyses']['insert'])} analysis
+    Sequence types: {str_seq_count}
 
-            Updating {len(summary['participants']['update'])} participants
-            Updating {len(summary['samples']['update'])} samples
-            Updating {len(summary['sequences']['update'])} sequences
+    Adding {len(summary['participants']['insert'])} participants
+    Adding {len(summary['samples']['insert'])} samples
+    Adding {len(summary['sequences']['insert'])} sequences
+    Adding {len(summary['analyses']['insert'])} analysis
+
+    Updating {len(summary['participants']['update'])} participants
+    Updating {len(summary['samples']['update'])} samples
+    Updating {len(summary['sequences']['update'])} sequences
         """
 
         if dry_run:
@@ -818,10 +838,9 @@ class GenericParser(
         proj = self.project
 
         # now we can start adding!!
-        sapi = SampleApi()
 
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
             proj, list(sample_map.keys()), allow_missing=True
         )
 
@@ -904,13 +923,13 @@ class GenericParser(
             logger.info(message)
 
         # Batch update
-        result = sapi.batch_upsert_samples(
+        result = await self.sapi.batch_upsert_samples_async(
             proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
         # Add analyses
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
             proj, list(sample_map.keys()), allow_missing=True
         )
         _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
@@ -918,7 +937,7 @@ class GenericParser(
         return result
 
     async def parse_files(
-        self, sample_id: str, reads: List[str]
+        self, sample_id: str, reads: List[str], checksums: List[str] = None
     ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
         """
         Returns a tuple of:
@@ -928,6 +947,16 @@ class GenericParser(
 
         if not isinstance(reads, list):
             reads = [reads]
+
+        if not checksums:
+            checksums = [None] * len(reads)
+
+        if len(checksums) != len(reads):
+            raise ValueError(
+                'Expected length of reads to match length of provided checksums'
+            )
+
+        read_to_checksum = dict(zip(reads, checksums))
 
         file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
             lambda: defaultdict(list)
@@ -941,7 +970,8 @@ class GenericParser(
             fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
             for fastq_group in structured_fastqs:
                 create_file_futures: List[Coroutine] = [
-                    self.create_file_object(f) for f in fastq_group
+                    self.create_file_object(f, checksum=read_to_checksum.get(f))
+                    for f in fastq_group
                 ]
                 fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
@@ -1086,17 +1116,19 @@ class GenericParser(
         self,
         filename: str,
         secondary_files: List[SingleRow] = None,
+        checksum: Optional[str] = None,
     ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
-        checksum = None
+        _checksum = checksum
         file_size = None
 
         if not self.skip_checking_gcs_objects:
-            md5_filename = self.file_path(filename + '.md5')
-            if await self.file_exists(md5_filename):
-                contents = await self.file_contents(md5_filename)
-                if contents:
-                    checksum = f'md5:{contents.strip()}'
+            if not _checksum:
+                md5_filename = self.file_path(filename + '.md5')
+                if await self.file_exists(md5_filename):
+                    contents = await self.file_contents(md5_filename)
+                    if contents:
+                        _checksum = f'md5:{contents.strip()}'
 
             file_size = await self.file_size(filename)
 
@@ -1104,7 +1136,7 @@ class GenericParser(
             'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
-            'checksum': checksum,
+            'checksum': _checksum,
             'size': file_size,
         }
 
@@ -1146,6 +1178,16 @@ class GenericParser(
         )
         if relevant_delimiter:
             return relevant_delimiter
+
+        # pylint: disable=no-member
+        with AnyPath(filename).open('r') as f:
+            first_line = f.readline()
+            delimiter = csv.Sniffer().sniff(first_line).delimiter
+            if delimiter:
+                logger.info(
+                    f'Guessing delimiter based on first line, got "{delimiter}"'
+                )
+                return delimiter
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
 

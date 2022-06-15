@@ -10,7 +10,6 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
 
-from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
@@ -93,6 +92,7 @@ class GenericMetadataParser(GenericParser):
         reported_gender_column: Optional[str] = None,
         karyotype_column: Optional[str] = None,
         reads_column: Optional[str] = None,
+        checksum_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
@@ -130,13 +130,12 @@ class GenericMetadataParser(GenericParser):
         self.sequence_meta_map = sequence_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
+        self.checksum_column = checksum_column
         self.gvcf_column = gvcf_column
         self.meta_column = meta_column
         self.seq_meta_column = seq_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
         self.batch_number = batch_number
-
-        self.sapi = SampleApi()
 
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
@@ -318,7 +317,8 @@ class GenericMetadataParser(GenericParser):
 
         if missing_files:
             errors.append(
-                f'Non-existent files found in file map: {", ".join(missing_files)}'
+                'There are files specified in the map, but not found in '
+                f'the search paths: {", ".join(missing_files)}'
             )
         if files_in_search_path_not_in_map:
             m = (
@@ -472,6 +472,21 @@ class GenericMetadataParser(GenericParser):
         # more post processing
         return self.process_filename_value(row[self.reads_column])
 
+    async def get_checksums_from_row(
+        self, sample_id: Optional[str], row: SingleRow, read_filenames: List[str]
+    ) -> Optional[List[Optional[str]]]:
+        """
+        Get checksums for some row, you must either return:
+            - no elements, or
+            - number of elements equal to read_filenames
+
+        Each element should be a string or None.
+        """
+        if not self.checksum_column or self.checksum_column not in row:
+            return []
+
+        return self.process_filename_value(row[self.checksum_column])
+
     async def get_gvcf_filenames(self, sample_id: str, row: GroupedRow) -> List[str]:
         """Get paths to gvcfs from a row"""
         if not self.gvcf_column:
@@ -539,32 +554,42 @@ class GenericMetadataParser(GenericParser):
 
         read_filenames: List[str] = []
         gvcf_filenames: List[str] = []
+        read_checksums: List[str] = []
+
         for r in rows:
-            read_filenames.extend(
-                await self.get_read_filenames(sample_id=sample_id, row=r)
-            )
+            _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
+            read_filenames.extend(_rfilenames)
+            if self.checksum_column and self.checksum_column in r:
+                checksums = await self.get_checksums_from_row(sample_id, r, _rfilenames)
+                if not checksums:
+                    checksums = [None] * len(_rfilenames)
+                read_checksums.extend(checksums)
             if self.gvcf_column and self.gvcf_column in r:
-                gvcf_filenames.extend(f for f in r[self.gvcf_column].split(',') if f)
+                gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
         # strip in case collaborator put "file1, file2"
-        full_filenames: List[str] = []
+        full_read_filenames: List[str] = []
+        full_gvcf_filenames: List[str] = []
         if read_filenames:
-            full_filenames.extend(
+            full_read_filenames.extend(
                 self.file_path(f.strip()) for f in read_filenames if f.strip()
             )
         if gvcf_filenames:
-            full_filenames.extend(
+            full_gvcf_filenames.extend(
                 self.file_path(f.strip()) for f in gvcf_filenames if f.strip()
             )
 
         if not sample_id:
             sample_id = await self.get_cpg_sample_id_from_row(rows[0])
 
-        file_types: Dict[str, Dict[str, List]] = await self.parse_files(
-            sample_id, full_filenames
+        read_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+            sample_id, full_read_filenames, read_checksums
         )
-        reads: Dict[str, List] = file_types.get('reads')
-        variants: Dict[str, List] = file_types.get('variants')
+        variant_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+            sample_id, full_gvcf_filenames, None
+        )
+        reads: Dict[str, List] = read_file_types.get('reads')
+        variants: Dict[str, List] = variant_file_types.get('variants')
         if reads:
             keys = list(reads.keys())
             if len(keys) > 1:

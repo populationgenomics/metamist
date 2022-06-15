@@ -14,12 +14,14 @@ PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
 READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
+CHECKSUM_COL_NAME = 'checksum'
 
 KeyMap = {
-    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id'],
-    SAMPLE_ID_COL_NAME: ['sample id', 'sample', 'sample id'],
+    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id', 'participant_id', 'participant id'],
+    SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
-    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type']
+    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
+    CHECKSUM_COL_NAME: ['md5', 'checksum'],
 }
 
 required_keys = [SAMPLE_ID_COL_NAME, READS_COL_NAME]
@@ -31,6 +33,7 @@ The SampleFileMapParser is used for parsing files with format:
 - 'Sample ID'
 - 'Filenames'
 - ['Type']
+- 'Checksum'
 
 e.g.
     Sample ID       Filenames
@@ -78,6 +81,7 @@ class SampleFileMapParser(GenericMetadataParser):
             participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
+            checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
