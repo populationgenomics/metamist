@@ -93,7 +93,7 @@ class GenericMetadataParser(GenericParser):
         reported_gender_column: Optional[str] = None,
         karyotype_column: Optional[str] = None,
         reads_column: Optional[str] = None,
-        checksum_column: Optional[str]=None,
+        checksum_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
@@ -475,7 +475,16 @@ class GenericMetadataParser(GenericParser):
         # more post processing
         return self.process_filename_value(row[self.reads_column])
 
-    async def get_checksums_from_row(self, sample_id: Optional[str], row: SingleRow, read_filenames: List[str]):
+    async def get_checksums_from_row(
+        self, sample_id: Optional[str], row: SingleRow, read_filenames: List[str]
+    ) -> Optional[List[Optional[str]]]:
+        """
+        Get checksums for some row, you must either return:
+            - no elements, or
+            - number of elements equal to read_filenames
+
+        Each element should be a string or None.
+        """
         if not self.checksum_column or self.checksum_column not in row:
             return []
 
@@ -554,7 +563,10 @@ class GenericMetadataParser(GenericParser):
             _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
             read_filenames.extend(_rfilenames)
             if self.checksum_column and self.checksum_column in r:
-                read_checksums.extend(await self.get_checksums_from_row(sample_id, r, _rfilenames))
+                checksums = await self.get_checksums_from_row(sample_id, r, _rfilenames)
+                if not checksums:
+                    checksums = [None] * len(_rfilenames)
+                read_checksums.extend(checksums)
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(self.process_filename_value([self.gvcf_column]))
 

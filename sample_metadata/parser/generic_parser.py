@@ -793,17 +793,17 @@ class GenericParser(
                 )
 
         sequences_count = defaultdict(int)
-        for s in (summary['sequences']['insert'] + summary['sequences']['update']):
+        for s in summary['sequences']['insert'] + summary['sequences']['update']:
             sequences_count[str(s['type'])] += 1
 
-        str_seq_count = ', '.join(f'{k}={v}' for k,v in sequences_count.items())
+        str_seq_count = ', '.join(f'{k}={v}' for k, v in sequences_count.items())
         message = f"""\
     {proj}: Processing participants: {', '.join(participant_map.keys())}
-    
+
     Sequence types: {str_seq_count}
 
     Adding {len(summary['participants']['insert'])} participants
-    Adding {len(summary['samples']['insert'])} samples 
+    Adding {len(summary['samples']['insert'])} samples
     Adding {len(summary['sequences']['insert'])} sequences
     Adding {len(summary['analyses']['insert'])} analysis
 
@@ -1119,16 +1119,16 @@ class GenericParser(
         checksum: Optional[str] = None,
     ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
-        checksum = checksum
+        _checksum = checksum
         file_size = None
 
         if not self.skip_checking_gcs_objects:
-            if not checksum:
+            if not _checksum:
                 md5_filename = self.file_path(filename + '.md5')
                 if await self.file_exists(md5_filename):
                     contents = await self.file_contents(md5_filename)
                     if contents:
-                        checksum = f'md5:{contents.strip()}'
+                        _checksum = f'md5:{contents.strip()}'
 
             file_size = await self.file_size(filename)
 
@@ -1136,7 +1136,7 @@ class GenericParser(
             'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
-            'checksum': checksum,
+            'checksum': _checksum,
             'size': file_size,
         }
 
@@ -1179,7 +1179,8 @@ class GenericParser(
         if relevant_delimiter:
             return relevant_delimiter
 
-        with AnyPath(filename).open("r") as f:
+        # pylint: disable=no-member
+        with AnyPath(filename).open('r') as f:
             first_line = f.readline()
             delimiter = csv.Sniffer().sniff(first_line).delimiter
             if delimiter:
