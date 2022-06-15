@@ -10,7 +10,6 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
 
-from sample_metadata.api.sample_api import SampleApi
 from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
 from sample_metadata.model.sequence_type import SequenceType
@@ -137,8 +136,6 @@ class GenericMetadataParser(GenericParser):
         self.seq_meta_column = seq_meta_column
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
         self.batch_number = batch_number
-
-        self.sapi = SampleApi()
 
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
