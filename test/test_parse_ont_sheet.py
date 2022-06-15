@@ -40,7 +40,12 @@ class TestOntSampleSheetParser(unittest.TestCase):
         )
 
         parser.skip_checking_gcs_objects = True
-        fs = ['Sample01_pass.fastq.gz', 'Sample02_pass.fastq.gz']
+        fs = [
+            'Sample01_pass.fastq.gz',
+            'Sample01_fail.fastq.gz',
+            'Sample02_pass.fastq.gz',
+            'Sample02_fail.fastq.gz',
+        ]
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
         parser.skip_checking_gcs_objects = True
 
@@ -68,7 +73,17 @@ class TestOntSampleSheetParser(unittest.TestCase):
             'basecalling': '4.0.11+f1071ce',
             'device': 'PromethION',
             'experiment_name': 'PBXP_Awesome',
-            'failed_fastqs': 'Sample01_fail.fastq.gz',
+            'failed_reads': [
+                [
+                    {
+                        'location': 'gs://BUCKET/FAKE/Sample01_fail.fastq.gz',
+                        'basename': 'Sample01_fail.fastq.gz',
+                        'class': 'File',
+                        'checksum': None,
+                        'size': None,
+                    }
+                ]
+            ],
             'flow_cell': 'PRO002',
             'flowcell_id': 'XYZ1',
             'mux_total': '7107',

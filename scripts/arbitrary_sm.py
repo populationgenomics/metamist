@@ -11,11 +11,13 @@ For example:
         --json '{"project": "acute-care", "external_id": "<external-id>"}'
 
 """
+from typing import List
+import os.path
 import logging
+import subprocess
+
 import argparse
 import json
-from typing import List
-from cloudpathlib import AnyPath
 
 from sample_metadata import apis
 from sample_metadata.model_utils import file_type
@@ -47,9 +49,9 @@ def run_sm(
     modified_kwargs = {**kwargs}
     for k in params_to_open:
         potential_path = kwargs.get(k)
-        if potential_path and AnyPath(potential_path).exists():
+        if potential_path and os.path.exists(potential_path):
             logging.info(f'Opening "{k}": {potential_path}')
-            files_to_close.append(AnyPath(potential_path).open())
+            files_to_close.append(open(potential_path))
             modified_kwargs[k] = files_to_close[-1]
         else:
             logging.info(f'Skipping opening {k}')
@@ -69,6 +71,10 @@ def from_args(args):
     positional_args: List[str] = args.args
     kwargs = {}
 
+    if args.file_to_localise:
+        for file in args.file_to_localise:
+            subprocess.check_output(['gsutil', 'cp', file, '.'])
+
     json_str = args.json
     if json_str:
         kwargs = json.loads(json_str)
@@ -87,6 +93,9 @@ def main(args=None):
     parser = argparse.ArgumentParser('Arbitrary sample-metadata script')
     parser.add_argument('api_name')
     parser.add_argument('method_name')
+    parser.add_argument(
+        '--file-to-localise', action='append', help='List of GS files to localise'
+    )
     parser.add_argument('--json', help='JSON encoded dictionary for kwargs')
     parser.add_argument(
         '--args',

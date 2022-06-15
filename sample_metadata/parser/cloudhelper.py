@@ -1,6 +1,5 @@
 # pylint: disable=no-member
 import os
-import asyncio
 import logging
 
 from cloudpathlib import AnyPath
@@ -9,7 +8,6 @@ from google.cloud import storage
 
 class CloudHelper:
     """General CloudHelper for parsers"""
-
     LOCAL_PREFIX = '/'
     GCS_PREFIX = 'gs://'
     AZ_PREFIX = 'az://'
@@ -21,9 +19,7 @@ class CloudHelper:
 
         self.search_paths = search_paths or []
 
-        self.filename_map: dict[str, str] = asyncio.get_event_loop().run_until_complete(
-            self.populate_filename_map(self.search_paths)
-        )
+        self.filename_map: dict[str, str] = self.populate_filename_map(self.search_paths)
         # pylint: disable
 
     @staticmethod
@@ -75,9 +71,13 @@ class CloudHelper:
 
         return self.filename_map[filename]
 
-    async def list_directory(self, directory_name) -> list[str]:
+    def list_directory(self, directory_name) -> list[str]:
         """List directory"""
         path = self.file_path(directory_name)
+
+        # this was super slow to perform, do don't do this atm
+        # return [os.path.join(path, p.name) for p in AnyPath(path).iterdir()]
+
         if path.startswith('gs://'):
             return self._list_gcs_directory(path)
 
@@ -100,7 +100,7 @@ class CloudHelper:
         """Get size of file in bytes"""
         return AnyPath(self.file_path(filename)).stat().st_size
 
-    async def populate_filename_map(
+    def populate_filename_map(
         self, search_locations: list[str]
     ) -> dict[str, str]:
         """
@@ -110,8 +110,7 @@ class CloudHelper:
 
         fn_map = {}
         for directory in search_locations:
-            directory_list = await self.list_directory(directory)
-
+            directory_list = self.list_directory(directory)
             for file in directory_list:
                 file = file.strip()
                 file_base = os.path.basename(file)
@@ -140,7 +139,7 @@ class CloudHelper:
 
         return self.gcs_bucket_refs[bucket_name]
 
-    def get_gcs_blob(self, filename: str) -> storage.Blob:
+    async def get_gcs_blob(self, filename: str) -> storage.Blob:
         """Convenience function for getting blob from fully qualified GCS path"""
         if not filename.startswith(self.GCS_PREFIX):
             raise ValueError('No blob available')
