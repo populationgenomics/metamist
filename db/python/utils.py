@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Sequence, Optional
+import re
+from typing import Sequence, Optional, List
 
 ProjectId = int
 
@@ -8,6 +9,8 @@ levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.W
 
 LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'DEBUG').upper()]
 USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
+
+RE_FILENAME_SPLITTER = re.compile('[,;]')
 
 # pylint: disable=invalid-name
 _logger = None
@@ -75,3 +78,18 @@ def get_logger():
         client.setup_logging()
 
     return _logger
+
+
+def split_generic_terms(string: str) -> List[str]:
+    """
+    Take a string and split on both [,;]
+    """
+    if not string:
+        return []
+    if isinstance(string, list):
+        return sorted(set(r for f in string for r in split_generic_terms(f)))
+
+    filenames = [f.strip() for f in RE_FILENAME_SPLITTER.split(string)]
+    filenames = [f for f in filenames if f]
+
+    return filenames

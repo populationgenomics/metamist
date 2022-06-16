@@ -607,7 +607,8 @@ def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.
         r = urllib3.PoolManager().request(
             'GET',
             gurl,
-            headers={'Metadata-Flavor': 'Google'}
+            headers={'Metadata-Flavor': 'Google'},
+            retries=False
         )
         if r.status == 200:
             token = r.data

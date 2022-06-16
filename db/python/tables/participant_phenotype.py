@@ -19,6 +19,8 @@ class ParticipantPhenotypeTable(DbBase):
         """
         Create a new sample, and add it to database
         """
+        if not rows:
+            return None
         _query = f"""
 INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
 VALUES (:participant_id, :description, :value, :author, 'DESCRIPTION')

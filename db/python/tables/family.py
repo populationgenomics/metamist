@@ -162,8 +162,12 @@ ON DUPLICATE KEY UPDATE
 
     async def get_id_map_by_external_ids(
         self, family_ids: List[str], allow_missing=False, project: Optional[int] = None
-    ):
+    ) -> Dict:
         """Get map of {external_id: internal_id} for a family"""
+
+        if not family_ids:
+            return {}
+
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
             _query, {'external_ids': family_ids, 'project': project or self.project}

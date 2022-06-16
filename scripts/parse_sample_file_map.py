@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 from typing import List
 import logging
 
@@ -31,7 +31,7 @@ logger.setLevel(logging.INFO)
 
 @click.command(help=__DOC)
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
@@ -59,7 +59,7 @@ logger.setLevel(logging.INFO)
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
@@ -75,7 +75,7 @@ async def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     parser = SampleFileMapParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

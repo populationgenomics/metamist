@@ -38,7 +38,7 @@ and we want to achieve the following:
 
 ```shell
 python parse_generic_metadata.py \
-    --sample-metadata-project $dataset \
+    --project $dataset \
     --sample-name-column "Sample ID" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \

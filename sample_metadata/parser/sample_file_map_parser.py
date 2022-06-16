@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 from typing import List
 import logging
 
@@ -14,12 +14,14 @@ PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
 READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
+CHECKSUM_COL_NAME = 'checksum'
 
 KeyMap = {
-    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id'],
-    SAMPLE_ID_COL_NAME: ['sample id', 'sample', 'sample id'],
+    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id', 'participant_id', 'participant id'],
+    SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
-    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type']
+    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
+    CHECKSUM_COL_NAME: ['md5', 'checksum'],
 }
 
 required_keys = [SAMPLE_ID_COL_NAME, READS_COL_NAME]
@@ -31,6 +33,7 @@ The SampleFileMapParser is used for parsing files with format:
 - 'Sample ID'
 - 'Filenames'
 - ['Type']
+- 'Checksum'
 
 e.g.
     Sample ID       Filenames
@@ -67,17 +70,18 @@ class SampleFileMapParser(GenericMetadataParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_metadata_project: str,
+        project: str,
         default_sequence_type='genome',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=READS_COL_NAME,
+            checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
@@ -92,7 +96,7 @@ class SampleFileMapParser(GenericMetadataParser):
 
 @click.command(help=__DOC)
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
@@ -120,7 +124,7 @@ class SampleFileMapParser(GenericMetadataParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project,
     default_sample_type='blood',
     default_sequence_type='genome',
     confirm=False,
@@ -136,7 +140,7 @@ async def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     parser = SampleFileMapParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

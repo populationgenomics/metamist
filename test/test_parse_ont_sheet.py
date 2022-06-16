@@ -13,7 +13,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
     @run_test_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids')
     async def test_simple_sheet(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_get_participant_id
     ):
@@ -36,11 +36,16 @@ class TestOntSampleSheetParser(unittest.TestCase):
         parser = OntParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            sample_metadata_project='dev',
+            project='dev',
         )
 
         parser.skip_checking_gcs_objects = True
-        fs = ['Sample01_pass.fastq.gz', 'Sample02_pass.fastq.gz']
+        fs = [
+            'Sample01_pass.fastq.gz',
+            'Sample01_fail.fastq.gz',
+            'Sample02_pass.fastq.gz',
+            'Sample02_fail.fastq.gz',
+        ]
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
         parser.skip_checking_gcs_objects = True
 
@@ -68,7 +73,17 @@ class TestOntSampleSheetParser(unittest.TestCase):
             'basecalling': '4.0.11+f1071ce',
             'device': 'PromethION',
             'experiment_name': 'PBXP_Awesome',
-            'failed_fastqs': 'Sample01_fail.fastq.gz',
+            'failed_reads': [
+                [
+                    {
+                        'location': 'gs://BUCKET/FAKE/Sample01_fail.fastq.gz',
+                        'basename': 'Sample01_fail.fastq.gz',
+                        'class': 'File',
+                        'checksum': None,
+                        'size': None,
+                    }
+                ]
+            ],
             'flow_cell': 'PRO002',
             'flowcell_id': 'XYZ1',
             'mux_total': '7107',

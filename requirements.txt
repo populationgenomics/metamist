@@ -5,9 +5,9 @@ google-auth==1.35.0
 google-cloud-secret-manager==2.8.0
 google-cloud-logging==2.7.0
 google-cloud-storage==1.43.0
-fastapi[all]==0.70.0
+uvicorn==0.17.6
+fastapi[all]==0.78.0
 python-multipart==0.0.5
-uvicorn==0.13.4
 databases[mysql]==0.4.3
 cryptography==36.0.1
 python-dateutil==2.8.2
