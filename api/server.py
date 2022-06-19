@@ -82,6 +82,9 @@ async def add_process_time_header(request: Request, call_next):
 
 @app.exception_handler(404)
 async def not_found(request, exc):
+    """
+    New version of FastAPI not fires this method for 404 errors
+    """
     if static_dir_exists:
         return FileResponse(STATIC_DIR + '/index.html')
 

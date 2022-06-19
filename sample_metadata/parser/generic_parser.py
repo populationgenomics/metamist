@@ -502,7 +502,7 @@ class GenericParser(
                 rows=rows,
                 external_sample_id=sample_id,
                 cpg_sample_id=cpg_id,
-                sequence_ids=sequence_map.get(cpg_id, {}),
+                sequences=sequence_map.get(cpg_id, {}),
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
