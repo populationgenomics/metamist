@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import json
 from typing import Sequence, Optional, List
 
 ProjectId = int
@@ -14,6 +15,7 @@ RE_FILENAME_SPLITTER = re.compile('[,;]')
 
 # pylint: disable=invalid-name
 _logger = None
+
 
 
 class Forbidden(Exception):
@@ -78,6 +80,11 @@ def get_logger():
         client.setup_logging()
 
     return _logger
+
+def to_db_json(val):
+    """Convert val to json for DB"""
+    # return psycopg2.extras.Json(val)
+    return json.dumps(val)
 
 
 def split_generic_terms(string: str) -> List[str]:

@@ -13,6 +13,7 @@ from typing import Optional
 import databases
 
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import to_db_json
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -28,12 +29,6 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
 ][::-1]
-
-
-def to_db_json(val):
-    """Convert val to json for DB"""
-    # return psycopg2.extras.Json(val)
-    return json.dumps(val)
 
 
 class Connection:
