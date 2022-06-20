@@ -9,7 +9,7 @@ import requests
 from cloudpathlib import AnyPath
 from sample_metadata.model.export_type import ExportType
 
-from sample_metadata.apis import SeqrApi
+from sample_metadata.apis import SeqrApi, ProjectApi
 
 MAP_LOCATION = 'gs://cpg-seqr-test/automation/'
 
@@ -38,13 +38,14 @@ url_update_es_index = '/api/project/{projectGuid}/add_dataset/variants/sa'
 url_update_saved_variants = '/api/project/{projectGuid}/update_saved_variant_json/sa'
 
 seqapi= SeqrApi()
+papi = ProjectApi()
 
 
-def sync_dataset(dataset):
+def sync_dataset(dataset, seqr_guid):
     # sync people first
     token = get_token()
     headers = {'Authorization': f'Bearer {token}'}
-    params = dict(dataset=dataset, project_guid='R0011_validation', headers=headers)
+    params = dict(dataset=dataset, project_guid=seqr_guid, headers=headers)
 
     sync_pedigree(**params)
     sync_families(**params)
@@ -254,5 +255,31 @@ def get_token():
         return credentials.token
 
 
+def sync_all_datasets():
+    seqr_projects = ProjectApi().get_seqr_projects()
+    for project in seqr_projects:
+        project_name = project['name']
+        seqr_guid = project.get('meta', {}).get('seqr_guid')
+        if not seqr_guid:
+            print(f'Skipping {project_name} as meta.seqr_guid is not set')
+            continue
+        sync_dataset(project_name, seqr_guid)
+
+
+def sync_single_dataset_from_name(dataset):
+    seqr_projects = ProjectApi().get_seqr_projects()
+    for project in seqr_projects:
+        project_name = project['name']
+        if project_name != dataset:
+            continue
+        seqr_guid = project.get('meta', {}).get('seqr_guid')
+        if not seqr_guid:
+            raise ValueError(f'{project_name} does NOT have a meta.seqr_guid is not set')
+
+        sync_dataset(project_name, seqr_guid)
+
+    raise ValueError(f'Could not find {dataset} seqr project')
+
+
 if __name__ == "__main__":
-    sync_dataset('validation')
+    sync_single_dataset_from_name('validation')
