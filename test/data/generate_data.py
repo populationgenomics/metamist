@@ -83,7 +83,13 @@ def main(
                     SequenceUpsert(
                         status=SequenceStatus('uploaded'),
                         type=SequenceType(
-                            random.choice(list(next(iter(SequenceType.allowed_values.values())).values()))
+                            random.choice(
+                                list(
+                                    next(
+                                        iter(SequenceType.allowed_values.values())
+                                    ).values()
+                                )
+                            )
                         ),
                         meta={
                             'facility': random.choice(
