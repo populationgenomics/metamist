@@ -1,14 +1,15 @@
 # pylint: disable=global-statement
 import asyncio
-from typing import Dict, List, Set, Iterable, Optional, Tuple
+from typing import Dict, List, Set, Iterable, Optional, Tuple, Any
 
 import os
+import json
 from datetime import datetime, timedelta
 
 from databases import Database
 from google.cloud import secretmanager
 
-from db.python.utils import ProjectId, Forbidden, NoProjectAccess, get_logger
+from db.python.utils import ProjectId, Forbidden, NoProjectAccess, get_logger, to_db_json
 from models.models.project import ProjectRow
 
 # minutes
@@ -286,7 +287,7 @@ class ProjectPermissionsTable:
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
-        _query = 'SELECT id, name, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
+        _query = 'SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
 
@@ -357,3 +358,41 @@ RETURNING ID"""
             project_id = await self.connection.fetch_val(_query, values)
 
         return project_id
+
+    async def update_project(self, project_name: str, update: dict, author: str):
+        """Update a sample-metadata project"""
+        await self.check_project_creator_permissions(author)
+
+        meta = update.get('meta')
+
+        fields: Dict[str, Any] = {
+            'author': author,
+            'name': project_name
+        }
+
+        setters = ['author = :author']
+
+        if meta is not None and len(meta) > 0:
+            fields['meta'] = to_db_json(meta)
+            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+
+        fields_str = ', '.join(setters)
+
+        _query = f'UPDATE project SET {fields_str} WHERE name = :name'
+
+        return await self.connection.execute(_query, fields)
+
+    async def get_seqr_projects(self) -> list[dict[str, Any]]:
+        _query = """\
+        SELECT id, name, dataset, meta FROM project
+        WHERE json_extract(meta, '$.is_seqr') = true
+        """
+
+        projects = []
+        for r in await self.connection.fetch_all(_query):
+            r = dict(r)
+            r['meta'] = json.loads(r['meta'] or '{}')
+            projects.append(r)
+
+        return projects
+
