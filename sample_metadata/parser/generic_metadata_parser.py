@@ -310,8 +310,8 @@ class GenericMetadataParser(GenericParser):
 
         relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
 
-        missing_files = fs - relevant_mapped_files
-        files_in_search_path_not_in_map = relevant_mapped_files - fs
+        missing_files = relevant_mapped_files - fs
+        files_in_search_path_not_in_map = fs - relevant_mapped_files
 
         errors = []
 
