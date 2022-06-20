@@ -1,14 +1,15 @@
-import datetime
-import json
-import re
+import csv
+import io
 import os
+import re
+import json
+import datetime
 
 import requests
 from cloudpathlib import AnyPath
+from sample_metadata.model.export_type import ExportType
 
-from sample_metadata.model.file_extension import FileExtension
-
-from sample_metadata.apis import FamilyApi, ParticipantApi
+from sample_metadata.apis import SeqrApi
 
 MAP_LOCATION = 'gs://cpg-seqr-test/automation/'
 
@@ -36,8 +37,7 @@ url_family_table_confirm = '/api/project/{projectGuid}/edit_families/sa'
 url_update_es_index = '/api/project/{projectGuid}/add_dataset/variants/sa'
 url_update_saved_variants = '/api/project/{projectGuid}/update_saved_variant_json/sa'
 
-fapi = FamilyApi()
-papi = ParticipantApi()
+seqapi= SeqrApi()
 
 
 def sync_dataset(dataset):
@@ -54,7 +54,7 @@ def sync_dataset(dataset):
 
 def sync_pedigree(dataset, project_guid, headers):
 
-    ped_rows = fapi.get_pedigree(project=dataset)
+    ped_rows = seqapi.get_pedigree(project=dataset)
     if not ped_rows:
         print('Skipping syncing pedigree')
     formatted_ped_rows = [
@@ -105,7 +105,7 @@ def sync_families(dataset, project_guid: str, headers: dict[str, str]):
 
     print(f'{dataset} :: Uploading family template')
 
-    fam_rows = fapi.get_families(project=dataset)
+    fam_rows = seqapi.get_families(project=dataset)
     fam_row_headers = ['Family ID', 'Display Name', 'Description', 'Coded Phenotype']
     formatted_fam_rows = [','.join(fam_row_headers)]
     formatted_fam_rows.extend(
@@ -146,20 +146,33 @@ def sync_families(dataset, project_guid: str, headers: dict[str, str]):
 
 def sync_individual_metadata(dataset, project_guid, headers):
 
-    individual_metadata = papi.get_individual_metadata_for_seqr(
-        project=dataset, export_type=FileExtension('csv')
+    individual_metadata_resp = seqapi.get_individual_metadata_for_seqr(
+        project=dataset, export_type=ExportType('json')
     )
-    if individual_metadata is None:
+
+    if individual_metadata_resp is None:
         print(
             'There is an issue with getting individual metadata from SM, please try again later'
         )
         return
 
+    json_rows = individual_metadata_resp['rows']
+    headers = individual_metadata_resp['headers']
+    col_header_map = individual_metadata_resp['header_map']
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=',')
+    rows = [
+        [col_header_map[h] for h in headers],
+        *[[row[kh] for kh in headers] for row in json_rows],
+    ]
+    writer.writerows(rows)
+
     req1_url = BASE + url_individual_metadata_table_upload.format(
         projectGuid=project_guid
     )
     resp_1 = requests.post(
-        req1_url, files={'datafile': ('file.csv', individual_metadata)}, headers=headers
+        req1_url, files={'datafile': ('file.csv', output.getvalue())}, headers=headers
     )
     print(f'Uploaded individual metadata with status: {resp_1.status_code}')
     if not resp_1.ok:
@@ -184,7 +197,7 @@ def sync_individual_metadata(dataset, project_guid, headers):
 
 def update_es_index(dataset, project_guid, headers):
 
-    person_sample_map_rows = papi.get_external_participant_id_to_internal_sample_id(
+    person_sample_map_rows = seqapi.get_external_participant_id_to_internal_sample_id(
         project=dataset
     )
 

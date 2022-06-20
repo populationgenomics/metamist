@@ -41,7 +41,7 @@ class FamilyUpdateModel(BaseModel):
     coded_phenotype: Optional[str] = None
 
 
-@router.post('/{project}/pedigree', operation_id='importPedigree')
+@router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
 async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
@@ -76,6 +76,7 @@ async def import_pedigree(
 @router.get(
     '/{project}/pedigree',
     operation_id='getPedigree',
+    tags=['seqr']
 )
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
@@ -141,11 +142,12 @@ async def get_pedigree(
     return pedigree_dicts
 
 
-@router.get('/{project}/', operation_id='getFamilies')
+@router.get('/{project}/', operation_id='getFamilies', tags=['seqr'])
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
     connection: Connection = get_project_readonly_connection,
+
 ) -> List[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)
@@ -173,7 +175,7 @@ async def update_family(
     }
 
 
-@router.post('/{project}/family-template', operation_id='importFamilies')
+@router.post('/{project}/family-template', operation_id='importFamilies', tags=['seqr'])
 async def import_families(
     file: UploadFile = File(...),
     has_header: bool = True,
