@@ -108,7 +108,7 @@ class CloudHelper:
         so let's prepopulate that filename_map from the search_locations!
         """
 
-        fn_map = {}
+        fn_map: dict[str, str] = {}
         for directory in search_locations:
             directory_list = self.list_directory(directory)
             for file in directory_list:
