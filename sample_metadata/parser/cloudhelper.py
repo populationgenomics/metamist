@@ -99,7 +99,7 @@ class CloudHelper:
     async def file_size(self, filename) -> int:
         """Get size of file in bytes"""
         return AnyPath(self.file_path(filename)).stat().st_size
-    
+
     def populate_filename_map(
         self, search_locations: list[str]
     ) -> dict[str, str]:
@@ -116,8 +116,7 @@ class CloudHelper:
                 file_base = os.path.basename(file)
                 if file_base in fn_map:
                     logging.warning(
-                        f'File "{file}" from "{directory}" already exists in '
-                        f'directory map: {fn_map[file_base]}'
+                        f'File "{file}" from "{directory}" already exists in directory map: {fn_map[file_base]}'
                     )
                     continue
                 fn_map[file_base] = file
