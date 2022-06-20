@@ -17,7 +17,6 @@ RE_FILENAME_SPLITTER = re.compile('[,;]')
 _logger = None
 
 
-
 class Forbidden(Exception):
     """Forbidden action"""
 
@@ -80,6 +79,7 @@ def get_logger():
         client.setup_logging()
 
     return _logger
+
 
 def to_db_json(val):
     """Convert val to json for DB"""

@@ -61,6 +61,7 @@ async def create_project(
 
 @router.get('/seqr/all', operation_id='getSeqrProjects')
 async def get_seqr_projects(connection: Connection = get_projectless_db_connection):
+    """Get SM projects that should sync to seqr"""
     ptable = ProjectPermissionsTable(connection.connection)
     return await ptable.get_seqr_projects()
 
@@ -71,6 +72,7 @@ async def update_project(
     project_update_model: dict,
     connection: Connection = get_projectless_db_connection,
 ):
+    """Update a project by project name"""
     ptable = ProjectPermissionsTable(connection.connection)
     return await ptable.update_project(
         project_name=project, update=project_update_model, author=connection.author

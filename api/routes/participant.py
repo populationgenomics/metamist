@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Dict, Union
+from typing import Any, List, Optional, Dict
 
 import io
 import csv
@@ -49,7 +49,7 @@ async def fill_in_missing_participants(
 )
 async def get_individual_metadata_template_for_seqr(
     project: str,
-    export_type: ExportType = ExportType.CSV.value,
+    export_type: ExportType = ExportType.JSON,
     external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
@@ -119,7 +119,7 @@ async def update_many_participant_external_ids(
 @router.get(
     '/{project}/external-pid-to-internal-sample-id',
     operation_id='getExternalParticipantIdToInternalSampleId',
-    tags=['seqr']
+    tags=['seqr'],
 )
 async def get_external_participant_id_to_internal_sample_id(
     connection: Connection = get_project_readonly_connection,
@@ -143,7 +143,7 @@ async def get_external_participant_id_to_internal_sample_id(
     '/{project}/external-pid-to-internal-sample-id/{export_type}',
     operation_id='getExternalParticipantIdToInternalSampleIdExport',
     response_class=StreamingResponse,
-    tags=['seqr']
+    tags=['seqr'],
 )
 async def get_external_participant_id_to_internal_sample_id_export(
     project: str,

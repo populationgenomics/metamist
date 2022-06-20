@@ -2,7 +2,8 @@ from datetime import datetime
 from itertools import groupby
 from typing import List, Optional, Set, Tuple, Dict, Any
 
-from db.python.connect import DbBase, NotFoundError, to_db_json  # , to_db_json
+from db.python.connect import DbBase, NotFoundError
+from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis

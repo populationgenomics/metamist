@@ -13,7 +13,11 @@ class ExportType(Enum):
 
     def get_extension(self):
         """Get extension (including .)"""
-        return {ExportType.CSV: '.csv', ExportType.TSV: '.tsv', ExportType.JSON: '.json'}[self]
+        return {
+            ExportType.CSV: '.csv',
+            ExportType.TSV: '.tsv',
+            ExportType.JSON: '.json',
+        }[self]
 
     def get_delimiter(self):
         """Get delimiter (eg: ',' OR '\t')"""

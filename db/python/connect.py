@@ -9,11 +9,9 @@ import logging
 import os
 from typing import Optional
 
-# import asyncio
 import databases
 
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import to_db_json
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

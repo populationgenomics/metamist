@@ -88,7 +88,9 @@ class SeqrMetadataKeys(Enum):
         """Get specific parsers for individual fields"""
         return {
             SeqrMetadataKeys.AGE_OF_ONSET: SeqrMetadataKeys.parse_age_of_onset,
-            SeqrMetadataKeys.HPO_TERMS_ABSENT: lambda q: ','.join(SeqrMetadataKeys.parse_hpo_terms(q)),
+            SeqrMetadataKeys.HPO_TERMS_ABSENT: lambda q: ','.join(
+                SeqrMetadataKeys.parse_hpo_terms(q)
+            ),
             # this is handled manually
             # SeqrMetadataKeys.HPO_TERMS_PRESENT: SeqrMetadataKeys.parse_hpo_terms,
         }
@@ -496,7 +498,7 @@ class ParticipantLayer(BaseLayer):
         """Get seqr individual level metadata template as List[List[str]]"""
 
         # avoid circular imports
-        # pylint: disable=import-outside-toplevel,cyclic-import
+        # pylint: disable=import-outside-toplevel,cyclic-import,too-many-locals
         from db.python.layers.family import FamilyLayer
 
         ppttable = ParticipantPhenotypeTable(self.connection)
@@ -539,12 +541,12 @@ class ParticipantLayer(BaseLayer):
         headers = [k.value for k in SeqrMetadataKeys.get_ordered_headers()]
         lheaders = [h.lower() for h in headers]
         json_headers = [
-            h.replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_")
+            h.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
             for h in lheaders
         ]
         json_header_map = dict(zip(json_headers, headers))
         lheader_to_json = dict(zip(lheaders, json_headers))
-        rows: List[Dict[str]] = []
+        rows: List[Dict[str, str]] = []
         for pid, d in pid_to_features.items():
             d[SeqrMetadataKeys.INDIVIDUAL_ID.value] = internal_to_external_pid_map.get(
                 pid, str(pid)
@@ -562,7 +564,11 @@ class ParticipantLayer(BaseLayer):
 
         rows = [{h: r.get(h) for h in set_headers if h in r} for r in rows]
 
-        return {"rows": rows, 'headers': list(set_headers), "header_map": json_header_map}
+        return {
+            'rows': rows,
+            'headers': list(set_headers),
+            'header_map': json_header_map,
+        }
 
     async def get_id_map_by_external_ids(
         self,

@@ -9,7 +9,13 @@ from datetime import datetime, timedelta
 from databases import Database
 from google.cloud import secretmanager
 
-from db.python.utils import ProjectId, Forbidden, NoProjectAccess, get_logger, to_db_json
+from db.python.utils import (
+    ProjectId,
+    Forbidden,
+    NoProjectAccess,
+    get_logger,
+    to_db_json,
+)
 from models.models.project import ProjectRow
 
 # minutes
@@ -365,10 +371,7 @@ RETURNING ID"""
 
         meta = update.get('meta')
 
-        fields: Dict[str, Any] = {
-            'author': author,
-            'name': project_name
-        }
+        fields: Dict[str, Any] = {'author': author, 'name': project_name}
 
         setters = ['author = :author']
 
@@ -383,6 +386,9 @@ RETURNING ID"""
         return await self.connection.execute(_query, fields)
 
     async def get_seqr_projects(self) -> list[dict[str, Any]]:
+        """
+        Get all projects with meta.is_seqr = true
+        """
         _query = """\
         SELECT id, name, dataset, meta FROM project
         WHERE json_extract(meta, '$.is_seqr') = true
@@ -395,4 +401,3 @@ RETURNING ID"""
             projects.append(r)
 
         return projects
-

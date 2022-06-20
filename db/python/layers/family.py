@@ -195,7 +195,7 @@ class PedRow:
                 )
                 raise Exception(
                     "There was an issue in the pedigree, either a parent wasn't "
-                    "found in the pedigree, or a circular dependency detected "
+                    'found in the pedigree, or a circular dependency detected '
                     "(eg: someone's child is an ancestor's parent). "
                     f"Can't resolve participants with parental IDs: {participant_ids}"
                 )

@@ -73,11 +73,7 @@ async def import_pedigree(
     }
 
 
-@router.get(
-    '/{project}/pedigree',
-    operation_id='getPedigree',
-    tags=['seqr']
-)
+@router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
     response_type: ContentType = ContentType.JSON,
@@ -147,7 +143,6 @@ async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
     connection: Connection = get_project_readonly_connection,
-
 ) -> List[Family]:
     """Get families for some project"""
     family_layer = FamilyLayer(connection)

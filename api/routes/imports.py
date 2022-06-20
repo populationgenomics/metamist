@@ -32,7 +32,7 @@ async def import_airtable_manifest(
 @router.post(
     '/{project}/individual-metadata-manifest',
     operation_id='importIndividualMetadataManifest',
-    tags=['seqr']
+    tags=['seqr'],
 )
 async def import_individual_metadata_manifest(
     file: UploadFile = File(...),
