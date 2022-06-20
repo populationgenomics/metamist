@@ -303,7 +303,7 @@ class GenericMetadataParser(GenericParser):
 
         filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
         fs = set(f.strip() for f in filenames if f and f.strip())
-        relevant_extensions = ('.cram', '.crai', '.fq.gz', '.fastq.gz', '.bam', '.bai')
+        relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
         def filename_filter(f):
             return any(f.endswith(ext) for ext in relevant_extensions)
