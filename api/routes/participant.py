@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Union
 
 import io
 import csv
@@ -6,7 +6,7 @@ from datetime import date
 
 from fastapi import APIRouter
 from fastapi.params import Query
-from starlette.responses import StreamingResponse
+from starlette.responses import StreamingResponse, JSONResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
@@ -14,6 +14,7 @@ from api.utils.db import (
     get_project_readonly_connection,
     Connection,
 )
+from api.utils.export import ExportType
 from api.utils.extensions import FileExtension
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -44,10 +45,11 @@ async def fill_in_missing_participants(
     '/{project}/individual-metadata-seqr/{export_type}',
     operation_id='getIndividualMetadataForSeqr',
     response_class=StreamingResponse,
+    tags=['seqr'],
 )
 async def get_individual_metadata_template_for_seqr(
     project: str,
-    export_type: FileExtension,
+    export_type: ExportType = ExportType.CSV.value,
     external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
@@ -56,14 +58,25 @@ async def get_individual_metadata_template_for_seqr(
     """Get individual metadata template for SEQR as a CSV"""
     participant_layer = ParticipantLayer(connection)
     assert connection.project
-    rows = await participant_layer.get_seqr_individual_template(
+    resp = await participant_layer.get_seqr_individual_template(
         project=connection.project,
         external_participant_ids=external_participant_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
     )
 
+    if export_type == ExportType.JSON:
+        return JSONResponse(resp)
+
+    json_rows = resp['rows']
+    headers = resp['headers']
+    col_header_map = resp['header_map']
+
     output = io.StringIO()
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
+    rows = [
+        [col_header_map[h] for h in headers],
+        *[[row[kh] for kh in headers] for row in json_rows],
+    ]
     writer.writerows(rows)
 
     basefn = f'{project}-{date.today().isoformat()}'
