@@ -303,15 +303,15 @@ class GenericMetadataParser(GenericParser):
 
         filenames: List[str] = sum(await asyncio.gather(*filename_promises), [])
         fs = set(f.strip() for f in filenames if f and f.strip())
-        relevant_extensions = ('.cram', '.fastq.gz', '.bam')
+        relevant_extensions = ('.cram', '.crai', '.fq.gz', '.fastq.gz', '.bam', '.bai')
 
         def filename_filter(f):
             return any(f.endswith(ext) for ext in relevant_extensions)
 
         relevant_mapped_files = set(filter(filename_filter, self.filename_map.keys()))
 
-        missing_files = fs - relevant_mapped_files
-        files_in_search_path_not_in_map = relevant_mapped_files - fs
+        missing_files = relevant_mapped_files - fs
+        files_in_search_path_not_in_map = fs - relevant_mapped_files
 
         errors = []
 

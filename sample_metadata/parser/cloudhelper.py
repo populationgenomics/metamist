@@ -2,7 +2,7 @@
 import os
 import logging
 
-from cloudpathlib import AnyPath
+from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
 
 
@@ -19,7 +19,8 @@ class CloudHelper:
 
         self.search_paths = search_paths or []
 
-        self.filename_map: dict[str, str] = self.populate_filename_map(self.search_paths)
+        self.filename_map: dict[str, str] = {}
+        self.populate_filename_map(self.search_paths)
         # pylint: disable
 
     @staticmethod
@@ -108,20 +109,20 @@ class CloudHelper:
         so let's prepopulate that filename_map from the search_locations!
         """
 
-        fn_map = {}
         for directory in search_locations:
             directory_list = self.list_directory(directory)
             for file in directory_list:
                 file = file.strip()
                 file_base = os.path.basename(file)
-                if file_base in fn_map:
+                if file_base in self.filename_map:
                     logging.warning(
-                        f'File "{file}" from "{directory}" already exists in directory map: {self.filename_map[file_base]}'
+                        f'File "{file}" from "{directory}" already exists in '
+                        f'directory map: {self.filename_map[file_base]}'
                     )
                     continue
-                fn_map[file_base] = file
+                self.filename_map[file_base] = file
 
-        return fn_map
+        return self.filename_map
 
     # GCS specific methods
     @property
@@ -155,7 +156,12 @@ class CloudHelper:
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:
 
-        bucket_name, remaining_path = gcs_path[5:].split('/', maxsplit=1)
-        bucket = self.get_gcs_bucket(bucket_name)
-        blobs = self.gcs_client.list_blobs(bucket, prefix=remaining_path, delimiter='/')
-        return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
+        path = GSPath(gcs_path)
+        if path.parts[2:]:
+            remaining_path = '/'.join(path.parts[2:]) + '/'  # has to end with "/"
+        else:
+            remaining_path = None
+        blobs = self.gcs_client.list_blobs(
+            path.bucket, prefix=remaining_path, delimiter='/'
+        )
+        return [f'gs://{path.bucket}/{blob.name}' for blob in blobs]
