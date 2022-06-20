@@ -83,7 +83,13 @@ def main(
                     SequenceUpsert(
                         status=SequenceStatus('uploaded'),
                         type=SequenceType(
-                            random.choice(['wgs', 'exome', 'single-cell'])
+                            random.choice(
+                                list(
+                                    next(
+                                        iter(SequenceType.allowed_values.values())
+                                    ).values()
+                                )
+                            )
                         ),
                         meta={
                             'facility': random.choice(

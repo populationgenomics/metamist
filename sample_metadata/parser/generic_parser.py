@@ -387,7 +387,7 @@ class GenericParser(
         rows: GroupedRow,
         external_sample_id: str,
         cpg_sample_id: Optional[str],
-        sequence_ids: Dict[Any, Any],
+        sequences: Dict[Any, Any],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -420,7 +420,7 @@ class GenericParser(
         # should we add or update sequencing
         if collapsed_sequencing_meta:
             for seq in collapsed_sequencing_meta:
-                sequence_id = sequence_ids.get(str(seq.sequence_type), None)
+                sequence_id = sequences.get(str(seq.sequence_type), None)
                 if isinstance(sequence_id, list):
                     if len(sequence_id) > 1:
                         raise ValueError(
@@ -502,7 +502,7 @@ class GenericParser(
                 rows=rows,
                 external_sample_id=sample_id,
                 cpg_sample_id=cpg_id,
-                sequence_ids=sequence_map.get(cpg_id, {}),
+                sequences=sequence_map.get(cpg_id, {}),
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -840,9 +840,23 @@ class GenericParser(
         # now we can start adding!!
 
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
-            proj, list(sample_map.keys()), allow_missing=True
+
+        external_to_internal_sample_id_map = (
+            await self.sapi.get_sample_id_map_by_external_async(
+                self.project, list(sample_map.keys()), allow_missing=True
+            )
         )
+
+        sequences = []
+        if external_to_internal_sample_id_map:
+            sequences = await self.seqapi.get_sequences_by_sample_ids_async(
+                list(external_to_internal_sample_id_map.values()),
+                get_latest_sequence_only=False,
+            )
+
+        sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
+        for seq in sequences:
+            sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
@@ -856,18 +870,14 @@ class GenericParser(
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(external_sids)}')
 
-            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
-                external_sids
-            )
-
             for external_sid in external_sids:
                 rows: GroupedRow = sample_map[external_sid]
-                cpg_id = existing_external_id_to_cpgid.get(external_sid, None)
+                cpg_id = external_to_internal_sample_id_map.get(external_sid)
                 promise = self.process_sample_group(
                     rows=rows,
                     external_sample_id=external_sid,
                     cpg_sample_id=cpg_id,
-                    sequence_ids=sequence_ids,
+                    sequences=sequence_map[cpg_id],
                 )
                 current_batch_promises[external_sid] = promise
 
