@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import FileResponse
 
 from db.python.connect import SMConnections
 from db.python.tables.project import is_full_access
@@ -17,11 +18,15 @@ from api.utils.exceptions import determine_code_from_error
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '4.10.0'
+_VERSION = '4.11.0'
 
 logger = get_logger()
 
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
+STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
+
+static_dir_exists = os.path.exists(STATIC_DIR)
+
 app = FastAPI()
 
 if is_full_access():
@@ -75,6 +80,17 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 
+@app.exception_handler(404)
+async def not_found(request, exc):
+    """
+    New version of FastAPI not fires this method for 404 errors
+    """
+    if static_dir_exists:
+        return FileResponse(STATIC_DIR + '/index.html')
+
+    return request, exc
+
+
 @app.exception_handler(Exception)
 async def exception_handler(_: Request, e: Exception):
     """Generic exception handler"""
@@ -105,10 +121,10 @@ for route in routes.__dict__.values():
         continue
     app.include_router(route, prefix='/api/v1')
 
-static_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
-if os.path.exists(static_dir):
+
+if static_dir_exists:
     # only allow static files if the static files are available
-    app.mount('/', SPAStaticFiles(directory=static_dir, html=True), name='static')
+    app.mount('/', SPAStaticFiles(directory=STATIC_DIR, html=True), name='static')
 
 app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 

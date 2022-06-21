@@ -8,6 +8,7 @@ import {
     Link
 } from "react-router-dom";
 import { ProjectSummary } from './project/ProjectSummary';
+import ProjectsAdmin from './admin/ProjectsAdmin';
 
 
 const Index = () => {
@@ -42,6 +43,8 @@ export const Routes = () => {
             />
 
             <Route path="project" element={<ProjectSummary />} />
+
+            <Route path="admin" element={<ProjectsAdmin />} />
 
             <Route
                 path="/"
