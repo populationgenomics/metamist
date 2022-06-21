@@ -1,7 +1,7 @@
 from typing import List, Dict, Tuple, Any, Optional
 
-from db.python.connect import DbBase, NotFoundError, to_db_json
-from db.python.utils import ProjectId
+from db.python.connect import DbBase, NotFoundError
+from db.python.utils import ProjectId, to_db_json
 
 
 class ParticipantTable(DbBase):

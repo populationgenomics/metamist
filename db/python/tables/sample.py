@@ -1,7 +1,8 @@
 import asyncio
 from typing import List, Dict, Tuple, Iterable, Set, Any
 
-from db.python.connect import DbBase, NotFoundError, to_db_json
+from db.python.connect import DbBase, NotFoundError
+from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import SampleType
 from models.models.sample import Sample, sample_id_format
