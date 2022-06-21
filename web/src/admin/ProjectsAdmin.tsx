@@ -7,7 +7,6 @@ const ProjectsAdmin = (props: any) => {
 
     const [projects, setProjects] = React.useState<ProjectRow[]>([]);
     const [error, setError] = React.useState<string | undefined>();
-    const [projectStateValue, setProjectMetaState] = React.useState<any>({})
 
     const getProjects = () => {
         setError(undefined)
