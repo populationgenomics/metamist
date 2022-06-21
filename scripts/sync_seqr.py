@@ -4,6 +4,7 @@ import os
 import re
 import json
 import datetime
+import logging
 from typing import Any
 
 import requests
@@ -11,6 +12,8 @@ from cloudpathlib import AnyPath
 from sample_metadata.model.export_type import ExportType
 
 from sample_metadata.apis import SeqrApi, ProjectApi
+
+logging.basicConfig(level=logging.DEBUG)
 
 MAP_LOCATION = 'gs://cpg-seqr-main/automation/'
 
@@ -43,7 +46,7 @@ papi = ProjectApi()
 
 def sync_dataset(dataset: str, seqr_guid: str):
     """
-    Syncronisation driver for a single dataset
+    Synchronisation driver for a single dataset
     """
     # sync people first
     token = get_token()
@@ -66,72 +69,91 @@ def sync_pedigree(dataset, project_guid, headers):
     2. Upload pedigree to seqr
     3. Confirm the upload
     """
-    pedigree_data = _get_pedigree_data_from_sm(dataset)
+
+    # 1. Get pedigree from SM
+    pedigree_data = _get_pedigree_csv_from_sm(dataset)
     if not pedigree_data:
-        return print(f'{dataset} :: Not updating pedigree because not data was found')
+        return logging.info(
+            f'{dataset} :: Not updating pedigree because not data was found'
+        )
 
+    # 2. Upload pedigree to seqr
+
+    # use a filename ending with .csv to signal to seqr it's comma-delimited
+    files = {'datafile': ('file.csv', pedigree_data)}
     req1_url = BASE + url_individuals_table_upload.format(projectGuid=project_guid)
-    resp_1 = requests.post(
-        req1_url, files={'datafile': ('file.csv', pedigree_data)}, headers=headers
-    )
-    print(f'Uploaded pedigree data with status: {resp_1.status_code}')
+    resp_1 = requests.post(req1_url, files=files, headers=headers)
+    logging.debug(f'Uploaded pedigree data with status: {resp_1.status_code}')
     if not resp_1.ok:
-        print(f'Request failed with information: {resp_1.text}')
+        logging.warning(f'{dataset} :: Uploading pedigree failed: {resp_1.text}')
     resp_1.raise_for_status()
-
     resp_1_json = resp_1.json()
     if not resp_1_json or 'uploadedFileId' not in resp_1_json:
         raise ValueError(f'Could not get uploadedFileId from {resp_1_json}')
-
     uploaded_file_id = resp_1_json['uploadedFileId']
 
+    # 3. Confirm the upload
     req2_url = BASE + url_individuals_table_confirm.format(
         projectGuid=project_guid, uploadedFileId=uploaded_file_id
     )
     resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
-
+    if not resp_1.ok:
+        logging.warning(f'{dataset} :: Confirming pedigree failed: {resp_1.text}')
     resp_2.raise_for_status()
 
-    print(f'{dataset} :: Uploaded pedigree')
+    logging.info(f'{dataset} :: Uploaded pedigree')
 
 
 def sync_families(dataset, project_guid: str, headers: dict[str, str]):
+    """
+    Synchronise families template from SM -> seqr in 3 steps:
 
-    print(f'{dataset} :: Uploading family template')
+        1. Get family from SM
+        2. Upload pedigree to seqr
+        3. Confirm the upload
+    """
+    logging.debug(f'{dataset} :: Uploading family template')
 
-    fam_rows = seqapi.get_families(project=dataset)
-    fam_row_headers = ['Family ID', 'Display Name', 'Description', 'Coded Phenotype']
-    formatted_fam_rows = [','.join(fam_row_headers)]
-    formatted_fam_rows.extend(
-        ','.join(
-            [
-                r['external_id'],
-                r['external_id'],
-                r['description'] or '',
-                r['coded_phenotype'] or '',
-            ]
-        )
-        for r in fam_rows
-    )
+    def _get_families_csv_from_sm(dataset: str):
 
-    family_data = '\n'.join(formatted_fam_rows)
+        fam_rows = seqapi.get_families(project=dataset)
+        fam_row_headers = [
+            'Family ID',
+            'Display Name',
+            'Description',
+            'Coded Phenotype',
+        ]
+        formatted_fam_rows = [','.join(fam_row_headers)]
+        keys = ['external_id', 'external_id', 'description', 'coded_phenotype']
+        formatted_fam_rows.extend([
+            ','.join(str(r[k] or '') for k in keys)
+            for r in fam_rows
+        ])
 
+        return '\n'.join(formatted_fam_rows)
+
+    # 1. Get family data from SM
+    family_data = _get_families_csv_from_sm(dataset)
+
+    # use a filename ending with .csv to signal to seqr it's comma-delimited
+    files = {'datafile': ('file.csv', family_data)}
     req1_url = BASE + url_family_table_upload.format(projectGuid=project_guid)
     resp_1 = requests.post(
-        req1_url, files={'datafile': ('file.csv', family_data)}, headers=headers
+        req1_url, files=files, headers=headers
     )
-    print(f'Uploaded new family template with status: {resp_1.status_code}')
+    logging.debug(f'{dataset} :: Uploaded new family template with status: {resp_1.status_code}')
     if not resp_1.ok:
-        print(f'Request failed with information: {resp_1.text}')
+        logging.warning(f'Request failed with information: {resp_1.text}')
     resp_1.raise_for_status()
-
     resp_1_json = resp_1.json()
+
+    # 3. Confirm uploaded file
 
     req2_url = BASE + url_family_table_confirm.format(projectGuid=project_guid)
     resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
 
     if not resp_2.ok:
-        print(f'Request failed with information: {resp_2.text}')
+        logging.warning(f'{dataset} :: Request failed with information: {resp_2.text}')
 
     resp_2.raise_for_status()
 
@@ -229,7 +251,7 @@ def update_es_index(dataset, project_guid, headers):
     resp_2.raise_for_status()
 
 
-def _get_pedigree_data_from_sm(dataset: str) -> str | None:
+def _get_pedigree_csv_from_sm(dataset: str) -> str | None:
     """Call get_pedigree and return formatted string with header"""
 
     ped_rows = seqapi.get_pedigree(project=dataset)
