@@ -76,7 +76,7 @@ class VcgsManifestParser(GenericMetadataParser):
 
     def __init__(
         self,
-        sample_metadata_project: str,
+        project: str,
         search_locations: List[str],
         default_sequence_type='wgs',
         default_sample_type='blood',
@@ -84,7 +84,7 @@ class VcgsManifestParser(GenericMetadataParser):
     ):
 
         super().__init__(
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             search_locations=search_locations,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
@@ -142,7 +142,7 @@ class VcgsManifestParser(GenericMetadataParser):
 
 @click.command(help='GCS path to manifest file')
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into (probably "seqr")',
 )
 @click.option('--default-sample-type', default='blood')
@@ -161,7 +161,7 @@ class VcgsManifestParser(GenericMetadataParser):
 @run_as_sync
 async def main(
     manifests,
-    sample_metadata_project,
+    project,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
@@ -173,7 +173,7 @@ async def main(
     parser = VcgsManifestParser(
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         search_locations=_search_locations,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )

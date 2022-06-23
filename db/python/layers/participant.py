@@ -1,6 +1,7 @@
 # pylint: disable=invalid-name
 from typing import Dict, List, Tuple, Optional, Any
 
+import re
 from collections import defaultdict
 from enum import Enum
 
@@ -18,8 +19,10 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import ProjectId
+from db.python.utils import ProjectId, split_generic_terms
 from models.models.participant import ParticipantModel
+
+HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
 
 class ParticipantUpdateModel(BaseModel):
@@ -85,9 +88,20 @@ class SeqrMetadataKeys(Enum):
         """Get specific parsers for individual fields"""
         return {
             SeqrMetadataKeys.AGE_OF_ONSET: SeqrMetadataKeys.parse_age_of_onset,
-            SeqrMetadataKeys.HPO_TERMS_ABSENT: SeqrMetadataKeys.parse_hpo_terms,
-            SeqrMetadataKeys.HPO_TERMS_PRESENT: SeqrMetadataKeys.parse_hpo_terms,
+            SeqrMetadataKeys.HPO_TERMS_ABSENT: lambda q: ','.join(
+                SeqrMetadataKeys.parse_hpo_terms(q)
+            ),
+            # this is handled manually
+            # SeqrMetadataKeys.HPO_TERMS_PRESENT: SeqrMetadataKeys.parse_hpo_terms,
         }
+
+    @staticmethod
+    def get_hpo_keys():
+        """Get list of columns where HPO present terms might be listed"""
+        return [
+            SeqrMetadataKeys.HPO_TERMS_PRESENT.value,
+            *[f'HPO Term {i}' for i in range(1, 21)],
+        ]
 
     @staticmethod
     def get_ordered_headers():
@@ -195,39 +209,52 @@ class SeqrMetadataKeys(Enum):
         )
 
     @staticmethod
-    def parse_hpo_terms(hpo_terms: str) -> Optional[str]:
+    def parse_hpo_terms(hpo_terms: str) -> List[str]:
         """
         Validate that comma-separated HPO terms must start with 'HP:'
 
         >>> SeqrMetadataKeys.parse_hpo_terms('')
-
+        []
         >>> SeqrMetadataKeys.parse_hpo_terms(',')
-
+        []
         >>> SeqrMetadataKeys.parse_hpo_terms(' ,')
-
+        []
         >>> SeqrMetadataKeys.parse_hpo_terms(' ')
-
-        >>> SeqrMetadataKeys.parse_hpo_terms(' HP12,  HP34 ')
-        'HP12,HP34'
+        []
+        >>> SeqrMetadataKeys.parse_hpo_terms('HP:0000504')
+        ['HP:0000504']
+        >>> SeqrMetadataKeys.parse_hpo_terms('HP:0003015 |Flared metaphysis|http://purl.obolibrary.org/obo/hp.fhir')
+        ['HP:0003015']
+        >>> SeqrMetadataKeys.parse_hpo_terms(' HP:12,  HP:34 ')
+        ['HP:12', 'HP:34']
         >>> SeqrMetadataKeys.parse_hpo_terms('Clinical,Failure')
         Traceback (most recent call last):
-        ValueError: HPO terms must start with "HP", found Clinical, Failure
+        ValueError: HPO terms must follow the format "HP\\:\\d+$": Clinical, Failure
         """
         if not hpo_terms or not hpo_terms.strip():
-            return None
-        terms = [t.strip() for t in hpo_terms.split(',') if t.strip()]
+            return []
+        terms = split_generic_terms(hpo_terms)
         if not terms:
-            return None
+            return []
+
+        def process_hpo_term(term):
+            if '|' in term:
+                return term.split('|', maxsplit=1)[0].strip()
+            return term
+
         # mfranklin (2021-09-06): There were no IDs that didn't start with HP
         # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
-        failing_terms = [term for term in terms if term and not term.startswith('HP')]
+        terms = list(map(process_hpo_term, terms))
+        terms = [t for t in terms if t]
+        failing_terms = [term for term in terms if not HPO_REGEX_MATCHER.match(term)]
         if failing_terms:
             raise ValueError(
-                'HPO terms must start with "HP", found ' + ', '.join(failing_terms)
+                f'HPO terms must follow the format "{HPO_REGEX_MATCHER.pattern}": '
+                + ', '.join(failing_terms)
             )
 
         # do this, because sometimes collaborators use ', ' instead of ','
-        return ','.join(terms)
+        return terms
 
 
 class ParticipantLayer(BaseLayer):
@@ -331,9 +358,9 @@ class ParticipantLayer(BaseLayer):
             participant_id_field_idx = lheaders_to_idx_map[
                 SeqrMetadataKeys.INDIVIDUAL_ID.value.lower()
             ]
-            family_id_field_indx = lheaders_to_idx_map[
+            family_id_field_indx = lheaders_to_idx_map.get(
                 SeqrMetadataKeys.FAMILY_ID.value.lower()
-            ]
+            )
             self._validate_individual_metadata_participant_ids(
                 rows=rows, participant_id_field_indx=participant_id_field_idx
             )
@@ -382,7 +409,7 @@ class ParticipantLayer(BaseLayer):
                     family_id_field_indx
                 ]
                 for row in rows
-                if row[family_id_field_indx]
+                if family_id_field_indx and row[family_id_field_indx]
             }
 
             external_family_ids = set(provided_pid_to_external_family.values())
@@ -467,11 +494,11 @@ class ParticipantLayer(BaseLayer):
         # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
         replace_with_family_external_ids=True,
-    ) -> List[List[str]]:
+    ) -> dict[str, Any]:
         """Get seqr individual level metadata template as List[List[str]]"""
 
         # avoid circular imports
-        # pylint: disable=import-outside-toplevel,cyclic-import
+        # pylint: disable=import-outside-toplevel,cyclic-import,too-many-locals
         from db.python.layers.family import FamilyLayer
 
         ppttable = ParticipantPhenotypeTable(self.connection)
@@ -513,7 +540,13 @@ class ParticipantLayer(BaseLayer):
 
         headers = [k.value for k in SeqrMetadataKeys.get_ordered_headers()]
         lheaders = [h.lower() for h in headers]
-        rows: List[List[str]] = [headers]
+        json_headers = [
+            h.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
+            for h in lheaders
+        ]
+        json_header_map = dict(zip(json_headers, headers))
+        lheader_to_json = dict(zip(lheaders, json_headers))
+        rows: List[Dict[str, str]] = []
         for pid, d in pid_to_features.items():
             d[SeqrMetadataKeys.INDIVIDUAL_ID.value] = internal_to_external_pid_map.get(
                 pid, str(pid)
@@ -523,9 +556,19 @@ class ParticipantLayer(BaseLayer):
                 fid, fid
             )
             ld = {k.lower(): v for k, v in d.items()}
-            rows.append([ld.get(h, '') for h in lheaders])
+            rows.append({lheader_to_json[h]: ld.get(h) for h in lheaders if ld.get(h)})
 
-        return rows
+        set_headers = set()
+        for row in rows:
+            set_headers.update(set(row.keys()))
+
+        rows = [{h: r.get(h) for h in set_headers if h in r} for r in rows]
+
+        return {
+            'rows': rows,
+            'headers': list(set_headers),
+            'header_map': json_header_map,
+        }
 
     async def get_id_map_by_external_ids(
         self,
@@ -581,6 +624,7 @@ class ParticipantLayer(BaseLayer):
             )
 
         recognised_keys = set(k.value.lower() for k in SeqrMetadataKeys)
+        recognised_keys |= set(k.lower() for k in SeqrMetadataKeys.get_hpo_keys())
         unrecognised_keys = [h for h in headers if h.lower() not in recognised_keys]
         if len(unrecognised_keys) > 0:
             unrecognised_keys_str = ', '.join(unrecognised_keys)
@@ -637,11 +681,21 @@ class ParticipantLayer(BaseLayer):
         insertable_rows: List[Tuple[int, str, Any]] = []
         parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
+        hpo_col_indices = [
+            lheaders_to_idx_map.get(h.lower())
+            for h in SeqrMetadataKeys.get_hpo_keys()
+            if h.lower() in lheaders_to_idx_map
+        ]
+
         for row in rows:
             external_participant_id = row[participant_id_field_idx]
             participant_id = pid_map[external_participant_id]
 
             for header_key, col_number in storeable_header_col_number_tuples:
+                if header_key == SeqrMetadataKeys.HPO_TERMS_PRESENT.value:
+                    continue
+                if col_number >= len(row):
+                    continue
                 value = row[col_number]
                 if header_key in parsers:
                     # use custom parse declared in SeqrMetadataKeys.get_key_parsers
@@ -649,6 +703,19 @@ class ParticipantLayer(BaseLayer):
 
                 if value:
                     insertable_rows.append((participant_id, header_key, value))
+
+            hpo_terms = []
+            for idx in hpo_col_indices:
+                hpo_terms.extend(SeqrMetadataKeys.parse_hpo_terms(row[idx]))
+
+            if hpo_terms:
+                insertable_rows.append(
+                    (
+                        participant_id,
+                        SeqrMetadataKeys.HPO_TERMS_PRESENT.value,
+                        ','.join(hpo_terms),
+                    )
+                )
 
         return insertable_rows
 

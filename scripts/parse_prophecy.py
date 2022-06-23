@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 """
 Parser for prophecy metadata.
 
@@ -57,18 +57,26 @@ class Columns:
         return {k: COLUMN_MAP[k] for k in fields}
 
 
+def fastq_file_name_to_sample_id(filename: str) -> str:
+    """
+    HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
+    -> 220208_FD02700641
+    """
+    return '_'.join(filename.split('_')[2:4])
+
+
 class ProphecyParser(GenericMetadataParser):
     """Parser for Prophecy manifests"""
 
     def __init__(
         self,
-        sample_metadata_project,
+        project,
         search_locations,
         batch_number,
     ):
 
         super().__init__(
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             search_locations=search_locations,
             sample_name_column=Columns.EXTERNAL_ID,
             participant_column=Columns.EXTERNAL_ID,
@@ -88,13 +96,6 @@ class ProphecyParser(GenericMetadataParser):
         reader = csv.DictReader(file_pointer, delimiter=delimiter)
         return reader
 
-    def fastq_file_name_to_sample_id(self, filename: str) -> str:
-        """
-        HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
-        -> 220208_FD02700641
-        """
-        return '_'.join(filename.split('_')[2:4])
-
     async def get_read_filenames(
         self, sample_id: Optional[str], row: SingleRow
     ) -> List[str]:
@@ -105,13 +106,13 @@ class ProphecyParser(GenericMetadataParser):
         return [
             path
             for filename, path in self.filename_map.items()
-            if self.fastq_file_name_to_sample_id(filename) == sample_id
+            if fastq_file_name_to_sample_id(filename) == row[Columns.SAMPLE_NAME]
         ]
 
 
 @click.command(help='GCS path to manifest file')
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
     default=PROJECT,
 )
@@ -125,7 +126,7 @@ class ProphecyParser(GenericMetadataParser):
 @run_as_sync
 async def main(
     manifests: List[str],
-    sample_metadata_project: str,
+    project: str,
     search_locations: List[str],
     batch_number: Optional[str],
     confirm=True,
@@ -134,7 +135,7 @@ async def main(
     """Run script from CLI arguments"""
 
     parser = ProphecyParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         search_locations=search_locations,
         batch_number=batch_number,
     )

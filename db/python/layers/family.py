@@ -88,12 +88,12 @@ class PedRow:
         if linking_id is None:
             return None
         if isinstance(linking_id, int):
-            linking_id = str(linking_id)
+            linking_id = str(linking_id).strip()
 
         if isinstance(linking_id, str):
-            if linking_id.lower() in blank_values:
+            if linking_id.strip().lower() in blank_values:
                 return None
-            return linking_id
+            return linking_id.strip()
 
         raise TypeError(
             f'Unexpected type {type(linking_id)} ({linking_id}) '
@@ -118,10 +118,13 @@ class PedRow:
             )
 
         sl = sex.lower()
-        if sl == 'm':
+        if sl in ('m', 'male'):
             return 1
-        if sl == 'f':
+        if sl in ('f', 'female'):
             return 2
+        if sl in ('u', 'unknown'):
+            return 0
+
         if sl == 'sex':
             raise ValueError(
                 f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
@@ -186,11 +189,15 @@ class PedRow:
             #   - Then raise an Exception
             # pylint: disable=chained-comparison
             if remaining_iterations_in_round <= 0 and len(rows_to_order) > 0:
-                participant_ids = ', '.join(r.individual_id for r in rows_to_order)
+                participant_ids = ', '.join(
+                    f'{r.individual_id} ({r.paternal_id} | {r.maternal_id})'
+                    for r in rows_to_order
+                )
                 raise Exception(
-                    "There was an issue in the pedigree, either a parent wasn't found in the pedigree, "
-                    "or a circular dependency detected (eg: someone's child is an ancestor's parent). "
-                    f"Can't resolve participants: {participant_ids}"
+                    "There was an issue in the pedigree, either a parent wasn't "
+                    'found in the pedigree, or a circular dependency detected '
+                    "(eg: someone's child is an ancestor's parent). "
+                    f"Can't resolve participants with parental IDs: {participant_ids}"
                 )
 
         return ordered

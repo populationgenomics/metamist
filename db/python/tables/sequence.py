@@ -2,7 +2,8 @@ from collections import defaultdict
 from itertools import groupby
 from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
 
-from db.python.connect import DbBase, to_db_json, NotFoundError
+from db.python.connect import DbBase, NotFoundError
+from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing

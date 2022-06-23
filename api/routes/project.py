@@ -13,7 +13,9 @@ router = APIRouter(prefix='/project', tags=['project'])
 async def get_all_projects(connection=get_projectless_db_connection):
     """Get list of projects"""
     ptable = ProjectPermissionsTable(connection.connection)
-    return await ptable.get_project_rows(author=connection.author)
+    return await ptable.get_project_rows(
+        author=connection.author, check_permissions=False
+    )
 
 
 @router.get('/', operation_id='getMyProjects', response_model=List[str])
@@ -55,3 +57,23 @@ async def create_project(
     )
 
     return pid
+
+
+@router.get('/seqr/all', operation_id='getSeqrProjects')
+async def get_seqr_projects(connection: Connection = get_projectless_db_connection):
+    """Get SM projects that should sync to seqr"""
+    ptable = ProjectPermissionsTable(connection.connection)
+    return await ptable.get_seqr_projects()
+
+
+@router.post('/{project}/update', operation_id='updateProject')
+async def update_project(
+    project: str,
+    project_update_model: dict,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Update a project by project name"""
+    ptable = ProjectPermissionsTable(connection.connection)
+    return await ptable.update_project(
+        project_name=project, update=project_update_model, author=connection.author
+    )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 from typing import List
 import logging
 
@@ -9,7 +9,7 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
 )
-
+from sample_metadata.parser.generic_parser import SequenceMetaGroup
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -39,7 +39,7 @@ class OntParser(GenericMetadataParser):
     def __init__(
         self,
         search_locations: List[str],
-        sample_metadata_project: str,
+        project: str,
         default_sequence_type='ont',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
@@ -54,7 +54,6 @@ class OntParser(GenericMetadataParser):
             Columns.FLOWCELL_ID: Columns.FLOWCELL_ID,
             Columns.MUX_TOTAL: Columns.MUX_TOTAL,
             Columns.BASECALLING: Columns.BASECALLING,
-            Columns.FAIL_FASTQ_FILENAME: 'failed_fastqs',
         }
 
         sequence_meta_map = {
@@ -63,7 +62,7 @@ class OntParser(GenericMetadataParser):
 
         super().__init__(
             search_locations=search_locations,
-            sample_metadata_project=sample_metadata_project,
+            project=project,
             participant_column=Columns.SAMPLE_ID,
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
@@ -76,6 +75,15 @@ class OntParser(GenericMetadataParser):
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
 
+    async def get_all_files_from_row(self, sample_id: str, row):
+        """Override get all files to include FAIL_FASTQ_FILENAME"""
+        fns = []
+        for r in row if isinstance(row, list) else [row]:
+            fns.extend(await self.get_read_filenames(sample_id, r))
+            fns.append(r[Columns.FAIL_FASTQ_FILENAME])
+
+        return fns
+
     @staticmethod
     def parse_fastqs_structure(fastqs) -> List[List[str]]:
         """
@@ -84,10 +92,44 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
+    async def get_sequence_meta(
+        self,
+        seq_group: SequenceMetaGroup,
+        sample_id: str | None = None,
+    ) -> SequenceMetaGroup:
+        """
+        Get sequence meta, override to include formed failed_fastqs
+        """
+        seq_group = await super().get_sequence_meta(seq_group, sample_id)
+
+        failed_fastqs: list[str] = []
+
+        for r in seq_group.rows:
+            parsed_failed_fastqs = await self.parse_files(
+                sample_id, r[Columns.FAIL_FASTQ_FILENAME]
+            )
+            if 'reads' not in parsed_failed_fastqs:
+                raise ValueError(
+                    f'Could not find "reads" key in parsed failed fastqs: {parsed_failed_fastqs}'
+                )
+            parsed_failed_fastq_reads = parsed_failed_fastqs['reads']
+            if (
+                len(parsed_failed_fastq_reads) != 1
+                or 'fastq' not in parsed_failed_fastq_reads
+            ):
+                raise ValueError(
+                    f'Failed to parse ONT failed fastqs, expected 1 key "fastq": {parsed_failed_fastq_reads}'
+                )
+            failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
+
+        seq_group.meta['failed_reads'] = failed_fastqs
+
+        return seq_group
+
 
 @click.command()
 @click.option(
-    '--sample-metadata-project',
+    '--project',
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
@@ -115,7 +157,7 @@ class OntParser(GenericMetadataParser):
 async def main(
     manifests,
     search_path: List[str],
-    sample_metadata_project,
+    project: str,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
@@ -131,7 +173,7 @@ async def main(
         search_path = list(set(search_path).union(set(extra_seach_paths)))
 
     parser = OntParser(
-        sample_metadata_project=sample_metadata_project,
+        project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

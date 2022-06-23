@@ -25,11 +25,12 @@ from typing import (
 )
 from functools import wraps
 
-from google.api_core.exceptions import Forbidden
-from google.cloud import storage
+from cloudpathlib import AnyPath
+
+from sample_metadata.parser.cloudhelper import CloudHelper
+
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
-from sample_metadata.model_utils import async_wrap
 from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi, ParticipantApi
 from sample_metadata.models import (
     ParticipantUpsert,
@@ -175,12 +176,19 @@ class SequenceMetaGroup:
         self.meta = meta
 
 
-def chunk(iterable: Sequence[T], chunk_size=50) -> Iterator[Sequence[T]]:
+def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     """
     Chunk a sequence by yielding lists of `chunk_size`
     """
-    for i in range(0, len(iterable), chunk_size):
-        yield iterable[i : i + chunk_size]
+    chnk: List[T] = []
+    for element in iterable:
+        chnk.append(element)
+        if len(chnk) >= chunk_size:
+            yield chnk
+            chnk = []
+
+    if chnk:
+        yield chnk
 
 
 def run_as_sync(f):
@@ -203,13 +211,16 @@ def run_as_sync(f):
     return wrapper
 
 
-class GenericParser:  # pylint: disable=too-many-public-methods,too-many-arguments
+class GenericParser(
+    CloudHelper
+):  # pylint: disable=too-many-public-methods,too-many-arguments
     """Parser for VCGS manifest"""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         path_prefix: Optional[str],
-        sample_metadata_project: str,
+        search_paths: list[str],
+        project: str,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
@@ -230,10 +241,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self.required_keys = required_keys
         self.ignore_extra_keys = ignore_extra_keys
 
-        if not sample_metadata_project:
+        if not project:
             raise ValueError('sample-metadata project is required')
 
-        self.sample_metadata_project = sample_metadata_project
+        self.project = project
 
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_status: str = default_sequence_status
@@ -248,24 +259,12 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self.bucket_clients: Dict[str, Any] = {}
 
         self.papi = ParticipantApi()
+        self.sapi = SampleApi()
         self.seqapi = SequenceApi()
 
-    @property
-    def client(self):
-        """Get GCP storage client"""
-        if not self._client:
-            self._client = storage.Client()
-        return self._client
+        super().__init__(search_paths)
 
-    def get_bucket(self, bucket_name):
-        """Get cached bucket client from optional bucket name"""
-        assert bucket_name
-        if bucket_name not in self.bucket_clients:
-            self.bucket_clients[bucket_name] = self.client.get_bucket(bucket_name)
-
-        return self.bucket_clients[bucket_name]
-
-    def file_path(self, filename: str) -> str:
+    def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
         """
         Get complete filepath of filename:
         - Includes gs://{bucket} if relevant
@@ -275,89 +274,15 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             return filename
 
         if not self.path_prefix:
-            raise FileNotFoundError(
-                f"Can't form full path to '{filename}' as no path_prefix was defined"
-            )
-
-        if self.client and not filename.startswith('/'):
-            assert self.default_bucket
-            return os.path.join(
-                'gs://',
-                self.default_bucket or '',
-                self.path_prefix or '',
-                filename or '',
-            )
+            fn = super().file_path(filename, raise_exception=raise_exception)
+            if not fn:
+                raise FileNotFoundError(
+                    f'Cannot form full path to "{filename}" as '
+                    'no path_prefix was defined'
+                )
+            return fn
 
         return os.path.join(self.path_prefix or '', filename)
-
-    @async_wrap
-    def get_blob(self, filename):
-        """Convenience function for getting blob from fully qualified GCS path"""
-        if not filename.startswith('gs://'):
-            raise ValueError('No blob available')
-
-        bucket_name, *components = filename[5:].split('/')
-        bucket = self.get_bucket(bucket_name)
-        path = '/'.join(components)
-
-        # the next few lines are equiv to `bucket.get_blob(path)`
-        # but without requiring storage.objects.get permission
-        blobs = list(self.client.list_blobs(bucket, prefix=path))
-        # first where r.name == path (or None)
-        return next((r for r in blobs if r.name == path), None)
-
-    def list_directory(self, directory_name) -> List[str]:
-        """List directory"""
-        path = self.file_path(directory_name)
-        if path.startswith('gs://'):
-            bucket_name, *components = directory_name[5:].split('/')
-            assert self.client
-            blobs = self.client.list_blobs(
-                bucket_name, prefix='/'.join(components), delimiter='/'
-            )
-            return [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
-
-        return [os.path.join(path, f) for f in os.listdir(path)]
-
-    async def file_contents(self, filename) -> Optional[str]:
-        """Get contents of file (decoded as utf8)"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(path)
-            try:
-                try:
-                    retval = blob.download_as_bytes()
-                except AttributeError:
-                    retval = blob.download_as_string()
-
-                if isinstance(retval, bytes):
-                    retval = retval.decode()
-                return retval
-            except Forbidden:
-                logger.warning(f"FORBIDDEN: Can't download {filename}")
-                return None
-
-        with open(filename, encoding='utf-8') as f:
-            return f.read()
-
-    async def file_exists(self, filename: str) -> bool:
-        """Determines whether a file exists"""
-        path = self.file_path(filename)
-
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob is not None
-
-        return os.path.exists(path)
-
-    async def file_size(self, filename):
-        """Get size of file in bytes"""
-        path = self.file_path(filename)
-        if path.startswith('gs://'):
-            blob = await self.get_blob(filename)
-            return blob.size
-
-        return os.path.getsize(path)
 
     @abstractmethod
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
@@ -462,7 +387,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         rows: GroupedRow,
         external_sample_id: str,
         cpg_sample_id: Optional[str],
-        sequence_ids: Dict[Any, Any],
+        sequences: Dict[Any, Any],
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -495,7 +420,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         # should we add or update sequencing
         if collapsed_sequencing_meta:
             for seq in collapsed_sequencing_meta:
-                sequence_id = sequence_ids.get(str(seq.sequence_type), None)
+                sequence_id = sequences.get(str(seq.sequence_type), None)
                 if isinstance(sequence_id, list):
                     if len(sequence_id) > 1:
                         raise ValueError(
@@ -547,9 +472,10 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
     async def process_participant_group(
         self,
         participant_name: str,
-        sample_map: Dict[str, Any],
+        sample_map,
+        external_to_internal_sample_id_map: Dict[str, Any],
         internal_pid: Optional[int],
-        sequence_ids: Dict[Any, Any] = None,
+        sequence_map: Dict[str, Dict[str, int]] = None,
     ):
         """
         ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
@@ -565,27 +491,18 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
 
         all_rows = [r for row in sample_map.values() for r in row]
 
-        # Get external sid to cpg map
-        existing_external_id_to_cpgid = (
-            await SampleApi().get_sample_id_map_by_external_async(
-                self.sample_metadata_project,
-                list(sample_map.keys()),
-                allow_missing=True,
-            )
-        )
-
         # Get all the samples and sequences to upsert first
         samples_to_upsert = []
         sequences_to_upsert = []
         analyses_to_add = []
 
         for sample_id, rows in sample_map.items():
-            cpg_id = existing_external_id_to_cpgid.get(sample_id, None)
+            cpg_id = external_to_internal_sample_id_map.get(sample_id, None)
             sample, seqs, analyses = await self.process_sample_group(
                 rows=rows,
                 external_sample_id=sample_id,
                 cpg_sample_id=cpg_id,
-                sequence_ids=sequence_ids,
+                sequences=sequence_map.get(cpg_id, {}),
             )
             samples_to_upsert.append(sample)
             sequences_to_upsert.extend(seqs)
@@ -760,7 +677,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
 
     async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
         """Given an analyses dictionary add analyses"""
-        proj = self.sample_metadata_project
+        proj = self.project
         analysisapi = AnalysisApi()
 
         logger.info(
@@ -794,7 +711,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on participant id and sample id"""
 
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
@@ -809,24 +726,41 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
                 logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
 
             # Construct participant to upsert
-            existing_participant_ids = self.papi.get_participant_id_map_by_external_ids(
-                self.sample_metadata_project, external_pids, allow_missing=True
+            existing_participant_ids = (
+                await self.papi.get_participant_id_map_by_external_ids_async(
+                    self.project, external_pids, allow_missing=True
+                )
             )
 
             sample_ids = list(
                 set(k for s in participant_map.values() for k in s.keys())
             )
-            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
-                sample_ids
+
+            external_to_internal_sample_id_map = (
+                await self.sapi.get_sample_id_map_by_external_async(
+                    self.project, sample_ids, allow_missing=True
+                )
             )
+
+            sequences = []
+            if external_to_internal_sample_id_map:
+                sequences = await self.seqapi.get_sequences_by_sample_ids_async(
+                    list(external_to_internal_sample_id_map.values()),
+                    get_latest_sequence_only=False,
+                )
+
+            sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
+            for seq in sequences:
+                sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
             for external_pid in external_pids:
                 sample_map = participant_map[external_pid]
                 promise = self.process_participant_group(
-                    external_pid,
-                    sample_map,
-                    existing_participant_ids.get(external_pid),
-                    sequence_ids=sequence_ids,
+                    participant_name=external_pid,
+                    sample_map=sample_map,
+                    internal_pid=existing_participant_ids.get(external_pid),
+                    sequence_map=sequence_map,
+                    external_to_internal_sample_id_map=external_to_internal_sample_id_map,
                 )
                 current_batch_promises[external_pid] = promise
 
@@ -859,17 +793,24 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
                     {external_pid: analysis_to_add},
                 )
 
+        sequences_count: Dict[str, int] = defaultdict(int)
+        for s in summary['sequences']['insert'] + summary['sequences']['update']:
+            sequences_count[str(s['type'])] += 1
+
+        str_seq_count = ', '.join(f'{k}={v}' for k, v in sequences_count.items())
         message = f"""\
-            {proj}: Processing participants: {', '.join(participant_map.keys())}
+    {proj}: Processing participants: {', '.join(participant_map.keys())}
 
-            Adding {len(summary['participants']['insert'])} participants
-            Adding {len(summary['samples']['insert'])} samples
-            Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(summary['analyses']['insert'])} analysis
+    Sequence types: {str_seq_count}
 
-            Updating {len(summary['participants']['update'])} participants
-            Updating {len(summary['samples']['update'])} samples
-            Updating {len(summary['sequences']['update'])} sequences
+    Adding {len(summary['participants']['insert'])} participants
+    Adding {len(summary['samples']['insert'])} samples
+    Adding {len(summary['sequences']['insert'])} sequences
+    Adding {len(summary['analyses']['insert'])} analysis
+
+    Updating {len(summary['participants']['update'])} participants
+    Updating {len(summary['samples']['update'])} samples
+    Updating {len(summary['sequences']['update'])} sequences
         """
 
         if dry_run:
@@ -894,15 +835,28 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
     ) -> Dict[str, Any]:
         """Parses a manifest of data that is keyed on sample id"""
-        proj = self.sample_metadata_project
+        proj = self.project
 
         # now we can start adding!!
-        sapi = SampleApi()
 
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
-            proj, list(sample_map.keys()), allow_missing=True
+
+        external_to_internal_sample_id_map = (
+            await self.sapi.get_sample_id_map_by_external_async(
+                self.project, list(sample_map.keys()), allow_missing=True
+            )
         )
+
+        sequences = []
+        if external_to_internal_sample_id_map:
+            sequences = await self.seqapi.get_sequences_by_sample_ids_async(
+                list(external_to_internal_sample_id_map.values()),
+                get_latest_sequence_only=False,
+            )
+
+        sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
+        for seq in sequences:
+            sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
         # all dicts indexed by external_sample_id
         summary: Dict[str, Dict[str, List[Any]]] = None
@@ -916,18 +870,14 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             if self.verbose:
                 logger.info(f'{proj}:Preparing {", ".join(external_sids)}')
 
-            sequence_ids = await self.seqapi.get_sequence_ids_from_sample_ids_async(
-                external_sids
-            )
-
             for external_sid in external_sids:
                 rows: GroupedRow = sample_map[external_sid]
-                cpg_id = existing_external_id_to_cpgid.get(external_sid, None)
+                cpg_id = external_to_internal_sample_id_map.get(external_sid)
                 promise = self.process_sample_group(
                     rows=rows,
                     external_sample_id=external_sid,
                     cpg_sample_id=cpg_id,
-                    sequence_ids=sequence_ids,
+                    sequences=sequence_map[cpg_id],
                 )
                 current_batch_promises[external_sid] = promise
 
@@ -983,13 +933,13 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             logger.info(message)
 
         # Batch update
-        result = sapi.batch_upsert_samples(
+        result = await self.sapi.batch_upsert_samples_async(
             proj, SampleBatchUpsertBody(samples=all_samples)
         )
 
         # Add analyses
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await sapi.get_sample_id_map_by_external_async(
+        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
             proj, list(sample_map.keys()), allow_missing=True
         )
         _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
@@ -997,13 +947,26 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         return result
 
     async def parse_files(
-        self, sample_id: str, reads: List[str]
+        self, sample_id: str, reads: List[str], checksums: List[str] = None
     ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
         """
         Returns a tuple of:
         1. single / list-of CWL file object(s), based on the extensions of the reads
         2. parsed type (fastq, cram, bam)
         """
+
+        if not isinstance(reads, list):
+            reads = [reads]
+
+        if not checksums:
+            checksums = [None] * len(reads)
+
+        if len(checksums) != len(reads):
+            raise ValueError(
+                'Expected length of reads to match length of provided checksums'
+            )
+
+        read_to_checksum = dict(zip(reads, checksums))
 
         file_by_type: Dict[SUPPORTED_FILE_TYPE, Dict[str, List]] = defaultdict(
             lambda: defaultdict(list)
@@ -1017,7 +980,8 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             fastq_files: List[Sequence[Union[Coroutine, BaseException]]] = []  # type: ignore
             for fastq_group in structured_fastqs:
                 create_file_futures: List[Coroutine] = [
-                    self.create_file_object(f) for f in fastq_group
+                    self.create_file_object(f, checksum=read_to_checksum.get(f))
+                    for f in fastq_group
                 ]
                 fastq_files.append(asyncio.gather(*create_file_futures))  # type: ignore
 
@@ -1162,17 +1126,19 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         self,
         filename: str,
         secondary_files: List[SingleRow] = None,
+        checksum: Optional[str] = None,
     ) -> SingleRow:
         """Takes filename, returns formed CWL dictionary"""
-        checksum = None
+        _checksum = checksum
         file_size = None
 
         if not self.skip_checking_gcs_objects:
-            md5_filename = self.file_path(filename + '.md5')
-            if await self.file_exists(md5_filename):
-                contents = await self.file_contents(md5_filename)
-                if contents:
-                    checksum = f'md5:{contents.strip()}'
+            if not _checksum:
+                md5_filename = self.file_path(filename + '.md5')
+                if await self.file_exists(md5_filename):
+                    contents = await self.file_contents(md5_filename)
+                    if contents:
+                        _checksum = f'md5:{contents.strip()}'
 
             file_size = await self.file_size(filename)
 
@@ -1180,7 +1146,7 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
             'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
-            'checksum': checksum,
+            'checksum': _checksum,
             'size': file_size,
         }
 
@@ -1222,6 +1188,16 @@ class GenericParser:  # pylint: disable=too-many-public-methods,too-many-argumen
         )
         if relevant_delimiter:
             return relevant_delimiter
+
+        # pylint: disable=no-member
+        with AnyPath(filename).open('r') as f:
+            first_line = f.readline()
+            delimiter = csv.Sniffer().sniff(first_line).delimiter
+            if delimiter:
+                logger.info(
+                    f'Guessing delimiter based on first line, got "{delimiter}"'
+                )
+                return delimiter
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
 

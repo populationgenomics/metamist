@@ -9,7 +9,6 @@ import logging
 import os
 from typing import Optional
 
-# import asyncio
 import databases
 
 from db.python.tables.project import ProjectPermissionsTable
@@ -28,12 +27,6 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
 ][::-1]
-
-
-def to_db_json(val):
-    """Convert val to json for DB"""
-    # return psycopg2.extras.Json(val)
-    return json.dumps(val)
 
 
 class Connection:
