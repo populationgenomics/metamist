@@ -66,7 +66,8 @@ async def update_sequence(
 
 
 @router.patch(
-    '/{sample_id}/{sequence_type}', operation_id='updateSequenceFromSampleAndType'
+    '/internal_id/{sample_id}/{sequence_type}',
+    operation_id='updateSequenceFromSampleAndType',
 )
 async def update_sequence_from_sample_and_type(
     sample_id: str,
@@ -89,7 +90,8 @@ async def update_sequence_from_sample_and_type(
 
 
 @router.patch(
-    '/{external_id}/{sequence_type}', operation_id='updateSequenceFromSampleAndType'
+    '/external_id/{external_id}/{sequence_type}',
+    operation_id='updateSequenceFromSampleAndType',
 )
 async def update_sequence_from_external_id_and_type(
     external_id: str,
