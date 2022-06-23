@@ -1,4 +1,4 @@
-# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument,too-many-arguments,unused-import
+# pylint: disable=R0904,too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments,unused-import
 import asyncio
 import re
 import shlex
@@ -104,7 +104,7 @@ class GenericMetadataParser(GenericParser):
         default_sample_type='blood',
         path_prefix: Optional[str] = None,
         allow_extra_files_in_search_path=False,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             path_prefix=path_prefix,
@@ -112,7 +112,7 @@ class GenericMetadataParser(GenericParser):
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
-            **kwargs
+            **kwargs,
         )
         self.search_locations = search_locations
         self.filename_map: Dict[str, str] = {}

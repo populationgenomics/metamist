@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 import logging
 import os
 import re

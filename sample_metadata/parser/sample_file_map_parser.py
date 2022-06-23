@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,no-self-use,wrong-import-order,unused-argument
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 from typing import List
 import logging
 
@@ -16,10 +16,16 @@ READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
 
 KeyMap = {
-    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id'],
+    PARTICIPANT_COL_NAME: [
+        'individual id',
+        'individual',
+        'individual_id',
+        'participant',
+        'participant-id',
+    ],
     SAMPLE_ID_COL_NAME: ['sample id', 'sample', 'sample id'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
-    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type']
+    SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
 }
 
 required_keys = [SAMPLE_ID_COL_NAME, READS_COL_NAME]
@@ -86,7 +92,7 @@ class SampleFileMapParser(GenericMetadataParser):
             sequence_meta_map={},
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
-            key_map=KeyMap
+            key_map=KeyMap,
         )
 
 
