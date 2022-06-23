@@ -134,7 +134,7 @@ class SampleSequencingTable(DbBase):
         """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
         if not result:
-            raise NotFoundError
+            raise NotFoundError(f'Sample with id = {sample_id} was not found.')
 
         return result['project'], result['id']
 
@@ -157,7 +157,9 @@ class SampleSequencingTable(DbBase):
             _query, {'sample_id': sample_id, 'stype': stype.value}
         )
         if not result:
-            raise NotFoundError
+            raise NotFoundError(
+                f'Could not find sequence for sample {sample_id} with sequence type {stype.value}'
+            )
 
         return result['project'], result['id']
 
