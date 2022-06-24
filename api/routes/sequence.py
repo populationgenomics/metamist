@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from api.utils.db import (
     Connection,
     get_projectless_db_connection,
+    get_project_write_connection,
 )
 from db.python.layers.sequence import (
     SequenceType,
@@ -66,21 +67,21 @@ async def update_sequence(
 
 
 @router.patch(
-    '/internal_id/{sample_id}/{sequence_type}',
+    '/internal_id/{cpg_sample_id}/{sequence_type}',
     operation_id='updateSequenceFromSampleAndType',
 )
 async def update_sequence_from_sample_and_type(
-    sample_id: str,
+    cpg_sample_id: str,
     sequence_type: SequenceType,
     sequence: SequenceUpdateModel,
     connection: Connection = get_projectless_db_connection,
 ):
     """Update the latest sequence by sample_id and sequence type"""
     sequence_layer = SampleSequenceLayer(connection)
-    sample_id_raw = sample_id_transform_to_raw(sample_id)
+    cpg_sample_id_raw = sample_id_transform_to_raw(cpg_sample_id)
 
     sequence_id = await sequence_layer.update_sequence_from_sample_and_type(
-        sample_id=sample_id_raw,
+        sample_id=cpg_sample_id_raw,
         sequence_type=sequence_type,
         status=sequence.status,
         meta=sequence.meta,
@@ -90,20 +91,20 @@ async def update_sequence_from_sample_and_type(
 
 
 @router.patch(
-    '/external_id/{external_id}/{sequence_type}',
+    '/external_sample_id/{external_sample_id}/{project}/{sequence_type}',
     operation_id='updateSequenceFromSampleAndType',
 )
 async def update_sequence_from_external_id_and_type(
-    external_id: str,
+    external_sample_id: str,
     sequence_type: SequenceType,
     sequence: SequenceUpdateModel,
-    connection: Connection = get_projectless_db_connection,
+    connection: Connection = get_project_write_connection,
 ):
     """Update the latest sequence by sample_id and sequence type"""
     sequence_layer = SampleSequenceLayer(connection)
 
     sequence_id = await sequence_layer.update_sequence_from_external_id_and_type(
-        external_id=external_id,
+        external_sample_id=external_sample_id,
         sequence_type=sequence_type,
         status=sequence.status,
         meta=sequence.meta,

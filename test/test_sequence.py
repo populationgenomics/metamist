@@ -35,14 +35,14 @@ class TestSequence(DbIsolatedTest):
             meta={'Testing': 'test_sequence'},
         )
 
-        sample_ids = await self.sl.get_sample_id_map_by_external_ids(
-            [self.external_sample_id], project=None
+        sample = await self.sl.get_single_by_external_id(
+            external_id=self.external_sample_id, project=None
         )
-        self.sample_id = sample_ids[self.external_sample_id]
+        self.cpg_id = sample.id
 
         # Create new sequence
-        _ = await self.seql.insert_sequencing(
-            self.sample_id,
+        await self.seql.insert_sequencing(
+            self.cpg_id,
             SequenceType(self.sequence_type),
             SequenceStatus(self.sequence_status),
             {},
@@ -61,7 +61,7 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from sample and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.sample_id)
+        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.cpg_id)
         sequence_id = latest[self.sequence_type][0]
         sequence = await self.seql.get_sequence_by_id(sequence_id)
 
@@ -82,7 +82,7 @@ class TestSequence(DbIsolatedTest):
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 1}
         await self.seql.update_sequence_from_sample_and_type(
-            sample_id=self.sample_id,
+            sample_id=self.cpg_id,
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(new_status),
             meta=meta,
@@ -122,7 +122,7 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from external id and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.sample_id)
+        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.cpg_id)
         sequence_id = latest[self.sequence_type][0]
         sequence = await self.seql.get_sequence_by_id(sequence_id)
 
@@ -143,7 +143,7 @@ class TestSequence(DbIsolatedTest):
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 1}
         await self.seql.update_sequence_from_external_id_and_type(
-            external_id=self.external_sample_id,
+            external_sample_id=self.external_sample_id,
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(new_status),
             meta=meta,

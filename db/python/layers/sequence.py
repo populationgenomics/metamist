@@ -312,18 +312,20 @@ class SampleSequenceLayer(BaseLayer):
         return sequence_id
 
     async def update_sequence_from_external_id_and_type(
-        self, external_id, sequence_type, status, meta
+        self, external_sample_id, sequence_type, status, meta
     ):
         """Update a sequence from the external_id and sequence_type"""
 
         # Convert the external_id to an internal sample_id
         sample_ids = await self.sampt.get_sample_id_map_by_external_ids(
-            [external_id], project=None
+            [external_sample_id], project=None
         )
         if not sample_ids:
-            raise ValueError(f'No sample found for external_id {external_id}')
+            raise ValueError(
+                f'No sample found for external_sample_id {external_sample_id}'
+            )
 
-        sample_id = sample_ids[external_id]
+        sample_id = sample_ids[external_sample_id]
 
         # Get sequence_id from sample_id and batch_id
         return await self.update_sequence_from_sample_and_type(
