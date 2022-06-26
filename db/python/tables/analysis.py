@@ -361,10 +361,10 @@ WHERE a.id = :analysis_id
 
     async def get_sample_cram_path_map_for_seqr(
         self, project: ProjectId
-    ) -> List[List[str]]:
+    ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
         _query = """
-SELECT p.external_id, a.output, s.id
+SELECT p.external_id as participant_id, a.output as output, s.id as sample_id
 FROM analysis a
 INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
@@ -378,10 +378,8 @@ ORDER BY a.timestamp_completed DESC
 """
 
         rows = await self.connection.fetch_all(_query, {'project': project})
-        # 1 per analysis
-        return [
-            list(list(g_rows)[0]) for _, g_rows in groupby(rows, lambda seq: seq['id'])
-        ]
+        # many per analysis
+        return [dict(d) for d in rows]
 
     async def get_analysis_runner_log(
         self, project_ids: List[int] = None

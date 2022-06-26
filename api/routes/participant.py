@@ -44,7 +44,6 @@ async def fill_in_missing_participants(
 @router.get(
     '/{project}/individual-metadata-seqr/{export_type}',
     operation_id='getIndividualMetadataForSeqr',
-    response_class=StreamingResponse,
     tags=['seqr'],
 )
 async def get_individual_metadata_template_for_seqr(
