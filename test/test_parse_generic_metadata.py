@@ -566,6 +566,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
             'file.cram': 'gs://path/file.cram',
+            'file2.cram': 'gs://path/file2.cram',
             'ref.fa': 'gs://path/ref.fa',
         }
 
