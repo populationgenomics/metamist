@@ -641,7 +641,7 @@ class GenericMetadataParser(GenericParser):
                 cram_reference = await self.create_file_object(
                     ref_fp, secondary_files=secondary_files
                 )
-                collapsed_sequence_meta['cram_reference'] = cram_reference
+                collapsed_sequence_meta['reference_assembly'] = cram_reference
 
         if variants:
             if 'gvcf' in variants:
