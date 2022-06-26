@@ -96,7 +96,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
-            '<sample-id>.g.vcf.gz\t<sample-id>.cram\t<sample-id>\tHK7NFCCXX.1\tILLUMINA\tKCCG\thg38\t0.01\t0.01\t400\t30',
+            '<sample-id>.g.vcf.gz\t<sample-id>.bam\t<sample-id>\tHK7NFCCXX.1\tILLUMINA\tKCCG\thg38\t0.01\t0.01\t400\t30',
         ]
         parser = GenericMetadataParser(
             search_locations=[],
@@ -123,7 +123,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         parser.filename_map = {
             '<sample-id>.g.vcf.gz': '/path/to/<sample-id>.g.vcf.gz',
-            '<sample-id>.cram': '/path/to/<sample-id>.cram',
+            '<sample-id>.bam': '/path/to/<sample-id>.bam',
         }
 
         file_contents = '\n'.join(rows)
@@ -151,14 +151,14 @@ class TestParseGenericMetadata(unittest.TestCase):
             },
             'reads': [
                 {
-                    'location': '/path/to/<sample-id>.cram',
-                    'basename': '<sample-id>.cram',
+                    'location': '/path/to/<sample-id>.bam',
+                    'basename': '<sample-id>.bam',
                     'class': 'File',
                     'checksum': None,
                     'size': 111,
                 }
             ],
-            'reads_type': 'cram',
+            'reads_type': 'bam',
             'gvcfs': [
                 {
                     'location': '/path/to/<sample-id>.g.vcf.gz',
@@ -399,3 +399,259 @@ class TestParseGenericMetadata(unittest.TestCase):
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
         return
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    async def test_cram_with_no_reference(
+        self,
+        mock_any_path,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
+    ):
+        """
+        Test importing a single row with a cram with no reference
+        This should throw an exception
+        """
+
+        mock_get_sequence_ids.return_value = {}
+        mock_get_sample_id.return_value = {}
+
+        mock_any_path.return_value.stat.return_value.st_size = 111
+        mock_any_path.return_value.exists.return_value = False
+
+        rows = [
+            'Sample ID\tFilename',
+            'sample_id003\tfile.cram',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project='devdev',
+        )
+
+        parser.filename_map = {'file.cram': 'gs://path/file.cram'}
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        with self.assertRaises(ValueError) as ctx:
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+        self.assertEqual(
+            'Reads type for "sample_id003" is CRAM, but a reference is not defined, please set the default reference assembly path',
+            str(ctx.exception),
+        )
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    async def test_cram_with_default_reference(
+        self,
+        mock_any_path,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
+    ):
+        """
+        Test importing a single row with a cram with no reference
+        This should throw an exception
+        """
+
+        mock_get_sequence_ids.return_value = {}
+        mock_get_sample_id.return_value = {}
+
+        mock_any_path.return_value.stat.return_value.st_size = 111
+        mock_any_path.return_value.exists.return_value = True
+
+        rows = [
+            'Sample ID\tFilename',
+            'sample_id003\tfile.cram',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project='devdev',
+            default_reference_assembly_location='gs://path/file.fasta',
+        )
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'file.cram': 'gs://path/file.cram',
+            'file.fasta': 'gs://path/file.fasta',
+            'file.fasta.fai': 'gs://path/file.fasta.fai',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        resp = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        expected = {
+            'location': 'gs://path/file.fasta',
+            'basename': 'file.fasta',
+            'class': 'File',
+            'checksum': None,
+            'size': None,
+            'secondaryFiles': [
+                {
+                    'location': 'gs://path/file.fasta.fai',
+                    'basename': 'file.fasta.fai',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': None,
+                }
+            ],
+        }
+
+        self.assertDictEqual(
+            expected,
+            resp['sequences']['insert'][0]['meta']['cram_reference'],
+        )
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    async def test_cram_with_row_level_reference(
+        self,
+        mock_any_path,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
+    ):
+        """
+        Test importing a single row with a cram with no reference
+        This should throw an exception
+        """
+
+        mock_get_sequence_ids.return_value = {}
+        mock_get_sample_id.return_value = {}
+
+        mock_any_path.return_value.exists.return_value = True
+
+        rows = [
+            'Sample ID\tFilename\tRef',
+            'sample_id003\tfile.cram\tref.fa',
+            'sample_id003\tfile2.cram\tref.fa',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project='devdev',
+            reference_assembly_location_column='Ref'
+            # default_reference_assembly_location='gs://path/file.fasta',
+        )
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'file.cram': 'gs://path/file.cram',
+            'ref.fa': 'gs://path/ref.fa',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        resp = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        expected = {
+            'location': 'gs://path/ref.fa',
+            'basename': 'ref.fa',
+            'class': 'File',
+            'checksum': None,
+            'size': None,
+            'secondaryFiles': [
+                {
+                    'location': 'gs://path/ref.fa.fai',
+                    'basename': 'ref.fa.fai',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': None,
+                }
+            ],
+        }
+
+        self.assertDictEqual(
+            expected,
+            resp['sequences']['insert'][0]['meta']['cram_reference'],
+        )
+
+    @run_test_as_sync
+    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    async def test_cram_with_multiple_row_level_references(
+        self,
+        mock_any_path,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
+    ):
+        """
+        Test importing a single row with a cram with no reference
+        This should throw an exception
+        """
+
+        mock_get_sequence_ids.return_value = {}
+        mock_get_sample_id.return_value = {}
+
+        mock_any_path.return_value.exists.return_value = True
+
+        rows = [
+            'Sample ID\tFilename\tRef',
+            'sample_id003\tfile.cram\tref.fa',
+            'sample_id003\tfile2.cram\tref2.fa',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            sequence_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project='devdev',
+            reference_assembly_location_column='Ref'
+            # default_reference_assembly_location='gs://path/file.fasta',
+        )
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'file.cram': 'gs://path/file.cram',
+            'file2.cram': 'gs://path/file.cram',
+            'ref.fa': 'gs://path/ref.fa',
+            'ref2.fa': 'gs://path/ref2.fa',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+
+        with self.assertRaises(ValueError) as ctx:
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+        self.assertEqual(
+            'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
+            str(ctx.exception),
+        )
