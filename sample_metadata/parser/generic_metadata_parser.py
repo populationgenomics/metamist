@@ -292,11 +292,6 @@ class GenericMetadataParser(GenericParser):
         """Get all files from row, to allow subparsers to include other files"""
         fns = await self.get_read_filenames(sample_id, row)
 
-        if self.reference_assembly_location_column and row.get(
-            self.reference_assembly_location_column
-        ):
-            fns.append(row.get(self.reference_assembly_location_column))
-
         return self.flatten_irregular_list(fns)
 
     async def check_files_covered_by_rows(
@@ -566,7 +561,7 @@ class GenericMetadataParser(GenericParser):
         read_filenames: List[str] = []
         gvcf_filenames: List[str] = []
         read_checksums: List[str] = []
-        reference_fastas: set[str] = set()
+        reference_assemblies: set[str] = set()
 
         for r in rows:
             _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
@@ -582,7 +577,7 @@ class GenericMetadataParser(GenericParser):
             if self.reference_assembly_location_column:
                 ref = r.get(self.reference_assembly_location_column)
                 if ref:
-                    reference_fastas.add(ref)
+                    reference_assemblies.add(ref)
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: List[str] = []
@@ -621,12 +616,14 @@ class GenericMetadataParser(GenericParser):
             collapsed_sequence_meta['reads'] = reads[reads_type]
 
             if reads_type == 'cram':
-                if len(reference_fastas) > 1:
+                if len(reference_assemblies) > 1:
+                    # sorted for consistent testing
+                    str_ref_assemblies = ', '.join(sorted(reference_assemblies))
                     raise ValueError(
-                        f'Multiple reference fastas were defined for {sample_id}: {reference_fastas}'
+                        f'Multiple reference assemblies were defined for {sample_id}: {str_ref_assemblies}'
                     )
-                if len(reference_fastas) == 1:
-                    ref = next(iter(reference_fastas))
+                if len(reference_assemblies) == 1:
+                    ref = next(iter(reference_assemblies))
                 else:
                     ref = self.default_reference_assembly_location
 
