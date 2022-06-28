@@ -49,11 +49,3 @@ class TestOntSampleSheetParser(unittest.TestCase):
         )
 
         self.assertEqual(4, len(analyses))
-
-    def test_fail(self):
-        """Failure test (to revert)"""
-
-        def _get_false():
-            return False
-
-        self.assertTrue(_get_false())
