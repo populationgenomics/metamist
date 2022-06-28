@@ -12,18 +12,12 @@ class TestOntSampleSheetParser(unittest.TestCase):
 
     @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('cpg_utils.hail_batch.get_config')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
-    async def test_single_row_all_files_exist(
-        self, mock_anypath, mock_get_config, mock_get_sample_id
-    ):
+    async def test_single_row_all_files_exist(self, mock_anypath, mock_get_sample_id):
         """
         Test processing one row with all files existing
         """
         mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
-        mock_get_config.return_value = {
-            'workflow': {'dataset': 'ONT-TEST', 'access_level': 'main'}
-        }
         mock_anypath.return_value.stat.return_value.st_size = 111
 
         rows = [
