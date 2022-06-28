@@ -13,9 +13,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
     @run_test_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
-    async def test_single_row_all_files_exist(
-        self, mock_anypath, mock_get_sample_id
-    ):
+    async def test_single_row_all_files_exist(self, mock_anypath, mock_get_sample_id):
         """
         Test processing one row with all files existing
         """
@@ -51,3 +49,11 @@ class TestOntSampleSheetParser(unittest.TestCase):
         )
 
         self.assertEqual(4, len(analyses))
+
+    def test_fail(self):
+        """Failure test (to revert)"""
+
+        def _get_false():
+            return False
+
+        self.assertTrue(_get_false())
