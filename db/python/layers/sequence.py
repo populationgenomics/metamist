@@ -188,7 +188,7 @@ class SampleSequenceLayer(BaseLayer):
 
     async def insert_sequencing(
         self,
-        sample_id,
+        sample_id: int,
         sequence_type: SequenceType,
         status: SequenceStatus,
         sequence_meta: Dict[str, Any] = None,
@@ -298,7 +298,11 @@ class SampleSequenceLayer(BaseLayer):
         return upserts
 
     async def update_sequence_from_sample_and_type(
-        self, sample_id, sequence_type, status, meta
+        self,
+        sample_id: int,
+        sequence_type: SequenceType,
+        status: SequenceStatus,
+        meta: dict,
     ):
         """Update a sequence from the sample_id and sequence_type"""
 

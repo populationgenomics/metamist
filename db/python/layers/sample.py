@@ -176,8 +176,8 @@ class SampleLayer(BaseLayer):
             active=active,
             meta=meta,
             participant_id=participant_id,
-            author=author,
-            project=project,
+            author=author or self.author,
+            project=project or self.connection.project,
         )
 
     async def update_sample(

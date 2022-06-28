@@ -1,6 +1,8 @@
 import random
 from test.testbase import DbIsolatedTest, run_test_as_sync
 
+from models.models.sample import sample_id_transform_to_raw
+
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer
@@ -38,11 +40,11 @@ class TestSequence(DbIsolatedTest):
         sample = await self.sl.get_single_by_external_id(
             external_id=self.external_sample_id, project=None
         )
-        self.cpg_id = sample.id
+        self.raw_cpg_id = sample_id_transform_to_raw(sample.id)
 
         # Create new sequence
         await self.seql.insert_sequencing(
-            self.cpg_id,
+            self.raw_cpg_id,
             SequenceType(self.sequence_type),
             SequenceStatus(self.sequence_status),
             {},
@@ -61,7 +63,7 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from sample and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.cpg_id)
+        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.raw_cpg_id)
         sequence_id = latest[self.sequence_type][0]
         sequence = await self.seql.get_sequence_by_id(sequence_id)
 
@@ -82,7 +84,7 @@ class TestSequence(DbIsolatedTest):
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 1}
         await self.seql.update_sequence_from_sample_and_type(
-            sample_id=self.cpg_id,
+            sample_id=self.raw_cpg_id,
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(new_status),
             meta=meta,
@@ -122,7 +124,7 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from external id and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.cpg_id)
+        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.raw_cpg_id)
         sequence_id = latest[self.sequence_type][0]
         sequence = await self.seql.get_sequence_by_id(sequence_id)
 
