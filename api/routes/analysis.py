@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
-from fastapi.params import Body
+from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -17,7 +17,7 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus
+from models.enums import AnalysisType, AnalysisStatus, SequenceType
 from models.models.analysis import Analysis
 from models.models.sample import (
     sample_id_transform_to_raw_list,
@@ -277,22 +277,14 @@ async def get_analysis_runner_log(
     return results
 
 
-# @router.get(
-#     '/{project}/sample-cram-path-map/tsv',
-#     operation_id='getSampleReadsMapForSeqr',
-#     tags=['seqr'],
-#     # response_class=StreamingResponse,
-# )
-# async def get_sample_reads_map_for_seqr(
-#     connection: Connection = get_project_readonly_connection,
-# ):
 @router.get(
     '/{project}/sample-cram-path-map',
-    operation_id='getSampleReadsMapForSeqr',
+    operation_id='getSamplesReadsMap',
+    tags=['seqr'],
 )
-async def get_sample_reads_map_for_seqr(
+async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    # sample_types: List[SampleType]=Query(...),
+    sequence_types: List[SequenceType] = Query(...),
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -307,7 +299,9 @@ async def get_sample_reads_map_for_seqr(
 
     at = AnalysisLayer(connection)
     assert connection.project
-    objs = await at.get_sample_cram_path_map_for_seqr(project=connection.project, sample_types=sample_types)
+    objs = await at.get_sample_cram_path_map_for_seqr(
+        project=connection.project, sequence_types=sequence_types
+    )
 
     if export_type == ExportType.JSON:
         return objs
@@ -324,5 +318,7 @@ async def get_sample_reads_map_for_seqr(
     return StreamingResponse(
         iter(output.getvalue()),
         media_type=export_type.get_mime_type(),
-        headers={'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'},
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
     )
