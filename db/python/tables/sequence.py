@@ -135,7 +135,7 @@ class SampleSequencingTable(DbBase):
         """
         result = await self.connection.fetch_one(_query, {'sample_id': sample_id})
         if not result:
-            raise NotFoundError
+            raise NotFoundError(f'Sample with id = {sample_id} was not found.')
 
         return result['project'], result['id']
 
@@ -150,19 +150,21 @@ class SampleSequencingTable(DbBase):
             FROM sample_sequencing sq
             INNER JOIN sample s ON sq.sample_id = s.id
             WHERE sample_id = :sample_id
-            AND type = :type
+            AND sq.type = :stype
             ORDER by sq.id DESC
             LIMIT 1
         """
         result = await self.connection.fetch_one(
-            _query, {'sample_id': sample_id, 'type': stype}
+            _query, {'sample_id': sample_id, 'stype': stype.value}
         )
         if not result:
-            raise NotFoundError
+            raise NotFoundError(
+                f'Could not find sequence for sample {sample_id} with sequence type {stype.value}'
+            )
 
         return result['project'], result['id']
 
-    async def get_all_sequence_id_for_sample_id(self, sample_id: int):
+    async def get_all_sequence_ids_for_sample_id(self, sample_id: int):
         """
         Get the sequence IDs from internal sample_id and sequence type
         Map them to be keyed on sequence type
@@ -323,7 +325,6 @@ class SampleSequencingTable(DbBase):
             updaters.append('status = :status')
             fields['status'] = status.value
         if meta is not None:
-
             updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
             fields['meta'] = to_db_json(meta)
 

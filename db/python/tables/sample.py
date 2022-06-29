@@ -260,9 +260,12 @@ class SampleTable(DbBase):
             'meta',
             'active',
             'type',
+            'project',
+            'author',
         ]
-        wheres = ['external_id = :eid', 'project = :project']
-        values = {'eid': external_id, 'project': project or self.project}
+        wheres = ['external_id = :external_id', 'project = :project']
+        proj = project or self.project
+        values = {'external_id': external_id, 'project': proj}
         if check_active:
             wheres.append('active')
 
@@ -277,10 +280,13 @@ class SampleTable(DbBase):
 
         if sample_row is None:
             raise NotFoundError(
-                f'Couldn\'t find active sample with external id {external_id}'
+                f'Couldn\'t find active sample with external id {external_id} in project {proj}'
             )
 
-        return Sample.from_db(dict(sample_row))
+        sample_row = dict(sample_row)
+        sample_row.update(values)
+
+        return Sample.from_db(sample_row)
 
     async def get_sample_id_map_by_external_ids(
         self,

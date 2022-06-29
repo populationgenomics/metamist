@@ -4,8 +4,6 @@ import logging
 from io import StringIO
 from collections import namedtuple
 
-from cpg_utils.hail_batch import dataset_path
-
 import click
 
 from sample_metadata.apis import SampleApi, AnalysisApi
@@ -183,7 +181,9 @@ class OntProductParser(CloudHelper):
             fn = row[preparer.fn_column]
             src = self.file_path(fn, raise_exception=False)
 
-            dest = os.path.join(dataset_path(preparer.output_path), fn)
+            output_bucket = f'gs://cpg-{self.project}-main/{preparer.output_path}'
+
+            dest = os.path.join(output_bucket, fn)
             if not src:
                 logging.info(
                     f'File for key "{preparer.fn_column}" at source "{src}" '
