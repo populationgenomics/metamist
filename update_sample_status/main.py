@@ -8,11 +8,63 @@ from flask import abort
 from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
+from sample_metadata.apis import SequenceApi
+from sample_metadata.models import SequenceType, SequenceUpdateModel, SequenceStatus
+from sample_metadata.exceptions import ForbiddenException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
 
 
-def update_sample_status(request):
+def update_airtable(project_config: dict, sample: str, status: str):
+    """Update sample status in AirTable"""
+    # Get the Airtable credentials.
+    base_key = project_config.get('baseKey')
+    table_name = project_config.get('tableName')
+    api_key = project_config.get('apiKey')
+    if not base_key or not table_name or not api_key:
+        return abort(500)
+
+    # Update the entry.
+    airtable = Airtable(base_key, table_name, api_key)
+    try:
+        response = airtable.update_by_field('Sample ID', sample, {'Status': status})
+    except HTTPError as err:  # Invalid status enum.
+        logging.error(err)
+        return abort(400)
+
+    if not response:  # Sample not found.
+        return abort(404)
+
+    return ('', 204)
+
+
+def update_sm(project, sample, status):
+    """Update the status of a sequence given it's corresponding
+    external sample id"""
+
+    seqapi = SequenceApi()
+    sequence_type = SequenceType('genome')
+
+    try:
+        sequence_model = SequenceUpdateModel(status=SequenceStatus(status))
+        seqapi.update_sequence_from_external_sample_and_type(
+            external_sample_id=sample,
+            sequence_type=sequence_type,
+            sequence_update_model=sequence_model,
+            project=project,
+        )
+    except ValueError as e:
+        logging.error(e)
+        return abort(400)
+
+    except ForbiddenException as e:
+        logging.error(e)
+        return abort(403)
+
+    return ('', 204)
+
+
+def update_sample_status(request):  # pylint: disable=R1710
     """Main entry point for the Cloud Function."""
 
     if request.method != 'PUT':
@@ -42,22 +94,6 @@ def update_sample_status(request):
     if not project_config:
         return abort(404)
 
-    # Get the Airtable credentials.
-    base_key = project_config.get('baseKey')
-    table_name = project_config.get('tableName')
-    api_key = project_config.get('apiKey')
-    if not base_key or not table_name or not api_key:
-        return abort(500)
+    # update_airtable(project_config, sample, status)
 
-    # Update the entry.
-    airtable = Airtable(base_key, table_name, api_key)
-    try:
-        response = airtable.update_by_field('Sample ID', sample, {'Status': status})
-    except HTTPError as err:  # Invalid status enum.
-        logging.error(err)
-        return abort(400)
-
-    if not response:  # Sample not found.
-        return abort(404)
-
-    return ('', 204)
+    update_sm(project, sample, status)
