@@ -3,10 +3,11 @@ from typing import Optional
 
 
 EXTENSION_TO_DELIM_MAP = {
-     '.csv': ',',
-     '.tsv': '\t',
-     '.ped': '\t',
+    '.csv': ',',
+    '.tsv': '\t',
+    '.ped': '\t',
 }
+
 
 def guess_delimiter_by_filename(filename: str, raise_exception=True) -> Optional[str]:
     """
@@ -27,7 +28,9 @@ def guess_delimiter_by_filename(filename: str, raise_exception=True) -> Optional
     return None
 
 
-def guess_delimiter_by_upload_file_obj(file, default_delimiter: Optional[str]=None, raise_exception: bool=True) -> Optional[str]:
+def guess_delimiter_by_upload_file_obj(
+    file, default_delimiter: Optional[str] = None, raise_exception: bool = True
+) -> Optional[str]:
     """
     Guess delimiter from uploaded file object, as a convenience, allow specifying
     a default_delimiter, and do transformations based on that (eg: un-escaping backslash)
@@ -35,7 +38,9 @@ def guess_delimiter_by_upload_file_obj(file, default_delimiter: Optional[str]=No
     if default_delimiter:
         return default_delimiter.replace('\\t', '\t')
 
-    filename_delimiter: str = guess_delimiter_by_filename(file.filename, raise_exception=False)
+    filename_delimiter: str = guess_delimiter_by_filename(
+        file.filename, raise_exception=False
+    )
 
     if filename_delimiter:
         return filename_delimiter
@@ -56,5 +61,3 @@ def guess_delimiter_by_upload_file_obj(file, default_delimiter: Optional[str]=No
         )
 
     return None
-
-

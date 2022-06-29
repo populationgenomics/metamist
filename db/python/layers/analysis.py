@@ -99,7 +99,9 @@ class AnalysisLayer(BaseLayer):
         self, project: ProjectId, sequence_types: list[SequenceType]
     ) -> List[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
-        return await self.at.get_sample_cram_path_map_for_seqr(project=project, sequence_types=sequence_types)
+        return await self.at.get_sample_cram_path_map_for_seqr(
+            project=project, sequence_types=sequence_types
+        )
 
     async def query_analysis(
         self,

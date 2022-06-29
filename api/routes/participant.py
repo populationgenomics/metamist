@@ -113,6 +113,7 @@ async def update_many_participant_external_ids(
     player = ParticipantLayer(connection)
     return await player.update_many_participant_external_ids(internal_to_external_id)
 
+
 @router.get(
     '/{project}/external-pid-to-internal-sample-id',
     operation_id='getExternalParticipantIdToInternalSampleIdExport',
@@ -120,7 +121,7 @@ async def update_many_participant_external_ids(
 )
 async def get_external_participant_id_to_internal_sample_id(
     project: str,
-    export_type: ExportType=ExportType.JSON,
+    export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):

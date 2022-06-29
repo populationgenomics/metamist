@@ -1,5 +1,4 @@
 from datetime import datetime
-from itertools import groupby
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
@@ -364,7 +363,7 @@ WHERE a.id = :analysis_id
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
-        values = {'project': project}
+        values: dict[str, Any] = {'project': project}
         seq_filter = ''
         if sequence_types:
             if len(sequence_types) == 1:

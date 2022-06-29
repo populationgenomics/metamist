@@ -98,7 +98,7 @@ async def get_pedigree(
     if export_type == ExportType.JSON:
         return pedigree_dicts
 
-    delim = '\t' if export_type == PedigreeExportType.TSV else ','
+    delim = '\t' if export_type == ExportType.TSV else ','
     output = io.StringIO()
     writer = csv.writer(output, delimiter=delim)
 
@@ -124,7 +124,9 @@ async def get_pedigree(
     return StreamingResponse(
         iter(output.getvalue()),
         media_type=export_type.get_mime_type(),
-        headers={'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'},
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
     )
 
 
