@@ -90,7 +90,7 @@ class SampleFileMapParser(GenericMetadataParser):
             sequence_meta_map={},
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
-            key_map=KeyMap
+            key_map=KeyMap,
         )
 
 

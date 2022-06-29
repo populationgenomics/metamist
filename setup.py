@@ -25,7 +25,7 @@ setup(
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
-    url=f'https://github.com/populationgenomics/{PKG}',
+    url=f'https://github.com/populationgenomics/sample-metadata',
     license='MIT',
     packages=all_packages,
     install_requires=[
