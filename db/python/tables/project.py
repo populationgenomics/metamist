@@ -293,7 +293,7 @@ class ProjectPermissionsTable:
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
-        _query = 'SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
+        _query = 'SELECT id, name, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
 
