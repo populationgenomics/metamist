@@ -92,7 +92,7 @@ async def update_sequence_from_sample_and_type(
 
 @router.patch(
     '/external_sample_id/{external_sample_id}/{project}/{sequence_type}',
-    operation_id='updateSequenceFromSampleAndType',
+    operation_id='updateSequenceFromExternalSampleAndType',
 )
 async def update_sequence_from_external_id_and_type(
     external_sample_id: str,
