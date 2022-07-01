@@ -149,9 +149,44 @@ class TestSequence(DbIsolatedTest):
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(new_status),
             meta=meta,
+            sample_type=SampleType('blood'),
         )
 
         # validate new status and meta
         sequence = await self.seql.get_sequence_by_id(sequence_id)
         self.assertEqual(new_status, sequence.status.value)
+        self.assertEqual(meta, sequence.meta)
+
+    @run_test_as_sync
+    async def test_new_sample_update_sequence_from_external_id_and_type(self):
+        """Test updating a sequence from external id and type, where
+        the sample does not already exist"""
+
+        # Set up new sample
+        external_sample_id = 'NEW_TEST123'
+
+        statuses = [
+            'received',
+            'sent-to-sequencing',
+            'completed-sequencing',
+            'completed-qc',
+            'failed-qc',
+            'uploaded',
+            'unknown',
+        ]
+        status = random.choice(statuses)
+
+        # Call new endpoint to update sequence status and meta
+        meta = {'batch': 2}
+        sequence_id = await self.seql.update_sequence_from_external_id_and_type(
+            external_sample_id=external_sample_id,
+            sequence_type=SequenceType(self.sequence_type),
+            status=SequenceStatus(status),
+            meta=meta,
+            sample_type=SampleType('blood'),
+        )
+
+        # validate new status and meta
+        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        self.assertEqual(status, sequence.status.value)
         self.assertEqual(meta, sequence.meta)
