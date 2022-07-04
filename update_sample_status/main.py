@@ -47,7 +47,7 @@ def update_sm(project, sample, status):
 
     try:
         sequence_model = SequenceUpdateModel(status=SequenceStatus(status))
-        seqapi.update_sequence_from_external_sample_and_type(
+        seqapi.upsert_sequence_from_external_sample_and_type(
             external_sample_id=sample,
             sequence_type=sequence_type,
             sequence_update_model=sequence_model,
@@ -69,12 +69,15 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     if request.method != 'PUT':
         return abort(405)
-
+    logging.info(f'Recieved request {request}')
     # Verify input parameters.
     request_json = request.get_json()
     project = request_json.get('project')
     sample = request_json.get('sample')
     status = request_json.get('status')
+    logging.info(
+        f'Input paramaters project={project}, sample={sample}. status={status}'
+    )
     if not project or not sample or not status:
         return abort(400)
 
