@@ -8,6 +8,7 @@ from google.cloud import storage
 
 class CloudHelper:
     """General CloudHelper for parsers"""
+
     LOCAL_PREFIX = '/'
     GCS_PREFIX = 'gs://'
     AZ_PREFIX = 'az://'
@@ -19,7 +20,9 @@ class CloudHelper:
 
         self.search_paths = search_paths or []
 
-        self.filename_map: dict[str, str] = self.populate_filename_map(self.search_paths)
+        self.filename_map: dict[str, str] = self.populate_filename_map(
+            self.search_paths
+        )
         # pylint: disable
 
     @staticmethod
@@ -89,7 +92,7 @@ class CloudHelper:
     async def file_contents(self, filename) -> str | None:
         """Get contents of file (decoded as utf8)"""
         path = self.file_path(filename)
-        with AnyPath(path).open() as f:
+        with AnyPath(path).open(encoding='utf-8-sig') as f:
             return f.read()
 
     async def file_exists(self, filename: str) -> bool:
@@ -100,9 +103,7 @@ class CloudHelper:
         """Get size of file in bytes"""
         return AnyPath(self.file_path(filename)).stat().st_size
 
-    def populate_filename_map(
-        self, search_locations: list[str]
-    ) -> dict[str, str]:
+    def populate_filename_map(self, search_locations: list[str]) -> dict[str, str]:
         """
         FileMapParser uses search locations based on the filename,
         so let's prepopulate that filename_map from the search_locations!

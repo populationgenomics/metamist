@@ -98,6 +98,8 @@ class GenericMetadataParser(GenericParser):
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
         batch_number: Optional[str] = None,
+        reference_assembly_location_column: Optional[str] = None,
+        default_reference_assembly_location: Optional[str] = None,
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
@@ -125,6 +127,9 @@ class GenericMetadataParser(GenericParser):
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
         self.seq_type_column = seq_type_column
+        self.reference_assembly_location_column = reference_assembly_location_column
+        self.default_reference_assembly_location = default_reference_assembly_location
+
         self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
         self.sequence_meta_map = sequence_meta_map or {}
@@ -286,6 +291,7 @@ class GenericMetadataParser(GenericParser):
     async def get_all_files_from_row(self, sample_id: str, row):
         """Get all files from row, to allow subparsers to include other files"""
         fns = await self.get_read_filenames(sample_id, row)
+
         return self.flatten_irregular_list(fns)
 
     async def check_files_covered_by_rows(
@@ -555,6 +561,7 @@ class GenericMetadataParser(GenericParser):
         read_filenames: List[str] = []
         gvcf_filenames: List[str] = []
         read_checksums: List[str] = []
+        reference_assemblies: set[str] = set()
 
         for r in rows:
             _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
@@ -566,6 +573,11 @@ class GenericMetadataParser(GenericParser):
                 read_checksums.extend(checksums)
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
+
+            if self.reference_assembly_location_column:
+                ref = r.get(self.reference_assembly_location_column)
+                if ref:
+                    reference_assemblies.add(ref)
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: List[str] = []
@@ -602,6 +614,34 @@ class GenericMetadataParser(GenericParser):
             reads_type = keys[0]
             collapsed_sequence_meta['reads_type'] = reads_type
             collapsed_sequence_meta['reads'] = reads[reads_type]
+
+            if reads_type == 'cram':
+                if len(reference_assemblies) > 1:
+                    # sorted for consistent testing
+                    str_ref_assemblies = ', '.join(sorted(reference_assemblies))
+                    raise ValueError(
+                        f'Multiple reference assemblies were defined for {sample_id}: {str_ref_assemblies}'
+                    )
+                if len(reference_assemblies) == 1:
+                    ref = next(iter(reference_assemblies))
+                else:
+                    ref = self.default_reference_assembly_location
+
+                if not ref:
+                    raise ValueError(
+                        f'Reads type for "{sample_id}" is CRAM, but a reference is not defined, please set the default reference assembly path'
+                    )
+
+                ref_fp = self.file_path(ref)
+                secondary_files = (
+                    await self.create_secondary_file_objects_by_potential_pattern(
+                        ref_fp, ['.fai']
+                    )
+                )
+                cram_reference = await self.create_file_object(
+                    ref_fp, secondary_files=secondary_files
+                )
+                collapsed_sequence_meta['reference_assembly'] = cram_reference
 
         if variants:
             if 'gvcf' in variants:
