@@ -120,7 +120,7 @@ class TestSequence(DbIsolatedTest):
             )
 
     @run_test_as_sync
-    async def test_update_sequence_from_external_id_and_type(self):
+    async def test_upsert_sequence_from_external_id_and_type(self):
         """Test updating a sequence from external id and type"""
 
         # Create a sample in this test database first, then grab
@@ -144,7 +144,7 @@ class TestSequence(DbIsolatedTest):
 
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 1}
-        await self.seql.update_sequence_from_external_id_and_type(
+        await self.seql.upsert_sequence_from_external_id_and_type(
             external_sample_id=self.external_sample_id,
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(new_status),
@@ -158,27 +158,18 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(meta, sequence.meta)
 
     @run_test_as_sync
-    async def test_new_sample_update_sequence_from_external_id_and_type(self):
+    async def test_new_sample_upsert_sequence_from_external_id_and_type(self):
         """Test updating a sequence from external id and type, where
         the sample does not already exist"""
 
         # Set up new sample
         external_sample_id = 'NEW_TEST123'
 
-        statuses = [
-            'received',
-            'sent-to-sequencing',
-            'completed-sequencing',
-            'completed-qc',
-            'failed-qc',
-            'uploaded',
-            'unknown',
-        ]
-        status = random.choice(statuses)
+        status = 'uploaded'
 
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 2}
-        sequence_id = await self.seql.update_sequence_from_external_id_and_type(
+        sequence_id = await self.seql.upsert_sequence_from_external_id_and_type(
             external_sample_id=external_sample_id,
             sequence_type=SequenceType(self.sequence_type),
             status=SequenceStatus(status),

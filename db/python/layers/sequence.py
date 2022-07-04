@@ -315,7 +315,7 @@ class SampleSequenceLayer(BaseLayer):
 
         return sequence_id
 
-    async def update_sequence_from_external_id_and_type(
+    async def upsert_sequence_from_external_id_and_type(
         self,
         external_sample_id,
         sequence_type,
