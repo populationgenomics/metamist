@@ -14,6 +14,8 @@ from db.python.layers.sequence import (
     SampleSequenceLayer,
     SequenceUpdateModel,
 )
+from models.enums import SampleType
+
 from models.models.sample import (
     sample_id_format,
     sample_id_transform_to_raw,
@@ -91,23 +93,25 @@ async def update_sequence_from_sample_and_type(
 
 
 @router.patch(
-    '/external_sample_id/{external_sample_id}/{project}/{sequence_type}',
-    operation_id='updateSequenceFromExternalSampleAndType',
+    '/external_sample_id/{project}/{external_sample_id}/{sequence_type}',
+    operation_id='upsertSequenceFromExternalSampleAndType',
 )
-async def update_sequence_from_external_id_and_type(
+async def upsert_sequence_from_external_id_and_type(
     external_sample_id: str,
     sequence_type: SequenceType,
     sequence: SequenceUpdateModel,
+    sample_type: SampleType = None,
     connection: Connection = get_project_write_connection,
 ):
     """Update the latest sequence by sample_id and sequence type"""
     sequence_layer = SampleSequenceLayer(connection)
 
-    sequence_id = await sequence_layer.update_sequence_from_external_id_and_type(
+    sequence_id = await sequence_layer.upsert_sequence_from_external_id_and_type(
         external_sample_id=external_sample_id,
         sequence_type=sequence_type,
         status=sequence.status,
         meta=sequence.meta,
+        sample_type=sample_type,
     )
 
     return sequence_id

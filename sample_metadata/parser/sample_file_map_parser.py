@@ -17,7 +17,15 @@ SEQ_TYPE_COL_NAME = 'type'
 CHECKSUM_COL_NAME = 'checksum'
 
 KeyMap = {
-    PARTICIPANT_COL_NAME: ['individual id', 'individual', 'individual_id', 'participant', 'participant-id', 'participant_id', 'participant id'],
+    PARTICIPANT_COL_NAME: [
+        'individual id',
+        'individual',
+        'individual_id',
+        'participant',
+        'participant-id',
+        'participant_id',
+        'participant id',
+    ],
     SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
@@ -74,6 +82,7 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sequence_type='genome',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
+        default_reference_assembly_location: str = None,
     ):
         super().__init__(
             search_locations=search_locations,
@@ -85,6 +94,7 @@ class SampleFileMapParser(GenericMetadataParser):
             seq_type_column=SEQ_TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            default_reference_assembly_location=default_reference_assembly_location,
             participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map={},
@@ -119,6 +129,14 @@ class SampleFileMapParser(GenericMetadataParser):
     help='By default, this parser will fail if there are crams, bams, fastqs '
     'in the search path that are not covered by the sample map.',
 )
+@click.option(
+    '--default-reference-assembly',
+    required=False,
+    help=(
+        'CRAMs require a reference assembly to realign. '
+        'This must be provided if any of the reads are crams'
+    ),
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -127,6 +145,7 @@ async def main(
     project,
     default_sample_type='blood',
     default_sequence_type='genome',
+    default_reference_assembly: str = None,
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
@@ -145,6 +164,7 @@ async def main(
         default_sequence_type=default_sequence_type,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
+        default_reference_assembly_location=default_reference_assembly,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
