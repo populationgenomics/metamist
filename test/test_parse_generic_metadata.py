@@ -521,7 +521,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['cram_reference'],
+            resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
     @run_test_as_sync
@@ -595,7 +595,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['cram_reference'],
+            resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
     @run_test_as_sync
