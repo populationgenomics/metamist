@@ -38,15 +38,18 @@ def update_airtable(project_config: dict, sample: str, status: str):
     return ('', 204)
 
 
-def update_sm(project, sample, status):
+def update_sm(project: str, sample: str, status: str, batch: dict = None):
     """Update the status of a sequence given it's corresponding
     external sample id"""
 
     seqapi = SequenceApi()
     sequence_type = SequenceType('genome')
 
+    if batch:
+        meta = {'batch': batch}
+
     try:
-        sequence_model = SequenceUpdateModel(status=SequenceStatus(status))
+        sequence_model = SequenceUpdateModel(status=SequenceStatus(status), meta=meta)
         seqapi.upsert_sequence_from_external_sample_and_type(
             external_sample_id=sample,
             sequence_type=sequence_type,
@@ -75,6 +78,7 @@ def update_sample_status(request):  # pylint: disable=R1710
     project = request_json.get('project')
     sample = request_json.get('sample')
     status = request_json.get('status')
+    batch = request_json.get('batch')
     logging.info(
         f'Input paramaters project={project}, sample={sample}. status={status}'
     )
@@ -99,4 +103,4 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     # update_airtable(project_config, sample, status)
 
-    update_sm(project, sample, status)
+    update_sm(project, sample, status, batch)
