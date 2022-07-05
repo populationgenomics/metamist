@@ -9,7 +9,12 @@ from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
 from sample_metadata.apis import SequenceApi
-from sample_metadata.models import SequenceType, SequenceUpdateModel, SequenceStatus
+from sample_metadata.models import (
+    SequenceType,
+    SequenceUpdateModel,
+    SequenceStatus,
+    SampleType,
+)
 from sample_metadata.exceptions import ForbiddenException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
@@ -44,6 +49,7 @@ def update_sm(project: str, sample: str, status: str, batch: dict = None):
 
     seqapi = SequenceApi()
     sequence_type = SequenceType('genome')
+    sample_type = SampleType('blood')
 
     if batch:
         meta = {'batch': batch}
@@ -55,6 +61,7 @@ def update_sm(project: str, sample: str, status: str, batch: dict = None):
             sequence_type=sequence_type,
             sequence_update_model=sequence_model,
             project=project,
+            sample_type=sample_type,
         )
     except ValueError as e:
         logging.error(e)
