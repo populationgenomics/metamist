@@ -24,16 +24,16 @@ through a service account key.
 
    ```json
    {
-       "project1": {
-           "baseKey": "baseasdf42",
-           "tableName": "Sample table",
-           "apiKey": "keyadjlas323"
-       },
-       "project2": {
-           "baseKey": "baseasdlj3",
-           "tableName": "Another table",
-           "apiKey": "keyajksdl231"
-       }
+     "project1": {
+       "baseKey": "baseasdf42",
+       "tableName": "Sample table",
+       "apiKey": "keyadjlas323"
+     },
+     "project2": {
+       "baseKey": "baseasdlj3",
+       "tableName": "Another table",
+       "apiKey": "keyajksdl231"
+     }
    }
    ```
 
@@ -59,10 +59,10 @@ Download a JSON key for the invoker service account. Then run:
 ```shell
 gcloud auth activate-service-account --key-file=invoker-service-account.json
 
-TOKEN=$(gcloud auth print-identity-token)
+TOKEN=$(gcloud auth print-identity-token --audiences https://$REGION-$PROJECT.cloudfunctions.net/update_sample_status )
 
 curl -X PUT https://$REGION-$PROJECT.cloudfunctions.net/update_sample_status \
-    -H "Authorization: bearer $TOKEN" \
+    -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type:application/json" \
     -d '{"project": "project1", "sample": "HG00123", "status": "Sequencing started"}'
 ```
