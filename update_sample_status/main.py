@@ -79,7 +79,6 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     if request.method != 'PUT':
         return abort(405)
-    logging.info(f'Recieved request {request}')
     # Verify input parameters.
     request_json = request.get_json()
     project = request_json.get('project')
