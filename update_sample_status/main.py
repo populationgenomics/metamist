@@ -86,13 +86,9 @@ def update_sample_status(request):  # pylint: disable=R1710
     sample = request_json.get('sample')
     status = request_json.get('status')
     batch = request_json.get('batch')
-    logging.info(
-        f'Input paramaters project={project}, sample={sample}. status={status}'
-    )
-    if not project or not sample or not status:
-        return abort(400)
 
-    logging.info(f'Processing request: {request_json}')
+    if not project or not sample or not status or not batch:
+        return abort(400)
 
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
