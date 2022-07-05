@@ -43,19 +43,19 @@ def update_airtable(project_config: dict, sample: str, status: str):
     return ('', 204)
 
 
-def update_sm(project: str, sample: str, status: str, batch: dict = None):
+def update_sm(project: str, sample: str, status: str, batch: str):
     """Update the status of a sequence given it's corresponding
     external sample id"""
 
     seqapi = SequenceApi()
     sequence_type = SequenceType('genome')
     sample_type = SampleType('blood')
-
-    if batch:
-        meta = {'batch': batch}
+    seq_meta = {'batch': batch}
 
     try:
-        sequence_model = SequenceUpdateModel(status=SequenceStatus(status), meta=meta)
+        sequence_model = SequenceUpdateModel(
+            status=SequenceStatus(status), meta=seq_meta
+        )
         seqapi.upsert_sequence_from_external_sample_and_type(
             external_sample_id=sample,
             sequence_type=sequence_type,
@@ -96,6 +96,7 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
+    assert gcp_project
     secret_name = (
         f'projects/{gcp_project}/secrets' '/update-sample-status-config/versions/latest'
     )
@@ -108,6 +109,8 @@ def update_sample_status(request):  # pylint: disable=R1710
     if not project_config:
         return abort(404)
 
-    # update_airtable(project_config, sample, status)
+    update_airtable(project_config, sample, status)
 
     update_sm(project, sample, status, batch)
+
+    return ('', 204)
