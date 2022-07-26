@@ -110,14 +110,20 @@ def validate_crams(sample_ids: list[str], project):
     return sample_ids
 
 
-# TODO: Clean this up, add some helpful messages.
 @click.command()
-@click.option('--clean-up-location')
-@click.option('--project')
+@click.option(
+    '--clean-up-location',
+    help='Cloud path to bucket where files will be deleted from e.g. "gs://cpg-bucket-upload"',
+)
+@click.option('--project', help='Metamist project, used to filter samples')
 @click.option('--external-sample-ids', default=None, multiple=True)
 @click.option('--internal-sample-ids', default=None, multiple=True)
-@click.option('--batch-filter', default=None)
-@click.option('--sequence-type', default=None)
+@click.option(
+    '--batch-filter',
+    default=None,
+    help='Batch name for filtering sequences. This will correspond to the field stored in sequence.meta.batch. e.g. BATCH001',
+)
+@click.option('--sequence-type', default=None, help='e.g. "genome"')
 @click.option('--force', is_flag=True, help='Do not confirm updates')
 def main(
     internal_sample_ids: list[str],
