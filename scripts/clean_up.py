@@ -118,6 +118,7 @@ def validate_crams(sample_ids: list[str], project):
 @click.option('--internal-sample-ids', default=None, multiple=True)
 @click.option('--batch-filter', default=None)
 @click.option('--sequence-type', default=None)
+@click.option('--force', is_flag=True, help='Do not confirm updates')
 def main(
     internal_sample_ids: list[str],
     clean_up_location,
@@ -125,6 +126,7 @@ def main(
     external_sample_ids,
     batch_filter,
     sequence_type,
+    force,
 ):
     """Clean up"""
     if internal_sample_ids == () and external_sample_ids == ():
@@ -153,6 +155,13 @@ def main(
         internal_sample_ids, sequence_type, batch_filter
     )
     sequence_ids = [seq['id'] for seq in sequences]
+
+    message = f'Deleting {len(sequences)} sequences: {sequences}'
+    if force:
+        print(message)
+    elif not click.confirm(message, default=False):
+        raise click.Abort()
+
     cleared_ids = clean_up_db_and_storage(sequences, clean_up_location)
 
     failed_ids = list(set(sequence_ids) - set(cleared_ids))
