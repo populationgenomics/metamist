@@ -21,6 +21,7 @@ coloredlogs.install()
 def clean_up_db_and_storage(
     sequences: list[dict],
     clean_up_location: str,
+    dry_run=True,
 ):
     """Deleting sequencing entires for specified sequences in metamist
     This will delete all of the reads for the latest sequence."""
@@ -62,14 +63,19 @@ def clean_up_db_and_storage(
                     continue
         # Clear reads metadata, including location, basename, class, checksum & size
         if delete_reads:
-            # Delete the reads meta from metamist & files from storage
-            clean_up_cloud_storage(current_read_locations)
-            sequence_update_model = SequenceUpdateModel(meta={'reads': []})
-            api_response = seqapi.update_sequence(sequence_id, sequence_update_model)
-            sequence_ids.append(int(api_response))
-            logging.info(
-                f'{int(api_response)}\'s reads metadata was cleared from metamist & cloud storage'
-            )
+            if dry_run:
+                logging.info(f'dry-run :: Would delete {current_read_locations}')
+            else:
+                # Delete the reads meta from metamist & files from storage
+                clean_up_cloud_storage(current_read_locations)
+                sequence_update_model = SequenceUpdateModel(meta={'reads': []})
+                api_response = seqapi.update_sequence(
+                    sequence_id, sequence_update_model
+                )
+                sequence_ids.append(int(api_response))
+                logging.info(
+                    f'{int(api_response)}\'s reads metadata was cleared from metamist & cloud storage'
+                )
 
     return sequence_ids
 
@@ -84,19 +90,23 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
 def get_sequences_from_sample(sample_ids: list[str], sequence_type, batch_filter):
     """Return latest sequence ids for sample ids"""
     sequences: list[dict] = []
-    all_sequences = seqapi.get_sequences_by_sample_ids(sample_ids)
+    all_sequences = seqapi.get_sequences_by_sample_ids(
+        sample_ids, get_latest_sequence_only=False
+    )
     for sequence in all_sequences:
-        if sequence_type == sequence.get('type'):
-            if batch_filter:
-                if sequence['meta'].get('batch') == batch_filter:
-                    sequences.append(sequence)
-            else:
+        if sequence_type != sequence.get('type'):
+            continue
+
+        if batch_filter:
+            if sequence['meta'].get('batch') == batch_filter:
                 sequences.append(sequence)
+        else:
+            sequences.append(sequence)
 
     return sequences
 
 
-def validate_crams(sample_ids: list[str], project):
+def validate_crams(sample_ids: list[str], project) -> list[str]:
     """Checks that crams exist for the sample. If not, it will not delete the fastqs"""
     samples_without_crams = aapi.get_all_sample_ids_without_analysis_type(
         AnalysisType('cram'), project
@@ -134,7 +144,7 @@ def main(
     force,
 ):
     """Performs validation then deletes fastqs from metamist and cloud storage"""
-    if internal_sample_ids == () and external_sample_ids == ():
+    if not internal_sample_ids and not external_sample_ids:
         if batch_filter is None:
             logging.error(f'Please specify either a batch filter or a set of IDs.')
             return
@@ -154,20 +164,21 @@ def main(
             internal_sample_ids = list(internal_sample_ids)
 
     # Validate CRAMs exist before deleting fastqs
-    internal_sample_ids = validate_crams(internal_sample_ids, project)
+    # only get sample IDs that can be removed (because they have crams)
+    internal_sample_ids_to_remove = validate_crams(internal_sample_ids, project)
 
     sequences = get_sequences_from_sample(
-        internal_sample_ids, sequence_type, batch_filter
+        internal_sample_ids_to_remove, sequence_type, batch_filter
     )
     sequence_ids = [seq['id'] for seq in sequences]
 
-    message = f'Deleting {len(sequences)} sequences: {sequences}'
+    message = f'Deleting {len(sequences)} sequences: {sequence_ids}'
     if force:
         print(message)
     elif not click.confirm(message, default=False):
         raise click.Abort()
 
-    cleared_ids = clean_up_db_and_storage(sequences, clean_up_location)
+    cleared_ids = clean_up_db_and_storage(sequences, clean_up_location, dry_run=True)
 
     failed_ids = list(set(sequence_ids) - set(cleared_ids))
     if len(failed_ids) != 0:
