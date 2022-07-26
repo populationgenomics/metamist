@@ -50,9 +50,8 @@ def clean_up_db_and_storage(
             for strand in read:
                 cloud_path = strand['location']
                 read_blob = CloudPath(cloud_path)
-                blob_location = read_blob.anchor + read_blob.drive
                 # Validates the file that we want to delete, is in the bucket specified.
-                if read_blob.exists() and blob_location == clean_up_location:
+                if read_blob.exists() and cloud_path.startswith(clean_up_location):
                     current_read_locations.append(read_blob)
                 else:
                     logging.error(
