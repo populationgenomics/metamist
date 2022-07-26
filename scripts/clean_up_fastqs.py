@@ -103,7 +103,7 @@ def validate_crams(sample_ids: list[str], project):
         AnalysisType('cram'), project
     )
 
-    if samples_without_crams is not None:
+    if samples_without_crams:
         sample_ids_without_crams = samples_without_crams['sample_ids']
         logging.warning(f'No crams found for {sample_ids_without_crams}, skipping.')
         sample_ids = list(set(sample_ids) - set(sample_ids_without_crams))
