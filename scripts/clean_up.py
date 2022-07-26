@@ -83,13 +83,18 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
         logging.info(f'{location.name} was deleted from cloud storage.')
 
 
-def get_sequences_from_sample(sample_ids: list[str], sequence_type):
+def get_sequences_from_sample(sample_ids: list[str], sequence_type, batch_filter):
     """Return latest sequence ids for sample ids"""
     sequences: list[dict] = []
     all_sequences = seqapi.get_sequences_by_sample_ids(sample_ids)
     for sequence in all_sequences:
         if sequence_type == sequence.get('type'):
-            sequences.append(sequence)
+            if batch_filter is not None:
+                if sequence['meta'].get('batch') == batch_filter:
+                    sequences.append(sequence)
+            else:
+                sequences.append(sequence)
+
     return sequences
 
 
@@ -99,34 +104,39 @@ def get_sequences_from_sample(sample_ids: list[str], sequence_type):
 @click.option('--project')
 @click.option('--external-sample-ids', default=None, multiple=True)
 @click.option('--internal-sample-ids', default=None, multiple=True)
+@click.option('--batch-filter', default=None)
+@click.option('--sequence-type', default=None)
 def main(
-    internal_sample_ids: list[str], clean_up_location, project, external_sample_ids
+    internal_sample_ids: list[str],
+    clean_up_location,
+    project,
+    external_sample_ids,
+    batch_filter,
+    sequence_type,
 ):
     """Clean up"""
-    # TODO: Can we take in a batch instead? Or something easier than specifying ID by ID?
-    external_sample_ids = list(external_sample_ids)
-    internal_sample_ids = list(internal_sample_ids)
+    if internal_sample_ids == () and external_sample_ids == ():
+        if batch_filter is None:
+            logging.error(f'Please specify either a batch filter or a set of IDs.')
+            return
 
-    # sequence_ids: List[str] = []
+        samples = sapi.get_samples(body_get_samples={'project_ids': [project]})
+        internal_sample_ids = [d['id'] for d in samples]
+    else:
+        if len(external_sample_ids) > 0:
+            # Get Sample Id Map By External
+            external_sample_ids = list(external_sample_ids)
+            sample_map = sapi.get_sample_id_map_by_external(
+                project, external_sample_ids, allow_missing=False
+            )
+            internal_sample_ids = list(sample_map.values())
 
-    if internal_sample_ids is None and external_sample_ids is None:
-        logging.error(
-            f'Please specify either internal or external-sample-ids to have fastqs deleted.'
-        )
-        return
+        if len(internal_sample_ids) > 0:
+            internal_sample_ids = list(internal_sample_ids)
 
-    if external_sample_ids:
-        # Get Sample Id Map By External
-        sample_map = sapi.get_sample_id_map_by_external(
-            project, external_sample_ids, allow_missing=False
-        )
-        internal_sample_ids = list(sample_map.values())
-        # TODO: Pull that sequence type into an arg
-        sequences = get_sequences_from_sample(internal_sample_ids, 'genome')
-    if internal_sample_ids:
-        # You need to return the sequence ids
-        sequences = get_sequences_from_sample(internal_sample_ids, 'genome')
-
+    sequences = get_sequences_from_sample(
+        internal_sample_ids, sequence_type, batch_filter
+    )
     sequence_ids = [seq['id'] for seq in sequences]
     # TODO: We should run a little bit of validation on the ids. I.E. Check that we have
     # CRAMS first before deleting fastq's.
