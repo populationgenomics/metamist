@@ -1,4 +1,4 @@
-""" This script cleans up the sequence data and metadata within GCS and Metamist """
+""" This script cleans up the fastq sequence data and metadata within GCS and Metamist """
 
 import logging
 import coloredlogs
@@ -7,13 +7,12 @@ import click
 from cloudpathlib import CloudPath
 from google.cloud import storage
 
-from sample_metadata.apis import SampleApi, SequenceApi
-from sample_metadata.models import (
-    SequenceUpdateModel,
-)
+from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
+from sample_metadata.models import SequenceUpdateModel, AnalysisType
 
 
 client = storage.Client()
+aapi = AnalysisApi()
 sapi = SampleApi()
 seqapi = SequenceApi()
 coloredlogs.install()
@@ -98,6 +97,19 @@ def get_sequences_from_sample(sample_ids: list[str], sequence_type, batch_filter
     return sequences
 
 
+def validate_crams(sample_ids: list[str], project):
+    """Checks that crams exist for the sample. If not, it will not delete the fastqs"""
+    samples_without_crams = aapi.get_all_sample_ids_without_analysis_type(
+        AnalysisType('cram'), project
+    )
+
+    if samples_without_crams is not None:
+        sample_ids_without_crams = samples_without_crams['sample_ids']
+        logging.warning(f'No crams found for {sample_ids_without_crams}, skipping.')
+        sample_ids = list(set(sample_ids) - set(sample_ids_without_crams))
+    return sample_ids
+
+
 # TODO: Clean this up, add some helpful messages.
 @click.command()
 @click.option('--clean-up-location')
@@ -134,12 +146,13 @@ def main(
         if len(internal_sample_ids) > 0:
             internal_sample_ids = list(internal_sample_ids)
 
+    # Validate CRAMs exist before deleting fastqs
+    internal_sample_ids = validate_crams(internal_sample_ids, project)
+
     sequences = get_sequences_from_sample(
         internal_sample_ids, sequence_type, batch_filter
     )
     sequence_ids = [seq['id'] for seq in sequences]
-    # TODO: We should run a little bit of validation on the ids. I.E. Check that we have
-    # CRAMS first before deleting fastq's.
     cleared_ids = clean_up_db_and_storage(sequences, clean_up_location)
 
     failed_ids = list(set(sequence_ids) - set(cleared_ids))
