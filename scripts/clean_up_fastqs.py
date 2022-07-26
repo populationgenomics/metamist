@@ -88,7 +88,7 @@ def get_sequences_from_sample(sample_ids: list[str], sequence_type, batch_filter
     all_sequences = seqapi.get_sequences_by_sample_ids(sample_ids)
     for sequence in all_sequences:
         if sequence_type == sequence.get('type'):
-            if batch_filter is not None:
+            if batch_filter:
                 if sequence['meta'].get('batch') == batch_filter:
                     sequences.append(sequence)
             else:
