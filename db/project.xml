@@ -234,7 +234,6 @@
 			<column
 				name="value"
 				type="JSON"
-				beforeColumn="author"
 			/>
 		</addColumn>
 
