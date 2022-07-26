@@ -21,7 +21,7 @@ coloredlogs.install()
 def clean_up_db_and_storage(
     sequences: list[dict],
     clean_up_location: str,
-    dry_run=True,
+    dry_run,
 ):
     """Deleting sequencing entires for specified sequences in metamist
     This will delete all of the reads for the latest sequence."""
@@ -134,6 +134,10 @@ def validate_crams(sample_ids: list[str], project) -> list[str]:
 )
 @click.option('--sequence-type', default=None, help='e.g. "genome"')
 @click.option('--force', is_flag=True, help='Do not confirm updates')
+@click.option(
+    '--dry-run',
+    is_flag=True,
+)
 def main(
     internal_sample_ids: list[str],
     clean_up_location,
@@ -142,6 +146,7 @@ def main(
     batch_filter,
     sequence_type,
     force,
+    dry_run,
 ):
     """Performs validation then deletes fastqs from metamist and cloud storage"""
     if not internal_sample_ids and not external_sample_ids:
@@ -178,7 +183,7 @@ def main(
     elif not click.confirm(message, default=False):
         raise click.Abort()
 
-    cleared_ids = clean_up_db_and_storage(sequences, clean_up_location, dry_run=True)
+    cleared_ids = clean_up_db_and_storage(sequences, clean_up_location, dry_run)
 
     failed_ids = list(set(sequence_ids) - set(cleared_ids))
     if len(failed_ids) != 0:
