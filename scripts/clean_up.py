@@ -19,20 +19,34 @@ seqapi = SequenceApi()
 coloredlogs.install()
 
 
-def clean_up_metamist(
-    sequence_ids_internal: list[str],
+def clean_up_db_and_storage(
+    sequences: list[dict],
     clean_up_location: str,
 ):
     """Deleting sequencing entires for specified sequences in metamist
     This will delete all of the reads for the latest sequence."""
-    all_locations: list[CloudPath] = []
     sequence_ids: list[int] = []
-    for sequence_id in sequence_ids_internal:
-        current_sequence = seqapi.get_sequence_by_id(sequence_id)
-        reads = current_sequence['meta']['reads']
+    for sequence in sequences:
+        reads = sequence['meta'].get('reads')
+        sequence_id = sequence.get('id')
         current_read_locations: list[CloudPath] = []
         # Skip delete operations if there are no reads for the given sequence
         delete_reads = bool(reads)
+        if not delete_reads:
+            logging.warning(f'No reads found for {sequence_id}. Skipping.')
+            continue
+
+        reads_type = sequence['meta'].get('reads_type')
+
+        if reads_type:
+            if reads_type != 'fastq':
+                # Currently not supporting mass deleting of crams
+                logging.warning(f'Reads type is not fastq, got {reads_type} instead.')
+                continue
+        else:
+            logging.warning(f'The reads_type was not set to fastq for {sequence_id}')
+            continue
+
         for read in reads:
             for strand in read:
                 cloud_path = strand['location']
@@ -50,16 +64,16 @@ def clean_up_metamist(
                     continue
         # Clear reads metadata, including location, basename, class, checksum & size
         if delete_reads:
-            # Delete the reads meta from metamist
-            all_locations.extend(current_read_locations)
+            # Delete the reads meta from metamist & files from storage
+            clean_up_cloud_storage(current_read_locations)
             sequence_update_model = SequenceUpdateModel(meta={'reads': []})
             api_response = seqapi.update_sequence(sequence_id, sequence_update_model)
             sequence_ids.append(int(api_response))
             logging.info(
-                f'{int(api_response)}\'s reads metadata was cleared from metamist'
+                f'{int(api_response)}\'s reads metadata was cleared from metamist & cloud storage'
             )
 
-    return sequence_ids, all_locations
+    return sequence_ids
 
 
 def clean_up_cloud_storage(locations: list[CloudPath]):
@@ -71,30 +85,33 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
 
 def get_sequences_from_sample(sample_ids: list[str], sequence_type):
     """Return latest sequence ids for sample ids"""
-    sequences: list[str] = []
-    # Get Sequence Ids From Sample Ids
-    sample_sequence_map = seqapi.get_all_sequences_by_sample_ids(sample_ids)
-    for sample in sample_sequence_map:
-        seq = sample_sequence_map[sample][sequence_type]
-        sequences.append(seq)
+    sequences: list[dict] = []
+    all_sequences = seqapi.get_sequences_by_sample_ids(sample_ids)
+    for sequence in all_sequences:
+        if sequence_type == sequence.get('type'):
+            sequences.append(sequence)
     return sequences
 
 
 # TODO: Clean this up, add some helpful messages.
 @click.command()
-@click.option('--sequence-ids', default=None, multiple=True)
 @click.option('--clean-up-location')
 @click.option('--project')
 @click.option('--external-sample-ids', default=None, multiple=True)
-def main(sequence_ids: list[str], clean_up_location, project, external_sample_ids):
+@click.option('--internal-sample-ids', default=None, multiple=True)
+def main(
+    internal_sample_ids: list[str], clean_up_location, project, external_sample_ids
+):
     """Clean up"""
     # TODO: Can we take in a batch instead? Or something easier than specifying ID by ID?
     external_sample_ids = list(external_sample_ids)
-    sequence_ids = list(sequence_ids)
+    internal_sample_ids = list(internal_sample_ids)
 
-    if sequence_ids is None and external_sample_ids is None:
+    # sequence_ids: List[str] = []
+
+    if internal_sample_ids is None and external_sample_ids is None:
         logging.error(
-            f'Please specify either sequence-ids or external-sample-ids to be deleted.'
+            f'Please specify either internal or external-sample-ids to have fastqs deleted.'
         )
         return
 
@@ -105,12 +122,15 @@ def main(sequence_ids: list[str], clean_up_location, project, external_sample_id
         )
         internal_sample_ids = list(sample_map.values())
         # TODO: Pull that sequence type into an arg
-        sequence_ids = get_sequences_from_sample(internal_sample_ids, 'genome')
+        sequences = get_sequences_from_sample(internal_sample_ids, 'genome')
+    if internal_sample_ids:
+        # You need to return the sequence ids
+        sequences = get_sequences_from_sample(internal_sample_ids, 'genome')
 
-    cleared_ids, locations_to_be_cleared = clean_up_metamist(
-        sequence_ids, clean_up_location
-    )
-    clean_up_cloud_storage(locations_to_be_cleared)
+    sequence_ids = [seq['id'] for seq in sequences]
+    # TODO: We should run a little bit of validation on the ids. I.E. Check that we have
+    # CRAMS first before deleting fastq's.
+    cleared_ids = clean_up_db_and_storage(sequences, clean_up_location)
 
     failed_ids = list(set(sequence_ids) - set(cleared_ids))
     if len(failed_ids) != 0:
