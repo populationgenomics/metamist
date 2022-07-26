@@ -134,7 +134,7 @@ def main(
     sequence_type,
     force,
 ):
-    """Clean up"""
+    """Performs validation then deletes fastqs from metamist and cloud storage"""
     if internal_sample_ids == () and external_sample_ids == ():
         if batch_filter is None:
             logging.error(f'Please specify either a batch filter or a set of IDs.')
