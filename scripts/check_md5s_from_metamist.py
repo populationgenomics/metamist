@@ -37,9 +37,8 @@ def validate_samples(cpg_sample_ids: list[str], datasets: list[str]):
         batch_name += f' ({", ".join(datasets)})'
 
     backend = hb.ServiceBackend(
-        billing_project='seqr',
+        billing_project=get_config()['hail']['billing_project'],
         remote_tmpdir=remote_tmpdir(),
-        token=os.environ.get('HAIL_TOKEN'),
     )
     b = hb.Batch(batch_name, backend=backend)
 
