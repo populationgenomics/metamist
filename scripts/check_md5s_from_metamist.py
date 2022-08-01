@@ -1,3 +1,5 @@
+from collections import namedtuple
+import math
 import os
 from shlex import quote
 
@@ -8,8 +10,14 @@ from cpg_utils.config import get_config
 
 from sample_metadata.apis import SampleApi, SequenceApi
 
+LocationTuple = namedtuple(
+    'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']
+)
 
-def validate_samples(cpg_sample_ids: list[str], datasets: list[str]):
+
+def validate_samples(
+    cpg_sample_ids: list[str], datasets: list[str], stream_files: bool
+):
     """Validate files from internal CPG sample IDs"""
 
     if cpg_sample_ids and datasets:
@@ -37,24 +45,28 @@ def validate_samples(cpg_sample_ids: list[str], datasets: list[str]):
         batch_name += f' ({", ".join(datasets)})'
 
     backend = hb.ServiceBackend(
-        billing_project=get_config()['hail']['billing_project'],
+        billing_project='seqr',
         remote_tmpdir=remote_tmpdir(),
+        token=os.environ.get('HAIL_TOKEN'),
     )
     b = hb.Batch(batch_name, backend=backend)
 
     triples = get_file_path_md5_pairs_from_samples(cpg_sample_ids=cpg_sample_ids)
 
-    for cpg_sample_id, filename, md5 in triples:
-        job = b.new_job(f'validate_{cpg_sample_id}_{os.path.basename(filename)}')
+    for obj in triples:
+        job = b.new_job(
+            f'validate_{obj.cpg_sample_id}_{os.path.basename(obj.location)}'
+        )
         job.image(driver_image)
-        validate_md5(job, filename, md5)
+
+        validate_md5(b, job, obj, stream_file=stream_files)
 
     b.run(wait=False)
 
 
 def get_file_path_md5_pairs_from_samples(
     cpg_sample_ids: list[str],
-) -> list[tuple[str, str, str]]:
+) -> list[LocationTuple]:
     """
     From a list of cpg_sample_ids, grab its sequences and determin
     a list of:
@@ -72,15 +84,15 @@ def get_file_path_md5_pairs_from_samples(
         if not reads:
             continue
 
-        pairs.extend(get_location_md5_pairs_from_file_obj(seq['sample_id'], reads))
+        pairs.extend(get_location_info_tuples(seq['sample_id'], reads))
 
     return pairs
 
 
-def get_location_md5_pairs_from_file_obj(
+def get_location_info_tuples(
     cpg_sample_id: str,
     file_obj: list[dict] | dict,
-) -> list[tuple[str, str, str]]:
+) -> list[LocationTuple]:
     """
     Get the tuples of (cpg_id, filename, md5)
     from a file object (or list of file objects).
@@ -88,28 +100,47 @@ def get_location_md5_pairs_from_file_obj(
     if isinstance(file_obj, list):
         pairs = []
         for o in file_obj:
-            pairs.extend(get_location_md5_pairs_from_file_obj(cpg_sample_id, o))
+            pairs.extend(get_location_info_tuples(cpg_sample_id, o))
         return pairs
 
     if 'checksum' not in file_obj:
         return []
 
-    return [(cpg_sample_id, file_obj['location'], file_obj['checksum'])]
+    return [
+        LocationTuple(
+            cpg_sample_id, file_obj['location'], file_obj['checksum'], file_obj['size']
+        )
+    ]
 
 
-def validate_md5(job: hb.batch.job, file, md5) -> hb.batch.job:
+def validate_md5(
+    batch: hb.Batch, job: hb.batch.job, obj: LocationTuple, stream_file
+) -> hb.batch.job:
     """
     This adds the command to perform a md5 checksum on a file
     and compare to its expected md5 - failing if they are not a match.
     """
 
     # Calculate md5 checksum.
-    job.env('GOOGLE_APPLICATION_CREDENTIALS', '/gsa-key/key.json')
+    job.command('set -euxo pipefail')
+
+    if stream_file:
+        job.env('GOOGLE_APPLICATION_CREDENTIALS', '/gsa-key/key.json')
+        job.command(
+            'gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS'
+        )
+        file_contents_command = f'gsutil cat {quote(obj.location)}'
+    else:
+        # hail batch file
+
+        file_contents_command = f'cat {batch.read_input(obj.location)}'
+        size_in_gb = math.ceil(1.2 * obj.size / 2**30)
+        job.storage(f'{size_in_gb}Gi')
+
     job.command(
         f"""\
-gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-gsutil cat {quote(file)} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
-diff <(cat /tmp/uploaded.md5) <(echo {quote(md5)} | cut -d " " -f1)
+{file_contents_command} | md5sum | cut -d " " -f1 > /tmp/uploaded.md5
+diff /tmp/uploaded.md5 <(echo {quote(obj.checksum)} | cut -d " " -f1)
     """
     )
 
@@ -118,10 +149,17 @@ diff <(cat /tmp/uploaded.md5) <(echo {quote(md5)} | cut -d " " -f1)
 
 @click.command()
 @click.option('--dataset', multiple=True, help='Only specify cpg_sample_ids OR dataset')
+@click.option(
+    '--copy-files',
+    is_flag=True,
+    help='Load files to disk before calculating MD5 sums, might reduce some transient copy errors',
+)
 @click.argument('cpg_sample_ids', nargs=-1)
-def main(cpg_sample_ids: list[str], dataset: list[str]):
+def main(cpg_sample_ids: list[str], dataset: list[str], copy_files: bool = False):
     """Main from CLI"""
-    validate_samples(cpg_sample_ids=cpg_sample_ids, datasets=dataset)
+    validate_samples(
+        cpg_sample_ids=cpg_sample_ids, datasets=dataset, stream_files=not copy_files
+    )
 
 
 if __name__ == '__main__':
