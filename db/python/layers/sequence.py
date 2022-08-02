@@ -357,3 +357,33 @@ class SampleSequenceLayer(BaseLayer):
         return await self.update_sequence_from_sample_and_type(
             internal_sample_id, sequence_type, status, meta
         )
+
+    async def get_sequences_by(
+        self,
+        sample_ids: List[int] = None,
+        sequence_ids: List[int] = None,
+        seq_meta: Dict[str, Any] = None,
+        project_ids=None,
+        types: List[str] = None,
+        statuses: List[str] = None,
+        active=True,
+        latest: bool = False,
+    ):
+        """Get sequences by some criteria"""
+        if not sample_ids and not sequence_ids and not project_ids:
+            raise ValueError(
+                'Must specify one of "project_ids", "sample_ids" or "sequence_ids"'
+            )
+
+        output = await self.seqt.get_sequences_by(
+            sample_ids=sample_ids,
+            seq_meta=seq_meta,
+            sequence_ids=sequence_ids,
+            project_ids=project_ids,
+            active=active,
+            types=types,
+            statuses=statuses,
+            latest=latest,
+        )
+
+        return output
