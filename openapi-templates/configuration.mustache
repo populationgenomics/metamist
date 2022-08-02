@@ -602,6 +602,7 @@ def _get_google_auth_token(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.
 
     # try to see if we're on a VM
     google_identity_message = ''
+    # use "format=full" here to ensure email is included in the response, by default it is not!
     gurl = f'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?format=full&audience={url}'
     try:
         r = urllib3.PoolManager().request(
