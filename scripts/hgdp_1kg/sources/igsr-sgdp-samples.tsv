@@ -1,0 +1,277 @@
+Sample name	Sex	Biosample ID	Population code	Population name	Superpopulation code	Superpopulation name	Population elastic ID	Data collections
+HG00360	male	SAME124539	FIN	Finnish,Finnish	EUR	European Ancestry,West Eurasia (SGDP)	FIN,FinnishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release,Geuvadis
+HG00174	female	SAME124958	FIN	Finnish,Finnish	EUR	European Ancestry,West Eurasia (SGDP)	FIN,FinnishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release,Geuvadis
+HG01503	male	SAME124944	IBS	Iberian,Spanish	EUR	European Ancestry,West Eurasia (SGDP)	IBS,SpanishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG02783	male	SAME1839162	PJL	Punjabi,Punjabi	SAS	South Asia (SGDP),South Asian Ancestry	PunjabiSGDP,PJL	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG02790	female	SAME1840345	PJL	Punjabi,Punjabi	SAS	South Asia (SGDP),South Asian Ancestry	PunjabiSGDP,PJL	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG02574	female	SAME1839652	GWD	Gambian Mandinka,Gambian	AFR	African Ancestry,Africa (SGDP)	GWD,GambianSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,Gambian Genome Variation Project (GRCh38)
+HG02943	female	SAME1839085	ESN	Esan,Esan	AFR	African Ancestry,Africa (SGDP)	ESN,EsanSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG03078	male	SAME1839047	MSL	Mende,Mende	AFR	African Ancestry,Africa (SGDP)	MSL,MendeSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG03085	female	SAME1840328	MSL	Mende,Mende	AFR	African Ancestry,Africa (SGDP)	MSL,MendeSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG03100	male	SAME1840003	ESN	Esan,Esan	AFR	African Ancestry,Africa (SGDP)	ESN,EsanSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+NA18940	male	SAME124310	JPT	Japanese,Japanese	EAS	East Asia (SGDP),East Asian Ancestry	JapaneseSGDP,JPT	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release
+NA19044	male	SAME125244	LWK	Luhya,Luhya	AFR	African Ancestry,Africa (SGDP)	LWK,LuhyaSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes phase 3 release,1000 Genomes phase 1 release
+HGDP00543	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00550	female			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00555	male			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HG00190	male	SAME123856	FIN	Finnish,Finnish	EUR	European Ancestry,West Eurasia (SGDP)	FIN,FinnishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release
+HGDP00547	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HG00128	female	SAME122868	GBR	British,English	EUR	European Ancestry,West Eurasia (SGDP)	GBR,EnglishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release,Geuvadis
+HG00126	male	SAME122872	GBR	British,English	EUR	European Ancestry,West Eurasia (SGDP)	GBR,EnglishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,1000 Genomes phase 1 release,Geuvadis
+Armenian222	male	SAMEA3302672		Armenian		West Eurasia (SGDP)	ArmenianSGDP	Simons Genome Diversity Project
+Ul31	female	SAMEA3302862		Ulchi		Central Asia and Siberia (SGDP)	UlchiSGDP	Simons Genome Diversity Project
+HGDP01344	male	SAMEA3302776		Naxi		East Asia (SGDP)	NaxiSGDP	Simons Genome Diversity Project
+Mansi79	male	SAMEA3302762		Mansi		Central Asia and Siberia (SGDP)	MansiSGDP	Simons Genome Diversity Project
+HGDP01274	female	SAMEA3302836		Mozabite,Mozabite		Middle East (HGDP),Africa (SGDP)	MozabiteHGDP,MozabiteSGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP01306	female	SAMEA3302611		Uygur		East Asia (SGDP)	UygurSGDP	Simons Genome Diversity Project
+HGDP01402	male	SAMEA3302656		Adygei		West Eurasia (SGDP)	AdygeiSGDP	Simons Genome Diversity Project
+Est375	male	SAMEA3302735		Estonian		West Eurasia (SGDP)	EstonianSGDP	Simons Genome Diversity Project
+NorthOssetia5	male	SAMEA3302698		North Ossetian		West Eurasia (SGDP)	NorthOssetianSGDP	Simons Genome Diversity Project
+iran11	male	SAMEA3302612		Iranian		West Eurasia (SGDP)	IranianSGDP	Simons Genome Diversity Project
+HGDP00461	male	SAMEA3302673		Biaka		Africa (SGDP)	BiakaSGDP	Simons Genome Diversity Project
+BulgarianB4	male	SAMEA3302718		Bulgarian		West Eurasia (SGDP)	BulgarianSGDP	Simons Genome Diversity Project
+IHW9193	male	SAMEA3302681		Australian		Oceania (SGDP)	AustralianSGDP	Simons Genome Diversity Project
+HGDP01286	male	SAMEA3302736		Mandenka		Africa (SGDP)	MandenkaSGDP	Simons Genome Diversity Project
+NA11200	male	SAMEA3302848		Quechua		America (SGDP)	QuechuaSGDP	Simons Genome Diversity Project
+TGBS21	male	SAMEA3302784		Chane		America (SGDP)	ChaneSGDP	Simons Genome Diversity Project
+Ul5	female	SAMEA3302703		Ulchi		Central Asia and Siberia (SGDP)	UlchiSGDP	Simons Genome Diversity Project
+Nlk18	male	SAMEA3302752		Even		Central Asia and Siberia (SGDP)	EvenSGDP	Simons Genome Diversity Project
+HGDP01015	male	SAMEA3302902		Karitiana		America (SGDP)	KaritianaSGDP	Simons Genome Diversity Project
+HGDP00928	female	SAMEA3302835		Yoruba		Africa (SGDP)	YorubaSGDP	Simons Genome Diversity Project
+HG01504	female	SAME124945	IBS	Iberian,Spanish	EUR	European Ancestry,West Eurasia (SGDP)	IBS,SpanishSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HGDP01250	male	SAMEA3302755		Xibo		East Asia (SGDP)	XiboSGDP	Simons Genome Diversity Project
+HGDP00846	female	SAMEA3302865		Surui		America (SGDP)	SuruiSGDP	Simons Genome Diversity Project
+HG01600	female	SAME123456	KHV	Kinh,Kinh Vietnamese	EAS	East Asia (SGDP),East Asian Ancestry	KinhSGDP,KHV	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+TZ-11	male	SAMEA3302625		Crete		West Eurasia (SGDP)	CreteSGDP	Simons Genome Diversity Project
+I3	male	SAMEA3302742		Irula		South Asia (SGDP)	IrulaSGDP	Simons Genome Diversity Project
+R6	male	SAMEA3302767		Relli		South Asia (SGDP)	RelliSGDP	Simons Genome Diversity Project
+HGDP00597	male	SAMEA3302870		Druze		West Eurasia (SGDP)	DruzeSGDP	Simons Genome Diversity Project
+Ale22	male	SAMEA3302773		Aleut		Central Asia and Siberia (SGDP)	AleutSGDP	Simons Genome Diversity Project
+mixe0007	female	SAMEA3302697		Mixe		America (SGDP)	MixeSGDP	Simons Genome Diversity Project
+NA17385	male	SAMEA3302908		Hawaiian		Oceania (SGDP)	HawaiianSGDP	Simons Genome Diversity Project
+Tuba19	female	SAMEA3302764		Tubalar		Central Asia and Siberia (SGDP)	TubalarSGDP	Simons Genome Diversity Project
+HGDP00702	female	SAMEA3302619		Piapoco		America (SGDP)	PiapocoSGDP	Simons Genome Diversity Project
+NA15763	female	SAMEA3302859		Icelandic		West Eurasia (SGDP)	IcelandicSGDP	Simons Genome Diversity Project
+ND19394	male	SAMEA3302778		Korean		East Asia (SGDP)	KoreanSGDP	Simons Genome Diversity Project
+HGDP00554	female	SAMEA3302746		Papuan		Oceania (SGDP)	PapuanSGDP	Simons Genome Diversity Project
+HGDP01414	female	SAMEA3302710		Bantu Kenya		Africa (SGDP)	BantuKenyaSGDP	Simons Genome Diversity Project
+K1	male	SAMEA3302633		Kapu		South Asia (SGDP)	KapuSGDP	Simons Genome Diversity Project
+HGDP00548	male	SAMEA3302704		Papuan		Oceania (SGDP)	PapuanSGDP	Simons Genome Diversity Project
+HGDP00857	female	SAMEA3302904		Mayan,Maya		America (SGDP),America (HGDP)	MayanSGDP,MayaHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP00125	male	SAMEA3302731		Hazara		South Asia (SGDP)	HazaraSGDP	Simons Genome Diversity Project
+Y4	male	SAMEA3302740		Yadava		South Asia (SGDP)	YadavaSGDP	Simons Genome Diversity Project
+HGDP01320	male	SAMEA3302832		Lahu		East Asia (SGDP)	LahuSGDP	Simons Genome Diversity Project
+altai363p	male	SAMEA3302753		Altaian		Central Asia and Siberia (SGDP)	AltaianSGDP	Simons Genome Diversity Project
+BulgarianC1	male	SAMEA3302842		Bulgarian		West Eurasia (SGDP)	BulgarianSGDP	Simons Genome Diversity Project
+ND15865	male	SAMEA3302699		Polish		West Eurasia (SGDP)	PolishSGDP	Simons Genome Diversity Project
+NA15202	male	SAMEA3302649		Hungarian		West Eurasia (SGDP)	HungarianSGDP	Simons Genome Diversity Project
+HGDP01211	female	SAMEA3302614		Oroqen		East Asia (SGDP)	OroqenSGDP	Simons Genome Diversity Project
+HGDP00656	female	SAMEA3302636		Bougainville		Oceania (SGDP)	BougainvilleSGDP	Simons Genome Diversity Project
+Peru60	female	SAMEA3302709		Quechua		America (SGDP)	QuechuaSGDP	Simons Genome Diversity Project
+HGDP00783	female	SAMEA3302770		Han		East Asia (SGDP)	HanSGDP	Simons Genome Diversity Project
+NA00726	female	SAMEA3302891		Korean		East Asia (SGDP)	KoreanSGDP	Simons Genome Diversity Project
+HGDP01034	male	SAMEA3302849		Bantu Tswana		Africa (SGDP)	BantuTswanaSGDP	Simons Genome Diversity Project
+mixe0002	female	SAMEA3302796		Mixe		America (SGDP)	MixeSGDP	Simons Genome Diversity Project
+zapo0098	male	SAMEA3302744		Zapotec		America (SGDP)	ZapotecSGDP	Simons Genome Diversity Project
+NA17377	male	SAMEA3302732		Greek		West Eurasia (SGDP)	GreekSGDP	Simons Genome Diversity Project
+HGDP00428	male	SAMEA3302798		Burusho		South Asia (SGDP)	BurushoSGDP	Simons Genome Diversity Project
+HGDP00903	female	SAMEA3302766		Russian		West Eurasia (SGDP)	RussianSGDP	Simons Genome Diversity Project
+DNK11	male	SAMEA3302792		Dinka		Africa (SGDP)	DinkaSGDP	Simons Genome Diversity Project
+IHW9118	female	SAMEA3302719		Australian		Oceania (SGDP)	AustralianSGDP	Simons Genome Diversity Project
+Jordan603	male	SAMEA3302675		Jordanian		West Eurasia (SGDP)	JordanianSGDP	Simons Genome Diversity Project
+HGDP01228	male	SAMEA3302653		Mongola		Central Asia and Siberia (SGDP)	MongolaSGDP	Simons Genome Diversity Project
+HGDP00749	male	SAMEA3302867		Japanese		East Asia (SGDP)	JapaneseSGDP	Simons Genome Diversity Project
+HGDP01297	male	SAMEA3302818		Uygur		East Asia (SGDP)	UygurSGDP	Simons Genome Diversity Project
+HGDP01355	female	SAMEA3302824		Tu		East Asia (SGDP)	TuSGDP	Simons Genome Diversity Project
+HGDP01312	male	SAMEA3302864		Dai		East Asia (SGDP)	DaiSGDP	Simons Genome Diversity Project
+tdj409_shugnan	male	SAMEA3302901		Tajik		West Eurasia (SGDP)	TajikSGDP	Simons Genome Diversity Project
+abh107	male	SAMEA3302655		Abkhasian		West Eurasia (SGDP)	AbkhasianSGDP	Simons Genome Diversity Project
+HGDP01076	male	SAMEA3302876		Sardinian		West Eurasia (SGDP)	SardinianSGDP	Simons Genome Diversity Project
+HGDP00991	male	SAMEA3302858		Ju|'hoan North		Africa (SGDP)	JuhoanNorthSGDP	Simons Genome Diversity Project
+HGDP00775	male	SAMEA3302877		Han		East Asia (SGDP)	HanSGDP	Simons Genome Diversity Project
+HGDP01153	male	SAMEA3449876		Bergamo		West Eurasia (SGDP)	BergamoSGDP	Simons Genome Diversity Project
+HGDP00713	female	SAMEA3302791		Cambodian,Cambodian		East Asia (SGDP),East Asia (HGDP)	CambodianSGDP,CambodianHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP00915	female	SAMEA3302850		Mandenka		Africa (SGDP)	MandenkaSGDP	Simons Genome Diversity Project
+HGDP00852	female	SAMEA3302830		Surui		America (SGDP)	SuruiSGDP	Simons Genome Diversity Project
+HGDP01172	female	SAMEA3302855		Bergamo		West Eurasia (SGDP)	BergamoSGDP	Simons Genome Diversity Project
+NA13616	male	SAMEA3302623		Ami		East Asia (SGDP)	AmiSGDP	Simons Genome Diversity Project
+HGDP00650	female	SAMEA3302695		Bedouin B		West Eurasia (SGDP)	BedouinBSGDP	Simons Genome Diversity Project
+B17	male	SAMEA3302645		Brahmin		South Asia (SGDP)	BrahminSGDP	Simons Genome Diversity Project
+HGDP01242	female	SAMEA3302845		Hezhen		East Asia (SGDP)	HezhenSGDP	Simons Genome Diversity Project
+lez42	male	SAMEA3302843		Lezgin		West Eurasia (SGDP)	LezginSGDP	Simons Genome Diversity Project
+HGDP00338	female	SAMEA3302795		Burusho		South Asia (SGDP)	BurushoSGDP	Simons Genome Diversity Project
+HGDP01223	female	SAMEA3302743		Mongola		Central Asia and Siberia (SGDP)	MongolaSGDP	Simons Genome Diversity Project
+HGDP00530	male	SAMEA3302635		French		West Eurasia (SGDP)	FrenchSGDP	Simons Genome Diversity Project
+KD4	male	SAMEA3302861		Khonda Dora		South Asia (SGDP)	KhondaDoraSGDP	Simons Genome Diversity Project
+HGDP00124	male	SAMEA3302749		Hazara		South Asia (SGDP)	HazaraSGDP	Simons Genome Diversity Project
+NA13604	male	SAMEA3302745		Atayal		East Asia (SGDP)	AtayalSGDP	Simons Genome Diversity Project
+HGDP01191	male	SAMEA3302846		Miao		East Asia (SGDP)	MiaoSGDP	Simons Genome Diversity Project
+HGDP00737	female	SAMEA3302897		Palestinian		West Eurasia (SGDP)	PalestinianSGDP	Simons Genome Diversity Project
+HGDP01350	male	SAMEA3302909		Tu		East Asia (SGDP)	TuSGDP	Simons Genome Diversity Project
+Esk29	male	SAMEA3302660		Eskimo Chaplin		Central Asia and Siberia (SGDP)	EskimoChaplinSGDP	Simons Genome Diversity Project
+Ayodo_430C	male	SAMEA3302868		Luo		Africa (SGDP)	LuoSGDP	Simons Genome Diversity Project
+HGDP00725	female	SAMEA3302646		Palestinian		West Eurasia (SGDP)	PalestinianSGDP	Simons Genome Diversity Project
+HGDP00706	female	SAMEA3302669		Piapoco		America (SGDP)	PiapocoSGDP	Simons Genome Diversity Project
+Ale14	female	SAMEA3302889		Tlingit		Central Asia and Siberia (SGDP)	TlingitSGDP	Simons Genome Diversity Project
+mixa0099	male	SAMEA3302618		Mixtec		America (SGDP)	MixtecSGDP	Simons Genome Diversity Project
+HGDP01401	female	SAMEA3302728		Adygei		West Eurasia (SGDP)	AdygeiSGDP	Simons Genome Diversity Project
+HGDP01095	male	SAMEA3302878		Tujia		East Asia (SGDP)	TujiaSGDP	Simons Genome Diversity Project
+Nlk1	female	SAMEA3302715		Even		Central Asia and Siberia (SGDP)	EvenSGDP	Simons Genome Diversity Project
+HGDP00232	female	SAMEA3302639		Pathan,Pathan		South Asia (SGDP),Central South Asia (HGDP)	PathanSGDP,PathanHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+IraqiJew4291	male	SAMEA3302705		Iraqi Jew		West Eurasia (SGDP)	IraqiJewSGDP	Simons Genome Diversity Project
+HG02494	female	SAME1839698	PJL	Punjabi,Punjabi	SAS	South Asia (SGDP),South Asian Ancestry	PunjabiSGDP,PJL	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG03007	female	SAME1840245	BEB	Bengali,Bengali	SAS	South Asia (SGDP),South Asian Ancestry	BengaliSGDP,BEB	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG01846	male	SAME123558	KHV	Kinh,Kinh Vietnamese	EAS	East Asia (SGDP),East Asian Ancestry	KinhSGDP,KHV	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG02724	male	SAME1839740	PJL	Punjabi,Punjabi	SAS	South Asia (SGDP),South Asian Ancestry	PunjabiSGDP,PJL	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HG02464	male	SAME1839978	GWD	Gambian Mandinka,Gambian	AFR	African Ancestry,Africa (SGDP)	GWD,GambianSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release,Gambian Genome Variation Project (GRCh38)
+HG03006	male	SAME1840242	BEB	Bengali,Bengali	SAS	South Asia (SGDP),South Asian Ancestry	BengaliSGDP,BEB	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+NA19023	female	SAME124854	LWK	Luhya,Luhya	AFR	African Ancestry,Africa (SGDP)	LWK,LuhyaSGDP	1000 Genomes on GRCh38,Simons Genome Diversity Project,1000 Genomes 30x on GRCh38,1000 Genomes phase 3 release
+HGDP00549	male			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00551	male			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00556	male			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00546	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00553	male			Papuan,Papuan Highlands		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanHighlandsHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00541	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+HGDP00936	male	SAMEA3302730		Yoruba		Africa (SGDP)	YorubaSGDP	Simons Genome Diversity Project
+Kor82	female	SAMEA3302806		Itelman		Central Asia and Siberia (SGDP)	ItelmanSGDP	Simons Genome Diversity Project
+CHI-034	female	SAMEA3302826		Thai		East Asia (SGDP)	ThaiSGDP	Simons Genome Diversity Project
+NA17386	male	SAMEA3302905		Maori		Oceania (SGDP)	MaoriSGDP	Simons Genome Diversity Project
+HGDP01028	male	SAMEA3302727		Bantu Herero		Africa (SGDP)	BantuHereroSGDP	Simons Genome Diversity Project
+HGDP00208	male	SAMEA3302815		Sindhi		South Asia (SGDP)	SindhiSGDP	Simons Genome Diversity Project
+IraqiJew1771	female	SAMEA3302747		Iraqi Jew		West Eurasia (SGDP)	IraqiJewSGDP	Simons Genome Diversity Project
+Nesk_25	female	SAMEA3302856		Eskimo Naukan		Central Asia and Siberia (SGDP)	EskimoNaukanSGDP	Simons Genome Diversity Project
+NA21490	male	SAMEA3302814	MKK	Masai		Africa (SGDP)	Masai	Simons Genome Diversity Project
+HGDP01078	female	SAMEA3302813		Sardinian		West Eurasia (SGDP)	SardinianSGDP	Simons Genome Diversity Project
+HGDP01035	male	SAMEA3302869		Bantu Herero		Africa (SGDP)	BantuHereroSGDP	Simons Genome Diversity Project
+SA0722	female	SAMEA3302800		Khomani San		Africa (SGDP)	KhomaniSanSGDP	Simons Genome Diversity Project
+Nlk3	female	SAMEA3302720		Even		Central Asia and Siberia (SGDP)	EvenSGDP	Simons Genome Diversity Project
+mg27	male	SAMEA3302808		Georgian		West Eurasia (SGDP)	GeorgianSGDP	Simons Genome Diversity Project
+ALB212	female	SAMEA3302780		Albanian		West Eurasia (SGDP)	AlbanianSGDP	Simons Genome Diversity Project
+HGDP01333	male	SAMEA3302817		She		East Asia (SGDP)	SheSGDP	Simons Genome Diversity Project
+HGDP00157	female	SAMEA3302616		Makrani		South Asia (SGDP)	MakraniSGDP	Simons Genome Diversity Project
+HGDP01338	male	SAMEA3302888		Naxi		East Asia (SGDP)	NaxiSGDP	Simons Genome Diversity Project
+SAH41	male	SAMEA3302694		Saharawi		Africa (SGDP)	SaharawiSGDP	Simons Genome Diversity Project
+HGDP00796	female	SAMEA3302713		Orcadian		West Eurasia (SGDP)	OrcadianSGDP	Simons Genome Diversity Project
+HGDP01047	male	SAMEA3302779		Pima		America (SGDP)	PimaSGDP	Simons Genome Diversity Project
+HGDP00722	male	SAMEA3302652		Palestinian		West Eurasia (SGDP)	PalestinianSGDP	Simons Genome Diversity Project
+HGDP01314	female	SAMEA3302827		Dai		East Asia (SGDP)	DaiSGDP	Simons Genome Diversity Project
+HGDP00328	male	SAMEA3302754		Kalash		South Asia (SGDP)	KalashSGDP	Simons Genome Diversity Project
+NA15203	female	SAMEA3302678		Hungarian		West Eurasia (SGDP)	HungarianSGDP	Simons Genome Diversity Project
+mixa0105	female	SAMEA3302811		Mixtec		America (SGDP)	MixtecSGDP	Simons Genome Diversity Project
+lez49	male	SAMEA3302664		Lezgin		West Eurasia (SGDP)	LezginSGDP	Simons Genome Diversity Project
+abh100	male	SAMEA3302693		Abkhasian		West Eurasia (SGDP)	AbkhasianSGDP	Simons Genome Diversity Project
+AV-21	female	SAMEA3302765		Crete		West Eurasia (SGDP)	CreteSGDP	Simons Genome Diversity Project
+iran17	male	SAMEA3302874		Iranian		West Eurasia (SGDP)	IranianSGDP	Simons Genome Diversity Project
+zapo0099	male	SAMEA3302757		Zapotec		America (SGDP)	ZapotecSGDP	Simons Genome Diversity Project
+Bu5	male	SAMEA3302692		Burmese		East Asia (SGDP)	BurmeseSGDP	Simons Genome Diversity Project
+HGDP00195	female	SAMEA3302685		Sindhi		South Asia (SGDP)	SindhiSGDP	Simons Genome Diversity Project
+HGDP01364	male	SAMEA3302621		Basque		West Eurasia (SGDP)	BasqueSGDP	Simons Genome Diversity Project
+HGDP01345	female	SAMEA3302620		Naxi		East Asia (SGDP)	NaxiSGDP	Simons Genome Diversity Project
+HGDP00474	male	SAMEA3302769		Mbuti		Africa (SGDP)	MbutiSGDP	Simons Genome Diversity Project
+DNK05	male	SAMEA3302668		Dinka		Africa (SGDP)	DinkaSGDP	Simons Genome Diversity Project
+ch113	male	SAMEA3302820		Chechen		West Eurasia (SGDP)	ChechenSGDP	Simons Genome Diversity Project
+NA11201	female	SAMEA3302896		Quechua		America (SGDP)	QuechuaSGDP	Simons Genome Diversity Project
+Jordan445	male	SAMEA3302887		Jordanian		West Eurasia (SGDP)	JordanianSGDP	Simons Genome Diversity Project
+SA0342	female	SAMEA3302708		Khomani San		Africa (SGDP)	KhomaniSanSGDP	Simons Genome Diversity Project
+HGDP01030	male	SAMEA3302630		Bantu Tswana		Africa (SGDP)	BantuTswanaSGDP	Simons Genome Diversity Project
+NA17374	male	SAMEA3302763		Greek		West Eurasia (SGDP)	GreekSGDP	Simons Genome Diversity Project
+Bishkek28439	female	SAMEA3302768		Kyrgyz		Central Asia and Siberia (SGDP)	KyrgyzSGDP	Simons Genome Diversity Project
+HGDP01198	female	SAMEA3302777		Miao		East Asia (SGDP)	MiaoSGDP	Simons Genome Diversity Project
+Kayseri23827	male	SAMEA3302750		Turkish		West Eurasia (SGDP)	TurkishSGDP	Simons Genome Diversity Project
+HGDP01179	male	SAMEA3302615		Yi		East Asia (SGDP)	YiSGDP	Simons Genome Diversity Project
+HGDP01188	female	SAMEA3302793		Yi		East Asia (SGDP)	YiSGDP	Simons Genome Diversity Project
+Kusunda02	male	SAMEA3302819		Kusunda		South Asia (SGDP)	KusundaSGDP	Simons Genome Diversity Project
+HGDP01203	male	SAMEA3302893		Oroqen		East Asia (SGDP)	OroqenSGDP	Simons Genome Diversity Project
+Sir19	male	SAMEA3302734		Chukchi		Central Asia and Siberia (SGDP)	ChukchiSGDP	Simons Genome Diversity Project
+Igor20	female	SAMEA3302724		Igorot		Oceania (SGDP)	IgorotSGDP	Simons Genome Diversity Project
+HGDP00058	male	SAMEA3449877		Balochi		South Asia (SGDP)	BalochiSGDP	Simons Genome Diversity Project
+Nesk_22	female	SAMEA3302831		Eskimo Naukan		Central Asia and Siberia (SGDP)	EskimoNaukanSGDP	Simons Genome Diversity Project
+HGDP01018	female	SAMEA3302662		Karitiana		America (SGDP)	KaritianaSGDP	Simons Genome Diversity Project
+HGDP01246	male	SAMEA3302648		Xibo		East Asia (SGDP)	XiboSGDP	Simons Genome Diversity Project
+HGDP01335	female	SAMEA3302787		She		East Asia (SGDP)	SheSGDP	Simons Genome Diversity Project
+HGDP01032	male	SAMEA3302682		Ju|'hoan North		Africa (SGDP)	JuhoanNorthSGDP	Simons Genome Diversity Project
+I1	male	SAMEA3302610		Irula		South Asia (SGDP)	IrulaSGDP	Simons Genome Diversity Project
+HGDP00027	male	SAMEA3302782		Brahui		South Asia (SGDP)	BrahuiSGDP	Simons Genome Diversity Project
+HGDP01417	male	SAMEA3302737		Bantu Kenya		Africa (SGDP)	BantuKenyaSGDP	Simons Genome Diversity Project
+Ayodo_81S	female	SAMEA3302884		Somali		Africa (SGDP)	SomaliSGDP	Simons Genome Diversity Project
+NA21581	male	SAMEA3302687	MKK	Masai		Africa (SGDP)	Masai	Simons Genome Diversity Project
+Jordan214	male	SAMEA3302729		Jordanian		West Eurasia (SGDP)	JordanianSGDP	Simons Genome Diversity Project
+Mansi41	female	SAMEA3302654		Mansi		Central Asia and Siberia (SGDP)	MansiSGDP	Simons Genome Diversity Project
+HGDP00798	male	SAMEA3302667		Orcadian		West Eurasia (SGDP)	OrcadianSGDP	Simons Genome Diversity Project
+NorthOssetia12	male	SAMEA3302797		North Ossetian		West Eurasia (SGDP)	NorthOssetianSGDP	Simons Genome Diversity Project
+HGDP00616	male	SAMEA3302823		Bedouin B		West Eurasia (SGDP)	BedouinBSGDP	Simons Genome Diversity Project
+HGDP00887	male	SAMEA3302786		Russian		West Eurasia (SGDP)	RussianSGDP	Simons Genome Diversity Project
+Sir26	male	SAMEA3302670		Eskimo Sireniki		Central Asia and Siberia (SGDP)	EskimoSirenikiSGDP	Simons Genome Diversity Project
+HGDP00286	female	SAMEA3302761		Kalash		South Asia (SGDP)	KalashSGDP	Simons Genome Diversity Project
+HGDP01323	female	SAMEA3302882		Lahu		East Asia (SGDP)	LahuSGDP	Simons Genome Diversity Project
+Ale32	male	SAMEA3302853		Tlingit		Central Asia and Siberia (SGDP)	TlingitSGDP	Simons Genome Diversity Project
+DNK07	male	SAMEA3302733		Dinka		Africa (SGDP)	DinkaSGDP	Simons Genome Diversity Project
+HGDP00457	male	SAMEA3302816		Biaka		Africa (SGDP)	BiakaSGDP	Simons Genome Diversity Project
+HGDP01044	female	SAMEA3302627		Pima		America (SGDP)	PimaSGDP	Simons Genome Diversity Project
+M4	male	SAMEA3302834		Madiga		South Asia (SGDP)	MadigaSGDP	Simons Genome Diversity Project
+Ayodo_502C	female	SAMEA3302810		Luo		Africa (SGDP)	LuoSGDP	Simons Genome Diversity Project
+Ale20	female	SAMEA3302642		Aleut		Central Asia and Siberia (SGDP)	AleutSGDP	Simons Genome Diversity Project
+mg31	male	SAMEA3302838		Georgian		West Eurasia (SGDP)	GeorgianSGDP	Simons Genome Diversity Project
+Utsa21	female	SAMEA3302875		Saami		West Eurasia (SGDP)	SaamiSGDP	Simons Genome Diversity Project
+HGDP01253	male	SAMEA3302825		Mozabite		Africa (SGDP)	MozabiteSGDP	Simons Genome Diversity Project
+HGDP00476	female	SAMEA3302716		Mbuti,Mbuti		Africa (SGDP),Africa (HGDP)	MbutiSGDP,MbutiHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP01215	female	SAMEA3302840		Daur		East Asia (SGDP)	DaurSGDP	Simons Genome Diversity Project
+Kayseri24424	female	SAMEA3302809		Turkish		West Eurasia (SGDP)	TurkishSGDP	Simons Genome Diversity Project
+Sir40	female	SAMEA3302641		Eskimo Sireniki		Central Asia and Siberia (SGDP)	EskimoSirenikiSGDP	Simons Genome Diversity Project
+Tuba9	female	SAMEA3302781		Tubalar		Central Asia and Siberia (SGDP)	TubalarSGDP	Simons Genome Diversity Project
+Y8	male	SAMEA3302725		Yadava		South Asia (SGDP)	YadavaSGDP	Simons Genome Diversity Project
+HGDP00717	male	SAMEA3302689		Cambodian		East Asia (SGDP)	CambodianSGDP	Simons Genome Diversity Project
+Dus16	female	SAMEA3302759		Dusun		Oceania (SGDP)	DusunSGDP	Simons Genome Diversity Project
+HGDP00540	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+tdj430_shugnan	male	SAMEA3302691		Tajik		West Eurasia (SGDP)	TajikSGDP	Simons Genome Diversity Project
+HGDP00545	male			Papuan,Papuan Sepik		Oceania (SGDP),Oceania (HGDP)	PapuanSGDP,PapuanSepikHGDP	Simons Genome Diversity Project,Human Genome Diversity Project
+SAH31	male	SAMEA3302857		Saharawi		Africa (SGDP)	SaharawiSGDP	Simons Genome Diversity Project
+B11	male	SAMEA3302829		Brahmin		South Asia (SGDP)	BrahminSGDP	Simons Genome Diversity Project
+YemeniteJew4695	female	SAMEA3302634		Yemenite Jew		West Eurasia (SGDP)	YemeniteJewSGDP	Simons Genome Diversity Project
+CHI-007	male	SAMEA3302663		Thai		East Asia (SGDP)	ThaiSGDP	Simons Genome Diversity Project
+HGDP00449	male	SAMEA3302659		Mbuti,Mbuti		Africa (SGDP),Africa (HGDP)	MbutiSGDP,MbutiHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP00019	male	SAMEA3302677		Brahui		South Asia (SGDP)	BrahuiSGDP	Simons Genome Diversity Project
+Igor21	male	SAMEA3302696		Igorot		Oceania (SGDP)	IgorotSGDP	Simons Genome Diversity Project
+Utsa22	male	SAMEA3302851		Saami		West Eurasia (SGDP)	SaamiSGDP	Simons Genome Diversity Project
+HGDP00533	male	SAMEA3302712		French		West Eurasia (SGDP)	FrenchSGDP	Simons Genome Diversity Project
+HGDP00526	female	SAMEA3302828		French		West Eurasia (SGDP)	FrenchSGDP	Simons Genome Diversity Project
+HGDP01036	male	SAMEA3302894		Ju|'hoan North,San		Africa (SGDP),Africa (HGDP)	JuhoanNorthSGDP,SanHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP01365	female	SAMEA3302903		Basque		West Eurasia (SGDP)	BasqueSGDP	Simons Genome Diversity Project
+Sam02	male	SAMEA3302863		Samaritan		West Eurasia (SGDP)	SamaritanSGDP	Simons Genome Diversity Project
+HGDP01079	male	SAMEA3302822		Sardinian		West Eurasia (SGDP)	SardinianSGDP	Simons Genome Diversity Project
+NOR111	female	SAMEA3449879		Norwegian		West Eurasia (SGDP)	NorwegianSGDP	Simons Genome Diversity Project
+HGDP00660	female	SAMEA3302841		Bougainville		Oceania (SGDP)	BougainvilleSGDP	Simons Genome Diversity Project
+HGDP00090	male	SAMEA3302890		Balochi		South Asia (SGDP)	BalochiSGDP	Simons Genome Diversity Project
+HGDP00569	female	SAMEA3302739		Druze		West Eurasia (SGDP)	DruzeSGDP	Simons Genome Diversity Project
+NA15761	female	SAMEA3302837		Icelandic		West Eurasia (SGDP)	IcelandicSGDP	Simons Genome Diversity Project
+YemeniteJew5433	male	SAMEA3302807		Yemenite Jew		West Eurasia (SGDP)	YemeniteJewSGDP	Simons Genome Diversity Project
+HGDP01199	male	SAMEA3302756		Mandenka		Africa (SGDP)	MandenkaSGDP	Simons Genome Diversity Project
+HGDP01168	female	SAMEA3302684		Tuscan		West Eurasia (SGDP)	TuscanSGDP	Simons Genome Diversity Project
+HGDP00552	female	SAMEA3302700		Papuan		Oceania (SGDP)	PapuanSGDP	Simons Genome Diversity Project
+HGDP00956	female	SAMEA3302706		Yakut		Central Asia and Siberia (SGDP)	YakutSGDP	Simons Genome Diversity Project
+armenia293	male	SAMEA3302624		Armenian		West Eurasia (SGDP)	ArmenianSGDP	Simons Genome Diversity Project
+NA15728	male	SAMEA3302844		Czech		West Eurasia (SGDP)	CzechSGDP	Simons Genome Diversity Project
+K4	male	SAMEA3302839		Kapu		South Asia (SGDP)	KapuSGDP	Simons Genome Diversity Project
+Bu16	male	SAMEA3302895		Burmese		East Asia (SGDP)	BurmeseSGDP	Simons Genome Diversity Project
+HGDP01012	male	SAMEA3302790		Karitiana		America (SGDP)	KaritianaSGDP	Simons Genome Diversity Project
+HGDP00987	male	SAMEA3302900		Ju|'hoan North,San		Africa (SGDP),Africa (HGDP)	JuhoanNorthSGDP,SanHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+HGDP00932	male	SAMEA3302632		Yoruba		Africa (SGDP)	YorubaSGDP	Simons Genome Diversity Project
+HGDP01315	female	SAMEA3302785		Dai		East Asia (SGDP)	DaiSGDP	Simons Genome Diversity Project
+HGDP01308	male	SAMEA3302666		Dai		East Asia (SGDP)	DaiSGDP	Simons Genome Diversity Project
+Dus22	female	SAMEA3302688		Dusun		Oceania (SGDP)	DusunSGDP	Simons Genome Diversity Project
+Est400	male	SAMEA3302679		Estonian		West Eurasia (SGDP)	EstonianSGDP	Simons Genome Diversity Project
+HGDP01240	male	SAMEA3302880		Hezhen		East Asia (SGDP)	HezhenSGDP	Simons Genome Diversity Project
+mixe0042	female	SAMEA3302723		Mixe		America (SGDP)	MixeSGDP	Simons Genome Diversity Project
+HGDP00216	male	SAMEA3302674		Pathan		South Asia (SGDP)	PathanSGDP	Simons Genome Diversity Project
+HGDP00982	male	SAMEA3302833		Mbuti		Africa (SGDP)	MbutiSGDP	Simons Genome Diversity Project
+HGDP01098	female	SAMEA3302665		Tujia		East Asia (SGDP)	TujiaSGDP	Simons Genome Diversity Project
+HGDP00160	male	SAMEA3302771		Makrani		South Asia (SGDP)	MakraniSGDP	Simons Genome Diversity Project
+Bishkek28440	male	SAMEA3302717		Kyrgyz		Central Asia and Siberia (SGDP)	KyrgyzSGDP	Simons Genome Diversity Project
+HGDP01163	male	SAMEA3302758		Tuscan		West Eurasia (SGDP)	TuscanSGDP	Simons Genome Diversity Project
+HGDP00951	male	SAMEA3302802		Yakut		Central Asia and Siberia (SGDP)	YakutSGDP	Simons Genome Diversity Project
+HGDP00785	male	SAMEA3302804		Han		East Asia (SGDP)	HanSGDP	Simons Genome Diversity Project
+HGDP00855	female	SAMEA3302866		Mayan,Maya		America (SGDP),America (HGDP)	MayanSGDP,MayaHGDP	Simons Genome Diversity Project,HGDP Transcriptome
+Kusunda15	male	SAMEA3302911		Kusunda		South Asia (SGDP)	KusundaSGDP	Simons Genome Diversity Project
+NA13607	male	SAMEA3302722		Ami		East Asia (SGDP)	AmiSGDP	Simons Genome Diversity Project
+HGDP00773	female	SAMEA3302906		Japanese		East Asia (SGDP)	JapaneseSGDP	Simons Genome Diversity Project
+R3	male	SAMEA3302714		Relli		South Asia (SGDP)	RelliSGDP	Simons Genome Diversity Project
