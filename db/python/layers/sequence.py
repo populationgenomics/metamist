@@ -363,6 +363,7 @@ class SampleSequenceLayer(BaseLayer):
         sample_ids: List[int] = None,
         sequence_ids: List[int] = None,
         seq_meta: Dict[str, Any] = None,
+        sample_meta: Dict[str, Any] = None,
         project_ids=None,
         types: List[str] = None,
         statuses: List[str] = None,
@@ -377,6 +378,7 @@ class SampleSequenceLayer(BaseLayer):
         output = await self.seqt.get_sequences_by(
             sample_ids=sample_ids,
             seq_meta=seq_meta,
+            sample_meta=sample_meta,
             sequence_ids=sequence_ids,
             project_ids=project_ids,
             active=active,

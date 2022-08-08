@@ -228,9 +228,15 @@ class TestSequence(DbIsolatedTest):
 
         # Filter by project & type
         results_exomes = await self.seql.get_sequences_by(
-            project_ids=[1], types=[self.sequence_two.type.value]
+            project_ids=[self.project_id], types=[self.sequence_two.type.value]
         )
         self.assertEqual(results_exomes, [self.sequence_two])
+
+        results_sample_filter = await self.seql.get_sequences_by(
+            project_ids=[self.project_id], sample_meta={'Testing': 'test_sequence'}
+        )
+        results_sample_filter.sort(key=attrgetter('id'))
+        self.assertEqual(results_sample_filter, self.all_sequences)
 
     @run_test_as_sync
     async def test_get_sequences_with_filters_empty(self):

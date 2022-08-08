@@ -340,6 +340,7 @@ class SampleSequencingTable(DbBase):
         self,
         sample_ids: List[int] = None,
         seq_meta: Dict[str, Any] = None,
+        sample_meta: Dict[str, Any] = None,
         sequence_ids: List[int] = None,
         project_ids=None,
         active=True,
@@ -363,8 +364,14 @@ class SampleSequencingTable(DbBase):
 
         if seq_meta:
             for k, v in seq_meta.items():
-                k_replacer = f'meta_{k}'
+                k_replacer = f'seq_meta_{k}'
                 where.append(f"json_extract(sq.meta, '$.{k}') = :{k_replacer}")
+                replacements[k_replacer] = v
+
+        if sample_meta:
+            for k, v in sample_meta.items():
+                k_replacer = f'sample_meta_{k}'
+                where.append(f"json_extract(s.meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
         if sequence_ids:
