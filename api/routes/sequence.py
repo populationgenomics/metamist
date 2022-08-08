@@ -139,7 +139,6 @@ async def get_sequences_by_criteria(
     active: bool = Body(default=True),
     types: List[str] = None,
     statuses: List[str] = None,
-    latest: bool = Body(default=False),
     connection: Connection = get_projectless_db_connection,
 ):
     """Get sequences by some criteria"""
@@ -164,7 +163,6 @@ async def get_sequences_by_criteria(
         active=active,
         types=types,
         statuses=statuses,
-        latest=latest,
     )
 
     return result

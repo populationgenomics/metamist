@@ -345,10 +345,9 @@ class SampleSequencingTable(DbBase):
         active=True,
         types: List[str] = None,
         statuses: List[str] = None,
-        latest: bool = False,
     ):
         """Get sequences by some criteria"""
-        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status']
+        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.meta']
         keys_str = ', '.join(keys)
 
         where = []
@@ -392,12 +391,6 @@ class SampleSequencingTable(DbBase):
         rows = await self.connection.fetch_all(_query, replacements)
 
         sequence_dicts = [dict(s) for s in rows]
-        if latest:
-            # get last one
-            sequence_dicts = [
-                list(seqs)[-1]
-                for _, seqs in groupby(sequence_dicts, lambda seq: seq['sample_id'])
-            ]
 
         sequences = [SampleSequencing.from_db(s) for s in sequence_dicts]
 

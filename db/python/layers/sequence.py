@@ -367,7 +367,6 @@ class SampleSequenceLayer(BaseLayer):
         types: List[str] = None,
         statuses: List[str] = None,
         active=True,
-        latest: bool = False,
     ):
         """Get sequences by some criteria"""
         if not sample_ids and not sequence_ids and not project_ids:
@@ -383,7 +382,6 @@ class SampleSequenceLayer(BaseLayer):
             active=active,
             types=types,
             statuses=statuses,
-            latest=latest,
         )
 
         return output
