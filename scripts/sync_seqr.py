@@ -19,14 +19,16 @@ logging.basicConfig(level=logging.DEBUG)
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
-SEQR_AUDIENCE = (
-    '1021400127367-40kj6v68nlps6unk6bgvh08r5o4djf6b.apps.googleusercontent.com'
-)
-# SEQR_AUDIENCE = (
-#     '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com'
-# )
 
-BASE = os.getenv('SEQR_URL', 'https://seqr-staging.populationgenomics.org.au')
+# SEQR_STAGING_AUDIENCE = (
+#     '1021400127367-40kj6v68nlps6unk6bgvh08r5o4djf6b.apps.googleusercontent.com'
+# )
+SEQR_PROD_AUDIENCE = (
+    '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com'
+)
+SEQR_AUDIENCE = SEQR_PROD_AUDIENCE
+
+BASE = os.getenv('SEQR_URL', 'https://seqr.populationgenomics.org.au')
 url_individuals_table_upload = '/api/project/{projectGuid}/upload_individuals_table/sa'
 url_individuals_table_confirm = (
     '/api/project/{projectGuid}/save_individuals_table/{uploadedFileId}/sa'
@@ -50,17 +52,21 @@ papi = ProjectApi()
 aapi = AnalysisApi()
 
 ES_INDICES = {
-    'acute-care': ['acute-care-genome-2022_0620_1843_l4h8u', 'acute-care-exome-2022_0624_0015_zs7fb'],
+    'validation': 'validation-genome-2022_0810_2358_474tt',
+    'acute-care': [
+        'acute-care-genome-2022_0620_1843_l4h8u',
+        'acute-care-exome-2022_0624_0015_zs7fb',
+    ],
     'ravenscroft-arch': 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
     'circa': 'circa-genome-2022_0618_1137_4qfyn',
     'ohmr3-mendelian': 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-    'validation': 'validation-genome-2022_0618_1137_4qfyn',
     'mito-disease': 'mito-disease-genome-2022_0618_1137_4qfyn',
     'perth-neuro': 'perth-neuro-genome-2022_0618_1137_4qfyn',
     'ohmr4-epilepsy': 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
     'hereditary-neuro': [
         'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-'hereditary-neuro-exome-2022_0624_0015_zs7fb'],
+        'hereditary-neuro-exome-2022_0624_0015_zs7fb',
+    ],
     'ravenscroft-rdstudy': 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
     'heartkids': 'heartkids-genome-2022_0618_1137_4qfyn',
 }
@@ -83,7 +89,6 @@ def sync_dataset(dataset: str, seqr_guid: str):
     update_es_index(**params)
 
     get_cram_map(dataset)
-
 
 
 def sync_pedigree(dataset, project_guid, headers):
@@ -308,7 +313,9 @@ def update_es_index(dataset, project_guid, headers):
 
         req2_url = BASE + url_update_saved_variants.format(projectGuid=project_guid)
         resp_2 = requests.post(req2_url, json={}, headers=headers)
-        print(f'{dataset} :: Updated saved variants with status code: {resp_2.status_code}')
+        print(
+            f'{dataset} :: Updated saved variants with status code: {resp_2.status_code}'
+        )
         if not resp_2.ok:
             print(f'{dataset} :: Request failed with information: {resp_2.text}')
         resp_2.raise_for_status()
@@ -333,9 +340,12 @@ def _get_pedigree_csv_from_sm(dataset: str) -> str | None:
         'affected',
         'notes',
     ]
-    formatted_ped_rows.extend(','.join(str(r.get(k) or '') for k in keys) for r in ped_rows)
+    formatted_ped_rows.extend(
+        ','.join(str(r.get(k) or '') for k in keys) for r in ped_rows
+    )
 
     return '\n'.join(formatted_ped_rows)
+
 
 def get_cram_map(dataset):
     reads_map = aapi.get_sample_reads_map_for_seqr(project=dataset)
@@ -347,12 +357,13 @@ def get_cram_map(dataset):
         f.writelines(reads_list)
 
 
-
 def get_token():
     import google.auth.exceptions
     import google.auth.transport.requests
 
-    credential_filename = '/Users/michael.franklin/source/sample-metadata/scripts/seqr-308602-6b221bc0893c.json'
+    credential_filename = (
+        '/Users/mfranklin/source/sample-metadata/scripts/seqr-308602-2c46bd711b1f.json'
+    )
     with open(credential_filename, 'r') as f:
         from google.oauth2 import service_account
 
@@ -412,7 +423,8 @@ def sync_single_dataset_from_name(dataset):
 
 if __name__ == '__main__':
     # sync_single_dataset_from_name('ohmr4-epilepsy')
-    sync_dataset('hereditary-neuro', 'R0013_hereditary_neuro_test')
+    get_cram_map('validation')
+    # sync_dataset('validation', 'R0019_validation')
     # ignore = {
     #     'heartkids',
     #     'acute-care',
@@ -422,5 +434,5 @@ if __name__ == '__main__':
     #     'hereditary-neuro',
     # }
     # ignore = {'ohmr4-epilepsy'}
-    ignore = None
-    sync_all_datasets(ignore=ignore)
+    # ignore = None
+    # sync_all_datasets(ignore=ignore)
