@@ -375,7 +375,7 @@ class SampleSequenceLayer(BaseLayer):
                 'Must specify one of "project_ids", "sample_ids" or "sequence_ids"'
             )
 
-        output = await self.seqt.get_sequences_by(
+        seqs, projs = await self.seqt.get_sequences_by(
             sample_ids=sample_ids,
             seq_meta=seq_meta,
             sample_meta=sample_meta,
@@ -386,4 +386,9 @@ class SampleSequenceLayer(BaseLayer):
             statuses=statuses,
         )
 
-        return output
+        if not project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projs, readonly=True
+            )
+
+        return seqs

@@ -348,7 +348,7 @@ class SampleSequencingTable(DbBase):
         statuses: List[str] = None,
     ):
         """Get sequences by some criteria"""
-        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.meta']
+        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.meta', 's.project']
         keys_str = ', '.join(keys)
 
         where = []
@@ -393,7 +393,7 @@ class SampleSequencingTable(DbBase):
 
         _query = f'SELECT {keys_str} FROM sample_sequencing sq INNER JOIN sample s ON sq.sample_id = s.id'
         if where:
-            _query += f' WHERE {" AND ".join(where)} ORDER by sq.id DESC;'
+            _query += f' WHERE {" AND ".join(where)};'
 
         rows = await self.connection.fetch_all(_query, replacements)
 
@@ -401,4 +401,6 @@ class SampleSequencingTable(DbBase):
 
         sequences = [SampleSequencing.from_db(s) for s in sequence_dicts]
 
-        return sequences
+        projs = list(set([s['project'] for s in sequence_dicts]))
+
+        return sequences, projs

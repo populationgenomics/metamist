@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from api.utils.db import (
@@ -137,7 +137,7 @@ async def get_sequences_by_criteria(
     seq_meta: Dict = None,
     sample_meta: Dict = None,
     project_ids: List[str] = None,
-    active: bool = Body(default=True),
+    active: bool = True,
     types: List[str] = None,
     statuses: List[str] = None,
     connection: Connection = get_projectless_db_connection,
