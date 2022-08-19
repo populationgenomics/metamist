@@ -1,6 +1,6 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 """
-Parser for prophecy metadata.
+Parser for existing-cohort metadata.
 
 parse_prophecy.py \
 gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M001.csv \
@@ -23,7 +23,6 @@ logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-PROJECT = 'prophecy-test'
 
 COLUMN_MAP = {
     'Application': 'platform',
@@ -31,20 +30,21 @@ COLUMN_MAP = {
     'Sample Concentration (ng/ul)': 'concentration',
     'Volume (uL)': 'volume',
     'Sex': 'sex',
+    'Reference Genome': 'reference_genome',
+    'Sample/Name': 'fluid_x_tube_id',
 }
 
 
 class Columns:
-    """Column keys for Prophecy manifest"""
+    """Column keys for manifest"""
 
     EXTERNAL_ID = 'External ID'
     PLATFORM = 'Application'
     CONCENTRATION = 'Sample Concentration (ng/ul)'
     VOLUME = 'Volume (uL)'
     SEX = 'Sex'
-    # SAMPLE_NAME != External Sample ID
-    # Follows XXXXXX_FLUIDX convention.
-    SAMPLE_NAME = 'Sample/Name'
+    MANIFEST_FLUID_X = 'Sample/Name'
+    REFERENCE_GENOME = 'Reference Genome'
 
     @staticmethod
     def sequence_meta_map():
@@ -53,6 +53,8 @@ class Columns:
             Columns.PLATFORM,
             Columns.CONCENTRATION,
             Columns.VOLUME,
+            Columns.MANIFEST_FLUID_X,
+            Columns.REFERENCE_GENOME,
         ]
         return {k: COLUMN_MAP[k] for k in fields}
 
@@ -103,10 +105,11 @@ class ProphecyParser(GenericMetadataParser):
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
         """
+
         return [
             path
             for filename, path in self.filename_map.items()
-            if fastq_file_name_to_sample_id(filename) == row[Columns.SAMPLE_NAME]
+            if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
         ]
 
 
@@ -114,7 +117,6 @@ class ProphecyParser(GenericMetadataParser):
 @click.option(
     '--project',
     help='The sample-metadata project to import manifest into',
-    default=PROJECT,
 )
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(
