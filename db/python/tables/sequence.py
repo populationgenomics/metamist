@@ -335,3 +335,72 @@ class SampleSequencingTable(DbBase):
         """
         await self.connection.execute(_query, fields)
         return True
+
+    async def get_sequences_by(
+        self,
+        sample_ids: List[int] = None,
+        seq_meta: Dict[str, Any] = None,
+        sample_meta: Dict[str, Any] = None,
+        sequence_ids: List[int] = None,
+        project_ids=None,
+        active=True,
+        types: List[str] = None,
+        statuses: List[str] = None,
+    ):
+        """Get sequences by some criteria"""
+        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.meta', 's.project']
+        keys_str = ', '.join(keys)
+
+        where = []
+        replacements = {}
+
+        if project_ids:
+            where.append('s.project in :project_ids')
+            replacements['project_ids'] = project_ids
+
+        if sample_ids:
+            where.append('s.id in :sample_ids')
+            replacements['sample_ids'] = sample_ids
+
+        if seq_meta:
+            for k, v in seq_meta.items():
+                k_replacer = f'seq_meta_{k}'
+                where.append(f"json_extract(sq.meta, '$.{k}') = :{k_replacer}")
+                replacements[k_replacer] = v
+
+        if sample_meta:
+            for k, v in sample_meta.items():
+                k_replacer = f'sample_meta_{k}'
+                where.append(f"json_extract(s.meta, '$.{k}') = :{k_replacer}")
+                replacements[k_replacer] = v
+
+        if sequence_ids:
+            where.append('sq.id in :sequence_ids')
+            replacements['sequence_ids'] = sequence_ids
+
+        if types:
+            where.append('sq.type in :types')
+            replacements['types'] = types
+
+        if statuses:
+            where.append('sq.status in :statuses')
+            replacements['statuses'] = statuses
+
+        if active is True:
+            where.append('s.active')
+        elif active is False:
+            where.append('NOT active')
+
+        _query = f'SELECT {keys_str} FROM sample_sequencing sq INNER JOIN sample s ON sq.sample_id = s.id'
+        if where:
+            _query += f' WHERE {" AND ".join(where)};'
+
+        rows = await self.connection.fetch_all(_query, replacements)
+
+        sequence_dicts = [dict(s) for s in rows]
+
+        sequences = [SampleSequencing.from_db(s) for s in sequence_dicts]
+
+        projs = list(set([s['project'] for s in sequence_dicts]))
+
+        return sequences, projs

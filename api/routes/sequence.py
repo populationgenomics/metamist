@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from db.python.layers.sequence import (
     SampleSequenceLayer,
     SequenceUpdateModel,
 )
+from db.python.tables.project import ProjectPermissionsTable
 from models.enums import SampleType
 
 from models.models.sample import (
@@ -21,6 +22,7 @@ from models.models.sample import (
     sample_id_transform_to_raw,
     sample_id_transform_to_raw_list,
 )
+
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
 
@@ -126,6 +128,46 @@ async def get_sequence(
     resp = await sequence_layer.get_sequence_by_id(sequence_id, check_project_id=True)
     resp.sample_id = sample_id_format(resp.sample_id)  # type: ignore[arg-type]
     return resp
+
+
+@router.post('/criteria', operation_id='getSequencesByCriteria')
+async def get_sequences_by_criteria(
+    sample_ids: List[str] = None,
+    sequence_ids: List[int] = None,
+    seq_meta: Dict = None,
+    sample_meta: Dict = None,
+    project_ids: List[str] = None,
+    active: bool = True,
+    types: List[str] = None,
+    statuses: List[str] = None,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Get sequences by some criteria"""
+    sequence_layer = SampleSequenceLayer(connection)
+    pt = ProjectPermissionsTable(connection.connection)
+
+    pids: Optional[List[int]] = None
+    if project_ids:
+        pids = await pt.get_project_ids_from_names_and_user(
+            connection.author, project_ids, readonly=True
+        )
+
+    unwrapped_sample_ids: Optional[List[int]] = None
+    if sample_ids:
+        unwrapped_sample_ids = sample_id_transform_to_raw_list(sample_ids)
+
+    result = await sequence_layer.get_sequences_by(
+        sample_ids=unwrapped_sample_ids,
+        sequence_ids=sequence_ids,
+        seq_meta=seq_meta,
+        sample_meta=sample_meta,
+        project_ids=pids,
+        active=active,
+        types=types,
+        statuses=statuses,
+    )
+
+    return result
 
 
 @router.post('/', operation_id='getSequencesBySampleIds')
