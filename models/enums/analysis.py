@@ -10,6 +10,7 @@ class AnalysisType(Enum):
     CRAM = 'cram'
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
+    SV = 'sv'
 
 
 class AnalysisStatus(Enum):
