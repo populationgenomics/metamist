@@ -350,6 +350,10 @@
 			/>
 		</addColumn>
 	</changeSet>
+	<changeSet author="vivian.bakiris" id="2022-08-22_add-sv-analysis-type">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv');</sql>
+	</changeSet>
 
 
 
