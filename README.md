@@ -15,7 +15,6 @@ controlled through membership of the google groups:
 `$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
 are cached in a secret as group-membership identity checks are slow.
 
-
 ## Structure
 
 ![Database structure](resources/2021-10-27_db-diagram.png)
@@ -41,13 +40,14 @@ stores these values separately on the `participant` as:
 
 - `reported_gender` (string, expected `male` | `female` | _other values_)
 - `reported_sex` (follows pedigree convention: `unknown=0 | null`, `male=1`, `female=2`)
-- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes)
+- `inferred_karyotype` (string, eg: `XX` | `XY` | \_other karyotypes)
 
 If you import a pedigree, the sex value is written to the `reported_sex` attribute.
 
 ## Local develompent of SM
 
 The recommended way to develop the sample-metadata system is to run a local copy of SM.
+
 > There have been some reported issues of running a local SM environment on an M1 mac.
 
 You can run MariaDB with a locally installed docker, or from within a docker container.
@@ -148,7 +148,6 @@ Finally, make sure you configure the server (making use of the environment varia
 export SM_DEV_DB_PORT=3307
 ```
 
-
 ### Running the server
 
 You'll want to set the following environment variables (permanently) in your
@@ -191,15 +190,15 @@ VSCode allows you to debug python modules, we could debug the web API at `api/se
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "API server",
-            "type": "python",
-            "request": "launch",
-            "module": "api.server"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API server",
+      "type": "python",
+      "request": "launch",
+      "module": "api.server"
+    }
+  ]
 }
 ```
 
@@ -214,7 +213,6 @@ cd web
 npm install
 npm start
 ```
-
 
 #### Unauthenticated access
 
@@ -240,24 +238,27 @@ Some handy links:
 The web API exposes this schema in two ways:
 
 - Swagger UI: `http://localhost:8000/docs`
-    - You can use this to construct requests to the server
-    - Make sure you fill in the Bearer token (at the top right )
+  - You can use this to construct requests to the server
+  - Make sure you fill in the Bearer token (at the top right )
 - OpenAPI schema: `http://localhost:8000/schema.json`
-    - Returns a JSON with the full OpenAPI 3 compliant schema.
-    - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
-    - We generate the sample_metadata installable Python API based on this schema.
+  - Returns a JSON with the full OpenAPI 3 compliant schema.
+  - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
+  - We generate the sample_metadata installable Python API based on this schema.
 
 #### Generating the installable API
 
 The installable API is automatically generated through the `package.yml` GitHub action and uploaded to PyPI.
 
-
 To generate the python api you'll need to install openapi generator v5.x.x
 
-```bash
-brew install openapi-generator
-```
+Follow [this tutorial](https://openapi-generator.tech/docs/installation/) for
+to specify the version and install.
 
+Then set your environment variable OPENAPI_COMMAND to the following:
+
+```bash
+export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
+```
 
 You could generate the installable API and install it with pip by running:
 
@@ -275,8 +276,6 @@ export SM_DOCKER="cpg/sample-metadata-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_apy.py
 ```
-
-
 
 ## Deployment
 

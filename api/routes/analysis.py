@@ -1,6 +1,8 @@
-import csv
 import io
-from datetime import date
+import csv
+from datetime import date, datetime
+
+# from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
@@ -17,7 +19,10 @@ from api.utils.db import (
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
-from models.models.analysis import Analysis
+from models.models.analysis import (
+    Analysis,
+    # ProjectSizeModel
+)
 from models.models.sample import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
@@ -309,3 +314,51 @@ async def get_sample_reads_map_for_seqr(
         media_type='text/tab-separated-values',
         headers={'Content-Disposition': f'filename={basefn}.tsv'},
     )
+
+
+@router.post('/sample-file-sizes', operation_id='getSampleFileSizes')
+async def get_sample_file_sizes(
+    start_date: str = None,
+    end_date: str = None,
+    project_names: List[str] = None,
+    connection: Connection = get_projectless_db_connection,
+) -> List[Any]:
+    """
+    Get the per sample file size by type over the given projects and date range
+    """
+    atable = AnalysisLayer(connection)
+
+    # Check access to projects
+    project_ids = None
+    if project_names:
+        pt = ProjectPermissionsTable(connection=connection.connection)
+        project_ids = await pt.get_project_ids_from_names_and_user(
+            connection.author, project_names, readonly=True
+        )
+
+    prj_name_map = dict(zip(project_ids, project_names))
+
+    # Try to convert dates
+    if start_date or end_date:
+        start, end = None, None
+        try:
+            if start_date:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+
+            if end_date:
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except Exception as excep:
+            raise ValueError(
+                f'Start or end date could not be converted: {start_date} {end_date}'
+            ) from excep
+
+    results = await atable.get_sample_file_sizes(
+        project_ids=project_ids, start_date=start, end_date=end
+    )
+
+    # Convert dict to list
+    fixed_pids: List[Any] = [
+        {'project': prj_name_map[p], 'samples': v} for p, v in results.items()
+    ]
+
+    return fixed_pids

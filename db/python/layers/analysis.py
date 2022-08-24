@@ -1,3 +1,5 @@
+from datetime import date
+from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
 from db.python.connect import Connection
@@ -7,7 +9,10 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 
 from models.enums import AnalysisStatus, AnalysisType
-from models.models.analysis import Analysis
+from models.models.analysis import (
+    Analysis,
+    # ProjectSizeModel
+)
 from models.models.sample import sample_id_format_list
 
 
@@ -17,6 +22,7 @@ class AnalysisLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
 
+        self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
 
     # GETS
@@ -131,6 +137,25 @@ class AnalysisLayer(BaseLayer):
         )
 
         return analyses
+
+    async def get_sample_file_sizes(
+        self,
+        project_ids: List[int] = None,
+        start_date: date = None,  # pylint: disable=W0613
+        end_date: date = None,  # pylint: disable=W0613
+    ):
+        """
+        Get the file sizes from all the given projects group by sample filtered
+        on the date range
+        """
+
+        result: dict[int, dict] = defaultdict(dict)
+        _, samples = await self.sampt.get_samples_by(project_ids=project_ids)
+
+        for sample in samples:
+            result[sample.project][sample.id] = sample
+
+        return result
 
     # CREATE / UPDATE
 

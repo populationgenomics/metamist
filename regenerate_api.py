@@ -88,7 +88,7 @@ def check_openapi_version():
     """
     Check compatible OpenAPI version
     """
-    command = [*OPENAPI_COMMAND, '--version']
+    command = [*OPENAPI_COMMAND, 'version']
     out = subprocess.check_output(command).decode().split('\n', maxsplit=1)[0].strip()
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
     if not version_match:
