@@ -141,6 +141,7 @@ class AnalysisLayer(BaseLayer):
     async def get_sample_file_sizes(
         self,
         project_ids: List[int] = None,
+        sample_ids: List[int] = None,
         start_date: date = None,  # pylint: disable=W0613
         end_date: date = None,  # pylint: disable=W0613
     ):
@@ -149,11 +150,37 @@ class AnalysisLayer(BaseLayer):
         on the date range
         """
 
-        result: dict[int, dict] = defaultdict(dict)
-        _, samples = await self.sampt.get_samples_by(project_ids=project_ids)
+        result: dict[int, list] = defaultdict(list)
+        projects = dict(zip(sample_ids, project_ids))
 
-        for sample in samples:
-            result[sample.project][sample.id] = sample
+        # Get sample history
+        history = await self.sampt.get_sample_create_date(sample_ids)
+
+        # Get size of analysis crams
+        crams = await self.at.query_analysis(
+            sample_ids=sample_ids,
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+        )
+        crams_by_sid: dict[Any, dict[str, list]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+
+        # Manual filtering to find the most recent analysis cram of each sequence type
+        # for each sample
+        for cram in crams:
+            if len(cram.sample_ids) == 1:
+                sid = cram.sample_ids[0]
+                seqtype = cram.meta.get('sequence_type')
+                seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
+                size = cram.meta.get('size')
+
+                if seqtype and size:
+                    crams_by_sid[sid][seqtype].append(cram)
+
+        # Format output
+        for s in sample_ids:
+            result[projects[s]].append({'sample': s, 'dates': history[s]})
 
         return result
 

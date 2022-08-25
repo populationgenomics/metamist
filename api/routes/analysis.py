@@ -16,6 +16,7 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
+from db.python.layers.sample import SampleLayer
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
@@ -26,7 +27,10 @@ from models.models.analysis import (
 from models.models.sample import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
+    sample_id_transform_to_raw,
+    sample_id_format,
 )
+
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -322,11 +326,12 @@ async def get_sample_file_sizes(
     end_date: str = None,
     project_names: List[str] = None,
     connection: Connection = get_projectless_db_connection,
-) -> List[Any]:
+) -> list[Any]:
     """
     Get the per sample file size by type over the given projects and date range
     """
     atable = AnalysisLayer(connection)
+    stable = SampleLayer(connection)
 
     # Check access to projects
     project_ids = None
@@ -339,8 +344,8 @@ async def get_sample_file_sizes(
     prj_name_map = dict(zip(project_ids, project_names))
 
     # Try to convert dates
+    start, end = None, None
     if start_date or end_date:
-        start, end = None, None
         try:
             if start_date:
                 start = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -352,13 +357,25 @@ async def get_sample_file_sizes(
                 f'Start or end date could not be converted: {start_date} {end_date}'
             ) from excep
 
+    # Get samples from pids
+    samples = await stable.get_samples_by(project_ids=project_ids)
+    sample_ids = [sample_id_transform_to_raw(s.id) for s in samples]
+    project_ids = [s.project for s in samples]
+
     results = await atable.get_sample_file_sizes(
-        project_ids=project_ids, start_date=start, end_date=end
+        project_ids=project_ids, sample_ids=sample_ids, start_date=start, end_date=end
     )
 
     # Convert dict to list
     fixed_pids: List[Any] = [
-        {'project': prj_name_map[p], 'samples': v} for p, v in results.items()
+        {
+            'project': prj_name_map[p],
+            'samples': [
+                {'sample': sample_id_format(s['sample']), 'dates': s['dates']}
+                for s in samples
+            ],
+        }
+        for p, samples in results.items()
     ]
 
     return fixed_pids

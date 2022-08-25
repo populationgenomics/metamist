@@ -62,7 +62,7 @@ class SampleSizeModel(BaseModel):
     """Project Size model"""
 
     cpg_id: str
-    date_ranges: list[DateSizeModel]
+    dates: list[DateSizeModel]
 
 
 class ProjectSizeModel(BaseModel):

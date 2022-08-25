@@ -150,6 +150,10 @@ class SampleLayer(BaseLayer):
         m = await self.st.get_sample_with_missing_participants_by_internal_id(project)
         return dict(m)
 
+    async def get_sample_create_date(self, sample_ids: List[int]):
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        return await self.st.get_sample_create_date(sample_ids)
+
     # CREATE / UPDATES
     async def insert_sample(
         self,

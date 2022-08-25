@@ -402,6 +402,12 @@ class SampleTable(DbBase):
         )
         return {row['id']: row['external_id'] for row in rows}
 
+    async def get_sample_create_date(self, sample_ids: List[int]):
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in (:sids) GROUP BY id'
+        rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
+        return {r[0]: str(r[1].date()) for r in rows}
+
     async def get_history_of_sample(self, id_: int):
         """Get all versions (history) of a sample"""
         keys = [

@@ -145,8 +145,12 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         :param sample_ids_all: (UNIMPLEMENTED) sample_ids_all means the analysis contains ALL of the sample_ids
         """
 
-        wheres = ['project in :project_ids']
-        values: Dict[str, Any] = {'project_ids': project_ids}
+        wheres = []
+        values: Dict[str, Any] = {}
+
+        if project_ids:
+            wheres.append('project in :project_ids')
+            values['project_ids'] = project_ids
 
         if sample_ids_all:
             raise NotImplementedError
