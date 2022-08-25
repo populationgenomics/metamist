@@ -6,29 +6,48 @@ import json
 import datetime
 import logging
 from typing import Any
+import yaml
+from io import StringIO
 
 import requests
 from cloudpathlib import AnyPath
-from sample_metadata.api.analysis_api import AnalysisApi
-
+from sample_metadata.model.analysis_type import AnalysisType
+from sample_metadata.model.analysis_status import AnalysisStatus
+from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.model.export_type import ExportType
+from sample_metadata.model.body_get_samples import BodyGetSamples
+from sample_metadata.model.body_get_participants import BodyGetParticipants
+from sample_metadata.model.analysis_query_model import AnalysisQueryModel
 
-from sample_metadata.apis import SeqrApi, ProjectApi
+from sample_metadata.apis import (
+    SeqrApi,
+    ProjectApi,
+    AnalysisApi,
+    SequenceApi,
+    SampleApi,
+    ParticipantApi,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
+ENVIRONMENT = 'prod'
 
-# SEQR_STAGING_AUDIENCE = (
-#     '1021400127367-40kj6v68nlps6unk6bgvh08r5o4djf6b.apps.googleusercontent.com'
-# )
-SEQR_PROD_AUDIENCE = (
-    '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com'
-)
-SEQR_AUDIENCE = SEQR_PROD_AUDIENCE
+ENVS = {
+    'staging': (
+        'https://seqr-staging.populationgenomics.org.au',
+        '1021400127367-40kj6v68nlps6unk6bgvh08r5o4djf6b.apps.googleusercontent.com',
+    ),
+    'prod': (
+        'https://seqr.populationgenomics.org.au',
+        '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com',
+    ),
+}
 
-BASE = os.getenv('SEQR_URL', 'https://seqr.populationgenomics.org.au')
+
+BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
+
 url_individuals_table_upload = '/api/project/{projectGuid}/upload_individuals_table/sa'
 url_individuals_table_confirm = (
     '/api/project/{projectGuid}/save_individuals_table/{uploadedFileId}/sa'
@@ -51,28 +70,35 @@ seqapi = SeqrApi()
 papi = ProjectApi()
 aapi = AnalysisApi()
 
-ES_INDICES = {
-    'validation': 'validation-genome-2022_0810_2358_474tt',
-    'acute-care': [
-        'acute-care-genome-2022_0620_1843_l4h8u',
-        'acute-care-exome-2022_0624_0015_zs7fb',
-    ],
-    'ravenscroft-arch': 'ravenscroft-arch-genome-2022_0618_1137_4qfyn',
-    'circa': 'circa-genome-2022_0618_1137_4qfyn',
-    'ohmr3-mendelian': 'ohmr3-mendelian-genome-2022_0618_1137_4qfyn',
-    'mito-disease': 'mito-disease-genome-2022_0618_1137_4qfyn',
-    'perth-neuro': 'perth-neuro-genome-2022_0618_1137_4qfyn',
-    'ohmr4-epilepsy': 'ohmr4-epilepsy-genome-2022_0618_1137_4qfyn',
-    'hereditary-neuro': [
-        'hereditary-neuro-genome-2022_0618_1137_4qfyn',
-        'hereditary-neuro-exome-2022_0624_0015_zs7fb',
-    ],
-    'ravenscroft-rdstudy': 'ravenscroft-rdstudy-genome-2022_0618_1137_4qfyn',
-    'heartkids': 'heartkids-genome-2022_0618_1137_4qfyn',
-}
+ES_INDICES_YAML = """
+exome:
+    hereditary-neuro: hereditary-neuro-exome-2022_0815_2246_h2pb9
+    mito-disease: mito-disease-exome-2022_0815_2246_h2pb9
+    kidgen: kidgen-exome-2022_0815_2246_h2pb9
+    acute-care: acute-care-exome-2022_0815_2246_h2pb9
+
+genome:
+    acute-care: acute-care-genome-2022_0815_1644_xkhvx
+    heartkids: heartkids-genome-2022_0812_1925_fhoif
+    kidgen: kidgen-genome-2022_0812_1925_fhoif
+    ohmr4-epilepsy: ohmr4-epilepsy-genome-2022_0812_1925_fhoif
+    schr-neuro: schr-neuro-genome-2022_0812_1925_fhoif
+    ravenscroft-rdstudy: ravenscroft-rdstudy-genome-2022_0812_1925_fhoif
+    validation: validation-genome-2022_0812_1925_fhoif
+    perth-neuro: perth-neuro-genome-2022_0812_1925_fhoif
+    mito-disease: mito-disease-genome-2022_0812_1925_fhoif
+    ibmdx: ibmdx-genome-2022_0812_1925_fhoif
+    hereditary-neuro: hereditary-neuro-genome-2022_0812_1925_fhoif
+    circa: circa-genome-2022_0812_1925_fhoif
+    ravenscroft-arch: ravenscroft-arch-genome-2022_0812_1925_fhoif
+    ohmr3-mendelian: ohmr3-mendelian-genome-2022_0812_1925_fhoif
+    ag-hidden: ag-hidden-genome-2022_0812_1925_fhoif
+"""
+
+ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
 
 
-def sync_dataset(dataset: str, seqr_guid: str):
+def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     """
     Synchronisation driver for a single dataset
     """
@@ -83,15 +109,49 @@ def sync_dataset(dataset: str, seqr_guid: str):
         dataset=dataset, project_guid=seqr_guid, headers=headers
     )
 
-    sync_pedigree(**params)
-    sync_families(**params)
-    sync_individual_metadata(**params)
-    update_es_index(**params)
+    seq_type = SequenceType(sequence_type)
 
-    get_cram_map(dataset)
+    samples = SampleApi().get_samples(
+        body_get_samples=BodyGetSamples(project_ids=[dataset])
+    )
+    sequences_all = SequenceApi().get_all_sequences_by_sample_ids(
+        [s['id'] for s in samples]
+    )
+    sample_ids = [sid for sid, types in sequences_all.items() if sequence_type in types]
+    participant_ids = set(
+        int(sample['participant_id'])
+        for sample in samples
+        if sample['id'] in sample_ids
+    )
+    participants = ParticipantApi().get_participants(
+        project=dataset,
+        body_get_participants=BodyGetParticipants(
+            internal_participant_ids=list(participant_ids)
+        ),
+    )
+    participant_eids = [p['external_id'] for p in participants]
+
+    ped_rows = seqapi.get_pedigree(project=dataset)
+    filtered_family_eids = set(
+        row['family_id'] for row in ped_rows if row['individual_id'] in participant_eids
+    )
+
+    if not participant_eids:
+        raise ValueError('No participants to sync?')
+    if not filtered_family_eids:
+        raise ValueError('No families to sync')
+
+    # sync_pedigree(**params, family_eids=filtered_family_eids)
+    # sync_families(**params, family_eids=filtered_family_eids)
+    sync_individual_metadata(**params, participant_eids=participant_eids)
+    # update_es_index(**params, sequence_type=sequence_type)
+
+    # get_cram_map(
+    #     dataset, participant_eids=participant_eids, sequence_type=sequence_type
+    # )
 
 
-def sync_pedigree(dataset, project_guid, headers):
+def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
     """
     Synchronise pedigree from SM -> seqr in 3 steps:
 
@@ -101,7 +161,7 @@ def sync_pedigree(dataset, project_guid, headers):
     """
 
     # 1. Get pedigree from SM
-    pedigree_data = _get_pedigree_csv_from_sm(dataset)
+    pedigree_data = _get_pedigree_csv_from_sm(dataset, family_eids=family_eids)
     if not pedigree_data:
         return print(f'{dataset} :: Not updating pedigree because not data was found')
 
@@ -145,7 +205,9 @@ def sync_pedigree(dataset, project_guid, headers):
     print(f'{dataset} :: Uploaded pedigree')
 
 
-def sync_families(dataset, project_guid: str, headers: dict[str, str]):
+def sync_families(
+    dataset, project_guid: str, headers: dict[str, str], family_eids: set[str]
+):
     """
     Synchronise families template from SM -> seqr in 3 steps:
 
@@ -167,8 +229,15 @@ def sync_families(dataset, project_guid: str, headers: dict[str, str]):
         formatted_fam_rows = [','.join(fam_row_headers)]
         keys = ['external_id', 'external_id', 'description', 'coded_phenotype']
         formatted_fam_rows.extend(
-            [','.join(str(r[k] or '') for k in keys) for r in fam_rows]
+            [
+                ','.join(str(r[k] or '') for k in keys)
+                for r in fam_rows
+                if r['external_id'] in family_eids
+            ]
         )
+
+        if len(formatted_fam_rows) == 1:
+            raise ValueError('No families to sync')
 
         return '\n'.join(formatted_fam_rows)
 
@@ -206,17 +275,35 @@ def sync_families(dataset, project_guid: str, headers: dict[str, str]):
     print(f'{dataset} :: Uploaded family template')
 
 
-def sync_individual_metadata(dataset, project_guid, headers):
+def sync_individual_metadata(
+    dataset, project_guid, headers, participant_eids: set[str]
+):
 
-    individual_metadata_resp = seqapi.get_individual_metadata_for_seqr(
-        project=dataset, export_type=ExportType('json')
-    )
+    IS_OLD = True
 
-    if individual_metadata_resp is None:
-        print(
-            f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
+    if IS_OLD:
+        # TEMP
+        base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
+        from sample_metadata.configuration import _get_google_auth_token
+
+        resp = requests.get(
+            base + f'/api/v1/participant/{dataset}/individual-metadata-seqr/json',
+            headers={'Authorization': f'Bearer {_get_google_auth_token()}'},
         )
-        return
+        resp.raise_for_status()
+        individual_metadata_resp = resp.json()
+    else:
+        individual_metadata_resp = seqapi.get_individual_metadata_for_seqr(
+            project=dataset, export_type=ExportType('json')
+        )
+
+        if individual_metadata_resp is None or isinstance(
+            individual_metadata_resp, str
+        ):
+            print(
+                f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
+            )
+            return
 
     json_rows = individual_metadata_resp['rows']
     individual_meta_headers = individual_metadata_resp['headers']
@@ -227,18 +314,23 @@ def sync_individual_metadata(dataset, project_guid, headers):
         return
 
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=',')
+    writer = csv.writer(output, delimiter='\t')
     rows = [
         [col_header_map[h] for h in individual_meta_headers],
-        *[[row.get(kh, '') for kh in individual_meta_headers] for row in json_rows],
+        *[
+            [row.get(kh, '') for kh in individual_meta_headers]
+            for row in json_rows
+            if row['individual_id'] in participant_eids
+        ],
     ]
     writer.writerows(rows)
+    file_tsv = output.getvalue()
 
     req1_url = BASE + url_individual_metadata_table_upload.format(
         projectGuid=project_guid
     )
     resp_1 = requests.post(
-        req1_url, files={'datafile': ('file.csv', output.getvalue())}, headers=headers
+        req1_url, files={'datafile': ('file.tsv', file_tsv)}, headers=headers
     )
     print(
         f'{dataset} :: Uploaded individual metadata with status: {resp_1.status_code}'
@@ -274,10 +366,10 @@ def sync_individual_metadata(dataset, project_guid, headers):
     print(f'{dataset} :: Uploaded individual metadata')
 
 
-def update_es_index(dataset, project_guid, headers):
+def update_es_index(dataset, sequence_type: str, project_guid, headers):
 
-    person_sample_map_rows = seqapi.get_external_participant_id_to_internal_sample_id(
-        project=dataset
+    person_sample_map_rows = (
+        seqapi.get_external_participant_id_to_internal_sample_id_export(project=dataset)
     )
 
     rows_to_write = ['\t'.join(s[::-1]) for s in person_sample_map_rows]
@@ -290,38 +382,48 @@ def update_es_index(dataset, project_guid, headers):
     with AnyPath(fn_path).open('w+') as f:
         f.write('\n'.join(rows_to_write))
 
-    dataset_es_indices = ES_INDICES[dataset]
-    if not isinstance(dataset_es_indices, list):
-        dataset_es_indices = [dataset_es_indices]
+    es_index_analyses = sorted(
+        aapi.query_analyses(
+            AnalysisQueryModel(
+                projects=[dataset],
+                type=AnalysisType('es-index'),
+                meta={'sequencing_type': sequence_type},
+                status=AnalysisStatus('completed'),
+            )
+        ),
+        key=lambda el: el['timestamp_completed'],
+    )
 
-    for es_index in dataset_es_indices:
+    if len(es_index_analyses) > 0:
+        es_index = es_index_analyses[-1]['output']
+    else:
+        es_index = ES_INDICES[sequence_type][dataset]
+        print(f'{dataset} :: Falling back to YAML es-index: "{es_index}"')
 
-        data = {
-            'elasticsearchIndex': es_index,
-            'datasetType': 'VARIANTS',
-            'mappingFilePath': fn_path,
-            'ignoreExtraSamplesInCallset': False,
-        }
-        print(data)
+    data = {
+        'elasticsearchIndex': es_index,
+        'datasetType': 'VARIANTS',
+        'mappingFilePath': fn_path,
+        'ignoreExtraSamplesInCallset': False,
+    }
+    print(data)
 
-        req1_url = BASE + url_update_es_index.format(projectGuid=project_guid)
-        resp_1 = requests.post(req1_url, json=data, headers=headers)
-        print(f'{dataset} :: Updated ES index with status: {resp_1.status_code}')
-        if not resp_1.ok:
-            print(f'{dataset} :: Request failed with information: {resp_1.text}')
-        resp_1.raise_for_status()
+    req1_url = BASE + url_update_es_index.format(projectGuid=project_guid)
+    resp_1 = requests.post(req1_url, json=data, headers=headers)
+    print(f'{dataset} :: Updated ES index with status: {resp_1.status_code}')
+    if not resp_1.ok:
+        print(f'{dataset} :: Request failed with information: {resp_1.text}')
+    resp_1.raise_for_status()
 
-        req2_url = BASE + url_update_saved_variants.format(projectGuid=project_guid)
-        resp_2 = requests.post(req2_url, json={}, headers=headers)
-        print(
-            f'{dataset} :: Updated saved variants with status code: {resp_2.status_code}'
-        )
-        if not resp_2.ok:
-            print(f'{dataset} :: Request failed with information: {resp_2.text}')
-        resp_2.raise_for_status()
+    req2_url = BASE + url_update_saved_variants.format(projectGuid=project_guid)
+    resp_2 = requests.post(req2_url, json={}, headers=headers)
+    print(f'{dataset} :: Updated saved variants with status code: {resp_2.status_code}')
+    if not resp_2.ok:
+        print(f'{dataset} :: Request failed with information: {resp_2.text}')
+    resp_2.raise_for_status()
 
 
-def _get_pedigree_csv_from_sm(dataset: str) -> str | None:
+def _get_pedigree_csv_from_sm(dataset: str, family_eids: set[str]) -> str | None:
     """Call get_pedigree and return formatted string with header"""
 
     ped_rows = seqapi.get_pedigree(project=dataset)
@@ -341,20 +443,52 @@ def _get_pedigree_csv_from_sm(dataset: str) -> str | None:
         'notes',
     ]
     formatted_ped_rows.extend(
-        ','.join(str(r.get(k) or '') for k in keys) for r in ped_rows
+        ','.join(str(r.get(k) or '') for k in keys)
+        for r in ped_rows
+        if r['family_id'] in family_eids
     )
 
     return '\n'.join(formatted_ped_rows)
 
 
-def get_cram_map(dataset):
-    reads_map = aapi.get_sample_reads_map_for_seqr(project=dataset)
-    reads_list = [l for l in list(set(reads_map.split("\n")))]
+def get_cram_map(dataset, participant_eids: list[str], sequence_type):
+    logging.info(f'{dataset} :: Getting cram map')
+
+    IS_OLD = True
+
+    if IS_OLD:
+        base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
+        from sample_metadata.configuration import _get_google_auth_token
+
+        resp = requests.get(
+            base + f'/api/v1/analysis/{dataset}/sample-cram-path-map/tsv',
+            headers={'Authorization': f'Bearer {_get_google_auth_token()}'},
+        )
+        resp.raise_for_status()
+        reads_map = resp.text
+    else:
+        reads_map = aapi.get_samples_reads_map(
+            project=dataset, sequence_types=[SequenceType(sequence_type)]
+        )
+
+    if isinstance(reads_map, str) and reads_map.startswith('<!doctype html>'):
+        print(f'{dataset} :: Bad API format (404d) for reads map')
+        return
+    if not reads_map:
+        print(f'{dataset} :: Bad API format for reads map')
+        return
+
+    reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))))
+    reads_list = [
+        "\t".join(l.split("\t")[:2])
+        for l in reads_list
+        if l.split("\t")[0] in participant_eids
+    ]
 
     # temporarily
-    d = '/Users/michael.franklin/source/sample-metadata/cram-map'
+    d = '/Users/mfranklin/source/sample-metadata/cram-map/'
     with open(os.path.join(d, dataset + '-cram-map.tsv'), 'w+') as f:
-        f.writelines(reads_list)
+        f.write("\n".join(reads_list))
 
 
 def get_token():
@@ -377,7 +511,7 @@ def get_token():
         return credentials.token
 
 
-def sync_all_datasets(ignore: set[str] = None):
+def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
     seqr_projects = ProjectApi().get_seqr_projects()
     error_projects = []
     for project in seqr_projects:
@@ -391,7 +525,7 @@ def sync_all_datasets(ignore: set[str] = None):
             continue
 
         try:
-            sync_dataset(project_name, seqr_guid)
+            sync_dataset(project_name, seqr_guid, sequence_type=sequence_type)
         except Exception as e:
             error_projects.append((project_name, e))
 
@@ -404,7 +538,7 @@ def sync_all_datasets(ignore: set[str] = None):
     return error_projects
 
 
-def sync_single_dataset_from_name(dataset):
+def sync_single_dataset_from_name(dataset, sequence_type: str):
     seqr_projects = ProjectApi().get_seqr_projects()
     for project in seqr_projects:
         project_name = project['name']
@@ -416,23 +550,21 @@ def sync_single_dataset_from_name(dataset):
                 f'{project_name} does NOT have a meta.seqr_guid is not set'
             )
 
-        return sync_dataset(project_name, seqr_guid)
+        return sync_dataset(
+            project_name, seqr_guid=seqr_guid, sequence_type=sequence_type
+        )
 
     raise ValueError(f'Could not find {dataset} seqr project')
 
 
 if __name__ == '__main__':
     # sync_single_dataset_from_name('ohmr4-epilepsy')
-    get_cram_map('validation')
+    # get_cram_map('validation')
     # sync_dataset('validation', 'R0019_validation')
-    # ignore = {
-    #     'heartkids',
-    #     'acute-care',
-    #     'perth-neuro',
-    #     'ravenscroft-rdstudy',
-    #     'circa',
-    #     'hereditary-neuro',
-    # }
-    # ignore = {'ohmr4-epilepsy'}
-    # ignore = None
-    # sync_all_datasets(ignore=ignore)
+    # sync_dataset('mito-disease', 'R0016_mito_disease_testing_exo', 'exome')
+    # sync_dataset('hereditary-neuro', 'R0014_hereditary_neuro_test_2', 'exome')
+    # sync_dataset('kidgen', 'R0015_kidgen_exome_testing', 'exome')
+    # sync_single_dataset_from_name('acute-care', 'genome')
+
+    ignore = {'ohmr4-epilepsy', 'acute-care'}
+    sync_all_datasets(sequence_type='genome', ignore=ignore)
