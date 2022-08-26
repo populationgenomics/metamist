@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime, date
 from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
@@ -9,9 +9,9 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 
 from models.enums import AnalysisStatus, AnalysisType
+from models.models.sequence import SequenceType
 from models.models.analysis import (
     Analysis,
-    # ProjectSizeModel
 )
 from models.models.sample import sample_id_format_list
 
@@ -150,37 +150,65 @@ class AnalysisLayer(BaseLayer):
         on the date range
         """
 
-        result: dict[int, list] = defaultdict(list)
         projects = dict(zip(sample_ids, project_ids))
 
         # Get sample history
         history = await self.sampt.get_sample_create_date(sample_ids)
 
+        def keep_sample(sid):
+            d = history[sid]
+            if start_date and d <= start_date:
+                return True
+            if end_date and d <= end_date:
+                return True
+            if not start_date and not end_date:
+                return True
+            return False
+
         # Get size of analysis crams
+        use_samples = list(filter(keep_sample, sample_ids))
         crams = await self.at.query_analysis(
-            sample_ids=sample_ids,
+            sample_ids=use_samples,
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
         )
-        crams_by_sid: dict[Any, dict[str, list]] = defaultdict(
+        crams_by_sid: dict[int, dict[SequenceType, list]] = defaultdict(
             lambda: defaultdict(list)
         )
 
         # Manual filtering to find the most recent analysis cram of each sequence type
         # for each sample
         for cram in crams:
-            if len(cram.sample_ids) == 1:
-                sid = cram.sample_ids[0]
-                seqtype = cram.meta.get('sequence_type')
-                seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
-                size = cram.meta.get('size')
+            sids = cram.sample_ids
+            seqtype = cram.meta.get('sequence_type')
+            seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
+            size = cram.meta.get('size')
 
-                if seqtype and size:
-                    crams_by_sid[sid][seqtype].append(cram)
+            if len(sids) == 1 and not isinstance(seqtype, list) and seqtype and size:
+                sid = int(sids[0])
+                seqtype = SequenceType(seqtype)
+                crams_by_sid[sid][seqtype].append(cram)
 
         # Format output
-        for s in sample_ids:
-            result[projects[s]].append({'sample': s, 'dates': history[s]})
+        result: dict[int, list] = defaultdict(list)
+        for sid in use_samples:
+            sample_crams: dict[SequenceType, int] = defaultdict(int)
+            for seqtype in crams_by_sid[sid]:
+                sequence_crams = sorted(
+                    crams_by_sid[sid][seqtype],
+                    key=lambda x: datetime.fromisoformat((x.timestamp_completed)),
+                )
+                latest_cram = sequence_crams.pop()
+                sample_crams[seqtype] = latest_cram.meta['size']
+
+            # Set final result
+            sample_entry = {
+                'start': datetime.strptime(history[sid], '%Y-%m-%d').date(),
+                'end': None,  # TODO: add functionality for deleted samples
+                'size': sample_crams,
+            }
+
+            result[projects[sid]].append({'sample': sid, 'dates': [sample_entry]})
 
         return result
 
