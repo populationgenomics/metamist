@@ -22,7 +22,9 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import (
     Analysis,
-    # ProjectSizeModel
+    ProjectSizeModel,
+    SampleSizeModel,
+    DateSizeModel,
 )
 from models.models.sample import (
     sample_id_transform_to_raw_list,
@@ -326,7 +328,7 @@ async def get_sample_file_sizes(
     end_date: str = None,
     project_names: List[str] = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[Any]:
+) -> list[ProjectSizeModel]:
     """
     Get the per sample file size by type over the given projects and date range
     """
@@ -366,15 +368,18 @@ async def get_sample_file_sizes(
         project_ids=project_ids, sample_ids=sample_ids, start_date=start, end_date=end
     )
 
-    # Convert dict to list
+    # Convert output type
     fixed_pids: List[Any] = [
-        {
-            'project': prj_name_map[p],
-            'samples': [
-                {'sample': sample_id_format(s['sample']), 'dates': s['dates']}
+        ProjectSizeModel(
+            project=prj_name_map[p],
+            samples=[
+                SampleSizeModel(
+                    sample=sample_id_format(s['sample']),
+                    dates=[DateSizeModel(**d) for d in s['dates']],
+                )
                 for s in samples
             ],
-        }
+        )
         for p, samples in results.items()
     ]
 

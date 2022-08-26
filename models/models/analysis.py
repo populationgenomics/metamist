@@ -54,14 +54,14 @@ class DateSizeModel(BaseModel):
     """Date Size model"""
 
     start: date
-    end: date
+    end: date | None
     size: dict[SequenceType, int]
 
 
 class SampleSizeModel(BaseModel):
     """Project Size model"""
 
-    cpg_id: str
+    sample: str
     dates: list[DateSizeModel]
 
 

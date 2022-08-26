@@ -82,6 +82,11 @@ export SM_DEV_DB_PORT=3306 # default mariadb port
 ```
 
 Create the database in MariaDB (by default, we call it `sm_dev`):
+If you use a different databse name also set the following
+
+```shell
+export SM_DEV_DB_NAME=sm_database_name
+```
 
 > Sample-metadata stores all metadata in one database (_previously: one database per project_).
 
@@ -93,12 +98,12 @@ Download the `mariadb-java-client` and create the schema using liquibase:
 
 ```shell
 pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
     --changeLogFile project.xml \
     --url jdbc:mariadb://localhost/sm_dev \
     --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-2.7.2.jar \
+    --classpath mariadb-java-client-3.0.3.jar \
     --username root \
     update
 popd
@@ -131,12 +136,12 @@ Go into the `db/` subdirectory, download the `mariadb-java-client` and create th
 ```bash
 
 pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
     --changeLogFile project.xml \
     --url jdbc:mariadb://127.0.0.1:3307/sm_dev \
     --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-2.7.2.jar \
+    --classpath mariadb-java-client-3.0.3.jar \
     --username root \
     update
 popd
