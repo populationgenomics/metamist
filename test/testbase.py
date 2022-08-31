@@ -101,7 +101,7 @@ class DbTest(unittest.TestCase):
                     *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
                     *('--driver', 'org.mariadb.jdbc.Driver'),
-                    *('--classpath', db_prefix + '/mariadb-java-client-2.7.2.jar'),
+                    *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
                     *('--username', db.MYSQL_USER),
                     *('--password', db.MYSQL_PASSWORD),
                     'update',

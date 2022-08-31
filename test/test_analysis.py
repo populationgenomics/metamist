@@ -1,9 +1,13 @@
 # pylint: disable=invalid-overridden-method
+from datetime import date, timedelta
+
 from test.testbase import DbIsolatedTest, run_test_as_sync
+
+from models.enums.sequencing import SequenceType
+from models.enums import AnalysisType, AnalysisStatus
 
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer, SampleType
-from models.enums import AnalysisType, AnalysisStatus
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -56,7 +60,50 @@ class TestAnalysis(DbIsolatedTest):
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
             sample_ids=[1],
-            meta={},
+            meta={'sequence_type': 'genome', 'size': 1024},
         )
 
-        return
+        result = await self.al.get_sample_file_sizes(project_ids=[1])
+        expected = [
+            {
+                'project': 1,
+                'samples': [
+                    {
+                        'sample': 1,
+                        'dates': [
+                            {
+                                'start': date.today(),
+                                'end': None,
+                                'size': {SequenceType.GENOME: 1024},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+
+        # Check output is formatted correctly
+        self.assertDictEqual(expected[0], result[0])
+
+        # Add exome cram
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+            sample_ids=[1],
+            meta={'sequence_type': 'exome', 'size': 3141},
+        )
+
+        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.EXOME] = 3141
+
+        # Assert that the exome size was added correctly
+        result = await self.al.get_sample_file_sizes(project_ids=[1])
+        self.assertDictEqual(expected[0], result[0])
+
+        # Assert that if we select a date range outside of sample creation date
+        # that is doesn't show up in the map
+        yesterday = date.today() - timedelta(days=1)
+        result = await self.al.get_sample_file_sizes(
+            project_ids=[1], end_date=yesterday
+        )
+
+        self.assertEqual([], [])

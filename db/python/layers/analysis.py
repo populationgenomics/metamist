@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from collections import defaultdict
 from typing import List, Optional, Dict, Any
+from api.utils.dates import strtodate
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -150,7 +151,7 @@ class AnalysisLayer(BaseLayer):
         project_ids: List[int] = None,
         start_date: date = None,
         end_date: date = None,
-    ):
+    ) -> list[dict]:
         """
         Get the file sizes from all the given projects group by sample filtered
         on the date range
@@ -166,7 +167,7 @@ class AnalysisLayer(BaseLayer):
         history = await self.sampt.get_samples_create_date(sample_ids)
 
         def keep_sample(sid):
-            d = history[sid]
+            d = strtodate(history[sid])
             if start_date and d <= start_date:
                 return True
             if end_date and d <= end_date:
@@ -202,7 +203,7 @@ class AnalysisLayer(BaseLayer):
         # Format output
         result: dict[int, list] = defaultdict(list)
         for sid in use_samples:
-            sample_crams: dict[SequenceType, int] = defaultdict(int)
+            sample_crams: dict = {}
             for seqtype in crams_by_sid[sid]:
                 sequence_crams = sorted(
                     crams_by_sid[sid][seqtype],
@@ -220,7 +221,8 @@ class AnalysisLayer(BaseLayer):
 
             result[prj_map[sid]].append({'sample': sid, 'dates': [sample_entry]})
 
-        return result
+        formated = [{'project': p, 'samples': result[p]} for p in result]
+        return formated
 
     # CREATE / UPDATE
 

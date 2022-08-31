@@ -355,16 +355,16 @@ async def get_sample_file_sizes(
     # Convert to the correct output type, converting internal ids to external
     fixed_pids: List[Any] = [
         ProjectSizeModel(
-            project=prj_name_map[p],
+            project=prj_name_map[project_data['project']],
             samples=[
                 SampleSizeModel(
                     sample=sample_id_format(s['sample']),
                     dates=[DateSizeModel(**d) for d in s['dates']],
                 )
-                for s in samples
+                for s in project_data['samples']
             ],
         )
-        for p, samples in results.items()
+        for project_data in results
     ]
 
     return fixed_pids
