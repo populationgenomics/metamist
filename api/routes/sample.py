@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel
 
 from models.enums import SampleType
@@ -235,9 +235,10 @@ async def get_history_of_sample(
     return result
 
 
-@router.post('/dateofcreation', operation_id='getSamplesCreateDate')
+@router.get('/dateofcreation', operation_id='getSamplesCreateDate')
 async def get_samples_create_date(
-    sample_ids: List[str], connection: Connection = get_projectless_db_connection
+    sample_ids: List[str] = Query(None),
+    connection: Connection = get_projectless_db_connection,
 ):
     """Get full history of sample from internal ID"""
     pt = ProjectPermissionsTable(connection.connection)

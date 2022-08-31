@@ -6,7 +6,7 @@ from datetime import date
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
-from fastapi.params import Body
+from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from api.utils.dates import strtodate
@@ -323,9 +323,9 @@ async def get_sample_reads_map_for_seqr(
     )
 
 
-@router.post('/sample-file-sizes', operation_id='getSampleFileSizes')
+@router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
 async def get_sample_file_sizes(
-    project_names: List[str],
+    project_names: List[str] = Query(None),
     start_date: str = None,
     end_date: str = None,
     connection: Connection = get_projectless_db_connection,
