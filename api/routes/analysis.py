@@ -17,7 +17,6 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
-from db.python.layers.sample import SampleLayer
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus
@@ -30,7 +29,6 @@ from models.models.analysis import (
 from models.models.sample import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
-    sample_id_transform_to_raw,
     sample_id_format,
 )
 
@@ -334,7 +332,6 @@ async def get_sample_file_sizes(
     Get the per sample file size by type over the given projects and date range
     """
     atable = AnalysisLayer(connection)
-    stable = SampleLayer(connection)
 
     # Check access to projects
     project_ids = None
@@ -346,18 +343,13 @@ async def get_sample_file_sizes(
     # Map from internal pids to project name
     prj_name_map = dict(zip(project_ids, project_names))
 
-    # Get samples from pids
-    samples = await stable.get_samples_by(project_ids=project_ids)
-    sample_ids = [sample_id_transform_to_raw(s.id) for s in samples]
-    project_ids = [s.project for s in samples]
-
     # Convert dates
     start = strtodate(start_date)
     end = strtodate(end_date)
 
     # Get results with internal ids as keys
     results = await atable.get_sample_file_sizes(
-        project_ids=project_ids, sample_ids=sample_ids, start_date=start, end_date=end
+        project_ids=project_ids, start_date=start, end_date=end
     )
 
     # Convert to the correct output type, converting internal ids to external

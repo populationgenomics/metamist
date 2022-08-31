@@ -26,6 +26,13 @@ class AnalysisLayer(BaseLayer):
         self.at = AnalysisTable(connection)
 
     # GETS
+    async def get_samples_from_projects(
+        self, project_ids: list[int], active_only: bool = True
+    ) -> dict[int, int]:
+        """Returns all active sample_ids with project in the set of project_ids"""
+        return await self.sampt.get_samples_from_projects(
+            project_ids=project_ids, active_only=active_only
+        )
 
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
@@ -141,16 +148,19 @@ class AnalysisLayer(BaseLayer):
     async def get_sample_file_sizes(
         self,
         project_ids: List[int] = None,
-        sample_ids: List[int] = None,
-        start_date: date = None,  # pylint: disable=W0613
-        end_date: date = None,  # pylint: disable=W0613
+        start_date: date = None,
+        end_date: date = None,
     ):
         """
         Get the file sizes from all the given projects group by sample filtered
         on the date range
         """
 
-        projects = dict(zip(sample_ids, project_ids))
+        # Get samples from pids
+        prj_map = await self.get_samples_from_projects(
+            project_ids=project_ids, active_only=True
+        )
+        sample_ids = list(prj_map.keys())
 
         # Get sample history
         history = await self.sampt.get_samples_create_date(sample_ids)
@@ -208,7 +218,7 @@ class AnalysisLayer(BaseLayer):
                 'size': sample_crams,
             }
 
-            result[projects[sid]].append({'sample': sid, 'dates': [sample_entry]})
+            result[prj_map[sid]].append({'sample': sid, 'dates': [sample_entry]})
 
         return result
 

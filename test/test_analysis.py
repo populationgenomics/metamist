@@ -47,8 +47,16 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
 
     @run_test_as_sync
-    async def test_(self):
+    async def test_get_sample_file_sizes(self):
         """
-        Test adding an analysis of type CRAM
+        Test retrieval of sample file sizes over time
         """
+
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+            sample_ids=[1],
+            meta={},
+        )
+
         return
