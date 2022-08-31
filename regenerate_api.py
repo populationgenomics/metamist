@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def check_if_server_is_accessible() -> bool:
     """Check if request to 'SCHEMA_URL' returns OK"""
     try:
-        return requests.get(SCHEMA_URL).ok
+        return requests.get(SCHEMA_URL, timeout=None).ok
     except requests.ConnectionError:
         return False
 
