@@ -230,7 +230,7 @@ WHERE fp.participant_id in :pids
             sequence_promise,
             participant_promise,
             family_promise,
-            sampl.get_sample_create_date(sids),
+            sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
         )
 

@@ -256,13 +256,20 @@ The installable API is automatically generated through the `package.yml` GitHub 
 
 To generate the python api you'll need to install openapi generator v5.x.x
 
-Follow [this tutorial](https://openapi-generator.tech/docs/installation/) for
-to specify the version and install.
+To install a specific version of the openapi-generator dow the following:
 
-Then set your environment variable OPENAPI_COMMAND to the following:
+```bash
+npm install @openapitools/openapi-generator-cli -g
+openapi-generator-cli version-manager set 5.3.0
+```
+
+Then set your environment variable OPENAPI_COMMAND to the following.
+You can also add an alias to your ~/.bash_profile or equivalent for running in the
+terminal.
 
 ```bash
 export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
+alias openapi-generator="npx @openapitools/openapi-generator-cli"
 ```
 
 You could generate the installable API and install it with pip by running:

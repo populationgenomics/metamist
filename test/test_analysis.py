@@ -45,3 +45,10 @@ class TestAnalysis(DbIsolatedTest):
 
         self.assertEqual(1, analysis_samples[0]['sample_id'])
         self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
+
+    @run_test_as_sync
+    async def test_(self):
+        """
+        Test adding an analysis of type CRAM
+        """
+        return

@@ -47,6 +47,10 @@ class SampleLayer(BaseLayer):
         self.connection = connection
 
     # GETS
+    async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
+        """Return the projects associated with the sample ids"""
+        return await self.st.get_project_ids_for_sample_ids(sample_ids)
+
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
     ) -> Sample:
@@ -150,9 +154,9 @@ class SampleLayer(BaseLayer):
         m = await self.st.get_sample_with_missing_participants_by_internal_id(project)
         return dict(m)
 
-    async def get_sample_create_date(self, sample_ids: List[int]):
+    async def get_samples_create_date(self, sample_ids: List[int]):
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
-        return await self.st.get_sample_create_date(sample_ids)
+        return await self.st.get_samples_create_date(sample_ids)
 
     # CREATE / UPDATES
     async def insert_sample(

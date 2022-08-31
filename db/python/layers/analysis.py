@@ -153,7 +153,7 @@ class AnalysisLayer(BaseLayer):
         projects = dict(zip(sample_ids, project_ids))
 
         # Get sample history
-        history = await self.sampt.get_sample_create_date(sample_ids)
+        history = await self.sampt.get_samples_create_date(sample_ids)
 
         def keep_sample(sid):
             d = history[sid]
@@ -196,7 +196,7 @@ class AnalysisLayer(BaseLayer):
             for seqtype in crams_by_sid[sid]:
                 sequence_crams = sorted(
                     crams_by_sid[sid][seqtype],
-                    key=lambda x: datetime.fromisoformat((x.timestamp_completed)),
+                    key=lambda x: datetime.fromisoformat(x.timestamp_completed),
                 )
                 latest_cram = sequence_crams.pop()
                 sample_crams[seqtype] = latest_cram.meta['size']

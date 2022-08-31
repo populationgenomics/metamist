@@ -235,13 +235,20 @@ async def get_history_of_sample(
     return result
 
 
-@router.post('/created', operation_id='getSampleCreateDate')
-async def get_sample_create_date(
+@router.post('/dateofcreation', operation_id='getSamplesCreateDate')
+async def get_samples_create_date(
     sample_ids: List[str], connection: Connection = get_projectless_db_connection
 ):
     """Get full history of sample from internal ID"""
+    pt = ProjectPermissionsTable(connection.connection)
     st = SampleLayer(connection)
-    internal_ids = sample_id_transform_to_raw_list(sample_ids)
-    result = await st.get_sample_create_date(internal_ids)
+
+    # Check access permissions
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
+    pjcts = await st.get_project_ids_for_sample_ids(sample_ids_raw)
+    await pt.check_access_to_project_ids(connection.author, pjcts, readonly=True)
+
+    # Convert to raw ids and query the start dates for all of them
+    result = await st.get_samples_create_date(sample_ids_raw)
 
     return {sample_id_format(k): v for k, v in result.items()}

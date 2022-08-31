@@ -1,6 +1,6 @@
 import io
 import csv
-from datetime import date, datetime
+from datetime import date
 
 # from collections import defaultdict
 from typing import List, Optional, Dict, Any
@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.params import Body
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+from api.utils.dates import strtodate
 
 from api.utils.db import (
     get_projectless_db_connection,
@@ -324,9 +325,9 @@ async def get_sample_reads_map_for_seqr(
 
 @router.post('/sample-file-sizes', operation_id='getSampleFileSizes')
 async def get_sample_file_sizes(
+    project_names: List[str],
     start_date: str = None,
     end_date: str = None,
-    project_names: List[str] = None,
     connection: Connection = get_projectless_db_connection,
 ) -> list[ProjectSizeModel]:
     """
@@ -337,38 +338,29 @@ async def get_sample_file_sizes(
 
     # Check access to projects
     project_ids = None
-    if project_names:
-        pt = ProjectPermissionsTable(connection=connection.connection)
-        project_ids = await pt.get_project_ids_from_names_and_user(
-            connection.author, project_names, readonly=True
-        )
+    pt = ProjectPermissionsTable(connection=connection.connection)
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, project_names, readonly=True
+    )
 
+    # Map from internal pids to project name
     prj_name_map = dict(zip(project_ids, project_names))
-
-    # Try to convert dates
-    start, end = None, None
-    if start_date or end_date:
-        try:
-            if start_date:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-
-            if end_date:
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except Exception as excep:
-            raise ValueError(
-                f'Start or end date could not be converted: {start_date} {end_date}'
-            ) from excep
 
     # Get samples from pids
     samples = await stable.get_samples_by(project_ids=project_ids)
     sample_ids = [sample_id_transform_to_raw(s.id) for s in samples]
     project_ids = [s.project for s in samples]
 
+    # Convert dates
+    start = strtodate(start_date)
+    end = strtodate(end_date)
+
+    # Get results with internal ids as keys
     results = await atable.get_sample_file_sizes(
         project_ids=project_ids, sample_ids=sample_ids, start_date=start, end_date=end
     )
 
-    # Convert output type
+    # Convert to the correct output type, converting internal ids to external
     fixed_pids: List[Any] = [
         ProjectSizeModel(
             project=prj_name_map[p],
