@@ -25,8 +25,8 @@ for project in ['thousand-genomes', 'hgdp']:
     )
 
     pops_tsv_path = 'samples-pops.tsv'
-    meta_by_collaborator_id = dict()
-    meta_by_illumina_id = dict()
+    meta_by_collaborator_id = {}
+    meta_by_illumina_id = {}
     with to_path(pops_tsv_path).open() as fh:
         tsv_file = csv.DictReader(fh, delimiter='\t')
         for entry in tsv_file:
@@ -36,7 +36,7 @@ for project in ['thousand-genomes', 'hgdp']:
             if illumina_id != 'NA':
                 meta_by_illumina_id[illumina_id] = entry
 
-    meta_by_cpg_id = dict()
+    meta_by_cpg_id = {}
     for s in metamist_samples:
         ext_id = s['external_id']
         meta = meta_by_illumina_id.get(ext_id) or meta_by_collaborator_id.get(ext_id)
@@ -59,7 +59,7 @@ for project in ['thousand-genomes', 'hgdp']:
         pid_map = papi.get_participant_id_map_by_external_ids(
             project=project, request_body=[s['external_id'] for s in metamist_samples]
         )
-    except:
+    except BaseException:
         if input('Participant entries do not exist. Create? (y/n): ').lower() == 'y':
             # Create new
             body = ParticipantUpsertBody(
