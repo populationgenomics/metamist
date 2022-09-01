@@ -14,7 +14,12 @@ from sample_metadata.apis import ParticipantApi
 @click.option('--force', is_flag=True, help='Do not confirm updates')
 def main(participant_id_json: str, project: str, force: bool = False):
     """Update participant IDs by external ID with map {old_external: new_external}"""
-    pid_map = json.loads(participant_id_json)
+    if participant_id_json.startswith('{'):
+        pid_map = json.loads(participant_id_json)
+    else:
+        with open(participant_id_json) as f:
+            pid_map = json.load(f)
+
     papi = ParticipantApi()
     internal_pid_map = papi.get_participant_id_map_by_external_ids(
         project=project, request_body=list(pid_map.keys()), allow_missing=True
