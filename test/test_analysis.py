@@ -17,14 +17,21 @@ class TestAnalysis(DbIsolatedTest):
     async def setUp(self) -> None:
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
-        sl = SampleLayer(self.connection)
+        self.sl = SampleLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
 
-        await sl.insert_sample(
+        self.sample_id = await self.sl.insert_sample(
             'Test01',
             SampleType.BLOOD,
             meta={'meta': 'meta ;)'},
             active=True,
+        )
+
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+            sample_ids=[self.sample_id],
+            meta={'sequence_type': 'genome', 'size': 1024},
         )
 
     @run_test_as_sync
@@ -32,12 +39,6 @@ class TestAnalysis(DbIsolatedTest):
         """
         Test adding an analysis of type CRAM
         """
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[1],
-            meta={},
-        )
 
         analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
         analysis_samples = await self.connection.connection.fetch_all(
@@ -56,20 +57,13 @@ class TestAnalysis(DbIsolatedTest):
         Test retrieval of sample file sizes over time
         """
 
-        await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
-            status=AnalysisStatus.COMPLETED,
-            sample_ids=[1],
-            meta={'sequence_type': 'genome', 'size': 1024},
-        )
-
         result = await self.al.get_sample_file_sizes(project_ids=[1])
         expected = [
             {
                 'project': 1,
                 'samples': [
                     {
-                        'sample': 1,
+                        'sample': self.sample_id,
                         'dates': [
                             {
                                 'start': date.today(),
@@ -89,7 +83,7 @@ class TestAnalysis(DbIsolatedTest):
         await self.al.insert_analysis(
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
-            sample_ids=[1],
+            sample_ids=[self.sample_id],
             meta={'sequence_type': 'exome', 'size': 3141},
         )
 
