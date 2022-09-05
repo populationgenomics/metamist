@@ -74,7 +74,7 @@ def get_logger():
         # pylint: disable=import-outside-toplevel,c-extension-no-member
         import google.cloud.logging
 
-        client = google.cloud.logging.Client()
+        client = google.cloud.logging.Client()  # pylint: disable=no-member
         client.get_default_handler()
         client.setup_logging()
 

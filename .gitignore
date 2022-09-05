@@ -30,3 +30,6 @@ build/
 test/*.sh
 .coverage
 coverage.xml
+temp.json
+data-dump.sql
+local.py

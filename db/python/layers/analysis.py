@@ -1,3 +1,5 @@
+from datetime import datetime, date
+from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
 from db.python.connect import Connection
@@ -5,10 +7,17 @@ from db.python.layers.base import BaseLayer
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
+from db.python.utils import get_logger
 
 from models.enums import AnalysisStatus, AnalysisType
-from models.models.analysis import Analysis
+from models.models.sequence import SequenceType
+from models.models.analysis import (
+    Analysis,
+)
 from models.models.sample import sample_id_format_list
+
+
+logger = get_logger()
 
 
 class AnalysisLayer(BaseLayer):
@@ -17,9 +26,17 @@ class AnalysisLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
 
+        self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
 
     # GETS
+    async def get_samples_from_projects(
+        self, project_ids: list[int], active_only: bool = True
+    ) -> dict[int, int]:
+        """Returns all active sample_ids with project in the set of project_ids"""
+        return await self.sampt.get_samples_from_projects(
+            project_ids=project_ids, active_only=active_only
+        )
 
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
@@ -131,6 +148,93 @@ class AnalysisLayer(BaseLayer):
         )
 
         return analyses
+
+    async def get_sample_file_sizes(
+        self,
+        project_ids: List[int] = None,
+        start_date: date = None,
+        end_date: date = None,
+    ) -> list[dict]:
+        """
+        Get the file sizes from all the given projects group by sample filtered
+        on the date range
+        """
+
+        # Get samples from pids
+        prj_map = await self.get_samples_from_projects(
+            project_ids=project_ids, active_only=True
+        )
+        sample_ids = list(prj_map.keys())
+
+        # Get sample history
+        history = await self.sampt.get_samples_create_date(sample_ids)
+
+        def keep_sample(sid):
+            d = history[sid]
+            if start_date and d <= start_date:
+                return True
+            if end_date and d <= end_date:
+                return True
+            if not start_date and not end_date:
+                return True
+            return False
+
+        # Get size of analysis crams
+        use_samples = list(filter(keep_sample, sample_ids))
+        crams = await self.at.query_analysis(
+            sample_ids=use_samples,
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+        )
+        crams_by_sid: dict[int, dict[SequenceType, list]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+
+        # Manual filtering to find the most recent analysis cram of each sequence type
+        # for each sample
+        affected_analyses = []
+        for cram in crams:
+            sids = cram.sample_ids
+            seqtype = cram.meta.get('sequence_type')
+            seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
+            size = cram.meta.get('size')
+
+            if len(sids) > 1:
+                affected_analyses.append(cram['id'])
+                continue
+
+            if not isinstance(seqtype, list) and seqtype and size:
+                sid = int(sids[0])
+                seqtype = SequenceType(seqtype)
+                crams_by_sid[sid][seqtype].append(cram)
+
+        # Log weird crams
+        for cram in affected_analyses:
+            logger.error(f'Cram with multiple sids ignored: {cram}')
+
+        # Format output
+        result: dict[int, list] = defaultdict(list)
+        for sid in use_samples:
+            sample_crams: dict = {}
+            for seqtype in crams_by_sid[sid]:
+                sequence_crams = sorted(
+                    crams_by_sid[sid][seqtype],
+                    key=lambda x: datetime.fromisoformat(x.timestamp_completed),
+                )
+                latest_cram = sequence_crams.pop()
+                sample_crams[seqtype] = latest_cram.meta['size']
+
+            # Set final result
+            sample_entry = {
+                'start': history[sid],
+                'end': None,  # TODO: add functionality for deleted samples
+                'size': sample_crams,
+            }
+
+            result[prj_map[sid]].append({'sample': sid, 'dates': [sample_entry]})
+
+        formated = [{'project': p, 'samples': result[p]} for p in result]
+        return formated
 
     # CREATE / UPDATE
 
