@@ -88,8 +88,18 @@ def check_openapi_version():
     """
     Check compatible OpenAPI version
     """
-    command = [*OPENAPI_COMMAND, 'version']
-    out = subprocess.check_output(command).decode().split('\n', maxsplit=1)[0].strip()
+    cmds = ['--version', 'version']
+
+    for cmd in cmds:
+        command = [*OPENAPI_COMMAND, cmd]
+
+        try:
+            out = subprocess.check_output(command)
+        except Exception:  # pylint: disable=broad-except
+            continue
+
+    out = out.decode().split('\n', maxsplit=1)[0].strip()
+
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
     if not version_match:
         raise Exception(f'Could not detect version of openapi-generator from "{out}"')

@@ -1,7 +1,6 @@
 from datetime import datetime, date
 from collections import defaultdict
 from typing import List, Optional, Dict, Any
-from api.utils.dates import strtodate
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -167,7 +166,7 @@ class AnalysisLayer(BaseLayer):
         history = await self.sampt.get_samples_create_date(sample_ids)
 
         def keep_sample(sid):
-            d = strtodate(history[sid])
+            d = history[sid]
             if start_date and d <= start_date:
                 return True
             if end_date and d <= end_date:
@@ -214,7 +213,7 @@ class AnalysisLayer(BaseLayer):
 
             # Set final result
             sample_entry = {
-                'start': datetime.strptime(history[sid], '%Y-%m-%d').date(),
+                'start': history[sid],
                 'end': None,  # TODO: add functionality for deleted samples
                 'size': sample_crams,
             }

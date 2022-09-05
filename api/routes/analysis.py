@@ -2,14 +2,13 @@ import io
 import csv
 from datetime import date
 
-# from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from api.utils.dates import strtodate
+from api.utils.dates import parse_date_only_string
 
 from api.utils.db import (
     get_projectless_db_connection,
@@ -344,8 +343,8 @@ async def get_sample_file_sizes(
     prj_name_map = dict(zip(project_ids, project_names))
 
     # Convert dates
-    start = strtodate(start_date)
-    end = strtodate(end_date)
+    start = parse_date_only_string(start_date)
+    end = parse_date_only_string(end_date)
 
     # Get results with internal ids as keys
     results = await atable.get_sample_file_sizes(

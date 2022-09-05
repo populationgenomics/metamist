@@ -77,6 +77,7 @@ class TestAnalysis(DbIsolatedTest):
         ]
 
         # Check output is formatted correctly
+        self.assertEqual(1, len(result))
         self.assertDictEqual(expected[0], result[0])
 
         # Add exome cram
@@ -100,4 +101,45 @@ class TestAnalysis(DbIsolatedTest):
             project_ids=[1], end_date=yesterday
         )
 
-        self.assertEqual([], [])
+        self.assertEqual([], result)
+
+        # Add another genome cram that's newer
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+            sample_ids=[self.sample_id],
+            meta={'sequence_type': 'genome', 'size': 11111},
+        )
+
+        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.GENOME] = 11111
+        result = await self.al.get_sample_file_sizes(project_ids=[1])
+        self.assertDictEqual(expected[0], result[0])
+
+        # Add another sample and it's analysis cram as well
+        sample_id_2 = await self.sl.insert_sample(
+            'Test02',
+            SampleType.BLOOD,
+            meta={'meta': 'meta ;)'},
+            active=True,
+        )
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.CRAM,
+            status=AnalysisStatus.COMPLETED,
+            sample_ids=[sample_id_2],
+            meta={'sequence_type': 'genome', 'size': 987654321},
+        )
+
+        sample_2_data = {
+            'sample': sample_id_2,
+            'dates': [
+                {
+                    'start': date.today(),
+                    'end': None,
+                    'size': {SequenceType.GENOME: 987654321},
+                }
+            ],
+        }
+        expected[0]['samples'].append(sample_2_data)
+
+        result = await self.al.get_sample_file_sizes(project_ids=[1])
+        self.assertDictEqual(expected[0], result[0])

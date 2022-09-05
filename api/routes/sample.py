@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from models.enums import SampleType
@@ -235,19 +235,16 @@ async def get_history_of_sample(
     return result
 
 
-@router.get('/dateofcreation', operation_id='getSamplesCreateDate')
+@router.post('/samples-create-date', operation_id='getSamplesCreateDate')
 async def get_samples_create_date(
-    sample_ids: List[str] = Query(None),
+    sample_ids: List[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """Get full history of sample from internal ID"""
-    pt = ProjectPermissionsTable(connection.connection)
     st = SampleLayer(connection)
 
     # Check access permissions
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
-    pjcts = await st.get_project_ids_for_sample_ids(sample_ids_raw)
-    await pt.check_access_to_project_ids(connection.author, pjcts, readonly=True)
 
     # Convert to raw ids and query the start dates for all of them
     result = await st.get_samples_create_date(sample_ids_raw)

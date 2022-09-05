@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
-from db.python.tables.project import ProjectId
+from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 
 from models.enums import SampleType
@@ -44,6 +44,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
+        self.pt = ProjectPermissionsTable(connection.connection)
         self.connection = connection
 
     # GETS
@@ -156,6 +157,8 @@ class SampleLayer(BaseLayer):
 
     async def get_samples_create_date(self, sample_ids: List[int]):
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
+        await self.pt.check_access_to_project_ids(self.author, pjcts, readonly=True)
         return await self.st.get_samples_create_date(sample_ids)
 
     # CREATE / UPDATES
