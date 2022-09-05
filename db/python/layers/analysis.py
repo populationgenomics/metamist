@@ -7,6 +7,7 @@ from db.python.layers.base import BaseLayer
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
+from db.python.utils import get_logger
 
 from models.enums import AnalysisStatus, AnalysisType
 from models.models.sequence import SequenceType
@@ -14,6 +15,9 @@ from models.models.analysis import (
     Analysis,
 )
 from models.models.sample import sample_id_format_list
+
+
+logger = get_logger()
 
 
 class AnalysisLayer(BaseLayer):
@@ -188,16 +192,25 @@ class AnalysisLayer(BaseLayer):
 
         # Manual filtering to find the most recent analysis cram of each sequence type
         # for each sample
+        affected_analyses = []
         for cram in crams:
             sids = cram.sample_ids
             seqtype = cram.meta.get('sequence_type')
             seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
             size = cram.meta.get('size')
 
-            if len(sids) == 1 and not isinstance(seqtype, list) and seqtype and size:
+            if len(sids) > 1:
+                affected_analyses.append(cram['id'])
+                continue
+
+            if not isinstance(seqtype, list) and seqtype and size:
                 sid = int(sids[0])
                 seqtype = SequenceType(seqtype)
                 crams_by_sid[sid][seqtype].append(cram)
+
+        # Log weird crams
+        for cram in affected_analyses:
+            logger.error(f'Cram with multiple sids ignored: {cram}')
 
         # Format output
         result: dict[int, list] = defaultdict(list)

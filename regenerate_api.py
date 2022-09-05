@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def check_if_server_is_accessible() -> bool:
     """Check if request to 'SCHEMA_URL' returns OK"""
     try:
-        return requests.get(SCHEMA_URL, timeout=None).ok
+        return requests.get(SCHEMA_URL, timeout=30).ok
     except requests.ConnectionError:
         return False
 
@@ -95,7 +95,7 @@ def check_openapi_version():
 
         try:
             out = subprocess.check_output(command)
-        except Exception:  # pylint: disable=broad-except
+        except subprocess.CalledProcessError:
             continue
 
     out = out.decode().split('\n', maxsplit=1)[0].strip()

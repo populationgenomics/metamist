@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from typing import Iterable, Any
 
 from db.python.connect import DbBase, NotFoundError
@@ -417,7 +418,7 @@ class SampleTable(DbBase):
         )
         return {row['id']: row['external_id'] for row in rows}
 
-    async def get_samples_create_date(self, sample_ids: list[int]):
+    async def get_samples_create_date(self, sample_ids: list[int]) -> dict[int, date]:
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         if len(sample_ids) == 0:
             return {}
