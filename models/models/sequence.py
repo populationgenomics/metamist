@@ -19,6 +19,15 @@ class SampleSequencing(BaseModel):
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())
 
+    def __eq__(self, other):
+        return (
+            self.id == other.id
+            and int(self.sample_id) == int(other.sample_id)
+            and self.status == other.status
+            and self.meta == other.meta
+            and self.type == other.type
+        )
+
     @staticmethod
     def from_db(d: Dict):
         """Take DB mapping object, and return SampleSequencing"""
