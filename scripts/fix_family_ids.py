@@ -15,10 +15,26 @@ from sample_metadata.model.family_update_model import FamilyUpdateModel
 @click.option('--force', is_flag=True, help='Do not confirm updates')
 def main(family_id_json: str, project: str, force=False):
     """Rename family external IDs with map {old_external: new_external}"""
-    fid_map = json.loads(family_id_json)
+    if family_id_json.startswith('{'):
+        fid_map = json.loads(family_id_json)
+    else:
+        with open(family_id_json) as f:
+            fid_map = json.load(f)
+
     fapi = FamilyApi()
     families = fapi.get_families(project=project)
     internal_fid_map = {f['external_id']: f['id'] for f in families}
+
+    family_eids_that_already_exist = [
+        f'{eid} ({internal_fid_map[eid]}) -> {old_eid} ({internal_fid_map.get(old_eid)})'
+        for old_eid, eid in fid_map.items()
+        if eid in internal_fid_map and old_eid in internal_fid_map
+    ]
+    if family_eids_that_already_exist:
+        raise ValueError(
+            f'The following family IDs already exist: {", ".join(family_eids_that_already_exist)}'
+        )
+
     update_map = {
         internal_fid_map[prev_id]: new_id
         for prev_id, new_id in fid_map.items()
