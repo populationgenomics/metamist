@@ -38,6 +38,8 @@ setup(
         'python-dateutil',
         'requests',
         'typing-extensions',
+        # for get id-token
+        'cpg-utils >= 4.6.0',
     ],
     include_package_data=True,
     zip_safe=False,
