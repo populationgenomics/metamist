@@ -21,7 +21,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='4.15.0',
+    version='4.16.0',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -38,6 +38,8 @@ setup(
         'python-dateutil',
         'requests',
         'typing-extensions',
+        # for get id-token
+        'cpg-utils >= 4.6.0',
     ],
     include_package_data=True,
     zip_safe=False,

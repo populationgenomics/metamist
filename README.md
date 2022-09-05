@@ -15,7 +15,6 @@ controlled through membership of the google groups:
 `$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
 are cached in a secret as group-membership identity checks are slow.
 
-
 ## Structure
 
 ![Database structure](resources/2021-10-27_db-diagram.png)
@@ -41,13 +40,14 @@ stores these values separately on the `participant` as:
 
 - `reported_gender` (string, expected `male` | `female` | _other values_)
 - `reported_sex` (follows pedigree convention: `unknown=0 | null`, `male=1`, `female=2`)
-- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes)
+- `inferred_karyotype` (string, eg: `XX` | `XY` | _other karyotypes_)
 
 If you import a pedigree, the sex value is written to the `reported_sex` attribute.
 
 ## Local develompent of SM
 
 The recommended way to develop the sample-metadata system is to run a local copy of SM.
+
 > There have been some reported issues of running a local SM environment on an M1 mac.
 
 You can run MariaDB with a locally installed docker, or from within a docker container.
@@ -82,6 +82,11 @@ export SM_DEV_DB_PORT=3306 # default mariadb port
 ```
 
 Create the database in MariaDB (by default, we call it `sm_dev`):
+If you use a different databse name also set the following
+
+```shell
+export SM_DEV_DB_NAME=sm_database_name
+```
 
 > Sample-metadata stores all metadata in one database (_previously: one database per project_).
 
@@ -93,12 +98,12 @@ Download the `mariadb-java-client` and create the schema using liquibase:
 
 ```shell
 pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
     --changeLogFile project.xml \
     --url jdbc:mariadb://localhost/sm_dev \
     --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-2.7.2.jar \
+    --classpath mariadb-java-client-3.0.3.jar \
     --username root \
     update
 popd
@@ -131,12 +136,12 @@ Go into the `db/` subdirectory, download the `mariadb-java-client` and create th
 ```bash
 
 pushd db/
-wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/2.7.2/mariadb-java-client-2.7.2.jar
+wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
     --changeLogFile project.xml \
     --url jdbc:mariadb://127.0.0.1:3307/sm_dev \
     --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-2.7.2.jar \
+    --classpath mariadb-java-client-3.0.3.jar \
     --username root \
     update
 popd
@@ -147,7 +152,6 @@ Finally, make sure you configure the server (making use of the environment varia
 ```bash
 export SM_DEV_DB_PORT=3307
 ```
-
 
 ### Running the server
 
@@ -191,15 +195,15 @@ VSCode allows you to debug python modules, we could debug the web API at `api/se
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "API server",
-            "type": "python",
-            "request": "launch",
-            "module": "api.server"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API server",
+      "type": "python",
+      "request": "launch",
+      "module": "api.server"
+    }
+  ]
 }
 ```
 
@@ -214,7 +218,6 @@ cd web
 npm install
 npm start
 ```
-
 
 #### Unauthenticated access
 
@@ -240,24 +243,34 @@ Some handy links:
 The web API exposes this schema in two ways:
 
 - Swagger UI: `http://localhost:8000/docs`
-    - You can use this to construct requests to the server
-    - Make sure you fill in the Bearer token (at the top right )
+  - You can use this to construct requests to the server
+  - Make sure you fill in the Bearer token (at the top right )
 - OpenAPI schema: `http://localhost:8000/schema.json`
-    - Returns a JSON with the full OpenAPI 3 compliant schema.
-    - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
-    - We generate the sample_metadata installable Python API based on this schema.
+  - Returns a JSON with the full OpenAPI 3 compliant schema.
+  - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
+  - We generate the sample_metadata installable Python API based on this schema.
 
 #### Generating the installable API
 
 The installable API is automatically generated through the `package.yml` GitHub action and uploaded to PyPI.
 
-
 To generate the python api you'll need to install openapi generator v5.x.x
 
+To install a specific version of the openapi-generator dow the following:
+
 ```bash
-brew install openapi-generator
+npm install @openapitools/openapi-generator-cli -g
+openapi-generator-cli version-manager set 5.3.0
 ```
 
+Then set your environment variable OPENAPI_COMMAND to the following.
+You can also add an alias to your ~/.bash_profile or equivalent for running in the
+terminal.
+
+```bash
+export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
+alias openapi-generator="npx @openapitools/openapi-generator-cli"
+```
 
 You could generate the installable API and install it with pip by running:
 
@@ -275,8 +288,6 @@ export SM_DOCKER="cpg/sample-metadata-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_apy.py
 ```
-
-
 
 ## Deployment
 
