@@ -140,15 +140,15 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
         raise ValueError('No participants to sync?')
     if not filtered_family_eids:
         raise ValueError('No families to sync')
-
-    # sync_pedigree(**params, family_eids=filtered_family_eids)
-    # sync_families(**params, family_eids=filtered_family_eids)
+    #
+    sync_pedigree(**params, family_eids=filtered_family_eids)
+    sync_families(**params, family_eids=filtered_family_eids)
     sync_individual_metadata(**params, participant_eids=participant_eids)
-    # update_es_index(**params, sequence_type=sequence_type)
+    update_es_index(**params, sequence_type=sequence_type)
 
-    # get_cram_map(
-    #     dataset, participant_eids=participant_eids, sequence_type=sequence_type
-    # )
+    get_cram_map(
+        dataset, participant_eids=participant_eids, sequence_type=sequence_type
+    )
 
 
 def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
@@ -479,10 +479,15 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
         return
 
     reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))))
+    sequence_filter = lambda row: True
+    if sequence_type == 'genome':
+        sequence_filter = lambda row: 'exome' not in row[1]
+    elif sequence_type == 'exome':
+        sequence_filter = lambda row: 'exome' in row[1]
     reads_list = [
         "\t".join(l.split("\t")[:2])
         for l in reads_list
-        if l.split("\t")[0] in participant_eids
+        if l.split("\t")[0] in participant_eids and sequence_filter(l.split("\t"))
     ]
 
     # temporarily
