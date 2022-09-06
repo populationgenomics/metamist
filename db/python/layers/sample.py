@@ -44,7 +44,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
-        self.pt = ProjectPermissionsTable(connection.connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     # GETS
