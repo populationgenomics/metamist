@@ -21,6 +21,28 @@ from models.enums.sample import SampleType
 from models.enums.sequencing import SequenceStatus, SequenceType
 
 
+def data_to_class(data: dict | list) -> dict | list:
+    """Convert the data into it's class using the _class field"""
+    if isinstance(data, list):
+        return [data_to_class(x) for x in data]
+
+    if not isinstance(data, dict):
+        return data
+
+    cls = data.pop('_class', None)
+    mapped_data = {k: data_to_class(v) for k, v in data.items()}
+
+    if isinstance(cls, type):
+        return cls(**mapped_data)
+
+    return mapped_data
+
+
+def merge(d1: dict, d2: dict):
+    """Merges two dictionaries"""
+    return dict(d1, **d2)
+
+
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
 
@@ -34,7 +56,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_test_as_sync
     async def test_project_summary(self):
-        """Test inserting a sample"""
+        """Test getting the summary for a project"""
         result = await self.webl.get_project_summary(token=None)
 
         # Expect an empty project
@@ -49,27 +71,6 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(expected, result)
 
         # Now add a participant with a sample and sequence
-        def data_to_class(data: dict | list) -> dict | list:
-            """Convert the data into it's class using the _class field"""
-            if isinstance(data, list):
-                return [data_to_class(x) for x in data]
-
-            if not isinstance(data, dict):
-                return data
-
-            cls = data.pop('_class', None)
-            mapped_data = {k: data_to_class(v) for k, v in data.items()}
-
-            if isinstance(cls, type):
-                if cls == NestedSequence:
-                    print('stop')
-                return cls(**mapped_data)
-
-            return mapped_data
-
-        def merge(d1: dict, d2: dict):
-            return dict(d1, **d2)
-
         data = [
             {
                 '_class': ParticipantUpsert,
