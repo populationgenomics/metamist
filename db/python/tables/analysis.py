@@ -399,12 +399,15 @@ ORDER BY a.timestamp_completed DESC;
         return [dict(d) for d in rows]
 
     async def get_analysis_runner_log(
-        self, project_ids: List[int] = None
+        self,
+        project_ids: List[int] = None,
+        author: str = None,
+        output_dir: str = None,
     ) -> List[Analysis]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
-        values = {}
+        values: dict[str, Any] = {}
         wheres = [
             "status = 'unknown'",
             "json_extract(meta, '$.source') = 'analysis-runner'",
@@ -413,6 +416,15 @@ ORDER BY a.timestamp_completed DESC;
         if project_ids:
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
+
+        if author:
+            wheres.append('author = :author')
+            values['author'] = author
+
+        if output_dir:
+            wheres.append('(output = :output OR output LIKE :output_like)')
+            values['output'] = output_dir
+            values['output_like'] = f'%{output_dir}'
 
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'

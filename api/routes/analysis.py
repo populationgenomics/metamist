@@ -205,7 +205,10 @@ async def get_latest_analysis_for_samples_and_type(
     allow_missing: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete gvcfs for sample"""
+    """
+    Get latest complete analysis for samples and type.
+    Should return one per sample.
+    """
     atable = AnalysisLayer(connection)
     results = await atable.get_latest_complete_analysis_for_samples_and_type(
         analysis_type=analysis_type,
@@ -223,7 +226,7 @@ async def get_latest_analysis_for_samples_and_type(
 @router.get(
     '/{analysis_id}/details',
     operation_id='getAnalysisById',
-    # mfranklin: uncomment when we supported OpenAPI 3.1
+    # mfranklin: uncomment when we support OpenAPI 3.1
     # response_model=Analysis
 )
 async def get_analysis_by_id(
@@ -268,7 +271,9 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: List[str] = None,
+    project_names: List[str] = Query(None),
+    author: str = None,
+    output_dir: str = None,
     connection: Connection = get_projectless_db_connection,
 ) -> List[Analysis]:
     """
@@ -282,7 +287,9 @@ async def get_analysis_runner_log(
             connection.author, project_names, readonly=True
         )
 
-    results = await atable.get_analysis_runner_log(project_ids=project_ids)
+    results = await atable.get_analysis_runner_log(
+        project_ids=project_ids, author=author, output_dir=output_dir
+    )
     return results
 
 
