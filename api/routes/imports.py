@@ -47,7 +47,7 @@ async def import_individual_metadata_manifest(
         add a PARTICIPANT entry for them
     """
 
-    delimiter = guess_delimiter_by_upload_file_obj(file)
+    delimiter = guess_delimiter_by_upload_file_obj(file, default_delimiter=delimiter)
 
     player = ParticipantLayer(connection)
     csvreader = csv.reader(

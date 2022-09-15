@@ -73,14 +73,15 @@ async def get_individual_metadata_template_for_seqr(
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
     rows = [
         [col_header_map[h] for h in headers],
-        *[[row[kh] for kh in headers] for row in json_rows],
+        *[[row.get(kh, '') for kh in headers] for row in json_rows],
     ]
     writer.writerows(rows)
 
     basefn = f'{project}-{date.today().isoformat()}'
     ext = export_type.get_extension()
+
     return StreamingResponse(
-        iter(output.getvalue()),
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={basefn}{ext}'},
     )
@@ -157,7 +158,8 @@ async def get_external_participant_id_to_internal_sample_id(
     ext = export_type.get_extension()
     filename = f'{project}-participant-to-sample-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
-        iter(output.getvalue()),
+        # stream the whole file at once, because it's all in memory anyway
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={filename}'},
     )

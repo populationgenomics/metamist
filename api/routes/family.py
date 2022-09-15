@@ -122,7 +122,7 @@ async def get_pedigree(
         basefn += '-'.join(str(fm) for fm in internal_family_ids)
 
     return StreamingResponse(
-        iter(output.getvalue()),
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={
             'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
