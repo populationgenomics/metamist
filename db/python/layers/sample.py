@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
-from db.python.tables.project import ProjectId
+from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 
 from models.enums import SampleType
@@ -44,9 +44,14 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     # GETS
+    async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
+        """Return the projects associated with the sample ids"""
+        return await self.st.get_project_ids_for_sample_ids(sample_ids)
+
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
     ) -> Sample:
@@ -149,6 +154,12 @@ class SampleLayer(BaseLayer):
         """Get samples with missing participants in project"""
         m = await self.st.get_sample_with_missing_participants_by_internal_id(project)
         return dict(m)
+
+    async def get_samples_create_date(self, sample_ids: List[int]):
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
+        await self.pt.check_access_to_project_ids(self.author, pjcts, readonly=True)
+        return await self.st.get_samples_create_date(sample_ids)
 
     # CREATE / UPDATES
     async def insert_sample(

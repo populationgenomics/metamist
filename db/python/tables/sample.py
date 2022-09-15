@@ -1,5 +1,6 @@
 import asyncio
-from typing import List, Dict, Tuple, Iterable, Set, Any
+from datetime import date
+from typing import Iterable, Any
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
@@ -15,11 +16,26 @@ class SampleTable(DbBase):
 
     table_name = 'sample'
 
-    async def get_project_ids_for_sample_ids(self, sample_ids: List[int]) -> Set[int]:
+    async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = 'SELECT project FROM sample WHERE id in :sample_ids GROUP BY project'
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
+
+    async def get_samples_from_projects(
+        self, project_ids: list[int], active_only: bool = True
+    ) -> dict[int, int]:
+        """
+        Get active sample IDs given project IDs
+        :return: {sample_id: project_id}
+        """
+        _query = 'SELECT id, project FROM sample WHERE project in :project_ids'
+
+        if active_only:
+            _query += ' AND active IS TRUE'
+
+        rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
+        return dict(rows)
 
     async def insert_sample(
         self,
@@ -64,7 +80,7 @@ class SampleTable(DbBase):
     async def update_sample(
         self,
         id_: int,
-        meta: Dict = None,
+        meta: dict = None,
         participant_id: int = None,
         type_: SampleType = None,
         author: str = None,
@@ -72,7 +88,7 @@ class SampleTable(DbBase):
     ):
         """Update a single sample"""
 
-        values: Dict[str, Any] = {
+        values: dict[str, Any] = {
             'author': author or self.author,
         }
         fields = [
@@ -113,7 +129,7 @@ class SampleTable(DbBase):
             self.get_single_by_id(id_merge),
         )
 
-        def list_merge(l1: Any, l2: Any) -> List:
+        def list_merge(l1: Any, l2: Any) -> list:
             if l1 is None:
                 return l2
             if l2 is None:
@@ -144,9 +160,9 @@ class SampleTable(DbBase):
         meta_original['merged_from'] = list_merge(
             meta_original.get('merged_from'), sid_merge
         )
-        meta: Dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
+        meta: dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
 
-        values: Dict[str, Any] = {
+        values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
                 'author': author or self.author,
@@ -189,7 +205,7 @@ class SampleTable(DbBase):
         return new_sample
 
     async def update_many_participant_ids(
-        self, ids: List[int], participant_ids: List[int]
+        self, ids: list[int], participant_ids: list[int]
     ):
         """
         Update participant IDs for many samples
@@ -201,7 +217,7 @@ class SampleTable(DbBase):
         ]
         await self.connection.execute_many(_query, values)
 
-    async def get_single_by_id(self, internal_id: int) -> Tuple[ProjectId, Sample]:
+    async def get_single_by_id(self, internal_id: int) -> tuple[ProjectId, Sample]:
         """Get a Sample by its external_id"""
         keys = [
             'id',
@@ -228,7 +244,7 @@ class SampleTable(DbBase):
 
     async def get_all(
         self, check_active: bool = True
-    ) -> Tuple[Iterable[ProjectId], List[Sample]]:
+    ) -> tuple[Iterable[ProjectId], list[Sample]]:
         """Get all samples"""
         keys = [
             'id',
@@ -290,9 +306,9 @@ class SampleTable(DbBase):
 
     async def get_sample_id_map_by_external_ids(
         self,
-        external_ids: List[str],
+        external_ids: list[str],
         project: ProjectId,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Get map of external sample id to internal id"""
         _query = """\
             SELECT id, external_id
@@ -307,8 +323,8 @@ class SampleTable(DbBase):
         return sample_id_map
 
     async def get_sample_id_map_by_internal_ids(
-        self, raw_internal_ids: List[int]
-    ) -> Tuple[Iterable[ProjectId], Dict[int, str]]:
+        self, raw_internal_ids: list[int]
+    ) -> tuple[Iterable[ProjectId], dict[int, str]]:
         """Get map of external sample id to internal id"""
         _query = 'SELECT id, external_id, project FROM sample WHERE id in :ids'
         values = {'ids': raw_internal_ids}
@@ -321,7 +337,7 @@ class SampleTable(DbBase):
 
     async def get_all_sample_id_map_by_internal_ids(
         self, project: ProjectId
-    ) -> Dict[int, str]:
+    ) -> dict[int, str]:
         """Get sample id map for all samples"""
         _query = 'SELECT id, external_id FROM sample WHERE project = :project'
         rows = await self.connection.fetch_all(
@@ -331,12 +347,12 @@ class SampleTable(DbBase):
 
     async def get_samples_by(
         self,
-        sample_ids: List[int] = None,
-        meta: Dict[str, Any] = None,
-        participant_ids: List[int] = None,
+        sample_ids: list[int] = None,
+        meta: dict[str, Any] = None,
+        participant_ids: list[int] = None,
         project_ids=None,
         active=True,
-    ) -> Tuple[Iterable[ProjectId], List[Sample]]:
+    ) -> tuple[Iterable[ProjectId], list[Sample]]:
         """Get samples by some criteria"""
         keys = [
             'id',
@@ -390,7 +406,7 @@ class SampleTable(DbBase):
 
     async def get_sample_with_missing_participants_by_internal_id(
         self, project: ProjectId
-    ) -> Dict[int, str]:
+    ) -> dict[int, str]:
         """Get samples with missing participants"""
         _query = """
             SELECT id, external_id
@@ -401,6 +417,14 @@ class SampleTable(DbBase):
             _query, {'project': project or self.project}
         )
         return {row['id']: row['external_id'] for row in rows}
+
+    async def get_samples_create_date(self, sample_ids: list[int]) -> dict[int, date]:
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        if len(sample_ids) == 0:
+            return {}
+        _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in :sids GROUP BY id'
+        rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
+        return {r[0]: r[1].date() for r in rows}
 
     async def get_history_of_sample(self, id_: int):
         """Get all versions (history) of a sample"""

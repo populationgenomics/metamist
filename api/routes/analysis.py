@@ -1,12 +1,14 @@
-import csv
 import io
+import csv
 from datetime import date
+
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+from api.utils.dates import parse_date_only_string
 
 from api.utils.db import (
     get_projectless_db_connection,
@@ -18,11 +20,18 @@ from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisType, AnalysisStatus, SequenceType
-from models.models.analysis import Analysis
+from models.models.analysis import (
+    Analysis,
+    ProjectSizeModel,
+    SampleSizeModel,
+    DateSizeModel,
+)
 from models.models.sample import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
+    sample_id_format,
 )
+
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -322,3 +331,52 @@ async def get_sample_reads_map(
             'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
         },
     )
+
+
+@router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
+async def get_sample_file_sizes(
+    project_names: List[str] = Query(None),
+    start_date: str = None,
+    end_date: str = None,
+    connection: Connection = get_projectless_db_connection,
+) -> list[ProjectSizeModel]:
+    """
+    Get the per sample file size by type over the given projects and date range
+    """
+    atable = AnalysisLayer(connection)
+
+    # Check access to projects
+    project_ids = None
+    pt = ProjectPermissionsTable(connection=connection.connection)
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, project_names, readonly=True
+    )
+
+    # Map from internal pids to project name
+    prj_name_map = dict(zip(project_ids, project_names))
+
+    # Convert dates
+    start = parse_date_only_string(start_date)
+    end = parse_date_only_string(end_date)
+
+    # Get results with internal ids as keys
+    results = await atable.get_sample_file_sizes(
+        project_ids=project_ids, start_date=start, end_date=end
+    )
+
+    # Convert to the correct output type, converting internal ids to external
+    fixed_pids: List[Any] = [
+        ProjectSizeModel(
+            project=prj_name_map[project_data['project']],
+            samples=[
+                SampleSizeModel(
+                    sample=sample_id_format(s['sample']),
+                    dates=[DateSizeModel(**d) for d in s['dates']],
+                )
+                for s in project_data['samples']
+            ],
+        )
+        for project_data in results
+    ]
+
+    return fixed_pids

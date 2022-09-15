@@ -1,7 +1,8 @@
 # pylint: disable=too-many-locals
+import json
 import asyncio
 import dataclasses
-import json
+from datetime import date
 from collections import defaultdict
 from itertools import groupby
 from typing import Dict, List, Optional, Set
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
+from db.python.layers.sample import SampleLayer
 from models.enums import SampleType, SequenceType, SequenceStatus
 
 
@@ -127,7 +129,7 @@ class WebDb(DbBase):
 
     @staticmethod
     def _project_summary_process_sample_rows(
-        sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, str]
+        sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, date]
     ) -> List[NestedSample]:
         """
         Process the returned sample rows into nested samples + sequences
@@ -139,7 +141,7 @@ class WebDb(DbBase):
                 external_id=s['external_id'],
                 type=s['type'],
                 meta=json.loads(s['meta']) or {},
-                created_date=sample_id_start_times.get(s['id'], ''),
+                created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequences=seq_models_by_sample_id.get(s['id'], []) or [],
             )
             for s in sample_rows
@@ -175,12 +177,6 @@ class WebDb(DbBase):
         }
         return pid_to_families
 
-    async def _project_summary_get_sample_create_date(self, sample_ids: List[int]):
-        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
-        _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in :sids GROUP BY id'
-        rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
-        return {r[0]: str(r[1].date()) for r in rows}
-
     async def get_project_summary(
         self, token: Optional[str], limit: int
     ) -> ProjectSummary:
@@ -191,6 +187,7 @@ class WebDb(DbBase):
         :param limit: Number of SAMPLEs to return, not including nested sequences
         """
         # do initial query to get sample info
+        sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(token, limit)
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
@@ -234,7 +231,7 @@ WHERE fp.participant_id in :pids
             sequence_promise,
             participant_promise,
             family_promise,
-            self._project_summary_get_sample_create_date(sids),
+            sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
         )
 
