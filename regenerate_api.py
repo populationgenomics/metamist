@@ -84,6 +84,7 @@ def start_server() -> Optional[subprocess.Popen]:
 
     return None
 
+
 def _get_openapi_version():
     # two different versions of openapi
     # require two different ways to get the version
@@ -97,6 +98,7 @@ def _get_openapi_version():
             continue
 
     raise ValueError('Could not get version of openapi')
+
 
 def check_openapi_version():
     """

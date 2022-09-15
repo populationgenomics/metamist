@@ -117,7 +117,7 @@ async def update_many_participant_external_ids(
 
 @router.get(
     '/{project}/external-pid-to-internal-sample-id',
-    operation_id='getExternalParticipantIdToInternalSampleIdExport',
+    operation_id='getExternalParticipantIdToInternalSampleId',
     tags=['seqr'],
 )
 async def get_external_participant_id_to_internal_sample_id(
