@@ -374,10 +374,10 @@ WHERE a.id = :analysis_id
                 seq_check = '= :seq_type'
                 values['seq_type'] = sequence_types[0].value
             else:
-                seq_check = 'JSON_VALUE(a.meta, "$.sequence_type") IN :seq_types'
-                values['seq_values'] = [s.value for s in sequence_types]
+                seq_check = 'IN :seq_types'
+                values['seq_types'] = [s.value for s in sequence_types]
 
-            seq_filter = f'JSON_VALUE(a.meta, "$.sequence_type) ' + seq_check
+            seq_filter = f'AND JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check
 
         _query = f"""
 SELECT p.external_id as participant_id, a.output as output, s.id as sample_id
@@ -386,10 +386,10 @@ INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
 INNER JOIN participant p ON s.participant_id = p.id
 WHERE
-    a.active AND
-    a.type = 'cram' AND
-    a.status = 'completed' AND
-    s.project = :project
+    a.active
+    AND a.type = 'cram'
+    AND a.status = 'completed'
+    AND s.project = :project
     {seq_filter}
 ORDER BY a.timestamp_completed DESC;
 """

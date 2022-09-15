@@ -300,7 +300,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequence_types: List[SequenceType] = Query(...),
+    sequence_types: List[SequenceType] = Query(None),
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -332,7 +332,7 @@ async def get_sample_reads_map(
     basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
 
     return StreamingResponse(
-        iter(output.getvalue()),
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={
             'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
