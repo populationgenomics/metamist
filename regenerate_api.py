@@ -84,22 +84,26 @@ def start_server() -> Optional[subprocess.Popen]:
 
     return None
 
+def _get_openapi_version():
+    # two different versions of openapi
+    # require two different ways to get the version
+    version_cmds = ['--version', 'version']
+
+    for version_cmd in version_cmds:
+        command = [*OPENAPI_COMMAND, version_cmd]
+        try:
+            return subprocess.check_output(command, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            continue
+
+    raise ValueError('Could not get version of openapi')
 
 def check_openapi_version():
     """
     Check compatible OpenAPI version
     """
-    cmds = ['--version', 'version']
 
-    for cmd in cmds:
-        command = [*OPENAPI_COMMAND, cmd]
-
-        try:
-            out = subprocess.check_output(command)
-        except subprocess.CalledProcessError:
-            continue
-
-    out = out.decode().split('\n', maxsplit=1)[0].strip()
+    out = _get_openapi_version().decode().split('\n', maxsplit=1)[0].strip()
 
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
     if not version_match:
@@ -109,13 +113,13 @@ def check_openapi_version():
     major = version.split('.')[0]
     if int(major) != 5:
         raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
+    logger.info(f'Got openapi version: {version}')
 
 
 def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] = None):
     """
     Use OpenApiGenerator to generate the installable API
     """
-    check_openapi_version()
     with open('deploy/python/version.txt', encoding='utf-8') as f:
         version = f.read().strip()
 
@@ -280,6 +284,7 @@ def main():
         process = start_server()
 
     try:
+        check_openapi_version()
         generate_api_and_copy(
             'python',
             copy_python_files_from,
