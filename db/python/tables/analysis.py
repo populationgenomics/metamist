@@ -1,11 +1,10 @@
 from datetime import datetime
-from itertools import groupby
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
-from models.enums import AnalysisStatus, AnalysisType
+from models.enums import AnalysisStatus, AnalysisType, SequenceType
 from models.models.analysis import Analysis
 
 
@@ -364,36 +363,51 @@ WHERE a.id = :analysis_id
         return project, a
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId
-    ) -> List[List[str]]:
+        self, project: ProjectId, sequence_types: list[SequenceType]
+    ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
-        _query = """
-SELECT p.external_id, a.output, s.id
+
+        values: dict[str, Any] = {'project': project}
+        seq_filter = ''
+        if sequence_types:
+            if len(sequence_types) == 1:
+                seq_check = '= :seq_type'
+                values['seq_type'] = sequence_types[0].value
+            else:
+                seq_check = 'IN :seq_types'
+                values['seq_types'] = [s.value for s in sequence_types]
+
+            seq_filter = f'AND JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check
+
+        _query = f"""
+SELECT p.external_id as participant_id, a.output as output, s.id as sample_id
 FROM analysis a
 INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
 INNER JOIN participant p ON s.participant_id = p.id
 WHERE
-    a.active AND
-    a.type = 'cram' AND
-    a.status = 'completed' AND
-    s.project = :project
-ORDER BY a.timestamp_completed DESC
+    a.active
+    AND a.type = 'cram'
+    AND a.status = 'completed'
+    AND s.project = :project
+    {seq_filter}
+ORDER BY a.timestamp_completed DESC;
 """
 
-        rows = await self.connection.fetch_all(_query, {'project': project})
-        # 1 per analysis
-        return [
-            list(list(g_rows)[0]) for _, g_rows in groupby(rows, lambda seq: seq['id'])
-        ]
+        rows = await self.connection.fetch_all(_query, values)
+        # many per analysis
+        return [dict(d) for d in rows]
 
     async def get_analysis_runner_log(
-        self, project_ids: List[int] = None
+        self,
+        project_ids: List[int] = None,
+        author: str = None,
+        output_dir: str = None,
     ) -> List[Analysis]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
-        values = {}
+        values: dict[str, Any] = {}
         wheres = [
             "status = 'unknown'",
             "json_extract(meta, '$.source') = 'analysis-runner'",
@@ -402,6 +416,15 @@ ORDER BY a.timestamp_completed DESC
         if project_ids:
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
+
+        if author:
+            wheres.append('author = :author')
+            values['author'] = author
+
+        if output_dir:
+            wheres.append('(output = :output OR output LIKE :output_like)')
+            values['output'] = output_dir
+            values['output_like'] = f'%{output_dir}'
 
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
