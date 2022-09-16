@@ -20,6 +20,7 @@ class Analysis(SMBase):
     project: Optional[int] = None
     active: Optional[bool] = None
     meta: Dict[str, Any] = {}
+    author: str = None
 
     @staticmethod
     def from_db(**kwargs):
@@ -47,6 +48,7 @@ class Analysis(SMBase):
             project=kwargs.get('project'),
             meta=meta,
             active=bool(kwargs.get('active')),
+            author=kwargs.get('author'),
         )
 
 

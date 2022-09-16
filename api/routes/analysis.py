@@ -16,9 +16,10 @@ from api.utils.db import (
     get_project_write_connection,
     Connection,
 )
+from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus
+from models.enums import AnalysisType, AnalysisStatus, SequenceType
 from models.models.analysis import (
     Analysis,
     ProjectSizeModel,
@@ -204,7 +205,10 @@ async def get_latest_analysis_for_samples_and_type(
     allow_missing: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):
-    """Get latest complete gvcfs for sample"""
+    """
+    Get latest complete analysis for samples and type.
+    Should return one per sample.
+    """
     atable = AnalysisLayer(connection)
     results = await atable.get_latest_complete_analysis_for_samples_and_type(
         analysis_type=analysis_type,
@@ -222,7 +226,7 @@ async def get_latest_analysis_for_samples_and_type(
 @router.get(
     '/{analysis_id}/details',
     operation_id='getAnalysisById',
-    # mfranklin: uncomment when we supported OpenAPI 3.1
+    # mfranklin: uncomment when we support OpenAPI 3.1
     # response_model=Analysis
 )
 async def get_analysis_by_id(
@@ -267,7 +271,9 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: List[str] = None,
+    project_names: List[str] = Query(None),
+    author: str = None,
+    output_dir: str = None,
     connection: Connection = get_projectless_db_connection,
 ) -> List[Analysis]:
     """
@@ -281,16 +287,20 @@ async def get_analysis_runner_log(
             connection.author, project_names, readonly=True
         )
 
-    results = await atable.get_analysis_runner_log(project_ids=project_ids)
+    results = await atable.get_analysis_runner_log(
+        project_ids=project_ids, author=author, output_dir=output_dir
+    )
     return results
 
 
 @router.get(
-    '/{project}/sample-cram-path-map/tsv',
-    operation_id='getSampleReadsMapForSeqr',
-    response_class=StreamingResponse,
+    '/{project}/sample-cram-path-map',
+    operation_id='getSamplesReadsMap',
+    tags=['seqr'],
 )
-async def get_sample_reads_map_for_seqr(
+async def get_sample_reads_map(
+    export_type: ExportType = ExportType.JSON,
+    sequence_types: List[SequenceType] = Query(None),
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -305,18 +315,28 @@ async def get_sample_reads_map_for_seqr(
 
     at = AnalysisLayer(connection)
     assert connection.project
-    rows = await at.get_sample_cram_path_map_for_seqr(project=connection.project)
+    objs = await at.get_sample_cram_path_map_for_seqr(
+        project=connection.project, sequence_types=sequence_types
+    )
+
+    if export_type == ExportType.JSON:
+        return objs
+
+    keys = ['participant_id', 'output', 'sample_id']
+    rows = [[r[k] for k in keys] for r in objs]
 
     output = io.StringIO()
-    writer = csv.writer(output, delimiter='\t')
+    writer = csv.writer(output, delimiter=export_type.get_delimiter())
     writer.writerows(rows)
 
     basefn = f'{connection.project}-seqr-igv-paths-{date.today().isoformat()}'
 
     return StreamingResponse(
-        iter(output.getvalue()),
-        media_type='text/tab-separated-values',
-        headers={'Content-Disposition': f'filename={basefn}.tsv'},
+        iter([output.getvalue()]),
+        media_type=export_type.get_mime_type(),
+        headers={
+            'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
+        },
     )
 
 

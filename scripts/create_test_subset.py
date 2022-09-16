@@ -32,7 +32,6 @@ from sample_metadata.models import (
     SampleType,
     SequenceStatus,
     AnalysisStatus,
-    ContentType,
 )
 
 logger = logging.getLogger(__file__)
@@ -255,12 +254,12 @@ def transfer_ped(initial_project, target_project, family_ids):
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
         initial_project,
-        response_type=ContentType('tsv'),
+        export_type='tsv',
         internal_family_ids=family_ids,
     )
     ped_json = fapi.get_pedigree(
         initial_project,
-        response_type=ContentType('json'),
+        export_type='tsv',
         internal_family_ids=family_ids,
     )
 
