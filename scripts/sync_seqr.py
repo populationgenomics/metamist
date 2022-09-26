@@ -29,7 +29,16 @@ from sample_metadata.apis import (
     ParticipantApi,
 )
 
-logging.basicConfig(level=logging.DEBUG)
+loggers_to_silence = [
+    'google.auth.transport.requests',
+    'google.auth._default',
+    'google.auth.compute_engine._metadata'
+]
+for lname in loggers_to_silence:
+    tlogger = logging.getLogger(lname)
+    tlogger.setLevel(level=logging.CRITICAL)
+    
+logger = logging.getLogger('sync-seqr')
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
@@ -142,11 +151,11 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
         raise ValueError('No participants to sync?')
     if not filtered_family_eids:
         raise ValueError('No families to sync')
-    #
-    # sync_pedigree(**params, family_eids=filtered_family_eids)
-    # sync_families(**params, family_eids=filtered_family_eids)
-    # sync_individual_metadata(**params, participant_eids=participant_eids)
-    # update_es_index(**params, sequence_type=sequence_type)
+
+    sync_pedigree(**params, family_eids=filtered_family_eids)
+    sync_families(**params, family_eids=filtered_family_eids)
+    sync_individual_metadata(**params, participant_eids=set(participant_eids))
+    update_es_index(**params, sequence_type=sequence_type)
 
     get_cram_map(
         dataset, participant_eids=participant_eids, sequence_type=sequence_type
@@ -173,11 +182,11 @@ def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
     files = {'datafile': ('file.csv', pedigree_data)}
     req1_url = BASE + url_individuals_table_upload.format(projectGuid=project_guid)
     resp_1 = requests.post(req1_url, files=files, headers=headers)
-    logging.debug(
+    logger.debug(
         f'{dataset} :: Uploaded pedigree data with status: {resp_1.status_code}'
     )
     if not resp_1.ok:
-        logging.warning(f'{dataset} :: Uploading pedigree failed: {resp_1.text}')
+        logger.warning(f'{dataset} :: Uploading pedigree failed: {resp_1.text}')
     resp_1.raise_for_status()
     resp_1_json = resp_1.json()
     if not resp_1_json or 'uploadedFileId' not in resp_1_json:
@@ -196,7 +205,7 @@ def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
         resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
         is_ok = resp_2.ok
         if not is_ok:
-            logging.warning(
+            logger.warning(
                 f'{dataset} :: Confirming pedigree failed, retrying '
                 f'({remaining_attempts} more times): {resp_2.text}'
             )
@@ -217,7 +226,7 @@ def sync_families(
         2. Upload pedigree to seqr
         3. Confirm the upload
     """
-    logging.debug(f'{dataset} :: Uploading family template')
+    logger.debug(f'{dataset} :: Uploading family template')
 
     def _get_families_csv_from_sm(dataset: str):
 
@@ -250,11 +259,11 @@ def sync_families(
     files = {'datafile': ('file.csv', family_data)}
     req1_url = BASE + url_family_table_upload.format(projectGuid=project_guid)
     resp_1 = requests.post(req1_url, files=files, headers=headers)
-    logging.debug(
+    logger.debug(
         f'{dataset} :: Uploaded new family template with status: {resp_1.status_code}'
     )
     if not resp_1.ok:
-        logging.warning(f'{dataset} :: Request failed with information: {resp_1.text}')
+        logger.warning(f'{dataset} :: Request failed with information: {resp_1.text}')
     resp_1.raise_for_status()
     resp_1_json = resp_1.json()
 
@@ -267,7 +276,7 @@ def sync_families(
         resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
         is_ok = resp_2.ok
         if not is_ok:
-            logging.warning(
+            logger.warning(
                 f'{dataset} :: Confirming family import failed: {resp_2.text}'
             )
             remaining_attempts -= 1
@@ -281,26 +290,26 @@ def sync_individual_metadata(
     dataset, project_guid, headers, participant_eids: set[str]
 ):
 
-    IS_OLD = True
+    IS_OLD = False
 
     if IS_OLD:
         # TEMP
         base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
 
         resp = requests.get(
-            base + f'/api/v1/participant/{dataset}/individual-metadata-seqr/json',
+            base + f'/api/v1/participant/{dataset}/individual-metadata-seqr?export_typejson',
             headers={'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'},
         )
         resp.raise_for_status()
         individual_metadata_resp = resp.json()
+
+
     else:
         individual_metadata_resp = seqapi.get_individual_metadata_for_seqr(
             project=dataset, export_type=ExportType('json')
         )
 
-        if individual_metadata_resp is None or isinstance(
-            individual_metadata_resp, str
-        ):
+        if individual_metadata_resp is None or isinstance(individual_metadata_resp, str):
             print(
                 f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
             )
@@ -357,7 +366,7 @@ def sync_individual_metadata(
         resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
         is_ok = resp_2.ok
         if not is_ok:
-            logging.warning(
+            logger.warning(
                 f'{dataset} :: Confirming individual metadata import failed: {resp_2.text}'
             )
             remaining_attempts -= 1
@@ -455,9 +464,9 @@ def _get_pedigree_csv_from_sm(dataset: str, family_eids: set[str]) -> str | None
 
 
 def get_cram_map(dataset, participant_eids: list[str], sequence_type):
-    logging.info(f'{dataset} :: Getting cram map')
+    logger.info(f'{dataset} :: Getting cram map')
 
-    IS_OLD = True
+    IS_OLD = False
 
     if IS_OLD:
         base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
@@ -470,26 +479,26 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
         reads_map = resp.text
     else:
         reads_map = aapi.get_samples_reads_map(
-            project=dataset, sequence_types=[SequenceType(sequence_type)]
+            project=dataset, export_type='tsv'
         )
 
     if isinstance(reads_map, str) and reads_map.startswith('<!doctype html>'):
         print(f'{dataset} :: Bad API format (404d) for reads map')
         return
     if not reads_map:
-        print(f'{dataset} :: Bad API format for reads map')
+        print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
     reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))))
     sequence_filter = lambda row: True
     if sequence_type == 'genome':
-        sequence_filter = lambda row: 'exome' not in row[1]
+        sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]
     elif sequence_type == 'exome':
-        sequence_filter = lambda row: 'exome' in row[1]
+        sequence_filter = lambda row: len(row) > 2 and 'exome' in row[1]
     reads_list = [
         "\t".join(l.split("\t")[:2])
         for l in reads_list
-        if l.split("\t")[0] in participant_eids and sequence_filter(l.split("\t"))
+        if (not participant_eids or l.split("\t")[0] in participant_eids) and sequence_filter(l.split("\t"))
     ]
 
     # temporarily
