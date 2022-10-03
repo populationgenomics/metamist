@@ -76,7 +76,7 @@ url_family_table_confirm = '/api/project/{projectGuid}/edit_families/sa'
 url_update_es_index = '/api/project/{projectGuid}/add_dataset/variants/sa'
 url_update_saved_variants = '/api/project/{projectGuid}/update_saved_variant_json/sa'
 
-seqapi = SeqrApi()
+seqrapi = SeqrApi()
 papi = ProjectApi()
 aapi = AnalysisApi()
 
@@ -85,7 +85,7 @@ exome:
     hereditary-neuro: hereditary-neuro-exome-2022_0815_2246_h2pb9
     mito-disease: mito-disease-exome-2022_0815_2246_h2pb9
     kidgen: kidgen-exome-2022_0815_2246_h2pb9
-    acute-care: acute-care-exome-2022_0815_2246_h2pb9
+    acute-care: acute-care-exome-2022_0915_1407_zvg8e
     validation: validation-exome-2022_0915_1315_htupt
 
 genome:
@@ -113,6 +113,9 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     """
     Synchronisation driver for a single dataset
     """
+    seqapi = SequenceApi()
+    samapi = SampleApi()
+
     # sync people first
     token = get_token()
     headers: dict[str, str] = {'Authorization': f'Bearer {token}'}
@@ -120,15 +123,16 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
         dataset=dataset, project_guid=seqr_guid, headers=headers
     )
 
-    seq_type = SequenceType(sequence_type)
+    # check sequence type is valid
+    _ = SequenceType(sequence_type)
 
-    samples = SampleApi().get_samples(
+    samples = samapi.get_samples(
         body_get_samples=BodyGetSamples(project_ids=[dataset])
     )
-    sequences_all = SequenceApi().get_all_sequences_by_sample_ids(
+    sequences_all = seqapi.get_all_sequences_by_sample_ids(
         [s['id'] for s in samples]
     )
-    sample_ids = [sid for sid, types in sequences_all.items() if sequence_type in types]
+    sample_ids = set([sid for sid, types in sequences_all.items() if sequence_type in types])
     participant_ids = set(
         int(sample['participant_id'])
         for sample in samples
@@ -142,7 +146,7 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     )
     participant_eids = [p['external_id'] for p in participants]
 
-    ped_rows = seqapi.get_pedigree(project=dataset)
+    ped_rows = seqrapi.get_pedigree(project=dataset)
     filtered_family_eids = set(
         row['family_id'] for row in ped_rows if row['individual_id'] in participant_eids
     )
@@ -230,7 +234,7 @@ def sync_families(
 
     def _get_families_csv_from_sm(dataset: str):
 
-        fam_rows = seqapi.get_families(project=dataset)
+        fam_rows = seqrapi.get_families(project=dataset)
         fam_row_headers = [
             'Family ID',
             'Display Name',
@@ -305,7 +309,7 @@ def sync_individual_metadata(
 
 
     else:
-        individual_metadata_resp = seqapi.get_individual_metadata_for_seqr(
+        individual_metadata_resp = seqrapi.get_individual_metadata_for_seqr(
             project=dataset, export_type=ExportType('json')
         )
 
@@ -345,9 +349,13 @@ def sync_individual_metadata(
     print(
         f'{dataset} :: Uploaded individual metadata with status: {resp_1.status_code}'
     )
-    if not resp_1.ok:
+
+    if resp_1.status_code == 400 and 'Unable to find individuals to update' in resp_1.text:
+        print('No individual metadata needed updating')
+        return
+    elif not resp_1.ok:
         print(f'{dataset} :: Request failed with information: {resp_1.text}')
-    resp_1.raise_for_status()
+        resp_1.raise_for_status()
 
     resp_1_json = resp_1.json()
     if not resp_1_json or 'uploadedFileId' not in resp_1_json:
@@ -382,7 +390,7 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
     #     seqapi.get_external_participant_id_to_internal_sample_id_export(project=dataset, export_type='tsv')
     # )
 
-    person_sample_map_rows = seqapi.get_external_participant_id_to_internal_sample_id(project=dataset)
+    person_sample_map_rows = seqrapi.get_external_participant_id_to_internal_sample_id(project=dataset)
 
     rows_to_write = ['\t'.join(s[::-1]) for s in person_sample_map_rows]
 
@@ -438,7 +446,7 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
 def _get_pedigree_csv_from_sm(dataset: str, family_eids: set[str]) -> str | None:
     """Call get_pedigree and return formatted string with header"""
 
-    ped_rows = seqapi.get_pedigree(project=dataset)
+    ped_rows = seqrapi.get_pedigree(project=dataset)
     if not ped_rows:
         return None
 
@@ -585,4 +593,4 @@ if __name__ == '__main__':
     # ignore = {'ohmr4-epilepsy', 'acute-care'}
     # sync_all_datasets(sequence_type='genome', ignore=ignore)
     #
-    sync_dataset('validation', 'R0011_validation', 'exome')
+    sync_dataset('acute-care', 'R0039_acute_care_exome', 'exome')
