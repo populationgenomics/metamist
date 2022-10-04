@@ -189,7 +189,7 @@ async def get_sequences_by_criteria(
     return result
 
 
-@router.post('/', operation_id='getSequencesBySampleIds')
+@router.post('/internal-sample-ids', operation_id='getSequencesBySampleIds')
 async def get_sequences_by_internal_sample_ids(
     sample_ids: List[str],
     connection: Connection = get_projectless_db_connection,
