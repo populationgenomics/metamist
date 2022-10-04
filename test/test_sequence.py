@@ -59,6 +59,7 @@ class TestSequence(DbIsolatedTest):
             sequence_type=self.sequence_one.type,
             status=self.sequence_one.status,
             sequence_meta=self.sequence_one.meta,
+            external_ids={},
         )
         # Create second sequence
         self.seq2 = await self.seql.insert_sequencing(
@@ -66,6 +67,7 @@ class TestSequence(DbIsolatedTest):
             sequence_type=self.sequence_two.type,
             status=self.sequence_two.status,
             sequence_meta=self.sequence_two.meta,
+            external_ids={},
         )
 
         # Update attributes in SampleSequencing objects for validation
@@ -88,9 +90,11 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from sample and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.raw_cpg_id)
+        latest = await self.seql.get_sequence_ids_for_sample_id(self.raw_cpg_id)
         sequence_id = latest[self.sequence_one.type.value][0]
-        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        sequence = await self.seql.get_sequence_by_id(
+            sequence_id, check_project_id=False
+        )
 
         # Pull current status, select new test status
         current_status = sequence.status.value
@@ -108,7 +112,7 @@ class TestSequence(DbIsolatedTest):
 
         # Call new endpoint to update sequence status and meta
         meta = {'batch': 1}
-        await self.seql.update_sequence_from_sample_and_type(
+        await self.seql.update_latest_sequence_from_sample_and_type(
             sample_id=self.raw_cpg_id,
             sequence_type=self.sequence_one.type,
             status=SequenceStatus(new_status),
@@ -116,7 +120,9 @@ class TestSequence(DbIsolatedTest):
         )
 
         # validate new status and meta
-        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        sequence = await self.seql.get_sequence_by_id(
+            sequence_id, check_project_id=False
+        )
         self.assertEqual(new_status, sequence.status.value)
         self.assertEqual(meta, sequence.meta)
 
@@ -129,7 +135,7 @@ class TestSequence(DbIsolatedTest):
         meta = {'batch': 1}
 
         with self.assertRaises(NotFoundError):
-            await self.seql.update_sequence_from_sample_and_type(
+            await self.seql.update_latest_sequence_from_sample_and_type(
                 sample_id=invalid_sample_id,
                 sequence_type=self.sequence_one.type,
                 status=SequenceStatus(new_status),
@@ -137,7 +143,7 @@ class TestSequence(DbIsolatedTest):
             )
 
         with self.assertRaises(NotFoundError):
-            await self.seql.update_sequence_from_sample_and_type(
+            await self.seql.update_latest_sequence_from_sample_and_type(
                 sample_id=self.external_sample_no_seq,
                 sequence_type=self.sequence_one.type,
                 status=SequenceStatus(new_status),
@@ -149,9 +155,11 @@ class TestSequence(DbIsolatedTest):
         """Test updating a sequence from external id and type"""
 
         # Create a sample in this test database first, then grab
-        latest = await self.seql.get_all_sequence_ids_for_sample_id(self.raw_cpg_id)
+        latest = await self.seql.get_sequence_ids_for_sample_id(self.raw_cpg_id)
         sequence_id = latest[self.sequence_one.type.value][0]
-        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        sequence = await self.seql.get_sequence_by_id(
+            sequence_id, check_project_id=False
+        )
 
         # Pull current status, select new test status
         current_status = sequence.status.value
@@ -178,7 +186,9 @@ class TestSequence(DbIsolatedTest):
         )
 
         # validate new status and meta
-        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        sequence = await self.seql.get_sequence_by_id(
+            sequence_id, check_project_id=False
+        )
         self.assertEqual(new_status, sequence.status.value)
         self.assertEqual(meta, sequence.meta)
 
@@ -203,7 +213,9 @@ class TestSequence(DbIsolatedTest):
         )
 
         # validate new status and meta
-        sequence = await self.seql.get_sequence_by_id(sequence_id)
+        sequence = await self.seql.get_sequence_by_id(
+            sequence_id, check_project_id=False
+        )
         self.assertEqual(status, sequence.status.value)
         self.assertEqual(meta, sequence.meta)
 

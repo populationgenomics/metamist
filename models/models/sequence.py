@@ -11,6 +11,7 @@ class SampleSequencing(BaseModel):
     """Model to hold SampleSequence data"""
 
     id: Optional[int] = None
+    external_ids: Optional[dict[str, str]] = None
     sample_id: Union[str, int]
     type: SequenceType
     meta: Optional[Dict[str, Any]] = None
