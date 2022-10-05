@@ -31,7 +31,13 @@ am_i_in_test_environment = os.getcwd().endswith('test')
 nest_asyncio.apply()
 
 
-for lname in 'asyncio', 'urllib3', 'docker', 'databases', 'testcontainers.core.container':
+for lname in (
+    'asyncio',
+    'urllib3',
+    'docker',
+    'databases',
+    'testcontainers.core.container',
+):
     logging.getLogger(lname).setLevel(logging.WARNING)
 
 

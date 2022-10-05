@@ -1,13 +1,9 @@
-import logging
-import random
-from operator import attrgetter
-
-from models.enums import SampleType
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
+from models.enums import SampleType
+
 
 class TestSequence(DbIsolatedTest):
     """Test sequence class"""
@@ -29,7 +25,6 @@ class TestSequence(DbIsolatedTest):
             active=True,
             meta={'Testing': 'test_sequence'},
         )
-
 
         # self.sequence_one = SampleSequencing(
         #     sample_id=self.external_sample_id,
@@ -86,14 +81,11 @@ class TestSequence(DbIsolatedTest):
 
     @run_as_sync
     async def test_insert_sequence(self):
+        """
+        Test inserting a sequence, and check all values are inserted correctly
+        """
         external_ids = {'default': 'SEQ01', 'collaborator2': 'CBSEQ_1'}
-        meta = {
-            '1': 1,
-            'nested': {
-                'nested': 'dict'
-            },
-            "alpha": ["b", "e", "t"]
-        }
+        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't']}
         seq_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
@@ -102,7 +94,9 @@ class TestSequence(DbIsolatedTest):
             external_ids={'default': 'SEQ01', 'collaborator2': 'CBSEQ_1'},
         )
 
-        sequence = await self.seqlayer.get_sequence_by_id(sequence_id=seq_id, check_project_id=False)
+        sequence = await self.seqlayer.get_sequence_by_id(
+            sequence_id=seq_id, check_project_id=False
+        )
 
         self.assertEqual(seq_id, sequence.id)
         self.assertEqual(self.sample_id_raw, int(sequence.sample_id))
@@ -113,25 +107,39 @@ class TestSequence(DbIsolatedTest):
 
     @run_as_sync
     async def test_update(self):
+        """Test updating a sequence, and all fields are updated correctly"""
         seq_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
             status=SequenceStatus.RECEIVED,
             sequence_meta={'a': 1, 'b': 2},
-            external_ids={'default': 'SEQ01', 'untouched': 'UTC+1'},
+            external_ids={
+                'default': 'SEQ01',
+                'untouched': 'UTC+1',
+                'to_delete': 'VALUE',
+            },
         )
 
-        await self.seqlayer.update_sequence(seq_id, external_ids={'default': 'NSQ_01', 'ext': 'EXTSEQ01'}, status=SequenceStatus.UPLOADED, meta={'a': 2, 'c': True})
+        await self.seqlayer.update_sequence(
+            seq_id,
+            external_ids={'default': 'NSQ_01', 'ext': 'EXTSEQ01', 'to_delete': None},
+            status=SequenceStatus.UPLOADED,
+            meta={'a': 2, 'c': True},
+        )
 
-        update_sequence = await self.seqlayer.get_sequence_by_id(sequence_id=seq_id, check_project_id=False)
+        update_sequence = await self.seqlayer.get_sequence_by_id(
+            sequence_id=seq_id, check_project_id=False
+        )
 
         self.assertEqual(seq_id, update_sequence.id)
         self.assertEqual(self.sample_id_raw, int(update_sequence.sample_id))
         self.assertEqual('genome', update_sequence.type.value)
         self.assertEqual('uploaded', update_sequence.status.value)
-        self.assertDictEqual({'default': 'NSQ_01', 'ext': 'EXTSEQ01', 'untouched': 'UTC+1'}, update_sequence.external_ids)
+        self.assertDictEqual(
+            {'default': 'NSQ_01', 'ext': 'EXTSEQ01', 'untouched': 'UTC+1'},
+            update_sequence.external_ids,
+        )
         self.assertDictEqual({'a': 2, 'b': 2, 'c': True}, update_sequence.meta)
-
 
     @run_as_sync
     async def test_update_status(self):
@@ -149,16 +157,10 @@ class TestSequence(DbIsolatedTest):
         # cycle through all statuses, and check that works
         for status in SequenceStatus:
             await self.seqlayer.update_status(seq_id, status, check_project_id=False)
-            status_to_check = await self.connection.connection.fetch_one('SELECT status FROM sample_sequencing WHERE id = :id', {'id': seq_id})
+            status_to_check = await self.connection.connection.fetch_one(
+                'SELECT status FROM sample_sequencing WHERE id = :id', {'id': seq_id}
+            )
             self.assertEqual(status.value, status_to_check['status'])
-
-
-
-
-
-
-
-
 
     # @run_as_sync
     # async def test_update_sequence_from_sample_and_type(self):
