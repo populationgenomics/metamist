@@ -79,7 +79,7 @@ def main(
     samples_n, families_n = _validate_opts(samples_n, families_n)
 
     all_samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
+        body_get_samples={
             'project_ids': [project],
             'active': True,
         }
@@ -259,7 +259,7 @@ def transfer_ped(initial_project, target_project, family_ids):
     )
     ped_json = fapi.get_pedigree(
         initial_project,
-        export_type='tsv',
+        export_type='json',
         internal_family_ids=family_ids,
     )
 
@@ -448,7 +448,7 @@ def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
     Removes samples that need to be removed and returns those that need to be kept
     """
     test_samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
+        body_get_samples={
             'project_ids': [test_project],
             'active': True,
         }
