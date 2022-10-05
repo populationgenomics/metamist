@@ -375,7 +375,7 @@
 
 		</createTable>
 		<addPrimaryKey
-				columnNames="sequence_id,external_id"
+				columnNames="sequence_id,name"
 				constraintName="PK_sample_sequencing_eid"
 				tableName="sample_sequencing_eid"
 				validate="true"

@@ -48,6 +48,13 @@ class SampleLayer(BaseLayer):
         self.connection = connection
 
     # GETS
+    async def get_by_id(self, sample_id: int, check_project_id=True) -> Sample:
+        project, sample = await self.st.get_single_by_id(sample_id)
+        if check_project_id:
+            await self.pt.check_access_to_project_ids(self.connection.author, [project], readonly=True)
+
+        return sample
+
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Return the projects associated with the sample ids"""
         return await self.st.get_project_ids_for_sample_ids(sample_ids)
