@@ -113,7 +113,9 @@ async def get_pedigree(
         'sex',
         'affected',
     ]
-    pedigree_rows = [[(row[k] or '') for k in keys] for row in pedigree_dicts]
+    pedigree_rows = [
+        [('' if row[k] is None else row[k]) for k in keys] for row in pedigree_dicts
+    ]
     writer.writerows(pedigree_rows)
 
     basefn = f'{connection.project}-{date.today().isoformat()}'
