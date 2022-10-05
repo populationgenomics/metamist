@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from test.testbase import run_test_as_sync
+from test.testbase import run_as_sync
 
 from scripts.parse_ont_sheet import OntParser
 
@@ -10,7 +10,7 @@ from scripts.parse_ont_sheet import OntParser
 class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids')

@@ -1,11 +1,11 @@
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.participant import ParticipantLayer
 
 
 class TestParticipant(DbIsolatedTest):
     """Test getting participants"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
 
@@ -17,7 +17,7 @@ class TestParticipant(DbIsolatedTest):
             external_id='EX02', reported_sex=1, karyotype='XY', meta={'field': 2}
         )
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_get_all_participants(self):
         """Test getting all participants"""
         pl = ParticipantLayer(self.connection)
@@ -31,7 +31,7 @@ class TestParticipant(DbIsolatedTest):
 
         self.assertEqual('EX02', ps[1].external_id)
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_get_participant_by_eid(self):
         """Test to see what's in the database"""
         pl = ParticipantLayer(self.connection)

@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from test.testbase import run_test_as_sync
+from test.testbase import run_as_sync
 
 from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
@@ -10,7 +10,7 @@ from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 class TestSampleMapParser(unittest.TestCase):
     """Test the TestSampleMapParser"""
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
@@ -81,7 +81,7 @@ class TestSampleMapParser(unittest.TestCase):
         }
         self.assertDictEqual(expected_sequence_dict, sequencing_to_add[0].meta)
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')

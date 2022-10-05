@@ -1,6 +1,6 @@
 from datetime import date
 
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.web import (
     WebLayer,
@@ -46,7 +46,7 @@ def merge(d1: dict, d2: dict):
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
         self.webl = WebLayer(self.connection)
@@ -54,7 +54,7 @@ class TestWeb(DbIsolatedTest):
         self.sampl = SampleLayer(self.connection)
         self.seql = SampleSequenceLayer(self.connection)
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_project_summary(self):
         """Test getting the summary for a project"""
         result = await self.webl.get_project_summary(token=None)

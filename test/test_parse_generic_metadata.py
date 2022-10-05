@@ -1,7 +1,7 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
-from test.testbase import run_test_as_sync
+from test.testbase import run_as_sync
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
@@ -9,7 +9,7 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('os.path.getsize')
@@ -76,7 +76,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'Key "extra" not found in provided key map: fn, sample', str(e)
             )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
@@ -182,7 +182,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             analysis.meta,
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
@@ -287,7 +287,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
@@ -353,7 +353,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         self.assertEqual(participants_to_add[3].karyotype, 'XX')
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
@@ -400,7 +400,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
@@ -451,7 +451,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             str(ctx.exception),
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
@@ -524,7 +524,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
@@ -598,7 +598,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
