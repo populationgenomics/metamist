@@ -22,7 +22,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
         - MOCKS:
             - get_participant_id_map_by_external_ids
             - get_sample_id_map_by_external
-            - get_sequence_ids_from_sample_ids
+            - get_sequence_ids_for_sample_ids_by_type
         """
         mock_get_participant_id.return_value = {'Sample01': 1}
         mock_get_sample_id.return_value = {'Sample01': 'CPG001'}

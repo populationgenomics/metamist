@@ -194,7 +194,7 @@ class SampleSequencingTable(DbBase):
 
         return list(projects), seq_map
 
-    async def get_sequence_ids_from_sample_ids(
+    async def get_sequence_ids_for_sample_ids_by_type(
         self, sample_ids: List[int]
     ) -> Tuple[Iterable[ProjectId], Dict[int, Dict[SequenceType, list[int]]]]:
         """
@@ -290,7 +290,7 @@ class SampleSequencingTable(DbBase):
                 }
 
                 if to_delete:
-                    _delete_query = 'DELETE sample_sequencing_eid WHERE sequence_id = :seq_id AND name in :names'
+                    _delete_query = 'DELETE FROM sample_sequencing_eid WHERE sequence_id = :seq_id AND name in :names'
                     promises.append(
                         self.connection.execute(
                             _delete_query,

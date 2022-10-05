@@ -26,8 +26,8 @@ class TestSample(DbIsolatedTest):
         s = samples[0]
         self.assertEqual(1, s['id'])
 
-    @run_as_sync
-    async def test_update_sample(self):
-        """Test to see what's in the database"""
-        print('Running test 2')
-        print(await self.connection.connection.fetch_all('SELECT * FROM sample'))
+    # @run_as_sync
+    # async def test_update_sample(self):
+    #     """Test to see what's in the database"""
+    #     print('Running test 2')
+    #     print(await self.connection.connection.fetch_all('SELECT * FROM sample'))

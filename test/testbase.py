@@ -37,6 +37,7 @@ for lname in (
     'docker',
     'databases',
     'testcontainers.core.container',
+    'testcontainers.core.waiting_utils',
 ):
     logging.getLogger(lname).setLevel(logging.WARNING)
 
@@ -116,7 +117,7 @@ class DbTest(unittest.TestCase):
                     *('--password', db.MYSQL_PASSWORD),
                     'update',
                 ]
-                subprocess.check_output(command)
+                subprocess.check_output(command, stderr=subprocess.STDOUT)
 
                 sm_db = SMConnections.make_connection(
                     ConnectionStringDatabaseConfiguration(con_string)

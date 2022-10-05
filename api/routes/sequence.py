@@ -224,16 +224,16 @@ async def get_sequence_ids_for_sample_id(
 
 @router.post(
     '/ids-for-samples',
-    operation_id='getSequencesForSampleIdsByType',
+    operation_id='getSequenceIdsForSampleIdsByType',
 )
-async def get_sequence_ids_for_sample_ids(
+async def get_sequence_ids_for_sample_ids_by_type_by_type(
     sample_ids: List[str],
     connection: Connection = get_projectless_db_connection,
 ) -> Dict[str, Dict[SequenceType, list[int]]]:
     """Get all sequences by internal Sample IDs list"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)
-    sequence_id_map = await sequence_layer.get_sequence_ids_from_sample_ids(
+    sequence_id_map = await sequence_layer.get_sequence_ids_for_sample_ids_by_type(
         sample_ids_raw
     )
     return {sample_id_format(k): v for k, v in sequence_id_map.items()}

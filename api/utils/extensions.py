@@ -38,7 +38,7 @@ def guess_delimiter_by_upload_file_obj(
     if default_delimiter:
         return default_delimiter.replace('\\t', '\t')
 
-    filename_delimiter: str = guess_delimiter_by_filename(
+    filename_delimiter: Optional[str] = guess_delimiter_by_filename(
         file.filename, raise_exception=False
     )
 

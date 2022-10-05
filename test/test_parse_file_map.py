@@ -13,13 +13,13 @@ class TestSampleMapParser(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     async def test_single_row_fastq(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
     ):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
         mock_participant_ids.return_value = {}
         mock_get_sample_id.return_value = {}
@@ -84,13 +84,13 @@ class TestSampleMapParser(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     async def test_two_rows_with_provided_checksums(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
     ):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
         mock_participant_ids.return_value = {}
         mock_get_sample_id.return_value = {}

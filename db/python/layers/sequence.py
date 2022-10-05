@@ -126,7 +126,7 @@ class SampleSequenceLayer(BaseLayer):
 
         return sequences
 
-    async def get_sequence_ids_from_sample_ids(
+    async def get_sequence_ids_for_sample_ids_by_type(
         self, sample_ids: List[int], check_project_ids=True
     ) -> dict[int, dict[SequenceType, list[int]]]:
         """
@@ -136,7 +136,9 @@ class SampleSequenceLayer(BaseLayer):
         (
             project_ids,
             sample_sequence_map,
-        ) = await self.seqt.get_sequence_ids_from_sample_ids(sample_ids=sample_ids)
+        ) = await self.seqt.get_sequence_ids_for_sample_ids_by_type(
+            sample_ids=sample_ids
+        )
 
         if not sample_sequence_map:
             return sample_sequence_map
