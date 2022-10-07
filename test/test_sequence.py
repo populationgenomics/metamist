@@ -1,8 +1,13 @@
+from db.python.connect import NotFoundError
+from sample_metadata.exceptions import NotFoundException
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
+from models.models.sequence import SampleSequencing
 from models.enums import SampleType
+
+from pymysql.err import IntegrityError
 
 
 class TestSequence(DbIsolatedTest):
@@ -80,6 +85,18 @@ class TestSequence(DbIsolatedTest):
         # )
 
     @run_as_sync
+    async def test_not_found_sequence(self):
+        """
+        Test the NotFoundError when getting an invalid sequence ID
+        """
+
+        @run_as_sync
+        async def get():
+            return await self.seqlayer.get_sequence_by_id(999, check_project_id=False)
+
+        self.assertRaises(NotFoundError, get)
+
+    @run_as_sync
     async def test_insert_sequence(self):
         """
         Test inserting a sequence, and check all values are inserted correctly
@@ -91,7 +108,7 @@ class TestSequence(DbIsolatedTest):
             sequence_type=SequenceType.GENOME,
             status=SequenceStatus.UPLOADED,
             sequence_meta=meta,
-            external_ids={'default': 'SEQ01', 'collaborator2': 'CBSEQ_1'},
+            external_ids=external_ids,
         )
 
         sequence = await self.seqlayer.get_sequence_by_id(
@@ -104,6 +121,257 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual('uploaded', sequence.status.value)
         self.assertDictEqual(external_ids, sequence.external_ids)
         self.assertDictEqual(meta, sequence.meta)
+
+    @run_as_sync
+    async def test_insert_sequences_for_each_type(self):
+        """
+        Test inserting a sequence, and check all values are inserted correctly
+        """
+        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't']}
+        seq_ids = await self.seqlayer.insert_many_sequencing(
+            [
+                SampleSequencing(
+                    external_ids={},
+                    sample_id=self.sample_id_raw,
+                    type=stype,
+                    meta=meta,
+                    status=SequenceStatus.COMPLETED_SEQUENCING,
+                )
+                for stype in SequenceType
+            ]
+        )
+
+        inserted_types_rows = await self.connection.connection.fetch_all(
+            'SELECT type FROM sample_sequencing WHERE id in :ids', {'ids': seq_ids}
+        )
+        inserted_types = set(r['type'] for r in inserted_types_rows)
+
+        self.assertEqual(len(SequenceType), len(seq_ids))
+        self.assertSetEqual(set(t.value for t in SequenceType), inserted_types)
+
+    @run_as_sync
+    async def test_clashing_external_ids(self):
+        external_ids = {'default': 'clashing'}
+        await self.seqlayer.insert_sequencing(
+            sample_id=self.sample_id_raw,
+            sequence_type=SequenceType.GENOME,
+            status=SequenceStatus.UPLOADED,
+            sequence_meta={},
+            external_ids=external_ids,
+        )
+
+        @run_as_sync
+        async def insert_failing_sequence():
+            return await self.seqlayer.insert_sequencing(
+                sample_id=self.sample_id_raw,
+                sequence_type=SequenceType.GENOME,
+                status=SequenceStatus.UPLOADED,
+                sequence_meta={},
+                external_ids=external_ids,
+            )
+
+        _n_sequences_query = 'SELECT COUNT(*) from sample_sequencing'
+        self.assertEqual(
+            1, await self.connection.connection.fetch_val(_n_sequences_query)
+        )
+        self.assertRaises(IntegrityError, insert_failing_sequence)
+        # make sure the transaction unwinds the insert second sequence if the external_id clashes
+        self.assertEqual(
+            1, await self.connection.connection.fetch_val(_n_sequences_query)
+        )
+
+    @run_as_sync
+    async def test_insert_clashing_external_ids_multiple(self):
+        """
+        Test inserting a sequence, and check all values are inserted correctly
+        """
+        external_ids = {'default': 'clashing'}
+
+        @run_as_sync
+        async def insert_clashing():
+            return await self.seqlayer.insert_many_sequencing(
+                [
+                    SampleSequencing(
+                        # both get the same external_ids
+                        external_ids=external_ids,
+                        sample_id=self.sample_id_raw,
+                        type=SequenceType.EXOME,
+                        meta={},
+                        status=SequenceStatus.COMPLETED_SEQUENCING,
+                    )
+                    for _ in range(2)
+                ]
+            )
+
+        _n_sequences_query = 'SELECT COUNT(*) from sample_sequencing'
+
+        self.assertEqual(
+            0, await self.connection.connection.fetch_val(_n_sequences_query)
+        )
+        self.assertRaises(IntegrityError, insert_clashing)
+        self.assertEqual(
+            0, await self.connection.connection.fetch_val(_n_sequences_query)
+        )
+
+    # @run_as_sync
+    # async def test_getting_sequence_by_external_id(self):
+    #     seq1_id = await self.seqlayer.insert_sequencing(
+    #         sample_id=self.sample_id_raw,
+    #         sequence_type=SequenceType.GENOME,
+    #         status=SequenceStatus.UPLOADED,
+    #         sequence_meta={},
+    #         external_ids={'default': 'SEQ01', 'other': 'EXT_SEQ1'},
+    #     )
+    #     seq2_id = await self.seqlayer.insert_sequencing(
+    #         sample_id=self.sample_id_raw,
+    #         sequence_type=SequenceType.EXOME,
+    #         status=SequenceStatus.UPLOADED,
+    #         sequence_meta={},
+    #         external_ids={'default': 'SEQ02'},
+    #     )
+    #
+    #     self.assertEqual(
+    #         seq1_id, (await self.seqlayer.get_sequence_by_external_id('SEQ01')).id
+    #     )
+    #     self.assertEqual(
+    #         seq1_id, (await self.seqlayer.get_sequence_by_external_id('EXT_SEQ1')).id
+    #     )
+    #     self.assertEqual(
+    #         seq2_id, (await self.seqlayer.get_sequence_by_external_id('SEQ02')).id
+    #     )
+
+    @run_as_sync
+    async def test_get_sequences_by_sample_id(self):
+        seq1_id = await self.seqlayer.insert_sequencing(
+            sample_id=self.sample_id_raw,
+            sequence_type=SequenceType.GENOME,
+            status=SequenceStatus.UPLOADED,
+            sequence_meta={},
+            external_ids={},
+        )
+        seq2_id = await self.seqlayer.insert_sequencing(
+            sample_id=self.sample_id_raw,
+            sequence_type=SequenceType.EXOME,
+            status=SequenceStatus.UPLOADED,
+            sequence_meta={},
+            external_ids={},
+        )
+
+        by_type = await self.seqlayer.get_sequence_ids_for_sample_ids_by_type(
+            [self.sample_id_raw], check_project_ids=False
+        )
+
+        self.assertIn(self.sample_id_raw, by_type)
+        self.assertEqual(1, len(by_type))
+
+        self.assertListEqual(
+            [seq1_id], by_type[self.sample_id_raw][SequenceType.GENOME]
+        )
+        self.assertListEqual([seq2_id], by_type[self.sample_id_raw][SequenceType.EXOME])
+
+    @run_as_sync
+    async def test_query(self):
+        sample_id_for_test = await self.slayer.insert_sample(
+            'SAM_TEST_QUERY',
+            SampleType.BLOOD,
+            active=True,
+            meta={'collection-year': '2022'},
+        )
+
+        seq1_id = await self.seqlayer.insert_sequencing(
+            sample_id=sample_id_for_test,
+            sequence_type=SequenceType.GENOME,
+            status=SequenceStatus.UPLOADED,
+            sequence_meta={'unique': 'a', 'common': 'common'},
+            external_ids={'default': 'SEQ01'},
+        )
+        seq2_id = await self.seqlayer.insert_sequencing(
+            sample_id=sample_id_for_test,
+            sequence_type=SequenceType.EXOME,
+            status=SequenceStatus.RECEIVED,
+            sequence_meta={'unique': 'b', 'common': 'common'},
+            external_ids={'default': 'SEQ02'},
+        )
+
+        async def search_result_to_ids(**query):
+            seqs = await self.seqlayer.get_sequences_by(**query, project_ids=[self.project_id])
+            return {s.id for s in seqs}
+
+        # sequence_ids
+        # external_sequence_ids
+        # seq_meta
+        # sample_meta
+        # project_ids
+        # types
+        # statuses
+
+        # sample_ids
+        self.assertSetEqual(
+            {seq1_id, seq2_id},
+            await search_result_to_ids(sample_ids=[sample_id_for_test]),
+        )
+        self.assertSetEqual(
+            set(), await search_result_to_ids(sample_ids=[9_999_999])
+        )
+
+        # external sequence IDs
+        self.assertSetEqual(
+            {seq1_id}, await search_result_to_ids(external_sequence_ids=['SEQ01'])
+        )
+        self.assertSetEqual(
+            {seq1_id, seq2_id},
+            await search_result_to_ids(external_sequence_ids=['SEQ01', 'SEQ02']),
+        )
+
+        # seq_meta
+        self.assertSetEqual(
+            {seq2_id}, await search_result_to_ids(seq_meta={'unique': 'b'})
+        )
+        self.assertSetEqual(
+            {seq1_id, seq2_id},
+            await search_result_to_ids(seq_meta={'common': 'common'}),
+        )
+
+        # sample meta
+        self.assertSetEqual(
+            {seq1_id, seq2_id},
+            await search_result_to_ids(sample_meta={'collection-year': '2022'}),
+        )
+        self.assertSetEqual(
+            set(), await search_result_to_ids(sample_meta={'unknown_key': '2022'})
+        )
+
+        # sequence types
+        self.assertSetEqual(
+            {seq1_id}, await search_result_to_ids(types=[SequenceType.GENOME])
+        )
+        self.assertSetEqual(
+            {seq2_id}, await search_result_to_ids(types=[SequenceType.EXOME])
+        )
+        self.assertSetEqual(
+            {seq1_id, seq2_id},
+            await search_result_to_ids(types=[SequenceType.GENOME, SequenceType.EXOME]),
+        )
+
+        # combination
+        self.assertSetEqual(
+            {seq2_id},
+            await search_result_to_ids(
+                sample_meta={'collection-year': '2022'}, external_sequence_ids=['SEQ02']
+            ),
+        )
+        self.assertSetEqual(
+            {seq1_id},
+            await search_result_to_ids(
+                external_sequence_ids=['SEQ01'], types=[SequenceType.GENOME]
+            ),
+        )
+        self.assertSetEqual(
+            set(),
+            await search_result_to_ids(
+                external_sequence_ids=['SEQ01'], types=[SequenceType.EXOME]
+            ),
+        )
 
     @run_as_sync
     async def test_update(self):

@@ -1,3 +1,4 @@
+import re
 import asyncio
 from collections import defaultdict
 from itertools import groupby
@@ -9,6 +10,25 @@ from db.python.tables.project import ProjectId
 from models.enums import SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 
+
+class NoOpAenter:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+REPLACEMENT_KEY_INVALID_CHARS = re.compile('[^A-z0-9_]')
+
+
+def fix_replacement_key(k):
+    """Fix a DB replacement key"""
+    if not k or not isinstance(k, str):
+        raise ValueError(f'Replacement key was not valid: {k} {type(k)}')
+    k = REPLACEMENT_KEY_INVALID_CHARS.sub('_', k)
+    if not k[0].isalpha():
+        k = 'k' + k
+    return k
 
 class SampleSequencingTable(DbBase):
     """
@@ -65,6 +85,7 @@ class SampleSequencingTable(DbBase):
                         status=sequence.status,
                         sequence_meta=sequence.meta,
                         author=author,
+                        open_transaction=False,
                     )
                 )
             return await asyncio.gather(*promises)
@@ -77,6 +98,7 @@ class SampleSequencingTable(DbBase):
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
+        open_transaction: bool=True,
     ) -> int:
         """
         Create a new sequence for a sample, and add it to database
@@ -89,7 +111,10 @@ class SampleSequencingTable(DbBase):
             RETURNING id;
         """
 
-        async with self.connection.transaction():
+        with_function = self.connection.transaction if open_transaction else NoOpAenter
+
+        async with with_function():
+
             id_of_new_sequence = await self.connection.fetch_val(
                 _query,
                 {
@@ -221,7 +246,6 @@ class SampleSequencingTable(DbBase):
         # groupby preserves ordering
         for key, seqs in groupby(sequences, lambda s: (s['sample_id'], s['type'])):
             sample_id, stype = key
-            print(sample_id, type(sample_id))
             # get all
             sample_id_to_seq_id[sample_id][SequenceType(stype)] = [
                 s['id'] for s in seqs
@@ -354,14 +378,20 @@ class SampleSequencingTable(DbBase):
 
         if seq_meta:
             for k, v in seq_meta.items():
-                k_replacer = f'seq_meta_{k}'
-                where.append(f"json_extract(sq.meta, '$.{k}') = :{k_replacer}")
+                k_replacer = fix_replacement_key(f'seq_meta_{k}')
+                while k_replacer in replacements:
+                    k_replacer += '_breaker'
+                escaped_key = k.replace("-", "\\-")
+                where.append(f"JSON_EXTRACT(sq.meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
         if sample_meta:
             for k, v in sample_meta.items():
-                k_replacer = f'sample_meta_{k}'
-                where.append(f"json_extract(s.meta, '$.{k}') = :{k_replacer}")
+                k_replacer = fix_replacement_key(f'sample_meta_{k}')
+                while k_replacer in replacements:
+                    k_replacer += '_breaker'
+                escaped_key = k.replace("-", "\\-")
+                where.append(f"JSON_EXTRACT(s.meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
         if sequence_ids:
@@ -379,8 +409,9 @@ class SampleSequencingTable(DbBase):
             replacements['external_ids'] = [s.lower() for s in external_sequence_ids]
 
         if types:
+            seq_types = [s.value if isinstance(s, SequenceType) else s for s in types]
             where.append('sq.type in :types')
-            replacements['types'] = types
+            replacements['types'] = seq_types
 
         if statuses:
             where.append('sq.status in :statuses')

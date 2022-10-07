@@ -35,7 +35,7 @@ for lname in (
     'asyncio',
     'urllib3',
     'docker',
-    'databases',
+    # 'databases',
     'testcontainers.core.container',
     'testcontainers.core.waiting_utils',
 ):
@@ -89,7 +89,7 @@ class DbTest(unittest.TestCase):
             try:
                 os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
-                db = MySqlContainer('mariadb:latest')
+                db = MySqlContainer('mariadb:10.8.3')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
