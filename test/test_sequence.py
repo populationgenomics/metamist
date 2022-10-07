@@ -1,13 +1,12 @@
-from db.python.connect import NotFoundError
-from sample_metadata.exceptions import NotFoundException
 from test.testbase import DbIsolatedTest, run_as_sync
+from pymysql.err import IntegrityError
 
+
+from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 from models.enums import SampleType
-
-from pymysql.err import IntegrityError
 
 
 class TestSequence(DbIsolatedTest):
@@ -151,6 +150,7 @@ class TestSequence(DbIsolatedTest):
 
     @run_as_sync
     async def test_clashing_external_ids(self):
+        """Test that should fail when 2nd sequence is inserted with same external_id"""
         external_ids = {'default': 'clashing'}
         await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
@@ -161,7 +161,7 @@ class TestSequence(DbIsolatedTest):
         )
 
         @run_as_sync
-        async def insert_failing_sequence():
+        async def _insert_failing_sequence():
             return await self.seqlayer.insert_sequencing(
                 sample_id=self.sample_id_raw,
                 sequence_type=SequenceType.GENOME,
@@ -174,7 +174,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(IntegrityError, insert_failing_sequence)
+        self.assertRaises(IntegrityError, _insert_failing_sequence)
         # make sure the transaction unwinds the insert second sequence if the external_id clashes
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
@@ -188,7 +188,7 @@ class TestSequence(DbIsolatedTest):
         external_ids = {'default': 'clashing'}
 
         @run_as_sync
-        async def insert_clashing():
+        async def _insert_clashing():
             return await self.seqlayer.insert_many_sequencing(
                 [
                     SampleSequencing(
@@ -208,7 +208,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(IntegrityError, insert_clashing)
+        self.assertRaises(IntegrityError, _insert_clashing)
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )
@@ -242,6 +242,7 @@ class TestSequence(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_sequences_by_sample_id(self):
+        """Get many sequences by sample ID"""
         seq1_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
@@ -271,6 +272,7 @@ class TestSequence(DbIsolatedTest):
 
     @run_as_sync
     async def test_query(self):
+        """Test query_sequences in different combinations"""
         sample_id_for_test = await self.slayer.insert_sample(
             'SAM_TEST_QUERY',
             SampleType.BLOOD,
@@ -294,25 +296,17 @@ class TestSequence(DbIsolatedTest):
         )
 
         async def search_result_to_ids(**query):
-            seqs = await self.seqlayer.get_sequences_by(**query, project_ids=[self.project_id])
+            seqs = await self.seqlayer.get_sequences_by(
+                **query, project_ids=[self.project_id]
+            )
             return {s.id for s in seqs}
-
-        # sequence_ids
-        # external_sequence_ids
-        # seq_meta
-        # sample_meta
-        # project_ids
-        # types
-        # statuses
 
         # sample_ids
         self.assertSetEqual(
             {seq1_id, seq2_id},
             await search_result_to_ids(sample_ids=[sample_id_for_test]),
         )
-        self.assertSetEqual(
-            set(), await search_result_to_ids(sample_ids=[9_999_999])
-        )
+        self.assertSetEqual(set(), await search_result_to_ids(sample_ids=[9_999_999]))
 
         # external sequence IDs
         self.assertSetEqual(

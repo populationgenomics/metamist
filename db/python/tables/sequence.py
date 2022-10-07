@@ -1,3 +1,5 @@
+# pylint: disable=too-many-locals
+
 import re
 import asyncio
 from collections import defaultdict
@@ -12,11 +14,18 @@ from models.models.sequence import SampleSequencing
 
 
 class NoOpAenter:
+    """
+    Sometimes it's useful to use `async with VARIABLE()`, and have
+    either VARIABLE be a transaction, or noop (eg: when a transaction
+    is already taking place). Use this in place.
+    """
+
     async def __aenter__(self):
         pass
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
+
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile('[^A-z0-9_]')
 
@@ -29,6 +38,7 @@ def fix_replacement_key(k):
     if not k[0].isalpha():
         k = 'k' + k
     return k
+
 
 class SampleSequencingTable(DbBase):
     """
@@ -98,7 +108,7 @@ class SampleSequencingTable(DbBase):
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
-        open_transaction: bool=True,
+        open_transaction: bool = True,
     ) -> int:
         """
         Create a new sequence for a sample, and add it to database
@@ -381,7 +391,6 @@ class SampleSequencingTable(DbBase):
                 k_replacer = fix_replacement_key(f'seq_meta_{k}')
                 while k_replacer in replacements:
                     k_replacer += '_breaker'
-                escaped_key = k.replace("-", "\\-")
                 where.append(f"JSON_EXTRACT(sq.meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
@@ -390,7 +399,6 @@ class SampleSequencingTable(DbBase):
                 k_replacer = fix_replacement_key(f'sample_meta_{k}')
                 while k_replacer in replacements:
                     k_replacer += '_breaker'
-                escaped_key = k.replace("-", "\\-")
                 where.append(f"JSON_EXTRACT(s.meta, '$.{k}') = :{k_replacer}")
                 replacements[k_replacer] = v
 
