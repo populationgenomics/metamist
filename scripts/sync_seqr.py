@@ -32,17 +32,17 @@ from sample_metadata.apis import (
 loggers_to_silence = [
     'google.auth.transport.requests',
     'google.auth._default',
-    'google.auth.compute_engine._metadata'
+    'google.auth.compute_engine._metadata',
 ]
 for lname in loggers_to_silence:
     tlogger = logging.getLogger(lname)
     tlogger.setLevel(level=logging.CRITICAL)
-    
+
 logger = logging.getLogger('sync-seqr')
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
-ENVIRONMENT = 'staging'
+ENVIRONMENT = 'prod' # 'staging'
 
 ENVS = {
     'staging': (
@@ -55,7 +55,7 @@ ENVS = {
     ),
 }
 
-
+SAMPLES_TO_IGNORE = {'CPG227355', 'CPG227397'}
 BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
 
 url_individuals_table_upload = '/api/project/{projectGuid}/upload_individuals_table/sa'
@@ -126,13 +126,17 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     # check sequence type is valid
     _ = SequenceType(sequence_type)
 
-    samples = samapi.get_samples(
-        body_get_samples=BodyGetSamples(project_ids=[dataset])
-    )
+    samples = samapi.get_samples(body_get_samples=BodyGetSamples(project_ids=[dataset]))
     sequences_all = seqapi.get_all_sequences_by_sample_ids(
-        [s['id'] for s in samples]
+        [s['id'] for s in samples if s['id'] not in SAMPLES_TO_IGNORE]
     )
-    sample_ids = set([sid for sid, types in sequences_all.items() if sequence_type in types])
+    sample_ids = set(
+        [
+            sid
+            for sid, types in sequences_all.items()
+            if sequence_type in types and sid not in SAMPLES_TO_IGNORE
+        ]
+    )
     participant_ids = set(
         int(sample['participant_id'])
         for sample in samples
@@ -301,19 +305,23 @@ def sync_individual_metadata(
         base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
 
         resp = requests.get(
-            base + f'/api/v1/participant/{dataset}/individual-metadata-seqr?export_typejson',
-            headers={'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'},
+            base
+            + f'/api/v1/participant/{dataset}/individual-metadata-seqr?export_typejson',
+            headers={
+                'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'
+            },
         )
         resp.raise_for_status()
         individual_metadata_resp = resp.json()
-
 
     else:
         individual_metadata_resp = seqrapi.get_individual_metadata_for_seqr(
             project=dataset, export_type=ExportType('json')
         )
 
-        if individual_metadata_resp is None or isinstance(individual_metadata_resp, str):
+        if individual_metadata_resp is None or isinstance(
+            individual_metadata_resp, str
+        ):
             print(
                 f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
             )
@@ -350,7 +358,10 @@ def sync_individual_metadata(
         f'{dataset} :: Uploaded individual metadata with status: {resp_1.status_code}'
     )
 
-    if resp_1.status_code == 400 and 'Unable to find individuals to update' in resp_1.text:
+    if (
+        resp_1.status_code == 400
+        and 'Unable to find individuals to update' in resp_1.text
+    ):
         print('No individual metadata needed updating')
         return
     elif not resp_1.ok:
@@ -390,9 +401,11 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
     #     seqapi.get_external_participant_id_to_internal_sample_id_export(project=dataset, export_type='tsv')
     # )
 
-    person_sample_map_rows = seqrapi.get_external_participant_id_to_internal_sample_id(project=dataset)
+    person_sample_map_rows = seqrapi.get_external_participant_id_to_internal_sample_id(
+        project=dataset
+    )
 
-    rows_to_write = ['\t'.join(s[::-1]) for s in person_sample_map_rows]
+    rows_to_write = ['\t'.join(s[::-1]) for s in person_sample_map_rows if not any(sid in s for sid in SAMPLES_TO_IGNORE)]
 
     filename = f'{dataset}_pid_sid_map_{datetime.datetime.now().isoformat()}.tsv'
     filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
@@ -414,7 +427,7 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
         key=lambda el: el['timestamp_completed'],
     )
 
-    if False: # len(es_index_analyses) > 0:
+    if False:  # len(es_index_analyses) > 0:
         es_index = es_index_analyses[-1]['output']
     else:
         es_index = ES_INDICES[sequence_type][dataset]
@@ -424,7 +437,7 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
         'elasticsearchIndex': es_index,
         'datasetType': 'VARIANTS',
         'mappingFilePath': fn_path,
-        'ignoreExtraSamplesInCallset': False,
+        'ignoreExtraSamplesInCallset': True,
     }
     print(data)
 
@@ -481,14 +494,14 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
 
         resp = requests.get(
             base + f'/api/v1/analysis/{dataset}/sample-cram-path-map/tsv',
-            headers={'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'},
+            headers={
+                'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'
+            },
         )
         resp.raise_for_status()
         reads_map = resp.text
     else:
-        reads_map = aapi.get_samples_reads_map(
-            project=dataset, export_type='tsv'
-        )
+        reads_map = aapi.get_samples_reads_map(project=dataset, export_type='tsv')
 
     if isinstance(reads_map, str) and reads_map.startswith('<!doctype html>'):
         print(f'{dataset} :: Bad API format (404d) for reads map')
@@ -497,7 +510,7 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
         print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
-    reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))))
+    reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))) if not any(s in l for s in SAMPLES_TO_IGNORE))
     sequence_filter = lambda row: True
     if sequence_type == 'genome':
         sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]
@@ -506,12 +519,13 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
     reads_list = [
         "\t".join(l.split("\t")[:2])
         for l in reads_list
-        if (not participant_eids or l.split("\t")[0] in participant_eids) and sequence_filter(l.split("\t"))
+        if (not participant_eids or l.split("\t")[0] in participant_eids)
+        and sequence_filter(l.split("\t"))
     ]
 
     # temporarily
     d = '/Users/mfranklin/source/sample-metadata/cram-map/'
-    with open(os.path.join(d, dataset + '-cram-map.tsv'), 'w+') as f:
+    with open(os.path.join(d, dataset + f'-{sequence_type}-cram-map.tsv'), 'w+') as f:
         f.write("\n".join(reads_list))
 
 
@@ -519,9 +533,7 @@ def get_token():
     import google.auth.exceptions
     import google.auth.transport.requests
 
-    credential_filename = (
-        '/Users/mfranklin/Desktop/tmp/seqr/seqr-sync-credentials.json'
-    )
+    credential_filename = '/Users/mfranklin/Desktop/tmp/seqr/seqr-sync-credentials.json'
     with open(credential_filename, 'r') as f:
         from google.oauth2 import service_account
 
