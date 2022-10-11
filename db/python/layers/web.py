@@ -59,7 +59,13 @@ class NestedParticipant(BaseModel):
 class ProjectSummary:
     """Return class for the project summary endpoint"""
 
+    # stats
     total_samples: int
+    total_participants: int
+    participants_in_seqr: int
+    sequence_stats: dict[str, dict[str, str]]
+
+    # grid
     participants: List[NestedParticipant]
     participant_keys: List[str]
     sample_keys: List[str]
@@ -197,7 +203,11 @@ class WebDb(DbBase):
                 participant_keys=[],
                 sample_keys=[],
                 sequence_keys=[],
+                # stats
                 total_samples=0,
+                total_participants=0,
+                participants_in_seqr=0,
+                sequence_stats={},
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -341,5 +351,22 @@ WHERE fp.participant_id in :pids
             participant_keys=participant_keys,
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
+            # TODO: fill these stats in properly
             total_samples=total_samples,
+            total_participants=1_000_000,
+            participants_in_seqr=-1,
+            sequence_stats={
+                'genome': {
+                    'Known': 420,
+                    'Sequences': 419,
+                    'Crams': 42,
+                    'Seqr': -1
+                },
+                'exome': {
+                    'Known': 0,
+                    'Sequences': 0,
+                    'Crams': 0,
+                    'Seqr': -1,
+                }
+            }
         )

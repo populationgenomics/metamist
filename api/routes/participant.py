@@ -244,7 +244,8 @@ async def batch_upsert_participants(
         return outputs
 
 
-@router.post('/{project}', operation_id='getParticipants')
+@router.post('/{project}', 
+operation_id='getParticipants')
 async def get_participants(
     external_participant_ids: List[str] = None,
     internal_participant_ids: List[int] = None,

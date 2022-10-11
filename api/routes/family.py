@@ -40,7 +40,6 @@ class FamilyUpdateModel(BaseModel):
     description: Optional[str] = None
     coded_phenotype: Optional[str] = None
 
-
 @router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
 async def import_pedigree(
     file: UploadFile = File(...),
@@ -73,7 +72,8 @@ async def import_pedigree(
     }
 
 
-@router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
+@router.get('/{project}/pedigree', 
+operation_id='getPedigree', tags=['seqr'])
 async def get_pedigree(
     internal_family_ids: List[int] = Query(None),
     response_type: ContentType = ContentType.JSON,
