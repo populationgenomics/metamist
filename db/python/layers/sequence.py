@@ -115,7 +115,7 @@ class SampleSequenceLayer(BaseLayer):
         check_project_ids=True,
     ) -> List[SampleSequencing]:
         """
-        Get the latest sequence objects for a list of internal sample IDs
+        Get ALL active sequence objects for a list of internal sample IDs
         """
         projects, sequences = await self.seqt.get_sequences_by(sample_ids=sample_ids)
 
