@@ -86,7 +86,7 @@ export const ProjectSummary = () => {
             _setPageLimit(parseInt(value));
             setPageNumber(1);
         },
-        []
+        [projectName, pageLimit, page]
     );
 
     const _updateProjectSummary = React.useCallback(() => {
