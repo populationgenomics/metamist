@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional, Dict, Union, List, Sequence, Type
+from typing import Optional, Dict, Union, List, Sequence
 
 from models.base import SMBase
 from models.enums.sample import SampleType
@@ -68,8 +68,8 @@ def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
         - validating prefix
         - validating checksum
     """
-    expected_type: Type[Union[str, SampleType]] = str if strict else SampleType
-    if not isinstance(identifier, expected_type):
+    expected_type = str if strict else (str, int)
+    if not isinstance(identifier, expected_type):  # type: ignore
         raise TypeError(
             f'Expected identifier type to be "{expected_type}", received "{type(identifier)}"'
         )

@@ -46,12 +46,35 @@ const exampleReducer = (state: State, action: Action): State => {
 };
 
 const resultRenderer = ({ ...props }) => {
+
+    let components = []
+
+    switch (props.type) {
+        case "sample": {
+            if (props.data.id !== props.title) {
+                components.push(props.data.id)
+            }
+            components.push(...(props.data.sample_external_ids || []))
+            break
+        }
+        case "participant": {
+            components.push(...(props.data.participant_external_ids || []))
+            break
+        }
+        case "family": {
+            components.push(...(props.data.family_external_ids || []))
+            break
+        }
+    }
+
+    let subtitle = props.type + ": " + components.join(" · ")
+
     return (
         <>
             {props.title && props.type && (
                 <div key="content" className="content">
                     <div className="title">{props.title}</div>
-                    <div className="description">{props.type}</div>
+                    <div className="description">{subtitle}</div>
                 </div>
             )}
         </>

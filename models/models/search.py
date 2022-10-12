@@ -13,6 +13,7 @@ class FamilySearchResponseData(SearchResponseData):
     """Family search response data"""
 
     id: int
+    family_external_ids: list[str]
 
 
 class ParticipantSearchResponseData(SearchResponseData):
