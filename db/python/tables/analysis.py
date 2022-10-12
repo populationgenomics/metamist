@@ -407,3 +407,41 @@ ORDER BY a.timestamp_completed DESC
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
         rows = await self.connection.fetch_all(_query, values)
         return [Analysis.from_db(**dict(r)) for r in rows]
+
+
+    # region STATS
+
+    async def get_number_of_crams_by_sequence_type(self, project: ProjectId) -> dict[str, int]:
+        _query = """
+        SELECT seq_type, COUNT(*) as number_of_crams FROM (
+            SELECT JSON_EXTRACT(meta, "$.sequencing_type") as seq_type  
+            FROM analysis
+            WHERE project = :project AND status = 'completed' AND type = 'cram'
+            GROUP BY seq_type, output
+        ) as a GROUP BY seq_type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        return {r['seq_type']: r['number_of_crams'] for r in rows}
+
+    async def get_seqr_stats_by_sequence_type(self, project: ProjectId) -> dict[str, int]:
+        _query = """
+SELECT a.seq_type, COUNT(*) as n
+FROM (
+    SELECT MAX(id) as analysis_id, JSON_EXTRACT(meta, "$.sequencing_type") as seq_type
+    FROM analysis
+    WHERE project = :project AND status = 'completed' AND type = 'es-index'
+    GROUP BY seq_type
+) a
+INNER JOIN analysis_sample asample ON asample.analysis_id = a.analysis_id
+GROUP BY a.seq_type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        return {r['seq_type']: r['n'] for r in rows}
+
+
+
+
+    # endregion STATS
