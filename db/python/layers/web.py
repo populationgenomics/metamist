@@ -368,9 +368,9 @@ WHERE fp.participant_id in :pids
         sequence_stats = {}
         for seq in seen_seq_types:
             sequence_stats[seq] = {
-                'Sequences': seq_number_by_seq_type.get(seq, 0),
-                'Crams': cram_number_by_seq_type.get(seq, 0),
-                'Seqr': seqr_stats_by_seq_type.get(seq, 0),
+                'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
+                'Crams': str(cram_number_by_seq_type.get(seq, 0)),
+                'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
             }
 
         return ProjectSummary(

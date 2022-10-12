@@ -158,8 +158,14 @@ class TestWeb(DbIsolatedTest):
 
         expected = ProjectSummary(
             total_samples=1,
-            total_participants=0,
-            sequence_stats={},
+            total_participants=1,
+            sequence_stats={
+                'genome': {
+                    'Sequences': '1',
+                    'Crams': '0',
+                    'Seqr': '0',
+                }
+            },
             participants=data_to_class(expected_data),
             participant_keys=['external_id'],
             sample_keys=['id', 'external_id', 'created_date'],
