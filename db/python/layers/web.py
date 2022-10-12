@@ -356,17 +356,12 @@ WHERE fp.participant_id in :pids
             total_participants=1_000_000,
             participants_in_seqr=-1,
             sequence_stats={
-                'genome': {
-                    'Known': 420,
-                    'Sequences': 419,
-                    'Crams': 42,
-                    'Seqr': -1
-                },
+                'genome': {'Known': 420, 'Sequences': 419, 'Crams': 42, 'Seqr': -1},
                 'exome': {
                     'Known': 0,
                     'Sequences': 0,
                     'Crams': 0,
                     'Seqr': -1,
-                }
-            }
+                },
+            },
         )
