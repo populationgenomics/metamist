@@ -6,20 +6,18 @@ from typing import Optional, List
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-
 from db.python.layers.search import SearchLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.sample import sample_id_format
 from db.python.layers.web import WebLayer, NestedParticipant
+
+from models.models.sample import sample_id_format
+from models.models.search import SearchResponse
 
 from api.utils.db import (
     get_project_readonly_connection,
     get_projectless_db_connection,
     Connection,
 )
-
-
-from models.models.search import SearchResponse
 
 
 class PagingLinks(BaseModel):
@@ -53,6 +51,8 @@ class ProjectSummaryResponse(BaseModel):
 
 
 class SearchResponseModel(BaseModel):
+    """Parent model class, allows flexibility later on"""
+
     responses: list[SearchResponse]
 
 
@@ -138,7 +138,6 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     responses = await SearchLayer(connection).search(keyword, project_ids=project_ids)
 
     for res in responses:
-        # remap project to name
-        res.data.project = projects[res.data.project]
+        res.data.project = projects.get(res.data.project, res.data.project)  # type: ignore
 
     return SearchResponseModel(responses=responses)

@@ -298,7 +298,7 @@ SELECT type, COUNT(*) as n
 FROM (
     SELECT sq.type
     FROM sample_sequencing sq
-    INNER JOIN sample s ON s.id = sq.sample_id 
+    INNER JOIN sample s ON s.id = sq.sample_id
     WHERE s.project = :project
     GROUP BY s.id, sq.type
 ) as s

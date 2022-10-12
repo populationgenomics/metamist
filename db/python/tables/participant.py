@@ -245,7 +245,7 @@ WHERE p.project = :project
         return [(r[0], r[1]) for r in values]
 
     async def search(
-        self, query, project_ids: list[ProjectId]
+        self, query, project_ids: list[ProjectId], limit: int = 5
     ) -> list[tuple[ProjectId, int, str]]:
         """
         Search by some term, return [ProjectId, ParticipantId, ExternalId]
@@ -254,9 +254,10 @@ WHERE p.project = :project
         SELECT project, id, external_id
         FROM participant
         WHERE project in :project_ids AND external_id LIKE :search_pattern
-        LIMIT 10
+        LIMIT :limit
         """
         rows = await self.connection.fetch_all(
-            _query, {'project_ids': project_ids, 'search_pattern': query + '%'}
+            _query,
+            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
         )
         return [(r['project'], r['id'], r['external_id']) for r in rows]

@@ -13,9 +13,9 @@ from models.models.sample import (
 )
 from models.models.search import (
     SearchResponse,
-    SampleResponseData,
-    ParticipantResponseData,
-    FamilyResponseData,
+    SampleSearchResponseData,
+    ParticipantSearchResponseData,
+    FamilySearchResponseData,
 )
 
 
@@ -29,9 +29,12 @@ class SearchLayer(BaseLayer):
 
     @staticmethod
     def try_get_sample_id_from_query(query: str) -> Optional[int]:
+        """
+        Try to get internal CPG sample Identifier from string,
+        otherwise return None (helper to catch exception)"""
         try:
-            return sample_id_transform_to_raw(query)
-        except Exception:
+            return sample_id_transform_to_raw(query, strict=False)
+        except ValueError:
             return None
 
     async def _get_search_result_for_sample(
@@ -72,7 +75,7 @@ class SearchLayer(BaseLayer):
         return SearchResponse(
             title=title,
             type=SearchResponseType.SAMPLE,
-            data=SampleResponseData(
+            data=SampleSearchResponseData(
                 project=project,
                 id=id_field,
                 sample_external_ids=sample_eids,
@@ -82,6 +85,9 @@ class SearchLayer(BaseLayer):
         )
 
     async def search(self, query: str, project_ids: list[int]) -> List[SearchResponse]:
+        """
+        Search metamist for some string, get some set of SearchResponses
+        """
         # this is the only place where a sample ID can get it
         if not query:
             return []
@@ -101,9 +107,9 @@ class SearchLayer(BaseLayer):
         stable = SampleTable(self.connection)
 
         sample_rows, participant_rows, family_rows = await asyncio.gather(
-            stable.search(query, project_ids=project_ids),
-            ptable.search(query, project_ids=project_ids),
-            ftable.search(query, project_ids=project_ids),
+            stable.search(query, project_ids=project_ids, limit=5),
+            ptable.search(query, project_ids=project_ids, limit=5),
+            ftable.search(query, project_ids=project_ids, limit=5),
         )
 
         sample_participant_ids = [s[2] for s in sample_rows]
@@ -120,7 +126,7 @@ class SearchLayer(BaseLayer):
             SearchResponse(
                 title=s_eid,
                 type=SearchResponseType.SAMPLE,
-                data=SampleResponseData(
+                data=SampleSearchResponseData(
                     project=project,
                     id=sample_id_format(s_id),
                     family_external_ids=participant_family_eids.get(p_id)
@@ -139,7 +145,7 @@ class SearchLayer(BaseLayer):
             SearchResponse(
                 title=p_eid,
                 type=SearchResponseType.PARTICIPANT,
-                data=ParticipantResponseData(
+                data=ParticipantSearchResponseData(
                     project=project,
                     id=p_id,
                     family_external_ids=participant_family_eids.get(p_id) or [],
@@ -153,7 +159,7 @@ class SearchLayer(BaseLayer):
             SearchResponse(
                 title=f_eid,
                 type=SearchResponseType.FAMILY,
-                data=FamilyResponseData(
+                data=FamilySearchResponseData(
                     project=project,
                     id=f_id,
                     family_external_ids=[f_eid],

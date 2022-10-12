@@ -62,6 +62,8 @@ class TestWeb(DbIsolatedTest):
         # Expect an empty project
         expected = ProjectSummary(
             total_samples=0,
+            total_participants=0,
+            sequence_stats={},
             participants=[],
             participant_keys=[],
             sample_keys=[],
@@ -156,6 +158,8 @@ class TestWeb(DbIsolatedTest):
 
         expected = ProjectSummary(
             total_samples=1,
+            total_participants=0,
+            sequence_stats={},
             participants=data_to_class(expected_data),
             participant_keys=['external_id'],
             sample_keys=['id', 'external_id', 'created_date'],

@@ -81,7 +81,7 @@ def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
         raise ValueError('Programming error related to sample checks')
 
     if not identifier.startswith(SAMPLE_PREFIX):
-        raise Exception(
+        raise ValueError(
             f'Invalid prefix found for {SAMPLE_PREFIX} sample identifier "{identifier}"'
         )
 

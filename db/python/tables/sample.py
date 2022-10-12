@@ -305,7 +305,7 @@ class SampleTable(DbBase):
         return Sample.from_db(sample_row)
 
     async def search(
-        self, query, project_ids: list[ProjectId]
+        self, query, project_ids: list[ProjectId], limit=5
     ) -> list[tuple[ProjectId, int, int, str]]:
         """
         Search by some term, return [ProjectId, SampleId, ParticipantId, ExternalId]
@@ -315,10 +315,11 @@ class SampleTable(DbBase):
             SELECT project, id, external_id, participant_id
             FROM sample
             WHERE project in :project_ids AND external_id LIKE :search_pattern
-            LIMIT 10
+            LIMIT :limit
         """.strip()
         rows = await self.connection.fetch_all(
-            _query, {'project_ids': project_ids, 'search_pattern': query + '%'}
+            _query,
+            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
         )
         return [
             (r['project'], r['id'], r['participant_id'], r['external_id']) for r in rows

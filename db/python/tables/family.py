@@ -65,7 +65,9 @@ class FamilyTable(DbBase):
                 seen.add(r.id)
         return families
 
-    async def search(self, query, project_ids) -> list[tuple[ProjectId, int, str]]:
+    async def search(
+        self, query, project_ids: list[ProjectId], limit: int = 5
+    ) -> list[tuple[ProjectId, int, str]]:
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
@@ -73,10 +75,11 @@ class FamilyTable(DbBase):
         SELECT project, id, external_id
         FROM family
         WHERE project in :project_ids AND external_id LIKE :search_pattern
-        LIMIT 10
+        LIMIT :limit
         """
         rows = await self.connection.fetch_all(
-            _query, {'project_ids': project_ids, 'search_pattern': query + '%'}
+            _query,
+            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
         )
         return [(r['project'], r['id'], r['external_id']) for r in rows]
 

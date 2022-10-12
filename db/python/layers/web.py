@@ -161,6 +161,7 @@ class WebDb(DbBase):
         return await self.connection.fetch_val(_query, {'project': self.project})
 
     async def get_total_number_of_participants(self):
+        """Get total number of participants within a project"""
         _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
 
@@ -361,7 +362,9 @@ WHERE fp.participant_id in :pids
         ]
         sequence_keys = ['type'] + ['meta.' + k for k in sequence_meta_keys]
 
-        seen_seq_types = set(cram_number_by_seq_type.keys()).union(set(seq_number_by_seq_type.keys()))
+        seen_seq_types = set(cram_number_by_seq_type.keys()).union(
+            set(seq_number_by_seq_type.keys())
+        )
         sequence_stats = {}
         for seq in seen_seq_types:
             sequence_stats[seq] = {

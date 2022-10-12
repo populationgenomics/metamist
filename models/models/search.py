@@ -3,21 +3,29 @@ from models.base import SMBase
 from models.enums.search import SearchResponseType
 
 
-class ResponseData(SMBase):
+class SearchResponseData(SMBase):
+    """Response data class for Search"""
+
     project: ProjectId | str
 
 
-class FamilyResponseData(ResponseData):
+class FamilySearchResponseData(SearchResponseData):
+    """Family search response data"""
+
     id: int
 
 
-class ParticipantResponseData(ResponseData):
+class ParticipantSearchResponseData(SearchResponseData):
+    """Participant search response data"""
+
     id: int
     family_external_ids: list[str]
     participant_external_ids: list[str]
 
 
-class SampleResponseData(ResponseData):
+class SampleSearchResponseData(SearchResponseData):
+    """Sample search response data"""
+
     id: str | None
     family_external_ids: list[str]
     participant_external_ids: list[str]
@@ -25,6 +33,8 @@ class SampleResponseData(ResponseData):
 
 
 class SearchResponse(SMBase):
+    """Response class for each search result"""
+
     type: SearchResponseType
     title: str
-    data: SampleResponseData | ParticipantResponseData | FamilyResponseData
+    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
