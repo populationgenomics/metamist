@@ -18,7 +18,6 @@ from api.utils.db import (
     Connection,
 )
 
-from typing import Union
 
 from models.models.search import SearchResponse
 
@@ -37,7 +36,6 @@ class ProjectSummaryResponse(BaseModel):
     # high level stats
     total_participants: int
     total_samples: int
-    participants_in_seqr: int
     sequence_stats: dict[str, dict[str, str]]
 
     # for display
@@ -113,7 +111,6 @@ async def get_project_summary(
     return ProjectSummaryResponse(
         total_samples=summary.total_samples,
         total_participants=summary.total_participants,
-        participants_in_seqr=summary.participants_in_seqr,
         sequence_stats=summary.sequence_stats,
         # other stuff
         participants=participants,

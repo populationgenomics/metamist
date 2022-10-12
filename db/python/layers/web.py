@@ -206,7 +206,6 @@ class WebDb(DbBase):
                 # stats
                 total_samples=0,
                 total_participants=0,
-                participants_in_seqr=0,
                 sequence_stats={},
             )
 
@@ -353,15 +352,6 @@ WHERE fp.participant_id in :pids
             sequence_keys=sequence_keys,
             # TODO: fill these stats in properly
             total_samples=total_samples,
-            total_participants=1_000_000,
-            participants_in_seqr=-1,
-            sequence_stats={
-                'genome': {'Known': 420, 'Sequences': 419, 'Crams': 42, 'Seqr': -1},
-                'exome': {
-                    'Known': 0,
-                    'Sequences': 0,
-                    'Crams': 0,
-                    'Seqr': -1,
-                },
-            },
+            total_participants=total_participants,
+            sequence_stats=sequence_stats,
         )
