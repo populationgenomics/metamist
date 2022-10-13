@@ -262,6 +262,9 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                             gridTemplateRows: `50px 1fr`,
                             gridTemplateColumns: `300px 400px 1fr`,
                             gap: 20,
+                            maxWidth: "1600px",
+                            marginLeft: "auto",
+                            marginRight: "auto",
                         }}
                     >
                         {sample && (
