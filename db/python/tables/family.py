@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import List, Optional, Set, Any, Dict
 
 from db.python.connect import DbBase, NotFoundError
@@ -63,6 +64,44 @@ class FamilyTable(DbBase):
                 families.append(Family.from_db(dict(r)))
                 seen.add(r.id)
         return families
+
+    async def search(
+        self, query, project_ids: list[ProjectId], limit: int = 5
+    ) -> list[tuple[ProjectId, int, str]]:
+        """
+        Search by some term, return [ProjectId, FamilyId, ExternalId]
+        """
+        _query = """
+        SELECT project, id, external_id
+        FROM family
+        WHERE project in :project_ids AND external_id LIKE :search_pattern
+        LIMIT :limit
+        """
+        rows = await self.connection.fetch_all(
+            _query,
+            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
+        )
+        return [(r['project'], r['id'], r['external_id']) for r in rows]
+
+    async def get_family_external_ids_by_participant_ids(
+        self, participant_ids
+    ) -> dict[int, list[str]]:
+        """Get family external IDs by participant IDs, useful for search"""
+        if not participant_ids:
+            return {}
+
+        _query = """
+        SELECT f.external_id, fp.participant_id
+        FROM family_participant fp
+        INNER JOIN family f ON fp.family_id = f.id
+        WHERE fp.participant_id in :pids
+        """
+        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+        result = defaultdict(list)
+        for r in rows:
+            result[r['participant_id']].append(r['external_id'])
+
+        return result
 
     async def update_family(
         self,

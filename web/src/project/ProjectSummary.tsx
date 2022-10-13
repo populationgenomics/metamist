@@ -62,6 +62,7 @@ export const ProjectSummary = () => {
         async (token: any) => {
             if (!projectName) return;
             let sanitisedToken = !!token ? token : undefined;
+            setError(undefined);
             setIsLoading(true);
             new WebApi()
                 .getProjectSummary(projectName, pageLimit, sanitisedToken)
@@ -303,8 +304,6 @@ export const ProjectSummary = () => {
             Total Participants: {summary?.total_participants}
             <br />
             Total Samples: {summary?.total_samples}
-            <br />
-            Participants in Seqr: {summary?.participants_in_seqr}
             <br />
             Sequence Statistics:
             <br />

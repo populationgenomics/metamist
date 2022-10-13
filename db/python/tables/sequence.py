@@ -287,6 +287,28 @@ class SampleSequencingTable(DbBase):
         sequences = [SampleSequencing.from_db(s) for s in sequence_dicts]
         return projects, sequences
 
+    async def get_sequence_type_numbers_for_project(self, project: ProjectId):
+        """
+        This groups by samples, so one sample with many sequences ONLY reports one here,
+        In the future, this should report the number of sequence groups (or something like that).
+        """
+
+        _query = """
+SELECT type, COUNT(*) as n
+FROM (
+    SELECT sq.type
+    FROM sample_sequencing sq
+    INNER JOIN sample s ON s.id = sq.sample_id
+    WHERE s.project = :project
+    GROUP BY s.id, sq.type
+) as s
+GROUP BY type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        return {r['type']: r['n'] for r in rows}
+
     async def update_status(
         self,
         sequencing_id,

@@ -22,9 +22,10 @@ async def get_all_projects(connection=get_projectless_db_connection):
 async def get_my_projects(connection=get_projectless_db_connection):
     """Get projects I have access to"""
     ptable = ProjectPermissionsTable(connection.connection)
-    return await ptable.get_projects_accessible_by_user(
+    pmap = await ptable.get_projects_accessible_by_user(
         author=connection.author, readonly=True
     )
+    return list(pmap.values())
 
 
 @router.put('/', operation_id='createProject')

@@ -211,6 +211,20 @@ RETURNING id
         await self.connection.execute_many(_query, mapped_values)
         return True
 
+    async def get_external_ids_by_participant(
+        self, participant_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """
+        Get list of external IDs for a participant,
+        This method signature is partially future-proofed for multiple-external IDs
+        """
+        if not participant_ids:
+            return {}
+
+        _query = 'SELECT id, external_id FROM participant WHERE id in :pids'
+        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+        return {r['id']: [r['external_id']] for r in rows}
+
     async def get_external_participant_id_to_internal_sample_id_map(
         self, project: ProjectId
     ) -> List[Tuple[str, int]]:
@@ -229,3 +243,21 @@ WHERE p.project = :project
 """
         values = await self.connection.fetch_all(_query, {'project': project})
         return [(r[0], r[1]) for r in values]
+
+    async def search(
+        self, query, project_ids: list[ProjectId], limit: int = 5
+    ) -> list[tuple[ProjectId, int, str]]:
+        """
+        Search by some term, return [ProjectId, ParticipantId, ExternalId]
+        """
+        _query = """
+        SELECT project, id, external_id
+        FROM participant
+        WHERE project in :project_ids AND external_id LIKE :search_pattern
+        LIMIT :limit
+        """
+        rows = await self.connection.fetch_all(
+            _query,
+            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
+        )
+        return [(r['project'], r['id'], r['external_id']) for r in rows]

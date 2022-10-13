@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
+from db.python.tables.analysis import AnalysisTable
+from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SampleType, SequenceType, SequenceStatus
 
 
@@ -62,7 +64,6 @@ class ProjectSummary:
     # stats
     total_samples: int
     total_participants: int
-    participants_in_seqr: int
     sequence_stats: dict[str, dict[str, str]]
 
     # grid
@@ -157,7 +158,12 @@ class WebDb(DbBase):
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
         _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
-        return (await self.connection.fetch_one(_query, {'project': self.project}))[0]
+        return await self.connection.fetch_val(_query, {'project': self.project})
+
+    async def get_total_number_of_participants(self):
+        """Get total number of participants within a project"""
+        _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
+        return await self.connection.fetch_val(_query, {'project': self.project})
 
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
@@ -206,7 +212,6 @@ class WebDb(DbBase):
                 # stats
                 total_samples=0,
                 total_participants=0,
-                participants_in_seqr=0,
                 sequence_stats={},
             )
 
@@ -231,18 +236,29 @@ WHERE fp.participant_id in :pids
         """
         family_promise = self.connection.fetch_all(f_query, {'pids': pids})
 
+        atable = AnalysisTable(self._connection)
+        seqtable = SampleSequencingTable(self._connection)
+
         [
             sequence_rows,
             participant_rows,
             family_rows,
             sample_id_start_times,
             total_samples,
+            total_participants,
+            cram_number_by_seq_type,
+            seq_number_by_seq_type,
+            seqr_stats_by_seq_type,
         ] = await asyncio.gather(
             sequence_promise,
             participant_promise,
             family_promise,
             sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
+            self.get_total_number_of_participants(),
+            atable.get_number_of_crams_by_sequence_type(project=self.project),
+            seqtable.get_sequence_type_numbers_for_project(project=self.project),
+            atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
 
         # post-processing
@@ -346,27 +362,23 @@ WHERE fp.participant_id in :pids
         ]
         sequence_keys = ['type'] + ['meta.' + k for k in sequence_meta_keys]
 
+        seen_seq_types = set(cram_number_by_seq_type.keys()).union(
+            set(seq_number_by_seq_type.keys())
+        )
+        sequence_stats = {}
+        for seq in seen_seq_types:
+            sequence_stats[seq] = {
+                'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
+                'Crams': str(cram_number_by_seq_type.get(seq, 0)),
+                'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
+            }
+
         return ProjectSummary(
             participants=pmodels,
             participant_keys=participant_keys,
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
-            # TODO: fill these stats in properly
             total_samples=total_samples,
-            total_participants=1_000_000,
-            participants_in_seqr=-1,
-            sequence_stats={
-                'genome': {
-                    'Known': 420,
-                    'Sequences': 419,
-                    'Crams': 42,
-                    'Seqr': -1
-                },
-                'exome': {
-                    'Known': 0,
-                    'Sequences': 0,
-                    'Crams': 0,
-                    'Seqr': -1,
-                }
-            }
+            total_participants=total_participants,
+            sequence_stats=sequence_stats,
         )
