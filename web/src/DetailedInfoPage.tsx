@@ -3,7 +3,7 @@
 import * as React from "react";
 import "./mystyle.css";
 
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     FamilyApi,
     SampleApi,
@@ -40,7 +40,7 @@ const sampleFieldsToDisplay = ["author", "active", "type", "participant_id"];
 
 export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const { projectName, sampleName } = useParams();
-
+    const navigate = useNavigate();
     const [samples, setSamples] = React.useState();
     const [isLoading, setIsLoading] = React.useState<boolean>(true);
     const [error, setError] = React.useState<string | undefined>();
@@ -161,11 +161,9 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         getSequenceInfo();
     }, [sampleInfo]);
 
-    const updateSample = (id: string) => {
+    const getCPGID = (id: string) => {
         const CPGID = idNameMap?.find(([name, _]) => name === id);
-        if (CPGID && samples) {
-            setSample(samples[CPGID[1]]);
-        }
+        return CPGID![1]; // You'd expect this to always work. Should I add the case where it doesn't?
     };
 
     const drawTrio = (
@@ -186,7 +184,14 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                     height={50}
                     stroke="black"
                     fill={affectedPaternal === 2 ? "black" : "white"}
-                    onClick={() => updateSample(paternal)}
+                    onClick={() => {
+                        if (!samples) return;
+                        navigate(
+                            `/project/${projectName}/sample/${getCPGID(
+                                paternal
+                            )}`
+                        );
+                    }}
                 />
                 <text x={125} y={170} textAnchor="middle">
                     {paternal}
@@ -197,7 +202,14 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                     r={25}
                     stroke="black"
                     fill={affectedMaternal === 2 ? "black" : "white"}
-                    onClick={() => updateSample(maternal)}
+                    onClick={() => {
+                        if (!samples) return;
+                        navigate(
+                            `/project/${projectName}/sample/${getCPGID(
+                                maternal
+                            )}`
+                        );
+                    }}
                 />
                 <text x={250} y={170} textAnchor="middle">
                     {maternal}
@@ -230,10 +242,11 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     };
 
     React.useEffect(() => {
+        if (!samples || !sampleName) return;
         setIsLoading(true);
-        setSample(sampleName);
+        setSample(samples[sampleName]);
         setIsLoading(false);
-    }, [projectName, sampleName]);
+    }, [projectName, samples, sampleName]);
 
     return (
         <>

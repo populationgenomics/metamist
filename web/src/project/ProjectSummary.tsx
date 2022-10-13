@@ -50,9 +50,7 @@ export const ProjectSummary = () => {
 
     const handleOnClick = React.useCallback(
         (p) => {
-            navigate(`/project/${projectName}/${p}/${pageLimit}`, {
-                replace: true,
-            });
+            navigate(`/project/${projectName}/${p}/${pageLimit}`);
             setPageNumber(p);
         },
         [navigate]
@@ -81,9 +79,7 @@ export const ProjectSummary = () => {
     const setPageLimit = React.useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
             const value = e.currentTarget.value;
-            navigate(`/project/${projectName}/1/${parseInt(value)}`, {
-                replace: true,
-            });
+            navigate(`/project/${projectName}/1/${parseInt(value)}`);
             _setPageLimit(parseInt(value));
             setPageNumber(1);
         },
@@ -257,7 +253,7 @@ export const ProjectSummary = () => {
                                                             ? renderLink(
                                                                   s,
                                                                   k,
-                                                                  s.external_id
+                                                                  s.id
                                                               )
                                                             : sanitiseValue(
                                                                   _.get(s, k)

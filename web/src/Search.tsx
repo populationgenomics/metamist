@@ -14,6 +14,7 @@ enum ActionKind {
     Start = "START_SEARCH",
     Finish = "FINISH_SEARCH",
     Update = "UPDATE_SELECTION",
+    Short = "QUERY_TOO_SHORT",
 }
 
 type Action = {
@@ -29,45 +30,48 @@ const initialState: State = {
     value: "",
 };
 
-const exampleReducer = (state: State, action: Action): State => {
-    switch (action.type) {
-        case ActionKind.Clear:
-            return initialState;
-        case ActionKind.Start:
-            return { ...state, loading: true, value: action.query! };
-        case ActionKind.Finish:
-            return { ...state, loading: false, results: action.results! };
-        case ActionKind.Update:
-            return { ...state, value: action.selection! };
+const assertUnreachable = (x: ActionKind): never => {
+    throw new Error(`Unexpected value: ${x}`);
+};
 
-        default:
-            throw new Error();
+const SearchReducer = (state: State, action: Action): State => {
+    switch (action.type) {
+        case "CLEAN_QUERY":
+            return initialState;
+        case "START_SEARCH":
+            return { ...state, loading: true, value: action.query! };
+        case "FINISH_SEARCH":
+            return { ...state, loading: false, results: action.results! };
+        case "UPDATE_SELECTION":
+            return { ...state, value: action.selection! };
+        case "QUERY_TOO_SHORT":
+            return { ...state, loading: false };
     }
+    return assertUnreachable(action.type);
 };
 
 const resultRenderer = ({ ...props }) => {
-
-    let components = []
+    let components = [];
 
     switch (props.type) {
         case "sample": {
             if (props.data.id !== props.title) {
-                components.push(props.data.id)
+                components.push(props.data.id);
             }
-            components.push(...(props.data.sample_external_ids || []))
-            break
+            components.push(...(props.data.sample_external_ids || []));
+            break;
         }
         case "participant": {
-            components.push(...(props.data.participant_external_ids || []))
-            break
+            components.push(...(props.data.participant_external_ids || []));
+            break;
         }
         case "family": {
-            components.push(...(props.data.family_external_ids || []))
-            break
+            components.push(...(props.data.family_external_ids || []));
+            break;
         }
     }
 
-    let subtitle = props.type + ": " + components.join(" · ")
+    let subtitle = props.type + ": " + components.join(" · ");
 
     return (
         <>
@@ -84,7 +88,7 @@ const resultRenderer = ({ ...props }) => {
 export const Searchbar: React.FunctionComponent = () => {
     const navigate = useNavigate();
     const [{ loading, results, value }, dispatch] = React.useReducer(
-        exampleReducer,
+        SearchReducer,
         initialState
     );
 
@@ -99,12 +103,21 @@ export const Searchbar: React.FunctionComponent = () => {
                 dispatch({ type: ActionKind.Clear });
                 return;
             }
-            new WebApi().searchByKeyword(data.value).then((resp) => {
-                dispatch({
-                    type: ActionKind.Finish,
-                    results: resp.data.responses,
+            if (data.value.length < 3) {
+                dispatch({ type: ActionKind.Short });
+                return;
+            }
+            new WebApi()
+                .searchByKeyword(data.value)
+                .then((resp) => {
+                    dispatch({
+                        type: ActionKind.Finish,
+                        results: resp.data.responses,
+                    });
+                })
+                .catch((er) => {
+                    console.log(er.message);
                 });
-            });
         }, 300);
     }, []);
 
@@ -128,10 +141,7 @@ export const Searchbar: React.FunctionComponent = () => {
                     selection: data.result.title,
                 });
                 navigate(
-                    `/project/${data.result.data.project}/${data.result.type}/${data.result.title}`,
-                    {
-                        replace: true,
-                    }
+                    `/project/${data.result.data.project}/${data.result.type}/${data.result.title}`
                 );
             }}
             resultRenderer={resultRenderer}
