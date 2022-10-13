@@ -12,6 +12,7 @@ from models.models.sample import (
 
 from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.sample import Sample
 
 from api.utils.db import (
     get_project_write_connection,
@@ -134,7 +135,7 @@ async def get_all_sample_id_map_by_internal(
 @router.get(
     '/{project}/{external_id}/details',
     # Don't support this until openapi 3.1
-    # response_model=Sample,
+    response_model=Sample,
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(

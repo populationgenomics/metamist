@@ -9,29 +9,11 @@ import {
     SampleApi,
     ParticipantApi,
     SequenceApi,
+    ParticipantModel,
+    Sample,
 } from "./sm-api/api";
 
 // TODO Move interfaces to appropriate API/routes
-interface Participant {
-    external_id: string;
-    id: number;
-    reported_sex: number;
-}
-
-interface Sample {
-    active: boolean;
-    author: string;
-    external_id: string;
-    id: string;
-    meta: {
-        collection_date: string;
-        specimen: string;
-    };
-    participant_id: string;
-    project: number;
-    type: string;
-}
-
 interface PedigreeEntry {
     affected: number;
     family_id: string;
@@ -65,7 +47,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const [sample, setSample] = React.useState<string>();
     const [sampleInfo, setSampleInfo] = React.useState<Sample>();
     const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>();
-    const [participants, setParticipants] = React.useState<Participant[]>();
+    const [participants, setParticipants] =
+        React.useState<ParticipantModel[]>();
     const [selectedExternalID, setSelectedExternalID] =
         React.useState<string>();
     const [idNameMap, setIdNameMap] = React.useState<[string, string][]>();
@@ -143,7 +126,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         if (!sampleInfo) return;
         if (!projectName) return;
         new SequenceApi()
-            .getSequencesBySampleIds([sampleInfo.id])
+            .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
                 setSequenceInfo(resp.data[0]);
                 setIsLoading(false);

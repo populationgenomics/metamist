@@ -20,6 +20,7 @@ from db.python.layers.participant import (
     ParticipantLayer,
     ParticipantUpdateModel,
     ParticipantUpsertBody,
+    ParticipantModel,
 )
 from models.models.sample import sample_id_format, sample_id_transform_to_raw
 
@@ -244,7 +245,7 @@ async def batch_upsert_participants(
         return outputs
 
 
-@router.post('/{project}', operation_id='getParticipants')
+@router.post('/{project}', response_model=List[ParticipantModel], operation_id='getParticipants')
 async def get_participants(
     external_participant_ids: List[str] = None,
     internal_participant_ids: List[int] = None,
