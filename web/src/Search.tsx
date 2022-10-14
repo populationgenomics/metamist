@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Search, Message } from "semantic-ui-react";
+import { Search } from "semantic-ui-react";
 import { WebApi } from "./sm-api/api";
 import { useNavigate } from "react-router-dom";
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";

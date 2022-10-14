@@ -1,13 +1,15 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
 import * as React from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import _ from "lodash";
 
 import { ProjectSelector } from "./ProjectSelector";
 import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
 import { Table, Button, Dropdown } from "semantic-ui-react";
+
+import { SampleLink } from "../Links";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
@@ -96,12 +98,6 @@ export const ProjectSummary = () => {
 
     const totalPageNumbers = Math.ceil(
         (summary?.total_samples || 0) / pageLimit
-    );
-
-    const renderLink = (s: any, k: any, external_id: string) => (
-        <Link to={`/project/${projectName}/sample/${external_id}`}>
-            {sanitiseValue(_.get(s, k))}
-        </Link>
     );
 
     const pageOptions = (
@@ -251,15 +247,22 @@ export const ProjectSummary = () => {
                                                         }
                                                     >
                                                         {k === "external_id" ||
-                                                        k === "id"
-                                                            ? renderLink(
-                                                                  s,
-                                                                  k,
-                                                                  s.id
-                                                              )
-                                                            : sanitiseValue(
-                                                                  _.get(s, k)
-                                                              )}
+                                                        k === "id" ? (
+                                                            <SampleLink
+                                                                id={s.id}
+                                                                projectName={
+                                                                    projectName
+                                                                }
+                                                            >
+                                                                {sanitiseValue(
+                                                                    _.get(s, k)
+                                                                )}
+                                                            </SampleLink>
+                                                        ) : (
+                                                            sanitiseValue(
+                                                                _.get(s, k)
+                                                            )
+                                                        )}
                                                     </Table.Cell>
                                                 ))}
                                             {seq &&
