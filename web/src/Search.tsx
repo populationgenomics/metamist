@@ -2,6 +2,10 @@ import * as React from "react";
 import { Search } from "semantic-ui-react";
 import { WebApi } from "./sm-api/api";
 import { useNavigate } from "react-router-dom";
+import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
+import ErrorRoundedIcon from "@mui/icons-material/ErrorRounded";
 
 type State = {
     loading: boolean;
@@ -50,6 +54,8 @@ const SearchReducer = (state: State, action: Action): State => {
 
 const resultRenderer = ({ ...props }) => {
     let components = [];
+    // let icon = <Diversity3RoundedIcon />;
+    let icon: React.ReactElement = <></>;
 
     switch (props.type) {
         case "sample": {
@@ -57,29 +63,46 @@ const resultRenderer = ({ ...props }) => {
                 components.push(props.data.id);
             }
             components.push(...(props.data.sample_external_ids || []));
+            icon = <BloodtypeRoundedIcon />;
             break;
         }
         case "participant": {
             components.push(...(props.data.participant_external_ids || []));
+            icon = <PersonRoundedIcon />;
             break;
         }
         case "family": {
             components.push(...(props.data.family_external_ids || []));
+            icon = <Diversity3RoundedIcon />;
             break;
         }
         case "error": {
             components.push(props.data.error);
+            icon = <ErrorRoundedIcon />;
             break;
         }
     }
 
-    let subtitle = props.type + ": " + components.join(" · ");
+    let subtitle = components.join(" · ");
 
     return (
         <>
             {props.title && props.type && (
                 <div key="content" className="content">
-                    <div className="title">{props.title}</div>
+                    <div className="title">
+                        {icon}
+                        {"  "}
+                        {props.title}
+                        <span
+                            style={{
+                                float: "right",
+                                fontWeight: "normal",
+                                fontStyle: "italic",
+                            }}
+                        >
+                            {props.data.project}
+                        </span>
+                    </div>
                     <div className="description">{subtitle}</div>
                 </div>
             )}

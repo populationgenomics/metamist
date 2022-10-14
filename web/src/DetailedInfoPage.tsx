@@ -1,7 +1,6 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
 import * as React from "react";
-import "./mystyle.css";
 
 import { useParams, useNavigate } from "react-router-dom";
 import {
