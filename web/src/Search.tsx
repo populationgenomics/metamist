@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Search } from "semantic-ui-react";
+import { Search, Message } from "semantic-ui-react";
 import { WebApi } from "./sm-api/api";
 import { useNavigate } from "react-router-dom";
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
@@ -117,6 +117,22 @@ export const Searchbar: React.FunctionComponent = () => {
         initialState
     );
 
+    const searchResultToRoute = (project: string, type: string, id: string) => {
+        switch (type) {
+            case "participant":
+                alert("Participants page not implemented yet");
+                // navigate(`/project/${project}/participant/${id}`);
+                break;
+            case "sample":
+                navigate(`/project/${project}/sample/${id}`);
+                break;
+            case "family":
+                alert("Family page not implemented yet");
+                // navigate(`/project/${project}/family/${id}`);
+                break;
+        }
+    };
+
     const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const handleSearchChange = React.useCallback((e, data) => {
@@ -174,8 +190,10 @@ export const Searchbar: React.FunctionComponent = () => {
                     type: ActionKind.Update,
                     selection: data.result.title,
                 });
-                navigate(
-                    `/project/${data.result.data.project}/${data.result.type}/${data.result.title}`
+                searchResultToRoute(
+                    data.result.data.project,
+                    data.result.type,
+                    data.result.data.id
                 );
             }}
             resultRenderer={resultRenderer}
