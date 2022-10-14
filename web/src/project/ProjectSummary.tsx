@@ -7,9 +7,7 @@ import _ from "lodash";
 import { ProjectSelector } from "./ProjectSelector";
 import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
-import { Input, Button } from "reactstrap";
-
-import { Icon, Label, Menu, Table } from "semantic-ui-react";
+import { Table, Button, Dropdown } from "semantic-ui-react";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
@@ -79,8 +77,7 @@ export const ProjectSummary = () => {
     );
 
     const setPageLimit = React.useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const value = e.currentTarget.value;
+        (e: React.SyntheticEvent<HTMLElement>, { value }) => {
             navigate(`/project/${projectName}/1/${parseInt(value)}`);
             _setPageLimit(parseInt(value));
             setPageNumber(1);
@@ -111,6 +108,7 @@ export const ProjectSummary = () => {
         <>
             {pageNumber > 1 && (
                 <Button
+                    style={{ marginLeft: "10px" }}
                     disabled={isLoading}
                     onClick={() => {
                         handleOnClick(pageNumber - 1);
@@ -120,7 +118,7 @@ export const ProjectSummary = () => {
                 </Button>
             )}
             {!!summary?.total_samples && (
-                <span style={{ padding: "0 10px" }}>
+                <span style={{ padding: "8px 10px 0 10px" }}>
                     Page {pageNumber} / {totalPageNumbers} (
                     {summary?.total_samples} samples)
                 </span>
@@ -175,15 +173,17 @@ export const ProjectSummary = () => {
             ];
 
             table = (
-                <table className="table table-bordered">
-                    <thead>
-                        <tr>
+                <Table celled>
+                    <Table.Header>
+                        <Table.Row>
                             {headers.map((k, i) => (
-                                <th key={`${k}-${i}`}>{k}</th>
+                                <Table.HeaderCell key={`${k}-${i}`}>
+                                    {k}
+                                </Table.HeaderCell>
                             ))}
-                        </tr>
-                    </thead>
-                    <tbody>
+                        </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
                         {summary.participants.map((p, pidx) =>
                             p.samples.map((s, sidx) => {
                                 // @ts-ignore
@@ -198,11 +198,11 @@ export const ProjectSummary = () => {
                                     const isFirstOfGroup =
                                         sidx === 0 && seqidx === 0;
                                     return (
-                                        <tr
+                                        <Table.Row
                                             key={`${p.external_id}-${s.id}-${seq.id}`}
                                         >
                                             {isFirstOfGroup && (
-                                                <td
+                                                <Table.Cell
                                                     style={{ backgroundColor }}
                                                     rowSpan={
                                                         lengthOfParticipant
@@ -213,12 +213,12 @@ export const ProjectSummary = () => {
                                                             (f) => f.external_id
                                                         )
                                                         .join(", ")}
-                                                </td>
+                                                </Table.Cell>
                                             )}
                                             {isFirstOfGroup &&
                                                 summary.participant_keys.map(
                                                     (k) => (
-                                                        <td
+                                                        <Table.Cell
                                                             style={{
                                                                 backgroundColor,
                                                             }}
@@ -234,12 +234,12 @@ export const ProjectSummary = () => {
                                                             {sanitiseValue(
                                                                 _.get(p, k)
                                                             )}
-                                                        </td>
+                                                        </Table.Cell>
                                                     )
                                                 )}
                                             {seqidx === 0 &&
                                                 summary.sample_keys.map((k) => (
-                                                    <td
+                                                    <Table.Cell
                                                         style={{
                                                             backgroundColor,
                                                         }}
@@ -260,12 +260,12 @@ export const ProjectSummary = () => {
                                                             : sanitiseValue(
                                                                   _.get(s, k)
                                                               )}
-                                                    </td>
+                                                    </Table.Cell>
                                                 ))}
                                             {seq &&
                                                 summary.sequence_keys.map(
                                                     (k) => (
-                                                        <td
+                                                        <Table.Cell
                                                             style={{
                                                                 backgroundColor,
                                                             }}
@@ -278,16 +278,16 @@ export const ProjectSummary = () => {
                                                             {sanitiseValue(
                                                                 _.get(seq, k)
                                                             )}
-                                                        </td>
+                                                        </Table.Cell>
                                                     )
                                                 )}
-                                        </tr>
+                                        </Table.Row>
                                     );
                                 });
                             })
                         )}
-                    </tbody>
-                </table>
+                    </Table.Body>
+                </Table>
             );
         }
     }
@@ -298,12 +298,13 @@ export const ProjectSummary = () => {
 
     const projectSummaryStats: React.ReactElement = (
         <>
-            <h5>Project Summary Stats</h5>
-            Total Participants: {summary?.total_participants}
+            <h2>Project Summary Stats</h2>
+            <b>Total Participants: </b>
+            {summary?.total_participants}
             <br />
-            Total Samples: {summary?.total_samples}
-            <br />
-            Sequence Statistics:
+            <b>Total Samples: </b>
+            {"    "}
+            {summary?.total_samples}
             <br />
             <Table celled>
                 <Table.Header>
@@ -318,8 +319,8 @@ export const ProjectSummary = () => {
                 <Table.Body>
                     {summary?.sequence_stats &&
                         Object.entries(summary?.sequence_stats).map(
-                            ([key, value], index) => (
-                                <Table.Row>
+                            ([key, value]) => (
+                                <Table.Row key={key}>
                                     <Table.Cell>{titleCase(key)}</Table.Cell>
                                     {Object.entries(value).map(([k1, v1]) => (
                                         <Table.Cell key={`${key}-${k1}`}>
@@ -339,6 +340,7 @@ export const ProjectSummary = () => {
             <br />
             <ProjectSelector />
             <br />
+            <hr />
             {summary && projectSummaryStats}
             <hr />
             {projectName && (
@@ -350,22 +352,16 @@ export const ProjectSummary = () => {
                         flexDirection: "row",
                     }}
                 >
-                    <Input
-                        type="select"
+                    <Dropdown
+                        selection
                         onChange={setPageLimit}
                         value={pageLimit}
-                        style={{
-                            display: "inline",
-                            width: "150px",
-                            marginRight: "10px",
-                        }}
-                    >
-                        {PAGE_SIZES.map((s) => (
-                            <option key={`page-size-${s}`} value={s}>
-                                {s} samples
-                            </option>
-                        ))}
-                    </Input>
+                        options={PAGE_SIZES.map((s) => ({
+                            key: s,
+                            text: `${s} samples`,
+                            value: s,
+                        }))}
+                    />
                     {pageOptions}
                 </div>
             )}

@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { useParams, useNavigate } from "react-router-dom";
 
-import { Input } from "reactstrap";
+import { Dropdown } from "semantic-ui-react";
 
 import { ProjectApi } from "../sm-api/api";
 
@@ -16,7 +16,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     const { projectName } = useParams();
     const navigate = useNavigate();
     const handleOnClick = React.useCallback(
-        (p) => navigate(`/project/${p}`),
+        (_, { value }) => navigate(`/project/${value}`),
         [navigate]
     );
 
@@ -43,21 +43,15 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
 
     return (
         <div>
-            <h4>Select a project</h4>
-            <Input
-                type="select"
-                onChange={(event) => {
-                    handleOnClick(event.target.value);
-                }}
-                value={projectName || ""}
-            >
-                {!projectName && <option value="">Select a project</option>}
-                {projects.map((p) => (
-                    <option key={p} value={p}>
-                        {p}
-                    </option>
-                ))}
-            </Input>
+            <h2>Select a project</h2>
+            <Dropdown
+                selection
+                fluid
+                onChange={handleOnClick}
+                placeholder="Select a project"
+                value={projectName}
+                options={projects.map((p) => ({ key: p, text: p, value: p }))}
+            />
         </div>
     );
 };
