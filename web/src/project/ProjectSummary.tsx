@@ -1,7 +1,7 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
 import * as React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import _ from "lodash";
 
 import { ProjectSelector } from "./ProjectSelector";
@@ -24,7 +24,10 @@ const sanitiseValue = (value: any) => {
 export const ProjectSummary = () => {
     const navigate = useNavigate();
 
-    const { projectName, page, pageSize } = useParams();
+    const { projectName, page } = useParams();
+
+    const [searchParams] = useSearchParams();
+    const pageSize = searchParams.get("size") || 20;
     let directToken = 0;
     if (page && pageSize) {
         directToken = +page * +pageSize - +pageSize;
@@ -52,7 +55,7 @@ export const ProjectSummary = () => {
 
     const handleOnClick = React.useCallback(
         (p) => {
-            navigate(`/project/${projectName}/${p}/${pageLimit}`);
+            navigate(`/project/${projectName}/${p}?size=${pageLimit}`);
             setPageNumber(p);
         },
         [navigate]
@@ -80,7 +83,7 @@ export const ProjectSummary = () => {
 
     const setPageLimit = React.useCallback(
         (e: React.SyntheticEvent<HTMLElement>, { value }) => {
-            navigate(`/project/${projectName}/1/${parseInt(value)}`);
+            navigate(`/project/${projectName}/1?size=${parseInt(value)}`);
             _setPageLimit(parseInt(value));
             setPageNumber(1);
         },

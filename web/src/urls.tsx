@@ -27,7 +27,7 @@ export const Routes = () => {
                     element={<ProjectSummary />}
                 />
                 <Route
-                    path="project/:projectName/:page/:pageSize"
+                    path="project/:projectName/:page/"
                     element={<ProjectSummary />}
                 />
 
