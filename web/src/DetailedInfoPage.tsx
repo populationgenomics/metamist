@@ -11,6 +11,7 @@ import {
     SequenceApi,
     ParticipantModel,
     Sample,
+    SampleSequencing,
 } from "./sm-api/api";
 
 // TODO Move interfaces to appropriate API/routes
@@ -23,20 +24,7 @@ interface PedigreeEntry {
     sex: number;
 }
 
-interface Sequence {
-    id: number;
-    meta: {
-        facility: string;
-        emoji: string;
-        technology: string;
-        coverage: string;
-    };
-    sample_id: string;
-    status: string;
-    type: string;
-}
-
-const sampleFieldsToDisplay = ["author", "active", "type", "participant_id"];
+const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
 export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const { projectName, sampleName } = useParams();
@@ -52,7 +40,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const [selectedExternalID, setSelectedExternalID] =
         React.useState<string>();
     const [idNameMap, setIdNameMap] = React.useState<[string, string][]>();
-    const [sequenceInfo, setSequenceInfo] = React.useState<Sequence>();
+    const [sequenceInfo, setSequenceInfo] = React.useState<SampleSequencing>();
 
     const getSamplesFromProject = React.useCallback(async () => {
         if (!projectName) return;
@@ -176,13 +164,14 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         probandSex: number
     ) => {
         return (
-            <svg viewBox="75 90 250 300" width="250" height="300">
+            <svg viewBox="75 90 250 200" width="250" height="200">
                 <rect
                     x={100}
                     y={100}
                     width={50}
                     height={50}
                     stroke="black"
+                    cursor="pointer"
                     fill={affectedPaternal === 2 ? "black" : "white"}
                     onClick={() => {
                         if (!samples) return;
@@ -201,6 +190,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                     cy={125}
                     r={25}
                     stroke="black"
+                    cursor="pointer"
                     fill={affectedMaternal === 2 ? "black" : "white"}
                     onClick={() => {
                         if (!samples) return;
@@ -223,7 +213,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                         width={50}
                         height={50}
                         stroke="black"
-                        fill={affectedPaternal === 2 ? "black" : "white"}
+                        fill={affectedProband === 2 ? "black" : "white"}
                     />
                 ) : (
                     <circle
@@ -231,7 +221,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                         cy={225}
                         r={25}
                         stroke="black"
-                        fill={affectedProband ? "black" : "white"}
+                        fill={affectedProband === 2 ? "black" : "white"}
                     />
                 )}
                 <text x={187.5} y={270} textAnchor="middle">
@@ -255,23 +245,11 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             {!!error && <h1>error</h1>}
             {projectName && !isLoading && !error && (
                 <>
-                    <div
-                        style={{
-                            display: "grid",
-                            gridTemplateAreas: `'header header header' 'pedigree sample sequence'`,
-                            gridTemplateRows: `50px 1fr`,
-                            gridTemplateColumns: `300px 400px 1fr`,
-                            gap: 20,
-                            maxWidth: "1600px",
-                            marginLeft: "auto",
-                            marginRight: "auto",
-                        }}
-                    >
+                    <div className="detailedInfo">
                         {sample && (
                             <>
                                 <div
                                     style={{
-                                        gridArea: "header",
                                         borderBottom: `1px solid black`,
                                     }}
                                 >
@@ -309,39 +287,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                 );
                                             })}
                                 </div>
-                                <div
-                                    style={{
-                                        gridArea: "sample",
-                                    }}
-                                >
-                                    {sample && (
-                                        <>
-                                            <h4>Sample Information</h4>
-                                            <hr />
-                                            {sampleInfo &&
-                                                Object.entries(sampleInfo)
-                                                    .filter(([key, value]) =>
-                                                        sampleFieldsToDisplay.includes(
-                                                            key
-                                                        )
-                                                    )
-                                                    .map(([key, value]) => (
-                                                        <div
-                                                            key={`${key}-${value}`}
-                                                        >
-                                                            <b>{key}:</b>{" "}
-                                                            {value.toString()}
-                                                        </div>
-                                                    ))}
-                                        </>
-                                    )}
-                                </div>
-                                <div
-                                    style={{
-                                        gridArea: "pedigree",
-                                        borderRight: `1px solid black`,
-                                    }}
-                                >
+                                <br />
+                                <div>
                                     {sample && (
                                         <>
                                             {pedigree &&
@@ -379,24 +326,52 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                         </>
                                     )}
                                 </div>
-                                <div
-                                    style={{
-                                        gridArea: "sequence",
-                                        borderLeft: `1px solid black`,
-                                        paddingLeft: 20,
-                                    }}
-                                >
+                                <div>
                                     {sample && (
                                         <>
-                                            <h4>Sequence Information</h4>
-                                            <hr />
+                                            <h4
+                                                style={{
+                                                    borderBottom: `1px solid black`,
+                                                }}
+                                            >
+                                                Sample Information
+                                            </h4>
+                                            {sampleInfo &&
+                                                Object.entries(sampleInfo)
+                                                    .filter(([key, value]) =>
+                                                        sampleFieldsToDisplay.includes(
+                                                            key
+                                                        )
+                                                    )
+                                                    .map(([key, value]) => (
+                                                        <div
+                                                            key={`${key}-${value}`}
+                                                        >
+                                                            <b>{key}:</b>{" "}
+                                                            {value.toString()}
+                                                        </div>
+                                                    ))}
+                                        </>
+                                    )}
+                                </div>
+                                <br />
+                                <div>
+                                    {sample && (
+                                        <>
+                                            <h4
+                                                style={{
+                                                    borderBottom: `1px solid black`,
+                                                }}
+                                            >
+                                                Sequence Information
+                                            </h4>
                                             {sequenceInfo &&
                                                 Object.entries(
                                                     sequenceInfo
                                                 ).map(([key, value]) => {
                                                     if (key === "meta") {
                                                         return Object.entries(
-                                                            sequenceInfo.meta
+                                                            sequenceInfo.meta!
                                                         ).map(([k1, v1]) => (
                                                             <div
                                                                 key={`${k1}-${v1}`}

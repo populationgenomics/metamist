@@ -16,7 +16,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     const { projectName } = useParams();
     const navigate = useNavigate();
     const handleOnClick = React.useCallback(
-        (p) => navigate(`/project/${p}`, { replace: true }),
+        (p) => navigate(`/project/${p}`),
         [navigate]
     );
 

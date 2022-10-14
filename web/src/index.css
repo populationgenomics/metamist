@@ -84,3 +84,11 @@ blockquote {
     color: white;
     text-decoration: none;
 }
+
+@media screen and (min-width: 1200px) {
+    .detailedInfo {
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}

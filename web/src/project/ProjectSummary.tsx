@@ -9,6 +9,8 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
 import { Input, Button } from "reactstrap";
 
+import { Icon, Label, Menu, Table } from "semantic-ui-react";
+
 const PAGE_SIZES = [20, 40, 100, 1000];
 
 const sanitiseValue = (value: any) => {
@@ -303,17 +305,32 @@ export const ProjectSummary = () => {
             <br />
             Sequence Statistics:
             <br />
-            {summary?.sequence_stats &&
-                Object.entries(summary?.sequence_stats).map(([key, value]) => (
-                    <ul key={key}>
-                        <li>{titleCase(key)}</li>
-                        {Object.entries(value).map(([k1, v1]) => (
-                            <ul key={`${key}-${k1}`}>
-                                <li>{`${k1}: ${v1}`}</li>
-                            </ul>
-                        ))}
-                    </ul>
-                ))}
+            <Table celled>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell>Type</Table.HeaderCell>
+                        <Table.HeaderCell>Sequences</Table.HeaderCell>
+                        <Table.HeaderCell>CRAMs</Table.HeaderCell>
+                        <Table.HeaderCell>Seqr</Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+
+                <Table.Body>
+                    {summary?.sequence_stats &&
+                        Object.entries(summary?.sequence_stats).map(
+                            ([key, value], index) => (
+                                <Table.Row>
+                                    <Table.Cell>{titleCase(key)}</Table.Cell>
+                                    {Object.entries(value).map(([k1, v1]) => (
+                                        <Table.Cell key={`${key}-${k1}`}>
+                                            {`${v1}`}
+                                        </Table.Cell>
+                                    ))}
+                                </Table.Row>
+                            )
+                        )}
+                </Table.Body>
+            </Table>
         </>
     );
 

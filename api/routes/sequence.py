@@ -18,10 +18,13 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.enums import SampleType
 
 from models.models.sample import (
+    Sample,
     sample_id_format,
     sample_id_transform_to_raw,
     sample_id_transform_to_raw_list,
 )
+
+from models.models.sequence import ( SampleSequencing )
 
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
@@ -170,7 +173,7 @@ async def get_sequences_by_criteria(
     return result
 
 
-@router.post('/', operation_id='getSequencesBySampleIds')
+@router.post('/', response_model=List[SampleSequencing], operation_id='getSequencesBySampleIds')
 async def get_sequences_by_internal_sample_ids(
     sample_ids: List[str],
     get_latest_sequence_only: bool = True,

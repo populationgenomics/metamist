@@ -15,6 +15,7 @@ enum ActionKind {
     Finish = "FINISH_SEARCH",
     Update = "UPDATE_SELECTION",
     Short = "QUERY_TOO_SHORT",
+    Error = "ERROR",
 }
 
 type Action = {
@@ -30,10 +31,6 @@ const initialState: State = {
     value: "",
 };
 
-const assertUnreachable = (x: ActionKind): never => {
-    throw new Error(`Unexpected value: ${x}`);
-};
-
 const SearchReducer = (state: State, action: Action): State => {
     switch (action.type) {
         case "CLEAN_QUERY":
@@ -46,8 +43,9 @@ const SearchReducer = (state: State, action: Action): State => {
             return { ...state, value: action.selection! };
         case "QUERY_TOO_SHORT":
             return { ...state, loading: false };
+        case "ERROR":
+            return { ...state, loading: false, results: action.results! };
     }
-    return assertUnreachable(action.type);
 };
 
 const resultRenderer = ({ ...props }) => {
@@ -67,6 +65,10 @@ const resultRenderer = ({ ...props }) => {
         }
         case "family": {
             components.push(...(props.data.family_external_ids || []));
+            break;
+        }
+        case "error": {
+            components.push(props.data.error);
             break;
         }
     }
@@ -116,7 +118,16 @@ export const Searchbar: React.FunctionComponent = () => {
                     });
                 })
                 .catch((er) => {
-                    console.log(er.message);
+                    dispatch({
+                        type: ActionKind.Error,
+                        results: [
+                            {
+                                title: "Error",
+                                type: "error",
+                                data: { error: er.message },
+                            },
+                        ],
+                    });
                 });
         }, 300);
     }, []);
