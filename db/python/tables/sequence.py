@@ -139,13 +139,13 @@ class SampleSequencingTable(DbBase):
             if external_ids:
                 _eid_query = """
                 INSERT INTO sample_sequencing_eid
-                    (project, sequence_id, external_id, name, author)
-                VALUES (:project, :sequence_id, :external_id, :name, :author);
+                    (project, sequencing_id, external_id, name, author)
+                VALUES (:project, :sequencing_id, :external_id, :name, :author);
                 """
                 eid_values = [
                     {
                         'project': self.project,
-                        'sequence_id': id_of_new_sequence,
+                        'sequencing_id': id_of_new_sequence,
                         'external_id': eid,
                         'name': name.lower(),
                         'author': author or self.author,
@@ -287,7 +287,7 @@ class SampleSequencingTable(DbBase):
 
     async def update_sequence(
         self,
-        sequence_id: int,
+        sequencing_id: int,
         *,
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
@@ -300,7 +300,7 @@ class SampleSequencingTable(DbBase):
 
             promises = []
 
-            fields = {'sequencing_id': sequence_id, 'author': author or self.author}
+            fields = {'sequencing_id': sequencing_id, 'author': author or self.author}
 
             updaters = ['author = :author']
             if status is not None:
@@ -324,29 +324,29 @@ class SampleSequencingTable(DbBase):
                 }
 
                 if to_delete:
-                    _delete_query = 'DELETE FROM sample_sequencing_eid WHERE sequence_id = :seq_id AND name in :names'
+                    _delete_query = 'DELETE FROM sample_sequencing_eid WHERE sequencing_id = :seq_id AND name in :names'
                     promises.append(
                         self.connection.execute(
                             _delete_query,
-                            {'seq_id': sequence_id, 'names': list(to_delete)},
+                            {'seq_id': sequencing_id, 'names': list(to_delete)},
                         )
                     )
                 if to_update:
 
                     # we actually need the project here, get first value from list
                     project = next(
-                        iter(await self.get_projects_by_sequence_ids([sequence_id]))
+                        iter(await self.get_projects_by_sequence_ids([sequencing_id]))
                     )
 
                     _update_query = """\
-                        INSERT INTO sample_sequencing_eid (project, sequence_id, external_id, name, author)
+                        INSERT INTO sample_sequencing_eid (project, sequencing_id, external_id, name, author)
                             VALUES (:project, :seq_id, :external_id, :name, :author)
                             ON DUPLICATE KEY UPDATE external_id = :external_id, author = :author
                     """
                     values = [
                         {
                             'project': project,
-                            'seq_id': sequence_id,
+                            'seq_id': sequencing_id,
                             'external_id': eid,
                             'name': name,
                             'author': author or self.author,
@@ -434,7 +434,7 @@ class SampleSequencingTable(DbBase):
             SELECT {keys_str}
             FROM sample_sequencing sq
             INNER JOIN sample s ON sq.sample_id = s.id
-            INNER JOIN sample_sequencing_eid sqeid ON sq.id = sqeid.sequence_id
+            INNER JOIN sample_sequencing_eid sqeid ON sq.id = sqeid.sequencing_id
         """
         if where:
             _query += f' WHERE {" AND ".join(where)};'
@@ -465,15 +465,15 @@ class SampleSequencingTable(DbBase):
             return {}
 
         _query = """\
-            SELECT sequence_id, name, external_id
+            SELECT sequencing_id, name, external_id
             FROM sample_sequencing_eid
-            WHERE sequence_id IN :sequence_ids
+            WHERE sequencing_id IN :sequence_ids
         """
 
         rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
         by_sequence_id: dict[int, dict[str, str]] = defaultdict(dict)
         for row in rows:
-            seq_id = row['sequence_id']
+            seq_id = row['sequencing_id']
             eid_name = row['name']
             by_sequence_id[seq_id][eid_name] = row['external_id']
 

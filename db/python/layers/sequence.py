@@ -255,7 +255,7 @@ class SampleSequenceLayer(BaseLayer):
             )
 
         return await self.seqt.update_sequence(
-            sequence_id=sequence_id,
+            sequencing_id=sequence_id,
             external_ids=external_ids,
             status=status,
             meta=meta,

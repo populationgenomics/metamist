@@ -360,7 +360,7 @@
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_project" references="project(id)" />
 			</column>
-			<column name="sequence_id" type="INT">
+			<column name="sequencing_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_sequence_id" references="sample_sequencing(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">
@@ -375,7 +375,7 @@
 
 		</createTable>
 		<addPrimaryKey
-				columnNames="sequence_id,name"
+				columnNames="sequencing_id,name"
 				constraintName="PK_sample_sequencing_eid"
 				tableName="sample_sequencing_eid"
 				validate="true"
@@ -387,7 +387,4 @@
 			validate="true"
 		/>
 	</changeSet>
-
-
-
 </databaseChangeLog>
