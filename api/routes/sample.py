@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from models.enums import SampleType
 from models.models.sample import (
+    Sample,
     sample_id_transform_to_raw,
     sample_id_format,
     sample_id_transform_to_raw_list,
@@ -12,7 +13,6 @@ from models.models.sample import (
 
 from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.sample import Sample
 
 from api.utils.db import (
     get_project_write_connection,
