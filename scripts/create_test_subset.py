@@ -66,10 +66,19 @@ DEFAULT_SAMPLES_N = 10
     type=int,
     help='Minimal number of families to include',
 )
+# Flag to be used when there isn't available pedigree/family information.
+@click.option(
+    '--skip-ped',
+    'skip_ped',
+    is_flag=True,
+    default=False,
+    help='Skip transferring pedigree/family information',
+)
 def main(
     project: str,
     samples_n: Optional[int],
     families_n: Optional[int],
+    skip_ped: Optional[bool] = True,
 ):
     """
     Script creates a test subset for a given project.
@@ -97,7 +106,7 @@ def main(
         if resp.lower() != 'y':
             raise SystemExit()
 
-    random.seed(42)  # for reproducibility
+    random.seed(40)  # for reproducibility
 
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
     sample_id_by_participant_id = dict(pid_sid)
@@ -105,9 +114,18 @@ def main(
     if families_n is not None:
         fams = fapi.get_families(project)
         all_families = [family['id'] for family in fams]
-        families = random.sample(all_families, families_n)
-        pedigree = fapi.get_pedigree(project=project, internal_family_ids=families)
+        full_pedigree = fapi.get_pedigree(
+            project=project, internal_family_ids=all_families
+        )
+        external_family_ids = _get_random_families(full_pedigree, families_n)
+        internal_family_ids = [
+            fam['id'] for fam in fams if fam['external_id'] in external_family_ids
+        ]
+        pedigree = fapi.get_pedigree(
+            project=project, internal_family_ids=internal_family_ids
+        )
         _print_fam_stats(pedigree)
+
         p_ids = [ped['individual_id'] for ped in pedigree]
         sample_ids = [
             sample
@@ -157,8 +175,17 @@ def main(
 
     # Parse Families & Participants
     participant_ids = [int(sample['participant_id']) for sample in samples]
-    family_ids = transfer_families(project, target_project, participant_ids)
-    external_participant_ids = transfer_ped(project, target_project, family_ids)
+    if skip_ped:
+        # If no family data is available, only the participants need to bne transfered.
+        external_participant_ids = transfer_participants(
+            initial_project=project,
+            target_project=target_project,
+            participant_ids=participant_ids,
+        )
+
+    else:
+        family_ids = transfer_families(project, target_project, participant_ids)
+        external_participant_ids = transfer_ped(project, target_project, family_ids)
 
     external_sample_internal_participant_map = get_map_ipid_esid(
         project, target_project, external_participant_ids
@@ -172,6 +199,8 @@ def main(
         if s['external_id'] in test_sample_by_external_id:
             new_s_id = test_sample_by_external_id[s['external_id']]['id']
             logger.info(f'Sample already in test project, with ID {new_s_id}')
+            new_sample_map[s['id']] = new_s_id
+
         else:
             logger.info('Creating test sample entry')
             new_s_id = sapi.create_new_sample(
@@ -179,7 +208,7 @@ def main(
                 new_sample=NewSample(
                     external_id=s['external_id'],
                     type=SampleType(s['type']),
-                    meta=_copy_files_in_dict(s['meta'], project),
+                    meta=(_copy_files_in_dict(s['meta'], project) or {}),
                     participant_id=external_sample_internal_participant_map[
                         s['external_id']
                     ],
@@ -278,6 +307,33 @@ def transfer_ped(initial_project, target_project, family_ids):
         )
 
     return external_participant_ids
+
+
+def transfer_participants(initial_project, target_project, participant_ids):
+    """Transfers a set list of participants between projects"""
+
+    current_participants = papi.get_participants(
+        initial_project,
+        body_get_participants={'internal_participant_ids': participant_ids},
+    )
+    existing_participants = papi.get_participants(target_project)
+
+    target_project_epids = [
+        participant['external_id'] for participant in existing_participants
+    ]
+
+    participants_to_transfer = []
+    for participant in current_participants:
+        if participant['external_id'] not in target_project_epids:
+            del participant['id']
+        transfer_participant = {k: v for k, v in participant.items() if v is not None}
+        transfer_participant['samples'] = []
+        participants_to_transfer.append(transfer_participant)
+
+    upserted_participants = papi.batch_upsert_participants(
+        target_project, {'participants': participants_to_transfer}
+    )
+    return list(upserted_participants.keys())
 
 
 def get_map_ipid_esid(
@@ -392,6 +448,50 @@ def _print_fam_stats(families: List):
         else:
             label = f'{fam_size} members'
         logger.info(f'  {label}: {fam_by_size[fam_size]}')
+
+
+def _get_random_families(
+    families: List,
+    families_n: int,
+    include_single_person_families: Optional[bool] = False,
+):
+    """A little less random
+    This function will discard single-person families by default."""
+
+    family_sizes = dict(Counter([fam['family_id'] for fam in families]))
+
+    family_threshold = 0 if include_single_person_families else 1
+    families_within_threshold = [
+        k for k, v in family_sizes.items() if v > family_threshold
+    ]
+
+    distributed_by_size: Dict[int, List[str]] = {}
+
+    for k, v in family_sizes.items():
+        if k in families_within_threshold:
+            if distributed_by_size.get(v):
+                distributed_by_size[v].append(k)
+            else:
+                distributed_by_size[v] = [k]
+
+    sizes = len(list(distributed_by_size.keys()))
+    returned_families: List[str] = []
+    sizes_of_bins = {k: len(v) for k, v in distributed_by_size.items()}
+    largest_bin = max(sizes_of_bins, key=sizes_of_bins.get)
+
+    if sizes <= families_n:
+        number_from_size = families_n // sizes
+        excess = families_n % sizes
+        for s, fams in distributed_by_size.items():
+            if s == largest_bin:
+                families.extend(random.sample(fams, number_from_size + excess))
+            else:
+                families.extend(random.sample(fams, number_from_size))
+    else:
+        # we can't evenly distribute, so we'll just pull randomly
+        returned_families = random.sample(families_within_threshold, families_n)
+
+    return returned_families
 
 
 def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None):
