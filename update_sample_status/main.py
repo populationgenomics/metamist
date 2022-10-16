@@ -3,19 +3,12 @@
 import json
 import os
 import logging
-from typing import Optional
-
 from airtable import Airtable
 from flask import abort
 from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
-from sample_metadata.apis import SampleApi, SequenceApi
-from sample_metadata.model.body_get_sequences_by_criteria import (
-    BodyGetSequencesByCriteria,
-)
-from sample_metadata.model.new_sample import NewSample
-from sample_metadata.model.new_sequence import NewSequence
+from sample_metadata.apis import SequenceApi
 from sample_metadata.models import (
     SequenceType,
     SequenceUpdateModel,
@@ -25,7 +18,6 @@ from sample_metadata.models import (
 from sample_metadata.exceptions import ForbiddenException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
-seqapi = SequenceApi()
 
 
 def update_airtable(project_config: dict, sample: str, status: str):
@@ -51,60 +43,26 @@ def update_airtable(project_config: dict, sample: str, status: str):
     return ('', 204)
 
 
-def update_sm(project: str, external_sample_id: str, status: str, batch: str):
-    """Update the status of a sequence given it's corresponding external sample id"""
+def update_sm(project: str, sample: str, status: str, batch: str):
+    """Update the status of a sequence given it's corresponding
+    external sample id"""
 
-    samapi = SampleApi()
+    seqapi = SequenceApi()
     sequence_type = SequenceType('genome')
     sample_type = SampleType('blood')
     seq_meta = {'batch': batch}
-    external_sequence_id: Optional[str] = None
-
-    sid_map = samapi.get_sample_id_map_by_internal([external_sample_id])
-    if sid_map and external_sample_id in sid_map:
-        internal_sample_id = sid_map[external_sample_id]
-    else:
-        samapi.create_new_sample(
-            project=project,
-            new_sample=NewSample(
-                external_id=external_sample_id,
-                type=sample_type,
-            ),
-        )
-
-        # should create here if it doesn't exist
-        return abort(
-            f'Could not find sample with external ID {external_sample_id}', 404
-        )
 
     try:
-        # 2022-10-03 mfranklin: Get the internal sequence ID here
-        sequence_id: Optional[int] = get_sequence_id_from(
-            project=project,
-            external_sequence_id=external_sequence_id,
-            internal_sample_id=internal_sample_id,
+        sequence_model = SequenceUpdateModel(
+            status=SequenceStatus(status), meta=seq_meta
         )
-
-        if sequence_id:
-            seqapi.update_sequence(
-                sequence_id,
-                SequenceUpdateModel(status=SequenceStatus(status), meta=seq_meta),
-            )
-        else:
-            external_ids = {}
-            if external_sequence_id:
-                external_ids = {'unknown?': external_sequence_id}
-
-            seqapi.create_new_sequence(
-                NewSequence(
-                    external_ids=external_ids,
-                    sample_id=internal_sample_id,
-                    meta=seq_meta,
-                    status=SequenceStatus(status),
-                    type=sequence_type,
-                )
-            )
-
+        seqapi.upsert_sequence_from_external_sample_and_type(
+            external_sample_id=sample,
+            sequence_type=sequence_type,
+            sequence_update_model=sequence_model,
+            project=project,
+            sample_type=sample_type,
+        )
     except ValueError as e:
         logging.error(e)
         return abort(400)
@@ -114,36 +72,6 @@ def update_sm(project: str, external_sample_id: str, status: str, batch: str):
         return abort(403)
 
     return ('', 204)
-
-
-def get_sequence_id_from(
-    project: str, internal_sample_id: Optional[str], external_sequence_id: Optional[str]
-) -> Optional[int]:
-    """
-    From project + external_sequence_id OR internal_sample_id,
-    GET the latest relevant sequence ID or None if not found (meaning insert)
-    """
-    if external_sequence_id:
-        try:
-            sequence = seqapi.get_sequence_by_external_id(
-                project=project, external_id=external_sequence_id
-            )
-            return sequence['id']
-        except Exception as exception:  # pylint: disable=broad-except
-            # TODO: Check that it's a 404
-            # error here means it doesn't exist ...
-            print(exception)
-
-    # fall back to get by internal_sample_id, and get latest
-    sequences = seqapi.get_sequences_by_criteria(
-        body_get_sequences_by_criteria=BodyGetSequencesByCriteria(
-            sample_ids=[internal_sample_id],
-        )
-    )
-    # crude, but it's how the old implementation worked
-    if sequences:
-        return max(seq['id'] for seq in sequences)
-    return None
 
 
 def update_sample_status(request):  # pylint: disable=R1710
