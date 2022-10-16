@@ -8,7 +8,7 @@ ProjectId = int
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
-LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'DEBUG').upper()]
+LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'INFO').upper()]
 USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
 
 RE_FILENAME_SPLITTER = re.compile('[,;]')
@@ -66,8 +66,11 @@ def get_logger():
     if _logger:
         return _logger
 
-    logging.basicConfig(level=LOGGING_LEVEL)
+    for lname in ('asyncio', 'urllib3', 'databases'):
+        logging.getLogger(lname).setLevel(logging.WARNING)
+
     _logger = logging.getLogger('sample-metadata-api')
+    _logger.setLevel(level=LOGGING_LEVEL)
 
     if USE_GCP_LOGGING:
 

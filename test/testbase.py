@@ -35,7 +35,7 @@ for lname in (
     'asyncio',
     'urllib3',
     'docker',
-    # 'databases',
+    'databases',
     'testcontainers.core.container',
     'testcontainers.core.waiting_utils',
 ):
