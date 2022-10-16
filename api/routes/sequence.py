@@ -72,55 +72,6 @@ async def update_sequence(
     return sequence_id
 
 
-# @router.patch(
-#     '/sample/{cpg_sample_id}/{sequence_type}',
-#     operation_id='updateSequenceFromSampleAndType',
-# )
-# async def update_sequence_from_sample_and_type(
-#     cpg_sample_id: str,
-#     sequence_type: SequenceType,
-#     sequence: SequenceUpdateModel,
-#     connection: Connection = get_projectless_db_connection,
-# ):
-#     """Update the latest sequence by sample_id and sequence type"""
-#     sequence_layer = SampleSequenceLayer(connection)
-#     cpg_sample_id_raw = sample_id_transform_to_raw(cpg_sample_id)
-#
-#     sequence_id = await sequence_layer.update_latest_sequence_from_sample_and_type(
-#         sample_id=cpg_sample_id_raw,
-#         sequence_type=sequence_type,
-#         status=sequence.status,
-#         meta=sequence.meta,
-#     )
-#
-#     return sequence_id
-
-
-# @router.patch(
-#     '/{project}/sample/{external_sample_id}/{sequence_type}',
-#     operation_id='upsertSequenceFromExternalSampleAndType',
-# )
-# async def upsert_sequence_from_external_id_and_type(
-#     external_sample_id: str,
-#     sequence_type: SequenceType,
-#     sequence: SequenceUpdateModel,
-#     sample_type: SampleType = None,
-#     connection: Connection = get_project_write_connection,
-# ):
-#     """Update the latest sequence by sample_id and sequence type"""
-#     sequence_layer = SampleSequenceLayer(connection)
-#
-#     sequence_id = await sequence_layer.upsert_sequence_from_external_id_and_type(
-#         external_sample_id=external_sample_id,
-#         sequence_type=sequence_type,
-#         status=sequence.status,
-#         meta=sequence.meta,
-#         sample_type=sample_type,
-#     )
-#
-#     return sequence_id
-
-
 @router.get('/{sequence_id}/details', operation_id='getSequenceByID')
 async def get_sequence(
     sequence_id: int, connection: Connection = get_projectless_db_connection
@@ -237,50 +188,3 @@ async def get_sequence_ids_for_sample_ids_by_type_by_type(
         sample_ids_raw
     )
     return {sample_id_format(k): v for k, v in sequence_id_map.items()}
-
-
-# @router.get(
-#     '/latest-from-sample-id/{sample_id}', operation_id='getSequenceIdFromSampleId'
-# )
-# async def get_sequence_id_from_sample_id(
-#     sample_id: str, connection: Connection = get_projectless_db_connection
-# ) -> int:
-#     """Get sequence by internal Sample ID"""
-#     sequence_layer = SampleSequenceLayer(connection)
-#     sample_id_raw = sample_id_transform_to_raw(sample_id)
-#     sequence_id = await sequence_layer.get_latest_sequence_id_for_sample_id(
-#         sample_id_raw
-#     )
-#
-#     return sequence_id
-
-
-# @router.get(
-#     '/by-sample-id-and-type/{sample_id}/{sequence_type}',
-#     operation_id='getSequenceBySampleIdAndType',
-# )
-# async def get_latest_sequence_id_from_sample_id_and_type(
-#     sample_id: str,
-#     sequence_type: SequenceType,
-#     connection: Connection = get_projectless_db_connection,
-# ) -> int:
-#     """Get sequence ID by internal Sample ID and sequence type"""
-#     sequence_layer = SampleSequenceLayer(connection)
-#     sample_id_raw = sample_id_transform_to_raw(sample_id)
-#     sequence_id = await sequence_layer.get_sequence_by_(
-#         sample_id_raw, SequenceType(sequence_type)
-#     )
-#
-#     return sequence_id
-
-# @router.post('/latest-ids-from-sample-ids', operation_id='getSequenceIdsFromSampleIds')
-# async def get_latest_sequence_ids_from_sample_ids(
-#     sample_ids: List[str], connection: Connection = get_projectless_db_connection
-# ) -> Dict[str, int]:
-#     """Get sequence ids from internal sample ids"""
-#     sequence_layer = SampleSequenceLayer(connection)
-#     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)
-#     sequence_id_map = await sequence_layer.get_latest_sequence_ids_for_sample_ids(
-#         sample_ids_raw
-#     )
-#     return {sample_id_format(k): v for k, v in sequence_id_map.items()}
