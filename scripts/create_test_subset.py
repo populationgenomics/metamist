@@ -106,7 +106,7 @@ def main(
         if resp.lower() != 'y':
             raise SystemExit()
 
-    random.seed(40)  # for reproducibility
+    random.seed(42)  # for reproducibility
 
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
     sample_id_by_participant_id = dict(pid_sid)
