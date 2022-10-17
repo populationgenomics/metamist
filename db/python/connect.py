@@ -23,6 +23,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'participant',
     'analysis_sample',
     'sample_sequencing',
+    'sample_sequencing_eid',
     'family',
     'family_participant',
     'participant_phenotypes',

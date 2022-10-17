@@ -1,4 +1,4 @@
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -14,7 +14,7 @@ class TestUpsert(DbIsolatedTest):
     Test upsert functionality in SM
     """
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_insert_participants(self):
         """
         Test inserting participants, samples and sequences, and make sure they're correctly linked.

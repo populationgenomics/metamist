@@ -1,4 +1,4 @@
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -7,7 +7,7 @@ from db.python.layers.participant import ParticipantLayer
 class TestPedigree(DbIsolatedTest):
     """Pedigree testing methods"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_import_get_pedigree(self):
         """Test import + get pedigree"""
         fl = FamilyLayer(self.connection)
@@ -40,7 +40,7 @@ class TestPedigree(DbIsolatedTest):
         self.assertEqual('EX01_father', subject['paternal_id'])
         self.assertEqual('EX01_mother', subject['maternal_id'])
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_pedigree_without_family(self):
         """
         Test getting pedigree where participants do not belong to a family

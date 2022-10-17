@@ -310,6 +310,9 @@ class SampleTable(DbBase):
         project: ProjectId,
     ) -> dict[str, int]:
         """Get map of external sample id to internal id"""
+        if not project:
+            raise ValueError('Must specify project when getting by external ids')
+
         _query = """\
             SELECT id, external_id
             FROM sample

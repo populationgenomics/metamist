@@ -20,7 +20,7 @@ class Analysis(SMBase):
     project: Optional[int] = None
     active: Optional[bool] = None
     meta: Dict[str, Any] = {}
-    author: str = None
+    author: Optional[str] = None
 
     @staticmethod
     def from_db(**kwargs):
