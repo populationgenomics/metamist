@@ -485,17 +485,14 @@ def _get_random_families(
 
     sizes = len(list(distributed_by_size.keys()))
     returned_families: List[str] = []
-    sizes_of_bins = {k: len(v) for k, v in distributed_by_size.items()}
-    largest_bin = max(sizes_of_bins, key=sizes_of_bins.get)
+
+    proportion = families_n / len(families_within_threshold)
 
     if sizes <= families_n:
-        number_from_size = families_n // sizes
-        excess = families_n % sizes
-        for s, fams in distributed_by_size.items():
-            if s == largest_bin:
-                returned_families.extend(random.sample(fams, number_from_size + excess))
-            else:
-                returned_families.extend(random.sample(fams, number_from_size))
+        for _s, fams in distributed_by_size.items():
+            n_pull = round(proportion * len(fams))
+            returned_families.extend(random.sample(fams, n_pull))
+
     else:
         # we can't evenly distribute, so we'll just pull randomly
         returned_families = random.sample(families_within_threshold, families_n)
