@@ -54,8 +54,18 @@ const SearchReducer = (state: State, action: Action): State => {
 
 const resultRenderer = ({ ...props }) => {
     let components = [];
-    // let icon = <Diversity3RoundedIcon />;
     let icon: React.ReactElement = <></>;
+    let available = "";
+    let colour = "black";
+    if (!!!props.data.id) {
+        available = `No access to this ${props.type}`;
+        colour = "gray";
+    }
+    if (props.type === "participant" || props.type === "family") {
+        available = `Search Result not available `;
+        colour = "gray";
+    }
+    const style = { fontSize: 50, color: colour };
 
     switch (props.type) {
         case "sample": {
@@ -63,22 +73,22 @@ const resultRenderer = ({ ...props }) => {
                 components.push(props.data.id);
             }
             components.push(...(props.data.sample_external_ids || []));
-            icon = <BloodtypeRoundedIcon />;
+            icon = <BloodtypeRoundedIcon sx={style} />;
             break;
         }
         case "participant": {
             components.push(...(props.data.participant_external_ids || []));
-            icon = <PersonRoundedIcon />;
+            icon = <PersonRoundedIcon sx={style} />;
             break;
         }
         case "family": {
             components.push(...(props.data.family_external_ids || []));
-            icon = <Diversity3RoundedIcon />;
+            icon = <Diversity3RoundedIcon sx={style} />;
             break;
         }
         case "error": {
             components.push(props.data.error);
-            icon = <ErrorRoundedIcon />;
+            icon = <ErrorRoundedIcon sx={style} />;
             break;
         }
     }
@@ -89,21 +99,32 @@ const resultRenderer = ({ ...props }) => {
         <>
             {props.title && props.type && (
                 <div key="content" className="content">
-                    <div className="title">
-                        {icon}
-                        {"  "}
-                        {props.title}
-                        <span
+                    <div style={{ display: "flex" }}>
+                        <div style={{ flex: 1, order: 1, width: "20%" }}>
+                            {icon}
+                        </div>
+                        <div
                             style={{
-                                float: "right",
-                                fontWeight: "normal",
+                                order: 2,
+                                flex: 3,
+                                display: "inline",
+                            }}
+                        >
+                            <div className="title">{props.title}</div>
+                            <div className="description">{subtitle}</div>
+                            <div>{available}</div>
+                        </div>
+                        <div
+                            style={{
+                                order: 3,
+                                flex: 2,
+                                textAlign: "right",
                                 fontStyle: "italic",
                             }}
                         >
                             {props.data.project}
-                        </span>
+                        </div>
                     </div>
-                    <div className="description">{subtitle}</div>
                 </div>
             )}
         </>
@@ -120,14 +141,14 @@ export const Searchbar: React.FunctionComponent = () => {
     const searchResultToRoute = (project: string, type: string, id: string) => {
         switch (type) {
             case "participant":
-                alert("Participants page not implemented yet");
+                // alert("Participants page not implemented yet");
                 // navigate(`/project/${project}/participant/${id}`);
                 break;
             case "sample":
                 navigate(`/project/${project}/sample/${id}`);
                 break;
             case "family":
-                alert("Family page not implemented yet");
+                // alert("Family page not implemented yet");
                 // navigate(`/project/${project}/family/${id}`);
                 break;
         }
