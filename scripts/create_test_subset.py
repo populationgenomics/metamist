@@ -176,7 +176,7 @@ def main(
     # Parse Families & Participants
     participant_ids = [int(sample['participant_id']) for sample in samples]
     if skip_ped:
-        # If no family data is available, only the participants need to bne transfered.
+        # If no family data is available, only the participants should be transferred.
         external_participant_ids = transfer_participants(
             initial_project=project,
             target_project=target_project,
