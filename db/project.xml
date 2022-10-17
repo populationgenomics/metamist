@@ -354,7 +354,37 @@
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv');</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-10-04_sequence-external-ids">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="sample_sequencing_eid">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_project" references="project(id)" />
+			</column>
+			<column name="sequencing_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_sequence_id" references="sample_sequencing(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints unique="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
 
-
-
+		</createTable>
+		<addPrimaryKey
+				columnNames="sequencing_id,name"
+				constraintName="PK_sample_sequencing_eid"
+				tableName="sample_sequencing_eid"
+				validate="true"
+		/>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="participant"
+			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
+			validate="true"
+		/>
+	</changeSet>
 </databaseChangeLog>

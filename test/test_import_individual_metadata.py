@@ -1,11 +1,11 @@
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.layers.participant import ParticipantLayer
 
 
 class TestImportIndividualMetadata(DbIsolatedTest):
     """Test importing individual metadata"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_import_many_hpo_terms(self):
         """Test import hpo terms from many columns"""
         pl = ParticipantLayer(self.connection)
@@ -35,7 +35,7 @@ class TestImportIndividualMetadata(DbIsolatedTest):
             '"HP:0000001,HP:0000002,HP:0000003,HP:0000004"', rows[0]['value']
         )
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_import_basic_metadata(self):
         """Test basic data for 2 participants and 2 columns"""
         pl = ParticipantLayer(self.connection)

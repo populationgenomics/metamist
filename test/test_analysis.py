@@ -1,7 +1,7 @@
 # pylint: disable=invalid-overridden-method
 from datetime import date, timedelta
 
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from models.enums.sequencing import SequenceType
 from models.enums import AnalysisType, AnalysisStatus
@@ -13,7 +13,7 @@ from db.python.layers.sample import SampleLayer, SampleType
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def setUp(self) -> None:
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
@@ -34,7 +34,7 @@ class TestAnalysis(DbIsolatedTest):
             meta={'sequence_type': 'genome', 'size': 1024},
         )
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
@@ -51,7 +51,7 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(1, analysis_samples[0]['sample_id'])
         self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_get_sample_file_sizes(self):
         """
         Test retrieval of sample file sizes over time
