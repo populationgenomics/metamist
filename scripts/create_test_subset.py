@@ -249,7 +249,9 @@ def main(
         logger.info(f'-')
 
 
-def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
+def transfer_families(
+    initial_project: str, target_project: str, participant_ids: List[int]
+) -> List[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     families = fapi.get_families(
         project=initial_project,
@@ -279,7 +281,9 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
     return family_ids
 
 
-def transfer_ped(initial_project, target_project, family_ids):
+def transfer_ped(
+    initial_project: str, target_project: str, family_ids: List[int]
+) -> List[str]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
         initial_project,
@@ -309,7 +313,9 @@ def transfer_ped(initial_project, target_project, family_ids):
     return external_participant_ids
 
 
-def transfer_participants(initial_project, target_project, participant_ids):
+def transfer_participants(
+    initial_project: str, target_project: str, participant_ids: List[int]
+) -> List[str]:
     """Transfers relevant participants between projects"""
 
     current_participants = papi.get_participants(
@@ -395,7 +401,9 @@ def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
     return normalised_map
 
 
-def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
+def _validate_opts(
+    samples_n: int, families_n: int
+) -> Tuple[Optional[int], Optional[int]]:
     if samples_n is not None and families_n is not None:
         raise click.BadParameter('Please specify only one of --samples or --families')
 
@@ -456,7 +464,7 @@ def _get_random_families(
     families: List,
     families_n: int,
     include_single_person_families: Optional[bool] = False,
-):
+) -> List[str]:
     """Obtains a subset of families, that are a little less random.
     By default single-person families are discarded.
     The function aims to evenly distribute the families chosen by size.
