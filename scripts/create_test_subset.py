@@ -310,7 +310,7 @@ def transfer_ped(initial_project, target_project, family_ids):
 
 
 def transfer_participants(initial_project, target_project, participant_ids):
-    """Transfers a set list of participants between projects"""
+    """Transfers relevant participants between projects"""
 
     current_participants = papi.get_participants(
         initial_project,
@@ -325,8 +325,10 @@ def transfer_participants(initial_project, target_project, participant_ids):
     participants_to_transfer = []
     for participant in current_participants:
         if participant['external_id'] not in target_project_epids:
+            # Participants with id field will be updated & those without will be inserted
             del participant['id']
         transfer_participant = {k: v for k, v in participant.items() if v is not None}
+        # Participants are being created before the samples are, so this will be empty for now.
         transfer_participant['samples'] = []
         participants_to_transfer.append(transfer_participant)
 
