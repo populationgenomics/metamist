@@ -65,7 +65,7 @@ const resultRenderer = ({ ...props }) => {
         available = `Search Result not available `;
         colour = "gray";
     }
-    const style = { fontSize: 50, color: colour };
+    const style = { fontSize: 50, color: colour, height: "33px" };
 
     switch (props.type) {
         case "sample": {
@@ -139,6 +139,9 @@ export const Searchbar: React.FunctionComponent = () => {
     );
 
     const searchResultToRoute = (project: string, type: string, id: string) => {
+        // handle "no access to this project"
+        if (!id) return
+
         switch (type) {
             case "participant":
                 // alert("Participants page not implemented yet");
