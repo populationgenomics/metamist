@@ -457,18 +457,25 @@ def _get_random_families(
     families_n: int,
     include_single_person_families: Optional[bool] = False,
 ):
-    """A little less random
-    This function will discard single-person families by default."""
+    """Obtains a subset of families, that are a little less random.
+    By default single-person families are discarded.
+    The function aims to evenly distribute the families chosen by size.
+    For example, if the composition of families inputted is as follows
+    Duos - 5 families, Trios - 10 families, Quads - 5 families
+    and families_n = 4
+    Then this function will randomly select, 1 duo, 1 quad, and 2 trios.
+    """
 
     family_sizes = dict(Counter([fam['family_id'] for fam in families]))
 
+    # Discard single-person families
     family_threshold = 0 if include_single_person_families else 1
     families_within_threshold = [
         k for k, v in family_sizes.items() if v > family_threshold
     ]
 
+    # Get family size distribution, i.e. {1:[FAM1, FAM2], 2:[FAM3], 3:[FAM4,FAM5, FAM6]}
     distributed_by_size: Dict[int, List[str]] = {}
-
     for k, v in family_sizes.items():
         if k in families_within_threshold:
             if distributed_by_size.get(v):
@@ -486,9 +493,9 @@ def _get_random_families(
         excess = families_n % sizes
         for s, fams in distributed_by_size.items():
             if s == largest_bin:
-                families.extend(random.sample(fams, number_from_size + excess))
+                returned_families.extend(random.sample(fams, number_from_size + excess))
             else:
-                families.extend(random.sample(fams, number_from_size))
+                returned_families.extend(random.sample(fams, number_from_size))
     else:
         # we can't evenly distribute, so we'll just pull randomly
         returned_families = random.sample(families_within_threshold, families_n)
