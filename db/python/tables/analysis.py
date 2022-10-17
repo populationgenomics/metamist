@@ -1,5 +1,7 @@
+import json
 from datetime import datetime
 from itertools import groupby
+from collections import defaultdict
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
@@ -431,7 +433,11 @@ ORDER BY a.timestamp_completed DESC
 
         rows = await self.connection.fetch_all(_query, {'project': project})
 
-        return {r['seq_type']: r['number_of_crams'] for r in rows}
+        # do it like this until I select lowercase value w/ JSON_EXTRACT
+        n_counts = defaultdict(int)
+        for r in rows:
+            n_counts[json.loads(r['seq_type']).lower()] += r['number_of_crams']
+        return n_counts
 
     async def get_seqr_stats_by_sequence_type(
         self, project: ProjectId
