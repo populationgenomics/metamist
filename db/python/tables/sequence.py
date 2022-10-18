@@ -434,7 +434,7 @@ class SampleSequencingTable(DbBase):
             SELECT {keys_str}
             FROM sample_sequencing sq
             INNER JOIN sample s ON sq.sample_id = s.id
-            INNER JOIN sample_sequencing_eid sqeid ON sq.id = sqeid.sequencing_id
+            LEFT OUTER JOIN sample_sequencing_eid sqeid ON sq.id = sqeid.sequencing_id
         """
         if where:
             _query += f' WHERE {" AND ".join(where)};'
