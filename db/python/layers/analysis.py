@@ -9,11 +9,8 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 from db.python.utils import get_logger
 
-from models.enums import AnalysisStatus, AnalysisType
-from models.models.sequence import SequenceType
-from models.models.analysis import (
-    Analysis,
-)
+from models.enums import AnalysisStatus, AnalysisType, SequenceType
+from models.models.analysis import Analysis
 from models.models.sample import sample_id_format_list
 
 
@@ -113,10 +110,12 @@ class AnalysisLayer(BaseLayer):
         return await self.at.get_incomplete_analyses(project=project)
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId
-    ) -> List[List[str]]:
+        self, project: ProjectId, sequence_types: list[SequenceType]
+    ) -> List[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
-        return await self.at.get_sample_cram_path_map_for_seqr(project=project)
+        return await self.at.get_sample_cram_path_map_for_seqr(
+            project=project, sequence_types=sequence_types
+        )
 
     async def query_analysis(
         self,
@@ -302,9 +301,14 @@ class AnalysisLayer(BaseLayer):
         )
 
     async def get_analysis_runner_log(
-        self, project_ids: List[int] = None
+        self,
+        project_ids: List[int] = None,
+        author: str = None,
+        output_dir: str = None,
     ) -> List[Analysis]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
-        return await self.at.get_analysis_runner_log(project_ids)
+        return await self.at.get_analysis_runner_log(
+            project_ids, author=author, output_dir=output_dir
+        )

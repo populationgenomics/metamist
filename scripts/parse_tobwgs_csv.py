@@ -156,7 +156,7 @@ class TobWgsParser(GenericMetadataParser):
             row = rows[0]
 
         result = await super().get_sequence_meta(seq_group, sample_id=sample_id)
-        collapsed_sequence_meta = result.meta
+        collapsed_sequence_meta = result.meta or {}
 
         batch_number = int(row['batch.batch_name'][-3:])
         collapsed_sequence_meta['batch'] = batch_number

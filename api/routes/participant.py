@@ -15,7 +15,6 @@ from api.utils.db import (
     Connection,
 )
 from api.utils.export import ExportType
-from api.utils.extensions import FileExtension
 from db.python.layers.participant import (
     ParticipantLayer,
     ParticipantUpdateModel,
@@ -43,9 +42,8 @@ async def fill_in_missing_participants(
 
 
 @router.get(
-    '/{project}/individual-metadata-seqr/{export_type}',
+    '/{project}/individual-metadata-seqr',
     operation_id='getIndividualMetadataForSeqr',
-    response_class=StreamingResponse,
     tags=['seqr'],
 )
 async def get_individual_metadata_template_for_seqr(
@@ -76,14 +74,15 @@ async def get_individual_metadata_template_for_seqr(
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
     rows = [
         [col_header_map[h] for h in headers],
-        *[[row[kh] for kh in headers] for row in json_rows],
+        *[[row.get(kh, '') for kh in headers] for row in json_rows],
     ]
     writer.writerows(rows)
 
     basefn = f'{project}-{date.today().isoformat()}'
     ext = export_type.get_extension()
+
     return StreamingResponse(
-        iter(output.getvalue()),
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={basefn}{ext}'},
     )
@@ -123,37 +122,19 @@ async def update_many_participant_external_ids(
     tags=['seqr'],
 )
 async def get_external_participant_id_to_internal_sample_id(
-    connection: Connection = get_project_readonly_connection,
-):
-    """
-    Get a map of {external_participant_id} -> {internal_sample_id}
-    useful to matching joint-called samples in the matrix table to the participant
-
-    Return a list not dictionary, because dict could lose
-    participants with multiple samples.
-    """
-    player = ParticipantLayer(connection)
-    assert connection.project
-    m = await player.get_external_participant_id_to_internal_sample_id_map(
-        project=connection.project
-    )
-    return [[pid, sample_id_format(sid)] for pid, sid in m]
-
-
-@router.get(
-    '/{project}/external-pid-to-internal-sample-id/{export_type}',
-    operation_id='getExternalParticipantIdToInternalSampleIdExport',
-    response_class=StreamingResponse,
-    tags=['seqr'],
-)
-async def get_external_participant_id_to_internal_sample_id_export(
     project: str,
-    export_type: FileExtension,
+    export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
     """
     Get csv / tsv export of external_participant_id to internal_sample_id
+
+    Get a map of {external_participant_id} -> {internal_sample_id}
+    useful to matching joint-called samples in the matrix table to the participant
+
+    Return a list not dictionary, because dict could lose
+    participants with multiple samples.
 
     :param flip_columns: Set to True when exporting for seqr
     """
@@ -168,6 +149,9 @@ async def get_external_participant_id_to_internal_sample_id_export(
     if flip_columns:
         rows = [r[::-1] for r in rows]
 
+    if export_type == ExportType.JSON:
+        return rows
+
     output = io.StringIO()
     writer = csv.writer(output, delimiter=export_type.get_delimiter())
     writer.writerows(rows)
@@ -175,7 +159,8 @@ async def get_external_participant_id_to_internal_sample_id_export(
     ext = export_type.get_extension()
     filename = f'{project}-participant-to-sample-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
-        iter(output.getvalue()),
+        # stream the whole file at once, because it's all in memory anyway
+        iter([output.getvalue()]),
         media_type=export_type.get_mime_type(),
         headers={'Content-Disposition': f'filename={filename}'},
     )

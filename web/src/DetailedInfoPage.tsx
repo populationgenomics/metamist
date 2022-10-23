@@ -12,6 +12,7 @@ import {
     Sample,
     SampleSequencing,
 } from "./sm-api/api";
+import { Table } from "semantic-ui-react";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -21,6 +22,13 @@ interface PedigreeEntry {
     maternal_id: string;
     paternal_id: string;
     sex: number;
+}
+interface MetadataReads {
+    location: string;
+    basename: string;
+    class: string;
+    checksum: string;
+    size: number;
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -151,6 +159,55 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const getCPGID = (id: string) => {
         const CPGID = idNameMap?.find(([name, _]) => name === id);
         return CPGID![1]; // You'd expect this to always work. Should I add the case where it doesn't?
+    };
+
+    const formatBytes = (bytes: number, decimals = 2) => {
+        if (!+bytes) return "0 Bytes";
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
+            sizes[i]
+        }`;
+    };
+
+    const renderReadsMetadata = (data: MetadataReads[][]) => {
+        return (
+            data && (
+                <>
+                    <h4>Sequence Reads</h4>
+
+                    {data.map((item: MetadataReads[]) => {
+                        return (
+                            <Table celled>
+                                <Table.Body>
+                                    <Table.Row>
+                                        <Table.Cell>
+                                            {item[0].location}
+                                        </Table.Cell>
+                                        <Table.Cell>
+                                            {formatBytes(item[0].size)}
+                                        </Table.Cell>
+                                    </Table.Row>
+                                    <Table.Row>
+                                        <Table.Cell>
+                                            {item[1].location}
+                                        </Table.Cell>
+                                        <Table.Cell>
+                                            {formatBytes(item[1].size)}
+                                        </Table.Cell>
+                                    </Table.Row>
+                                </Table.Body>
+                            </Table>
+                        );
+                    })}
+                </>
+            )
+        );
     };
 
     const drawTrio = (
@@ -368,17 +425,35 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                 Object.entries(
                                                     sequenceInfo
                                                 ).map(([key, value]) => {
+                                                    if (
+                                                        key === "external_ids"
+                                                    ) {
+                                                        return (
+                                                            <div
+                                                                key={`${key}-${value}`}
+                                                            >
+                                                                <b>{key}:</b>{" "}
+                                                                TestValue
+                                                            </div>
+                                                        );
+                                                    }
                                                     if (key === "meta") {
                                                         return Object.entries(
                                                             sequenceInfo.meta!
-                                                        ).map(([k1, v1]) => (
-                                                            <div
-                                                                key={`${k1}-${v1}`}
-                                                            >
-                                                                <b>{k1}:</b>{" "}
-                                                                {v1}
-                                                            </div>
-                                                        ));
+                                                        )
+                                                            .filter(
+                                                                ([k1, v1]) =>
+                                                                    k1 !==
+                                                                    "reads"
+                                                            )
+                                                            .map(([k1, v1]) => (
+                                                                <div
+                                                                    key={`${k1}-${v1}`}
+                                                                >
+                                                                    <b>{k1}:</b>{" "}
+                                                                    {v1}
+                                                                </div>
+                                                            ));
                                                     }
                                                     return (
                                                         <div
@@ -389,6 +464,10 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                         </div>
                                                     );
                                                 })}
+                                            {sequenceInfo &&
+                                                renderReadsMetadata(
+                                                    sequenceInfo.meta?.reads
+                                                )}
                                         </>
                                     )}
                                 </div>

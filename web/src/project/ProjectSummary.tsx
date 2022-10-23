@@ -32,6 +32,7 @@ export const ProjectSummary = () => {
     if (page && pageSize) {
         directToken = +page * +pageSize - +pageSize;
     }
+    // console.log(directToken);
 
     const validPages = !!(
         page &&
@@ -40,6 +41,7 @@ export const ProjectSummary = () => {
         +pageSize &&
         PAGE_SIZES.includes(+pageSize)
     );
+    // console.log(validPages);
 
     const [summary, setSummary] = React.useState<
         ProjectSummaryResponse | undefined
@@ -52,6 +54,11 @@ export const ProjectSummary = () => {
     const [pageLimit, _setPageLimit] = React.useState<number>(
         validPages ? +pageSize : PAGE_SIZES[0]
     );
+
+    React.useEffect(() => {
+        setPageNumber(1);
+        _setPageLimit(PAGE_SIZES[0]);
+    }, [projectName]);
 
     const handleOnClick = React.useCallback(
         (p) => {
@@ -78,7 +85,7 @@ export const ProjectSummary = () => {
                     setError(er.message);
                 });
         },
-        [projectName, pageLimit, page]
+        [projectName, pageLimit, pageNumber]
     );
 
     const setPageLimit = React.useCallback(
@@ -95,7 +102,11 @@ export const ProjectSummary = () => {
     }, [getProjectSummary, directToken]);
 
     // retrigger if project changes, or pageLimit changes
-    React.useEffect(_updateProjectSummary, [projectName, pageLimit, page]);
+    React.useEffect(_updateProjectSummary, [
+        projectName,
+        pageLimit,
+        pageNumber,
+    ]);
 
     let table: React.ReactElement = <></>;
 

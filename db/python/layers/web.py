@@ -90,20 +90,21 @@ class WebLayer(BaseLayer):
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, after, limit):
+    def _project_summary_sample_query(self, limit, after):
         """
         Get query for getting list of samples
         """
         wheres = ['project = :project']
-        values = {'limit': limit, 'project': self.project}
-        if after:
-            values['after'] = after
-            wheres.append('id > :after')
+        values = {'limit': limit, 'project': self.project, 'after': after}
+        # if after:
+        #     values['after'] = after
+        #     # wheres.append('id > :after')
+        #     wheres.append('offset :after')
 
         where_str = ''
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
-        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit'
+        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit OFFSET :after'
 
         return sample_query, values
 
@@ -200,7 +201,7 @@ class WebDb(DbBase):
         """
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
-        sample_query, values = self._project_summary_sample_query(token, limit)
+        sample_query, values = self._project_summary_sample_query(limit, int(token or 0))
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
         if len(sample_rows) == 0:

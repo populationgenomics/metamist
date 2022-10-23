@@ -18,7 +18,7 @@ from api.utils.exceptions import determine_code_from_error
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '4.17.0'
+_VERSION = '5.0.1'
 
 logger = get_logger()
 
