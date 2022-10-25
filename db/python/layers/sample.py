@@ -44,7 +44,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
-        self.pt = ProjectPermissionsTable(connection)
+        self.pt = ProjectPermissionsTable(connection.connection)
         self.connection = connection
 
     # GETS
@@ -61,6 +61,16 @@ class SampleLayer(BaseLayer):
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Return the projects associated with the sample ids"""
         return await self.st.get_project_ids_for_sample_ids(sample_ids)
+
+    async def get_sample_by_id(self, sample_id: int, check_project_id=True) -> Sample:
+        """Get sample by ID"""
+        project, sample = await self.st.get_single_by_id(sample_id)
+        if check_project_id:
+            await self.pt.check_access_to_project_ids(
+                self.author, [project], readonly=True
+            )
+
+        return sample
 
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
@@ -176,7 +186,7 @@ class SampleLayer(BaseLayer):
         self,
         external_id,
         sample_type: SampleType,
-        active,
+        active=True,
         meta=None,
         participant_id=None,
         author=None,

@@ -387,4 +387,7 @@
 			validate="true"
 		/>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-10-25_sequence-external-ids-correction">
+		<sql>ALTER TABLE sample_sequencing_eid ADD SYSTEM VERSIONING;</sql>
+	</changeSet>
 </databaseChangeLog>

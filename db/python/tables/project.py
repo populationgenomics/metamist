@@ -71,6 +71,10 @@ class ProjectPermissionsTable:
 
     def __init__(self, connection: Database, allow_full_access=None):
 
+        if not isinstance(connection, Database):
+            raise ValueError(
+                f'Invalid type connection, execpted Database, got {type(connection)}, did you forget to call connection.connection?'
+            )
         self.connection: Database = connection
         self.allow_full_access = (
             allow_full_access if allow_full_access is not None else is_full_access()
@@ -297,7 +301,9 @@ class ProjectPermissionsTable:
         rows = await self.connection.fetch_all(_query)
         return list(map(ProjectRow.from_db, rows))
 
-    async def get_projects_accessible_by_user(self, author: str, readonly=True):
+    async def get_projects_accessible_by_user(
+        self, author: str, readonly=True
+    ) -> dict[int, str]:
         """
         Get projects that are accessible by the specified user
         """
@@ -313,13 +319,15 @@ class ProjectPermissionsTable:
             for pid in project_id_map.keys()
         ]
         has_access_to_project = await asyncio.gather(*promises)
-        relevant_project_names = [
-            name
-            for name, has_access in zip(project_id_map.values(), has_access_to_project)
+        relevant_project_map = {
+            pid: name
+            for (pid, name), has_access in zip(
+                project_id_map.items(), has_access_to_project
+            )
             if has_access
-        ]
+        }
 
-        return relevant_project_names
+        return relevant_project_map
 
     async def create_project(
         self,

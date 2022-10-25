@@ -22,6 +22,9 @@ MODULE_NAME = 'sample_metadata'
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+STATIC_DIR = 'web/src/static'
+OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
+
 
 def check_if_server_is_accessible() -> bool:
     """Check if request to 'SCHEMA_URL' returns OK"""
@@ -256,17 +259,14 @@ def copy_python_files_from(tmpdir):
             shutil.copy(path_to_copy, output_path)
 
     docs_dir = os.path.join(tmpdir, 'docs')
-    static_dir = 'web/src/static'
-    output_docs_dir = os.path.join(static_dir, 'sm_docs')
-    if os.path.exists(output_docs_dir):
-        shutil.rmtree(output_docs_dir)
-    if not os.path.exists(static_dir):
-        os.makedirs(static_dir)
-    shutil.copytree(docs_dir, output_docs_dir)
+    if os.path.exists(OUTPUT_DOCS_DIR):
+        shutil.rmtree(OUTPUT_DOCS_DIR)
+    if not os.path.exists(STATIC_DIR):
+        os.makedirs(STATIC_DIR)
+    shutil.copytree(docs_dir, OUTPUT_DOCS_DIR)
     shutil.copy(
-        os.path.join(tmpdir, 'README.md'), os.path.join(output_docs_dir, 'README.md')
+        os.path.join(tmpdir, 'README.md'), os.path.join(OUTPUT_DOCS_DIR, 'README.md')
     )
-    shutil.copy('README.md', os.path.join(output_docs_dir, 'index.md'))
 
 
 def main():
@@ -293,6 +293,13 @@ def main():
             ['--template-dir', 'openapi-templates'],
         )
         generate_api_and_copy('typescript-axios', copy_typescript_files_from)
+
+        shutil.copy(
+            './resources/muck-the-duck.svg',
+            os.path.join(STATIC_DIR, 'muck-the-duck.svg'),
+        )
+        shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
+
     # pylint: disable=broad-except
     except BaseException as e:
         logger.error(str(e))
