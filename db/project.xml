@@ -695,5 +695,42 @@
 			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 		</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-10-18_first-class-files">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+			<createTable tableName="file">
+<!--				Maybe should consider "in-progress" flag to shos that it's expecting an output to exist -->
+				<column name="id" type="INT" autoIncrement="true">
+					<constraints primaryKey="true" nullable="false" />
+				</column>
+				<column name="type" type="ENUM('file', 'directory')" />
+				<column name="path" type="TEXT">
+					<constraints unique="true" nullable="false" />
+				</column>
+				<column name="size" type="INT" />
+				<column name="checksum" type="TEXT" />
 
+			</createTable>
+
+<!--			attach files to analysis-->
+			<createTable tableName="analysis_files">
+				<column name="analysis_id" type="INT">
+					<constraints nullable="false" foreignKeyName="fk_analysis_files_analysis" references="analysis(id)" />
+				</column>
+				<column name="file_id" type="INT">
+					<constraints nullable="false" foreignKeyName="fk_analysis_files_file" references="file(id)" />
+				</column>
+				<column name="pattern" type="TEXT"/>
+			</createTable>
+
+		<!--			attach files to analysis-->
+			<createTable tableName="sequence_files">
+				<column name="sequence_id" type="INT">
+					<constraints nullable="false" foreignKeyName="fk_analysis_files_analysis" references="sample_sequencing(id)" />
+				</column>
+				<column name="file_id" type="INT">
+					<constraints nullable="false" foreignKeyName="fk_analysis_files_file" references="file(id)" />
+				</column>
+				<column name="pattern" type="TEXT"/>
+			</createTable>
+	</changeSet>
 </databaseChangeLog>
