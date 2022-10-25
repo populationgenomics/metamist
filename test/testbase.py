@@ -10,6 +10,7 @@ from functools import wraps
 
 from typing import Dict
 
+from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
@@ -186,4 +187,8 @@ class DbIsolatedTest(DbTest):
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
-            await self.connection.connection.execute(f'DELETE FROM {table}')
+            try:
+                await self.connection.connection.execute(f'DELETE FROM {table}')
+                await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
+            except IntegrityError as e:
+                raise IntegrityError(f'Could not delete {table}') from e

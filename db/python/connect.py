@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
     'analysis',
-    'sample',
     'participant',
+    'sample',
     'analysis_sample',
     'sample_sequencing',
     'sample_sequencing_eid',
