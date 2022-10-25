@@ -134,7 +134,7 @@ def main(
     pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
     sample_id_by_participant_id = dict(pid_sid)
 
-    if families_n is not None:
+    if families_n:
         if _additional_samples:
             _additional_fams.extend(
                 get_fams_for_samples(
@@ -172,7 +172,7 @@ def main(
 
     else:
         assert samples_n
-        if _additional_fams is not None:
+        if _additional_fams:
             _additional_samples.extend(
                 get_samples_for_families(project, _additional_fams)
             )
