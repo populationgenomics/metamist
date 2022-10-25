@@ -37,10 +37,10 @@ class ProjectSummaryResponse(BaseModel):
     sequence_stats: dict[str, dict[str, str]]
 
     # for display
-    participants: List[NestedParticipant]
-    participant_keys: List[str]
-    sample_keys: List[str]
-    sequence_keys: List[str]
+    participants: list[NestedParticipant]
+    participant_keys: list[tuple[str, str]]
+    sample_keys: list[tuple[str, str]]
+    sequence_keys: list[tuple[str, str]]
 
     links: Optional[PagingLinks]
 

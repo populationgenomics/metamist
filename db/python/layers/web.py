@@ -68,9 +68,9 @@ class ProjectSummary:
 
     # grid
     participants: List[NestedParticipant]
-    participant_keys: List[str]
-    sample_keys: List[str]
-    sequence_keys: List[str]
+    participant_keys: list[tuple[str, str]]
+    sample_keys: list[tuple[str, str]]
+    sequence_keys: list[tuple[str, str]]
 
 
 class WebLayer(BaseLayer):
@@ -201,15 +201,17 @@ class WebDb(DbBase):
         """
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
-        sample_query, values = self._project_summary_sample_query(limit, int(token or 0))
+        sample_query, values = self._project_summary_sample_query(
+            limit, int(token or 0)
+        )
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
         if len(sample_rows) == 0:
             return ProjectSummary(
                 participants=[],
-                participant_keys=[],
-                sample_keys=[],
-                sequence_keys=[],
+                participant_keys={},
+                sample_keys={},
+                sequence_keys={},
                 # stats
                 total_samples=0,
                 total_participants=0,
@@ -348,20 +350,24 @@ WHERE fp.participant_id in :pids
         has_reported_gender = any(p.reported_gender for p in pmodels)
         has_karyotype = any(p.karyotype for p in pmodels)
 
-        participant_keys = ['external_id']
+        participant_keys = [('external_id', 'Participant ID')]
 
         if has_reported_sex:
-            participant_keys.append('reported_sex')
+            participant_keys.append(('reported_sex', 'Reported sex'))
         if has_reported_gender:
-            participant_keys.append('reported_gender')
+            participant_keys.append(('reported_gender', 'Reported gender'))
         if has_karyotype:
-            participant_keys.append('karyotype')
+            participant_keys.append(('karyotype', 'Karyotype'))
 
-        participant_keys.extend('meta.' + k for k in participant_meta_keys)
-        sample_keys = ['id', 'external_id', 'created_date'] + [
-            'meta.' + k for k in sample_meta_keys
+        participant_keys.extend(('meta.' + k, k) for k in participant_meta_keys)
+        sample_keys: list[tuple[str, str]] = [
+            ('id', 'Sample ID'),
+            ('external_id', 'External Sample ID'),
+            ('created_date', 'Created date'),
+        ] + [('meta.' + k, k) for k in sample_meta_keys]
+        sequence_keys = [('type', 'type')] + [
+            ('meta.' + k, k) for k in sequence_meta_keys
         ]
-        sequence_keys = ['type'] + ['meta.' + k for k in sequence_meta_keys]
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())

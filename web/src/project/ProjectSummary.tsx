@@ -166,12 +166,10 @@ export const ProjectSummary = () => {
         } else {
             const headers = [
                 "Family ID",
-                ...summary.participant_keys.map((pk) =>
-                    pk.replace(".meta", "")
-                ),
-                ...summary.sample_keys.map((sk) => sk.replace(".meta", "")),
+                ...summary.participant_keys.map((field) => field[1]),
+                ...summary.sample_keys.map((field) => field[1]),
                 ...summary.sequence_keys.map(
-                    (sk) => "sequence." + sk.replace(".meta", "")
+                    (field) => "sequence." + field[1]
                 ),
             ];
 
@@ -220,7 +218,7 @@ export const ProjectSummary = () => {
                                             )}
                                             {isFirstOfGroup &&
                                                 summary.participant_keys.map(
-                                                    (k) => (
+                                                    ([k, dn]) => (
                                                         <Table.Cell
                                                             style={{
                                                                 backgroundColor,
@@ -241,7 +239,7 @@ export const ProjectSummary = () => {
                                                     )
                                                 )}
                                             {seqidx === 0 &&
-                                                summary.sample_keys.map((k) => (
+                                                summary.sample_keys.map(([k, dn]) => (
                                                     <Table.Cell
                                                         style={{
                                                             backgroundColor,
@@ -254,7 +252,7 @@ export const ProjectSummary = () => {
                                                         }
                                                     >
                                                         {k === "external_id" ||
-                                                        k === "id" ? (
+                                                            k === "id" ? (
                                                             <SampleLink
                                                                 id={s.id}
                                                                 projectName={
@@ -274,7 +272,7 @@ export const ProjectSummary = () => {
                                                 ))}
                                             {seq &&
                                                 summary.sequence_keys.map(
-                                                    (k) => (
+                                                    ([k, dn]) => (
                                                         <Table.Cell
                                                             style={{
                                                                 backgroundColor,
