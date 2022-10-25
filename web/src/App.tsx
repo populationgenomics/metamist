@@ -8,6 +8,7 @@ import "semantic-ui-css/semantic.min.css";
 // import 'bootstrap/dist/css/bootstrap.min.css'
 import { Routes } from "./urls";
 import { Searchbar } from "./Search";
+import MuckTheDuck from "./MuckTheDuck";
 
 function App() {
     return (
@@ -15,6 +16,9 @@ function App() {
             <div className="App">
                 <header className="App-header">
                     <div className="header">
+                        <Link className="metamist-img" to="/">
+                            <MuckTheDuck height={28} style={{ marginRight: "5px" }} />
+                        </Link>
                         <Link className="metamist" to="/">
                             METAMIST
                         </Link>
