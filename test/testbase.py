@@ -163,9 +163,10 @@ class DbTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        db = cls.dbs[cls.__name__]
-        db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
-        db.stop()
+        db = cls.dbs.get(cls.__name__)
+        if db:
+            db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+            db.stop()
 
     def setUp(self) -> None:
         self.project_id = 1

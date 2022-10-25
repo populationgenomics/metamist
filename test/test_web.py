@@ -167,9 +167,13 @@ class TestWeb(DbIsolatedTest):
                 }
             },
             participants=data_to_class(expected_data),
-            participant_keys=['external_id'],
-            sample_keys=['id', 'external_id', 'created_date'],
-            sequence_keys=['type', 'meta.reads_type'],
+            participant_keys=[('external_id', 'Participant ID')],
+            sample_keys=[
+                ('id', 'Sample ID'),
+                ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequence_keys=[('type', 'type'), ('meta.reads_type', 'reads_type')],
         )
 
         self.assertEqual(expected, result)
