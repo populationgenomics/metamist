@@ -294,8 +294,6 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
-    console.log(sequenceInfo);
-
     return (
         <>
             <br />
