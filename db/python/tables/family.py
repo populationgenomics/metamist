@@ -79,7 +79,7 @@ class FamilyTable(DbBase):
         """
         rows = await self.connection.fetch_all(
             _query,
-            {'project_ids': project_ids, 'search_pattern': query + '%', 'limit': limit},
+            {'project_ids': project_ids, 'search_pattern': self.escape_like_term(query) + '%', 'limit': limit},
         )
         return [(r['project'], r['id'], r['external_id']) for r in rows]
 

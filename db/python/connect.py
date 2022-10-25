@@ -241,3 +241,7 @@ class DbBase:
             raise Exception(f'Must provide author to {self.__class__.__name__}')
 
     # piped from the connection
+
+    @staticmethod
+    def escape_like_term(query: str):
+        return query.replace("%", "\\%").replace('_', '\\_')
