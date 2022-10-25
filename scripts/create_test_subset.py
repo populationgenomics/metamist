@@ -107,10 +107,8 @@ def main(
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
     samples_n, families_n = _validate_opts(samples_n, families_n)
-    _additional_fams: List[str] = []
-    _additional_samples: List[str] = []
-    _additional_fams = list(additional_fams)
-    _additional_samples = list(additional_samples)
+    _additional_fams: List[str] = list(additional_fams)
+    _additional_samples: List[str] = list(additional_samples)
 
     all_samples = sapi.get_samples(
         body_get_samples={
