@@ -74,11 +74,32 @@ DEFAULT_SAMPLES_N = 10
     default=False,
     help='Skip transferring pedigree/family information',
 )
+@click.option(
+    '--add-fam',
+    'additional_fams',
+    type=str,
+    multiple=True,
+    help="""Additional families to include.
+    All samples from these fams will be included.
+    This is in addition to the number of families specified in
+    --families and the number of samples specified in -n""",
+)
+@click.option(
+    '--add-sample',
+    'additional_samples',
+    type=str,
+    multiple=True,
+    help="""Additional samples to include.
+    This is in addition to the number of families specified in
+    --families and the number of samples specified in -n""",
+)
 def main(
     project: str,
     samples_n: Optional[int],
     families_n: Optional[int],
     skip_ped: Optional[bool] = True,
+    additional_fams: Optional[Tuple[str]] = None,
+    additional_samples: Optional[Tuple[str]] = None,
 ):
     """
     Script creates a test subset for a given project.
@@ -86,6 +107,10 @@ def main(
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
     samples_n, families_n = _validate_opts(samples_n, families_n)
+    _additional_fams: List[str] = []
+    _additional_samples: List[str] = []
+    _additional_fams = list(additional_fams)
+    _additional_samples = list(additional_samples)
 
     all_samples = sapi.get_samples(
         body_get_samples={
@@ -112,12 +137,24 @@ def main(
     sample_id_by_participant_id = dict(pid_sid)
 
     if families_n is not None:
+        if _additional_samples:
+            _additional_fams.extend(
+                get_fams_for_samples(
+                    project,
+                    _additional_samples,
+                )
+            )
         fams = fapi.get_families(project)
-        all_families = [family['id'] for family in fams]
+        families_to_subset = [
+            family['id']
+            for family in fams
+            if family['external_id'] not in _additional_fams
+        ]
         full_pedigree = fapi.get_pedigree(
-            project=project, internal_family_ids=all_families
+            project=project, internal_family_ids=families_to_subset
         )
         external_family_ids = _get_random_families(full_pedigree, families_n)
+        external_family_ids.extend(_additional_fams)
         internal_family_ids = [
             fam['id'] for fam in fams if fam['external_id'] in external_family_ids
         ]
@@ -137,7 +174,19 @@ def main(
 
     else:
         assert samples_n
-        samples = random.sample(all_samples, samples_n)
+        if _additional_fams is not None:
+            _additional_samples.extend(
+                get_samples_for_families(project, _additional_fams)
+            )
+
+        samples_to_subset = [
+            sample for sample in all_samples if sample['id'] not in _additional_samples
+        ]
+        samples_to_add = [
+            sample for sample in all_samples if sample['id'] in _additional_samples
+        ]
+        samples = random.sample(samples_to_subset, samples_n)
+        samples.extend(samples_to_add)
         sample_ids = [s['id'] for s in samples]
 
     logger.info(
@@ -388,6 +437,63 @@ def get_map_ipid_esid(
     external_sample_internal_participant_map = _normalise_map(ip_es_map)
 
     return external_sample_internal_participant_map
+
+
+def get_samples_for_families(project: str, additional_fams: Optional[List[str]] = None):
+    """Returns the samples that belong to a list of families"""
+
+    samples: List[str] = []
+    full_pedigree = fapi.get_pedigree(
+        project=project,
+        replace_with_participant_external_ids=False,
+        replace_with_family_external_ids=True,
+    )
+
+    ipids = [
+        family['individual_id']
+        for family in full_pedigree
+        if family['family_id'] in additional_fams
+    ]
+
+    sample_objects = sapi.get_samples(
+        body_get_samples={
+            'project_ids': [project],
+            'participant_ids': ipids,
+            'active': True,
+        }
+    )
+
+    samples = [sample['id'] for sample in sample_objects]
+
+    return samples
+
+
+def get_fams_for_samples(
+    project: str,
+    additional_samples: Optional[List[str]] = None,
+):
+    """Returns the families that a list of samples belong to"""
+    fams: List[str] = []
+    sample_objects = sapi.get_samples(
+        body_get_samples={
+            'project_ids': [project],
+            'sample_ids': additional_samples,
+            'active': True,
+        }
+    )
+
+    pids = [sample['participant_id'] for sample in sample_objects]
+    full_pedigree = fapi.get_pedigree(
+        project=project,
+        replace_with_participant_external_ids=False,
+        replace_with_family_external_ids=True,
+    )
+
+    fams = [
+        fam['family_id'] for fam in full_pedigree if str(fam['individual_id']) in pids
+    ]
+
+    return fams
 
 
 def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
