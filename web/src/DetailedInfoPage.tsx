@@ -294,6 +294,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
+    console.log(sequenceInfo);
+
     return (
         <>
             <br />
@@ -428,16 +430,33 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                     if (
                                                         key === "external_ids"
                                                     ) {
-                                                        return (
-                                                            <div
-                                                                key={`${key}-${value}`}
-                                                            >
-                                                                <b>{key}:</b>{" "}
-                                                                TestValue
-                                                            </div>
-                                                        );
-                                                    }
-                                                    if (key === "meta") {
+                                                        if (
+                                                            Object.keys(
+                                                                sequenceInfo.external_ids!
+                                                            ).length
+                                                        ) {
+                                                            return (
+                                                                <>
+                                                                    <b>
+                                                                        External
+                                                                        Ids:
+                                                                    </b>{" "}
+                                                                    {Object.entries(
+                                                                        sequenceInfo!
+                                                                            .external_ids!
+                                                                    )
+                                                                        .map(
+                                                                            ([
+                                                                                k1,
+                                                                                v1,
+                                                                            ]) =>
+                                                                                `${v1} (${k1})`
+                                                                        )
+                                                                        .join()}
+                                                                </>
+                                                            );
+                                                        }
+                                                    } else if (key === "meta") {
                                                         return Object.entries(
                                                             sequenceInfo.meta!
                                                         )
@@ -454,15 +473,16 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                                     {v1}
                                                                 </div>
                                                             ));
+                                                    } else {
+                                                        return (
+                                                            <div
+                                                                key={`${key}-${value}`}
+                                                            >
+                                                                <b>{key}:</b>{" "}
+                                                                {value}
+                                                            </div>
+                                                        );
                                                     }
-                                                    return (
-                                                        <div
-                                                            key={`${key}-${value}`}
-                                                        >
-                                                            <b>{key}:</b>{" "}
-                                                            {value}
-                                                        </div>
-                                                    );
                                                 })}
                                             {sequenceInfo &&
                                                 renderReadsMetadata(
