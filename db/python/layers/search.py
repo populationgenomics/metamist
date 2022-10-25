@@ -1,6 +1,7 @@
 import asyncio
 from typing import List, Optional
 
+from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
@@ -47,9 +48,9 @@ class SearchLayer(BaseLayer):
 
         cpg_id = sample_id_format(sample_id)
 
-        project, sample = await stable.get_single_by_id(sample_id)
-
-        if not sample:
+        try:
+            project, sample = await stable.get_single_by_id(sample_id)
+        except NotFoundError:
             return None
 
         sample_eids = [sample.external_id]
@@ -71,9 +72,9 @@ class SearchLayer(BaseLayer):
                 ftable.get_family_external_ids_by_participant_ids([participant_id]),
             )
             if participant_id in p_eids_map:
-                participant_eids = p_eids_map.get(participant_id)
+                participant_eids = p_eids_map.get(participant_id) or []
             if participant_id in f_eids_map:
-                family_eids = f_eids_map.get(participant_id)
+                family_eids = f_eids_map.get(participant_id) or []
 
         return SearchResponse(
             title=title,
@@ -127,7 +128,7 @@ class SearchLayer(BaseLayer):
 
         samples = [
             SearchResponse(
-                title=s_eid,
+                title=sample_id_format(s_id),
                 type=SearchResponseType.SAMPLE,
                 data=SampleSearchResponseData(
                     project=project,

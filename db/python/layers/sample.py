@@ -186,7 +186,7 @@ class SampleLayer(BaseLayer):
         self,
         external_id,
         sample_type: SampleType,
-        active,
+        active=True,
         meta=None,
         participant_id=None,
         author=None,
