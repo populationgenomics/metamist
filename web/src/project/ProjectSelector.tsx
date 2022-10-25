@@ -7,17 +7,26 @@ import { Dropdown } from "semantic-ui-react";
 import { ProjectApi } from "../sm-api/api";
 
 interface ProjectSelectorProps {
-    onChange?: (project: string) => void;
+    // onChange?: (project: string) => void;
+    setPageNumber: React.Dispatch<React.SetStateAction<number>>;
+    setPageLimit: React.Dispatch<React.SetStateAction<number>>;
+    pageLimit: number;
 }
 
 export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
-    onChange,
+    setPageNumber,
+    setPageLimit,
+    pageLimit,
 }) => {
     const { projectName } = useParams();
     const navigate = useNavigate();
     const handleOnClick = React.useCallback(
-        (_, { value }) => navigate(`/project/${value}`),
-        [navigate]
+        (_, { value }) => {
+            navigate(`/project/${value}`);
+            setPageNumber(1);
+            setPageLimit(pageLimit);
+        },
+        [navigate, setPageLimit, setPageNumber, pageLimit]
     );
 
     const [projects, setProjects] = React.useState<string[] | undefined>();
