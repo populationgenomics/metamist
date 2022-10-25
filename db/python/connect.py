@@ -244,4 +244,7 @@ class DbBase:
 
     @staticmethod
     def escape_like_term(query: str):
-        return query.replace("%", "\\%").replace('_', '\\_')
+        """
+        Escape meaningful keys when using LIKE with a user supplied input
+        """
+        return query.replace('%', '\\%').replace('_', '\\_')

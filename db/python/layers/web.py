@@ -209,9 +209,9 @@ class WebDb(DbBase):
         if len(sample_rows) == 0:
             return ProjectSummary(
                 participants=[],
-                participant_keys={},
-                sample_keys={},
-                sequence_keys={},
+                participant_keys=[],
+                sample_keys=[],
+                sequence_keys=[],
                 # stats
                 total_samples=0,
                 total_participants=0,

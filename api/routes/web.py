@@ -1,7 +1,7 @@
 """
 Web routes
 """
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel

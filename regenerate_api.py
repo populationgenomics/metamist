@@ -294,7 +294,10 @@ def main():
         )
         generate_api_and_copy('typescript-axios', copy_typescript_files_from)
 
-        shutil.copy('./resources/muck-the-duck.svg', os.path.join(STATIC_DIR, 'muck-the-duck.svg'))
+        shutil.copy(
+            './resources/muck-the-duck.svg',
+            os.path.join(STATIC_DIR, 'muck-the-duck.svg'),
+        )
         shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
 
     # pylint: disable=broad-except

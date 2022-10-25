@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from itertools import groupby
 from collections import defaultdict
 from typing import List, Optional, Set, Tuple, Dict, Any
 
@@ -458,7 +457,7 @@ ORDER BY a.timestamp_completed DESC;
         rows = await self.connection.fetch_all(_query, {'project': project})
 
         # do it like this until I select lowercase value w/ JSON_EXTRACT
-        n_counts = defaultdict(int)
+        n_counts: dict[str, int] = defaultdict(int)
         for r in rows:
             n_counts[json.loads(r['seq_type']).lower()] += r['number_of_crams']
         return n_counts
