@@ -82,6 +82,7 @@ jobs:
         # also copies build artifacts to api/public
       - name: "build web front-end"
         run: |
+          set -eo pipefail
           pushd web
           # installs package-lock, not what it thinks it should be
           npm ci
