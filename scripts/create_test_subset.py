@@ -222,12 +222,14 @@ def main(
                 new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
                 logger.info('Creating sequence entry in test')
                 seqapi.create_new_sequence(
+                    project=target_project,
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
                         type=SequenceType(seq_info['type']),
+                        external_ids=seq_info['external_ids'],
                         status=SequenceStatus(seq_info['status']),
-                    )
+                    ),
                 )
 
         for a_type in ['cram', 'gvcf']:

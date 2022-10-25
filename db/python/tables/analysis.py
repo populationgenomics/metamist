@@ -1,4 +1,6 @@
+import json
 from datetime import datetime
+from collections import defaultdict
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
@@ -430,3 +432,55 @@ ORDER BY a.timestamp_completed DESC;
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
         rows = await self.connection.fetch_all(_query, values)
         return [Analysis.from_db(**dict(r)) for r in rows]
+
+    # region STATS
+
+    async def get_number_of_crams_by_sequence_type(
+        self, project: ProjectId
+    ) -> dict[str, int]:
+        """
+        Get number of crams, grouped by sequence type (one per sample per sequence type)
+        """
+
+        # Only count one cram per sample, do this in a double query.
+        # First select, then aggregate
+        _query = """
+        SELECT seq_type, COUNT(*) as number_of_crams FROM (
+            SELECT JSON_EXTRACT(meta, "$.sequencing_type") as seq_type
+            FROM analysis a
+            INNER JOIN analysis_sample asam ON a.id = asam.analysis_id
+            WHERE project = :project AND status = 'completed' AND type = 'cram'
+            GROUP BY seq_type, asam.sample_id
+        ) as iq GROUP BY seq_type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        # do it like this until I select lowercase value w/ JSON_EXTRACT
+        n_counts: dict[str, int] = defaultdict(int)
+        for r in rows:
+            n_counts[json.loads(r['seq_type']).lower()] += r['number_of_crams']
+        return n_counts
+
+    async def get_seqr_stats_by_sequence_type(
+        self, project: ProjectId
+    ) -> dict[str, int]:
+        """
+        Get number of samples in seqr (in latest es-index), grouped by sequence type
+        """
+        _query = """
+SELECT a.seq_type, COUNT(*) as n
+FROM (
+    SELECT MAX(id) as analysis_id, JSON_EXTRACT(meta, "$.sequencing_type") as seq_type
+    FROM analysis
+    WHERE project = :project AND status = 'completed' AND type = 'es-index'
+    GROUP BY seq_type
+) a
+INNER JOIN analysis_sample asample ON asample.analysis_id = a.analysis_id
+GROUP BY a.seq_type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        return {r['seq_type']: r['n'] for r in rows}
+
+    # endregion STATS
