@@ -49,6 +49,9 @@ class SearchLayer(BaseLayer):
 
         project, sample = await stable.get_single_by_id(sample_id)
 
+        if not sample:
+            return None
+
         sample_eids = [sample.external_id]
         participant_id = int(sample.participant_id) if sample.participant_id else None
         participant_eids = []
