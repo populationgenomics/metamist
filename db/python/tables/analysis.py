@@ -459,7 +459,11 @@ ORDER BY a.timestamp_completed DESC;
         # do it like this until I select lowercase value w/ JSON_EXTRACT
         n_counts: dict[str, int] = defaultdict(int)
         for r in rows:
-            n_counts[json.loads(r['seq_type']).lower()] += r['number_of_crams']
+            if seq_type := r['seq_type']:
+                try:
+                    seq_type = json.loads(seq_type)
+                finally:
+                    n_counts[seq_type.lower()] += r['number_of_crams']
         return n_counts
 
     async def get_seqr_stats_by_sequence_type(

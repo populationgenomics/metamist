@@ -23,12 +23,16 @@ interface PedigreeEntry {
     paternal_id: string;
     sex: number;
 }
-interface MetadataReads {
+interface File {
     location: string;
     basename: string;
     class: string;
     checksum: string;
     size: number;
+}
+
+interface meta {
+    reads?: File | Array<File> | Array<Array<File>>;
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -175,38 +179,27 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         }`;
     };
 
-    const renderReadsMetadata = (data: MetadataReads[][]) => {
-        return (
-            data && (
-                <>
-                    <h4>Sequence Reads</h4>
+    const prepReadMetadata = (data: meta) => {
+        if (!data.reads) return <></>;
+        if (!Array.isArray(data.reads))
+            return renderReadsMetadata([data.reads], 1);
+        return data.reads.map((v, i) => {
+            return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
+        });
+    };
 
-                    {data.map((item: MetadataReads[]) => {
-                        return (
-                            <Table celled>
-                                <Table.Body>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[0].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[0].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[1].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[1].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                </Table.Body>
-                            </Table>
-                        );
-                    })}
-                </>
-            )
+    const renderReadsMetadata = (data: File[], key: number) => {
+        return (
+            <Table celled key={key}>
+                <Table.Body>
+                    {data.map((item: File) => (
+                        <Table.Row key={item.location}>
+                            <Table.Cell>{item.location}</Table.Cell>
+                            <Table.Cell>{formatBytes(item.size)}</Table.Cell>
+                        </Table.Row>
+                    ))}
+                </Table.Body>
+            </Table>
         );
     };
 
@@ -302,12 +295,16 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                         <>
                             <b>External Ids:</b>{" "}
                             {Object.entries(seqInfo!.external_ids!)
-                                .map(([k1, v1]) => `${v1} (${k1})`)
+                                .map(([k1, v1]) => (
+                                    <React.Fragment
+                                        key={`${v1} (${k1})`}
+                                    >{`${v1} (${k1})`}</React.Fragment>
+                                ))
                                 .join()}
                         </>
                     );
                 }
-                return <></>;
+                return <React.Fragment key="ExternalID"></React.Fragment>;
             }
             if (key === "meta") {
                 return Object.entries(seqInfo.meta!)
@@ -456,8 +453,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                             {sequenceInfo &&
                                                 renderSeqInfo(sequenceInfo)}
                                             {sequenceInfo &&
-                                                renderReadsMetadata(
-                                                    sequenceInfo.meta?.reads
+                                                prepReadMetadata(
+                                                    sequenceInfo.meta || {}
                                                 )}
                                         </>
                                     )}
