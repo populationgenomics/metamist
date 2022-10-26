@@ -459,7 +459,7 @@ ORDER BY a.timestamp_completed DESC;
         # do it like this until I select lowercase value w/ JSON_EXTRACT
         n_counts: dict[str, int] = defaultdict(int)
         for r in rows:
-            if seq_type := r.get('seq_type'):
+            if seq_type := r['seq_type']:
                 try:
                     seq_type = json.loads(seq_type)
                 finally:
