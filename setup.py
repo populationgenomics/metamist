@@ -30,7 +30,6 @@ setup(
     packages=all_packages,
     install_requires=[
         'click',
-        'cpg-utils',
         'google-auth',
         'google-api-core',  # dependency to google-auth that however is not
         # pulled automatically: https://github.com/googleapis/google-auth-library-python/blob/main/setup.py#L22-L27
@@ -39,7 +38,7 @@ setup(
         'requests',
         'typing-extensions',
         # for get id-token
-        'cpg-utils >= 4.6.0',
+        'cpg-utils >= 4.9.4',
     ],
     include_package_data=True,
     zip_safe=False,
