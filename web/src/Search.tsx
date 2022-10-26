@@ -97,11 +97,15 @@ const resultRenderer = ({ ...props }) => {
 
     let subtitle = components.length > 0 ? components.join(" · ") : null;
 
+    const key: string = String(props.data.id || `${props.data.project}|${props.data.title}`)
+
+
     // prefer early return for empty results
     if (!props.title || !props.type) return <></>
 
+
     return (
-        <div key="content" className="content">
+        <div key={key} className="content">
             <div style={{ display: "flex" }}>
                 <div style={{ flex: 1, order: 1, width: "20%" }}>
                     {icon}
