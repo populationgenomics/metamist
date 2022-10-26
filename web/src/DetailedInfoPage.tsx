@@ -23,12 +23,16 @@ interface PedigreeEntry {
     paternal_id: string;
     sex: number;
 }
-interface MetadataReads {
+interface File {
     location: string;
     basename: string;
     class: string;
     checksum: string;
     size: number;
+}
+
+interface meta {
+    reads?: File | Array<File> | Array<Array<File>>;
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -175,38 +179,29 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         }`;
     };
 
-    const renderReadsMetadata = (data: MetadataReads[][]) => {
-        return (
-            data && (
-                <>
-                    <h4>Sequence Reads</h4>
+    const prepReadMetadata = (data: meta) => {
+        if (!data.reads) return <></>;
+        if (!Array.isArray(data.reads))
+            return renderReadsMetadata([data.reads]);
+        return data.reads.map((v) => {
+            console.log(v);
+            return renderReadsMetadata(Array.isArray(v) ? v : [v]);
+        });
+    };
 
-                    {data.map((item: MetadataReads[]) => {
-                        return (
-                            <Table celled>
-                                <Table.Body>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[0].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[0].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[1].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[1].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                </Table.Body>
-                            </Table>
-                        );
-                    })}
-                </>
-            )
+    const renderReadsMetadata = (data: File[]) => {
+        console.log(data);
+        return (
+            <Table celled>
+                <Table.Body>
+                    {data.map((item: File) => (
+                        <Table.Row>
+                            <Table.Cell>{item.location}</Table.Cell>
+                            <Table.Cell>{formatBytes(item.size)}</Table.Cell>
+                        </Table.Row>
+                    ))}
+                </Table.Body>
+            </Table>
         );
     };
 
@@ -483,8 +478,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                     }
                                                 })}
                                             {sequenceInfo &&
-                                                renderReadsMetadata(
-                                                    sequenceInfo.meta?.reads
+                                                prepReadMetadata(
+                                                    sequenceInfo.meta || {}
                                                 )}
                                         </>
                                     )}
