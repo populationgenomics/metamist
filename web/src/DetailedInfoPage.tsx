@@ -294,6 +294,38 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
+    const renderSeqInfo = (seqInfo: SampleSequencing) => {
+        return Object.entries(seqInfo).map(([key, value]) => {
+            if (key === "external_ids") {
+                if (Object.keys(seqInfo.external_ids!).length) {
+                    return (
+                        <>
+                            <b>External Ids:</b>{" "}
+                            {Object.entries(seqInfo!.external_ids!)
+                                .map(([k1, v1]) => `${v1} (${k1})`)
+                                .join()}
+                        </>
+                    );
+                }
+                return <></>;
+            }
+            if (key === "meta") {
+                return Object.entries(seqInfo.meta!)
+                    .filter(([k1, v1]) => k1 !== "reads")
+                    .map(([k1, v1]) => (
+                        <div key={`${k1}-${v1}`}>
+                            <b>{k1}:</b> {v1}
+                        </div>
+                    ));
+            }
+            return (
+                <div key={`${key}-${value}`}>
+                    <b>{key}:</b> {value}
+                </div>
+            );
+        });
+    };
+
     return (
         <>
             <br />
@@ -422,66 +454,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                 Sequence Information
                                             </h4>
                                             {sequenceInfo &&
-                                                Object.entries(
-                                                    sequenceInfo
-                                                ).map(([key, value]) => {
-                                                    if (
-                                                        key === "external_ids"
-                                                    ) {
-                                                        if (
-                                                            Object.keys(
-                                                                sequenceInfo.external_ids!
-                                                            ).length
-                                                        ) {
-                                                            return (
-                                                                <>
-                                                                    <b>
-                                                                        External
-                                                                        Ids:
-                                                                    </b>{" "}
-                                                                    {Object.entries(
-                                                                        sequenceInfo!
-                                                                            .external_ids!
-                                                                    )
-                                                                        .map(
-                                                                            ([
-                                                                                k1,
-                                                                                v1,
-                                                                            ]) =>
-                                                                                `${v1} (${k1})`
-                                                                        )
-                                                                        .join()}
-                                                                </>
-                                                            );
-                                                        }
-                                                    } else if (key === "meta") {
-                                                        return Object.entries(
-                                                            sequenceInfo.meta!
-                                                        )
-                                                            .filter(
-                                                                ([k1, v1]) =>
-                                                                    k1 !==
-                                                                    "reads"
-                                                            )
-                                                            .map(([k1, v1]) => (
-                                                                <div
-                                                                    key={`${k1}-${v1}`}
-                                                                >
-                                                                    <b>{k1}:</b>{" "}
-                                                                    {v1}
-                                                                </div>
-                                                            ));
-                                                    } else {
-                                                        return (
-                                                            <div
-                                                                key={`${key}-${value}`}
-                                                            >
-                                                                <b>{key}:</b>{" "}
-                                                                {value}
-                                                            </div>
-                                                        );
-                                                    }
-                                                })}
+                                                renderSeqInfo(sequenceInfo)}
                                             {sequenceInfo &&
                                                 renderReadsMetadata(
                                                     sequenceInfo.meta?.reads
