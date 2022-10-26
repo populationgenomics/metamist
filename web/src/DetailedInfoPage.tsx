@@ -182,20 +182,18 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const prepReadMetadata = (data: meta) => {
         if (!data.reads) return <></>;
         if (!Array.isArray(data.reads))
-            return renderReadsMetadata([data.reads]);
-        return data.reads.map((v) => {
-            console.log(v);
-            return renderReadsMetadata(Array.isArray(v) ? v : [v]);
+            return renderReadsMetadata([data.reads], 1);
+        return data.reads.map((v, i) => {
+            return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
         });
     };
 
-    const renderReadsMetadata = (data: File[]) => {
-        console.log(data);
+    const renderReadsMetadata = (data: File[], key: number) => {
         return (
-            <Table celled>
+            <Table celled key={key}>
                 <Table.Body>
                     {data.map((item: File) => (
-                        <Table.Row>
+                        <Table.Row key={item.location}>
                             <Table.Cell>{item.location}</Table.Cell>
                             <Table.Cell>{formatBytes(item.size)}</Table.Cell>
                         </Table.Row>
@@ -297,12 +295,16 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                         <>
                             <b>External Ids:</b>{" "}
                             {Object.entries(seqInfo!.external_ids!)
-                                .map(([k1, v1]) => `${v1} (${k1})`)
+                                .map(([k1, v1]) => (
+                                    <React.Fragment
+                                        key={`${v1} (${k1})`}
+                                    >{`${v1} (${k1})`}</React.Fragment>
+                                ))
                                 .join()}
                         </>
                     );
                 }
-                return <></>;
+                return <React.Fragment key="ExternalID"></React.Fragment>;
             }
             if (key === "meta") {
                 return Object.entries(seqInfo.meta!)
