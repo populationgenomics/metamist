@@ -1,11 +1,14 @@
 import * as React from "react";
 import { Search } from "semantic-ui-react";
-import { WebApi } from "./sm-api/api";
+import _ from "lodash";
+
 import { useNavigate } from "react-router-dom";
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
 import ErrorRoundedIcon from "@mui/icons-material/ErrorRounded";
+
+import { WebApi } from "./sm-api/api";
 
 type State = {
     loading: boolean;
@@ -37,17 +40,17 @@ const initialState: State = {
 
 const SearchReducer = (state: State, action: Action): State => {
     switch (action.type) {
-        case "CLEAN_QUERY":
+        case ActionKind.Clear:
             return initialState;
-        case "START_SEARCH":
+        case ActionKind.Start:
             return { ...state, loading: true, value: action.query! };
-        case "FINISH_SEARCH":
+        case ActionKind.Finish:
             return { ...state, loading: false, results: action.results! };
-        case "UPDATE_SELECTION":
+        case ActionKind.Update:
             return { ...state, value: action.selection! };
-        case "QUERY_TOO_SHORT":
+        case ActionKind.Short:
             return { ...state, loading: false };
-        case "ERROR":
+        case ActionKind.Error:
             return { ...state, loading: false, results: action.results! };
     }
 };
@@ -55,23 +58,20 @@ const SearchReducer = (state: State, action: Action): State => {
 const resultRenderer = ({ ...props }) => {
     let components = [];
     let icon: React.ReactElement = <></>;
-    let available = "";
+    let available: string | undefined;
     let colour = "black";
     if (!!!props.data.id) {
         available = `No access to this ${props.type}`;
         colour = "gray";
     }
     if (props.type === "participant" || props.type === "family") {
-        available = `Search Result not available `;
+        available = `${_.capitalize(props.type)} result is not supported`
         colour = "gray";
     }
     const style = { fontSize: 50, color: colour, height: "33px" };
 
     switch (props.type) {
         case "sample": {
-            if (props.data.id !== props.title) {
-                components.push(props.data.id);
-            }
             components.push(...(props.data.sample_external_ids || []));
             icon = <BloodtypeRoundedIcon sx={style} />;
             break;
@@ -93,41 +93,42 @@ const resultRenderer = ({ ...props }) => {
         }
     }
 
-    let subtitle = components.join(" · ");
+    components = components.filter(f => f !== props.title)
+
+    let subtitle = components.length > 0 ? components.join(" · ") : null;
+
+    // prefer early return for empty results
+    if (!props.title || !props.type) return <></>
 
     return (
-        <>
-            {props.title && props.type && (
-                <div key="content" className="content">
-                    <div style={{ display: "flex" }}>
-                        <div style={{ flex: 1, order: 1, width: "20%" }}>
-                            {icon}
-                        </div>
-                        <div
-                            style={{
-                                order: 2,
-                                flex: 3,
-                                display: "inline",
-                            }}
-                        >
-                            <div className="title">{props.title}</div>
-                            <div className="description">{subtitle}</div>
-                            <div>{available}</div>
-                        </div>
-                        <div
-                            style={{
-                                order: 3,
-                                flex: 2,
-                                textAlign: "right",
-                                fontStyle: "italic",
-                            }}
-                        >
-                            {props.data.project}
-                        </div>
-                    </div>
+        <div key="content" className="content">
+            <div style={{ display: "flex" }}>
+                <div style={{ flex: 1, order: 1, width: "20%" }}>
+                    {icon}
                 </div>
-            )}
-        </>
+                <div
+                    style={{
+                        order: 2,
+                        flex: 3,
+                        display: "inline",
+                    }}
+                >
+                    <div className="title">{props.title}</div>
+                    {subtitle && <div className="description">{subtitle}</div>}
+                    {available && <div>{available}</div>}
+                </div>
+                <div
+                    style={{
+                        order: 3,
+                        flex: 2,
+                        textAlign: "right",
+                        fontStyle: "italic",
+                    }}
+                >
+                    {props.data.project}
+                </div>
+            </div>
+        </div>
     );
 };
 
