@@ -746,7 +746,6 @@ class GenericParser(
             if external_to_internal_sample_id_map:
                 sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                     list(external_to_internal_sample_id_map.values()),
-                    get_latest_sequence_only=False,
                 )
 
             sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
@@ -851,7 +850,6 @@ class GenericParser(
         if external_to_internal_sample_id_map:
             sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                 list(external_to_internal_sample_id_map.values()),
-                get_latest_sequence_only=False,
             )
 
         sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
@@ -939,8 +937,10 @@ class GenericParser(
 
         # Add analyses
         # Map external sids into cpg ids
-        existing_external_id_to_cpgid = await self.sapi.get_sample_id_map_by_external_async(
-            proj, list(sample_map.keys()), allow_missing=True
+        existing_external_id_to_cpgid = (
+            await self.sapi.get_sample_id_map_by_external_async(
+                proj, list(sample_map.keys()), allow_missing=True
+            )
         )
         _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
 

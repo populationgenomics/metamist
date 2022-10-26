@@ -1,6 +1,6 @@
 from datetime import date
 
-from test.testbase import DbIsolatedTest, run_test_as_sync
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.web import (
     WebLayer,
@@ -46,7 +46,7 @@ def merge(d1: dict, d2: dict):
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
 
-    @run_test_as_sync
+    @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
         self.webl = WebLayer(self.connection)
@@ -54,7 +54,7 @@ class TestWeb(DbIsolatedTest):
         self.sampl = SampleLayer(self.connection)
         self.seql = SampleSequenceLayer(self.connection)
 
-    @run_test_as_sync
+    @run_as_sync
     async def test_project_summary(self):
         """Test getting the summary for a project"""
         result = await self.webl.get_project_summary(token=None)
@@ -62,6 +62,8 @@ class TestWeb(DbIsolatedTest):
         # Expect an empty project
         expected = ProjectSummary(
             total_samples=0,
+            total_participants=0,
+            sequence_stats={},
             participants=[],
             participant_keys=[],
             sample_keys=[],
@@ -156,10 +158,22 @@ class TestWeb(DbIsolatedTest):
 
         expected = ProjectSummary(
             total_samples=1,
+            total_participants=1,
+            sequence_stats={
+                'genome': {
+                    'Sequences': '1',
+                    'Crams': '0',
+                    'Seqr': '0',
+                }
+            },
             participants=data_to_class(expected_data),
-            participant_keys=['external_id'],
-            sample_keys=['id', 'external_id', 'created_date'],
-            sequence_keys=['type', 'meta.reads_type'],
+            participant_keys=[('external_id', 'Participant ID')],
+            sample_keys=[
+                ('id', 'Sample ID'),
+                ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequence_keys=[('type', 'type'), ('meta.reads_type', 'reads_type')],
         )
 
         self.assertEqual(expected, result)

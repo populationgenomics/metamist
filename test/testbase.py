@@ -10,6 +10,7 @@ from functools import wraps
 
 from typing import Dict
 
+from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
@@ -31,6 +32,17 @@ am_i_in_test_environment = os.getcwd().endswith('test')
 nest_asyncio.apply()
 
 
+for lname in (
+    'asyncio',
+    'urllib3',
+    'docker',
+    'databases',
+    'testcontainers.core.container',
+    'testcontainers.core.waiting_utils',
+):
+    logging.getLogger(lname).setLevel(logging.WARNING)
+
+
 def find_free_port():
     """Find free port to run tests on"""
     s = socket.socket()
@@ -41,7 +53,7 @@ def find_free_port():
 loop = asyncio.new_event_loop()
 
 
-def run_test_as_sync(f):
+def run_as_sync(f):
     """
     Decorate your async function to run is synchronously
     This runs on the testing event loop
@@ -64,7 +76,7 @@ class DbTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        @run_test_as_sync
+        @run_as_sync
         async def setup():
             """
             This starts a mariadb container, applies liquibase schema and inserts a project
@@ -78,7 +90,7 @@ class DbTest(unittest.TestCase):
             try:
                 os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
-                db = MySqlContainer('mariadb:latest')
+                db = MySqlContainer('mariadb:10.8.3')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
@@ -106,7 +118,7 @@ class DbTest(unittest.TestCase):
                     *('--password', db.MYSQL_PASSWORD),
                     'update',
                 ]
-                subprocess.check_output(command)
+                subprocess.check_output(command, stderr=subprocess.STDOUT)
 
                 sm_db = SMConnections.make_connection(
                     ConnectionStringDatabaseConfiguration(con_string)
@@ -152,11 +164,13 @@ class DbTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        db = cls.dbs[cls.__name__]
-        db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
-        db.stop()
+        db = cls.dbs.get(cls.__name__)
+        if db:
+            db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+            db.stop()
 
     def setUp(self) -> None:
+        self.project_id = 1
         self.connection = self.connections[self.__class__.__name__]
 
 
@@ -165,7 +179,7 @@ class DbIsolatedTest(DbTest):
     Database integration tests that performs clean-up at the start of each test
     """
 
-    @run_test_as_sync
+    @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
 
@@ -173,4 +187,8 @@ class DbIsolatedTest(DbTest):
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
-            await self.connection.connection.execute(f'DELETE FROM {table}')
+            try:
+                await self.connection.connection.execute(f'DELETE FROM {table}')
+                await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
+            except IntegrityError as e:
+                raise IntegrityError(f'Could not delete {table}') from e

@@ -298,6 +298,16 @@ class FamilyLayer(BaseLayer):
         self.ftable = FamilyTable(connection)
         self.fptable = FamilyParticipantTable(self.connection)
 
+    async def create_family(
+        self, external_id: str, description: str = None, coded_phenotype: str = None
+    ):
+        """Create a family"""
+        return await self.ftable.create_family(
+            external_id=external_id,
+            description=description,
+            coded_phenotype=coded_phenotype,
+        )
+
     async def get_families(
         self,
         project: int = None,

@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
+from db.python.tables.analysis import AnalysisTable
+from db.python.tables.sequence import SampleSequencingTable
 from models.enums import SampleType, SequenceType, SequenceStatus
 
 
@@ -59,11 +61,16 @@ class NestedParticipant(BaseModel):
 class ProjectSummary:
     """Return class for the project summary endpoint"""
 
+    # stats
     total_samples: int
+    total_participants: int
+    sequence_stats: dict[str, dict[str, str]]
+
+    # grid
     participants: List[NestedParticipant]
-    participant_keys: List[str]
-    sample_keys: List[str]
-    sequence_keys: List[str]
+    participant_keys: list[tuple[str, str]]
+    sample_keys: list[tuple[str, str]]
+    sequence_keys: list[tuple[str, str]]
 
 
 class WebLayer(BaseLayer):
@@ -83,20 +90,21 @@ class WebLayer(BaseLayer):
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, after, limit):
+    def _project_summary_sample_query(self, limit, after):
         """
         Get query for getting list of samples
         """
         wheres = ['project = :project']
-        values = {'limit': limit, 'project': self.project}
-        if after:
-            values['after'] = after
-            wheres.append('id > :after')
+        values = {'limit': limit, 'project': self.project, 'after': after}
+        # if after:
+        #     values['after'] = after
+        #     # wheres.append('id > :after')
+        #     wheres.append('offset :after')
 
         where_str = ''
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
-        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit'
+        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit OFFSET :after'
 
         return sample_query, values
 
@@ -151,7 +159,12 @@ class WebDb(DbBase):
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
         _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
-        return (await self.connection.fetch_one(_query, {'project': self.project}))[0]
+        return await self.connection.fetch_val(_query, {'project': self.project})
+
+    async def get_total_number_of_participants(self):
+        """Get total number of participants within a project"""
+        _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
+        return await self.connection.fetch_val(_query, {'project': self.project})
 
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
@@ -188,7 +201,9 @@ class WebDb(DbBase):
         """
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
-        sample_query, values = self._project_summary_sample_query(token, limit)
+        sample_query, values = self._project_summary_sample_query(
+            limit, int(token or 0)
+        )
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
         if len(sample_rows) == 0:
@@ -197,7 +212,10 @@ class WebDb(DbBase):
                 participant_keys=[],
                 sample_keys=[],
                 sequence_keys=[],
+                # stats
                 total_samples=0,
+                total_participants=0,
+                sequence_stats={},
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -221,18 +239,29 @@ WHERE fp.participant_id in :pids
         """
         family_promise = self.connection.fetch_all(f_query, {'pids': pids})
 
+        atable = AnalysisTable(self._connection)
+        seqtable = SampleSequencingTable(self._connection)
+
         [
             sequence_rows,
             participant_rows,
             family_rows,
             sample_id_start_times,
             total_samples,
+            total_participants,
+            cram_number_by_seq_type,
+            seq_number_by_seq_type,
+            seqr_stats_by_seq_type,
         ] = await asyncio.gather(
             sequence_promise,
             participant_promise,
             family_promise,
             sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
+            self.get_total_number_of_participants(),
+            atable.get_number_of_crams_by_sequence_type(project=self.project),
+            seqtable.get_sequence_type_numbers_for_project(project=self.project),
+            atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
 
         # post-processing
@@ -321,20 +350,35 @@ WHERE fp.participant_id in :pids
         has_reported_gender = any(p.reported_gender for p in pmodels)
         has_karyotype = any(p.karyotype for p in pmodels)
 
-        participant_keys = ['external_id']
+        participant_keys = [('external_id', 'Participant ID')]
 
         if has_reported_sex:
-            participant_keys.append('reported_sex')
+            participant_keys.append(('reported_sex', 'Reported sex'))
         if has_reported_gender:
-            participant_keys.append('reported_gender')
+            participant_keys.append(('reported_gender', 'Reported gender'))
         if has_karyotype:
-            participant_keys.append('karyotype')
+            participant_keys.append(('karyotype', 'Karyotype'))
 
-        participant_keys.extend('meta.' + k for k in participant_meta_keys)
-        sample_keys = ['id', 'external_id', 'created_date'] + [
-            'meta.' + k for k in sample_meta_keys
+        participant_keys.extend(('meta.' + k, k) for k in participant_meta_keys)
+        sample_keys: list[tuple[str, str]] = [
+            ('id', 'Sample ID'),
+            ('external_id', 'External Sample ID'),
+            ('created_date', 'Created date'),
+        ] + [('meta.' + k, k) for k in sample_meta_keys]
+        sequence_keys = [('type', 'type')] + [
+            ('meta.' + k, k) for k in sequence_meta_keys
         ]
-        sequence_keys = ['type'] + ['meta.' + k for k in sequence_meta_keys]
+
+        seen_seq_types = set(cram_number_by_seq_type.keys()).union(
+            set(seq_number_by_seq_type.keys())
+        )
+        sequence_stats = {}
+        for seq in seen_seq_types:
+            sequence_stats[seq] = {
+                'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
+                'Crams': str(cram_number_by_seq_type.get(seq, 0)),
+                'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
+            }
 
         return ProjectSummary(
             participants=pmodels,
@@ -342,4 +386,6 @@ WHERE fp.participant_id in :pids
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
             total_samples=total_samples,
+            total_participants=total_participants,
+            sequence_stats=sequence_stats,
         )

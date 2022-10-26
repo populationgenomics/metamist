@@ -1,7 +1,7 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
-from test.testbase import run_test_as_sync
+from test.testbase import run_as_sync
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
@@ -9,9 +9,9 @@ from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('os.path.getsize')
     async def test_key_map(
         self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
@@ -76,16 +76,16 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'Key "extra" not found in provided key map: fn, sample', str(e)
             )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_single_row(
         self, mock_any_path, mock_get_sequence_ids, mock_get_sample_id
     ):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
@@ -182,9 +182,9 @@ class TestParseGenericMetadata(unittest.TestCase):
             analysis.meta,
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     async def test_rows_with_participants(
         self,
@@ -194,7 +194,7 @@ class TestParseGenericMetadata(unittest.TestCase):
     ):
         """
         Test importing a single row with a participant id, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_from_sample_ids
+        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
@@ -287,10 +287,10 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     async def test_rows_with_valid_participant_meta(
         self,
         mock_get_sequence_ids,
@@ -301,7 +301,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
         - MOCKS: get_sample_id_map_by_external,  get_participant_id_map_by_external_ids,
-        get_sequence_ids_from_sample_ids
+        get_sequence_ids_for_sample_ids_by_type
         """
 
         mock_get_sample_id.return_value = {}
@@ -353,10 +353,10 @@ class TestParseGenericMetadata(unittest.TestCase):
         self.assertEqual(participants_to_add[3].karyotype, 'XX')
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     async def test_rows_with_invalid_participant_meta(
         self,
         mock_get_sequence_ids,
@@ -400,9 +400,9 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
         return
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_cram_with_no_reference(
         self,
@@ -451,9 +451,9 @@ class TestParseGenericMetadata(unittest.TestCase):
             str(ctx.exception),
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_cram_with_default_reference(
         self,
@@ -524,9 +524,9 @@ class TestParseGenericMetadata(unittest.TestCase):
             resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_cram_with_row_level_reference(
         self,
@@ -598,9 +598,9 @@ class TestParseGenericMetadata(unittest.TestCase):
             resp['sequences']['insert'][0]['meta']['reference_assembly'],
         )
 
-    @run_test_as_sync
+    @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_from_sample_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.AnyPath')
     async def test_cram_with_multiple_row_level_references(
         self,
