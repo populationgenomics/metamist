@@ -54,9 +54,6 @@ interface SampleSequencing {
     status: string
 }
 
-const sequenceResponse = [{ "id": 1002, "external_ids": {}, "sample_id": "CPG10025", "type": "genome", "meta": { "Eppendorf Tube Label": "951", "Rack": "A1", "Box": "2E", "Well": "C10", "KCCG FluidX tube ID": "FD09265765", "Container Type*": "FLuidX 0.7 ml Screw Cap Tube", "Sample Type*": "DNA", "Specimen Type*": "102:Normal-Blood derived", "Extraction Method": "Qiagen DNeasy Blood and Tissue Kit", "Sample Buffer*": "AE buffer", "Reference Genome*": "GRCh38", "Service*": "30X WGS  (KAPA PCR- Free)", "Bioinformatics*": "GenomeOne Bioinformatics package (BWA-MEM, GATK)", "Status": "Upload successful", "Primary study": "TOB", "sample.flowcell_lane": "HC2HTDSX2.1-2-3-4", "sample.library_id": "LP4821165-NTP_D08", "sample.platform": "ILLUMINA", "sample.centre": "KCCG", "sample.reference_genome": "hg38", "raw_data.FREEMIX": "0.0075545700", "raw_data.PCT_CHIMERAS": "0.018759", "raw_data.PERCENT_DUPLICATION": "0.136298", "raw_data.MEDIAN_INSERT_SIZE": "440.0", "raw_data.MEDIAN_COVERAGE": "50.0", "reads": { "location": "gs://cpg-tob-wgs-main-upload/TOB1825.cram", "basename": "TOB1825.cram", "class": "File", "checksum": "md5:c8e49c9033c7d15c8904dfa7304a96f0", "size": 31122249789, "secondaryFiles": [{ "location": "gs://cpg-tob-wgs-main-upload/TOB1825.cram.crai", "basename": "TOB1825.cram.crai", "class": "File", "checksum": null, "size": 2158871 }] }, "reads_type": "cram", "gvcf": { "location": "gs://cpg-tob-wgs-main-upload/TOB1825.g.vcf.gz", "basename": "TOB1825.g.vcf.gz", "class": "File", "checksum": "md5:b912359b75f449f696f74ab384d133e5  TOB1825.g.vcf.gz", "size": 643739688, "secondaryFiles": [{ "location": "gs://cpg-tob-wgs-main-upload/TOB1825.g.vcf.gz.tbi", "basename": "TOB1825.g.vcf.gz.tbi", "class": "File", "checksum": null, "size": 2763605 }] }, "gvcf_type": "gvcf", "batch": 13, "batch_name": "R_210315_BINKAN1_1K1KDNA" }, "status": "uploaded" }]
-
-
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
 export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
@@ -149,8 +146,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         new SequenceApi()
             .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
-                setSequenceInfo(sequenceResponse[0])
-                // setSequenceInfo(resp.data[0]);
+                setSequenceInfo(resp.data[0]);
                 setIsLoading(false);
             })
             .catch((er) => {
