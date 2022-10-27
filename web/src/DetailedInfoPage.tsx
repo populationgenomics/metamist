@@ -8,9 +8,9 @@ import {
     SampleApi,
     ParticipantApi,
     SequenceApi,
-    ParticipantModel,
+    // ParticipantModel,
     Sample,
-    SampleSequencing,
+    // SampleSequencing,
 } from "./sm-api/api";
 import { Table } from "semantic-ui-react";
 
@@ -31,9 +31,31 @@ interface File {
     size: number;
 }
 
-interface meta {
+interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>;
 }
+
+// temporary
+interface ParticipantModel {
+    id: number
+    external_id: string
+    reported_sex?: number
+    reported_gender?: string
+    karyotype?: string
+    meta: { [key: string]: any }
+}
+
+interface SampleSequencing {
+    id: number
+    external_ids?: { [name: string]: string }
+    sample_id: string
+    type: string
+    meta?: SequenceMeta
+    status: string
+}
+
+const sequenceResponse = [{ "id": 1002, "external_ids": {}, "sample_id": "CPG10025", "type": "genome", "meta": { "Eppendorf Tube Label": "951", "Rack": "A1", "Box": "2E", "Well": "C10", "KCCG FluidX tube ID": "FD09265765", "Container Type*": "FLuidX 0.7 ml Screw Cap Tube", "Sample Type*": "DNA", "Specimen Type*": "102:Normal-Blood derived", "Extraction Method": "Qiagen DNeasy Blood and Tissue Kit", "Sample Buffer*": "AE buffer", "Reference Genome*": "GRCh38", "Service*": "30X WGS  (KAPA PCR- Free)", "Bioinformatics*": "GenomeOne Bioinformatics package (BWA-MEM, GATK)", "Status": "Upload successful", "Primary study": "TOB", "sample.flowcell_lane": "HC2HTDSX2.1-2-3-4", "sample.library_id": "LP4821165-NTP_D08", "sample.platform": "ILLUMINA", "sample.centre": "KCCG", "sample.reference_genome": "hg38", "raw_data.FREEMIX": "0.0075545700", "raw_data.PCT_CHIMERAS": "0.018759", "raw_data.PERCENT_DUPLICATION": "0.136298", "raw_data.MEDIAN_INSERT_SIZE": "440.0", "raw_data.MEDIAN_COVERAGE": "50.0", "reads": { "location": "gs://cpg-tob-wgs-main-upload/TOB1825.cram", "basename": "TOB1825.cram", "class": "File", "checksum": "md5:c8e49c9033c7d15c8904dfa7304a96f0", "size": 31122249789, "secondaryFiles": [{ "location": "gs://cpg-tob-wgs-main-upload/TOB1825.cram.crai", "basename": "TOB1825.cram.crai", "class": "File", "checksum": null, "size": 2158871 }] }, "reads_type": "cram", "gvcf": { "location": "gs://cpg-tob-wgs-main-upload/TOB1825.g.vcf.gz", "basename": "TOB1825.g.vcf.gz", "class": "File", "checksum": "md5:b912359b75f449f696f74ab384d133e5  TOB1825.g.vcf.gz", "size": 643739688, "secondaryFiles": [{ "location": "gs://cpg-tob-wgs-main-upload/TOB1825.g.vcf.gz.tbi", "basename": "TOB1825.g.vcf.gz.tbi", "class": "File", "checksum": null, "size": 2763605 }] }, "gvcf_type": "gvcf", "batch": 13, "batch_name": "R_210315_BINKAN1_1K1KDNA" }, "status": "uploaded" }]
+
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
@@ -127,7 +149,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         new SequenceApi()
             .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
-                setSequenceInfo(resp.data[0]);
+                setSequenceInfo(sequenceResponse[0])
+                // setSequenceInfo(resp.data[0]);
                 setIsLoading(false);
             })
             .catch((er) => {
@@ -174,12 +197,11 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
 
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-            sizes[i]
-        }`;
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]
+            }`;
     };
 
-    const prepReadMetadata = (data: meta) => {
+    const prepReadMetadata = (data: SequenceMeta) => {
         if (!data.reads) return <></>;
         if (!Array.isArray(data.reads))
             return renderReadsMetadata([data.reads], 1);
@@ -188,7 +210,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         });
     };
 
-    const renderReadsMetadata = (data: File[], key: number) => {
+    const renderReadsMetadata = (data: File[], key: number | string) => {
         return (
             <Table celled key={key}>
                 <Table.Body>
@@ -287,6 +309,30 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
+    const safeValue = (value: any): string => {
+        if (!value) return value
+        if (Array.isArray(value)) {
+            debugger
+            return value.map(safeValue).join(", ")
+        }
+        if (typeof value === "number") {
+            return value.toString()
+        }
+        if (typeof value === "string") {
+            return value
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            debugger
+            if (!!value.location && !!value.size) {
+                return `${value.location} (${formatBytes(value.size)})`
+            }
+
+        }
+        debugger
+        return JSON.stringify(value)
+
+    }
+
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
         return Object.entries(seqInfo).map(([key, value]) => {
             if (key === "external_ids") {
@@ -309,15 +355,22 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             if (key === "meta") {
                 return Object.entries(seqInfo.meta!)
                     .filter(([k1, v1]) => k1 !== "reads")
-                    .map(([k1, v1]) => (
-                        <div key={`${k1}-${v1}`}>
-                            <b>{k1}:</b> {v1}
-                        </div>
-                    ));
+                    .map(([k1, v1]) => {
+                        if (Array.isArray(v1) && v1.filter(v => !!v.location && !!v.size).length === v1.length) {
+                            // all are files coincidentally
+                            return renderReadsMetadata(value as File[], key)
+                        }
+                        const stringifiedValue = safeValue(v1)
+                        return (<div key={`${k1}-${stringifiedValue}`}>
+                            <b>{k1}:</b> {stringifiedValue}
+                        </div>)
+                    });
             }
+
+            const stringifiedValue = safeValue(value)
             return (
-                <div key={`${key}-${value}`}>
-                    <b>{key}:</b> {value}
+                <div key={`${key}-${stringifiedValue}`}>
+                    <b>{key}:</b> {stringifiedValue}
                 </div>
             );
         });

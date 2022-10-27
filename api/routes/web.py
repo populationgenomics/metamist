@@ -24,8 +24,8 @@ class PagingLinks(BaseModel):
     """Model for PAGING"""
 
     self: str
-    next: Optional[str]
-    token: Optional[str]
+    next: str | None
+    token: str | None
 
 
 class ProjectSummaryResponse(BaseModel):
@@ -38,11 +38,11 @@ class ProjectSummaryResponse(BaseModel):
 
     # for display
     participants: list[NestedParticipant]
-    participant_keys: list[tuple[str, str]]
-    sample_keys: list[tuple[str, str]]
-    sequence_keys: list[tuple[str, str]]
+    participant_keys: list[list[str]]
+    sample_keys: list[list[str]]
+    sequence_keys: list[list[str]]
 
-    links: Optional[PagingLinks]
+    links: PagingLinks | None
 
     class Config:
         """Config for ProjectSummaryResponse"""
