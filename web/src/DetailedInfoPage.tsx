@@ -8,9 +8,9 @@ import {
     SampleApi,
     ParticipantApi,
     SequenceApi,
-    ParticipantModel,
+    // ParticipantModel,
     Sample,
-    SampleSequencing,
+    // SampleSequencing,
 } from "./sm-api/api";
 import { Table } from "semantic-ui-react";
 
@@ -31,8 +31,27 @@ interface File {
     size: number;
 }
 
-interface meta {
+interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>;
+}
+
+// temporary
+interface ParticipantModel {
+    id: number
+    external_id: string
+    reported_sex?: number
+    reported_gender?: string
+    karyotype?: string
+    meta: { [key: string]: any }
+}
+
+interface SampleSequencing {
+    id: number
+    external_ids?: { [name: string]: string }
+    sample_id: string
+    type: string
+    meta?: SequenceMeta
+    status: string
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -174,12 +193,11 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
 
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-            sizes[i]
-        }`;
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]
+            }`;
     };
 
-    const prepReadMetadata = (data: meta) => {
+    const prepReadMetadata = (data: SequenceMeta) => {
         if (!data.reads) return <></>;
         if (!Array.isArray(data.reads))
             return renderReadsMetadata([data.reads], 1);
@@ -188,7 +206,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         });
     };
 
-    const renderReadsMetadata = (data: File[], key: number) => {
+    const renderReadsMetadata = (data: File[], key: number | string) => {
         return (
             <Table celled key={key}>
                 <Table.Body>
@@ -287,6 +305,30 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
+    const safeValue = (value: any): string => {
+        if (!value) return value
+        if (Array.isArray(value)) {
+            debugger
+            return value.map(safeValue).join(", ")
+        }
+        if (typeof value === "number") {
+            return value.toString()
+        }
+        if (typeof value === "string") {
+            return value
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            debugger
+            if (!!value.location && !!value.size) {
+                return `${value.location} (${formatBytes(value.size)})`
+            }
+
+        }
+        debugger
+        return JSON.stringify(value)
+
+    }
+
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
         return Object.entries(seqInfo).map(([key, value]) => {
             if (key === "external_ids") {
@@ -309,15 +351,22 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             if (key === "meta") {
                 return Object.entries(seqInfo.meta!)
                     .filter(([k1, v1]) => k1 !== "reads")
-                    .map(([k1, v1]) => (
-                        <div key={`${k1}-${v1}`}>
-                            <b>{k1}:</b> {v1}
-                        </div>
-                    ));
+                    .map(([k1, v1]) => {
+                        if (Array.isArray(v1) && v1.filter(v => !!v.location && !!v.size).length === v1.length) {
+                            // all are files coincidentally
+                            return renderReadsMetadata(value as File[], key)
+                        }
+                        const stringifiedValue = safeValue(v1)
+                        return (<div key={`${k1}-${stringifiedValue}`}>
+                            <b>{k1}:</b> {stringifiedValue}
+                        </div>)
+                    });
             }
+
+            const stringifiedValue = safeValue(value)
             return (
-                <div key={`${key}-${value}`}>
-                    <b>{key}:</b> {value}
+                <div key={`${key}-${stringifiedValue}`}>
+                    <b>{key}:</b> {stringifiedValue}
                 </div>
             );
         });
