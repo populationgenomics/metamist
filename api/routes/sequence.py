@@ -21,7 +21,7 @@ from models.models.sample import (
     sample_id_transform_to_raw_list,
 )
 
-from models.models.sequence import SampleSequencing
+# from models.models.sequence import SampleSequencing
 
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
@@ -144,7 +144,9 @@ async def get_sequences_by_criteria(
 
 
 @router.post(
-    '/', response_model=List[SampleSequencing], operation_id='getSequencesBySampleIds'
+    '/',
+    # response_model=List[SampleSequencing],
+    operation_id='getSequencesBySampleIds',
 )
 async def get_sequences_by_internal_sample_ids(
     sample_ids: List[str],

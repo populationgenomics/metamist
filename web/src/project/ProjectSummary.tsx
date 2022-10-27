@@ -168,9 +168,7 @@ export const ProjectSummary = () => {
                 "Family ID",
                 ...summary.participant_keys.map((field) => field[1]),
                 ...summary.sample_keys.map((field) => field[1]),
-                ...summary.sequence_keys.map(
-                    (field) => "sequence." + field[1]
-                ),
+                ...summary.sequence_keys.map((field) => "sequence." + field[1]),
             ];
 
             table = (
@@ -239,37 +237,46 @@ export const ProjectSummary = () => {
                                                     )
                                                 )}
                                             {seqidx === 0 &&
-                                                summary.sample_keys.map(([k, dn]) => (
-                                                    <Table.Cell
-                                                        style={{
-                                                            backgroundColor,
-                                                        }}
-                                                        key={
-                                                            s.id + "sample." + k
-                                                        }
-                                                        rowSpan={
-                                                            s.sequences.length
-                                                        }
-                                                    >
-                                                        {k === "external_id" ||
+                                                summary.sample_keys.map(
+                                                    ([k, dn]) => (
+                                                        <Table.Cell
+                                                            style={{
+                                                                backgroundColor,
+                                                            }}
+                                                            key={
+                                                                s.id +
+                                                                "sample." +
+                                                                k
+                                                            }
+                                                            rowSpan={
+                                                                s.sequences
+                                                                    .length
+                                                            }
+                                                        >
+                                                            {k ===
+                                                                "external_id" ||
                                                             k === "id" ? (
-                                                            <SampleLink
-                                                                id={s.id}
-                                                                projectName={
-                                                                    projectName
-                                                                }
-                                                            >
-                                                                {sanitiseValue(
+                                                                <SampleLink
+                                                                    id={s.id}
+                                                                    projectName={
+                                                                        projectName
+                                                                    }
+                                                                >
+                                                                    {sanitiseValue(
+                                                                        _.get(
+                                                                            s,
+                                                                            k
+                                                                        )
+                                                                    )}
+                                                                </SampleLink>
+                                                            ) : (
+                                                                sanitiseValue(
                                                                     _.get(s, k)
-                                                                )}
-                                                            </SampleLink>
-                                                        ) : (
-                                                            sanitiseValue(
-                                                                _.get(s, k)
-                                                            )
-                                                        )}
-                                                    </Table.Cell>
-                                                ))}
+                                                                )
+                                                            )}
+                                                        </Table.Cell>
+                                                    )
+                                                )}
                                             {seq &&
                                                 summary.sequence_keys.map(
                                                     ([k, dn]) => (
