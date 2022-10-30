@@ -19,7 +19,7 @@ from db.python.layers.participant import (
     ParticipantLayer,
     ParticipantUpdateModel,
     ParticipantUpsertBody,
-    # ParticipantModel,
+    ParticipantModel,
 )
 from models.models.sample import sample_id_format, sample_id_transform_to_raw
 
@@ -49,7 +49,7 @@ async def fill_in_missing_participants(
 async def get_individual_metadata_template_for_seqr(
     project: str,
     export_type: ExportType = ExportType.JSON,
-    external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
+    external_participant_ids: list[str] = Query(default=[]),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
     connection: Connection = get_project_readonly_connection,
@@ -232,7 +232,7 @@ async def batch_upsert_participants(
 
 @router.post(
     '/{project}',
-    # response_model=List[ParticipantModel],
+    response_model=List[ParticipantModel],
     operation_id='getParticipants',
 )
 async def get_participants(

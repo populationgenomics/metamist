@@ -10,6 +10,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from models.models.family import PedigreeRow
 
 
 class PedRow:
@@ -367,7 +368,7 @@ class FamilyLayer(BaseLayer):
         replace_with_family_external_ids=False,
         empty_participant_value=None,
         include_participants_not_in_families=False,
-    ) -> List[Dict[str, str]]:
+    ) -> List[PedigreeRow]:
         """
         Generate pedigree file for ALL families in project
         (unless internal_family_ids is specified).
@@ -411,7 +412,7 @@ class FamilyLayer(BaseLayer):
             for r in rows:
                 r['family_id'] = fmap.get(r['family_id'], r['family_id'])
 
-        return rows
+        return [PedigreeRow(**r) for r in rows]
 
     async def get_participant_family_map(
         self, participant_ids: List[int], check_project_ids=False
