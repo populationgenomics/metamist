@@ -18,7 +18,7 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.family import FamilyLayer, PedRow
-from models.models.family import Family
+from models.models.family import Family, PedigreeRow
 from models.models.sample import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
@@ -33,7 +33,29 @@ class FamilyUpdateModel(BaseModel):
     coded_phenotype: Optional[str] = None
 
 
-@router.post('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
+@router.patch(
+    '/{project}/pedigree/json',
+    operation_id='importPedigreeFromFormedRows',
+    tags=['seqr'],
+)
+async def import_pedigree_from_formed_rows(
+    rows: list[PedigreeRow],
+    create_missing_participants: bool = False,
+    perform_sex_check: bool = True,
+    connection: Connection = get_project_write_connection,
+):
+    family_layer = FamilyLayer(connection)
+
+    return {
+        'success': await family_layer.import_pedigree_from_formed_rows(
+            rows,
+            create_missing_participants=create_missing_participants,
+            perform_sex_check=perform_sex_check,
+        )
+    }
+
+
+@router.patch('/{project}/pedigree', operation_id='importPedigree', tags=['seqr'])
 async def import_pedigree(
     file: UploadFile = File(...),
     has_header: bool = False,
@@ -65,16 +87,14 @@ async def import_pedigree(
     }
 
 
-@router.get('/{project}/pedigree', operation_id='getPedigree', tags=['seqr'])
+@router.post('/{project}/pedigree', operation_id='getPedigree', response_model=list[PedigreeRow], tags=['seqr'])
 async def get_pedigree(
-    internal_family_ids: List[int] = Query(None),
-    export_type: ExportType = ExportType.JSON,
+    internal_family_ids: list[int] = [],
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
-    include_header: bool = True,
-    empty_participant_value: Optional[str] = None,
-    connection: Connection = get_project_readonly_connection,
+    empty_participant_value: str | None = None,
     include_participants_not_in_families: bool = False,
+    connection: Connection = get_project_readonly_connection,
 ):
     """
     Generate tab-separated Pedigree file for ALL families
@@ -86,7 +106,7 @@ async def get_pedigree(
 
     family_layer = FamilyLayer(connection)
     assert connection.project
-    pedigree_dicts = await family_layer.get_pedigree(
+    rows = await family_layer.get_pedigree(
         project=connection.project,
         family_ids=internal_family_ids,
         replace_with_participant_external_ids=replace_with_participant_external_ids,
@@ -95,8 +115,30 @@ async def get_pedigree(
         include_participants_not_in_families=include_participants_not_in_families,
     )
 
-    if export_type == ExportType.JSON:
-        return pedigree_dicts
+    return rows
+
+
+@router.post('/{project}/pedigree/{export_type}', operation_id='getExportedPedigree', tags=['seqr'])
+async def get_exported_pedigree(
+    internal_family_ids: list[int] = [],
+    export_type: ExportType = ExportType.TSV,
+    replace_with_participant_external_ids: bool = True,
+    replace_with_family_external_ids: bool = True,
+    include_header: bool = True,
+    empty_participant_value: str | None = None,
+    include_participants_not_in_families: bool = False,
+    connection: Connection = get_project_readonly_connection,
+):
+    family_layer = FamilyLayer(connection)
+    assert connection.project
+    pedigree_dicts = await family_layer.get_pedigree(
+        project=connection.project,
+        family_ids=internal_family_ids,
+        replace_with_participant_external_ids=replace_with_participant_external_ids,
+        replace_with_family_external_ids=replace_with_family_external_ids,
+        empty_participant_value=empty_participant_value,
+        include_participants_not_in_families=include_participants_not_in_families,
+    )
 
     delim = '\t' if export_type == ExportType.TSV else ','
     output = io.StringIO()
@@ -114,7 +156,7 @@ async def get_pedigree(
         'affected',
     ]
     pedigree_rows = [
-        [('' if row[k] is None else row[k]) for k in keys] for row in pedigree_dicts
+        [('' if getattr(row, k) is None else getattr(row, k)) for k in keys] for row in pedigree_dicts
     ]
     writer.writerows(pedigree_rows)
 
@@ -131,8 +173,12 @@ async def get_pedigree(
         },
     )
 
-
-@router.get('/{project}/', operation_id='getFamilies', tags=['seqr'])
+@router.get(
+    '/{project}/',
+    operation_id='getFamilies',
+    response_model=list[Family],
+    tags=['seqr'],
+)
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),
@@ -142,9 +188,10 @@ async def get_families(
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
 
-    return await family_layer.get_families(
+    fams = await family_layer.get_families(
         participant_ids=participant_ids, sample_ids=sample_ids_raw
     )
+    return fams
 
 
 @router.post('/', operation_id='updateFamily')
