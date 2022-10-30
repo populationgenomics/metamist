@@ -62,7 +62,7 @@ const ProjectsAdmin = (props: any) => {
                 // label={metaKey}
                 defaultValue={projectMeta[metaKey]}
                 // onChange={(e) => setProjectMetaState({ [project.name!]: { meta: { ...projStateMeta, [metaKey]: e.target.value } } })}
-                onBlur={(e: any) => {
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                     const newValue = e.currentTarget.value;
                     if (newValue === projectMeta[metaKey]) {
                         console.log(
