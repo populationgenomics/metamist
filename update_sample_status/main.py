@@ -94,7 +94,7 @@ def update_sm(
         )
         existing_sequence = SequenceUpdateModel(**sequence_info)
         seqapi.update_sequence(
-            sequence_id=seqid[0], sequence_update_model=existing_sequence
+            sequence_id=seqid['id'], sequence_update_model=existing_sequence
         )
 
     except NotFoundException as e:
@@ -122,7 +122,7 @@ def update_sample_status(request):  # pylint: disable=R1710
     sample = request_json.get('sample')
     status = request_json.get('status')
     batch = request_json.get('batch')
-    eseqid = request_json.get('eseqid')
+    eseqid = request_json.get('sequence_id')
 
     if not project or not sample or not status or not batch:
         return abort(400)
@@ -147,14 +147,3 @@ def update_sample_status(request):  # pylint: disable=R1710
     update_sm(project, sample, status, batch, eseqid)
 
     return ('', 204)
-
-
-# testing
-if __name__ == '__main__':
-    update_sm(
-        project='dev1',
-        sample='SpookySample',
-        status='uploaded',
-        batch='HappyHalloween',
-        eseqid={'KCCG_VALUE': 'SpookySequence1'},
-    )
