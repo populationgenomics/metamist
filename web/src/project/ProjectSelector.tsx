@@ -54,6 +54,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
         <div>
             <h2>Select a project</h2>
             <Dropdown
+                search
                 selection
                 fluid
                 onChange={handleOnClick}

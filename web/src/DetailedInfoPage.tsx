@@ -8,9 +8,9 @@ import {
     SampleApi,
     ParticipantApi,
     SequenceApi,
-    ParticipantModel,
+    // ParticipantModel,
     Sample,
-    SampleSequencing,
+    // SampleSequencing,
 } from "./sm-api/api";
 import { Table } from "semantic-ui-react";
 
@@ -23,12 +23,35 @@ interface PedigreeEntry {
     paternal_id: string;
     sex: number;
 }
-interface MetadataReads {
+interface File {
     location: string;
     basename: string;
     class: string;
     checksum: string;
     size: number;
+}
+
+interface SequenceMeta {
+    reads?: File | Array<File> | Array<Array<File>>;
+}
+
+// temporary
+interface ParticipantModel {
+    id: number
+    external_id: string
+    reported_sex?: number
+    reported_gender?: string
+    karyotype?: string
+    meta: { [key: string]: any }
+}
+
+interface SampleSequencing {
+    id: number
+    external_ids?: { [name: string]: string }
+    sample_id: string
+    type: string
+    meta?: SequenceMeta
+    status: string
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -170,43 +193,31 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
 
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-            sizes[i]
-        }`;
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]
+            }`;
     };
 
-    const renderReadsMetadata = (data: MetadataReads[][]) => {
-        return (
-            data && (
-                <>
-                    <h4>Sequence Reads</h4>
+    const prepReadMetadata = (data: SequenceMeta) => {
+        if (!data.reads) return <></>;
+        if (!Array.isArray(data.reads))
+            return renderReadsMetadata([data.reads], 1);
+        return data.reads.map((v, i) => {
+            return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
+        });
+    };
 
-                    {data.map((item: MetadataReads[]) => {
-                        return (
-                            <Table celled>
-                                <Table.Body>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[0].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[0].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                    <Table.Row>
-                                        <Table.Cell>
-                                            {item[1].location}
-                                        </Table.Cell>
-                                        <Table.Cell>
-                                            {formatBytes(item[1].size)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                </Table.Body>
-                            </Table>
-                        );
-                    })}
-                </>
-            )
+    const renderReadsMetadata = (data: File[], key: number | string) => {
+        return (
+            <Table celled key={key}>
+                <Table.Body>
+                    {data.map((item: File) => (
+                        <Table.Row key={item.location}>
+                            <Table.Cell>{item.location}</Table.Cell>
+                            <Table.Cell>{formatBytes(item.size)}</Table.Cell>
+                        </Table.Row>
+                    ))}
+                </Table.Body>
+            </Table>
         );
     };
 
@@ -293,6 +304,73 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         setSample(samples[sampleName]);
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
+
+    const safeValue = (value: any): string => {
+        if (!value) return value
+        if (Array.isArray(value)) {
+            debugger
+            return value.map(safeValue).join(", ")
+        }
+        if (typeof value === "number") {
+            return value.toString()
+        }
+        if (typeof value === "string") {
+            return value
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            debugger
+            if (!!value.location && !!value.size) {
+                return `${value.location} (${formatBytes(value.size)})`
+            }
+
+        }
+        debugger
+        return JSON.stringify(value)
+
+    }
+
+    const renderSeqInfo = (seqInfo: SampleSequencing) => {
+        return Object.entries(seqInfo).map(([key, value]) => {
+            if (key === "external_ids") {
+                if (Object.keys(seqInfo.external_ids!).length) {
+                    return (
+                        <>
+                            <b>External Ids:</b>{" "}
+                            {Object.entries(seqInfo!.external_ids!)
+                                .map(([k1, v1]) => (
+                                    <React.Fragment
+                                        key={`${v1} (${k1})`}
+                                    >{`${v1} (${k1})`}</React.Fragment>
+                                ))
+                                .join()}
+                        </>
+                    );
+                }
+                return <React.Fragment key="ExternalID"></React.Fragment>;
+            }
+            if (key === "meta") {
+                return Object.entries(seqInfo.meta!)
+                    .filter(([k1, v1]) => k1 !== "reads")
+                    .map(([k1, v1]) => {
+                        if (Array.isArray(v1) && v1.filter(v => !!v.location && !!v.size).length === v1.length) {
+                            // all are files coincidentally
+                            return renderReadsMetadata(value as File[], key)
+                        }
+                        const stringifiedValue = safeValue(v1)
+                        return (<div key={`${k1}-${stringifiedValue}`}>
+                            <b>{k1}:</b> {stringifiedValue}
+                        </div>)
+                    });
+            }
+
+            const stringifiedValue = safeValue(value)
+            return (
+                <div key={`${key}-${stringifiedValue}`}>
+                    <b>{key}:</b> {stringifiedValue}
+                </div>
+            );
+        });
+    };
 
     return (
         <>
@@ -422,69 +500,10 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                                 Sequence Information
                                             </h4>
                                             {sequenceInfo &&
-                                                Object.entries(
-                                                    sequenceInfo
-                                                ).map(([key, value]) => {
-                                                    if (
-                                                        key === "external_ids"
-                                                    ) {
-                                                        if (
-                                                            Object.keys(
-                                                                sequenceInfo.external_ids!
-                                                            ).length
-                                                        ) {
-                                                            return (
-                                                                <>
-                                                                    <b>
-                                                                        External
-                                                                        Ids:
-                                                                    </b>{" "}
-                                                                    {Object.entries(
-                                                                        sequenceInfo!
-                                                                            .external_ids!
-                                                                    )
-                                                                        .map(
-                                                                            ([
-                                                                                k1,
-                                                                                v1,
-                                                                            ]) =>
-                                                                                `${v1} (${k1})`
-                                                                        )
-                                                                        .join()}
-                                                                </>
-                                                            );
-                                                        }
-                                                    } else if (key === "meta") {
-                                                        return Object.entries(
-                                                            sequenceInfo.meta!
-                                                        )
-                                                            .filter(
-                                                                ([k1, v1]) =>
-                                                                    k1 !==
-                                                                    "reads"
-                                                            )
-                                                            .map(([k1, v1]) => (
-                                                                <div
-                                                                    key={`${k1}-${v1}`}
-                                                                >
-                                                                    <b>{k1}:</b>{" "}
-                                                                    {v1}
-                                                                </div>
-                                                            ));
-                                                    } else {
-                                                        return (
-                                                            <div
-                                                                key={`${key}-${value}`}
-                                                            >
-                                                                <b>{key}:</b>{" "}
-                                                                {value}
-                                                            </div>
-                                                        );
-                                                    }
-                                                })}
+                                                renderSeqInfo(sequenceInfo)}
                                             {sequenceInfo &&
-                                                renderReadsMetadata(
-                                                    sequenceInfo.meta?.reads
+                                                prepReadMetadata(
+                                                    sequenceInfo.meta || {}
                                                 )}
                                         </>
                                     )}

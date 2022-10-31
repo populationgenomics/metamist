@@ -133,10 +133,10 @@ class SearchLayer(BaseLayer):
                 data=SampleSearchResponseData(
                     project=project,
                     id=sample_id_format(s_id),
-                    family_external_ids=participant_family_eids.get(p_id)
+                    family_external_ids=participant_family_eids.get(p_id) or []
                     if p_id
                     else [],
-                    participant_external_ids=sample_participant_eids.get(p_id)
+                    participant_external_ids=sample_participant_eids.get(p_id) or []
                     if p_id
                     else [],
                     sample_external_ids=[s_eid],
