@@ -133,6 +133,7 @@ async def get_all_sample_ids_without_analysis_type(
 @router.get(
     '/{project}/incomplete',
     operation_id='getIncompleteAnalyses',
+    response_model=list[Analysis],
 )
 async def get_incomplete_analyses(
     connection: Connection = get_project_readonly_connection,
@@ -152,6 +153,7 @@ async def get_incomplete_analyses(
 @router.get(
     '/{project}/{analysis_type}/latest-complete',
     operation_id='getLatestCompleteAnalysisForType',
+    response_model=Analysis,
 )
 async def get_latest_complete_analysis_for_type(
     analysis_type: AnalysisType,
@@ -172,6 +174,7 @@ async def get_latest_complete_analysis_for_type(
 @router.post(
     '/{project}/{analysis_type}/latest-complete',
     operation_id='getLatestCompleteAnalysisForTypePost',
+    response_model=Analysis,
 )
 async def get_latest_complete_analysis_for_type_post(
     analysis_type: AnalysisType,
@@ -198,6 +201,7 @@ async def get_latest_complete_analysis_for_type_post(
 @router.post(
     '/{project}/{analysis_type}/latest-complete/for-samples',
     operation_id='getLatestAnalysisForSamplesAndType',
+    response_model=list[Analysis],
 )
 async def get_latest_analysis_for_samples_and_type(
     sample_ids: List[str],
@@ -224,10 +228,7 @@ async def get_latest_analysis_for_samples_and_type(
 
 
 @router.get(
-    '/{analysis_id}/details',
-    operation_id='getAnalysisById',
-    # mfranklin: uncomment when we support OpenAPI 3.1
-    # response_model=Analysis
+    '/{analysis_id}/details', operation_id='getAnalysisById', response_model=Analysis
 )
 async def get_analysis_by_id(
     analysis_id: int, connection: Connection = get_projectless_db_connection
@@ -239,7 +240,7 @@ async def get_analysis_by_id(
     return result
 
 
-@router.post('/query', operation_id='queryAnalyses')
+@router.post('/query', operation_id='queryAnalyses', response_model=list[Analysis])
 async def query_analyses(
     query: AnalysisQueryModel, connection: Connection = get_projectless_db_connection
 ):
@@ -269,7 +270,11 @@ async def query_analyses(
     return analyses
 
 
-@router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
+@router.get(
+    '/analysis-runner',
+    operation_id='getAnalysisRunnerLog',
+    response_model=list[Analysis],
+)
 async def get_analysis_runner_log(
     project_names: List[str] = Query(None),
     author: str = None,
@@ -340,7 +345,11 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
+@router.get(
+    '/sample-file-sizes',
+    operation_id='getSampleFileSizes',
+    response_model=list[ProjectSizeModel],
+)
 async def get_sample_file_sizes(
     project_names: List[str] = Query(None),
     start_date: str = None,

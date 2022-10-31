@@ -1,6 +1,5 @@
 # pylint: disable=used-before-assignment
-import logging
-from typing import List, Union, Optional, Dict
+from typing import List, Union, Optional
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
@@ -13,8 +12,10 @@ from db.python.tables.sample import SampleTable
 from models.models.family import PedigreeRow
 
 
-class PedRow:
-    """Class for capturing a row in a pedigree"""
+class PedigreeRowHelper(PedigreeRow):
+    """
+    Class for capturing parsing a row in a pedigree. Keep this separate to a PedigreeRow
+    """
 
     ALLOWED_SEX_VALUES = [0, 1, 2]
     ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
@@ -63,8 +64,8 @@ class PedRow:
             'Affected',
         ]
 
-    def __init__(
-        self,
+    @staticmethod
+    def parse_from_fields(
         family_id,
         individual_id,
         paternal_id,
@@ -72,16 +73,19 @@ class PedRow:
         sex,
         affected,
         notes=None,
-    ):
-        self.family_id = family_id.strip()
-        self.individual_id = individual_id.strip()
-        self.paternal_id = None
-        self.maternal_id = None
-        self.paternal_id = self.check_linking_id(paternal_id, 'paternal_id')
-        self.maternal_id = self.check_linking_id(maternal_id, 'maternal_id')
-        self.sex = self.parse_sex(sex)
-        self.affected = self.parse_affected_status(affected)
-        self.notes = notes
+    ) -> PedigreeRow:
+        """
+        Run helper methods to check fields before instantiating PedigreeRow
+        """
+        return PedigreeRow(
+            family_id=family_id.strip(),
+            individual_id=individual_id.strip(),
+            paternal_id=PedigreeRowHelper.check_linking_id(paternal_id, 'paternal_id'),
+            maternal_id=PedigreeRowHelper.check_linking_id(maternal_id, 'maternal_id'),
+            sex=PedigreeRowHelper.parse_sex(sex),
+            affected=PedigreeRowHelper.parse_affected_status(affected),
+            notes=notes,
+        )
 
     @staticmethod
     def check_linking_id(linking_id, description: str, blank_values=('0', '')):
@@ -112,10 +116,10 @@ class PedRow:
         if isinstance(sex, str) and sex.isdigit():
             sex = int(sex)
         if isinstance(sex, int):
-            if sex in PedRow.ALLOWED_SEX_VALUES:
+            if sex in PedigreeRowHelper.ALLOWED_SEX_VALUES:
                 return sex
             raise ValueError(
-                f'Sex value ({sex}) was not an expected value {PedRow.ALLOWED_SEX_VALUES}.'
+                f'Sex value ({sex}) was not an expected value {PedigreeRowHelper.ALLOWED_SEX_VALUES}.'
             )
 
         sl = sex.lower()
@@ -131,7 +135,7 @@ class PedRow:
                 f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
             )
         raise ValueError(
-            f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
+            f'Unknown sex "{sex}", please ensure sex is in {PedigreeRowHelper.ALLOWED_SEX_VALUES}'
         )
 
     @staticmethod
@@ -152,9 +156,9 @@ class PedRow:
                 return 2
 
         affected = int(affected)
-        if affected not in PedRow.ALLOWED_AFFECTED_VALUES:
+        if affected not in PedigreeRowHelper.ALLOWED_AFFECTED_VALUES:
             raise ValueError(
-                f'Affected value {affected} was not in expected value: {PedRow.ALLOWED_AFFECTED_VALUES}'
+                f'Affected value {affected} was not in expected value: {PedigreeRowHelper.ALLOWED_AFFECTED_VALUES}'
             )
 
         return affected
@@ -163,104 +167,17 @@ class PedRow:
         return f'PedRow: {self.individual_id} ({self.sex})'
 
     @staticmethod
-    def order(rows: List['PedRow']) -> List['PedRow']:
-        """
-        Order a list of PedRows, but also validates:
-        - There are no circular dependencies
-        - All maternal / paternal IDs are found in the pedigree
-        """
-        rows_to_order: List['PedRow'] = [*rows]
-        ordered = []
-        seen_individuals = set()
-        remaining_iterations_in_round = len(rows_to_order)
-
-        while len(rows_to_order) > 0:
-            row = rows_to_order.pop(0)
-            reqs = [row.paternal_id, row.maternal_id]
-            if all(r is None or r in seen_individuals for r in reqs):
-                remaining_iterations_in_round = len(rows_to_order)
-                ordered.append(row)
-                seen_individuals.add(row.individual_id)
-            else:
-                remaining_iterations_in_round -= 1
-                rows_to_order.append(row)
-
-            # makes more sense to keep this comparison separate:
-            #   - If remaining iterations is or AND we still have rows
-            #   - Then raise an Exception
-            # pylint: disable=chained-comparison
-            if remaining_iterations_in_round <= 0 and len(rows_to_order) > 0:
-                participant_ids = ', '.join(
-                    f'{r.individual_id} ({r.paternal_id} | {r.maternal_id})'
-                    for r in rows_to_order
-                )
-                raise Exception(
-                    "There was an issue in the pedigree, either a parent wasn't "
-                    'found in the pedigree, or a circular dependency detected '
-                    "(eg: someone's child is an ancestor's parent). "
-                    f"Can't resolve participants with parental IDs: {participant_ids}"
-                )
-
-        return ordered
-
-    @staticmethod
-    def validate_sexes(rows: List['PedRow'], throws=True) -> bool:
-        """
-        Validate that individuals listed as mothers and fathers
-        have either unknown sex, male if paternal, and female if maternal.
-
-        Future note: The pedigree has a simplified view of sex, especially
-        how it relates families together. This function might not handle
-        more complex cases around intersex disorders within families. The
-        best advice is either to skip this check, or provide sex as 0 (unknown)
-
-        :param throws: If True is provided (default), raise a ValueError, else just return False
-        """
-        keyed: Dict[str, PedRow] = {r.individual_id: r for r in rows}
-        paternal_ids = [r.paternal_id for r in rows if r.paternal_id]
-        mismatched_pat_sex = [
-            pid for pid in paternal_ids if keyed[pid].sex not in (0, 1)
-        ]
-        maternal_ids = [r.maternal_id for r in rows if r.maternal_id]
-        mismatched_mat_sex = [
-            mid for mid in maternal_ids if keyed[mid].sex not in (0, 2)
-        ]
-
-        messages = []
-        if mismatched_pat_sex:
-            actual_values = ', '.join(
-                f'{pid} ({keyed[pid].sex})' for pid in mismatched_pat_sex
-            )
-            messages.append('(0, 1) as they are listed as fathers: ' + actual_values)
-        if mismatched_mat_sex:
-            actual_values = ', '.join(
-                f'{pid} ({keyed[pid].sex})' for pid in mismatched_mat_sex
-            )
-            messages.append('(0, 2) as they are listed as mothers: ' + actual_values)
-
-        if messages:
-            message = 'Expected individuals have sex values:' + ''.join(
-                '\n\t' + m for m in messages
-            )
-            if throws:
-                raise ValueError(message)
-            logging.warning(message)
-            return False
-
-        return True
-
-    @staticmethod
     def parse_header_order(header: List[str]):
         """
         Takes a list of unformatted headers, and returns a list of ordered init_keys
 
-        >>> PedRow.parse_header_order(['family', 'mother', 'paternal id', 'phenotypes', 'gender'])
+        >>> PedigreeRowHelper.parse_header_order(['family', 'mother', 'paternal id', 'phenotypes', 'gender'])
         ['family_id', 'maternal_id', 'paternal_id', 'affected', 'sex']
 
-        >>> PedRow.parse_header_order(['#family id'])
+        >>> PedigreeRowHelper.parse_header_order(['#family id'])
         ['family_id']
 
-        >>> PedRow.parse_header_order(['unexpected header'])
+        >>> PedigreeRowHelper.parse_header_order(['unexpected header'])
         Traceback (most recent call last):
         ValueError: Unable to identity header elements: "unexpected header"
         """
@@ -269,7 +186,7 @@ class PedRow:
         for item in header:
             litem = item.lower().strip().strip('#')
             found = False
-            for h, options in PedRow.PedRowKeys.items():
+            for h, options in PedigreeRowHelper.PedRowKeys.items():
                 for potential_key in options:
                     if potential_key == litem:
                         ordered_init_keys.append(h)
@@ -440,9 +357,9 @@ class FamilyLayer(BaseLayer):
         Import pedigree file
         """
         if header is None:
-            _header = PedRow.default_header()
+            _header = PedigreeRowHelper.default_header()
         else:
-            _header = PedRow.parse_header_order(header)
+            _header = PedigreeRowHelper.parse_header_order(header)
 
         if len(rows) == 0:
             return None
@@ -456,18 +373,61 @@ class FamilyLayer(BaseLayer):
         if len(_header) > max_row_length:
             _header = _header[:max_row_length]
 
-        pedrows: List[PedRow] = [
-            PedRow(**{_header[i]: r[i] for i in range(len(_header))}) for r in rows
+        pedrows: list[PedigreeRow] = [
+            PedigreeRowHelper.parse_from_fields(
+                **{_header[i]: r[i] for i in range(len(_header))}
+            )
+            for r in rows
         ]
-        # this validates a lot of the pedigree too
-        pedrows = PedRow.order(pedrows)
-        if perform_sex_check:
-            PedRow.validate_sexes(pedrows, throws=True)
 
-        external_family_ids = set(r.family_id for r in pedrows)
+        return await self.import_pedigree_from_formed_rows(
+            pedrows,
+            create_missing_participants=create_missing_participants,
+            perform_sex_check=perform_sex_check,
+        )
+
+    async def import_pedigree_from_formed_rows(
+        self,
+        rows: list[PedigreeRow],
+        create_missing_participants: bool,
+        perform_sex_check: bool,
+    ):
+        """
+        Import pedigree from pre-formed rows, separate this to allow jumping straight to this
+        rather than constructing a table with a set of headers
+        """
+        # this validates a lot of the pedigree too
+        pedrows = PedigreeRow.order(rows)
+        if perform_sex_check:
+            PedigreeRow.validate_sexes(pedrows, throws=True)
+
+        invalid_rows = []
+        for idx, row in enumerate(rows):
+            values_to_check = [
+                ('family_id', row.family_id),
+                ('individual_id', row.individual_id),
+                ('maternal_id', row.maternal_id),
+                ('paternal_id', row.paternal_id),
+            ]
+            bad_values = [
+                f'{key} ("{value}")'
+                for key, value in values_to_check
+                if value and not isinstance(value, str)
+            ]
+            if bad_values:
+                invalid_rows.append(f'Row {idx+1}: ' + ', '.join(bad_values))
+
+        if invalid_rows:
+            raise ValueError(
+                'Expected to find external IDs when importing pedigree rows, '
+                'found the following errors in the following (1-based index) rows: '
+                + '\n'.join(invalid_rows)
+            )
+
+        external_family_ids = set(str(r.family_id) for r in pedrows if r.family_id)
         # get set of all individual, paternal, maternal participant ids
         external_participant_ids = set(
-            pid
+            str(pid)
             for r in pedrows
             for pid in [r.individual_id, r.paternal_id, r.maternal_id]
             if pid
@@ -499,6 +459,7 @@ class FamilyLayer(BaseLayer):
                 for row in pedrows:
                     if row.individual_id not in missing_participant_ids:
                         continue
+                    assert isinstance(row.individual_id, str)
                     external_participant_ids_map[
                         row.individual_id
                     ] = await participant_table.create_participant(
@@ -517,13 +478,15 @@ class FamilyLayer(BaseLayer):
 
             insertable_rows = [
                 {
-                    'family_id': external_family_id_map[row.family_id],
-                    'participant_id': external_participant_ids_map[row.individual_id],
+                    'family_id': external_family_id_map[str(row.family_id)],
+                    'participant_id': external_participant_ids_map[
+                        str(row.individual_id)
+                    ],
                     'paternal_participant_id': external_participant_ids_map.get(
-                        row.paternal_id
+                        str(row.paternal_id)
                     ),
                     'maternal_participant_id': external_participant_ids_map.get(
-                        row.maternal_id
+                        str(row.maternal_id)
                     ),
                     'affected': row.affected,
                     'notes': row.notes,
@@ -533,7 +496,8 @@ class FamilyLayer(BaseLayer):
 
             await participant_table.update_participants(
                 participant_ids=[
-                    external_participant_ids_map[row.individual_id] for row in pedrows
+                    external_participant_ids_map[str(row.individual_id)]
+                    for row in pedrows
                 ],
                 reported_sexes=[row.sex for row in pedrows],
             )

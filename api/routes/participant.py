@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Dict
+from typing import Any
 
 import io
 import csv
@@ -91,9 +91,10 @@ async def get_individual_metadata_template_for_seqr(
 @router.post(
     '/{project}/id-map/external',
     operation_id='getParticipantIdMapByExternalIds',
+    response_model=dict[str, int],
 )
 async def get_id_map_by_external_ids(
-    external_participant_ids: List[str],
+    external_participant_ids: list[str],
     allow_missing: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
@@ -108,7 +109,7 @@ async def get_id_map_by_external_ids(
 
 @router.post('/update-many', operation_id='updateManyParticipants')
 async def update_many_participant_external_ids(
-    internal_to_external_id: Dict[int, str],
+    internal_to_external_id: dict[int, str],
     connection: Connection = get_projectless_db_connection,
 ):
     """Update external_ids of participants by providing an update map"""
@@ -188,13 +189,13 @@ async def update_participant(
 
 @router.put(
     '/{project}/batch',
-    response_model=Dict[str, Any],
+    response_model=dict[str, Any],
     operation_id='batchUpsertParticipants',
 )
 async def batch_upsert_participants(
     participants: ParticipantUpsertBody,
     connection: Connection = get_project_write_connection,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Upserts a list of participants with samples and sequences
     Returns the list of internal sample IDs
@@ -215,9 +216,9 @@ async def batch_upsert_participants(
         pid_key = dict(zip(results.keys(), external_pids))
 
         # Map sids back from ints to strs
-        outputs: Dict[str, Dict[str, Any]] = {}
+        outputs: dict[str, dict[str, Any]] = {}
         for pid, samples in results.items():
-            samples_output: Dict[str, Any] = {}
+            samples_output: dict[str, Any] = {}
             for iid, seqs in samples.items():
                 data = {'sequences': seqs}
                 samples_output[sample_id_format(iid)] = data
@@ -232,12 +233,12 @@ async def batch_upsert_participants(
 
 @router.post(
     '/{project}',
-    response_model=List[ParticipantModel],
+    response_model=list[ParticipantModel],
     operation_id='getParticipants',
 )
 async def get_participants(
-    external_participant_ids: List[str] = None,
-    internal_participant_ids: List[int] = None,
+    external_participant_ids: list[str] = None,
+    internal_participant_ids: list[int] = None,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get participants, default ALL participants in project"""

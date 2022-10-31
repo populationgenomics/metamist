@@ -1,24 +1,22 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
-
-from models.enums import SampleType
-from models.models.sample import (
-    Sample,
-    sample_id_transform_to_raw,
-    sample_id_format,
-    sample_id_transform_to_raw_list,
-)
-
-from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
-from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
     get_project_write_connection,
     get_project_readonly_connection,
     Connection,
     get_projectless_db_connection,
+)
+from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
+from db.python.tables.project import ProjectPermissionsTable
+from models.enums import SampleType
+from models.models.sample import (
+    Sample,
+    sample_id_transform_to_raw,
+    sample_id_format,
+    sample_id_transform_to_raw_list,
 )
 
 
@@ -63,12 +61,12 @@ async def create_new_sample(
 
 
 @router.put(
-    '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
+    '/{project}/batch', response_model=dict[str, Any], operation_id='batchUpsertSamples'
 )
 async def batch_upsert_samples(
     samples: SampleBatchUpsertBody,
     connection: Connection = get_project_write_connection,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
 
     # Convert id in samples to int
@@ -90,9 +88,13 @@ async def batch_upsert_samples(
         return results
 
 
-@router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
+@router.post(
+    '/{project}/id-map/external',
+    operation_id='getSampleIdMapByExternal',
+    response_model=dict[str, str],
+)
 async def get_sample_id_map_by_external(
-    external_ids: List[str],
+    external_ids: list[str],
     allow_missing: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
@@ -104,9 +106,13 @@ async def get_sample_id_map_by_external(
     return {k: sample_id_format(v) for k, v in result.items()}
 
 
-@router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
+@router.post(
+    '/id-map/internal',
+    operation_id='getSampleIdMapByInternal',
+    response_model=dict[str, str],
+)
 async def get_sample_id_map_by_internal(
-    internal_ids: List[str],
+    internal_ids: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -120,7 +126,9 @@ async def get_sample_id_map_by_internal(
 
 
 @router.get(
-    '/{project}/id-map/internal/all', operation_id='getAllSampleIdMapByInternal'
+    '/{project}/id-map/internal/all',
+    operation_id='getAllSampleIdMapByInternal',
+    response_model=dict[str, str],
 )
 async def get_all_sample_id_map_by_internal(
     connection: Connection = get_project_readonly_connection,
@@ -148,12 +156,12 @@ async def get_sample_by_external_id(
     return result
 
 
-@router.post('/', operation_id='getSamples')
+@router.post('/', operation_id='getSamples', response_model=list[Sample])
 async def get_samples_by_criteria(
-    sample_ids: List[str] = None,
+    sample_ids: list[str] = None,
     meta: Dict = None,
-    participant_ids: List[int] = None,
-    project_ids: List[str] = None,
+    participant_ids: list[int] = None,
+    project_ids: list[str] = None,
     active: bool = Body(default=True),
     connection: Connection = get_projectless_db_connection,
 ):
@@ -163,7 +171,7 @@ async def get_samples_by_criteria(
     st = SampleLayer(connection)
 
     pt = ProjectPermissionsTable(connection.connection)
-    pids: Optional[List[int]] = None
+    pids: Optional[list[int]] = None
     if project_ids:
         pids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_ids, readonly=True
@@ -236,9 +244,13 @@ async def get_history_of_sample(
     return result
 
 
-@router.post('/samples-create-date', operation_id='getSamplesCreateDate')
+@router.post(
+    '/samples-create-date',
+    operation_id='getSamplesCreateDate',
+    response_model=dict[str, str],
+)
 async def get_samples_create_date(
-    sample_ids: List[str],
+    sample_ids: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """Get full history of sample from internal ID"""
@@ -250,4 +262,4 @@ async def get_samples_create_date(
     # Convert to raw ids and query the start dates for all of them
     result = await st.get_samples_create_date(sample_ids_raw)
 
-    return {sample_id_format(k): v for k, v in result.items()}
+    return {sample_id_format(k): str(v) for k, v in result.items()}

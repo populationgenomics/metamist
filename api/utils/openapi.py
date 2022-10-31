@@ -47,7 +47,7 @@ def get_openapi_schema_func(app, version):
             else:
                 if not isinstance(s_type, list):
                     f_schema['type'] = [s_type]
-                f_schema['type'].append(None)
+                f_schema['type'].append({'type': None})
 
         elif '$ref' in f_schema:
             # This case causes awkward UNKNOWNBASETYPE

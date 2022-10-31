@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ from models.models.sample import (
 )
 
 # from models.models.sequence import SampleSequencing
-
+from models.models.sequence import SampleSequencing
 
 router = APIRouter(prefix='/sequence', tags=['sequence'])
 
@@ -75,7 +75,11 @@ async def update_sequence(
     return sequence_id
 
 
-@router.get('/{sequence_id}/details', operation_id='getSequenceByID')
+@router.get(
+    '/{sequence_id}/details',
+    operation_id='getSequenceById',
+    response_model=SampleSequencing,
+)
 async def get_sequence(
     sequence_id: int, connection: Connection = get_projectless_db_connection
 ):
@@ -87,7 +91,9 @@ async def get_sequence(
 
 
 @router.get(
-    '/{project}/external_id/{external_id}', operation_id='getSequenceByExternalId'
+    '/{project}/external_id/{external_id}',
+    operation_id='getSequenceByExternalId',
+    response_model=SampleSequencing,
 )
 async def get_sequence_by_external_id(
     external_id: str, connection=get_project_readonly_connection
@@ -101,30 +107,34 @@ async def get_sequence_by_external_id(
     return resp
 
 
-@router.post('/criteria', operation_id='getSequencesByCriteria')
+@router.post(
+    '/criteria',
+    operation_id='getSequencesByCriteria',
+    response_model=list[SampleSequencing],
+)
 async def get_sequences_by_criteria(
-    sample_ids: List[str] = None,
-    sequence_ids: List[int] = None,
-    external_sequence_ids: List[str] = None,
+    sample_ids: list[str] = None,
+    sequence_ids: list[int] = None,
+    external_sequence_ids: list[str] = None,
     seq_meta: Dict = None,
     sample_meta: Dict = None,
-    projects: List[str] = None,
+    projects: list[str] = None,
     active: bool = True,
-    types: List[str] = None,
-    statuses: List[str] = None,
+    types: list[str] = None,
+    statuses: list[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
     """Get sequences by some criteria"""
     sequence_layer = SampleSequenceLayer(connection)
     pt = ProjectPermissionsTable(connection.connection)
 
-    pids: Optional[List[int]] = None
+    pids: Optional[list[int]] = None
     if projects:
         pids = await pt.get_project_ids_from_names_and_user(
             connection.author, projects, readonly=True
         )
 
-    unwrapped_sample_ids: Optional[List[int]] = None
+    unwrapped_sample_ids: Optional[list[int]] = None
     if sample_ids:
         unwrapped_sample_ids = sample_id_transform_to_raw_list(sample_ids)
 
@@ -145,16 +155,16 @@ async def get_sequences_by_criteria(
 
 @router.post(
     '/',
-    # response_model=List[SampleSequencing],
+    response_model=list[SampleSequencing],
     operation_id='getSequencesBySampleIds',
 )
 async def get_sequences_by_internal_sample_ids(
-    sample_ids: List[str],
+    sample_ids: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """Get a list of sequence objects by their internal CPG sample IDs"""
     sequence_layer = SampleSequenceLayer(connection)
-    unwrapped_sample_ids: List[int] = sample_id_transform_to_raw_list(sample_ids)
+    unwrapped_sample_ids: list[int] = sample_id_transform_to_raw_list(sample_ids)
     sequences = await sequence_layer.get_sequences_for_sample_ids(unwrapped_sample_ids)
 
     for seq in sequences:
@@ -163,31 +173,15 @@ async def get_sequences_by_internal_sample_ids(
     return sequences
 
 
-@router.get(
-    '/ids-for-sample',
-    operation_id='getSequencesForSampleIdByType',
-)
-async def get_sequence_ids_for_sample_id(
-    sample_id: str,
-    connection: Connection = get_projectless_db_connection,
-) -> Dict[str, list[int]]:
-    """Get all sequences for internal Sample ID"""
-    sequence_layer = SampleSequenceLayer(connection)
-    sample_id_raw = sample_id_transform_to_raw(sample_id)
-    sequence_ids_map = await sequence_layer.get_sequence_ids_for_sample_id(
-        sample_id_raw
-    )
-    return sequence_ids_map
-
-
 @router.post(
     '/ids-for-samples',
     operation_id='getSequenceIdsForSampleIdsByType',
+    response_model=dict[str, dict[SequenceType, list[int]]],
 )
 async def get_sequence_ids_for_sample_ids_by_type_by_type(
-    sample_ids: List[str],
+    sample_ids: list[str],
     connection: Connection = get_projectless_db_connection,
-) -> Dict[str, Dict[SequenceType, list[int]]]:
+) -> dict[str, dict[SequenceType, list[int]]]:
     """Get all sequences by internal Sample IDs list"""
     sequence_layer = SampleSequenceLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)

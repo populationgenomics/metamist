@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter
 
@@ -9,7 +9,7 @@ from models.models.project import ProjectRow
 router = APIRouter(prefix='/project', tags=['project'])
 
 
-@router.get('/all', operation_id='getAllProjects', response_model=List[ProjectRow])
+@router.get('/all', operation_id='getAllProjects', response_model=list[ProjectRow])
 async def get_all_projects(connection=get_projectless_db_connection):
     """Get list of projects"""
     ptable = ProjectPermissionsTable(connection.connection)
@@ -18,7 +18,7 @@ async def get_all_projects(connection=get_projectless_db_connection):
     )
 
 
-@router.get('/', operation_id='getMyProjects', response_model=List[str])
+@router.get('/', operation_id='getMyProjects', response_model=list[str])
 async def get_my_projects(connection=get_projectless_db_connection):
     """Get projects I have access to"""
     ptable = ProjectPermissionsTable(connection.connection)
@@ -28,7 +28,7 @@ async def get_my_projects(connection=get_projectless_db_connection):
     return list(pmap.values())
 
 
-@router.put('/', operation_id='createProject')
+@router.put('/', operation_id='createProject', response_model=int)
 async def create_project(
     name: str,
     dataset: str,
@@ -60,11 +60,14 @@ async def create_project(
     return pid
 
 
-@router.get('/seqr/all', operation_id='getSeqrProjects')
+@router.get(
+    '/seqr/all',
+    operation_id='getSeqrProjects',
+)
 async def get_seqr_projects(connection: Connection = get_projectless_db_connection):
     """Get SM projects that should sync to seqr"""
     ptable = ProjectPermissionsTable(connection.connection)
-    return await ptable.get_seqr_projects()
+    return [ProjectRow(**r) for r in await ptable.get_seqr_projects()]
 
 
 @router.post('/{project}/update', operation_id='updateProject')

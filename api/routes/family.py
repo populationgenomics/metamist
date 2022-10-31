@@ -17,7 +17,7 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
-from db.python.layers.family import FamilyLayer, PedRow
+from db.python.layers.family import FamilyLayer, PedigreeRowHelper
 from models.models.family import Family, PedigreeRow
 from models.models.sample import sample_id_transform_to_raw_list
 
@@ -44,6 +44,10 @@ async def import_pedigree_from_formed_rows(
     perform_sex_check: bool = True,
     connection: Connection = get_project_write_connection,
 ):
+    """
+    Import pedigree from already formed JSON rows, this is
+    expecting external family and participant IDs
+    """
     family_layer = FamilyLayer(connection)
 
     return {
@@ -87,9 +91,19 @@ async def import_pedigree(
     }
 
 
-@router.post('/{project}/pedigree', operation_id='getPedigree', response_model=list[PedigreeRow], tags=['seqr'])
+@router.post(
+    '/{project}/pedigree',
+    operation_id='getPedigree',
+    response_model=list[PedigreeRow],
+    tags=['seqr'],
+)
 async def get_pedigree(
-    internal_family_ids: list[int] = [],
+    # 2022-10-31 mfranklin: It's better to have a default value as it simplfies
+    #       the function call, except openapi-generator is not correctly supporting
+    #       optional lists in 5.3.0. So set it to a "dangerous" list, I checked the
+    #       value doesn't get reused between function calls, so I feel comfortable
+    #       silencing the dangerous-default-value
+    internal_family_ids: list[int] = [],  # pylint: disable=dangerous-default-value
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     empty_participant_value: str | None = None,
@@ -108,7 +122,7 @@ async def get_pedigree(
     assert connection.project
     rows = await family_layer.get_pedigree(
         project=connection.project,
-        family_ids=internal_family_ids,
+        family_ids=internal_family_ids or [],
         replace_with_participant_external_ids=replace_with_participant_external_ids,
         replace_with_family_external_ids=replace_with_family_external_ids,
         empty_participant_value=empty_participant_value,
@@ -118,9 +132,18 @@ async def get_pedigree(
     return rows
 
 
-@router.post('/{project}/pedigree/{export_type}', operation_id='getExportedPedigree', tags=['seqr'])
+@router.post(
+    '/{project}/pedigree/{export_type}',
+    operation_id='getExportedPedigree',
+    tags=['seqr'],
+)
 async def get_exported_pedigree(
-    internal_family_ids: list[int] = [],
+    # 2022-10-31 mfranklin: It's better to have a default value as it simplfies
+    #       the function call, except openapi-generator is not correctly supporting
+    #       optional lists in 5.3.0. So set it to a "dangerous" list, I checked the
+    #       value doesn't get reused between function calls, so I feel comfortable
+    #       silencing the dangerous-default-value
+    internal_family_ids: list[int] = [],  # pylint: disable=dangerous-default-value
     export_type: ExportType = ExportType.TSV,
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
@@ -129,6 +152,7 @@ async def get_exported_pedigree(
     include_participants_not_in_families: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
+    """Export pedigree to CSV / TSV with export_type"""
     family_layer = FamilyLayer(connection)
     assert connection.project
     pedigree_dicts = await family_layer.get_pedigree(
@@ -145,7 +169,7 @@ async def get_exported_pedigree(
     writer = csv.writer(output, delimiter=delim)
 
     if include_header:
-        writer.writerow(PedRow.row_header())
+        writer.writerow(PedigreeRowHelper.row_header())
 
     keys = [
         'family_id',
@@ -156,7 +180,8 @@ async def get_exported_pedigree(
         'affected',
     ]
     pedigree_rows = [
-        [('' if getattr(row, k) is None else getattr(row, k)) for k in keys] for row in pedigree_dicts
+        [('' if getattr(row, k) is None else getattr(row, k)) for k in keys]
+        for row in pedigree_dicts
     ]
     writer.writerows(pedigree_rows)
 
@@ -172,6 +197,7 @@ async def get_exported_pedigree(
             'Content-Disposition': f'filename={basefn}{export_type.get_extension()}'
         },
     )
+
 
 @router.get(
     '/{project}/',
