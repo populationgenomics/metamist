@@ -185,9 +185,11 @@ class SampleSequenceLayer(BaseLayer):
         """
         Create a new sequence for a sample, and add it to database
         """
+        st = SampleTable(self.connection)
+        project_ids = await st.get_project_ids_for_sample_ids([sample_id])
+        project_id = next(iter(project_ids))
+
         if check_project_id:
-            st = SampleTable(self.connection)
-            project_ids = await st.get_project_ids_for_sample_ids([sample_id])
             await self.ptable.check_access_to_project_ids(
                 self.author, project_ids, readonly=False
             )
@@ -199,6 +201,7 @@ class SampleSequenceLayer(BaseLayer):
             status=status,
             sequence_meta=sequence_meta,
             author=author,
+            project=project_id,
         )
 
     # endregion INSERTS
@@ -215,8 +218,10 @@ class SampleSequenceLayer(BaseLayer):
         check_project_id=True,
     ):
         """Update a sequence"""
+        project_ids = await self.seqt.get_projects_by_sequence_ids([sequence_id])
+        project_id = next(iter(project_ids))
+
         if check_project_id:
-            project_ids = await self.seqt.get_projects_by_sequence_ids([sequence_id])
             await self.ptable.check_access_to_project_ids(
                 self.author, project_ids, readonly=False
             )
@@ -227,6 +232,7 @@ class SampleSequenceLayer(BaseLayer):
             status=status,
             meta=meta,
             author=author,
+            project=project_id,
         )
 
     async def update_status(
