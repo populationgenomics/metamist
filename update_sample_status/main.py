@@ -70,7 +70,6 @@ def update_sm(
             external_id=sample, project=project
         )
         isid = existing_sample['id']
-        print(isid)
 
     except NotFoundException as e:
         # Otherwise create
@@ -81,7 +80,6 @@ def update_sm(
             meta=sample_meta,
         )
         isid = sapi.create_new_sample(new_sample=new_sample, project=project)
-        print(isid)
 
     except ForbiddenException as e:
         logging.error(e)
