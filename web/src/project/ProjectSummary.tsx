@@ -1,183 +1,391 @@
 /* eslint react-hooks/exhaustive-deps: 0 */
 
-import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
-import _ from 'lodash'
+import * as React from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import _ from "lodash";
 
-import { AppContext } from '../GlobalState'
-import { ProjectSelector } from './ProjectSelector'
-import { WebApi, ProjectSummaryResponse } from '../sm-api/api'
+import { ProjectSelector } from "./ProjectSelector";
+import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
-import { Input, Button } from 'reactstrap'
+import { Table, Button, Dropdown } from "semantic-ui-react";
 
-const PAGE_SIZES = [20, 40, 100, 1000]
+import { SampleLink } from "../Links";
+
+const PAGE_SIZES = [20, 40, 100, 1000];
 
 const sanitiseValue = (value: any) => {
-    const tvalue = typeof value
-    if (tvalue === 'string' || tvalue === 'number') return value
-    if (tvalue === 'boolean') return value ? 'true' : 'false'
-    if (value === undefined || value === null) return ''
-    return JSON.stringify(value)
-}
-
+    const tvalue = typeof value;
+    if (tvalue === "string" || tvalue === "number") return value;
+    if (tvalue === "boolean") return value ? "true" : "false";
+    if (value === undefined || value === null) return "";
+    return JSON.stringify(value);
+};
 
 export const ProjectSummary = () => {
+    const navigate = useNavigate();
 
-    // store project in global settings
-    const globalContext = React.useContext(AppContext)
+    const { projectName, page } = useParams();
 
-    let [searchParams, setSearchParams] = useSearchParams()
+    const [searchParams] = useSearchParams();
+    const pageSize = searchParams.get("size") || 20;
+    let directToken = 0;
+    if (page && pageSize) {
+        directToken = +page * +pageSize - +pageSize;
+    }
 
-    const directToken = searchParams.get('token')
+    const validPages = !!(
+        page &&
+        +page &&
+        pageSize &&
+        +pageSize &&
+        PAGE_SIZES.includes(+pageSize)
+    );
 
-    const [summary, setSummary] = React.useState<ProjectSummaryResponse | undefined>()
-    const [suppliedDirectToken, setSuppliedDirectToken] = React.useState<boolean | undefined>(undefined)
-    const [pageTokens, setPageTokens] = React.useState<number[]>([])
-    const [isLoading, setIsLoading] = React.useState<boolean>(false)
-    const [error, setError] = React.useState<string | undefined>()
-    const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[0])
+    const [summary, setSummary] = React.useState<
+        ProjectSummaryResponse | undefined
+    >();
+    const [pageNumber, setPageNumber] = React.useState<number>(
+        validPages ? +page : 1
+    );
+    const [isLoading, setIsLoading] = React.useState<boolean>(false);
+    const [error, setError] = React.useState<string | undefined>();
+    const [pageLimit, _setPageLimit] = React.useState<number>(
+        validPages ? +pageSize : PAGE_SIZES[0]
+    );
 
-    const getProjectSummary = React.useCallback(async (token: any, addToPageToken: boolean) => {
-        if (!globalContext.project) return
-        let sanitisedToken = !!token ? token : undefined
-        setIsLoading(true)
-        new WebApi()
-            .getProjectSummary(globalContext.project, pageLimit, sanitisedToken)
-            .then(resp => {
-                if (token && addToPageToken) {
-                    setPageTokens([...pageTokens, token])
-                }
-                setIsLoading(false)
-                setSummary(resp.data)
-            }).catch(er => {
-                setIsLoading(false)
-                setError(er.message)
-            })
-    }, [globalContext.project, pageLimit, pageTokens])
+    const handleOnClick = React.useCallback(
+        (p) => {
+            navigate(`/project/${projectName}/${p}?size=${pageLimit}`);
+            setPageNumber(p);
+        },
+        [navigate]
+    );
 
+    const getProjectSummary = React.useCallback(
+        async (token: any) => {
+            if (!projectName) return;
+            let sanitisedToken = !!token ? token : undefined;
+            setError(undefined);
+            setIsLoading(true);
+            new WebApi()
+                .getProjectSummary(projectName, pageLimit, sanitisedToken)
+                .then((resp) => {
+                    setIsLoading(false);
+                    setSummary(resp.data);
+                })
+                .catch((er) => {
+                    setIsLoading(false);
+                    setError(er.message);
+                });
+        },
+        [projectName, pageLimit, pageNumber]
+    );
 
-    const setPageLimit = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.currentTarget.value
-
-        if (!suppliedDirectToken) {
-            // if we supplied a token directly to the page,
-            // we want to START from that point, otherwise,
-            // let's go back to the start.
-            setPageTokens([])
-            searchParams.delete('token')
-            setSearchParams(searchParams)
-        }
-        _setPageLimit(parseInt(value))
-    }, [suppliedDirectToken])
+    const setPageLimit = React.useCallback(
+        (e: React.SyntheticEvent<HTMLElement>, { value }) => {
+            navigate(`/project/${projectName}/1?size=${parseInt(value)}`);
+            _setPageLimit(parseInt(value));
+            setPageNumber(1);
+        },
+        [projectName, pageLimit, page]
+    );
 
     const _updateProjectSummary = React.useCallback(() => {
-        if (_.isUndefined(suppliedDirectToken)) {
-            setSuppliedDirectToken(!!directToken)
-        }
-        getProjectSummary(directToken, false)
-    }, [getProjectSummary, suppliedDirectToken, directToken])
+        getProjectSummary(directToken);
+    }, [getProjectSummary, directToken]);
 
     // retrigger if project changes, or pageLimit changes
-    React.useEffect(
-        _updateProjectSummary,
-        [globalContext.project, pageLimit]
-    )
+    React.useEffect(_updateProjectSummary, [
+        projectName,
+        pageLimit,
+        pageNumber,
+    ]);
 
-    let table: React.ReactElement = <></>
+    let table: React.ReactElement = <></>;
 
+    const totalPageNumbers = Math.ceil(
+        (summary?.total_samples || 0) / pageLimit
+    );
 
-    const pageNumber = pageTokens.length + 1
-    const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
-
-    let pageOptions: React.ReactElement = <></>
-    if (suppliedDirectToken) {
-        let supplied_samples = summary?.participants.reduce((p, s) => s.samples.length + p, 0)
-        pageOptions = <>
-            {<Button disabled={isLoading} onClick={(async () => {
-                await getProjectSummary(undefined, false)
-                setSuppliedDirectToken(false)
-                searchParams.delete('token')
-                setSearchParams(searchParams)
-            })}>Go to start</Button>}
-            <span style={{ padding: "0 10px" }}>({supplied_samples} / {summary?.total_samples} samples)</span>
+    const pageOptions = (
+        <>
+            {pageNumber > 1 && (
+                <Button
+                    style={{ marginLeft: "10px" }}
+                    disabled={isLoading}
+                    onClick={() => {
+                        handleOnClick(pageNumber - 1);
+                    }}
+                >
+                    Previous
+                </Button>
+            )}
+            {!!summary?.total_samples && (
+                <span style={{ padding: "8px 10px 0 10px" }}>
+                    Page {pageNumber} / {totalPageNumbers} (
+                    {summary?.total_samples} samples)
+                </span>
+            )}
+            {summary?._links?.token && (
+                <Button
+                    disabled={isLoading}
+                    onClick={() => {
+                        handleOnClick(pageNumber + 1);
+                    }}
+                >
+                    Next
+                </Button>
+            )}
         </>
-    } else {
-
-        pageOptions = <>
-            {pageTokens.length >= 1 && <Button disabled={isLoading} onClick={(async () => {
-                setPageTokens(pageTokens.slice(undefined, pageTokens.length - 1))
-                await getProjectSummary(pageTokens[pageTokens.length - 2], false)
-            })}>Previous</Button>}
-            {!!summary?.total_samples && <span style={{ padding: "0 10px" }}>Page {pageNumber} / {totalPageNumbers} ({summary?.total_samples} samples)</span>}
-            {summary?._links?.token && <Button disabled={isLoading} onClick={async () => {
-                searchParams.set('token', summary?._links?.token || '')
-                setSearchParams(searchParams)
-                await getProjectSummary(summary?._links?.token, true)
-            }}>Next</Button>}
-        </>
-    }
-
+    );
+    // }
 
     if (error) {
-        table = <p><em>An error occurred when fetching samples: {error}</em></p>
-    }
-    else if (!summary) {
-        if (globalContext.project) { table = <p>Loading...</p> }
-        else { table = <p><em>Please select a project</em></p> }
-    }
-
-    else {
-        if (summary.participants.length === 0) {
-            table = <p><em>No samples</em></p>
+        table = (
+            <p>
+                <em>An error occurred when fetching samples: {error}</em>
+            </p>
+        );
+    } else if (!summary) {
+        if (projectName) {
+            table = <p>Loading...</p>;
         } else {
-
+            table = (
+                <p>
+                    <em>Please select a project</em>
+                </p>
+            );
+        }
+    } else {
+        if (summary.participants.length === 0) {
+            table = (
+                <p>
+                    <em>No samples</em>
+                </p>
+            );
+        } else {
             const headers = [
-                'Family ID',
-                ...(summary.participant_keys.map(pk => pk.replace(".meta", ""))),
-                ...(summary.sample_keys.map(sk => sk.replace(".meta", ""))),
-                ...(summary.sequence_keys.map(sk => "sequence." + sk.replace(".meta", ""))),
-            ]
+                "Family ID",
+                ...summary.participant_keys.map((field) => field[1]),
+                ...summary.sample_keys.map((field) => field[1]),
+                ...summary.sequence_keys.map((field) => "sequence." + field[1]),
+            ];
 
-            table = <table className='table table-bordered'>
-                <thead>
-                    <tr>
-                        {headers.map(k => <th key={k}>{k}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
-                    {summary.participants.map((p, pidx) => p.samples.map((s, sidx) => {
-                        // @ts-ignore
-                        const backgroundColor = pidx % 2 === 0 ? 'white' : 'var(--bs-table-striped-bg)'
-                        const lengthOfParticipant = p.samples.map(s => s.sequences.length).reduce((a, b) => a + b, 0)
-                        return s.sequences.map((seq, seqidx) => {
-                            const isFirstOfGroup = sidx === 0 && seqidx === 0
-                            return <tr key={`${p.external_id}-${s.id}-${seq.id}`}>
-                                {isFirstOfGroup && <td style={{ backgroundColor }} rowSpan={lengthOfParticipant}>{p.families.map(f => f.external_id).join(', ')}</td>}
-                                {isFirstOfGroup && summary.participant_keys.map(k => <td style={{ backgroundColor }} key={p.id + 'participant.' + k} rowSpan={lengthOfParticipant}>{sanitiseValue(_.get(p, k))}</td>)}
-                                {seqidx === 0 && summary.sample_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sample.' + k} rowSpan={s.sequences.length}>{sanitiseValue(_.get(s, k))}</td>)}
-                                {seq && summary.sequence_keys.map(k => <td style={{ backgroundColor }} key={s.id + 'sequence.' + k}>{sanitiseValue(_.get(seq, k))}</td>)}
-                            </tr>
-                        })
-
-                    }))}
-                </tbody>
-            </table>
+            table = (
+                <Table celled>
+                    <Table.Header>
+                        <Table.Row>
+                            {headers.map((k, i) => (
+                                <Table.HeaderCell key={`${k}-${i}`}>
+                                    {k}
+                                </Table.HeaderCell>
+                            ))}
+                        </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                        {summary.participants.map((p, pidx) =>
+                            p.samples.map((s, sidx) => {
+                                // @ts-ignore
+                                const backgroundColor =
+                                    pidx % 2 === 0
+                                        ? "white"
+                                        : "var(--bs-table-striped-bg)";
+                                const lengthOfParticipant = p.samples
+                                    .map((s) => s.sequences.length)
+                                    .reduce((a, b) => a + b, 0);
+                                return s.sequences.map((seq, seqidx) => {
+                                    const isFirstOfGroup =
+                                        sidx === 0 && seqidx === 0;
+                                    return (
+                                        <Table.Row
+                                            key={`${p.external_id}-${s.id}-${seq.id}`}
+                                        >
+                                            {isFirstOfGroup && (
+                                                <Table.Cell
+                                                    style={{ backgroundColor }}
+                                                    rowSpan={
+                                                        lengthOfParticipant
+                                                    }
+                                                >
+                                                    {p.families
+                                                        .map(
+                                                            (f) => f.external_id
+                                                        )
+                                                        .join(", ")}
+                                                </Table.Cell>
+                                            )}
+                                            {isFirstOfGroup &&
+                                                summary.participant_keys.map(
+                                                    ([k, dn]) => (
+                                                        <Table.Cell
+                                                            style={{
+                                                                backgroundColor,
+                                                            }}
+                                                            key={
+                                                                p.id +
+                                                                "participant." +
+                                                                k
+                                                            }
+                                                            rowSpan={
+                                                                lengthOfParticipant
+                                                            }
+                                                        >
+                                                            {sanitiseValue(
+                                                                _.get(p, k)
+                                                            )}
+                                                        </Table.Cell>
+                                                    )
+                                                )}
+                                            {seqidx === 0 &&
+                                                summary.sample_keys.map(
+                                                    ([k, dn]) => (
+                                                        <Table.Cell
+                                                            style={{
+                                                                backgroundColor,
+                                                            }}
+                                                            key={
+                                                                s.id +
+                                                                "sample." +
+                                                                k
+                                                            }
+                                                            rowSpan={
+                                                                s.sequences
+                                                                    .length
+                                                            }
+                                                        >
+                                                            {k ===
+                                                                "external_id" ||
+                                                            k === "id" ? (
+                                                                <SampleLink
+                                                                    id={s.id}
+                                                                    projectName={
+                                                                        projectName
+                                                                    }
+                                                                >
+                                                                    {sanitiseValue(
+                                                                        _.get(
+                                                                            s,
+                                                                            k
+                                                                        )
+                                                                    )}
+                                                                </SampleLink>
+                                                            ) : (
+                                                                sanitiseValue(
+                                                                    _.get(s, k)
+                                                                )
+                                                            )}
+                                                        </Table.Cell>
+                                                    )
+                                                )}
+                                            {seq &&
+                                                summary.sequence_keys.map(
+                                                    ([k, dn]) => (
+                                                        <Table.Cell
+                                                            style={{
+                                                                backgroundColor,
+                                                            }}
+                                                            key={
+                                                                s.id +
+                                                                "sequence." +
+                                                                k
+                                                            }
+                                                        >
+                                                            {sanitiseValue(
+                                                                _.get(seq, k)
+                                                            )}
+                                                        </Table.Cell>
+                                                    )
+                                                )}
+                                        </Table.Row>
+                                    );
+                                });
+                            })
+                        )}
+                    </Table.Body>
+                </Table>
+            );
         }
     }
 
+    const titleCase = (s: string) => {
+        return s[0].toUpperCase() + s.slice(1).toLowerCase();
+    };
 
-    return <>
-        <br />
-        <ProjectSelector />
-        <hr />
-        <div style={{ marginBottom: "10px", justifyContent: "flex-end", display: "flex", flexDirection: "row" }}>
-            <Input type="select" onChange={setPageLimit} value={pageLimit} style={{ display: "inline", width: "150px", marginRight: "10px" }}>
-                {PAGE_SIZES.map(s => <option key={`page-size-${s}`} value={s}>{s} samples</option>)}
-            </Input>
+    const projectSummaryStats: React.ReactElement = (
+        <>
+            <h2>Project Summary Stats</h2>
+            <b>Total Participants: </b>
+            {summary?.total_participants}
+            <br />
+            <b>Total Samples: </b>
+            {"    "}
+            {summary?.total_samples}
+            <br />
+            <Table celled>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell>Type</Table.HeaderCell>
+                        <Table.HeaderCell>Sequences</Table.HeaderCell>
+                        <Table.HeaderCell>CRAMs</Table.HeaderCell>
+                        <Table.HeaderCell>Seqr</Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+
+                <Table.Body>
+                    {summary?.sequence_stats &&
+                        Object.entries(summary?.sequence_stats).map(
+                            ([key, value]) => (
+                                <Table.Row key={key}>
+                                    <Table.Cell>{titleCase(key)}</Table.Cell>
+                                    {Object.entries(value).map(([k1, v1]) => (
+                                        <Table.Cell key={`${key}-${k1}`}>
+                                            {`${v1}`}
+                                        </Table.Cell>
+                                    ))}
+                                </Table.Row>
+                            )
+                        )}
+                </Table.Body>
+            </Table>
+        </>
+    );
+
+    return (
+        <>
+            <br />
+            <ProjectSelector
+                setPageLimit={_setPageLimit}
+                setPageNumber={setPageNumber}
+                pageLimit={PAGE_SIZES[0]}
+            />
+            <br />
+            <hr />
+            {summary && projectSummaryStats}
+            <hr />
+            {projectName && (
+                <div
+                    style={{
+                        marginBottom: "10px",
+                        justifyContent: "flex-end",
+                        display: "flex",
+                        flexDirection: "row",
+                    }}
+                >
+                    <Dropdown
+                        selection
+                        onChange={setPageLimit}
+                        value={pageLimit}
+                        options={PAGE_SIZES.map((s) => ({
+                            key: s,
+                            text: `${s} samples`,
+                            value: s,
+                        }))}
+                    />
+                    {pageOptions}
+                </div>
+            )}
+            {table}
             {pageOptions}
-        </div>
-        {table}
-        {pageOptions}
-    </>
-
-}
+        </>
+    );
+};

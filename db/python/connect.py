@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
     'analysis',
-    'sample',
     'participant',
+    'sample',
     'analysis_sample',
     'sample_sequencing',
+    'sample_sequencing_eid',
     'family',
     'family_participant',
     'participant_phenotypes',
@@ -240,3 +241,10 @@ class DbBase:
             raise Exception(f'Must provide author to {self.__class__.__name__}')
 
     # piped from the connection
+
+    @staticmethod
+    def escape_like_term(query: str):
+        """
+        Escape meaningful keys when using LIKE with a user supplied input
+        """
+        return query.replace('%', '\\%').replace('_', '\\_')

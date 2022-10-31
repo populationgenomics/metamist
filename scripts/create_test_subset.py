@@ -66,10 +66,19 @@ DEFAULT_SAMPLES_N = 10
     type=int,
     help='Minimal number of families to include',
 )
+# Flag to be used when there isn't available pedigree/family information.
+@click.option(
+    '--skip-ped',
+    'skip_ped',
+    is_flag=True,
+    default=False,
+    help='Skip transferring pedigree/family information',
+)
 def main(
     project: str,
     samples_n: Optional[int],
     families_n: Optional[int],
+    skip_ped: Optional[bool] = True,
 ):
     """
     Script creates a test subset for a given project.
@@ -79,7 +88,7 @@ def main(
     samples_n, families_n = _validate_opts(samples_n, families_n)
 
     all_samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
+        body_get_samples={
             'project_ids': [project],
             'active': True,
         }
@@ -105,9 +114,18 @@ def main(
     if families_n is not None:
         fams = fapi.get_families(project)
         all_families = [family['id'] for family in fams]
-        families = random.sample(all_families, families_n)
-        pedigree = fapi.get_pedigree(project=project, internal_family_ids=families)
+        full_pedigree = fapi.get_pedigree(
+            project=project, internal_family_ids=all_families
+        )
+        external_family_ids = _get_random_families(full_pedigree, families_n)
+        internal_family_ids = [
+            fam['id'] for fam in fams if fam['external_id'] in external_family_ids
+        ]
+        pedigree = fapi.get_pedigree(
+            project=project, internal_family_ids=internal_family_ids
+        )
         _print_fam_stats(pedigree)
+
         p_ids = [ped['individual_id'] for ped in pedigree]
         sample_ids = [
             sample
@@ -157,8 +175,17 @@ def main(
 
     # Parse Families & Participants
     participant_ids = [int(sample['participant_id']) for sample in samples]
-    family_ids = transfer_families(project, target_project, participant_ids)
-    external_participant_ids = transfer_ped(project, target_project, family_ids)
+    if skip_ped:
+        # If no family data is available, only the participants should be transferred.
+        external_participant_ids = transfer_participants(
+            initial_project=project,
+            target_project=target_project,
+            participant_ids=participant_ids,
+        )
+
+    else:
+        family_ids = transfer_families(project, target_project, participant_ids)
+        external_participant_ids = transfer_ped(project, target_project, family_ids)
 
     external_sample_internal_participant_map = get_map_ipid_esid(
         project, target_project, external_participant_ids
@@ -172,6 +199,8 @@ def main(
         if s['external_id'] in test_sample_by_external_id:
             new_s_id = test_sample_by_external_id[s['external_id']]['id']
             logger.info(f'Sample already in test project, with ID {new_s_id}')
+            new_sample_map[s['id']] = new_s_id
+
         else:
             logger.info('Creating test sample entry')
             new_s_id = sapi.create_new_sample(
@@ -179,7 +208,7 @@ def main(
                 new_sample=NewSample(
                     external_id=s['external_id'],
                     type=SampleType(s['type']),
-                    meta=_copy_files_in_dict(s['meta'], project),
+                    meta=(_copy_files_in_dict(s['meta'], project) or {}),
                     participant_id=external_sample_internal_participant_map[
                         s['external_id']
                     ],
@@ -193,12 +222,14 @@ def main(
                 new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
                 logger.info('Creating sequence entry in test')
                 seqapi.create_new_sequence(
+                    project=target_project,
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
                         type=SequenceType(seq_info['type']),
+                        external_ids=seq_info['external_ids'],
                         status=SequenceStatus(seq_info['status']),
-                    )
+                    ),
                 )
 
         for a_type in ['cram', 'gvcf']:
@@ -220,7 +251,9 @@ def main(
         logger.info(f'-')
 
 
-def transfer_families(initial_project, target_project, participant_ids) -> List[str]:
+def transfer_families(
+    initial_project: str, target_project: str, participant_ids: List[int]
+) -> List[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     families = fapi.get_families(
         project=initial_project,
@@ -250,7 +283,9 @@ def transfer_families(initial_project, target_project, participant_ids) -> List[
     return family_ids
 
 
-def transfer_ped(initial_project, target_project, family_ids):
+def transfer_ped(
+    initial_project: str, target_project: str, family_ids: List[int]
+) -> List[str]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
         initial_project,
@@ -259,7 +294,7 @@ def transfer_ped(initial_project, target_project, family_ids):
     )
     ped_json = fapi.get_pedigree(
         initial_project,
-        export_type='tsv',
+        export_type='json',
         internal_family_ids=family_ids,
     )
 
@@ -278,6 +313,37 @@ def transfer_ped(initial_project, target_project, family_ids):
         )
 
     return external_participant_ids
+
+
+def transfer_participants(
+    initial_project: str, target_project: str, participant_ids: List[int]
+) -> List[str]:
+    """Transfers relevant participants between projects"""
+
+    current_participants = papi.get_participants(
+        initial_project,
+        body_get_participants={'internal_participant_ids': participant_ids},
+    )
+    existing_participants = papi.get_participants(target_project)
+
+    target_project_epids = [
+        participant['external_id'] for participant in existing_participants
+    ]
+
+    participants_to_transfer = []
+    for participant in current_participants:
+        if participant['external_id'] not in target_project_epids:
+            # Participants with id field will be updated & those without will be inserted
+            del participant['id']
+        transfer_participant = {k: v for k, v in participant.items() if v is not None}
+        # Participants are being created before the samples are, so this will be empty for now.
+        transfer_participant['samples'] = []
+        participants_to_transfer.append(transfer_participant)
+
+    upserted_participants = papi.batch_upsert_participants(
+        target_project, {'participants': participants_to_transfer}
+    )
+    return list(upserted_participants.keys())
 
 
 def get_map_ipid_esid(
@@ -337,7 +403,9 @@ def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
     return normalised_map
 
 
-def _validate_opts(samples_n, families_n) -> Tuple[Optional[int], Optional[int]]:
+def _validate_opts(
+    samples_n: int, families_n: int
+) -> Tuple[Optional[int], Optional[int]]:
     if samples_n is not None and families_n is not None:
         raise click.BadParameter('Please specify only one of --samples or --families')
 
@@ -394,6 +462,54 @@ def _print_fam_stats(families: List):
         logger.info(f'  {label}: {fam_by_size[fam_size]}')
 
 
+def _get_random_families(
+    families: List,
+    families_n: int,
+    include_single_person_families: Optional[bool] = False,
+) -> List[str]:
+    """Obtains a subset of families, that are a little less random.
+    By default single-person families are discarded.
+    The function aims to evenly distribute the families chosen by size.
+    For example, if the composition of families inputted is as follows
+    Duos - 5 families, Trios - 10 families, Quads - 5 families
+    and families_n = 4
+    Then this function will randomly select, 1 duo, 1 quad, and 2 trios.
+    """
+
+    family_sizes = dict(Counter([fam['family_id'] for fam in families]))
+
+    # Discard single-person families
+    family_threshold = 0 if include_single_person_families else 1
+    families_within_threshold = [
+        k for k, v in family_sizes.items() if v > family_threshold
+    ]
+
+    # Get family size distribution, i.e. {1:[FAM1, FAM2], 2:[FAM3], 3:[FAM4,FAM5, FAM6]}
+    distributed_by_size: Dict[int, List[str]] = {}
+    for k, v in family_sizes.items():
+        if k in families_within_threshold:
+            if distributed_by_size.get(v):
+                distributed_by_size[v].append(k)
+            else:
+                distributed_by_size[v] = [k]
+
+    sizes = len(list(distributed_by_size.keys()))
+    returned_families: List[str] = []
+
+    proportion = families_n / len(families_within_threshold)
+
+    if sizes <= families_n:
+        for _s, fams in distributed_by_size.items():
+            n_pull = round(proportion * len(fams))
+            returned_families.extend(random.sample(fams, n_pull))
+
+    else:
+        # we can't evenly distribute, so we'll just pull randomly
+        returned_families = random.sample(families_within_threshold, families_n)
+
+    return returned_families
+
+
 def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
@@ -448,7 +564,7 @@ def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
     Removes samples that need to be removed and returns those that need to be kept
     """
     test_samples = sapi.get_samples(
-        body_get_samples_by_criteria_api_v1_sample_post={
+        body_get_samples={
             'project_ids': [test_project],
             'active': True,
         }

@@ -48,4 +48,4 @@ repos:
   rev: v0.961
   hooks:
   - id: mypy
-    args: [--pretty, --show-error-codes, --no-strict-optional, --ignore-missing-imports]
+    args: [--pretty, --show-error-codes, --no-strict-optional, --ignore-missing-imports, --install-types, --non-interactive]

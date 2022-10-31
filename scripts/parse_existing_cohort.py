@@ -2,10 +2,34 @@
 """
 Parser for existing-cohort metadata.
 
-parse_prophecy.py \
-gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M001.csv \
-gs://cpg-prophecy-test-upload/R_220208_BINKAN1_PROPHECY_M002.csv \
---search-location gs://cpg-prophecy-test-upload
+Usage:
+parse_existing_cohort.py \
+--project bioheart \
+--search-location gs://cpg-bioheart-upload \
+--batch-number M001 \
+gs://cpg-bioheart-upload/R_220405_BINKAN1_BIOHEART_M001.csv
+
+
+2022-10-19 vivbak:
+This script will:
+- Upsert Participants (currently assumes esid == epid)
+- Upsert Samples
+- Upsert WGS Sequences
+
+This script does NOT:
+- Create Projects
+- Upsert Analysis Objects
+- Upsert Pedigrees
+- Upsert HPO terms
+
+The fields from the CSV file that will be ingested are defined in the columns class.
+
+On top of the GenericMetadataParser this script handles the extra lines found at the top of the
+input CSV files that should be discarded.
+
+Additionally, the reads-column is not provided for existing-cohort csvs.
+This information is derived from the fluidX id pulled from the filename.
+
 """
 
 import logging
@@ -67,8 +91,8 @@ def fastq_file_name_to_sample_id(filename: str) -> str:
     return '_'.join(filename.split('_')[2:4])
 
 
-class ProphecyParser(GenericMetadataParser):
-    """Parser for Prophecy manifests"""
+class ExistingCohortParser(GenericMetadataParser):
+    """Parser for existing cohort manifests"""
 
     def __init__(
         self,
@@ -136,7 +160,7 @@ async def main(
 ):
     """Run script from CLI arguments"""
 
-    parser = ProphecyParser(
+    parser = ExistingCohortParser(
         project=project,
         search_locations=search_locations,
         batch_number=batch_number,
