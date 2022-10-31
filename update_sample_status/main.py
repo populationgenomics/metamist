@@ -121,6 +121,7 @@ def update_sample_status(request):  # pylint: disable=R1710
     status = request_json.get('status')
     batch = request_json.get('batch')
     eseqid = request_json.get('sequence_id')
+    eseqid_dict = {'kccg': eseqid}
 
     if not project or not sample or not status or not batch:
         return abort(400)
@@ -142,6 +143,6 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     update_airtable(project_config, sample, status)
 
-    update_sm(project, sample, status, batch, eseqid)
+    update_sm(project, sample, status, batch, eseqid_dict)
 
     return ('', 204)
