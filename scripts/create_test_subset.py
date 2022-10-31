@@ -75,7 +75,7 @@ DEFAULT_SAMPLES_N = 10
     help='Skip transferring pedigree/family information',
 )
 @click.option(
-    '--add-fam',
+    '--add-family',
     'additional_fams',
     type=str,
     multiple=True,
@@ -146,7 +146,7 @@ def main(
         families_to_subset = [
             family['id']
             for family in fams
-            if family['external_id'] not in _additional_fams
+            if family['external_id'] not in set(_additional_fams)
         ]
         full_pedigree = fapi.get_pedigree(
             project=project, internal_family_ids=families_to_subset
