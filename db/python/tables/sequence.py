@@ -198,7 +198,7 @@ class SampleSequencingTable(DbBase):
         _query = f"""
             SELECT {keys_str}
             FROM sample_sequencing sq
-            INNER JOIN sample_sequencing_eid sqeid
+            INNER JOIN sample_sequencing_eid sqeid ON sqeid.sequencing_id = sq.id
             WHERE sqeid.external_id = :external_id AND project = :project
         """
         d = await self.connection.fetch_one(
