@@ -108,6 +108,7 @@ class SampleSequencingTable(DbBase):
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
+        project: Optional[int] = None,
         open_transaction: bool = True,
     ) -> int:
         """
@@ -137,6 +138,14 @@ class SampleSequencingTable(DbBase):
             )
 
             if external_ids:
+
+                _project = project or self.project
+                if not _project:
+                    raise ValueError(
+                        'When inserting an external identifier for a sequence, a '
+                        'project must be specified. This might be a server error.'
+                    )
+
                 _eid_query = """
                 INSERT INTO sample_sequencing_eid
                     (project, sequencing_id, external_id, name, author)
@@ -144,7 +153,7 @@ class SampleSequencingTable(DbBase):
                 """
                 eid_values = [
                     {
-                        'project': self.project,
+                        'project': project or self.project,
                         'sequencing_id': id_of_new_sequence,
                         'external_id': eid,
                         'name': name.lower(),
@@ -189,7 +198,7 @@ class SampleSequencingTable(DbBase):
         _query = f"""
             SELECT {keys_str}
             FROM sample_sequencing sq
-            INNER JOIN sample_sequencing_eid sqeid
+            INNER JOIN sample_sequencing_eid sqeid ON sqeid.sequencing_id = sq.id
             WHERE sqeid.external_id = :external_id AND project = :project
         """
         d = await self.connection.fetch_one(
@@ -263,6 +272,28 @@ class SampleSequencingTable(DbBase):
 
         return projects, sample_id_to_seq_id
 
+    async def get_sequence_type_numbers_for_project(self, project: ProjectId):
+        """
+        This groups by samples, so one sample with many sequences ONLY reports one here,
+        In the future, this should report the number of sequence groups (or something like that).
+        """
+
+        _query = """
+SELECT type, COUNT(*) as n
+FROM (
+    SELECT sq.type
+    FROM sample_sequencing sq
+    INNER JOIN sample s ON s.id = sq.sample_id
+    WHERE s.project = :project
+    GROUP BY s.id, sq.type
+) as s
+GROUP BY type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        return {r['type']: r['n'] for r in rows}
+
     async def update_status(
         self,
         sequencing_id: int,
@@ -292,6 +323,7 @@ class SampleSequencingTable(DbBase):
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
         meta: Optional[Dict] = None,
+        project: Optional[ProjectId] = None,
         author=None,
     ):
         """Update a sequence"""
@@ -318,6 +350,14 @@ class SampleSequencingTable(DbBase):
             promises.append(self.connection.execute(_query, fields))
 
             if external_ids:
+                _project = project or self.project
+                if not _project:
+                    raise ValueError(
+                        'When inserting or updating an external identifier for a '
+                        'sequence, a project must be specified. This might be a '
+                        'server error.'
+                    )
+
                 to_delete = {k.lower() for k, v in external_ids.items() if v is None}
                 to_update = {
                     k.lower(): v for k, v in external_ids.items() if v is not None
