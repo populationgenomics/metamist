@@ -54,11 +54,15 @@ def update_sm(
 
     seqapi = SequenceApi()
     sapi = SampleApi()
-    sequence_type = SequenceType('genome')
     sample_type = SampleType('blood')
-    seq_meta = {'batch': batch}
     sample_meta: Dict[str, Any] = {}
-    seq_status = SequenceStatus(status)
+
+    sequence_info = {
+        'external_ids': eseqid,
+        'status': SequenceStatus(status),
+        'meta': {'batch': batch},
+        'type': SequenceType('genome'),
+    }
 
     try:
         # Try pulling sample id
@@ -88,14 +92,7 @@ def update_sm(
         seqid = seqapi.get_sequence_by_external_id(
             project=project, external_id=list(eseqid.values())[0]
         )
-
-        existing_sequence = SequenceUpdateModel(
-            external_ids=eseqid,
-            status=seq_status,
-            meta=seq_meta,
-            type=sequence_type,
-        )
-
+        existing_sequence = SequenceUpdateModel(**sequence_info)
         seqapi.update_sequence(
             sequence_id=seqid[0], sequence_update_model=existing_sequence
         )
@@ -103,13 +100,8 @@ def update_sm(
     except NotFoundException as e:
         logging.info(e)
         # Otherwise create
-        new_sequence = NewSequence(
-            sample_id=isid,
-            external_ids=eseqid,
-            status=seq_status,
-            meta=seq_meta,
-            type=sequence_type,
-        )
+        sequence_info['sample_id'] = isid
+        new_sequence = NewSequence(**sequence_info)
         seqapi.create_new_sequence(new_sequence=new_sequence)
 
     except ForbiddenException as e:
