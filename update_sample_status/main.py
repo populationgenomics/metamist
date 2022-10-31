@@ -3,19 +3,22 @@
 import json
 import os
 import logging
+from typing import Dict, Any
 from airtable import Airtable
 from flask import abort
 from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
-from sample_metadata.apis import SequenceApi
+from sample_metadata.apis import SequenceApi, SampleApi
 from sample_metadata.models import (
     SequenceType,
     SequenceUpdateModel,
     SequenceStatus,
     SampleType,
+    NewSample,
+    NewSequence,
 )
-from sample_metadata.exceptions import ForbiddenException
+from sample_metadata.exceptions import ForbiddenException, NotFoundException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
 
@@ -43,29 +46,71 @@ def update_airtable(project_config: dict, sample: str, status: str):
     return ('', 204)
 
 
-def update_sm(project: str, sample: str, status: str, batch: str):
+def update_sm(
+    project: str, sample: str, status: str, batch: str, eseqid: Dict[str, str]
+):
     """Update the status of a sequence given it's corresponding
     external sample id"""
 
     seqapi = SequenceApi()
+    sapi = SampleApi()
     sequence_type = SequenceType('genome')
     sample_type = SampleType('blood')
     seq_meta = {'batch': batch}
+    sample_meta: Dict[str, Any] = {}
+    seq_status = SequenceStatus(status)
 
     try:
-        sequence_model = SequenceUpdateModel(
-            status=SequenceStatus(status), meta=seq_meta
+        # Try pulling sample id
+        existing_sample = sapi.get_sample_by_external_id(
+            external_id=sample, project=project
         )
-        seqapi.upsert_sequence_from_external_sample_and_type(
-            external_sample_id=sample,
-            sequence_type=sequence_type,
-            sequence_update_model=sequence_model,
-            project=project,
-            sample_type=sample_type,
+        isid = existing_sample['id']
+        print(isid)
+
+    except NotFoundException as e:
+        # Otherwise create
+        logging.info(e)
+        new_sample = NewSample(
+            external_id=sample,
+            type=sample_type,
+            meta=sample_meta,
         )
-    except ValueError as e:
+        isid = sapi.create_new_sample(new_sample=new_sample, project=project)
+        print(isid)
+
+    except ForbiddenException as e:
         logging.error(e)
-        return abort(400)
+        return abort(403)
+
+    try:
+        # Try update the sequence
+        seqid = seqapi.get_sequence_by_external_id(
+            project=project, external_id=list(eseqid.values())[0]
+        )
+
+        existing_sequence = SequenceUpdateModel(
+            external_ids=eseqid,
+            status=seq_status,
+            meta=seq_meta,
+            type=sequence_type,
+        )
+
+        seqapi.update_sequence(
+            sequence_id=seqid[0], sequence_update_model=existing_sequence
+        )
+
+    except NotFoundException as e:
+        logging.info(e)
+        # Otherwise create
+        new_sequence = NewSequence(
+            sample_id=isid,
+            external_ids=eseqid,
+            status=seq_status,
+            meta=seq_meta,
+            type=sequence_type,
+        )
+        seqapi.create_new_sequence(new_sequence=new_sequence)
 
     except ForbiddenException as e:
         logging.error(e)
@@ -85,6 +130,7 @@ def update_sample_status(request):  # pylint: disable=R1710
     sample = request_json.get('sample')
     status = request_json.get('status')
     batch = request_json.get('batch')
+    eseqid = request_json.get('eseqid')
 
     if not project or not sample or not status or not batch:
         return abort(400)
@@ -106,6 +152,17 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     update_airtable(project_config, sample, status)
 
-    update_sm(project, sample, status, batch)
+    update_sm(project, sample, status, batch, eseqid)
 
     return ('', 204)
+
+
+# testing
+if __name__ == '__main__':
+    update_sm(
+        project='dev1',
+        sample='SpookySample',
+        status='uploaded',
+        batch='HappyHalloween',
+        eseqid={'KCCG_VALUE': 'SpookySequence1'},
+    )
