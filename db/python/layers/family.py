@@ -11,34 +11,33 @@ from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from models.models.family import PedigreeRow
 
+ALLOWED_SEX_VALUES = [0, 1, 2]
+ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
+
+PED_ROW_KEYS = {
+    # seqr individual template:
+    # Family ID, Individual ID, Paternal ID, Maternal ID, Sex, Affected, Status, Notes
+    'family_id': {'familyid', 'family id', 'family', 'family_id'},
+    'individual_id': {'individualid', 'id', 'individual_id', 'individual id'},
+    'paternal_id': {'paternal_id', 'paternal id', 'paternalid', 'father'},
+    'maternal_id': {'maternal_id', 'maternal id', 'maternalid', 'mother'},
+    'sex': {'sex', 'gender'},
+    'affected': {
+        'phenotype',
+        'affected',
+        'phenotypes',
+        'affected status',
+        'affection',
+        'affection status',
+    },
+    'notes': {'notes'},
+}
+
 
 class PedigreeRowHelper(PedigreeRow):
     """
     Class for capturing parsing a row in a pedigree. Keep this separate to a PedigreeRow
     """
-
-    ALLOWED_SEX_VALUES = [0, 1, 2]
-    ALLOWED_AFFECTED_VALUES = [-9, 0, 1, 2]
-
-    PedRowKeys = {
-        # seqr individual template:
-        # Family ID, Individual ID, Paternal ID, Maternal ID, Sex, Affected, Status, Notes
-        'family_id': {'familyid', 'family id', 'family', 'family_id'},
-        'individual_id': {'individualid', 'id', 'individual_id', 'individual id'},
-        'paternal_id': {'paternal_id', 'paternal id', 'paternalid', 'father'},
-        'maternal_id': {'maternal_id', 'maternal id', 'maternalid', 'mother'},
-        'sex': {'sex', 'gender'},
-        'affected': {
-            'phenotype',
-            'affected',
-            'phenotypes',
-            'affected status',
-            'affection',
-            'affection status',
-        },
-        'notes': {'notes'},
-    }
-
     @staticmethod
     def default_header():
         """Default header (corresponds to the __init__ keys)"""
@@ -116,10 +115,10 @@ class PedigreeRowHelper(PedigreeRow):
         if isinstance(sex, str) and sex.isdigit():
             sex = int(sex)
         if isinstance(sex, int):
-            if sex in PedigreeRowHelper.ALLOWED_SEX_VALUES:
+            if sex in ALLOWED_SEX_VALUES:
                 return sex
             raise ValueError(
-                f'Sex value ({sex}) was not an expected value {PedigreeRowHelper.ALLOWED_SEX_VALUES}.'
+                f'Sex value ({sex}) was not an expected value {ALLOWED_SEX_VALUES}.'
             )
 
         sl = sex.lower()
@@ -135,7 +134,7 @@ class PedigreeRowHelper(PedigreeRow):
                 f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
             )
         raise ValueError(
-            f'Unknown sex "{sex}", please ensure sex is in {PedigreeRowHelper.ALLOWED_SEX_VALUES}'
+            f'Unknown sex "{sex}", please ensure sex is in {ALLOWED_SEX_VALUES}'
         )
 
     @staticmethod
@@ -156,9 +155,9 @@ class PedigreeRowHelper(PedigreeRow):
                 return 2
 
         affected = int(affected)
-        if affected not in PedigreeRowHelper.ALLOWED_AFFECTED_VALUES:
+        if affected not in ALLOWED_AFFECTED_VALUES:
             raise ValueError(
-                f'Affected value {affected} was not in expected value: {PedigreeRowHelper.ALLOWED_AFFECTED_VALUES}'
+                f'Affected value {affected} was not in expected value: {ALLOWED_AFFECTED_VALUES}'
             )
 
         return affected
@@ -186,7 +185,7 @@ class PedigreeRowHelper(PedigreeRow):
         for item in header:
             litem = item.lower().strip().strip('#')
             found = False
-            for h, options in PedigreeRowHelper.PedRowKeys.items():
+            for h, options in PED_ROW_KEYS.items():
                 for potential_key in options:
                     if potential_key == litem:
                         ordered_init_keys.append(h)
