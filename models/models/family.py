@@ -21,6 +21,7 @@ class PedigreeRow(BaseModel):
     """
     Formed pedigree row
     """
+
     family_id: int | str | None
     individual_id: int | str
     paternal_id: int | str | None

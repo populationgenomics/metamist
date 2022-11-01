@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,dangerous-default-value
 import io
 import csv
 import codecs
@@ -103,7 +103,8 @@ async def get_pedigree(
     #       optional lists in 5.3.0. So set it to a "dangerous" list, I checked the
     #       value doesn't get reused between function calls, so I feel comfortable
     #       silencing the dangerous-default-value
-    internal_family_ids: list[int] = [],  # pylint: disable=dangerous-default-value
+    # flake8: noqa
+    internal_family_ids: list[int] = [],
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
     empty_participant_value: str | None = None,
@@ -143,7 +144,8 @@ async def get_exported_pedigree(
     #       optional lists in 5.3.0. So set it to a "dangerous" list, I checked the
     #       value doesn't get reused between function calls, so I feel comfortable
     #       silencing the dangerous-default-value
-    internal_family_ids: list[int] = [],  # pylint: disable=dangerous-default-value
+    # flake8: noqa
+    internal_family_ids: list[int] = [],
     export_type: ExportType = ExportType.TSV,
     replace_with_participant_external_ids: bool = True,
     replace_with_family_external_ids: bool = True,
