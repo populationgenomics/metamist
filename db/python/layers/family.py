@@ -38,6 +38,7 @@ class PedigreeRowHelper(PedigreeRow):
     """
     Class for capturing parsing a row in a pedigree. Keep this separate to a PedigreeRow
     """
+
     @staticmethod
     def default_header():
         """Default header (corresponds to the __init__ keys)"""
