@@ -42,7 +42,7 @@ logger = logging.getLogger('sync-seqr')
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
-ENVIRONMENT = 'prod' # 'staging'
+ENVIRONMENT = 'prod'  # 'staging'
 
 ENVS = {
     'staging': (
@@ -127,7 +127,7 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     _ = SequenceType(sequence_type)
 
     samples = samapi.get_samples(body_get_samples=BodyGetSamples(project_ids=[dataset]))
-    sequences_all = seqapi.get_all_sequences_by_sample_ids(
+    sequences_all = seqapi.get_sequence_ids_for_sample_ids_by_type(
         [s['id'] for s in samples if s['id'] not in SAMPLES_TO_IGNORE]
     )
     sample_ids = set(
@@ -405,7 +405,11 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
         project=dataset
     )
 
-    rows_to_write = ['\t'.join(s[::-1]) for s in person_sample_map_rows if not any(sid in s for sid in SAMPLES_TO_IGNORE)]
+    rows_to_write = [
+        '\t'.join(s[::-1])
+        for s in person_sample_map_rows
+        if not any(sid in s for sid in SAMPLES_TO_IGNORE)
+    ]
 
     filename = f'{dataset}_pid_sid_map_{datetime.datetime.now().isoformat()}.tsv'
     filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
@@ -510,12 +514,17 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
         print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
-    reads_list = set(l.strip() for l in list(set(reads_map.split("\n"))) if not any(s in l for s in SAMPLES_TO_IGNORE))
+    reads_list = set(
+        l.strip()
+        for l in list(set(reads_map.split("\n")))
+        if not any(s in l for s in SAMPLES_TO_IGNORE)
+    )
     sequence_filter = lambda row: True
     if sequence_type == 'genome':
         sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]
     elif sequence_type == 'exome':
         sequence_filter = lambda row: len(row) > 2 and 'exome' in row[1]
+
     reads_list = [
         "\t".join(l.split("\t")[:2])
         for l in reads_list
@@ -555,9 +564,11 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
         if ignore and project_name in ignore:
             print(f'Skipping {project_name}')
             continue
-        seqr_guid = project.get('meta', {}).get('seqr_guid')
+
+        meta_key = f'seqr-project-{sequence_type}'
+        seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
-            print(f'Skipping "{project_name}" as meta.seqr_guid is not set')
+            print(f'Skipping "{project_name}" as meta.{meta_key} is not set')
             continue
 
         try:
@@ -585,6 +596,7 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
             raise ValueError(
                 f'{project_name} does NOT have a meta.seqr_guid is not set'
             )
+        print(f'Syncing {project_name} to {seqr_guid}')
 
         return sync_dataset(
             project_name, seqr_guid=seqr_guid, sequence_type=sequence_type
@@ -603,6 +615,6 @@ if __name__ == '__main__':
     # sync_single_dataset_from_name('acute-care', 'genome')
 
     # ignore = {'ohmr4-epilepsy', 'acute-care'}
-    # sync_all_datasets(sequence_type='genome', ignore=ignore)
+    sync_all_datasets(sequence_type='exome', ignore={'acute-care'})
     #
-    sync_dataset('acute-care', 'R0039_acute_care_exome', 'exome')
+    # sync_dataset('acute-care', 'R0039_acute_care_exome', 'exome')
