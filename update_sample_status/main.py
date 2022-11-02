@@ -38,10 +38,10 @@ def update_airtable(project_config: dict, sample: str, status: str):
         response = airtable.update_by_field('Sample ID', sample, {'Status': status})
     except HTTPError as err:  # Invalid status enum.
         logging.error(err)
-        return abort(400)
+        return abort(400, f'{status} is not a valid value')
 
     if not response:  # Sample not found.
-        return abort(404)
+        return abort(404, f'Could not find {sample} in AirTable')
 
     return ('', 204)
 
@@ -83,7 +83,9 @@ def update_sm(
 
     except ForbiddenException as e:
         logging.error(e)
-        return abort(403)
+        return abort(
+            403, f'Forbidden. Check that you have access to {project} in metamist'
+        )
 
     try:
         # Try update the sequence
@@ -104,7 +106,10 @@ def update_sm(
 
     except ForbiddenException as e:
         logging.error(e)
-        return abort(403)
+        return abort(
+            403,
+            f'Forbidden. Please check that you have access to {project} in metamist.',
+        )
 
     return ('', 204)
 
@@ -124,7 +129,9 @@ def update_sample_status(request):  # pylint: disable=R1710
     eseqid_dict = {'kccg': eseqid}
 
     if not project or not sample or not status or not batch:
-        return abort(400)
+        return abort(
+            400, f'Please check that project,sample,status and batch have been set.'
+        )
 
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
@@ -139,7 +146,7 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     project_config = config.get(project)
     if not project_config:
-        return abort(404)
+        return abort(404, f'Could not find project config.')
 
     update_airtable(project_config, sample, status)
 
