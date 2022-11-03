@@ -22,6 +22,25 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 
+    async def get_samples_for_participant(self, participant_id: int) -> tuple[set[ProjectId], list[Sample]]:
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active',
+            'type',
+            'project',
+        ]
+        _query = f'SELECT {", ".join(keys)} from sample where participant_id = :pid;'
+
+        rows = await self.connection.fetch_all(_query, {'pid': participant_id})
+
+        ds = [dict(d) for d in rows]
+        projects = set(d.pop('project') for d in ds)
+        samples = [Sample.from_db(d) for d in ds]
+        return projects, samples
+
     async def get_samples_from_projects(
         self, project_ids: list[int], active_only: bool = True
     ) -> dict[int, int]:

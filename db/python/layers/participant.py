@@ -264,6 +264,11 @@ class ParticipantLayer(BaseLayer):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
 
+    async def get_participants_by_ids(self, pids: list[int]) -> list[ParticipantModel]:
+        project, participants = await self.pttable.get_participants_by_ids(pids)
+
+        return participants
+
     async def get_participants(
         self,
         project: int,
