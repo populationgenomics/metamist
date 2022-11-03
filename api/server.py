@@ -25,7 +25,7 @@ logger = get_logger()
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
-static_dir_exists = os.path.exists(os.path.join(STATIC_DIR, 'index.html'))
+static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
