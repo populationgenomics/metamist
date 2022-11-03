@@ -82,9 +82,9 @@ aapi = AnalysisApi()
 
 ES_INDICES_YAML = """
 exome:
-    hereditary-neuro: hereditary-neuro-exome-2022_0815_2246_h2pb9
-    mito-disease: mito-disease-exome-2022_0815_2246_h2pb9
-    kidgen: kidgen-exome-2022_0815_2246_h2pb9
+    hereditary-neuro: hereditary-neuro-exome-2022_0915_1407_zvg8e
+    mito-disease: mito-disease-exome-2022_0915_1407_zvg8e
+    kidgen: kidgen-exome-2022_0915_1407_zvg8e
     acute-care: acute-care-exome-2022_0915_1407_zvg8e
     validation: validation-exome-2022_0915_1315_htupt
 
@@ -591,11 +591,10 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
         project_name = project['name']
         if project_name != dataset:
             continue
-        seqr_guid = project.get('meta', {}).get('seqr_guid')
+        meta_key = f'seqr-project-{sequence_type}'
+        seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
-            raise ValueError(
-                f'{project_name} does NOT have a meta.seqr_guid is not set'
-            )
+            raise ValueError(f'{project_name} does NOT have meta.{meta_key} set')
         print(f'Syncing {project_name} to {seqr_guid}')
 
         return sync_dataset(
@@ -606,15 +605,5 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
 
 
 if __name__ == '__main__':
-    # sync_single_dataset_from_name('ohmr4-epilepsy')
-    # get_cram_map('validation')
-    # sync_dataset('validation', 'R0019_validation')
-    # sync_dataset('mito-disease', 'R0016_mito_disease_testing_exo', 'exome')
-    # sync_dataset('hereditary-neuro', 'R0014_hereditary_neuro_test_2', 'exome')
-    # sync_dataset('kidgen', 'R0015_kidgen_exome_testing', 'exome')
-    # sync_single_dataset_from_name('acute-care', 'genome')
-
-    # ignore = {'ohmr4-epilepsy', 'acute-care'}
-    sync_all_datasets(sequence_type='exome', ignore={'acute-care'})
-    #
-    # sync_dataset('acute-care', 'R0039_acute_care_exome', 'exome')
+    # sync_single_dataset_from_name('ohmr4-epilepsy', 'genome')
+    sync_all_datasets(sequence_type='exome')
