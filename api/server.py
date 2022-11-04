@@ -117,8 +117,11 @@ async def exception_handler(_: Request, e: Exception):
         content=base_params,
     )
 
+
 # graphql
-graphql_app = GraphQLRouter(graphql.schema, graphiql=True, context_getter=graphql.get_context)
+graphql_app = GraphQLRouter(
+    graphql.schema, graphiql=True, context_getter=graphql.get_context
+)
 app.include_router(graphql_app, prefix='/graphql')
 
 
