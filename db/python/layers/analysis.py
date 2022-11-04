@@ -35,6 +35,11 @@ class AnalysisLayer(BaseLayer):
             project_ids=project_ids, active_only=active_only
         )
 
+    async def get_analysis_for_sample(self, sample_id: int, map_sample_ids: bool, check_project_id=True):
+        projects, analysis = await self.at.get_analysis_for_sample(sample_id, map_sample_ids=map_sample_ids)
+
+        return analysis
+
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)

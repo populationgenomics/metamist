@@ -261,6 +261,29 @@ class SampleTable(DbBase):
         sample = Sample.from_db(d)
         return project, sample
 
+    async def get_samples_by_analysis_id(self, analysis_id: int) -> tuple[set[ProjectId], list[Sample]]:
+        keys = [
+            'id',
+            'external_id',
+            'participant_id',
+            'meta',
+            'active',
+            'type',
+            'project',
+        ]
+        _query = f"""
+        SELECT {", ".join("s." + k for k in keys)} from sample s
+        INNER JOIN analysis_sample a_s ON s.id = a_s.sample_id
+        WHERE a_s.analysis_id = :analysis_id
+        """
+
+        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+
+        ds = [dict(d) for d in rows]
+        projects = set(d.pop('project') for d in ds)
+        samples = [Sample.from_db(d) for d in ds]
+        return projects, samples
+
     async def get_all(
         self, check_active: bool = True
     ) -> tuple[Iterable[ProjectId], list[Sample]]:

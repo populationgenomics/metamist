@@ -58,6 +58,11 @@ class SampleLayer(BaseLayer):
 
         return sample
 
+    async def get_samples_by_analysis_id(self, analysis_id: int) -> list[Sample]:
+        project, samples = await self.st.get_samples_by_analysis_id(analysis_id)
+
+        return samples
+
     async def get_samples_by_participant(self, participant_id: int) -> list[Sample]:
         projects, samples = await self.st.get_samples_for_participant(participant_id)
 

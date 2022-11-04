@@ -20,7 +20,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId, split_generic_terms
-from models.models.participant import ParticipantModel
+from models.models.participant import Participant
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -264,7 +264,7 @@ class ParticipantLayer(BaseLayer):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
 
-    async def get_participants_by_ids(self, pids: list[int]) -> list[ParticipantModel]:
+    async def get_participants_by_ids(self, pids: list[int]) -> list[Participant]:
         project, participants = await self.pttable.get_participants_by_ids(pids)
 
         return participants
@@ -288,7 +288,7 @@ class ParticipantLayer(BaseLayer):
         ps = await self.pttable.get_participants(
             project=project, internal_participant_ids=list(internal_ids)
         )
-        return [ParticipantModel(**p) for p in ps]
+        return [Participant(**p) for p in ps]
 
     async def fill_in_missing_participants(self):
         """Update the sequencing status from the internal sample id"""
