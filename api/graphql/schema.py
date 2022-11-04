@@ -70,7 +70,7 @@ class Sample:
         )
 
     @strawberry.field
-    async def analyses_by_type(self, info: Info, root, analysis_type: strawberry.enum(AnalysisType)) -> list[Analysis]:
+    async def analyses_for_type(self, info: Info, root, analysis_type: strawberry.enum(AnalysisType)) -> list[Analysis]:
         connection = info.context['connection']
         alayer = AnalysisLayer(connection)
         return await alayer.get_latest_complete_analysis_for_samples_and_type(
