@@ -4,12 +4,12 @@ from fastapi import APIRouter
 
 from api.utils.db import Connection, get_projectless_db_connection
 from db.python.tables.project import ProjectPermissionsTable
-from models.models.project import ProjectRow
+from models.models.project import Project
 
 router = APIRouter(prefix='/project', tags=['project'])
 
 
-@router.get('/all', operation_id='getAllProjects', response_model=List[ProjectRow])
+@router.get('/all', operation_id='getAllProjects', response_model=List[Project])
 async def get_all_projects(connection=get_projectless_db_connection):
     """Get list of projects"""
     ptable = ProjectPermissionsTable(connection.connection)
@@ -78,3 +78,21 @@ async def update_project(
     return await ptable.update_project(
         project_name=project, update=project_update_model, author=connection.author
     )
+
+
+@router.delete('/{project}', operation_id='deleteProject')
+async def delete_project(
+    project: str,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Delete a project by project name.
+    Requires READ access + project-creator permissions
+    """
+    ptable = ProjectPermissionsTable(connection.connection)
+    pid = await ptable.get_project_id_from_name_and_user(
+        connection.author, project, readonly=False
+    )
+    success = await ptable.delete_project(project_id=pid, author=connection.author)
+
+    return {'success': success}

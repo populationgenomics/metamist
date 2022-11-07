@@ -15,17 +15,18 @@ from db.python.utils import get_logger
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.1.1'
+_VERSION = '5.2.0'
 
 logger = get_logger()
 
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
-static_dir_exists = os.path.exists(os.path.join(STATIC_DIR, 'index.html'))
+static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
@@ -114,6 +115,10 @@ async def exception_handler(_: Request, e: Exception):
         status_code=code,
         content=base_params,
     )
+
+
+# graphql
+app.include_router(MetamistGraphQLRouter, prefix='/graphql')
 
 
 for route in routes.__dict__.values():
