@@ -1,9 +1,11 @@
 # pylint: disable=too-many-locals
+import collections
 import json
 import asyncio
 import dataclasses
 from datetime import date
 from collections import defaultdict
+from collections.abc import Mapping
 from itertools import groupby
 from typing import Dict, List, Optional, Set
 
@@ -64,7 +66,7 @@ class ProjectSummary:
     # stats
     total_samples: int
     total_participants: int
-    sequence_stats: dict[str, dict[str, str]]
+    sequence_stats: dict[str, dict[str, str | dict[str, str]]]
 
     # grid
     participants: List[NestedParticipant]
@@ -372,13 +374,19 @@ WHERE fp.participant_id in :pids
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
+        seen_batches = set([item for s in seen_seq_types for item in seq_number_by_seq_type.get(s).keys()])
         sequence_stats = {}
         for seq in seen_seq_types:
-            sequence_stats[seq] = {
-                'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
-                'Crams': str(cram_number_by_seq_type.get(seq, 0)),
-                'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
-            }
+            s = seq_number_by_seq_type.get(seq, 0)
+            c = cram_number_by_seq_type.get(seq, 0)
+            seqr = seqr_stats_by_seq_type.get(seq, 0)
+            sequence_stats[seq] = {}
+            for batch in seen_batches:
+                sequence_stats[seq][batch] = {
+                    'Sequences': s.get(batch, 0) if isinstance(s, Mapping) else 0,
+                    'Crams': c.get(batch, 0) if isinstance(c, Mapping) else 0,
+                    'Seqr': seqr.get(batch, 0) if isinstance(seqr, Mapping) else 0,
+                }
 
         return ProjectSummary(
             participants=pmodels,

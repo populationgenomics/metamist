@@ -311,6 +311,8 @@ export const ProjectSummary = () => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
 
+    console.log(summary?.sequence_stats);
+
     const projectSummaryStats: React.ReactElement = (
         <>
             <h2>Project Summary Stats</h2>
@@ -325,6 +327,7 @@ export const ProjectSummary = () => {
                 <Table.Header>
                     <Table.Row>
                         <Table.HeaderCell>Type</Table.HeaderCell>
+                        <Table.HeaderCell>Batch</Table.HeaderCell>
                         <Table.HeaderCell>Sequences</Table.HeaderCell>
                         <Table.HeaderCell>CRAMs</Table.HeaderCell>
                         <Table.HeaderCell>Seqr</Table.HeaderCell>
@@ -334,16 +337,35 @@ export const ProjectSummary = () => {
                 <Table.Body>
                     {summary?.sequence_stats &&
                         Object.entries(summary?.sequence_stats).map(
-                            ([key, value]) => (
-                                <Table.Row key={key}>
-                                    <Table.Cell>{titleCase(key)}</Table.Cell>
-                                    {Object.entries(value).map(([k1, v1]) => (
-                                        <Table.Cell key={`${key}-${k1}`}>
-                                            {`${v1}`}
-                                        </Table.Cell>
-                                    ))}
-                                </Table.Row>
-                            )
+                            ([key, value]) =>
+                                Object.entries(value).map(([k1, v1], i) => (
+                                    <>
+                                        <Table.Row key={key}>
+                                            {i === 0 && (
+                                                <Table.Cell
+                                                    rowSpan={
+                                                        Object.keys(value)
+                                                            .length
+                                                    }
+                                                >
+                                                    {titleCase(key)}
+                                                </Table.Cell>
+                                            )}
+                                            <Table.Cell>
+                                                {titleCase(k1)}
+                                            </Table.Cell>
+                                            {Object.entries(v1).map(
+                                                ([k2, v2]) => (
+                                                    <Table.Cell
+                                                        key={`${k2}-${v2}`}
+                                                    >
+                                                        {`${v2}`}
+                                                    </Table.Cell>
+                                                )
+                                            )}
+                                        </Table.Row>
+                                    </>
+                                ))
                         )}
                 </Table.Body>
             </Table>
