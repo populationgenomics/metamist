@@ -15,7 +15,7 @@ from db.python.utils import get_logger
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
-from api.graphql.schema import MetamistGraphQLRouter    # type: ignore
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version

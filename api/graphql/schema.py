@@ -68,6 +68,15 @@ async def load_samples_for_participant_ids(
 
 
 @connected_data_loader
+async def load_samples_for_ids(sample_ids: list[int], connection) -> list['Sample']:
+    """
+    DataLoader: get_samples_for_ids
+    """
+    samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
+    return samples
+
+
+@connected_data_loader
 async def load_participants_for_ids(
     participant_ids: list[int], connection
 ) -> list['Participant']:
@@ -91,19 +100,29 @@ async def load_samples_for_analysis_ids(
     return [analysis_sample_map.get(aid, []) for aid in analysis_ids]
 
 
+@connected_data_loader
+async def load_projects_for_ids(project_ids: list[int], connection) -> list['Project']:
+    pttable = ProjectPermissionsTable(connection.connection)
+    return await pttable.get_projects_by_ids(project_ids)
+
+
 async def get_context(connection=get_projectless_db_connection):
     return {
         'connection': connection,
         'loader_samples_for_participants': DataLoader(
             load_samples_for_participant_ids(connection)
         ),
+        'loader_samples_for_ids': DataLoader(load_samples_for_ids(connection)),
         'loader_sequences_for_samples': DataLoader(
             load_sequences_for_samples(connection)
         ),
         'loader_samples_for_analysis_ids': DataLoader(
             load_samples_for_analysis_ids(connection)
         ),
-        'load_participants_for_ids': DataLoader(load_participants_for_ids(connection)),
+        'loader_participants_for_ids': DataLoader(
+            load_participants_for_ids(connection)
+        ),
+        'loader_projects_for_ids': DataLoader(load_projects_for_ids(connection)),
     }
 
 
@@ -200,7 +219,7 @@ class Sample:
 
     @strawberry.field
     async def participant(self, info: Info, root: 'Sample') -> Participant:
-        loader_participants_for_ids = info.context['load_participants_for_ids']
+        loader_participants_for_ids = info.context['loader_participants_for_ids']
         return await loader_participants_for_ids.load(root.participant_id)
 
     @strawberry.field
@@ -209,6 +228,10 @@ class Sample:
         return await loader_sequences_for_samples.load(
             sample_id_transform_to_raw(root.id)
         )
+
+    @strawberry.field
+    async def project(self, info: Info, root) -> Project:
+        return await info.context['loader_projects_for_ids'].load(root.project)
 
     @strawberry.field
     async def analyses(
@@ -241,8 +264,8 @@ class SampleSequencing:
 
     @strawberry.field
     async def sample(self, info: Info, root) -> 'Sample':
-        connection = info.context['connection']
-        return await SampleLayer(connection).get_sample_by_id(root.sample_id)
+        loader = info.context['loader_samples_for_ids']
+        return await loader.load(root.sample_id)
 
 
 @strawberry.type
@@ -251,9 +274,8 @@ class Query:
 
     @strawberry.field
     async def sample(self, info: Info, id: str) -> Sample:
-        connection = info.context['connection']
-        slayer = SampleLayer(connection)
-        return await slayer.get_sample_by_id(sample_id_transform_to_raw(id))
+        loader = info.context['loader_samples_for_ids']
+        return await loader.load(sample_id_transform_to_raw(id))
 
     @strawberry.field
     async def sample_sequence(self, info: Info, id: int) -> SampleSequencing:

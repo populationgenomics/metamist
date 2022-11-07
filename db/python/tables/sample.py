@@ -263,7 +263,7 @@ class SampleTable(DbBase):
             )
 
         d = dict(sample_row)
-        project = d.pop('project')
+        project = d.get('project')
         sample = Sample.from_db(d)
         return project, sample
 
