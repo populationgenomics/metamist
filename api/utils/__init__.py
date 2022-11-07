@@ -12,6 +12,7 @@ from .db import (
 T = TypeVar('T')
 X = TypeVar('X')
 
+
 def group_by(iterable: Iterable[T], selector: Callable[[T], X]) -> dict[X, list[T]]:
     """Simple group by implementation"""
     ret = defaultdict(list)

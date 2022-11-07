@@ -264,8 +264,18 @@ class ParticipantLayer(BaseLayer):
         super().__init__(connection)
         self.pttable = ParticipantTable(connection=connection)
 
-    async def get_participants_by_ids(self, pids: list[int]) -> list[Participant]:
-        project, participants = await self.pttable.get_participants_by_ids(pids)
+    async def get_participants_by_ids(
+        self, pids: list[int], check_project_ids: bool = True
+    ) -> list[Participant]:
+        """
+        Get participants by IDs
+        """
+        projects, participants = await self.pttable.get_participants_by_ids(pids)
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         return participants
 

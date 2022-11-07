@@ -330,13 +330,21 @@ class ProjectPermissionsTable:
         return relevant_project_map
 
     async def get_projects_by_ids(self, project_ids: list[ProjectId]) -> list[Project]:
+        """
+        Get projects by IDs, NO authorization is performed here
+        """
         _query = """
-        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name 
+        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
         FROM project
         WHERE id IN :project_ids
         """
         rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
-        return list(map(Project.from_db, rows))
+        projects = list(map(Project.from_db, rows))
+        if len(project_ids) != len(rows):
+            missing_projects = set(project_ids) - set(p.id for p in projects)
+            raise ValueError(f'Some projects were not found: {missing_projects}')
+
+        return projects
 
     async def create_project(
         self,

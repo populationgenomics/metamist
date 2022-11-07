@@ -23,7 +23,12 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 
-    async def get_samples_for_participants(self, participant_ids: list[int]) -> tuple[set[ProjectId], list[Sample]]:
+    async def get_samples_for_participants(
+        self, participant_ids: list[int]
+    ) -> tuple[set[ProjectId], list[Sample]]:
+        """
+        Get samples FROM participants. This returns a flat list of samples
+        """
         keys = [
             'id',
             'external_id',
@@ -262,7 +267,10 @@ class SampleTable(DbBase):
         sample = Sample.from_db(d)
         return project, sample
 
-    async def get_samples_by_analysis_ids(self, analysis_ids: list[int]) -> tuple[set[ProjectId], dict[int, list[Sample]]]:
+    async def get_samples_by_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[Sample]]]:
+        """Get map of samples by analysis_ids"""
         keys = [
             'id',
             'external_id',
@@ -273,7 +281,7 @@ class SampleTable(DbBase):
             'project',
         ]
         _query = f"""
-        SELECT {", ".join("s." + k for k in keys)}, a_s.analysis_id 
+        SELECT {", ".join("s." + k for k in keys)}, a_s.analysis_id
         FROM analysis_sample a_s ON s.id = a_s.sample_id
         INNER JOIN sample s
         WHERE a_s.analysis_id IN :aids
@@ -293,7 +301,10 @@ class SampleTable(DbBase):
             if sid not in ds:
                 sample_map[sid] = Sample.from_db({k: row.get(k) for k in keys})
 
-        analysis_map: dict[int, list[Sample]] = {analysis_id: [sample_map.get(sid) for sid in sids] for analysis_id, sids in mapped_analysis_to_sample_id.items()}
+        analysis_map: dict[int, list[Sample]] = {
+            analysis_id: [sample_map.get(sid) for sid in sids]
+            for analysis_id, sids in mapped_analysis_to_sample_id.items()
+        }
 
         return projects, analysis_map
 

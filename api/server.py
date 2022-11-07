@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
-from strawberry.fastapi import GraphQLRouter
 
 from db.python.connect import SMConnections
 from db.python.tables.project import is_full_access
@@ -16,7 +15,7 @@ from db.python.utils import get_logger
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
-from api.graphql import schema as graphql
+from api.graphql.schema import MetamistGraphQLRouter    # type: ignore
 
 
 # This tag is automatically updated by bump2version
@@ -117,9 +116,9 @@ async def exception_handler(_: Request, e: Exception):
         content=base_params,
     )
 
+
 # graphql
-graphql_app = GraphQLRouter(graphql.schema, graphiql=True, context_getter=graphql.get_context)
-app.include_router(graphql_app, prefix='/graphql')
+app.include_router(MetamistGraphQLRouter, prefix='/graphql')
 
 
 for route in routes.__dict__.values():

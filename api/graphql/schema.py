@@ -1,5 +1,15 @@
+# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring
+# type: ignore
+"""
+Schema for GraphQL.
+
+Note, we silence a lot of linting here because GraphQL looks at type annotations
+and defaults to decide the GraphQL schema, so it might not necessarily look correct.
+"""
+
 import strawberry
 from strawberry.dataloader import DataLoader
+from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
 from api.utils import get_projectless_db_connection, group_by
@@ -12,51 +22,95 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.enums import SampleType, SequenceType, AnalysisType, AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw
 
+
 def connected_data_loader(fn):
+    """
+    DataLoader Decorator for allowing DB connection to be bound to a loader
+    """
+
     def inner(connection):
         async def wrapped(*args, **kwargs):
             return await fn(*args, **kwargs, connection=connection)
+
         return wrapped
+
     return inner
 
+
 @connected_data_loader
-async def load_sequences_from_samples(sample_ids: list[int], connection) -> list[list['SampleSequencing']]:
+async def load_sequences_for_samples(
+    sample_ids: list[int], connection
+) -> list[list['SampleSequencing']]:
+    """
+    DataLoader: get_sequences_for_sample_ids
+    """
     seqlayer = SampleSequenceLayer(connection)
     sequences = await seqlayer.get_sequences_for_sample_ids(sample_ids=sample_ids)
-    seq_map = group_by(sequences, lambda sequence: int(sequence.sample_id))
+    seq_map: dict[int, list['SampleSequencing']] = group_by(
+        sequences, lambda sequence: int(sequence.sample_id)
+    )
 
     return [seq_map.get(sid, []) for sid in sample_ids]
 
-@connected_data_loader
-async def load_samples_from_participant_ids(participant_ids: list[int], connection) -> list[list['Sample']]:
-    return await SampleLayer(connection).get_samples_by_participants(participant_ids)
 
 @connected_data_loader
-async def load_participants_from_ids(participant_ids: list[int], connection) -> list['Participant']:
+async def load_samples_for_participant_ids(
+    participant_ids: list[int], connection
+) -> list[list['Sample']]:
+    """
+    DataLoader: get_samples_for_participant_ids
+    """
+    sample_map = await SampleLayer(connection).get_samples_by_participants(
+        participant_ids
+    )
+
+    return [sample_map.get(pid, []) for pid in participant_ids]
+
+
+@connected_data_loader
+async def load_participants_for_ids(
+    participant_ids: list[int], connection
+) -> list['Participant']:
+    """
+    DataLoader: get_participants_by_ids
+    """
     player = ParticipantLayer(connection)
     return await player.get_participants_by_ids(participant_ids)
 
+
 @connected_data_loader
-async def load_samples_from_analysis_ids(analysis_ids: list[int], connection) -> list['Sample']:
+async def load_samples_for_analysis_ids(
+    analysis_ids: list[int], connection
+) -> list['Sample']:
+    """
+    DataLoader: get_samples_for_analysis_ids
+    """
     slayer = SampleLayer(connection)
     analysis_sample_map = await slayer.get_samples_by_analysis_ids(analysis_ids)
 
     return [analysis_sample_map.get(aid, []) for aid in analysis_ids]
 
 
-
-
 async def get_context(connection=get_projectless_db_connection):
     return {
         'connection': connection,
-        'loader_samples_from_participants': DataLoader(load_samples_from_participant_ids(connection)),
-        'loader_sequences_from_samples': DataLoader(load_sequences_from_samples(connection)),
-        'loader_samples_from_analysis_ids': DataLoader(load_samples_from_analysis_ids(connection))
+        'loader_samples_for_participants': DataLoader(
+            load_samples_for_participant_ids(connection)
+        ),
+        'loader_sequences_for_samples': DataLoader(
+            load_sequences_for_samples(connection)
+        ),
+        'loader_samples_for_analysis_ids': DataLoader(
+            load_samples_for_analysis_ids(connection)
+        ),
+        'load_participants_for_ids': DataLoader(load_participants_for_ids(connection)),
     }
 
 
 @strawberry.type
 class Project:
+    """Project GraphQL model"""
+
     id: int
     name: str
     dataset: str
@@ -92,13 +146,17 @@ class Project:
     @strawberry.field()
     async def participants(self, info: Info, root: 'Project') -> list['Participant']:
         connection = info.context['connection']
-        participants = await ParticipantLayer(connection).get_participants(project=root.id)
+        participants = await ParticipantLayer(connection).get_participants(
+            project=root.id
+        )
 
         return participants
 
 
 @strawberry.type
 class Analysis:
+    """Analysis GraphQL model"""
+
     id: int
     type: strawberry.enum(AnalysisType)
     status: strawberry.enum(AnalysisStatus)
@@ -112,23 +170,27 @@ class Analysis:
 
     @strawberry.field
     async def samples(self, info: Info, root) -> list['Sample']:
-        loader = info.context['loader_samples_from_analysis_ids']
+        loader = info.context['loader_samples_for_analysis_ids']
         return loader.load(root.id)
 
 
 @strawberry.type
 class Participant:
+    """Participant GraphQL model"""
+
     id: int
     external_id: str
     meta: strawberry.scalars.JSON
 
     @strawberry.field
     async def samples(self, info: Info, root) -> list['Sample']:
-        return await info.context['loader_samples_from_participants'].load(root.id)
+        return await info.context['loader_samples_for_participants'].load(root.id)
 
 
 @strawberry.type
 class Sample:
+    """Sample GraphQL model"""
+
     id: str
     external_id: str
     active: bool
@@ -138,15 +200,15 @@ class Sample:
 
     @strawberry.field
     async def participant(self, info: Info, root: 'Sample') -> Participant:
-        connection = info.context['connection']
-        player = ParticipantLayer(connection)
-        return (await player.get_participants_by_ids([root.participant_id]))[0]
+        loader_participants_for_ids = info.context['load_participants_for_ids']
+        return await loader_participants_for_ids.load(root.participant_id)
 
     @strawberry.field
     async def sequences(self, info: Info, root) -> list['SampleSequencing']:
-        loader_sequences_from_samples = info.context['loader_sequences_from_samples']
-        return await loader_sequences_from_samples.load(sample_id_transform_to_raw(root.id))
-
+        loader_sequences_for_samples = info.context['loader_sequences_for_samples']
+        return await loader_sequences_for_samples.load(
+            sample_id_transform_to_raw(root.id)
+        )
 
     @strawberry.field
     async def analyses(
@@ -154,12 +216,14 @@ class Sample:
         info: Info,
         root: 'Sample',
         type: strawberry.enum(AnalysisType) | None = None,
+        status: strawberry.enum(AnalysisStatus) | None = None,
     ) -> list[Analysis]:
         connection = info.context['connection']
         alayer = AnalysisLayer(connection)
         analyses = await alayer.get_analysis_for_sample(
             sample_id_transform_to_raw(root.id),
             analysis_type=type,
+            status=status,
             map_sample_ids=False,
         )
 
@@ -168,6 +232,8 @@ class Sample:
 
 @strawberry.type
 class SampleSequencing:
+    """SampleSequencing GraphQL model"""
+
     id: int
     type: strawberry.enum(SequenceType)
     meta: strawberry.scalars.JSON
@@ -181,6 +247,8 @@ class SampleSequencing:
 
 @strawberry.type
 class Query:
+    """GraphQL Queries"""
+
     @strawberry.field
     async def sample(self, info: Info, id: str) -> Sample:
         connection = info.context['connection']
@@ -204,7 +272,9 @@ class Query:
     async def project(self, info: Info, name: str) -> Project:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
-        project_id = await ptable.get_project_id_from_name_and_user(user=connection.author, project_name=name, readonly=True)
+        project_id = await ptable.get_project_id_from_name_and_user(
+            user=connection.author, project_name=name, readonly=True
+        )
         presponse = await ptable.get_projects_by_ids([project_id])
         return presponse[0]
 
@@ -219,3 +289,4 @@ class Query:
 
 
 schema = strawberry.Schema(query=Query, mutation=None)
+MetamistGraphQLRouter = GraphQLRouter(schema, graphiql=True, context_getter=get_context)
