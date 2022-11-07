@@ -2,6 +2,7 @@ from typing import List, Dict, Tuple, Any, Optional
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import ProjectId, to_db_json
+from models.models.participant import Participant
 
 
 class ParticipantTable(DbBase):
@@ -18,6 +19,18 @@ class ParticipantTable(DbBase):
             _query, {'participant_ids': participant_ids}
         )
         return set(r['project'] for r in rows)
+
+    async def get_participants_by_ids(
+        self, ids: list[int]
+    ) -> tuple[set[ProjectId], list[Participant]]:
+        """Get participants by IDs"""
+        _query = 'SELECT project, id, external_id, reported_sex, reported_gender, karyotype, meta FROM participant WHERE id in :ids'
+        rows = await self.connection.fetch_all(_query, {'ids': ids})
+
+        ds = [dict(r) for r in rows]
+        projects = set(d.pop('project') for d in ds)
+
+        return projects, [Participant(**d) for d in ds]
 
     async def get_participants(
         self, project: int, internal_participant_ids: List[int] = None

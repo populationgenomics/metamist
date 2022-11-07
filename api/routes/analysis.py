@@ -271,7 +271,7 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: List[str] = Query(None),
+    project_names: List[str] = Query(None),  # type: ignore
     author: str = None,
     output_dir: str = None,
     connection: Connection = get_projectless_db_connection,
@@ -300,7 +300,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequence_types: List[SequenceType] = Query(None),
+    sequence_types: List[SequenceType] = Query(None),  # type: ignore
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -342,7 +342,7 @@ async def get_sample_reads_map(
 
 @router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
 async def get_sample_file_sizes(
-    project_names: List[str] = Query(None),
+    project_names: List[str] = Query(None),  # type: ignore
     start_date: str = None,
     end_date: str = None,
     connection: Connection = get_projectless_db_connection,

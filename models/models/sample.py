@@ -15,7 +15,7 @@ class Sample(SMBase):
 
     id: Union[str, int]
     external_id: str
-    participant_id: Optional[str] = None
+    participant_id: Optional[int] = None
     active: Optional[bool] = None
     meta: Optional[Dict] = None
     type: Optional[SampleType] = None

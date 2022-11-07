@@ -3,7 +3,7 @@ import json
 from pydantic import BaseModel
 
 
-class ParticipantModel(BaseModel):
+class Participant(BaseModel):
     """Update participant model"""
 
     id: int
