@@ -334,10 +334,11 @@ ORDER BY a.timestamp_completed DESC
         seen_sample_ids = set()
         analyses: List[Analysis] = []
         for row in rows:
-            if row['sample_id'] in seen_sample_ids:
+            row_dict = dict(row)
+            if row_dict['sample_id'] in seen_sample_ids:
                 continue
-            seen_sample_ids.add(row['sample_id'])
-            analyses.append(Analysis.from_db(**row))
+            seen_sample_ids.add(row_dict['sample_id'])
+            analyses.append(Analysis.from_db(**row_dict))
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -363,6 +364,41 @@ WHERE a.id = :analysis_id
             a.sample_ids.append(row['sample_id'])
 
         return project, a
+
+    async def get_analysis_for_sample(
+        self, sample_id: int, map_sample_ids: bool
+    ) -> tuple[set[ProjectId], list[Analysis]]:
+        """Get related samples from this sequence"""
+        _query = """
+    SELECT a.id as id, a.type as type, a.status as status,
+    a.output as output, a.project as project, a_s.sample_id as sample_id,
+    a.timestamp_completed as timestamp_completed, a.meta as meta
+    FROM analysis_sample a_s
+    INNER JOIN analysis a ON a_s.analysis_id = a.id
+    WHERE a_s.sample_id = :sample_id
+        """
+
+        rows = await self.connection.fetch_all(_query, {'sample_id': sample_id})
+        analyses = [Analysis.from_db(**dict(d)) for d in rows]
+
+        if map_sample_ids:
+
+            _samples_query = """
+                SELECT analysis_id, sample_id
+                FROM analysis_sample
+                WHERE analysis_id IN :aids
+            """
+            analyses_samples = await self.connection.fetch_all(
+                _samples_query, {'aids': [a.id for a in analyses]}
+            )
+            analyses_samples_dict = defaultdict(list)
+            for a_s in analyses_samples:
+                analyses_samples_dict[a_s['analysis_id']].append(a_s['sample_id'])
+
+            for a in analyses:
+                analyses.sample_ids = analyses_samples_dict[a.id]
+
+        return set(a.project for a in analyses), analyses
 
     async def get_sample_cram_path_map_for_seqr(
         self, project: ProjectId, sequence_types: list[SequenceType]

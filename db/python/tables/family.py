@@ -60,9 +60,9 @@ class FamilyTable(DbBase):
         seen = set()
         families = []
         for r in rows:
-            if r.id not in seen:
+            if r['id'] not in seen:
                 families.append(Family.from_db(dict(r)))
-                seen.add(r.id)
+                seen.add(r['id'])
         return families
 
     async def search(

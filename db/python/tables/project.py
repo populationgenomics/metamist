@@ -404,8 +404,8 @@ RETURNING ID"""
 
         projects = []
         for r in await self.connection.fetch_all(_query):
-            r = dict(r)
-            r['meta'] = json.loads(r['meta'] or '{}')
-            projects.append(r)
+            r_dict = dict(r)
+            r_dict['meta'] = json.loads(r_dict['meta'] or '{}')
+            projects.append(r_dict)
 
         return projects

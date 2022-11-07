@@ -2,9 +2,10 @@
 
 import re
 import asyncio
-from collections import defaultdict
+
 from itertools import groupby
-from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
+from collections import defaultdict
+from typing import Optional, Callable, Dict, List, Tuple, Iterable, Set, Any
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
@@ -122,7 +123,9 @@ class SampleSequencingTable(DbBase):
             RETURNING id;
         """
 
-        with_function = self.connection.transaction if open_transaction else NoOpAenter
+        with_function: Callable | NoOpAenter = (
+            self.connection.transaction if open_transaction else NoOpAenter
+        )
 
         async with with_function():
 
