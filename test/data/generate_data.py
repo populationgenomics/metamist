@@ -58,6 +58,7 @@ def main(
 
     samples = []
     sample_id_index = 1003
+
     for participant_eid in participant_eids:
         pid = id_map[participant_eid]
 
@@ -114,6 +115,7 @@ def main(
 
     batch_samples = SampleBatchUpsertBody(samples=samples)
     response = SampleApi().batch_upsert_samples(project, batch_samples)
+
     pprint(response)
 
 
