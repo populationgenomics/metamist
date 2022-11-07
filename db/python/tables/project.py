@@ -409,3 +409,26 @@ RETURNING ID"""
             projects.append(r)
 
         return projects
+
+    async def delete_project(self, project_id: int, author: str) -> bool:
+        """Delete metamist project, reuqires project_creator_permissions"""
+        await self.check_project_creator_permissions(author)
+
+        async with self.connection.transaction():
+            _query = """
+DELETE FROM participant_phenotypes where participant_id IN (SELECT id FROM participant WHERE project = :project);
+DELETE FROM family_participant WHERE family_id IN (SELECT id FROM family where project = :project);
+DELETE FROM family WHERE project = :project;
+DELETE FROM sample_sequencing_eid WHERE project = :project;
+DELETE FROM sample_sequencing WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM analysis_sample WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE project = :project);
+DELETE FROM sample WHERE project = :project;
+DELETE FROM participant WHERE project = :project;
+DELETE FROM analysis WHERE project = :project;
+DELETE FROM project WHERE id = :project;
+            """
+
+            await self.connection.execute(_query, {'project': project_id})
+
+        return True

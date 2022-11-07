@@ -78,3 +78,21 @@ async def update_project(
     return await ptable.update_project(
         project_name=project, update=project_update_model, author=connection.author
     )
+
+
+@router.delete('/{project}', operation_id='deleteProject')
+async def delete_project(
+    project: str,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Delete a project by project name.
+    Requires READ access + project-creator permissions
+    """
+    ptable = ProjectPermissionsTable(connection.connection)
+    pid = await ptable.get_project_id_from_name_and_user(
+        connection.author, project, readonly=False
+    )
+    success = await ptable.delete_project(project_id=pid, author=connection.author)
+
+    return {'success': success}
