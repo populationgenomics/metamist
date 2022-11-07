@@ -364,17 +364,25 @@ WHERE a.id = :analysis_id
 
         return project, a
 
-    async def get_analysis_for_sample(self, sample_id: int, map_sample_ids: bool) -> tuple[set[ProjectId], list[Analysis]]:
-        _query = """
+    async def get_analysis_for_sample(self, sample_id: int, analysis_type: AnalysisType | None, map_sample_ids: bool) -> tuple[set[ProjectId], list[Analysis]]:
+
+        values = {'sample_id': sample_id}
+        wheres = ['a_s.sample_id = :sample_id']
+
+        if analysis_type:
+            wheres.append('a.type = :atype')
+            values['atype'] = analysis_type.value
+
+        _query = f"""
     SELECT a.id as id, a.type as type, a.status as status,
     a.output as output, a.project as project, a_s.sample_id as sample_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
     FROM analysis_sample a_s
     INNER JOIN analysis a ON a_s.analysis_id = a.id
-    WHERE a_s.sample_id = :sample_id
+    WHERE {' AND '.join(wheres)}
         """
 
-        rows = await self.connection.fetch_all(_query, {'sample_id': sample_id})
+        rows = await self.connection.fetch_all(_query, values)
         analyses = [Analysis.from_db(**dict(d)) for d in rows]
 
         if map_sample_ids:

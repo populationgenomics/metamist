@@ -1,7 +1,9 @@
+from itertools import groupby
 from typing import Dict, List, Any, Optional, Union
 
 from pydantic import BaseModel
 
+from api.utils import group_by
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
@@ -63,12 +65,17 @@ class SampleLayer(BaseLayer):
 
         return samples
 
-    async def get_samples_by_participant(self, participant_id: int) -> list[Sample]:
-        projects, samples = await self.st.get_samples_for_participant(participant_id)
+    async def get_samples_by_participants(self, participant_ids: list[int], check_project_ids: bool=True) -> list[list[Sample]]:
+        projects, samples = await self.st.get_samples_for_participants(participant_ids)
+        if not samples:
+            return [[]] * len(participant_ids)
 
-        # TODO: project check
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(self.author, projects, readonly=True)
 
-        return samples
+        grouped_samples = group_by(samples, lambda s: s.participant_id)
+
+        return [grouped_samples.get(p, []) for p in participant_ids]
 
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Return the projects associated with the sample ids"""

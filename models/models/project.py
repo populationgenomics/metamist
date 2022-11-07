@@ -4,7 +4,7 @@ import json
 from models.base import SMBase
 
 
-class ProjectRow(SMBase):
+class Project(SMBase):
     """Row for project in 'project' table"""
 
     id: Optional[int] = None
@@ -20,4 +20,4 @@ class ProjectRow(SMBase):
         """From DB row, with db keys"""
         kwargs = dict(kwargs)
         kwargs['meta'] = json.loads(kwargs['meta']) if kwargs.get('meta') else {}
-        return ProjectRow(**kwargs)
+        return Project(**kwargs)

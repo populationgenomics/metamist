@@ -1,17 +1,76 @@
 import strawberry
+from strawberry.dataloader import DataLoader
 from strawberry.types import Info
 
 from api.utils import get_projectless_db_connection
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer
+from db.python.tables.project import ProjectPermissionsTable
 from models.enums import SampleType, SequenceType, AnalysisType, AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw
 
+def connected_data_loader(fn):
+    def inner(connection):
+        async def wrapped(*args, **kwargs):
+            return await fn(*args, **kwargs, connection=connection)
+        return wrapped
+    return inner
+
+@connected_data_loader
+async def load_samples_from_participants(participant_ids: list[int], connection) -> list[list['Sample']]:
+    return await SampleLayer(connection).get_samples_by_participants(participant_ids)
+
 
 async def get_context(connection=get_projectless_db_connection):
-    return {'connection': connection}
+    return {
+        'connection': connection,
+        'loader_samples_from_participants': DataLoader(load_samples_from_participants(connection))
+    }
+
+
+@strawberry.type
+class Project:
+    id: int
+    name: str
+    dataset: str
+    meta: strawberry.scalars.JSON
+    read_secret_name: str | None = None
+    write_secret_name: str | None = None
+
+    @strawberry.field()
+    async def pedigree(
+        self,
+        info: Info,
+        root: 'Project',
+        internal_family_ids: list[int] | None = None,
+        replace_with_participant_external_ids: bool = True,
+        replace_with_family_external_ids: bool = True,
+        include_participants_not_in_families: bool = False,
+        empty_participant_value: str | None = None,
+    ) -> list[strawberry.scalars.JSON]:
+        connection = info.context['connection']
+        family_layer = FamilyLayer(connection)
+
+        pedigree_dicts = await family_layer.get_pedigree(
+            project=root.id,
+            family_ids=internal_family_ids,
+            replace_with_participant_external_ids=replace_with_participant_external_ids,
+            replace_with_family_external_ids=replace_with_family_external_ids,
+            empty_participant_value=empty_participant_value,
+            include_participants_not_in_families=include_participants_not_in_families,
+        )
+
+        return pedigree_dicts
+
+    @strawberry.field()
+    async def participants(self, info: Info, root: 'Project') -> list['Participant']:
+        connection = info.context['connection']
+        participants = await ParticipantLayer(connection).get_participants(project=root.id)
+
+        return participants
 
 
 @strawberry.type
@@ -41,8 +100,7 @@ class Participant:
 
     @strawberry.field
     async def samples(self, info: Info, root) -> list['Sample']:
-        connection = info.context['connection']
-        return await SampleLayer(connection).get_samples_by_participant(root.id)
+        return await info.context['loader_samples_from_participants'].load(root.id)
 
 
 @strawberry.type
@@ -55,7 +113,7 @@ class Sample:
     author: str | None
 
     @strawberry.field
-    async def participant(self, info: Info, root) -> Participant:
+    async def participant(self, info: Info, root: 'Sample') -> Participant:
         connection = info.context['connection']
         player = ParticipantLayer(connection)
         return (await player.get_participants_by_ids([root.participant_id]))[0]
@@ -70,12 +128,21 @@ class Sample:
         )
 
     @strawberry.field
-    async def analyses_for_type(self, info: Info, root, analysis_type: strawberry.enum(AnalysisType)) -> list[Analysis]:
+    async def analyses(
+        self,
+        info: Info,
+        root: 'Sample',
+        type: strawberry.enum(AnalysisType) | None = None,
+    ) -> list[Analysis]:
         connection = info.context['connection']
         alayer = AnalysisLayer(connection)
-        return await alayer.get_latest_complete_analysis_for_samples_and_type(
-            sample_ids=[sample_id_transform_to_raw(root.id)], analysis_type=analysis_type
+        analyses = await alayer.get_analysis_for_sample(
+            sample_id_transform_to_raw(root.id),
+            analysis_type=type,
+            map_sample_ids=False,
         )
+
+        return analyses
 
 
 @strawberry.type
@@ -112,15 +179,22 @@ class Query:
         ps = await player.get_participants_by_ids([id])
         return ps[0]
 
-    @strawberry.field
-    async def get_analyses_for_sample(
-        self, info: Info, sample_id: str
-    ) -> list[Analysis]:
+    @strawberry.field()
+    async def project(self, info: Info, name: str) -> Project:
         connection = info.context['connection']
-        alayer = AnalysisLayer(connection)
-        return await alayer.get_analysis_for_sample(
-            sample_id_transform_to_raw(sample_id), map_sample_ids=False
+        ptable = ProjectPermissionsTable(connection.connection)
+        project_id = await ptable.get_project_id_from_name_and_user(user=connection.author, project_name=name, readonly=True)
+        presponse = await ptable.get_projects_by_ids([project_id])
+        return presponse[0]
+
+    @strawberry.field
+    async def my_projects(self, info: Info) -> list[Project]:
+        connection = info.context['connection']
+        ptable = ProjectPermissionsTable(connection.connection)
+        project_map = await ptable.get_projects_accessible_by_user(
+            connection.author, readonly=True
         )
+        return await ptable.get_projects_by_ids(list(project_map.keys()))
 
 
 schema = strawberry.Schema(query=Query, mutation=None)
