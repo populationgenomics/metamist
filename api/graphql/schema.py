@@ -2,7 +2,7 @@ import strawberry
 from strawberry.dataloader import DataLoader
 from strawberry.types import Info
 
-from api.utils import get_projectless_db_connection
+from api.utils import get_projectless_db_connection, group_by
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
@@ -20,14 +20,38 @@ def connected_data_loader(fn):
     return inner
 
 @connected_data_loader
-async def load_samples_from_participants(participant_ids: list[int], connection) -> list[list['Sample']]:
+async def load_sequences_from_samples(sample_ids: list[int], connection) -> list[list['SampleSequencing']]:
+    seqlayer = SampleSequenceLayer(connection)
+    sequences = await seqlayer.get_sequences_for_sample_ids(sample_ids=sample_ids)
+    seq_map = group_by(sequences, lambda sequence: int(sequence.sample_id))
+
+    return [seq_map.get(sid, []) for sid in sample_ids]
+
+@connected_data_loader
+async def load_samples_from_participant_ids(participant_ids: list[int], connection) -> list[list['Sample']]:
     return await SampleLayer(connection).get_samples_by_participants(participant_ids)
+
+@connected_data_loader
+async def load_participants_from_ids(participant_ids: list[int], connection) -> list['Participant']:
+    player = ParticipantLayer(connection)
+    return await player.get_participants_by_ids(participant_ids)
+
+@connected_data_loader
+async def load_samples_from_analysis_ids(analysis_ids: list[int], connection) -> list['Sample']:
+    slayer = SampleLayer(connection)
+    analysis_sample_map = await slayer.get_samples_by_analysis_ids(analysis_ids)
+
+    return [analysis_sample_map.get(aid, []) for aid in analysis_ids]
+
+
 
 
 async def get_context(connection=get_projectless_db_connection):
     return {
         'connection': connection,
-        'loader_samples_from_participants': DataLoader(load_samples_from_participants(connection))
+        'loader_samples_from_participants': DataLoader(load_samples_from_participant_ids(connection)),
+        'loader_sequences_from_samples': DataLoader(load_sequences_from_samples(connection)),
+        'loader_samples_from_analysis_ids': DataLoader(load_samples_from_analysis_ids(connection))
     }
 
 
@@ -88,8 +112,8 @@ class Analysis:
 
     @strawberry.field
     async def samples(self, info: Info, root) -> list['Sample']:
-        connection = info.context['connection']
-        return await SampleLayer(connection).get_samples_by_analysis_id(root.id)
+        loader = info.context['loader_samples_from_analysis_ids']
+        return loader.load(root.id)
 
 
 @strawberry.type
@@ -120,12 +144,9 @@ class Sample:
 
     @strawberry.field
     async def sequences(self, info: Info, root) -> list['SampleSequencing']:
-        connection = info.context['connection']
-        seqlayer = SampleSequenceLayer(connection)
+        loader_sequences_from_samples = info.context['loader_sequences_from_samples']
+        return await loader_sequences_from_samples.load(sample_id_transform_to_raw(root.id))
 
-        return await seqlayer.get_sequences_for_sample_ids(
-            [sample_id_transform_to_raw(root.id)]
-        )
 
     @strawberry.field
     async def analyses(

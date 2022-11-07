@@ -60,10 +60,18 @@ class SampleLayer(BaseLayer):
 
         return sample
 
-    async def get_samples_by_analysis_id(self, analysis_id: int) -> list[Sample]:
-        project, samples = await self.st.get_samples_by_analysis_id(analysis_id)
+    async def get_samples_by_analysis_ids(self, analysis_ids: list[int], check_project_ids: bool=True) -> dict[int, list[Sample]]:
+        projects, analysis_sample_map = await self.st.get_samples_by_analysis_ids(analysis_ids)
 
-        return samples
+        if not analysis_sample_map:
+            return {}
+
+        if check_project_ids:
+            await self.pt.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return analysis_sample_map
 
     async def get_samples_by_participants(self, participant_ids: list[int], check_project_ids: bool=True) -> list[list[Sample]]:
         projects, samples = await self.st.get_samples_for_participants(participant_ids)

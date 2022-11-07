@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from datetime import date
 from typing import Iterable, Any
 
@@ -261,7 +262,7 @@ class SampleTable(DbBase):
         sample = Sample.from_db(d)
         return project, sample
 
-    async def get_samples_by_analysis_id(self, analysis_id: int) -> tuple[set[ProjectId], list[Sample]]:
+    async def get_samples_by_analysis_ids(self, analysis_ids: list[int]) -> tuple[set[ProjectId], dict[int, list[Sample]]]:
         keys = [
             'id',
             'external_id',
@@ -272,17 +273,29 @@ class SampleTable(DbBase):
             'project',
         ]
         _query = f"""
-        SELECT {", ".join("s." + k for k in keys)} from sample s
-        INNER JOIN analysis_sample a_s ON s.id = a_s.sample_id
-        WHERE a_s.analysis_id = :analysis_id
+        SELECT {", ".join("s." + k for k in keys)}, a_s.analysis_id 
+        FROM analysis_sample a_s ON s.id = a_s.sample_id
+        INNER JOIN sample s
+        WHERE a_s.analysis_id IN :aids
         """
-
-        rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
+        rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
 
         ds = [dict(d) for d in rows]
-        projects = set(d.pop('project') for d in ds)
-        samples = [Sample.from_db(d) for d in ds]
-        return projects, samples
+
+        mapped_analysis_to_sample_id: dict[int, list[int]] = defaultdict(list)
+        sample_map: dict[int, Sample] = {}
+        projects: set[int] = set()
+        for row in ds:
+            sid = row['id']
+            mapped_analysis_to_sample_id[row['analysis_id']].append(sid)
+            projects.add(row['project'])
+
+            if sid not in ds:
+                sample_map[sid] = Sample.from_db({k: row.get(k) for k in keys})
+
+        analysis_map: dict[int, list[Sample]] = {analysis_id: [sample_map.get(sid) for sid in sids] for analysis_id, sids in mapped_analysis_to_sample_id.items()}
+
+        return projects, analysis_map
 
     async def get_all(
         self, check_active: bool = True
