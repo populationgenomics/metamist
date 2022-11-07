@@ -28,4 +28,3 @@ with client as session:
     samples = session.execute(query)
 
 print(json.dumps(samples, indent=2))
-print('hi')

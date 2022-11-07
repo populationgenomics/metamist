@@ -4,9 +4,9 @@ from strawberry.types import Info
 
 from api.utils import get_projectless_db_connection
 from db.python.layers.sample import SampleLayer
-from db.python.layers.sequence import SampleSequenceLayer
-from models.enums import SampleType
-from models.models.sequence import SampleSequencing as SampleSequencingType
+
+# from db.python.layers.sequence import SampleSequenceLayer
+from models.enums import SampleType, SequenceType, SequenceStatus
 from models.models.sample import sample_id_transform_to_raw
 
 
@@ -22,6 +22,9 @@ class SampleSequencing:
     id: int
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
+    sample_id: int
+    type: SequenceType
+    status: SequenceStatus
 
 
 @strawberry.type
@@ -36,15 +39,16 @@ class Sample:
     type: SampleType
     author: str | None
 
-    @strawberry.field
-    async def sequences(self, info: Info, root) -> list[SampleSequencingType]:
-        """Get related sequences"""
-        connection = info.context['connection']
-        seqlayer = SampleSequenceLayer(connection)
-
-        return await seqlayer.get_sequences_for_sample_ids(
-            [sample_id_transform_to_raw(root.id)]
-        )
+    # @strawberry.field
+    # async def sequences(self, info: Info, root) -> list['SampleSequencing']:
+    #     """Get related sequences"""
+    #     connection = info.context['connection']
+    #     seqlayer = SampleSequenceLayer(connection)
+    #     sequences = await seqlayer.get_sequences_for_sample_ids(
+    #         [sample_id_transform_to_raw(root.id)]
+    #     )
+    #     return [SampleSequencing(s) for s in sequences]
+    #     # return sequences
 
 
 @strawberry.type

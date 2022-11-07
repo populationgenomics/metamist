@@ -163,19 +163,8 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
     shutil.rmtree(tmpdir)
 
 
-def copy_typescript_files_from(tmpdir):
+def copy_files_from(files_to_ignore, dir_to_copy_to, dir_to_copy_from):
     """Copy typescript files to web/src/sm-api/"""
-    files_to_ignore = {
-        'README.md',
-        '.gitignore',
-        '.npmignore',
-        '.openapi-generator',
-        '.openapi-generator-ignore',
-        'git_push.sh',
-    }
-
-    dir_to_copy_to = 'web/src/sm-api/'  # should be relative to this script
-    dir_to_copy_from = tmpdir
 
     if not os.path.exists(dir_to_copy_to):
         os.makedirs(dir_to_copy_to)
@@ -209,6 +198,32 @@ def copy_typescript_files_from(tmpdir):
             shutil.copy(path_to_copy, output_path)
 
 
+def copy_graphql_files_from(tmpdir):
+    """Copy graphql files to api/graphql/"""
+    files_to_ignore = {}
+    dir_to_copy_to = 'sample_metadata/graphql/'  # should be relative to this script
+    dir_to_copy_from = tmpdir
+
+    copy_files_from(files_to_ignore, dir_to_copy_to, dir_to_copy_from)
+
+
+def copy_typescript_files_from(tmpdir):
+    """Copy typescript files to web/src/sm-api/"""
+    files_to_ignore = {
+        'README.md',
+        '.gitignore',
+        '.npmignore',
+        '.openapi-generator',
+        '.openapi-generator-ignore',
+        'git_push.sh',
+    }
+
+    dir_to_copy_to = 'web/src/sm-api/'  # should be relative to this script
+    dir_to_copy_from = tmpdir
+
+    copy_files_from(files_to_ignore, dir_to_copy_to, dir_to_copy_from)
+
+
 def copy_python_files_from(tmpdir):
     """
     Copy a selection of API files generated from openapi-generator:
@@ -225,38 +240,7 @@ def copy_python_files_from(tmpdir):
     dir_to_copy_to = module_dir  # should be relative to this script
     dir_to_copy_from = os.path.join(tmpdir, module_dir)
 
-    if not os.path.exists(dir_to_copy_to):
-        raise FileNotFoundError(
-            f"Directory to copy to doesn't exist ({dir_to_copy_to})"
-        )
-    if not os.path.exists(dir_to_copy_from):
-        raise FileNotFoundError(
-            f"Directory to copy from doesn't exist ({dir_to_copy_from})"
-        )
-
-    # remove everything from dir_to_copy_to except those in files_to_ignore
-    logger.info('Removing files from dest directory ' + dir_to_copy_to)
-    for file_to_remove in os.listdir(dir_to_copy_to):
-        if file_to_remove in files_to_ignore:
-            continue
-        path_to_remove = os.path.join(dir_to_copy_to, file_to_remove)
-        if os.path.isdir(path_to_remove):
-            shutil.rmtree(path_to_remove)
-        else:
-            os.remove(path_to_remove)
-
-    files_to_copy = os.listdir(dir_to_copy_from)
-    logger.info(f'Copying {len(files_to_copy)} files / directories to {dir_to_copy_to}')
-    for file_to_copy in files_to_copy:
-        if file_to_copy in files_to_ignore:
-            continue
-
-        path_to_copy = os.path.join(dir_to_copy_from, file_to_copy)
-        output_path = os.path.join(dir_to_copy_to, file_to_copy)
-        if os.path.isdir(path_to_copy):
-            shutil.copytree(path_to_copy, output_path)
-        else:
-            shutil.copy(path_to_copy, output_path)
+    copy_files_from(files_to_ignore, dir_to_copy_to, dir_to_copy_from)
 
     docs_dir = os.path.join(tmpdir, 'docs')
     if os.path.exists(OUTPUT_DOCS_DIR):
@@ -293,6 +277,7 @@ def main():
             ['--template-dir', 'openapi-templates'],
         )
         generate_api_and_copy('typescript-axios', copy_typescript_files_from)
+        copy_graphql_files_from('api/graphql/')
 
         shutil.copy(
             './resources/muck-the-duck.svg',
