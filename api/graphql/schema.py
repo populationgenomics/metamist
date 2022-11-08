@@ -190,7 +190,7 @@ class Analysis:
     @strawberry.field
     async def samples(self, info: Info, root) -> list['Sample']:
         loader = info.context['loader_samples_for_analysis_ids']
-        return loader.load(root.id)
+        return await loader.load(root.id)
 
 
 @strawberry.type
