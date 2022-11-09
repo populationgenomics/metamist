@@ -319,6 +319,7 @@ export const ProjectSummary = () => {
     const titleCase = (s: string) => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
+    console.log(summary?.sequence_stats);
 
     const batchTable = (key: string) => {
         return summary?.sequence_stats ? (
@@ -338,11 +339,7 @@ export const ProjectSummary = () => {
                                 <React.Fragment key={`${key}-${k1}`}>
                                     <Table.Row>
                                         <Table.Cell>{titleCase(k1)}</Table.Cell>
-                                        {Object.entries(v1).map(([k2, v2]) => (
-                                            <Table.Cell key={`${k2}-${v2}`}>
-                                                {`${v2}`}
-                                            </Table.Cell>
-                                        ))}
+                                        <Table.Cell>{`${v1}`}</Table.Cell>
                                     </Table.Row>
                                 </React.Fragment>
                             ))

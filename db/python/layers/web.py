@@ -1,11 +1,9 @@
-# pylint: disable=too-many-locals
-import collections
+# pylint: disable=too-many-locals, too-many-instance-attributes
 import json
 import asyncio
 import dataclasses
 from datetime import date
 from collections import defaultdict
-from collections.abc import Mapping
 from itertools import groupby
 from typing import Dict, List, Optional, Set
 
@@ -68,7 +66,7 @@ class ProjectSummary:
     total_participants: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
-    sequence_stats: dict[str, dict[str, str | dict[str, str]]]
+    sequence_stats: dict[str, dict[str, str]]
 
     # grid
     participants: List[NestedParticipant]
@@ -169,7 +167,7 @@ class WebDb(DbBase):
         """Get total number of participants within a project"""
         _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
-    
+
     async def get_total_number_of_sequences(self):
         """Get total number of sequences within a project"""
         _query = 'SELECT COUNT(*) FROM sample_sequencing sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
@@ -224,7 +222,9 @@ class WebDb(DbBase):
                 # stats
                 total_samples=0,
                 total_participants=0,
+                total_sequences=0,
                 sequence_stats={},
+                cram_seqr_stats={},
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -273,7 +273,9 @@ WHERE fp.participant_id in :pids
             self.get_total_number_of_sequences(),
             atable.get_number_of_crams_by_sequence_type(project=self.project),
             seqtable.get_sequence_type_numbers_for_project(project=self.project),
-            seqtable.get_sequence_type_numbers_by_batch_for_project(project=self.project),
+            seqtable.get_sequence_type_numbers_by_batch_for_project(
+                project=self.project
+            ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
 
@@ -385,22 +387,28 @@ WHERE fp.participant_id in :pids
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
-        seen_batches = set([item for s in seen_seq_types for item in seq_number_by_seq_type_and_batch.get(s).keys()])
-        sequence_stats = {}
-        cram_seqr_stats = {}            
+        seen_batches = set(
+            [
+                item
+                for s in seen_seq_types
+                for item in seq_number_by_seq_type_and_batch.get(s).keys()
+            ]
+        )
+        sequence_stats: Dict[str, Dict[str, str]] = {}
+        cram_seqr_stats = {}
 
         for seq in sorted(seen_seq_types):
             cram_seqr_stats[seq] = {
-                'Sequence': str(seq_number_by_seq_type.get(seq, 0)),
+                'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
                 'Crams': str(cram_number_by_seq_type.get(seq, 0)),
                 'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
             }
-            s = seq_number_by_seq_type_and_batch.get(seq, 0)
+            seq_batch = seq_number_by_seq_type_and_batch.get(seq, 0)
             sequence_stats[seq] = {}
-            for batch in sorted(seen_batches, key=lambda x: (x is 'null', x)): #sorts and puts 'null' last
-                sequence_stats[seq][batch] = {
-                    'Sequences': s.get(batch, 0) if isinstance(s, Mapping) else 0,
-                }
+            for batch in sorted(
+                seen_batches, key=lambda x: (x == 'null', x)
+            ):  # sorts and puts 'null' last
+                sequence_stats[seq][batch] = seq_batch.get(batch, 0)
 
         return ProjectSummary(
             participants=pmodels,

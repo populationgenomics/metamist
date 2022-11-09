@@ -296,26 +296,26 @@ class SampleSequencingTable(DbBase):
 
     async def get_sequence_type_numbers_by_batch_for_project(self, project: ProjectId):
         """
-        This groups by samples, so one sample with many sequences ONLY reports one here,
-        In the future, this should report the number of sequence groups (or something like that).
+        This groups by batch.
         """
 
         _query = """
-        SELECT batch, type, count(*) AS n 
+        SELECT batch, type, count(*) AS n
         FROM (
-            SELECT IFNULL(JSON_EXTRACT(sq.meta, '$.batch'), 'null') as batch, sq.type 
-            FROM sample_sequencing sq 
-            INNER JOIN sample s ON s.id = sq.sample_id 
+            SELECT IFNULL(JSON_EXTRACT(sq.meta, '$.batch'), 'null') as batch, sq.type
+            FROM sample_sequencing sq
+            INNER JOIN sample s ON s.id = sq.sample_id
             WHERE s.project = :project
-        ) as p 
+        ) as p
         GROUP BY batch, type
             """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        result = {}
-        for batch, type, count in rows:
+        batch_result: Dict[str, Dict[str, str]] = {}
+        for batch, seqType, count in rows:
+            print(type(batch), type(seqType), type(count))
             batch = batch.strip('\"')
-            result.setdefault(type, {}).update({batch: str(count)})
-        return result
+            batch_result.setdefault(seqType, {}).update(dict(batch=str(count)))
+        return batch_result
 
     async def update_status(
         self,

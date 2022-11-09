@@ -36,7 +36,7 @@ class ProjectSummaryResponse(BaseModel):
     total_samples: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
-    sequence_stats: dict[str, dict[str, str | dict[str, str]]]
+    sequence_stats: dict[str, dict[str, str]]
 
     # for display
     participants: list[NestedParticipant]
