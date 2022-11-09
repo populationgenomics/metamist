@@ -24,6 +24,9 @@
             <column name="name" type="VARCHAR(64)">
                 <constraints unique="true" nullable="false"/>
             </column>
+            <column name="dataset" type="VARCHAR(64)">
+                <constraints unique="true" nullable="false"/>
+            </column>
             <column
                     name="gcp_id"
                     type="VARCHAR(255)"

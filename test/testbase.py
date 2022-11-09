@@ -10,8 +10,7 @@ from functools import wraps
 
 from typing import Dict
 
-from pymysql import IntegrityError
-from testcontainers.mysql import MySqlContainer
+from testcontainers.postgres import PostgresContainer
 import nest_asyncio
 
 from db.python.connect import (
@@ -71,7 +70,7 @@ class DbTest(unittest.TestCase):
 
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
-    dbs: Dict[str, MySqlContainer] = {}
+    dbs: Dict[str, PostgresContainer] = {}
     connections: Dict[str, Connection] = {}
 
     @classmethod
@@ -79,7 +78,7 @@ class DbTest(unittest.TestCase):
         @run_as_sync
         async def setup():
             """
-            This starts a mariadb container, applies liquibase schema and inserts a project
+            This starts a postgres container, applies liquibase schema and inserts a project
             MAYBE, the best way in the future would be to only ever create ONE connection
             between all Test classes, and create a new database per test, new set of a connections,
             but that certaintly has a host of it's own problems
@@ -90,7 +89,7 @@ class DbTest(unittest.TestCase):
             try:
                 os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
-                db = MySqlContainer('mariadb:10.8.3')
+                db = PostgresContainer('postgres:15.0')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
@@ -104,18 +103,18 @@ class DbTest(unittest.TestCase):
                     db_prefix = '../db'
 
                 con_string = db.get_connection_url()
-                con_string = 'mysql://' + con_string.split('://', maxsplit=1)[1]
-                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db.MYSQL_DATABASE}'
+                con_string = 'postgresql://' + con_string.split('://', maxsplit=1)[1]
+                lcon_string = f'jdbc:postgresql://{db.get_container_host_ip()}:{port_to_expose}/{db.POSTGRES_DB}'
                 # apply the liquibase schema
                 command = [
                     'liquibase',
                     *('--changeLogFile', db_prefix + '/project.xml'),
                     *('--defaultsFile', db_prefix + '/liquibase.properties'),
                     *('--url', lcon_string),
-                    *('--driver', 'org.mariadb.jdbc.Driver'),
-                    *('--classpath', db_prefix + '/mariadb-java-client-3.0.3.jar'),
-                    *('--username', db.MYSQL_USER),
-                    *('--password', db.MYSQL_PASSWORD),
+                    # *('--driver', 'postgresql-42.5.0.jar'),
+                    *('--classpath', db_prefix + '/postgresql-42.5.0.jar'),
+                    *('--username', db.POSTGRES_USER),
+                    *('--password', db.POSTGRES_PASSWORD),
                     'update',
                 ]
                 subprocess.check_output(command, stderr=subprocess.STDOUT)
@@ -166,7 +165,7 @@ class DbTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         db = cls.dbs.get(cls.__name__)
         if db:
-            db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
+            db.exec(f'DROP DATABASE {db.POSTGRES_DB};')
             db.stop()
 
     def setUp(self) -> None:
@@ -187,8 +186,5 @@ class DbIsolatedTest(DbTest):
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
-            try:
-                await self.connection.connection.execute(f'DELETE FROM {table}')
-                await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
-            except IntegrityError as e:
-                raise IntegrityError(f'Could not delete {table}') from e
+            await self.connection.connection.execute(f'DELETE FROM {table}')
+            # await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')

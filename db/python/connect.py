@@ -98,10 +98,10 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         # consider pulling from env variables
         return CredentialedDatabaseConfiguration(
             dbname=os.environ.get('SM_DEV_DB_NAME', 'sm_dev'),
-            username=os.environ.get('SM_DEV_DB_USER', 'root'),
+            username=os.environ.get('SM_DEV_DB_USER', 'mfranklin'),
             password=os.environ.get('SM_DEV_DB_PASSWORD', ''),
             host=os.environ.get('SM_DEV_DB_HOST', '127.0.0.1'),
-            port=os.environ.get('SM_DEV_DB_PORT', '3306'),
+            port=os.environ.get('SM_DEV_DB_PORT', '5432'),
         )
 
     def get_connection_string(self):
@@ -118,7 +118,7 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         options = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
-        url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'
+        url = f'postgresql://{u_p}@{_host}/{self.dbname}?{_options}'
 
         return url
 
