@@ -99,12 +99,13 @@ Download the `mariadb-java-client` and create the schema using liquibase:
 ```shell
 pushd db/
 wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
+wget https://jdbc.postgresql.org/download/postgresql-42.5.0.jar
+
 liquibase \
     --changeLogFile project.xml \
-    --url jdbc:mariadb://localhost/sm_dev \
-    --driver org.mariadb.jdbc.Driver \
-    --classpath mariadb-java-client-3.0.3.jar \
-    --username root \
+    --url jdbc:postgresql://localhost:5432/sm_dev \
+    --classpath postgresql-42.5.0.jar \
+    --username $(whoami) \
     update
 popd
 ```
