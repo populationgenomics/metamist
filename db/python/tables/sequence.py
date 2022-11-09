@@ -278,34 +278,42 @@ class SampleSequencingTable(DbBase):
         In the future, this should report the number of sequence groups (or something like that).
         """
 
-#Old query
-#         _query = """
-# SELECT type, COUNT(*) as n
-# FROM (
-#     SELECT sq.type
-#     FROM sample_sequencing sq
-#     INNER JOIN sample s ON s.id = sq.sample_id
-#     WHERE s.project = :project
-#     GROUP BY s.id, sq.type
-# ) as s
-# GROUP BY type
-#         """
+        _query = """
+            SELECT type, COUNT(*) as n
+            FROM (
+                SELECT sq.type
+                FROM sample_sequencing sq
+                INNER JOIN sample s ON s.id = sq.sample_id
+                WHERE s.project = :project
+                GROUP BY s.id, sq.type
+            ) as s
+            GROUP BY type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        return {r['type']: r['n'] for r in rows}
+
+    async def get_sequence_type_numbers_by_batch_for_project(self, project: ProjectId):
+        """
+        This groups by samples, so one sample with many sequences ONLY reports one here,
+        In the future, this should report the number of sequence groups (or something like that).
+        """
 
         _query = """
-        SELECT batch, type, count(batch) AS n 
+        SELECT batch, type, count(*) AS n 
         FROM (
-            SELECT JSON_EXTRACT(sq.meta, '$.batch') as batch, sq.type 
+            SELECT IFNULL(JSON_EXTRACT(sq.meta, '$.batch'), 'null') as batch, sq.type 
             FROM sample_sequencing sq 
             INNER JOIN sample s ON s.id = sq.sample_id 
             WHERE s.project = :project
         ) as p 
         GROUP BY batch, type
             """
-
         rows = await self.connection.fetch_all(_query, {'project': project})
         result = {}
         for batch, type, count in rows:
-            batch = batch.strip('\"') if batch else 'N/A'
+            batch = batch.strip('\"')
             result.setdefault(type, {}).update({batch: str(count)})
         return result
 

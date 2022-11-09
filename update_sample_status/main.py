@@ -3,19 +3,22 @@
 import json
 import os
 import logging
+from typing import Dict, Any
 from airtable import Airtable
 from flask import abort
 from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
-from sample_metadata.apis import SequenceApi
+from sample_metadata.apis import SequenceApi, SampleApi
 from sample_metadata.models import (
     SequenceType,
     SequenceUpdateModel,
     SequenceStatus,
     SampleType,
+    NewSample,
+    NewSequence,
 )
-from sample_metadata.exceptions import ForbiddenException
+from sample_metadata.exceptions import ForbiddenException, NotFoundException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
 
@@ -35,41 +38,78 @@ def update_airtable(project_config: dict, sample: str, status: str):
         response = airtable.update_by_field('Sample ID', sample, {'Status': status})
     except HTTPError as err:  # Invalid status enum.
         logging.error(err)
-        return abort(400)
+        return abort(400, f'{status} is not a valid value')
 
     if not response:  # Sample not found.
-        return abort(404)
+        return abort(404, f'Could not find {sample} in AirTable')
 
     return ('', 204)
 
 
-def update_sm(project: str, sample: str, status: str, batch: str):
+def update_sm(
+    project: str, sample: str, status: str, batch: str, eseqid: Dict[str, str]
+):
     """Update the status of a sequence given it's corresponding
     external sample id"""
 
     seqapi = SequenceApi()
-    sequence_type = SequenceType('genome')
+    sapi = SampleApi()
     sample_type = SampleType('blood')
-    seq_meta = {'batch': batch}
+    sample_meta: Dict[str, Any] = {}
+
+    sequence_info = {
+        'external_ids': eseqid,
+        'status': SequenceStatus(status),
+        'meta': {'batch': batch},
+        'type': SequenceType('genome'),
+    }
 
     try:
-        sequence_model = SequenceUpdateModel(
-            status=SequenceStatus(status), meta=seq_meta
+        # Try pulling sample id
+        existing_sample = sapi.get_sample_by_external_id(
+            external_id=sample, project=project
         )
-        seqapi.upsert_sequence_from_external_sample_and_type(
-            external_sample_id=sample,
-            sequence_type=sequence_type,
-            sequence_update_model=sequence_model,
-            project=project,
-            sample_type=sample_type,
+        isid = existing_sample['id']
+
+    except NotFoundException as e:
+        # Otherwise create
+        logging.info(e)
+        new_sample = NewSample(
+            external_id=sample,
+            type=sample_type,
+            meta=sample_meta,
         )
-    except ValueError as e:
-        logging.error(e)
-        return abort(400)
+        isid = sapi.create_new_sample(new_sample=new_sample, project=project)
 
     except ForbiddenException as e:
         logging.error(e)
-        return abort(403)
+        return abort(
+            403, f'Forbidden. Check that you have access to {project} in metamist'
+        )
+
+    try:
+        # Try update the sequence
+        seqid = seqapi.get_sequence_by_external_id(
+            project=project, external_id=list(eseqid.values())[0]
+        )
+        existing_sequence = SequenceUpdateModel(**sequence_info)
+        seqapi.update_sequence(
+            sequence_id=seqid['id'], sequence_update_model=existing_sequence
+        )
+
+    except NotFoundException as e:
+        logging.info(e)
+        # Otherwise create
+        sequence_info['sample_id'] = isid
+        new_sequence = NewSequence(**sequence_info)
+        seqapi.create_new_sequence(new_sequence=new_sequence)
+
+    except ForbiddenException as e:
+        logging.error(e)
+        return abort(
+            403,
+            f'Forbidden. Please check that you have access to {project} in metamist.',
+        )
 
     return ('', 204)
 
@@ -85,9 +125,13 @@ def update_sample_status(request):  # pylint: disable=R1710
     sample = request_json.get('sample')
     status = request_json.get('status')
     batch = request_json.get('batch')
+    eseqid = request_json.get('sequence_id')
+    eseqid_dict = {'kccg': eseqid}
 
     if not project or not sample or not status or not batch:
-        return abort(400)
+        return abort(
+            400, f'Please check that project,sample,status and batch have been set.'
+        )
 
     # Fetch the per-project configuration from the Secret Manager.
     gcp_project = os.getenv('GCP_PROJECT')
@@ -102,10 +146,10 @@ def update_sample_status(request):  # pylint: disable=R1710
 
     project_config = config.get(project)
     if not project_config:
-        return abort(404)
+        return abort(404, f'Could not find project config.')
 
     update_airtable(project_config, sample, status)
 
-    update_sm(project, sample, status, batch)
+    update_sm(project, sample, status, batch, eseqid_dict)
 
     return ('', 204)

@@ -35,6 +35,32 @@ class AnalysisLayer(BaseLayer):
             project_ids=project_ids, active_only=active_only
         )
 
+    async def get_analysis_for_sample(
+        self,
+        sample_id: int,
+        analysis_type: AnalysisType | None,
+        status: AnalysisStatus | None,
+        map_sample_ids: bool,
+        check_project_id=True,
+    ):
+        """
+        Get a list of all analysis that relevant for samples
+
+        """
+        projects, analysis = await self.at.get_analysis_for_sample(
+            sample_id,
+            analysis_type=analysis_type,
+            status=status,
+            map_sample_ids=map_sample_ids,
+        )
+
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return analysis
+
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
         project, analysis = await self.at.get_analysis_by_id(analysis_id)
@@ -199,7 +225,7 @@ class AnalysisLayer(BaseLayer):
             size = cram.meta.get('size')
 
             if len(sids) > 1:
-                affected_analyses.append(cram['id'])
+                affected_analyses.append(cram.id)
                 continue
 
             if not isinstance(seqtype, list) and seqtype and size:
@@ -208,8 +234,8 @@ class AnalysisLayer(BaseLayer):
                 crams_by_sid[sid][seqtype].append(cram)
 
         # Log weird crams
-        for cram in affected_analyses:
-            logger.error(f'Cram with multiple sids ignored: {cram}')
+        for _cram in affected_analyses:
+            logger.error(f'Cram with multiple sids ignored: {_cram}')
 
         # Format output
         result: dict[int, list] = defaultdict(list)

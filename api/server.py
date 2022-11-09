@@ -15,10 +15,11 @@ from db.python.utils import get_logger
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.2.0'
+_VERSION = '5.2.1'
 
 logger = get_logger()
 
@@ -114,6 +115,10 @@ async def exception_handler(_: Request, e: Exception):
         status_code=code,
         content=base_params,
     )
+
+
+# graphql
+app.include_router(MetamistGraphQLRouter, prefix='/graphql')
 
 
 for route in routes.__dict__.values():

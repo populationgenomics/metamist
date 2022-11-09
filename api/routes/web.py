@@ -34,6 +34,8 @@ class ProjectSummaryResponse(BaseModel):
     # high level stats
     total_participants: int
     total_samples: int
+    total_sequences: int
+    cram_seqr_stats: dict[str, dict[str, str]]
     sequence_stats: dict[str, dict[str, str | dict[str, str]]]
 
     # for display
@@ -85,7 +87,9 @@ async def get_project_summary(
             _links=None,
             total_samples=0,
             total_participants=0,
+            total_sequences=0,
             participants_in_seqr=0,
+            cram_seqr_stats={},
             sequence_stats={},
         )
 
@@ -111,6 +115,8 @@ async def get_project_summary(
     return ProjectSummaryResponse(
         total_samples=summary.total_samples,
         total_participants=summary.total_participants,
+        total_sequences=summary.total_sequences,
+        cram_seqr_stats=summary.cram_seqr_stats,
         sequence_stats=summary.sequence_stats,
         # other stuff
         participants=participants,
