@@ -312,9 +312,9 @@ class SampleSequencingTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'project': project})
         batch_result: Dict[str, Dict[str, str]] = {}
         for batch, seqType, count in rows:
-            print(type(batch), type(seqType), type(count))
             batch = batch.strip('\"')
-            batch_result.setdefault(seqType, {}).update(dict(batch=str(count)))
+            batch_result.setdefault(seqType, {}).update(dict({batch: str(count)}))
+        print(batch_result)
         return batch_result
 
     async def update_status(
