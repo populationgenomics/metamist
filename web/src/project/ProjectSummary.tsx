@@ -23,7 +23,7 @@ const sanitiseValue = (value: any) => {
 
 export const ProjectSummary = () => {
     const navigate = useNavigate();
-    const [openBatches, setOpenBatches] = React.useState<String[]>([]);
+    const [openBatches, setOpenBatches] = React.useState<string[]>([]);
 
     const { projectName, page } = useParams();
 
@@ -319,7 +319,6 @@ export const ProjectSummary = () => {
     const titleCase = (s: string) => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
-    console.log(summary?.sequence_stats);
 
     const batchTable = (key: string) => {
         return summary?.sequence_stats ? (
@@ -336,7 +335,9 @@ export const ProjectSummary = () => {
                         .filter(([key1, value1]) => key1 === key)
                         .map(([key, value]) =>
                             Object.entries(value).map(([k1, v1]) => (
-                                <React.Fragment key={`${key}-${k1}`}>
+                                <React.Fragment
+                                    key={`${key}-${k1}-${projectName}`}
+                                >
                                     <Table.Row>
                                         <Table.Cell>{titleCase(k1)}</Table.Cell>
                                         <Table.Cell>{`${v1}`}</Table.Cell>
@@ -389,7 +390,7 @@ export const ProjectSummary = () => {
                     <Table.Body>
                         {Object.entries(summary?.cram_seqr_stats).map(
                             ([key, value]) => (
-                                <React.Fragment key={`${key}`}>
+                                <React.Fragment key={`${key}-${projectName}`}>
                                     <Table.Row>
                                         <Table.Cell collapsing>
                                             <Checkbox
@@ -405,7 +406,7 @@ export const ProjectSummary = () => {
                                         {Object.entries(value).map(
                                             ([k1, v1]) => (
                                                 <Table.Cell
-                                                    key={`${key}-${k1}`}
+                                                    key={`${key}-${k1}-${projectName}`}
                                                 >
                                                     {`${v1}`}
                                                 </Table.Cell>
@@ -439,6 +440,7 @@ export const ProjectSummary = () => {
                 setPageLimit={_setPageLimit}
                 setPageNumber={setPageNumber}
                 pageLimit={PAGE_SIZES[0]}
+                setOpenBatches={setOpenBatches}
             />
             <br />
             <hr />
