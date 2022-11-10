@@ -1,12 +1,15 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from asyncpg.exceptions import UniqueViolationError
-
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 from models.enums import SampleType
+
+from psycopg2.errorcodes import UNIQUE_VIOLATION
+from psycopg2 import errors
+
+UniqueViolation = errors.lookup(UNIQUE_VIOLATION)
 
 
 class TestSequence(DbIsolatedTest):
@@ -121,7 +124,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(UniqueViolationError, _insert_failing_sequence)
+        self.assertRaises(UniqueViolation, _insert_failing_sequence)
         # make sure the transaction unwinds the insert second sequence if the external_id clashes
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
@@ -155,7 +158,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(UniqueViolationError, _insert_clashing)
+        self.assertRaises(UniqueViolation, _insert_clashing)
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )
