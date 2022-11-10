@@ -1,13 +1,14 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from psycopg2 import errors
+from psycopg2.errorcodes import UNIQUE_VIOLATION
+
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
 from models.enums import SampleType
 
-from psycopg2.errorcodes import UNIQUE_VIOLATION
-from psycopg2 import errors
 
 UniqueViolation = errors.lookup(UNIQUE_VIOLATION)
 
@@ -91,7 +92,8 @@ class TestSequence(DbIsolatedTest):
         )
 
         inserted_types_rows = await self.connection.connection.fetch_all(
-            'SELECT type FROM sample_sequencing WHERE id in :ids', {'ids': tuple(seq_ids)}
+            'SELECT type FROM sample_sequencing WHERE id in :ids',
+            {'ids': tuple(seq_ids)},
         )
         inserted_types = set(r['type'] for r in inserted_types_rows)
 

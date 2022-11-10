@@ -22,7 +22,9 @@ class FamilyTable(DbBase):
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'family_ids': tuple(family_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'family_ids': tuple(family_ids)}
+        )
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
@@ -213,7 +215,8 @@ ON CONFLICT (external_id) DO UPDATE SET
 
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
-            _query, {'external_ids': tuple(family_ids), 'project': project or self.project}
+            _query,
+            {'external_ids': tuple(family_ids), 'project': project or self.project},
         )
         id_map = {r['external_id']: r['id'] for r in results}
 

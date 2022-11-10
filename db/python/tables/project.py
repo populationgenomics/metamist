@@ -338,7 +338,9 @@ class ProjectPermissionsTable:
         FROM project
         WHERE id IN :project_ids
         """
-        rows = await self.connection.fetch_all(_query, {'project_ids': tuple(project_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'project_ids': tuple(project_ids)}
+        )
         projects = list(map(Project.from_db, rows))
         if len(project_ids) != len(rows):
             missing_projects = set(project_ids) - set(p.id for p in projects)

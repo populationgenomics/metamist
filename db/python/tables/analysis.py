@@ -24,7 +24,9 @@ class AnalysisTable(DbBase):
         _query = (
             'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
         )
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': tuple(analysis_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'analysis_ids': tuple(analysis_ids)}
+        )
         return set(r['project'] for r in rows)
 
     async def insert_analysis(

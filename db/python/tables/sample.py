@@ -20,7 +20,9 @@ class SampleTable(DbBase):
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = 'SELECT project FROM sample WHERE id in :sample_ids GROUP BY project'
-        rows = await self.connection.fetch_all(_query, {'sample_ids': tuple(sample_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'sample_ids': tuple(sample_ids)}
+        )
         return set(r['project'] for r in rows)
 
     async def get_samples_for_participants(
@@ -59,7 +61,9 @@ class SampleTable(DbBase):
         if active_only:
             _query += ' AND active IS TRUE'
 
-        rows = await self.connection.fetch_all(_query, {'project_ids': tuple(project_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'project_ids': tuple(project_ids)}
+        )
         return {r['id']: r['project'] for r in rows}
 
     async def insert_sample(
@@ -410,7 +414,8 @@ class SampleTable(DbBase):
             WHERE external_id in :external_ids AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'external_ids': tuple(external_ids), 'project': project or self.project}
+            _query,
+            {'external_ids': tuple(external_ids), 'project': project or self.project},
         )
         sample_id_map = {el[1]: el[0] for el in rows}
 

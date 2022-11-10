@@ -67,7 +67,9 @@ class SampleSequencingTable(DbBase):
         """
         if len(sequence_ids) == 0:
             raise ValueError('Received no sequence IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'sequence_ids': tuple(sequence_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'sequence_ids': tuple(sequence_ids)}
+        )
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
@@ -256,7 +258,9 @@ class SampleSequencingTable(DbBase):
          """
 
         # hopefully there aren't too many
-        sequences = await self.connection.fetch_all(_query, {'sample_ids': tuple(sample_ids)})
+        sequences = await self.connection.fetch_all(
+            _query, {'sample_ids': tuple(sample_ids)}
+        )
         projects = set(s['project'] for s in sequences)
         sample_id_to_seq_id: Dict[int, Dict[SequenceType, list[int]]] = defaultdict(
             dict
@@ -454,7 +458,9 @@ GROUP BY type
             where.append(
                 'sqeid.external_id in :external_ids AND sqeid.project in :project_ids'
             )
-            replacements['external_ids'] = tuple(s.lower() for s in external_sequence_ids)
+            replacements['external_ids'] = tuple(
+                s.lower() for s in external_sequence_ids
+            )
 
         if types:
             seq_types = [s.value if isinstance(s, SequenceType) else s for s in types]
@@ -510,7 +516,9 @@ GROUP BY type
             WHERE sequencing_id IN :sequence_ids
         """
 
-        rows = await self.connection.fetch_all(_query, {'sequence_ids': tuple(sequence_ids)})
+        rows = await self.connection.fetch_all(
+            _query, {'sequence_ids': tuple(sequence_ids)}
+        )
         by_sequence_id: dict[int, dict[str, str]] = defaultdict(dict)
         for row in rows:
             seq_id = row['sequencing_id']

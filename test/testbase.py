@@ -103,7 +103,9 @@ class DbTest(unittest.TestCase):
                     db_prefix = '../db'
 
                 con_string = db.get_connection_url()
-                con_string = 'postgresql+aiopg://' + con_string.split('://', maxsplit=1)[1]
+                con_string = (
+                    'postgresql+aiopg://' + con_string.split('://', maxsplit=1)[1]
+                )
                 lcon_string = f'jdbc:postgresql://{db.get_container_host_ip()}:{port_to_expose}/{db.POSTGRES_DB}'
                 # apply the liquibase schema
                 command = [
