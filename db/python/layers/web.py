@@ -405,7 +405,6 @@ WHERE fp.participant_id in :pids
                 sequence_stats[batch][seq] = seq_number_by_seq_type_and_batch[
                     batch
                 ].get(seq, 0)
-        print(sequence_stats)
 
         return ProjectSummary(
             participants=pmodels,

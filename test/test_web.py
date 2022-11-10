@@ -1,4 +1,5 @@
 from datetime import date
+from collections import defaultdict
 
 from test.testbase import DbIsolatedTest, run_as_sync
 
@@ -170,7 +171,7 @@ class TestWeb(DbIsolatedTest):
                     'Seqr': '0',
                 }
             },
-            batch_sequence_stats={'genome': {'M001': '1'}},
+            batch_sequence_stats=defaultdict(dict, M001={'genome': '1'}),
             participants=data_to_class(expected_data),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
@@ -180,8 +181,8 @@ class TestWeb(DbIsolatedTest):
             ],
             sequence_keys=[
                 ('type', 'type'),
-                ('meta.reads_type', 'reads_type'),
                 ('meta.batch', 'batch'),
+                ('meta.reads_type', 'reads_type'),
             ],
         )
 
