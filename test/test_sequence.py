@@ -1,6 +1,6 @@
 from test.testbase import DbIsolatedTest, run_as_sync
-from pymysql.err import IntegrityError
 
+from asyncpg.exceptions import UniqueViolationError
 
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
@@ -88,7 +88,7 @@ class TestSequence(DbIsolatedTest):
         )
 
         inserted_types_rows = await self.connection.connection.fetch_all(
-            'SELECT type FROM sample_sequencing WHERE id in :ids', {'ids': seq_ids}
+            'SELECT type FROM sample_sequencing WHERE id in :ids', {'ids': tuple(seq_ids)}
         )
         inserted_types = set(r['type'] for r in inserted_types_rows)
 
@@ -121,7 +121,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(IntegrityError, _insert_failing_sequence)
+        self.assertRaises(UniqueViolationError, _insert_failing_sequence)
         # make sure the transaction unwinds the insert second sequence if the external_id clashes
         self.assertEqual(
             1, await self.connection.connection.fetch_val(_n_sequences_query)
@@ -155,7 +155,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )
-        self.assertRaises(IntegrityError, _insert_clashing)
+        self.assertRaises(UniqueViolationError, _insert_clashing)
         self.assertEqual(
             0, await self.connection.connection.fetch_val(_n_sequences_query)
         )

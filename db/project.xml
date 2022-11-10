@@ -141,7 +141,7 @@
         <!-- Participant Phenotype -->
         <createTable tableName="participant_phenotypes">
             <column name="participant_id" type="INT">
-                <constraints primaryKey="true" nullable="false" foreignKeyName="fk_participant_phenotype"
+                <constraints nullable="false" foreignKeyName="fk_participant_phenotype"
                              references="participant(id)"/>
             </column>
             <column name="hpo_term" type="VARCHAR(255)">
@@ -150,10 +150,7 @@
             <column name="description" type="TEXT">
                 <constraints nullable="false"/>
             </column>
-            <column
-                    name="value"
-                    type="JSON"
-            />
+            <column name="value" type="JSON" />
 
 
             <!-- Record keeping -->
@@ -249,7 +246,7 @@
                 <constraints nullable="false" foreignKeyName="fk_family_participant" references="family(id)"/>
             </column>
             <column name="participant_id" type="INT">
-                <constraints nullable="false" foreignKeyName="fk_family_participant_participant"
+                <constraints primaryKey="true" nullable="false" foreignKeyName="fk_family_participant_participant"
                              references="participant(id)"/>
             </column>
             <column name="paternal_participant_id" type="INT">

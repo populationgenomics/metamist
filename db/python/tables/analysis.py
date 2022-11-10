@@ -24,7 +24,7 @@ class AnalysisTable(DbBase):
         _query = (
             'SELECT project FROM analysis WHERE id in :analysis_ids GROUP BY project'
         )
-        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+        rows = await self.connection.fetch_all(_query, {'analysis_ids': tuple(analysis_ids)})
         return set(r['project'] for r in rows)
 
     async def insert_analysis(
@@ -151,14 +151,14 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         if project_ids:
             wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
+            values['project_ids'] = tuple(project_ids)
 
         if sample_ids_all:
             raise NotImplementedError
 
         if sample_ids:
             wheres.append('a_s.sample_id in :sample_ids')
-            values['sample_ids'] = sample_ids
+            values['sample_ids'] = tuple(sample_ids)
 
         if analysis_type is not None:
             wheres.append('a.type = :type')
@@ -329,7 +329,7 @@ ORDER BY a.timestamp_completed DESC
                 f'Received analysis type "{analysis_type.value}", received {expected_types_str}'
             )
 
-        values = {'sample_ids': sample_ids, 'type': analysis_type.value}
+        values = {'sample_ids': tuple(sample_ids), 'type': analysis_type.value}
         rows = await self.connection.fetch_all(_query, values)
         seen_sample_ids = set()
         analyses: List[Analysis] = []
@@ -407,7 +407,7 @@ WHERE a.id = :analysis_id
     WHERE analysis_id IN :aids
             """
             analyses_samples = await self.connection.fetch_all(
-                _samples_query, {'aids': [a.id for a in analyses]}
+                _samples_query, {'aids': tuple(a.id for a in analyses)}
             )
             analyses_samples_dict = defaultdict(list)
             for a_s in analyses_samples:
@@ -431,7 +431,7 @@ WHERE a.id = :analysis_id
                 values['seq_type'] = sequence_types[0].value
             else:
                 seq_check = 'IN :seq_types'
-                values['seq_types'] = [s.value for s in sequence_types]
+                values['seq_types'] = tuple(s.value for s in sequence_types)
 
             seq_filter = f'AND JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check
 
@@ -471,7 +471,7 @@ ORDER BY a.timestamp_completed DESC;
         ]
         if project_ids:
             wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
+            values['project_ids'] = tuple(project_ids)
 
         if author:
             wheres.append('author = :author')

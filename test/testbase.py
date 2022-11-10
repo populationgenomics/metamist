@@ -31,15 +31,15 @@ am_i_in_test_environment = os.getcwd().endswith('test')
 nest_asyncio.apply()
 
 
-for lname in (
-    'asyncio',
-    'urllib3',
-    'docker',
-    'databases',
-    'testcontainers.core.container',
-    'testcontainers.core.waiting_utils',
-):
-    logging.getLogger(lname).setLevel(logging.WARNING)
+# for lname in (
+#     'asyncio',
+#     'urllib3',
+#     'docker',
+#     # 'databases',
+#     # 'testcontainers.core.container',
+#     'testcontainers.core.waiting_utils',
+# ):
+#     logging.getLogger(lname).setLevel(logging.WARNING)
 
 
 def find_free_port():
@@ -103,7 +103,7 @@ class DbTest(unittest.TestCase):
                     db_prefix = '../db'
 
                 con_string = db.get_connection_url()
-                con_string = 'postgresql://' + con_string.split('://', maxsplit=1)[1]
+                con_string = 'postgresql+aiopg://' + con_string.split('://', maxsplit=1)[1]
                 lcon_string = f'jdbc:postgresql://{db.get_container_host_ip()}:{port_to_expose}/{db.POSTGRES_DB}'
                 # apply the liquibase schema
                 command = [

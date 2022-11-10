@@ -94,8 +94,7 @@ INSERT INTO family_participant
     ({str_keys})
 VALUES
     ({placeholder_keys})
-ON DUPLICATE KEY UPDATE
-    {update_keys}
+ON CONFLICT (participant_id) DO UPDATE SET {update_keys}
     """
             await self.connection.execute_many(_query, remapped_ds)
 
@@ -126,7 +125,7 @@ ON DUPLICATE KEY UPDATE
         wheres = ['p.project = :project']
         if family_ids:
             wheres.append('family_id in :family_ids')
-            values['family_ids'] = family_ids
+            values['family_ids'] = tuple(family_ids)
 
         if not include_participants_not_in_families:
             wheres.append('f.project = :project')
@@ -179,7 +178,7 @@ INNER JOIN participant p ON p.id = fp.participant_id
 WHERE fp.participant_id in :participant_ids
 """
         rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
+            _query, {'participant_ids': tuple(participant_ids)}
         )
         projects = set(r['project'] for r in rows)
         m = {r['id']: r['family_id'] for r in rows}

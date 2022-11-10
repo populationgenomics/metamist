@@ -16,7 +16,7 @@ class ParticipantTable(DbBase):
         """Get project IDs for participant_ids (mostly for checking auth)"""
         _query = 'SELECT project FROM participant WHERE id in :participant_ids GROUP BY project'
         rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
+            _query, {'participant_ids': tuple(participant_ids)}
         )
         return set(r['project'] for r in rows)
 
@@ -25,7 +25,7 @@ class ParticipantTable(DbBase):
     ) -> tuple[set[ProjectId], list[Participant]]:
         """Get participants by IDs"""
         _query = 'SELECT project, id, external_id, reported_sex, reported_gender, karyotype, meta FROM participant WHERE id in :ids'
-        rows = await self.connection.fetch_all(_query, {'ids': ids})
+        rows = await self.connection.fetch_all(_query, {'ids': tuple(ids)})
 
         ds = [dict(r) for r in rows]
         projects = set(d.pop('project') for d in ds)
@@ -41,7 +41,7 @@ class ParticipantTable(DbBase):
         values: Dict[str, Any] = {'project': project}
         if internal_participant_ids:
             _query = 'SELECT * FROM participant WHERE project = :project AND id in :ids'
-            values['ids'] = internal_participant_ids
+            values['ids'] = tuple(internal_participant_ids)
         else:
             _query = 'SELECT * FROM participant WHERE project = :project'
         return await self.connection.fetch_all(_query, values)
@@ -177,7 +177,7 @@ RETURNING id
         results = await self.connection.fetch_all(
             _query,
             {
-                'external_ids': external_participant_ids,
+                'external_ids': tuple(external_participant_ids),
                 'project': project,
             },
         )
@@ -194,7 +194,7 @@ RETURNING id
 
         _query = 'SELECT id, external_id FROM participant WHERE id in :ids'
         results = await self.connection.fetch_all(
-            _query, {'ids': internal_participant_ids}
+            _query, {'ids': tuple(internal_participant_ids)}
         )
         id_map: Dict[int, str] = {r['id']: r['external_id'] for r in results}
 
@@ -235,7 +235,7 @@ RETURNING id
             return {}
 
         _query = 'SELECT id, external_id FROM participant WHERE id in :pids'
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+        rows = await self.connection.fetch_all(_query, {'pids': tuple(participant_ids)})
         return {r['id']: [r['external_id']] for r in rows}
 
     async def get_external_participant_id_to_internal_sample_id_map(
@@ -272,7 +272,7 @@ WHERE p.project = :project
         rows = await self.connection.fetch_all(
             _query,
             {
-                'project_ids': project_ids,
+                'project_ids': tuple(project_ids),
                 'search_pattern': self.escape_like_term(query) + '%',
                 'limit': limit,
             },

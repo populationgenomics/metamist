@@ -66,11 +66,11 @@ def get_logger():
     if _logger:
         return _logger
 
-    for lname in ('asyncio', 'urllib3', 'databases'):
-        logging.getLogger(lname).setLevel(logging.WARNING)
+    # for lname in ('asyncio', 'urllib3', 'databases'):
+    #     logging.getLogger(lname).setLevel(logging.WARNING)
 
     _logger = logging.getLogger('sample-metadata-api')
-    _logger.setLevel(level=LOGGING_LEVEL)
+    _logger.setLevel(level=logging.DEBUG)
 
     if USE_GCP_LOGGING:
 

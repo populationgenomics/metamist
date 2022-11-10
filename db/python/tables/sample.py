@@ -20,7 +20,7 @@ class SampleTable(DbBase):
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = 'SELECT project FROM sample WHERE id in :sample_ids GROUP BY project'
-        rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        rows = await self.connection.fetch_all(_query, {'sample_ids': tuple(sample_ids)})
         return set(r['project'] for r in rows)
 
     async def get_samples_for_participants(
@@ -40,7 +40,7 @@ class SampleTable(DbBase):
         ]
         _query = f'SELECT {", ".join(keys)} from sample where participant_id IN :pids;'
 
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+        rows = await self.connection.fetch_all(_query, {'pids': tuple(participant_ids)})
 
         ds = [dict(d) for d in rows]
         projects = set(d.pop('project') for d in ds)
@@ -59,8 +59,8 @@ class SampleTable(DbBase):
         if active_only:
             _query += ' AND active IS TRUE'
 
-        rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
-        return dict(rows)
+        rows = await self.connection.fetch_all(_query, {'project_ids': tuple(project_ids)})
+        return {r['id']: r['project'] for r in rows}
 
     async def insert_sample(
         self,
@@ -286,7 +286,7 @@ class SampleTable(DbBase):
         INNER JOIN sample s
         WHERE a_s.analysis_id IN :aids
         """
-        rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
+        rows = await self.connection.fetch_all(_query, {'aids': tuple(analysis_ids)})
 
         ds = [dict(d) for d in rows]
 
@@ -386,7 +386,7 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(
             _query,
             {
-                'project_ids': project_ids,
+                'project_ids': tuple(project_ids),
                 'search_pattern': self.escape_like_term(query) + '%',
                 'limit': limit,
             },
@@ -410,7 +410,7 @@ class SampleTable(DbBase):
             WHERE external_id in :external_ids AND project = :project
         """
         rows = await self.connection.fetch_all(
-            _query, {'external_ids': external_ids, 'project': project or self.project}
+            _query, {'external_ids': tuple(external_ids), 'project': project or self.project}
         )
         sample_id_map = {el[1]: el[0] for el in rows}
 
@@ -421,7 +421,7 @@ class SampleTable(DbBase):
     ) -> tuple[Iterable[ProjectId], dict[int, str]]:
         """Get map of external sample id to internal id"""
         _query = 'SELECT id, external_id, project FROM sample WHERE id in :ids'
-        values = {'ids': raw_internal_ids}
+        values = {'ids': tuple(raw_internal_ids)}
         rows = await self.connection.fetch_all(_query, values)
 
         sample_id_map = {el['id']: el['external_id'] for el in rows}
@@ -464,11 +464,11 @@ class SampleTable(DbBase):
 
         if project_ids:
             where.append('project in :project_ids')
-            replacements['project_ids'] = project_ids
+            replacements['project_ids'] = tuple(project_ids)
 
         if sample_ids:
             where.append('id in :sample_ids')
-            replacements['sample_ids'] = sample_ids
+            replacements['sample_ids'] = tuple(sample_ids)
 
         if meta:
             for k, v in meta.items():
@@ -478,7 +478,7 @@ class SampleTable(DbBase):
 
         if participant_ids:
             where.append('participant_id in :participant_ids')
-            replacements['participant_ids'] = participant_ids
+            replacements['participant_ids'] = tuple(participant_ids)
 
         if active is True:
             where.append('active')
@@ -517,7 +517,7 @@ class SampleTable(DbBase):
         if len(sample_ids) == 0:
             return {}
         _query = 'SELECT id, min(row_start) FROM sample FOR SYSTEM_TIME ALL WHERE id in :sids GROUP BY id'
-        rows = await self.connection.fetch_all(_query, {'sids': sample_ids})
+        rows = await self.connection.fetch_all(_query, {'sids': tuple(sample_ids)})
         return {r[0]: r[1].date() for r in rows}
 
     async def get_history_of_sample(self, id_: int):

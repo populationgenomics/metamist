@@ -22,7 +22,7 @@ class FamilyTable(DbBase):
         """
         if len(family_ids) == 0:
             raise ValueError('Received no family IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'family_ids': family_ids})
+        rows = await self.connection.fetch_all(_query, {'family_ids': tuple(family_ids)})
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
@@ -48,7 +48,7 @@ class FamilyTable(DbBase):
                 ON family.id = family_participant.family_id
             """
             where.append(f'participant_id IN :pids')
-            values['pids'] = participant_ids
+            values['pids'] = tuple(participant_ids)
 
         if project or self.project:
             where.append('project = :project')
@@ -80,7 +80,7 @@ class FamilyTable(DbBase):
         rows = await self.connection.fetch_all(
             _query,
             {
-                'project_ids': project_ids,
+                'project_ids': tuple(project_ids),
                 'search_pattern': self.escape_like_term(query) + '%',
                 'limit': limit,
             },
@@ -100,7 +100,7 @@ class FamilyTable(DbBase):
         INNER JOIN family f ON fp.family_id = f.id
         WHERE fp.participant_id in :pids
         """
-        rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
+        rows = await self.connection.fetch_all(_query, {'pids': tuple(participant_ids)})
         result = defaultdict(list)
         for r in rows:
             result[r['participant_id']].append(r['external_id'])
@@ -196,7 +196,7 @@ INSERT INTO family
     ({str_keys})
 VALUES
     ({placeholder_keys})
-ON DUPLICATE KEY UPDATE
+ON CONFLICT (external_id) DO UPDATE SET
     {str_uo_placeholder_keys}
         """
 
@@ -213,7 +213,7 @@ ON DUPLICATE KEY UPDATE
 
         _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
         results = await self.connection.fetch_all(
-            _query, {'external_ids': family_ids, 'project': project or self.project}
+            _query, {'external_ids': tuple(family_ids), 'project': project or self.project}
         )
         id_map = {r['external_id']: r['id'] for r in results}
 
@@ -238,7 +238,7 @@ ON DUPLICATE KEY UPDATE
         if len(family_ids) == 0:
             return {}
         _query = 'SELECT id, external_id FROM family WHERE id in :ids'
-        results = await self.connection.fetch_all(_query, {'ids': family_ids})
+        results = await self.connection.fetch_all(_query, {'ids': tuple(family_ids)})
         id_map = {r['id']: r['external_id'] for r in results}
         if not allow_missing and len(id_map) != len(family_ids):
             provided_external_ids = set(family_ids)

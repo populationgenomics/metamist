@@ -24,7 +24,7 @@ class ParticipantPhenotypeTable(DbBase):
         _query = f"""
 INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
 VALUES (:participant_id, :description, :value, :author, 'DESCRIPTION')
-ON DUPLICATE KEY UPDATE
+ON CONFLICT(participant_id, hpo_term, description) DO UPDATE SET
     description=:description, value=:value, author=:author
         """
 
@@ -60,7 +60,7 @@ FROM participant_phenotypes
 WHERE participant_id in :participant_ids AND value IS NOT NULL
 """
         rows = await self.connection.fetch_all(
-            _query, {'participant_ids': participant_ids}
+            _query, {'participant_ids': tuple(participant_ids)}
         )
         formed_key_value_pairs: Dict[int, Dict[str, Any]] = defaultdict(dict)
         for row in rows:

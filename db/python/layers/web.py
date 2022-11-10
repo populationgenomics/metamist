@@ -224,11 +224,11 @@ class WebDb(DbBase):
         # sequences
 
         seq_query = 'SELECT id, sample_id, meta, type, status FROM sample_sequencing WHERE sample_id IN :sids'
-        sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
+        sequence_promise = self.connection.fetch_all(seq_query, {'sids': tuple(sids)})
 
         # participant
         p_query = 'SELECT id, external_id, meta, reported_sex, reported_gender, karyotype FROM participant WHERE id in :pids'
-        participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
+        participant_promise = self.connection.fetch_all(p_query, {'pids': tuple(pids)})
 
         # family
         f_query = """
@@ -237,7 +237,7 @@ FROM family_participant fp
 INNER JOIN family f ON f.id = fp.family_id
 WHERE fp.participant_id in :pids
         """
-        family_promise = self.connection.fetch_all(f_query, {'pids': pids})
+        family_promise = self.connection.fetch_all(f_query, {'pids': tuple(pids)})
 
         atable = AnalysisTable(self._connection)
         seqtable = SampleSequencingTable(self._connection)

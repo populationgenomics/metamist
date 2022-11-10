@@ -67,7 +67,7 @@ class SampleSequencingTable(DbBase):
         """
         if len(sequence_ids) == 0:
             raise ValueError('Received no sequence IDs to get project ids for')
-        rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
+        rows = await self.connection.fetch_all(_query, {'sequence_ids': tuple(sequence_ids)})
         projects = set(r['project'] for r in rows)
         if not projects:
             raise ValueError(
@@ -256,7 +256,7 @@ class SampleSequencingTable(DbBase):
          """
 
         # hopefully there aren't too many
-        sequences = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        sequences = await self.connection.fetch_all(_query, {'sample_ids': tuple(sample_ids)})
         projects = set(s['project'] for s in sequences)
         sample_id_to_seq_id: Dict[int, Dict[SequenceType, list[int]]] = defaultdict(
             dict
@@ -368,7 +368,7 @@ GROUP BY type
                     promises.append(
                         self.connection.execute(
                             _delete_query,
-                            {'seq_id': sequencing_id, 'names': list(to_delete)},
+                            {'seq_id': sequencing_id, 'names': tuple(to_delete)},
                         )
                     )
                 if to_update:
@@ -381,7 +381,7 @@ GROUP BY type
                     _update_query = """\
                         INSERT INTO sample_sequencing_eid (project, sequencing_id, external_id, name, author)
                             VALUES (:project, :seq_id, :external_id, :name, :author)
-                            ON DUPLICATE KEY UPDATE external_id = :external_id, author = :author
+                            ON CONFLICT (project, external_id) DO UPDATE SET external_id = :external_id, author = :author
                     """
                     values = [
                         {
@@ -420,11 +420,11 @@ GROUP BY type
 
         if project_ids:
             where.append('s.project in :project_ids')
-            replacements['project_ids'] = project_ids
+            replacements['project_ids'] = tuple(project_ids)
 
         if sample_ids:
             where.append('s.id in :sample_ids')
-            replacements['sample_ids'] = sample_ids
+            replacements['sample_ids'] = tuple(sample_ids)
 
         if seq_meta:
             for k, v in seq_meta.items():
@@ -444,7 +444,7 @@ GROUP BY type
 
         if sequence_ids:
             where.append('sq.id in :sequence_ids')
-            replacements['sequence_ids'] = sequence_ids
+            replacements['sequence_ids'] = tuple(sequence_ids)
 
         if external_sequence_ids:
             if not project_ids:
@@ -454,16 +454,16 @@ GROUP BY type
             where.append(
                 'sqeid.external_id in :external_ids AND sqeid.project in :project_ids'
             )
-            replacements['external_ids'] = [s.lower() for s in external_sequence_ids]
+            replacements['external_ids'] = tuple(s.lower() for s in external_sequence_ids)
 
         if types:
             seq_types = [s.value if isinstance(s, SequenceType) else s for s in types]
             where.append('sq.type in :types')
-            replacements['types'] = seq_types
+            replacements['types'] = tuple(seq_types)
 
         if statuses:
             where.append('sq.status in :statuses')
-            replacements['statuses'] = statuses
+            replacements['statuses'] = tuple(statuses)
 
         if active is True:
             where.append('s.active')
@@ -510,7 +510,7 @@ GROUP BY type
             WHERE sequencing_id IN :sequence_ids
         """
 
-        rows = await self.connection.fetch_all(_query, {'sequence_ids': sequence_ids})
+        rows = await self.connection.fetch_all(_query, {'sequence_ids': tuple(sequence_ids)})
         by_sequence_id: dict[int, dict[str, str]] = defaultdict(dict)
         for row in rows:
             seq_id = row['sequencing_id']
