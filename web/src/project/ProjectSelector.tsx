@@ -10,14 +10,12 @@ interface ProjectSelectorProps {
     setPageNumber: React.Dispatch<React.SetStateAction<number>>;
     setPageLimit: React.Dispatch<React.SetStateAction<number>>;
     pageLimit: number;
-    setOpenBatches: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     setPageNumber,
     setPageLimit,
     pageLimit,
-    setOpenBatches,
 }) => {
     const { projectName } = useParams();
     const navigate = useNavigate();
@@ -26,9 +24,8 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
             navigate(`/project/${value}`);
             setPageNumber(1);
             setPageLimit(pageLimit);
-            setOpenBatches([]);
         },
-        [navigate, setPageLimit, setPageNumber, pageLimit, setOpenBatches]
+        [navigate, setPageLimit, setPageNumber, pageLimit]
     );
 
     const [projects, setProjects] = React.useState<string[] | undefined>();

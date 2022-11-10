@@ -296,25 +296,26 @@ class SampleSequencingTable(DbBase):
 
     async def get_sequence_type_numbers_by_batch_for_project(self, project: ProjectId):
         """
-        This groups by batch.
+        This groups by batch. Python NONE types and SQL NULL types are combined into a null string by IFNULL
         """
 
         _query = """
-        SELECT batch, type, count(*) AS n
-        FROM (
-            SELECT IFNULL(JSON_EXTRACT(sq.meta, '$.batch'), 'null') as batch, sq.type
-            FROM sample_sequencing sq
-            INNER JOIN sample s ON s.id = sq.sample_id
-            WHERE s.project = :project
-        ) as p
-        GROUP BY batch, type
-            """
+            SELECT batch, type, count(*) AS n
+            FROM (
+                SELECT IFNULL(JSON_EXTRACT(sq.meta, '$.batch'), 'null') as batch, sq.type
+                FROM sample_sequencing sq
+                INNER JOIN sample s ON s.id = sq.sample_id
+                WHERE s.project = :project
+            ) as p
+            GROUP BY batch, type
+        """
         rows = await self.connection.fetch_all(_query, {'project': project})
-        batch_result: Dict[str, Dict[str, str]] = {}
+        batch_result: Dict[str, Dict[str, str]] = defaultdict(dict)
         for batch, seqType, count in rows:
-            batch = batch.strip('\"')
-            batch_result.setdefault(seqType, {}).update(dict({batch: str(count)}))
-        print(batch_result)
+            batch = batch.strip('\"') if batch != 'null' else 'no-batch'
+            batch_result[batch][seqType] = str(count)
+        if list(batch_result.keys()) == ['no-batch']:
+            return {}
         return batch_result
 
     async def update_status(

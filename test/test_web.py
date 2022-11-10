@@ -64,7 +64,7 @@ class TestWeb(DbIsolatedTest):
             total_samples=0,
             total_participants=0,
             total_sequences=0,
-            sequence_stats={},
+            batch_sequence_stats={},
             cram_seqr_stats={},
             participants=[],
             participant_keys=[],
@@ -111,6 +111,7 @@ class TestWeb(DbIsolatedTest):
                                         ]
                                     ],
                                     'reads_type': 'fastq',
+                                    'batch': 'M001',
                                 },
                             },
                         ],
@@ -169,7 +170,7 @@ class TestWeb(DbIsolatedTest):
                     'Seqr': '0',
                 }
             },
-            sequence_stats={'genome': {'null': '1'}},
+            batch_sequence_stats={'genome': {'M001': '1'}},
             participants=data_to_class(expected_data),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
@@ -177,7 +178,11 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[('type', 'type'), ('meta.reads_type', 'reads_type')],
+            sequence_keys=[
+                ('type', 'type'),
+                ('meta.reads_type', 'reads_type'),
+                ('meta.batch', 'batch'),
+            ],
         )
 
         self.assertEqual(expected, result)

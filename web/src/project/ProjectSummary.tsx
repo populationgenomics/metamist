@@ -7,7 +7,7 @@ import _ from "lodash";
 import { ProjectSelector } from "./ProjectSelector";
 import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
-import { Table, Button, Dropdown, Checkbox } from "semantic-ui-react";
+import { Table, Button, Dropdown } from "semantic-ui-react";
 
 import { SampleLink } from "../Links";
 
@@ -23,7 +23,6 @@ const sanitiseValue = (value: any) => {
 
 export const ProjectSummary = () => {
     const navigate = useNavigate();
-    const [openBatches, setOpenBatches] = React.useState<string[]>([]);
 
     const { projectName, page } = useParams();
 
@@ -53,14 +52,6 @@ export const ProjectSummary = () => {
     const [pageLimit, _setPageLimit] = React.useState<number>(
         validPages ? +pageSize : PAGE_SIZES[0]
     );
-
-    const handleToggle = (e: string) => {
-        if (!openBatches.includes(e)) {
-            setOpenBatches([...openBatches, e]);
-        } else {
-            setOpenBatches(openBatches.filter((i) => i !== e));
-        }
-    };
 
     const handleOnClick = React.useCallback(
         (p) => {
@@ -320,35 +311,54 @@ export const ProjectSummary = () => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
 
-    const batchTable = (key: string) => {
-        return summary?.sequence_stats ? (
+    const batchTable = () => {
+        if (
+            !summary?.cram_seqr_stats ||
+            _.isEmpty(summary.cram_seqr_stats) ||
+            !summary?.batch_sequence_stats ||
+            _.isEmpty(summary.batch_sequence_stats)
+        ) {
+            return <></>;
+        }
+
+        const seqTypes = Object.keys(summary?.cram_seqr_stats);
+        return (
             <Table celled compact>
                 <Table.Header>
                     <Table.Row>
                         <Table.HeaderCell>Batch</Table.HeaderCell>
-                        <Table.HeaderCell>Sequences</Table.HeaderCell>
+                        {seqTypes.map((item) => (
+                            <Table.HeaderCell
+                                key={`header-${item}-${projectName}`}
+                            >
+                                {titleCase(item)}
+                            </Table.HeaderCell>
+                        ))}
+                        <Table.HeaderCell>Total</Table.HeaderCell>
                     </Table.Row>
                 </Table.Header>
 
                 <Table.Body>
-                    {Object.entries(summary?.sequence_stats)
-                        .filter(([key1, value1]) => key1 === key)
-                        .map(([key, value]) =>
-                            Object.entries(value).map(([k1, v1]) => (
-                                <React.Fragment
-                                    key={`${key}-${k1}-${projectName}`}
-                                >
-                                    <Table.Row>
-                                        <Table.Cell>{titleCase(k1)}</Table.Cell>
-                                        <Table.Cell>{`${v1}`}</Table.Cell>
-                                    </Table.Row>
-                                </React.Fragment>
-                            ))
-                        )}
+                    {Object.entries(summary?.batch_sequence_stats).map(
+                        ([key, value]) => (
+                            <Table.Row key={`body-${key}-${projectName}`}>
+                                <Table.Cell>{titleCase(key)}</Table.Cell>
+                                {seqTypes.map((seq) => (
+                                    <Table.Cell
+                                        key={`${key}-${seq}`}
+                                    >{`${value[seq]}`}</Table.Cell>
+                                ))}
+                                <Table.Cell>
+                                    {Object.values(value).reduce(
+                                        (a, b) => +a + +b,
+                                        0
+                                    )}
+                                </Table.Cell>
+                            </Table.Row>
+                        )
+                    )}
                 </Table.Body>
             </Table>
-        ) : (
-            <></>
         );
     };
 
@@ -369,69 +379,41 @@ export const ProjectSummary = () => {
         </>
     );
 
-    let projectSummaryStats: React.ReactElement = <></>;
-
-    if (!summary?.cram_seqr_stats || !summary?.sequence_stats) {
-        projectSummaryStats = totalsStats;
-    } else {
-        projectSummaryStats = (
-            <>
-                {totalsStats}
-                <Table celled>
-                    <Table.Header>
-                        <Table.Row>
-                            <Table.HeaderCell>Batch</Table.HeaderCell>
-                            <Table.HeaderCell>Type</Table.HeaderCell>
-                            <Table.HeaderCell>Sequences</Table.HeaderCell>
-                            <Table.HeaderCell>CRAMs</Table.HeaderCell>
-                            <Table.HeaderCell>Seqr</Table.HeaderCell>
-                        </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                        {Object.entries(summary?.cram_seqr_stats).map(
-                            ([key, value]) => (
-                                <React.Fragment key={`${key}-${projectName}`}>
-                                    <Table.Row>
-                                        <Table.Cell collapsing>
-                                            <Checkbox
-                                                slider
-                                                onClick={() =>
-                                                    handleToggle(key)
-                                                }
-                                            />
+    const seqStats = () => {
+        if (!summary?.cram_seqr_stats || _.isEmpty(summary?.cram_seqr_stats)) {
+            return <></>;
+        }
+        return (
+            <Table celled>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell>Type</Table.HeaderCell>
+                        <Table.HeaderCell>Sequences</Table.HeaderCell>
+                        <Table.HeaderCell>CRAMs</Table.HeaderCell>
+                        <Table.HeaderCell>Seqr</Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {Object.entries(summary?.cram_seqr_stats).map(
+                        ([key, value]) => (
+                            <React.Fragment key={`${key}-${projectName}`}>
+                                <Table.Row>
+                                    <Table.Cell>{titleCase(key)}</Table.Cell>
+                                    {Object.entries(value).map(([k1, v1]) => (
+                                        <Table.Cell
+                                            key={`${key}-${k1}-${projectName}`}
+                                        >
+                                            {`${v1}`}
                                         </Table.Cell>
-                                        <Table.Cell>
-                                            {titleCase(key)}
-                                        </Table.Cell>
-                                        {Object.entries(value).map(
-                                            ([k1, v1]) => (
-                                                <Table.Cell
-                                                    key={`${key}-${k1}-${projectName}`}
-                                                >
-                                                    {`${v1}`}
-                                                </Table.Cell>
-                                            )
-                                        )}
-                                    </Table.Row>
-                                    <Table.Row
-                                        style={{
-                                            display: openBatches.includes(key)
-                                                ? "table-row"
-                                                : "none",
-                                        }}
-                                    >
-                                        <Table.Cell colSpan={5}>
-                                            {batchTable(key)}
-                                        </Table.Cell>
-                                    </Table.Row>
-                                </React.Fragment>
-                            )
-                        )}
-                    </Table.Body>
-                </Table>
-            </>
+                                    ))}
+                                </Table.Row>
+                            </React.Fragment>
+                        )
+                    )}
+                </Table.Body>
+            </Table>
         );
-    }
+    };
 
     return (
         <>
@@ -440,11 +422,12 @@ export const ProjectSummary = () => {
                 setPageLimit={_setPageLimit}
                 setPageNumber={setPageNumber}
                 pageLimit={PAGE_SIZES[0]}
-                setOpenBatches={setOpenBatches}
             />
             <br />
             <hr />
-            {summary && projectSummaryStats}
+            {totalsStats}
+            {seqStats()}
+            {batchTable()}
             <hr />
             {projectName && (
                 <div

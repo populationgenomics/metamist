@@ -36,7 +36,7 @@ class ProjectSummaryResponse(BaseModel):
     total_samples: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
-    sequence_stats: dict[str, dict[str, str]]
+    batch_sequence_stats: dict[str, dict[str, str]]
 
     # for display
     participants: list[NestedParticipant]
@@ -88,9 +88,8 @@ async def get_project_summary(
             total_samples=0,
             total_participants=0,
             total_sequences=0,
-            participants_in_seqr=0,
             cram_seqr_stats={},
-            sequence_stats={},
+            batch_sequence_stats={},
         )
 
     participants = summary.participants
@@ -117,7 +116,7 @@ async def get_project_summary(
         total_participants=summary.total_participants,
         total_sequences=summary.total_sequences,
         cram_seqr_stats=summary.cram_seqr_stats,
-        sequence_stats=summary.sequence_stats,
+        batch_sequence_stats=summary.batch_sequence_stats,
         # other stuff
         participants=participants,
         participant_keys=summary.participant_keys,

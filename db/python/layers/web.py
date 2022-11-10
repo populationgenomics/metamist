@@ -66,7 +66,7 @@ class ProjectSummary:
     total_participants: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
-    sequence_stats: dict[str, dict[str, str]]
+    batch_sequence_stats: dict[str, dict[str, str]]
 
     # grid
     participants: List[NestedParticipant]
@@ -223,7 +223,7 @@ class WebDb(DbBase):
                 total_samples=0,
                 total_participants=0,
                 total_sequences=0,
-                sequence_stats={},
+                batch_sequence_stats={},
                 cram_seqr_stats={},
             )
 
@@ -387,28 +387,25 @@ WHERE fp.participant_id in :pids
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
-        seen_batches = set(
-            [
-                item
-                for s in seen_seq_types
-                for item in seq_number_by_seq_type_and_batch.get(s).keys()
-            ]
-        )
+        seen_batches = set(seq_number_by_seq_type_and_batch.keys())
+
         sequence_stats: Dict[str, Dict[str, str]] = {}
         cram_seqr_stats = {}
 
-        for seq in sorted(seen_seq_types):
+        for seq in seen_seq_types:
             cram_seqr_stats[seq] = {
                 'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
                 'Crams': str(cram_number_by_seq_type.get(seq, 0)),
                 'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
             }
-            seq_batch = seq_number_by_seq_type_and_batch.get(seq, 0)
-            sequence_stats[seq] = {}
-            for batch in sorted(
-                seen_batches, key=lambda x: (x == 'null', x)
-            ):  # sorts and puts 'null' last
-                sequence_stats[seq][batch] = seq_batch.get(batch, 0)
+
+        for batch in seen_batches:
+            sequence_stats[batch] = {}
+            for seq in seen_seq_types:
+                sequence_stats[batch][seq] = seq_number_by_seq_type_and_batch[
+                    batch
+                ].get(seq, 0)
+        print(sequence_stats)
 
         return ProjectSummary(
             participants=pmodels,
@@ -418,6 +415,6 @@ WHERE fp.participant_id in :pids
             total_samples=total_samples,
             total_participants=total_participants,
             total_sequences=total_sequences,
-            sequence_stats=sequence_stats,
+            batch_sequence_stats=seq_number_by_seq_type_and_batch,
             cram_seqr_stats=cram_seqr_stats,
         )
