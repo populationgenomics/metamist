@@ -9,7 +9,7 @@ import {
     ParticipantApi,
     SequenceApi,
     // ParticipantModel,
-    Sample,
+    // Sample,
     // SampleSequencing,
 } from "./sm-api/api";
 import { Table } from "semantic-ui-react";
@@ -37,21 +37,37 @@ interface SequenceMeta {
 
 // temporary
 interface ParticipantModel {
-    id: number
-    external_id: string
-    reported_sex?: number
-    reported_gender?: string
-    karyotype?: string
-    meta: { [key: string]: any }
+    id: number;
+    external_id: string;
+    reported_sex?: number;
+    reported_gender?: string;
+    karyotype?: string;
+    meta: { [key: string]: any };
 }
 
 interface SampleSequencing {
-    id: number
-    external_ids?: { [name: string]: string }
-    sample_id: string
-    type: string
-    meta?: SequenceMeta
-    status: string
+    id: number;
+    external_ids?: { [name: string]: string };
+    sample_id: string;
+    type: string;
+    meta?: SequenceMeta;
+    status: string;
+}
+
+enum SampleType {
+    BLOOD = "blood",
+    SALIVA = "saliva",
+}
+
+interface Sample {
+    id: number | string;
+    external_id: string;
+    participant_id?: number;
+    active?: boolean;
+    meta?: { [key: string]: any };
+    type?: SampleType;
+    project?: number;
+    author?: string;
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
@@ -106,8 +122,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                 setSampleInfo(resp.data);
                 setSelectedExternalID(
                     participants.find(
-                        (item) =>
-                            item.id.toString() === resp.data.participant_id
+                        (item) => item.id === resp.data.participant_id
                     )?.external_id
                 );
             })
@@ -193,8 +208,9 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
 
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]
-            }`;
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
+            sizes[i]
+        }`;
     };
 
     const prepReadMetadata = (data: SequenceMeta) => {
@@ -306,28 +322,26 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     }, [projectName, samples, sampleName]);
 
     const safeValue = (value: any): string => {
-        if (!value) return value
+        if (!value) return value;
         if (Array.isArray(value)) {
-            debugger
-            return value.map(safeValue).join(", ")
+            debugger;
+            return value.map(safeValue).join(", ");
         }
         if (typeof value === "number") {
-            return value.toString()
+            return value.toString();
         }
         if (typeof value === "string") {
-            return value
+            return value;
         }
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-            debugger
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+            debugger;
             if (!!value.location && !!value.size) {
-                return `${value.location} (${formatBytes(value.size)})`
+                return `${value.location} (${formatBytes(value.size)})`;
             }
-
         }
-        debugger
-        return JSON.stringify(value)
-
-    }
+        debugger;
+        return JSON.stringify(value);
+    };
 
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
         return Object.entries(seqInfo).map(([key, value]) => {
@@ -352,18 +366,24 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                 return Object.entries(seqInfo.meta!)
                     .filter(([k1, v1]) => k1 !== "reads")
                     .map(([k1, v1]) => {
-                        if (Array.isArray(v1) && v1.filter(v => !!v.location && !!v.size).length === v1.length) {
+                        if (
+                            Array.isArray(v1) &&
+                            v1.filter((v) => !!v.location && !!v.size)
+                                .length === v1.length
+                        ) {
                             // all are files coincidentally
-                            return renderReadsMetadata(value as File[], key)
+                            return renderReadsMetadata(value as File[], key);
                         }
-                        const stringifiedValue = safeValue(v1)
-                        return (<div key={`${k1}-${stringifiedValue}`}>
-                            <b>{k1}:</b> {stringifiedValue}
-                        </div>)
+                        const stringifiedValue = safeValue(v1);
+                        return (
+                            <div key={`${k1}-${stringifiedValue}`}>
+                                <b>{k1}:</b> {stringifiedValue}
+                            </div>
+                        );
                     });
             }
 
-            const stringifiedValue = safeValue(value)
+            const stringifiedValue = safeValue(value);
             return (
                 <div key={`${key}-${stringifiedValue}`}>
                     <b>{key}:</b> {stringifiedValue}
@@ -391,7 +411,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                                         participants
                                             .filter(
                                                 (item) =>
-                                                    item.id.toString() ===
+                                                    item.id ===
                                                     sampleInfo?.participant_id
                                             )
                                             .map((item) => {
