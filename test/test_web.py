@@ -178,11 +178,13 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[
-                ('type', 'type'),
-                ('meta.batch', 'batch'),
-                ('meta.reads_type', 'reads_type'),
-            ],
+            sequence_keys=sorted(
+                [
+                    ('type', 'type'),
+                    ('meta.reads_type', 'reads_type'),
+                    ('meta.batch', 'batch'),
+                ]
+            ),
         )
 
         self.assertEqual(expected, result)

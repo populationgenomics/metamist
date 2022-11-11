@@ -380,9 +380,9 @@ WHERE fp.participant_id in :pids
             ('external_id', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
-        sequence_keys = [('type', 'type')] + [
-            ('meta.' + k, k) for k in sequence_meta_keys
-        ]
+        sequence_keys = sorted(
+            [('type', 'type')] + [('meta.' + k, k) for k in sequence_meta_keys]
+        )
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
