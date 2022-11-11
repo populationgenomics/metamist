@@ -87,7 +87,7 @@ class SampleSequenceLayer(BaseLayer):
         projects, sequences = await self.seqt.get_sequences_by(sample_ids=sample_ids)
 
         if (
-            check_project_ids and projects and sequences
+            check_project_ids and sequences
         ):  # Only do this check if a sample actually has associated sequences
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True

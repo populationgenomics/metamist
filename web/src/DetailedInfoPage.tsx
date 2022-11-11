@@ -60,7 +60,7 @@ enum SampleType {
 }
 
 interface Sample {
-    id: number | string;
+    id: string;
     external_id: string;
     participant_id?: number;
     active?: boolean;
