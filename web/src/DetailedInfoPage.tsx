@@ -323,7 +323,6 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const safeValue = (value: any): string => {
         if (!value) return value;
         if (Array.isArray(value)) {
-            debugger;
             return value.map(safeValue).join(", ");
         }
         if (typeof value === "number") {
@@ -333,12 +332,10 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             return value;
         }
         if (value && typeof value === "object" && !Array.isArray(value)) {
-            debugger;
             if (!!value.location && !!value.size) {
                 return `${value.location} (${formatBytes(value.size)})`;
             }
         }
-        debugger;
         return JSON.stringify(value);
     };
 
@@ -427,17 +424,14 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                     .filter(([key, value]) =>
                         sampleFieldsToDisplay.includes(key)
                     )
-                    .map(([key, value]) =>
-                        value ? (
-                            <div key={`${key}-${value}`}>
-                                <b>{key}:</b> {value.toString()}
-                            </div>
-                        ) : (
-                            <React.Fragment
-                                key={`${key}-${value}`}
-                            ></React.Fragment>
-                        )
-                    )}
+                    .map(([key, value]) => (
+                        <div key={`${key}-${value}`}>
+                            <b>{key}:</b>{" "}
+                            {value != null
+                                ? value.toString()
+                                : "null/undefined"}
+                        </div>
+                    ))}
             </>
         );
     };
@@ -477,46 +471,42 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         );
     };
 
-    const renderTitle = () => {
-        return (
-            <div
-                style={{
-                    borderBottom: `1px solid black`,
-                }}
-            >
-                {participants &&
-                    participants
-                        .filter(
-                            (item) => item.id === sampleInfo?.participant_id
-                        )
-                        .map((item) => {
-                            return (
-                                <React.Fragment key={item.external_id}>
-                                    <h1
-                                        style={{
-                                            display: "inline",
-                                        }}
-                                        key={`${item.external_id}`}
-                                    >
-                                        {`${item.external_id}\t`}
-                                    </h1>
-                                </React.Fragment>
-                            );
-                        })}
-                {sampleInfo && (
-                    <>
-                        <h3
-                            style={{
-                                display: "inline",
-                            }}
-                        >
-                            {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}
-                        </h3>
-                    </>
-                )}
-            </div>
-        );
-    };
+    const renderTitle = (
+        <div
+            style={{
+                borderBottom: `1px solid black`,
+            }}
+        >
+            {participants &&
+                participants
+                    .filter((item) => item.id === sampleInfo?.participant_id)
+                    .map((item) => {
+                        return (
+                            <React.Fragment key={item.external_id}>
+                                <h1
+                                    style={{
+                                        display: "inline",
+                                    }}
+                                    key={`${item.external_id}`}
+                                >
+                                    {`${item.external_id}\t`}
+                                </h1>
+                            </React.Fragment>
+                        );
+                    })}
+            {sampleInfo && (
+                <>
+                    <h3
+                        style={{
+                            display: "inline",
+                        }}
+                    >
+                        {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}
+                    </h3>
+                </>
+            )}
+        </div>
+    );
 
     return (
         <>
@@ -526,7 +516,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             {projectName && !isLoading && !error && (
                 <>
                     <div className="detailedInfo">
-                        <div>{renderTitle()}</div>
+                        <div>{renderTitle}</div>
                         <br />
                         <div>{renderPedigreeSection()}</div>
                         <br />
