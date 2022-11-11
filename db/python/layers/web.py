@@ -400,11 +400,10 @@ WHERE fp.participant_id in :pids
             }
 
         for batch in seen_batches:
-            sequence_stats[batch] = {}
-            for seq in seen_seq_types:
-                sequence_stats[batch][seq] = seq_number_by_seq_type_and_batch[
-                    batch
-                ].get(seq, 0)
+            sequence_stats[batch] = {
+                seq: seq_number_by_seq_type_and_batch[batch].get(seq, 0)
+                for seq in seen_seq_types
+            }
 
         return ProjectSummary(
             participants=pmodels,
@@ -414,6 +413,6 @@ WHERE fp.participant_id in :pids
             total_samples=total_samples,
             total_participants=total_participants,
             total_sequences=total_sequences,
-            batch_sequence_stats=seq_number_by_seq_type_and_batch,
+            batch_sequence_stats=sequence_stats,
             cram_seqr_stats=cram_seqr_stats,
         )
