@@ -162,7 +162,6 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
                 setSequenceInfo(resp.data[0]);
-                setIsLoading(false);
             })
             .catch((er) => {
                 setError(er.message);
@@ -392,6 +391,133 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         });
     };
 
+    const renderSeqSection = () => {
+        if (!sample || !sequenceInfo) {
+            return <></>;
+        }
+        return (
+            <>
+                <h4
+                    style={{
+                        borderBottom: `1px solid black`,
+                    }}
+                >
+                    Sequence Information
+                </h4>
+                {renderSeqInfo(sequenceInfo)}
+                {prepReadMetadata(sequenceInfo.meta || {})}
+            </>
+        );
+    };
+
+    const renderSampleSection = () => {
+        if (!sample || !sampleInfo) {
+            return <></>;
+        }
+        return (
+            <>
+                <h4
+                    style={{
+                        borderBottom: `1px solid black`,
+                    }}
+                >
+                    Sample Information
+                </h4>
+                {Object.entries(sampleInfo)
+                    .filter(([key, value]) =>
+                        sampleFieldsToDisplay.includes(key)
+                    )
+                    .map(([key, value]) =>
+                        value ? (
+                            <div key={`${key}-${value}`}>
+                                <b>{key}:</b> {value.toString()}
+                            </div>
+                        ) : (
+                            <React.Fragment
+                                key={`${key}-${value}`}
+                            ></React.Fragment>
+                        )
+                    )}
+            </>
+        );
+    };
+
+    const renderPedigreeSection = () => {
+        if (!sample || !pedigree) {
+            return <></>;
+        }
+        return (
+            <>
+                {pedigree
+                    .filter((item) => item.individual_id === selectedExternalID)
+                    .map((item) => (
+                        <React.Fragment
+                            key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
+                        >
+                            {item.paternal_id &&
+                                item.maternal_id &&
+                                drawTrio(
+                                    item.paternal_id,
+                                    pedigree?.find(
+                                        (i) =>
+                                            i.individual_id === item.paternal_id
+                                    )!.affected,
+                                    item.maternal_id,
+                                    pedigree?.find(
+                                        (i) =>
+                                            i.individual_id === item.maternal_id
+                                    )!.affected,
+                                    item.individual_id,
+                                    item.affected,
+                                    item.sex
+                                )}
+                        </React.Fragment>
+                    ))}
+            </>
+        );
+    };
+
+    const renderTitle = () => {
+        return (
+            <div
+                style={{
+                    borderBottom: `1px solid black`,
+                }}
+            >
+                {participants &&
+                    participants
+                        .filter(
+                            (item) => item.id === sampleInfo?.participant_id
+                        )
+                        .map((item) => {
+                            return (
+                                <React.Fragment key={item.external_id}>
+                                    <h1
+                                        style={{
+                                            display: "inline",
+                                        }}
+                                        key={`${item.external_id}`}
+                                    >
+                                        {`${item.external_id}\t`}
+                                    </h1>
+                                </React.Fragment>
+                            );
+                        })}
+                {sampleInfo && (
+                    <>
+                        <h3
+                            style={{
+                                display: "inline",
+                            }}
+                        >
+                            {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}
+                        </h3>
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
         <>
             <br />
@@ -400,136 +526,13 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             {projectName && !isLoading && !error && (
                 <>
                     <div className="detailedInfo">
-                        {sample && (
-                            <>
-                                <div
-                                    style={{
-                                        borderBottom: `1px solid black`,
-                                    }}
-                                >
-                                    {participants &&
-                                        participants
-                                            .filter(
-                                                (item) =>
-                                                    item.id ===
-                                                    sampleInfo?.participant_id
-                                            )
-                                            .map((item) => {
-                                                return (
-                                                    <React.Fragment
-                                                        key={item.external_id}
-                                                    >
-                                                        <h1
-                                                            style={{
-                                                                display:
-                                                                    "inline",
-                                                            }}
-                                                            key={`${item.external_id}`}
-                                                        >
-                                                            {`${item.external_id}\t`}
-                                                        </h1>
-                                                        <h3
-                                                            style={{
-                                                                display:
-                                                                    "inline",
-                                                            }}
-                                                        >
-                                                            {`${sampleInfo?.id}\t
-                                                                ${sampleInfo?.external_id}`}
-                                                        </h3>
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                </div>
-                                <br />
-                                <div>
-                                    {sample && (
-                                        <>
-                                            {pedigree &&
-                                                pedigree
-                                                    .filter(
-                                                        (item) =>
-                                                            item.individual_id ===
-                                                            selectedExternalID
-                                                    )
-                                                    .map((item) => (
-                                                        <React.Fragment
-                                                            key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
-                                                        >
-                                                            {item.paternal_id &&
-                                                                item.maternal_id &&
-                                                                drawTrio(
-                                                                    item.paternal_id,
-                                                                    pedigree?.find(
-                                                                        (i) =>
-                                                                            i.individual_id ===
-                                                                            item.paternal_id
-                                                                    )!.affected,
-                                                                    item.maternal_id,
-                                                                    pedigree?.find(
-                                                                        (i) =>
-                                                                            i.individual_id ===
-                                                                            item.maternal_id
-                                                                    )!.affected,
-                                                                    item.individual_id,
-                                                                    item.affected,
-                                                                    item.sex
-                                                                )}
-                                                        </React.Fragment>
-                                                    ))}
-                                        </>
-                                    )}
-                                </div>
-                                <div>
-                                    {sample && (
-                                        <>
-                                            <h4
-                                                style={{
-                                                    borderBottom: `1px solid black`,
-                                                }}
-                                            >
-                                                Sample Information
-                                            </h4>
-                                            {sampleInfo &&
-                                                Object.entries(sampleInfo)
-                                                    .filter(([key, value]) =>
-                                                        sampleFieldsToDisplay.includes(
-                                                            key
-                                                        )
-                                                    )
-                                                    .map(([key, value]) => (
-                                                        <div
-                                                            key={`${key}-${value}`}
-                                                        >
-                                                            <b>{key}:</b>{" "}
-                                                            {value.toString()}
-                                                        </div>
-                                                    ))}
-                                        </>
-                                    )}
-                                </div>
-                                <br />
-                                <div>
-                                    {sample && (
-                                        <>
-                                            <h4
-                                                style={{
-                                                    borderBottom: `1px solid black`,
-                                                }}
-                                            >
-                                                Sequence Information
-                                            </h4>
-                                            {sequenceInfo &&
-                                                renderSeqInfo(sequenceInfo)}
-                                            {sequenceInfo &&
-                                                prepReadMetadata(
-                                                    sequenceInfo.meta || {}
-                                                )}
-                                        </>
-                                    )}
-                                </div>
-                            </>
-                        )}
+                        <div>{renderTitle()}</div>
+                        <br />
+                        <div>{renderPedigreeSection()}</div>
+                        <br />
+                        <div>{renderSampleSection()}</div>
+                        <br />
+                        <div>{renderSeqSection()}</div>
                     </div>
                 </>
             )}
