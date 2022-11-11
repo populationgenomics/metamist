@@ -49,3 +49,5 @@ repos:
   hooks:
   - id: mypy
     args: [--pretty, --show-error-codes, --no-strict-optional, --ignore-missing-imports, --install-types, --non-interactive]
+    additional_dependencies:
+    - strawberry-graphql[fastapi]==0.138.1

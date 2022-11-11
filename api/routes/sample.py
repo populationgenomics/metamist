@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from models.enums import SampleType
 from models.models.sample import (
-    Sample,
+    # Sample,
     sample_id_transform_to_raw,
     sample_id_format,
     sample_id_transform_to_raw_list,
@@ -135,7 +135,7 @@ async def get_all_sample_id_map_by_internal(
 @router.get(
     '/{project}/{external_id}/details',
     # Don't support this until openapi 3.1
-    response_model=Sample,
+    # response_model=Sample,
     operation_id='getSampleByExternalId',
 )
 async def get_sample_by_external_id(
