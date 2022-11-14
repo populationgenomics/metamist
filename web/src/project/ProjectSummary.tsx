@@ -311,7 +311,58 @@ export const ProjectSummary = () => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
 
-    const projectSummaryStats: React.ReactElement = (
+    const batchTable = () => {
+        if (
+            !summary?.cram_seqr_stats ||
+            _.isEmpty(summary.cram_seqr_stats) ||
+            !summary?.batch_sequence_stats ||
+            _.isEmpty(summary.batch_sequence_stats)
+        ) {
+            return <></>;
+        }
+
+        const seqTypes = Object.keys(summary?.cram_seqr_stats);
+        return (
+            <Table celled compact>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell>Batch</Table.HeaderCell>
+                        {seqTypes.map((item) => (
+                            <Table.HeaderCell
+                                key={`header-${item}-${projectName}`}
+                            >
+                                {titleCase(item)}
+                            </Table.HeaderCell>
+                        ))}
+                        <Table.HeaderCell>Total</Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+
+                <Table.Body>
+                    {Object.entries(summary?.batch_sequence_stats).map(
+                        ([key, value]) => (
+                            <Table.Row key={`body-${key}-${projectName}`}>
+                                <Table.Cell>{titleCase(key)}</Table.Cell>
+                                {seqTypes.map((seq) => (
+                                    <Table.Cell
+                                        key={`${key}-${seq}`}
+                                    >{`${value[seq]}`}</Table.Cell>
+                                ))}
+                                <Table.Cell>
+                                    {Object.values(value).reduce(
+                                        (a, b) => +a + +b,
+                                        0
+                                    )}
+                                </Table.Cell>
+                            </Table.Row>
+                        )
+                    )}
+                </Table.Body>
+            </Table>
+        );
+    };
+
+    const totalsStats: React.ReactElement = (
         <>
             <h2>Project Summary Stats</h2>
             <b>Total Participants: </b>
@@ -321,6 +372,18 @@ export const ProjectSummary = () => {
             {"    "}
             {summary?.total_samples}
             <br />
+            <b>Total Sequences: </b>
+            {"    "}
+            {summary?.total_sequences}
+            <br />
+        </>
+    );
+
+    const seqStats = () => {
+        if (!summary?.cram_seqr_stats || _.isEmpty(summary?.cram_seqr_stats)) {
+            return <></>;
+        }
+        return (
             <Table celled>
                 <Table.Header>
                     <Table.Row>
@@ -330,25 +393,27 @@ export const ProjectSummary = () => {
                         <Table.HeaderCell>Seqr</Table.HeaderCell>
                     </Table.Row>
                 </Table.Header>
-
                 <Table.Body>
-                    {summary?.sequence_stats &&
-                        Object.entries(summary?.sequence_stats).map(
-                            ([key, value]) => (
-                                <Table.Row key={key}>
+                    {Object.entries(summary?.cram_seqr_stats).map(
+                        ([key, value]) => (
+                            <React.Fragment key={`${key}-${projectName}`}>
+                                <Table.Row>
                                     <Table.Cell>{titleCase(key)}</Table.Cell>
                                     {Object.entries(value).map(([k1, v1]) => (
-                                        <Table.Cell key={`${key}-${k1}`}>
+                                        <Table.Cell
+                                            key={`${key}-${k1}-${projectName}`}
+                                        >
                                             {`${v1}`}
                                         </Table.Cell>
                                     ))}
                                 </Table.Row>
-                            )
-                        )}
+                            </React.Fragment>
+                        )
+                    )}
                 </Table.Body>
             </Table>
-        </>
-    );
+        );
+    };
 
     return (
         <>
@@ -360,7 +425,9 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {summary && projectSummaryStats}
+            {totalsStats}
+            {seqStats()}
+            {batchTable()}
             <hr />
             {projectName && (
                 <div
