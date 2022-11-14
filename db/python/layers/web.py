@@ -1,4 +1,4 @@
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals, too-many-instance-attributes
 import json
 import asyncio
 import dataclasses
@@ -64,7 +64,9 @@ class ProjectSummary:
     # stats
     total_samples: int
     total_participants: int
-    sequence_stats: dict[str, dict[str, str]]
+    total_sequences: int
+    cram_seqr_stats: dict[str, dict[str, str]]
+    batch_sequence_stats: dict[str, dict[str, str]]
 
     # grid
     participants: List[NestedParticipant]
@@ -166,6 +168,11 @@ class WebDb(DbBase):
         _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
 
+    async def get_total_number_of_sequences(self):
+        """Get total number of sequences within a project"""
+        _query = 'SELECT COUNT(*) FROM sample_sequencing sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
+        return await self.connection.fetch_val(_query, {'project': self.project})
+
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
         family_rows,
@@ -215,7 +222,9 @@ class WebDb(DbBase):
                 # stats
                 total_samples=0,
                 total_participants=0,
-                sequence_stats={},
+                total_sequences=0,
+                batch_sequence_stats={},
+                cram_seqr_stats={},
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -249,8 +258,10 @@ WHERE fp.participant_id in :pids
             sample_id_start_times,
             total_samples,
             total_participants,
+            total_sequences,
             cram_number_by_seq_type,
             seq_number_by_seq_type,
+            seq_number_by_seq_type_and_batch,
             seqr_stats_by_seq_type,
         ] = await asyncio.gather(
             sequence_promise,
@@ -259,8 +270,12 @@ WHERE fp.participant_id in :pids
             sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
             self.get_total_number_of_participants(),
+            self.get_total_number_of_sequences(),
             atable.get_number_of_crams_by_sequence_type(project=self.project),
             seqtable.get_sequence_type_numbers_for_project(project=self.project),
+            seqtable.get_sequence_type_numbers_by_batch_for_project(
+                project=self.project
+            ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
 
@@ -365,19 +380,29 @@ WHERE fp.participant_id in :pids
             ('external_id', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
-        sequence_keys = [('type', 'type')] + [
-            ('meta.' + k, k) for k in sequence_meta_keys
-        ]
+        sequence_keys = sorted(
+            [('type', 'type')] + [('meta.' + k, k) for k in sequence_meta_keys]
+        )
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
-        sequence_stats = {}
+        seen_batches = set(seq_number_by_seq_type_and_batch.keys())
+
+        sequence_stats: Dict[str, Dict[str, str]] = {}
+        cram_seqr_stats = {}
+
         for seq in seen_seq_types:
-            sequence_stats[seq] = {
+            cram_seqr_stats[seq] = {
                 'Sequences': str(seq_number_by_seq_type.get(seq, 0)),
                 'Crams': str(cram_number_by_seq_type.get(seq, 0)),
                 'Seqr': str(seqr_stats_by_seq_type.get(seq, 0)),
+            }
+
+        for batch in seen_batches:
+            sequence_stats[batch] = {
+                seq: seq_number_by_seq_type_and_batch[batch].get(seq, 0)
+                for seq in seen_seq_types
             }
 
         return ProjectSummary(
@@ -387,5 +412,7 @@ WHERE fp.participant_id in :pids
             sequence_keys=sequence_keys,
             total_samples=total_samples,
             total_participants=total_participants,
-            sequence_stats=sequence_stats,
+            total_sequences=total_sequences,
+            batch_sequence_stats=sequence_stats,
+            cram_seqr_stats=cram_seqr_stats,
         )

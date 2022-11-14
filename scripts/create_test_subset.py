@@ -156,7 +156,7 @@ def main(
     except exceptions.ApiException:
         seq_info_by_s_id = {}
     else:
-        seq_info_by_s_id = dict(zip(sample_ids, seq_infos))
+        seq_info_by_s_id = {seq['sample_id']: seq for seq in seq_infos}
 
     analysis_by_sid_by_type: Dict[str, Dict] = {'cram': {}, 'gvcf': {}}
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
@@ -222,7 +222,6 @@ def main(
                 new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
                 logger.info('Creating sequence entry in test')
                 seqapi.create_new_sequence(
-                    project=target_project,
                     new_sequence=NewSequence(
                         sample_id=new_s_id,
                         meta=new_meta,
