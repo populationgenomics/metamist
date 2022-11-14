@@ -72,7 +72,22 @@ interface Sample {
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
-export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
+export class DetailedInfoPage extends React.Component<{}, { error?: Error }> {
+    state = {};
+    static getDerivedStateFromError(error: Error) {
+        // Update state so the next render will show the fallback UI.
+        return { error: error };
+    }
+
+    render() {
+        if (this.state.error) {
+            return <p>{this.state.error.toString()}</p>;
+        }
+        return <DetailedInfoPage_ />; /* eslint react/jsx-pascal-case: 0 */
+    }
+}
+
+export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
     const { projectName, sampleName } = useParams();
     const navigate = useNavigate();
     const [samples, setSamples] = React.useState();
@@ -427,9 +442,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                     .map(([key, value]) => (
                         <div key={`${key}-${value}`}>
                             <b>{key}:</b>{" "}
-                            {value != null
-                                ? value.toString()
-                                : "null/undefined"}
+                            {value?.toString() ?? <em>no value</em>}
                         </div>
                     ))}
             </>
