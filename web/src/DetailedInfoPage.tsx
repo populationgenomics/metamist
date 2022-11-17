@@ -73,7 +73,11 @@ interface Sample {
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
 export class DetailedInfoPage extends React.Component<{}, { error?: Error }> {
-    state = {};
+    constructor(props: any) {
+        super(props);
+        this.state = {};
+    }
+
     static getDerivedStateFromError(error: Error) {
         // Update state so the next render will show the fallback UI.
         return { error: error };
