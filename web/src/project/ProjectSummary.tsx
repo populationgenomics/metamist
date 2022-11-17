@@ -13,6 +13,17 @@ import { SampleLink } from "../Links";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
+const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
+
+const REPORT_TYPES = {
+    "WGS Cram MultiQC": "/qc/cram/multiqc.html",
+    "WGS GVCF MultiQC": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC MultiQC": "qc/fastqc/multiqc.html",
+    "Exome Cram MultiQC": "exome/qc/cram/multiqc.html",
+    "Exome GVCF MultiQC": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC MultiQC": "exome/qc/fastqc/multiqc.html",
+};
+
 const sanitiseValue = (value: any) => {
     const tvalue = typeof value;
     if (tvalue === "string" || tvalue === "number") return value;
@@ -413,6 +424,18 @@ export const ProjectSummary = () => {
         );
     };
 
+    const multiQCReports = () => {
+        return Object.entries(REPORT_TYPES).map(([key, value]) => (
+            <a
+                href={`${REPORT_PREFIX}${projectName}${value}`}
+                className="ui button"
+                key={key}
+            >
+                {key}
+            </a>
+        ));
+    };
+
     return (
         <>
             <br />
@@ -426,6 +449,8 @@ export const ProjectSummary = () => {
             {totalsStats}
             {seqStats()}
             {batchTable()}
+            <hr />
+            {multiQCReports()}
             <hr />
             {projectName && (
                 <div
