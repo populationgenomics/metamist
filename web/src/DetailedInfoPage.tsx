@@ -409,7 +409,9 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                                     </React.Fragment>
                                 );
                             }
-                            const stringifiedValue = safeValue(v1);
+                            const stringifiedValue = safeValue(v1) ?? (
+                                <em>no-value</em>
+                            );
                             return (
                                 <div key={`${k1}-${stringifiedValue}`}>
                                     <b>{k1}:</b> {stringifiedValue}
@@ -418,7 +420,7 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                         });
                 }
 
-                const stringifiedValue = safeValue(value);
+                const stringifiedValue = safeValue(value) ?? <em>no-value</em>;
                 return (
                     <div key={`${key}-${stringifiedValue}`}>
                         <b>{key}:</b> {stringifiedValue}
