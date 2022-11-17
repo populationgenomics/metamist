@@ -364,20 +364,19 @@ WHERE a.id = :analysis_id
 
         return project, a
 
-    async def get_analysis_for_sample(
+    async def get_analyses_for_samples(
         self,
-        sample_id: int,
+        sample_ids: list[int],
         analysis_type: AnalysisType | None,
         status: AnalysisStatus,
-        map_sample_ids: bool,
     ) -> tuple[set[ProjectId], list[Analysis]]:
         """
         Get relevant analyses for a sample, optional type / status filters
         map_sample_ids will map the Analysis.sample_ids component,
         not required for GraphQL sources.
         """
-        values: dict[str, Any] = {'sample_id': sample_id}
-        wheres = ['a_s.sample_id = :sample_id']
+        values: dict[str, Any] = {'sample_ids': sample_ids}
+        wheres = ['a_s.sample_id IN :sample_ids']
 
         if analysis_type:
             wheres.append('a.type = :atype')
@@ -391,30 +390,27 @@ WHERE a.id = :analysis_id
     SELECT a.id as id, a.type as type, a.status as status,
     a.output as output, a.project as project, a_s.sample_id as sample_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
-    FROM analysis_sample a_s
-    INNER JOIN analysis a ON a_s.analysis_id = a.id
+    FROM analysis a
+    INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
     WHERE {' AND '.join(wheres)}
         """
 
         rows = await self.connection.fetch_all(_query, values)
+        analyses = {}
+        for a in rows:
+            if a['id'] not in analyses:
+                analyses['id'] = Analysis.from_db(**dict(a))
+
+            analyses.sample_ids.append(a['sample_id'])
+
         analyses = [Analysis.from_db(**dict(d)) for d in rows]
 
-        if map_sample_ids:
+        analyses_samples_dict = defaultdict(list)
+        for a_s in analyses_samples:
+            analyses_samples_dict[a_s['analysis_id']].append(a_s['sample_id'])
 
-            _samples_query = """
-    SELECT analysis_id, sample_id
-    FROM analysis_sample
-    WHERE analysis_id IN :aids
-            """
-            analyses_samples = await self.connection.fetch_all(
-                _samples_query, {'aids': [a.id for a in analyses]}
-            )
-            analyses_samples_dict = defaultdict(list)
-            for a_s in analyses_samples:
-                analyses_samples_dict[a_s['analysis_id']].append(a_s['sample_id'])
-
-            for a in analyses:
-                a.sample_ids = analyses_samples_dict[a.id]
+        for a in analyses:
+            a.sample_ids = analyses_samples_dict[a.id]
 
         return set(a.project for a in analyses), analyses
 

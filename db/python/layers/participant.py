@@ -265,12 +265,15 @@ class ParticipantLayer(BaseLayer):
         self.pttable = ParticipantTable(connection=connection)
 
     async def get_participants_by_ids(
-        self, pids: list[int], check_project_ids: bool = True
+        self, pids: list[int], check_project_ids: bool = True, allow_missing: bool = False
     ) -> list[Participant]:
         """
         Get participants by IDs
         """
         projects, participants = await self.pttable.get_participants_by_ids(pids)
+
+        if not participants:
+            return []
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
