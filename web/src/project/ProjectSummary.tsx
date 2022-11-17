@@ -326,8 +326,20 @@ export const ProjectSummary = () => {
                 </Table.Header>
 
                 <Table.Body>
-                    {Object.entries(summary?.batch_sequence_stats).map(
-                        ([key, value]) => (
+                    {Object.entries(summary?.batch_sequence_stats)
+                        .sort((a, b) => {
+                            if (a[0] === b[0]) {
+                                return 0;
+                            }
+                            if (a[0] === "no-batch") {
+                                return 1;
+                            }
+                            if (b[0] === "no-batch") {
+                                return -1;
+                            }
+                            return a[0] > b[0] ? 1 : -1;
+                        })
+                        .map(([key, value]) => (
                             <Table.Row key={`body-${key}-${projectName}`}>
                                 <Table.Cell>{titleCase(key)}</Table.Cell>
                                 {seqTypes.map((seq) => (
@@ -342,8 +354,7 @@ export const ProjectSummary = () => {
                                     )}
                                 </Table.Cell>
                             </Table.Row>
-                        )
-                    )}
+                        ))}
                 </Table.Body>
             </Table>
         );
