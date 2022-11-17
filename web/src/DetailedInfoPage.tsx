@@ -27,12 +27,14 @@ interface File {
     location: string;
     basename: string;
     class: string;
-    checksum: string;
+    checksum: string | null;
     size: number;
+    secondaryFiles?: File[];
 }
 
 interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>;
+    [key: string]: any;
 }
 
 // temporary
@@ -105,7 +107,8 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
     const [selectedExternalID, setSelectedExternalID] =
         React.useState<string>();
     const [idNameMap, setIdNameMap] = React.useState<[string, string][]>();
-    const [sequenceInfo, setSequenceInfo] = React.useState<SampleSequencing>();
+    const [sequenceInfo, setSequenceInfo] =
+        React.useState<SampleSequencing[]>();
 
     const getSamplesFromProject = React.useCallback(async () => {
         if (!projectName) return;
@@ -180,7 +183,7 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
         new SequenceApi()
             .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
-                setSequenceInfo(resp.data[0]);
+                setSequenceInfo(resp.data);
             })
             .catch((er) => {
                 setError(er.message);
@@ -234,10 +237,20 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
     const prepReadMetadata = (data: SequenceMeta) => {
         if (!data.reads) return <></>;
         if (!Array.isArray(data.reads))
-            return renderReadsMetadata([data.reads], 1);
-        return data.reads.map((v, i) => {
-            return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
-        });
+            return (
+                <>
+                    <b>Reads:</b>
+                    {renderReadsMetadata([data.reads], 1)}
+                </>
+            );
+        return (
+            <>
+                <b>reads:</b>
+                {data.reads.map((v, i) => {
+                    return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
+                })}
+            </>
+        );
     };
 
     const renderReadsMetadata = (data: File[], key: number | string) => {
@@ -359,52 +372,59 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
     };
 
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return Object.entries(seqInfo).map(([key, value]) => {
-            if (key === "external_ids") {
-                if (Object.keys(seqInfo.external_ids!).length) {
-                    return (
-                        <>
-                            <b>External Ids:</b>{" "}
-                            {Object.entries(seqInfo!.external_ids!)
-                                .map(([k1, v1]) => (
-                                    <React.Fragment
-                                        key={`${v1} (${k1})`}
-                                    >{`${v1} (${k1})`}</React.Fragment>
-                                ))
-                                .join()}
-                        </>
-                    );
-                }
-                return <React.Fragment key="ExternalID"></React.Fragment>;
-            }
-            if (key === "meta") {
-                return Object.entries(seqInfo.meta!)
-                    .filter(([k1, v1]) => k1 !== "reads")
-                    .map(([k1, v1]) => {
-                        if (
-                            Array.isArray(v1) &&
-                            v1.filter((v) => !!v.location && !!v.size)
-                                .length === v1.length
-                        ) {
-                            // all are files coincidentally
-                            return renderReadsMetadata(value as File[], key);
-                        }
-                        const stringifiedValue = safeValue(v1);
+        return Object.entries(seqInfo)
+            .filter(([key, value]) => key !== "id")
+            .map(([key, value]) => {
+                if (key === "external_ids") {
+                    if (Object.keys(seqInfo.external_ids!).length) {
                         return (
-                            <div key={`${k1}-${stringifiedValue}`}>
-                                <b>{k1}:</b> {stringifiedValue}
-                            </div>
+                            <>
+                                <b>External Ids:</b>{" "}
+                                {Object.entries(seqInfo!.external_ids!)
+                                    .map(([k1, v1]) => (
+                                        <React.Fragment
+                                            key={`${v1} (${k1})`}
+                                        >{`${v1} (${k1})`}</React.Fragment>
+                                    ))
+                                    .join()}
+                            </>
                         );
-                    });
-            }
+                    }
+                    return <React.Fragment key="ExternalID"></React.Fragment>;
+                }
+                if (key === "meta") {
+                    return Object.entries(seqInfo.meta!)
+                        .filter(([k1, v1]) => k1 !== "reads")
+                        .map(([k1, v1]) => {
+                            if (
+                                Array.isArray(v1) &&
+                                v1.filter((v) => !!v.location && !!v.size)
+                                    .length === v1.length
+                            ) {
+                                // all are files coincidentally
+                                return (
+                                    <React.Fragment key={`${k1}`}>
+                                        <b>{k1}:</b>
+                                        {renderReadsMetadata(v1 as File[], key)}
+                                    </React.Fragment>
+                                );
+                            }
+                            const stringifiedValue = safeValue(v1);
+                            return (
+                                <div key={`${k1}-${stringifiedValue}`}>
+                                    <b>{k1}:</b> {stringifiedValue}
+                                </div>
+                            );
+                        });
+                }
 
-            const stringifiedValue = safeValue(value);
-            return (
-                <div key={`${key}-${stringifiedValue}`}>
-                    <b>{key}:</b> {stringifiedValue}
-                </div>
-            );
-        });
+                const stringifiedValue = safeValue(value);
+                return (
+                    <div key={`${key}-${stringifiedValue}`}>
+                        <b>{key}:</b> {stringifiedValue}
+                    </div>
+                );
+            });
     };
 
     const renderSeqSection = () => {
@@ -420,8 +440,21 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                 >
                     Sequence Information
                 </h4>
-                {renderSeqInfo(sequenceInfo)}
-                {prepReadMetadata(sequenceInfo.meta || {})}
+                {sequenceInfo.map((seq) => {
+                    return (
+                        <React.Fragment key={seq.id}>
+                            <h6>
+                                <b>Sequence ID:</b> {seq.id}
+                            </h6>
+
+                            <div style={{ marginLeft: "30px" }}>
+                                {renderSeqInfo(seq)}
+                                {prepReadMetadata(seq.meta || {})}
+                            </div>
+                            <br />
+                        </React.Fragment>
+                    );
+                })}
             </>
         );
     };
