@@ -7,7 +7,6 @@ import os
 import re
 from abc import abstractmethod
 from collections import defaultdict
-from itertools import groupby
 from typing import (
     List,
     Dict,
@@ -26,6 +25,8 @@ from typing import (
 from functools import wraps
 
 from cloudpathlib import AnyPath
+
+from api.utils import group_by
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -1112,7 +1113,7 @@ class GenericParser(
             )
 
         values = []
-        for _, grouped in groupby(
+        for _, grouped in group_by(
             sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
         ):
             values.append(sorted(grouped))

@@ -4,10 +4,11 @@ import asyncio
 import dataclasses
 from datetime import date
 from collections import defaultdict
-from itertools import groupby
 from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel
+
+from api.utils import group_by
 
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
@@ -130,9 +131,7 @@ class WebDb(DbBase):
         ]
         seq_models_by_sample_id = {
             k: list(v)
-            for k, v in (
-                groupby(seq_models, key=lambda s: seq_id_to_sample_id_map[s.id])
-            )
+            for k, v in (group_by(seq_models, lambda s: seq_id_to_sample_id_map[s.id]))
         }
 
         return seq_models_by_sample_id
@@ -290,8 +289,7 @@ WHERE fp.participant_id in :pids
         # but cast back here to do the lookup
         sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
         smodels_by_pid = {
-            k: list(v)
-            for k, v in (groupby(smodels, key=lambda s: sid_to_pid[int(s.id)]))
+            k: list(v) for k, v in (group_by(smodels, lambda s: sid_to_pid[int(s.id)]))
         }
 
         pid_to_families = self._project_summary_process_family_rows_by_pid(family_rows)
