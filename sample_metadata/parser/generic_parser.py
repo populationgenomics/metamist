@@ -1115,7 +1115,7 @@ class GenericParser(
         values = []
         for _, grouped in group_by(
             sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
-        ):
+        ).items():
             values.append(sorted(grouped))
         invalid_fastq_groups = [grp for grp in values if len(grp) != 2]
         if invalid_fastq_groups:

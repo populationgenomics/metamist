@@ -508,7 +508,7 @@ class GenericMetadataParser(GenericParser):
     async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
         """Return list of grouped by sample metadata from the rows"""
         sample_metadata = []
-        for sid, row_group in group_by(rows, self.get_sample_id):
+        for sid, row_group in group_by(rows, self.get_sample_id).items():
             sample_group = SampleMetaGroup(sample_id=sid, rows=row_group, meta=None)
             sample_metadata.append(await self.get_sample_meta(sample_group))
         return sample_metadata
@@ -538,10 +538,10 @@ class GenericMetadataParser(GenericParser):
         resulting list of metadata
         """
         sequence_meta = []
-        for stype, row_group in group_by(rows, self.get_sequence_type):
+        for stype, row_group in group_by(rows, lambda s: str(self.get_sequence_type(s))).items():
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
-                sequence_type=stype,
+                sequence_type=SequenceType(stype),
             )
             sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta

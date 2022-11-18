@@ -263,7 +263,9 @@ class SampleSequencingTable(DbBase):
         )
 
         # group_by preserves ordering
-        for key, seqs in group_by(sequences, lambda s: (s['sample_id'], s['type'])):
+        for key, seqs in group_by(
+            sequences, lambda s: (s['sample_id'], s['type'])
+        ).items():
             sample_id, stype = key
             # get all
             sample_id_to_seq_id[sample_id][SequenceType(stype)] = [
