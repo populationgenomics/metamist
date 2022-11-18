@@ -301,6 +301,20 @@ class ProjectPermissionsTable:
         rows = await self.connection.fetch_all(_query)
         return list(map(Project.from_db, rows))
 
+    async def get_project_by_id(self, project_id: ProjectId) -> Project:
+        """Get Project from id, NO auth checks are performed"""
+        if not project_id:
+            raise ValueError('Project ID is required for get_project_by_id')
+        _query = """
+        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
+        FROM project
+        WHERE id = :project_id
+        """
+        row = await self.connection.fetch_one(_query, {'project_id': project_id})
+        if not row:
+            raise ValueError('No project found')
+        return Project.from_db(row)
+
     async def get_projects_accessible_by_user(
         self, author: str, readonly=True
     ) -> dict[int, str]:
