@@ -430,6 +430,8 @@ export const ProjectSummary = () => {
                 href={`${REPORT_PREFIX}${projectName}${value}`}
                 className="ui button"
                 key={key}
+                target="_blank"
+                rel="noreferrer"
             >
                 {key}
             </a>
@@ -441,8 +443,14 @@ export const ProjectSummary = () => {
             return <></>;
         }
         return Object.entries(summary.seqr_links).map(([key, value]) => (
-            <a href={value} className="ui button" key={key}>
-                {key}
+            <a
+                href={value}
+                className="ui button"
+                key={key}
+                target="_blank"
+                rel="noreferrer"
+            >
+                {`Seqr ${key}`}
             </a>
         ));
     };
