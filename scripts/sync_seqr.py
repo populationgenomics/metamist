@@ -53,6 +53,10 @@ ENVS = {
         'https://seqr.populationgenomics.org.au',
         '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com',
     ),
+    'reanalysis-dev': (
+        'seqr-reanalysis-dev.populationgenomics.org.au'
+'1021400127367-4vch8s8kc9opeg4v14b2n70se55jpao4.apps.googleusercontent.com'
+    )
 }
 
 SAMPLES_TO_IGNORE = {'CPG227355', 'CPG227397'}
