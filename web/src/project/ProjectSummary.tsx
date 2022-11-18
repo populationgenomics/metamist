@@ -457,36 +457,38 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {totalsStats}
-            {seqStats()}
-            {batchTable()}
-            <hr />
-            {multiQCReports()}
-            <br />
-            <br />
-            {seqrLinks()}
-            <hr />
             {projectName && (
-                <div
-                    style={{
-                        marginBottom: "10px",
-                        justifyContent: "flex-end",
-                        display: "flex",
-                        flexDirection: "row",
-                    }}
-                >
-                    <Dropdown
-                        selection
-                        onChange={setPageLimit}
-                        value={pageLimit}
-                        options={PAGE_SIZES.map((s) => ({
-                            key: s,
-                            text: `${s} samples`,
-                            value: s,
-                        }))}
-                    />
-                    {pageOptions}
-                </div>
+                <>
+                    {totalsStats}
+                    {seqStats()}
+                    {batchTable()}
+                    <hr />
+                    {multiQCReports()}
+                    <br />
+                    <br />
+                    {seqrLinks()}
+                    <hr />
+                    <div
+                        style={{
+                            marginBottom: "10px",
+                            justifyContent: "flex-end",
+                            display: "flex",
+                            flexDirection: "row",
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
+                        />
+                        {pageOptions}
+                    </div>
+                </>
             )}
             {renderGrid()}
             {pageOptions}
