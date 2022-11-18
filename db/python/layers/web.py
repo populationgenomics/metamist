@@ -129,10 +129,9 @@ class WebDb(DbBase):
             )
             for seq in sequence_rows
         ]
-        seq_models_by_sample_id = {
-            k: list(v)
-            for k, v in (group_by(seq_models, lambda s: seq_id_to_sample_id_map[s.id]))
-        }
+        seq_models_by_sample_id = group_by(
+            seq_models, lambda s: seq_id_to_sample_id_map[s.id]
+        )
 
         return seq_models_by_sample_id
 
@@ -288,9 +287,7 @@ WHERE fp.participant_id in :pids
         # the pydantic model is casting to the id to a str, as that makes sense on the front end
         # but cast back here to do the lookup
         sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
-        smodels_by_pid = {
-            k: list(v) for k, v in (group_by(smodels, lambda s: sid_to_pid[int(s.id)]))
-        }
+        smodels_by_pid = group_by(smodels, lambda s: sid_to_pid[int(s.id)])
 
         pid_to_families = self._project_summary_process_family_rows_by_pid(family_rows)
         participant_map = {p['id']: p for p in participant_rows}

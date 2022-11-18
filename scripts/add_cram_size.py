@@ -71,9 +71,9 @@ async def process_project(project: str):
         return
 
     base_paths = set(os.path.dirname(a) for a in analysis_by_file)
-    base_paths_by_bucket: Dict[str, List[str]] = {
-        k: list(v) for k, v in group_by(base_paths, get_bucket_name_from_path)
-    }
+    base_paths_by_bucket: Dict[str, List[str]] = group_by(
+        base_paths, get_bucket_name_from_path
+    )
 
     # the next few lines are equiv to `bucket.get_blob(path)`
     # but without requiring storage.objects.get permission
