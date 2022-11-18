@@ -409,6 +409,18 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                                     </React.Fragment>
                                 );
                             }
+                            if (
+                                v1 &&
+                                typeof v1 === "object" &&
+                                !Array.isArray(value)
+                            ) {
+                                if (!!value.location && !!value.size) {
+                                    return renderReadsMetadata(
+                                        [value] as File[],
+                                        k1
+                                    );
+                                }
+                            }
                             const stringifiedValue = safeValue(v1) ?? (
                                 <em>no-value</em>
                             );
