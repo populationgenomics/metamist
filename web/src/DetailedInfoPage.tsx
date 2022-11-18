@@ -239,13 +239,13 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
         if (!Array.isArray(data.reads))
             return (
                 <>
-                    <b>Reads:</b>
+                    <b>reads:</b>
                     {renderReadsMetadata([data.reads], 1)}
                 </>
             );
         return (
             <>
-                <b>Reads:</b>
+                <b>reads:</b>
                 {data.reads.map((v, i) => {
                     return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
                 })}
@@ -259,8 +259,10 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                 <Table.Body>
                     {data.map((item: File) => (
                         <Table.Row key={item.location}>
-                            <Table.Cell>{item.location}</Table.Cell>
-                            <Table.Cell>{formatBytes(item.size)}</Table.Cell>
+                            <Table.Cell collapsing>{item.location}</Table.Cell>
+                            <Table.Cell collapsing>
+                                {formatBytes(item.size)}
+                            </Table.Cell>
                         </Table.Row>
                     ))}
                 </Table.Body>
@@ -412,12 +414,17 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                             if (
                                 v1 &&
                                 typeof v1 === "object" &&
-                                !Array.isArray(value)
+                                !Array.isArray(v1)
                             ) {
-                                if (!!value.location && !!value.size) {
-                                    return renderReadsMetadata(
-                                        [value] as File[],
-                                        k1
+                                if (!!v1.location && !!v1.size) {
+                                    return (
+                                        <React.Fragment key={`${k1}`}>
+                                            <b>{k1}:</b>
+                                            {renderReadsMetadata(
+                                                [v1] as File[],
+                                                k1
+                                            )}
+                                        </React.Fragment>
                                     );
                                 }
                             }
