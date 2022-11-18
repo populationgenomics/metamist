@@ -13,6 +13,17 @@ import { SampleLink } from "../Links";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
+const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
+
+const REPORT_TYPES = {
+    "WGS Cram MultiQC": "/qc/cram/multiqc.html",
+    "WGS GVCF MultiQC": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC MultiQC": "qc/fastqc/multiqc.html",
+    "Exome Cram MultiQC": "exome/qc/cram/multiqc.html",
+    "Exome GVCF MultiQC": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC MultiQC": "exome/qc/fastqc/multiqc.html",
+};
+
 const sanitiseValue = (value: any) => {
     const tvalue = typeof value;
     if (tvalue === "string" || tvalue === "number") return value;
@@ -326,8 +337,20 @@ export const ProjectSummary = () => {
                 </Table.Header>
 
                 <Table.Body>
-                    {Object.entries(summary?.batch_sequence_stats).map(
-                        ([key, value]) => (
+                    {Object.entries(summary?.batch_sequence_stats)
+                        .sort((a, b) => {
+                            if (a[0] === b[0]) {
+                                return 0;
+                            }
+                            if (a[0] === "no-batch") {
+                                return 1;
+                            }
+                            if (b[0] === "no-batch") {
+                                return -1;
+                            }
+                            return a[0] > b[0] ? 1 : -1;
+                        })
+                        .map(([key, value]) => (
                             <Table.Row key={`body-${key}-${projectName}`}>
                                 <Table.Cell>{titleCase(key)}</Table.Cell>
                                 {seqTypes.map((seq) => (
@@ -342,8 +365,7 @@ export const ProjectSummary = () => {
                                     )}
                                 </Table.Cell>
                             </Table.Row>
-                        )
-                    )}
+                        ))}
                 </Table.Body>
             </Table>
         );
@@ -402,6 +424,29 @@ export const ProjectSummary = () => {
         );
     };
 
+    const multiQCReports = () => {
+        return Object.entries(REPORT_TYPES).map(([key, value]) => (
+            <a
+                href={`${REPORT_PREFIX}${projectName}${value}`}
+                className="ui button"
+                key={key}
+            >
+                {key}
+            </a>
+        ));
+    };
+
+    const seqrLinks = () => {
+        if (!summary?.seqr_links) {
+            return <></>;
+        }
+        return Object.entries(summary.seqr_links).map(([key, value]) => (
+            <a href={value} className="ui button" key={key}>
+                {key}
+            </a>
+        ));
+    };
+
     return (
         <>
             <br />
@@ -415,6 +460,11 @@ export const ProjectSummary = () => {
             {totalsStats}
             {seqStats()}
             {batchTable()}
+            <hr />
+            {multiQCReports()}
+            <br />
+            <br />
+            {seqrLinks()}
             <hr />
             {projectName && (
                 <div

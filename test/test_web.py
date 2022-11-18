@@ -8,6 +8,7 @@ from db.python.layers.web import (
     NestedParticipant,
     NestedSample,
     NestedSequence,
+    WebProject,
 )
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -61,6 +62,9 @@ class TestWeb(DbIsolatedTest):
 
         # Expect an empty project
         expected = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
             total_samples=0,
             total_participants=0,
             total_sequences=0,
@@ -70,6 +74,7 @@ class TestWeb(DbIsolatedTest):
             participant_keys=[],
             sample_keys=[],
             sequence_keys=[],
+            seqr_links={},
         )
 
         self.assertEqual(expected, result)
@@ -160,6 +165,9 @@ class TestWeb(DbIsolatedTest):
         result = await self.webl.get_project_summary(token=None)
 
         expected = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
             total_samples=1,
             total_participants=1,
             total_sequences=1,
@@ -185,6 +193,7 @@ class TestWeb(DbIsolatedTest):
                     ('meta.batch', 'batch'),
                 ]
             ),
+            seqr_links={},
         )
 
         self.assertEqual(expected, result)
