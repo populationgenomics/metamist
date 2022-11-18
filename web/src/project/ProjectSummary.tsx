@@ -436,6 +436,17 @@ export const ProjectSummary = () => {
         ));
     };
 
+    const seqrLinks = () => {
+        if (!summary?.seqr_links) {
+            return <></>;
+        }
+        return Object.entries(summary.seqr_links).map(([key, value]) => (
+            <a href={value} className="ui button" key={key}>
+                {key}
+            </a>
+        ));
+    };
+
     return (
         <>
             <br />
@@ -451,6 +462,9 @@ export const ProjectSummary = () => {
             {batchTable()}
             <hr />
             {multiQCReports()}
+            <br />
+            <br />
+            {seqrLinks()}
             <hr />
             {projectName && (
                 <div
