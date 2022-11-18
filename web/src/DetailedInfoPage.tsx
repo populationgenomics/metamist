@@ -245,7 +245,7 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
             );
         return (
             <>
-                <b>reads:</b>
+                <b>Reads:</b>
                 {data.reads.map((v, i) => {
                     return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
                 })}
@@ -421,21 +421,20 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                                     );
                                 }
                             }
-                            const stringifiedValue = safeValue(v1) ?? (
-                                <em>no-value</em>
-                            );
+                            const stringifiedValue = safeValue(v1);
                             return (
                                 <div key={`${k1}-${stringifiedValue}`}>
-                                    <b>{k1}:</b> {stringifiedValue}
+                                    <b>{k1}:</b>{" "}
+                                    {stringifiedValue ?? <em>no-value</em>}
                                 </div>
                             );
                         });
                 }
 
-                const stringifiedValue = safeValue(value) ?? <em>no-value</em>;
+                const stringifiedValue = safeValue(value);
                 return (
                     <div key={`${key}-${stringifiedValue}`}>
-                        <b>{key}:</b> {stringifiedValue}
+                        <b>{key}:</b> {stringifiedValue ?? <em>no-value</em>}
                     </div>
                 );
             });
