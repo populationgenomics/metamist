@@ -3,8 +3,8 @@
 import re
 import asyncio
 from collections import defaultdict
-from itertools import groupby
 from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
+from api.utils import group_by
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
@@ -262,8 +262,10 @@ class SampleSequencingTable(DbBase):
             dict
         )
 
-        # groupby preserves ordering
-        for key, seqs in groupby(sequences, lambda s: (s['sample_id'], s['type'])):
+        # group_by preserves ordering
+        for key, seqs in group_by(
+            sequences, lambda s: (s['sample_id'], s['type'])
+        ).items():
             sample_id, stype = key
             # get all
             sample_id_to_seq_id[sample_id][SequenceType(stype)] = [
