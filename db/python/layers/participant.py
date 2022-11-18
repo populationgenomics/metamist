@@ -573,7 +573,8 @@ class ParticipantLayer(BaseLayer):
             ld = {k.lower(): v for k, v in d.items()}
             rows.append({lheader_to_json[h]: ld.get(h) for h in lheaders if ld.get(h)})
 
-        set_headers = set()
+        # these two columns must ALWAYS be present
+        set_headers = {'individual_id', 'family_id'}
         for row in rows:
             set_headers.update(set(row.keys()))
 
@@ -581,7 +582,8 @@ class ParticipantLayer(BaseLayer):
 
         return {
             'rows': rows,
-            'headers': list(set_headers),
+            # get ordered headers if we have data for it
+            'headers': [h for h in SeqrMetadataKeys.get_ordered_headers() if h in set_headers],
             'header_map': json_header_map,
         }
 

@@ -89,21 +89,20 @@ exome:
     validation: validation-exome-2022_0915_1315_htupt
 
 genome:
-    acute-care: acute-care-genome-2022_0815_1644_xkhvx
-    heartkids: heartkids-genome-2022_0812_1925_fhoif
-    kidgen: kidgen-genome-2022_0812_1925_fhoif
-    ohmr4-epilepsy: ohmr4-epilepsy-genome-2022_0812_1925_fhoif
-    schr-neuro: schr-neuro-genome-2022_0812_1925_fhoif
-    ravenscroft-rdstudy: ravenscroft-rdstudy-genome-2022_0812_1925_fhoif
-    validation: validation-genome-2022_0812_1925_fhoif
-    perth-neuro: perth-neuro-genome-2022_0812_1925_fhoif
-    mito-disease: mito-disease-genome-2022_0812_1925_fhoif
-    ibmdx: ibmdx-genome-2022_0812_1925_fhoif
-    hereditary-neuro: hereditary-neuro-genome-2022_0812_1925_fhoif
-    circa: circa-genome-2022_0812_1925_fhoif
-    ravenscroft-arch: ravenscroft-arch-genome-2022_0812_1925_fhoif
-    ohmr3-mendelian: ohmr3-mendelian-genome-2022_0812_1925_fhoif
-    ag-hidden: ag-hidden-genome-2022_0812_1925_fhoif
+    perth-neuro: perth-neuro-genome-2022_1113_1641_4xt4v
+    ravenscroft-rdstudy: ravenscroft-rdstudy-genome-2022_1113_1641_4xt4v
+    mito-disease: mito-disease-genome-2022_1113_1641_4xt4v
+    ag-hidden: ag-hidden-genome-2022_1111_1947_54vza
+    hereditary-neuro: hereditary-neuro-genome-2022_1111_1947_54vza
+    kidgen: kidgen-genome-2022_1111_1947_54vza
+    ravenscroft-arch: ravenscroft-arch-genome-2022_1111_1947_54vza
+    ohmr4-epilepsy: ohmr4-epilepsy-genome-2022_1111_1947_54vza
+    heartkids: heartkids-genome-2022_1111_1947_54vza
+    schr-neuro: schr-neuro-genome-2022_1111_1947_54vza
+    ohmr3-mendelian: ohmr3-mendelian-genome-2022_1111_1947_54vza
+    rdp-kidney: rdp-kidney-genome-2022_1111_1947_54vza
+    ibmdx: ibmdx-genome-2022_1111_1947_54vza
+    circa: circa-genome-2022_1111_1947_54vza
 """
 
 ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
@@ -160,14 +159,14 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     if not filtered_family_eids:
         raise ValueError('No families to sync')
 
-    sync_pedigree(**params, family_eids=filtered_family_eids)
-    sync_families(**params, family_eids=filtered_family_eids)
+    # sync_pedigree(**params, family_eids=filtered_family_eids)
+    # sync_families(**params, family_eids=filtered_family_eids)
     sync_individual_metadata(**params, participant_eids=set(participant_eids))
-    update_es_index(**params, sequence_type=sequence_type)
+    # update_es_index(**params, sequence_type=sequence_type)
 
-    get_cram_map(
-        dataset, participant_eids=participant_eids, sequence_type=sequence_type
-    )
+    # get_cram_map(
+    #     dataset, participant_eids=participant_eids, sequence_type=sequence_type
+    # )
 
 
 def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
@@ -328,7 +327,16 @@ def sync_individual_metadata(
             return
 
     json_rows = individual_metadata_resp['rows']
-    individual_meta_headers = individual_metadata_resp['headers']
+    individual_meta_headers: list[str] = individual_metadata_resp['headers']
+
+    if 'individual_id' in individual_meta_headers:
+        individual_meta_headers.remove('individual_id')
+    if 'family_id' in individual_meta_headers:
+        individual_meta_headers.remove('family_id')
+
+    # make sure individual_meta_headers always come first
+    individual_meta_headers = ['family_id', 'individual_id']
+
     col_header_map = individual_metadata_resp['header_map']
 
     if len(json_rows) == 0:
@@ -606,4 +614,5 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
 
 if __name__ == '__main__':
     # sync_single_dataset_from_name('ohmr4-epilepsy', 'genome')
-    sync_all_datasets(sequence_type='exome')
+
+    sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
