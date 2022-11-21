@@ -458,7 +458,7 @@ export const ProjectSummary = () => {
     };
 
     const seqrLinks = () => {
-        if (!summary?.seqr_links.length) {
+        if (!summary?.seqr_links || _.isEmpty(summary?.seqr_links)) {
             return <></>;
         }
         return (
