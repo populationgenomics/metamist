@@ -510,9 +510,11 @@ ORDER BY a.timestamp_completed DESC;
 
                     if isinstance(seq_type, str):
                         n_counts[seq_type.lower()] += r['number_of_crams']
-                    elif isinstance(seq_type, dict) and isinstance(seq_type.get('value'), str):
-                            # if API inserts it as meta: {'sequencing_type': SequenceType('genome')}
-                            n_counts[seq_type.get('value').lower()] += r['number_of_crams']
+                    elif isinstance(seq_type, dict) and isinstance(
+                        seq_type.get('value'), str
+                    ):
+                        # if API inserts it as meta: {'sequencing_type': SequenceType('genome')}
+                        n_counts[seq_type.get('value').lower()] += r['number_of_crams']
                     else:
                         n_counts['unknown'] += r['number_of_crams']
 

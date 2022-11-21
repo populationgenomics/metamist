@@ -309,6 +309,24 @@ class FamilyLayer(BaseLayer):
             coded_phenotype=coded_phenotype,
         )
 
+    async def get_family_by_internal_id(
+        self, family_id: int, check_project_id: bool = True
+    ) -> Family:
+        """Get family by internal ID"""
+        project, family = await self.ftable.get_family_by_internal_id(family_id)
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                self.author, [project], readonly=True
+            )
+
+        return family
+
+    async def get_family_by_external_id(
+        self, external_id: str, project: ProjectId = None
+    ):
+        """Get family by external ID, requires project scope"""
+        return await self.ftable.get_family_by_external_id(external_id, project=project)
+
     async def get_families(
         self,
         project: int = None,
@@ -336,7 +354,12 @@ class FamilyLayer(BaseLayer):
             project=project, participant_ids=all_participants
         )
 
-    async def get_families_by_participants(self, participant_ids: list[int], check_project_ids: bool = True) -> dict[int, list[Family]]:
+    async def get_families_by_participants(
+        self, participant_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[Family]]:
+        """
+        Get families keyed by participant_ids, this will duplicate families
+        """
         projects, participant_map = await self.ftable.get_families_by_participants(
             participant_ids=participant_ids
         )
@@ -344,11 +367,11 @@ class FamilyLayer(BaseLayer):
             return {}
 
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.connection.author, projects, readonly=True)
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
 
         return participant_map
-
-
 
     async def update_family(
         self,

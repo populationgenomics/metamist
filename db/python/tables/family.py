@@ -66,7 +66,10 @@ class FamilyTable(DbBase):
 
         return families
 
-    async def get_families_by_participants(self, participant_ids: list[int]) -> tuple[set[ProjectId], dict[int, list[Family]]]:
+    async def get_families_by_participants(
+        self, participant_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[Family]]]:
+        """Get families, keyed by participants"""
         if not participant_ids:
             return set(), {}
 
@@ -86,7 +89,33 @@ class FamilyTable(DbBase):
 
         return projects, ret_map
 
+    async def get_family_by_external_id(
+        self, external_id: str, project: ProjectId = None
+    ):
+        """Get single family by external ID (requires project)"""
+        _query = """
+        SELECT id, external_id, description, coded_phenotype, project
+        FROM family
+        WHERE project = :project AND external_id = :external_id
+        """
+        row = await self.connection.fetch_one(
+            _query, {'project': project or self.project, 'external_id': external_id}
+        )
+        return Family.from_db(row)
 
+    async def get_family_by_internal_id(
+        self, family_id: int
+    ) -> tuple[ProjectId, Family]:
+        """Get family (+ project) by internal ID"""
+        _query = """
+        SELECT id, external_id, description, coded_phenotype, project
+        FROM family WHERE id = :fid
+        """
+        row = await self.connection.fetch_one(_query, {'fid': family_id})
+        if not row:
+            raise NotFoundError
+        project = row['project']
+        return project, Family.from_db(row)
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5

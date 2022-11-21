@@ -265,7 +265,10 @@ class ParticipantLayer(BaseLayer):
         self.pttable = ParticipantTable(connection=connection)
 
     async def get_participants_by_ids(
-        self, pids: list[int], check_project_ids: bool = True, allow_missing: bool = False
+        self,
+        pids: list[int],
+        check_project_ids: bool = True,
+        allow_missing: bool = False,
     ) -> list[Participant]:
         """
         Get participants by IDs
@@ -279,6 +282,12 @@ class ParticipantLayer(BaseLayer):
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
             )
+
+        if not allow_missing and len(participants) != len(pids):
+            # participants are missing
+            pids_missing = set(pids) - set(p.id for p in participants)
+            pids_missing_str = ', '.join(map(str, pids_missing))
+            raise ValueError('Some participants were not found: ' + pids_missing_str)
 
         return participants
 
@@ -504,6 +513,23 @@ class ParticipantLayer(BaseLayer):
 
             await ppttable.add_key_value_rows(insertable_rows)
             return True
+
+    async def get_participants_by_families(
+        self, family_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[Participant]]:
+        """Get participants, keyed by family ID"""
+        projects, family_map = await self.pttable.get_participants_by_families(
+            family_ids=family_ids
+        )
+        if not family_map:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return family_map
 
     async def get_seqr_individual_template(
         self,
