@@ -486,7 +486,7 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {summary?.participants.length !== 0 && (
+            {projectName && summary?.participants.length !== 0 && (
                 <>
                     {totalsStats}
                     {seqStats()}
