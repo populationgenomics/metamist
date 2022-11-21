@@ -75,7 +75,10 @@ export const ProjectSummary = () => {
 
     const getProjectSummary = React.useCallback(
         async (token: any) => {
-            if (!projectName) return;
+            if (!projectName) {
+                setSummary(undefined);
+                return;
+            }
             let sanitisedToken = !!token ? token : undefined;
             setError(undefined);
             setIsLoading(true);
