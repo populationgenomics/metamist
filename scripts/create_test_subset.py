@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments
 
+""" Example Invocation
+
+analysis-runner \
+--dataset acute-care --description "reset acute care test" --output-dir "acute-care-test" \
+--access-level full \
+scripts/create_test_subset.py --project acute-care --families 4
+
+This example will populate acute-care-test with the metamist data for 4 families.
+"""
+
 from typing import Dict, List, Optional, Tuple
 import logging
 import os
