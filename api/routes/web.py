@@ -3,12 +3,13 @@ Web routes
 """
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from pydantic import BaseModel
 
 from db.python.layers.search import SearchLayer
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.layers.web import WebLayer, NestedParticipant
+from models.enums import SequenceType
 
 from models.models.sample import sample_id_format
 from models.models.search import SearchResponse
@@ -81,13 +82,16 @@ async def get_project_summary(
     request: Request,
     limit: int = 20,
     token: Optional[str] = None,
+    sequence_types: list[SequenceType] = Query(None),
     connection: Connection = get_project_readonly_connection,
 ) -> ProjectSummaryResponse:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
     print(token)
 
-    summary = await st.get_project_summary(token=token, limit=limit)
+    summary = await st.get_project_summary(
+        token=token, limit=limit, sequence_types=sequence_types or []
+    )
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(

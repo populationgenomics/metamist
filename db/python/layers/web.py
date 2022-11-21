@@ -96,20 +96,24 @@ class WebLayer(BaseLayer):
     """Web layer"""
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int = 50
+        self, token: Optional[str], sequence_types: list[SequenceType] | None = None, limit: int = 50
     ) -> ProjectSummary:
         """
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_summary(token=token, limit=limit)
+        return await webdb.get_project_summary(
+            token=token, sequence_types=sequence_types, limit=limit
+        )
 
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after):
+    def _project_summary_sample_query(
+        self, sequence_types: list[SequenceType] | None, limit, after
+    ):
         """
         Get query for getting list of samples
         """
@@ -120,10 +124,23 @@ class WebDb(DbBase):
         #     # wheres.append('id > :after')
         #     wheres.append('offset :after')
 
+        join_sequences = False
+        if sequence_types:
+            join_sequences = True
+            wheres.append('sq.type IN :seqtypes')
+            values['seqtypes'] = [st.value for st in sequence_types]
+
         where_str = ''
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
-        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit OFFSET :after'
+
+        sample_query = f"""
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
+        FROM sample s
+        {'INNER JOIN sample_sequencing sq ON s.id = sq.sample_id' if join_sequences else ''}
+        {where_str}
+        ORDER BY id
+        LIMIT :limit OFFSET :after"""
 
         return sample_query, values
 
@@ -230,7 +247,7 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int
+        self, token: Optional[str], sequence_types: list[SequenceType] | None, limit: int
     ) -> ProjectSummary:
         """
         Get project summary
@@ -241,7 +258,7 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0)
+            limit=limit, sequence_types=sequence_types, after=int(token or 0)
         )
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
@@ -276,8 +293,17 @@ class WebDb(DbBase):
 
         # sequences
 
-        seq_query = 'SELECT id, sample_id, meta, type, status FROM sample_sequencing WHERE sample_id IN :sids'
-        sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
+        seq_wheres = ['sample_id IN :sids']
+        values = {'sids': sids}
+        if sequence_types:
+            seq_wheres.append('type IN :types')
+            values['types'] = [s.value for s in sequence_types]
+        seq_query = f"""
+        SELECT id, sample_id, meta, type, status
+        FROM sample_sequencing
+        WHERE {' AND '.join(seq_wheres)}
+        """
+        sequence_promise = self.connection.fetch_all(seq_query, values)
 
         # participant
         p_query = 'SELECT id, external_id, meta, reported_sex, reported_gender, karyotype FROM participant WHERE id in :pids'
