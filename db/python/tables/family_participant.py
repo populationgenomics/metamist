@@ -94,7 +94,7 @@ INSERT INTO family_participant
     ({str_keys})
 VALUES
     ({placeholder_keys})
-ON CONFLICT (participant_id) DO UPDATE SET {update_keys}
+ON CONFLICT (family_id, participant_id) DO UPDATE SET {update_keys}
     """
             await self.connection.execute_many(_query, remapped_ds)
 

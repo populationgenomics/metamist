@@ -173,14 +173,17 @@ RETURNING id
         if len(external_participant_ids) == 0:
             return {}
 
-        _query = 'SELECT external_id, id FROM participant WHERE external_id in :external_ids AND project = :project'
-        results = await self.connection.fetch_all(
-            _query,
-            {
-                'external_ids': tuple(external_participant_ids),
-                'project': project,
-            },
+        values = {
+            'project': project,
+        }
+        eid_placeholders = ', '.join(
+            f':eid_{i+1}' for i in range(len(external_participant_ids))
         )
+        values.update(
+            {f'eid_{idx+1}': eid for idx, eid in enumerate(external_participant_ids)}
+        )
+        _query = f'SELECT external_id, id FROM participant WHERE external_id IN ({eid_placeholders}) AND project = :project'
+        results = await self.connection.fetch_all(_query, values)
         id_map = {r['external_id']: r['id'] for r in results}
 
         return id_map

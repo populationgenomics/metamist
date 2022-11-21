@@ -333,14 +333,25 @@ class ProjectPermissionsTable:
         """
         Get projects by IDs, NO authorization is performed here
         """
-        _query = """
+
+        if len(project_ids) == 1:
+
+            project_where = 'id = :pid'
+            values = {'pid': project_ids[0]}
+        else:
+
+            eid_placeholders = ', '.join(
+                f':eid_{i+1}' for i in range(len(project_ids))
+            )
+            project_where = f'id IN ({eid_placeholders})'
+            values = {f'eid_{idx+1}': eid for idx, eid in enumerate(project_ids)}
+
+        _query = f"""
         SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
         FROM project
-        WHERE id IN :project_ids
+        WHERE {project_where}
         """
-        rows = await self.connection.fetch_all(
-            _query, {'project_ids': tuple(project_ids)}
-        )
+        rows = await self.connection.fetch_all(_query, values)
         projects = list(map(Project.from_db, rows))
         if len(project_ids) != len(rows):
             missing_projects = set(project_ids) - set(p.id for p in projects)

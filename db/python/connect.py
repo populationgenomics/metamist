@@ -115,7 +115,7 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         if self.port:
             _host += f':{self.port}'
 
-        options = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
+        options = {'min_size': 5, 'max_size': 15}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'postgresql+asyncpg://{u_p}@{_host}/{self.dbname}?{_options}'

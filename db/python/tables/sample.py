@@ -19,10 +19,10 @@ class SampleTable(DbBase):
 
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = 'SELECT project FROM sample WHERE id in :sample_ids GROUP BY project'
-        rows = await self.connection.fetch_all(
-            _query, {'sample_ids': tuple(sample_ids)}
-        )
+        sid_placeholder = ', '.join(f':eid_{i+1}' for i in range(len(sample_ids)))
+        values = {f'eid_{idx + 1}': eid for idx, eid in enumerate(sample_ids)}
+        _query = f'SELECT project FROM sample WHERE id IN ({sid_placeholder}) GROUP BY project'
+        rows = await self.connection.fetch_all(_query, values)
         return set(r['project'] for r in rows)
 
     async def get_samples_for_participants(

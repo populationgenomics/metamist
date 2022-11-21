@@ -213,11 +213,16 @@ ON CONFLICT (external_id) DO UPDATE SET
         if not family_ids:
             return {}
 
-        _query = 'SELECT external_id, id FROM family WHERE external_id in :external_ids AND project = :project'
-        results = await self.connection.fetch_all(
-            _query,
-            {'external_ids': tuple(family_ids), 'project': project or self.project},
-        )
+        values = {'project': project or self.project}
+        if len(family_ids) == 1:
+            eid_clause = 'external_id = :feid'
+            values['feid'] = family_ids[0]
+        else:
+            eid_clause = 'external_id IN :feids'
+            values['feids'] = list(family_ids)
+
+        _query = f'SELECT external_id, id FROM family WHERE {eid_clause} AND project = :project'
+        results = await self.connection.fetch_all(_query, values)
         id_map = {r['external_id']: r['id'] for r in results}
 
         if not allow_missing and len(id_map) != len(family_ids):
