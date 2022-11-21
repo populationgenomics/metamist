@@ -30,6 +30,11 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
+if os.getenv('SM_PROFILE_REQUESTS', 'false').upper() in ('1', 'y', 't', 'true'):
+    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+
+    app.add_middleware(PyInstrumentProfilerMiddleware)
+
 if is_full_access():
     app.add_middleware(
         CORSMiddleware,
