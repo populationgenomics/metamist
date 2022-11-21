@@ -397,22 +397,16 @@ WHERE a.id = :analysis_id
 
         rows = await self.connection.fetch_all(_query, values)
         analyses = {}
+        projects: set[ProjectId] = set()
         for a in rows:
-            if a['id'] not in analyses:
-                analyses['id'] = Analysis.from_db(**dict(a))
+            a_id = a['id']
+            if a_id not in analyses:
+                analyses[a_id] = Analysis.from_db(**dict(a))
+                projects.add(a['project'])
 
-            analyses.sample_ids.append(a['sample_id'])
+            analyses[a_id].sample_ids.append(a['sample_id'])
 
-        analyses = [Analysis.from_db(**dict(d)) for d in rows]
-
-        analyses_samples_dict = defaultdict(list)
-        for a_s in analyses_samples:
-            analyses_samples_dict[a_s['analysis_id']].append(a_s['sample_id'])
-
-        for a in analyses:
-            a.sample_ids = analyses_samples_dict[a.id]
-
-        return set(a.project for a in analyses), analyses
+        return projects, list(analyses.values())
 
     async def get_sample_cram_path_map_for_seqr(
         self, project: ProjectId, sequence_types: list[SequenceType]
@@ -513,7 +507,15 @@ ORDER BY a.timestamp_completed DESC;
                 try:
                     seq_type = json.loads(seq_type)
                 finally:
-                    n_counts[seq_type.lower()] += r['number_of_crams']
+
+                    if isinstance(seq_type, str):
+                        n_counts[seq_type.lower()] += r['number_of_crams']
+                    elif isinstance(seq_type, dict) and isinstance(seq_type.get('value'), str):
+                            # if API inserts it as meta: {'sequencing_type': SequenceType('genome')}
+                            n_counts[seq_type.get('value').lower()] += r['number_of_crams']
+                    else:
+                        n_counts['unknown'] += r['number_of_crams']
+
         return n_counts
 
     async def get_seqr_stats_by_sequence_type(

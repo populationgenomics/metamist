@@ -40,9 +40,8 @@ class AnalysisLayer(BaseLayer):
         sample_ids: list[int],
         analysis_type: AnalysisType | None,
         status: AnalysisStatus | None,
-        map_sample_ids: bool,
         check_project_id=True,
-    ):
+    ) -> list[Analysis]:
         """
         Get a list of all analysis that relevant for samples
 
@@ -51,8 +50,10 @@ class AnalysisLayer(BaseLayer):
             sample_ids,
             analysis_type=analysis_type,
             status=status,
-            map_sample_ids=map_sample_ids,
         )
+
+        if len(analysis) == 0:
+            return []
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(

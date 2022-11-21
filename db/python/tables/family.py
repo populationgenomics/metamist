@@ -60,10 +60,33 @@ class FamilyTable(DbBase):
         seen = set()
         families = []
         for r in rows:
-            if r.id not in seen:
+            if r['id'] not in seen:
                 families.append(Family.from_db(dict(r)))
-                seen.add(r.id)
+                seen.add(r['id'])
+
         return families
+
+    async def get_families_by_participants(self, participant_ids: list[int]) -> tuple[set[ProjectId], dict[int, list[Family]]]:
+        if not participant_ids:
+            return set(), {}
+
+        _query = """
+            SELECT id, external_id, description, coded_phenotype, project, fp.participant_id
+            FROM family
+            INNER JOIN family_participant fp ON family.id = fp.family_id
+            WHERE fp.participant_id in :pids
+        """
+        ret_map = defaultdict(list)
+        projects: set[ProjectId] = set()
+        for row in await self.connection.fetch_all(_query, {'pids': participant_ids}):
+            drow = dict(row)
+            pid = drow.pop('participant_id')
+            projects.add(drow.get('project'))
+            ret_map[pid].append(Family.from_db(drow))
+
+        return projects, ret_map
+
+
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5

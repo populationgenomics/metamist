@@ -10,6 +10,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from models.models.family import Family
 
 
 class PedRow:
@@ -334,6 +335,20 @@ class FamilyLayer(BaseLayer):
         return await self.ftable.get_families(
             project=project, participant_ids=all_participants
         )
+
+    async def get_families_by_participants(self, participant_ids: list[int], check_project_ids: bool = True) -> dict[int, list[Family]]:
+        projects, participant_map = await self.ftable.get_families_by_participants(
+            participant_ids=participant_ids
+        )
+        if not participant_map:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(self.connection.author, projects, readonly=True)
+
+        return participant_map
+
+
 
     async def update_family(
         self,

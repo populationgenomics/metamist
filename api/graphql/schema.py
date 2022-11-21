@@ -6,6 +6,7 @@ Schema for GraphQL.
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+from collections import defaultdict
 
 import strawberry
 from strawberry.dataloader import DataLoader
@@ -108,6 +109,12 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list['Pro
     pttable = ProjectPermissionsTable(connection.connection)
     return await pttable.get_projects_by_ids(project_ids)
 
+@connected_data_loader
+async def load_families_for_participants(participant_ids: list[int], connection) -> list[list['Family']]:
+    flayer = FamilyLayer(connection)
+    fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
+    return [fam_map.get(p) for p in participant_ids]
+
 
 @connected_data_loader
 async def load_analyses_for_samples(queries: list[dict], connection):
@@ -122,32 +129,33 @@ async def load_analyses_for_samples(queries: list[dict], connection):
         queries, lambda q: tuple([(key, q.get(key)) for key in supported_params])
     )
     alayer = AnalysisLayer(connection)
-    cached_for_return = {}
+    cached_for_return = defaultdict(list)
     for group in grouped_by_params.values():
         analysis_type = group[0].get('type')
         status = group[0].get('status')
+        sample_ids = [r['sample'] for r in group]
 
         by_sample = defaultdict(list)
 
         analyses = await alayer.get_analyses_for_samples(
-            [r['sample'] for r in group],
+            sample_ids,
             analysis_type=analysis_type,
             status=status,
-            map_sample_ids=True,
         )
 
         for a in analyses:
-            for sample_id in a['sample_ids']:
+            for sample_id in a.sample_ids:
                 by_sample[sample_id].append(a)
 
-        for sample_id in group:
+        for row in group:
             # use tuple
-            cached_for_return[
-                tuple([group.get(k) for k in ordered_lookup])
-            ] = by_sample.get(sample_id)
+            if result_for_sample := by_sample.get(row['sample']):
+                cached_for_return[
+                tuple([row.get(k) for k in ordered_lookup])
+            ] = result_for_sample
 
     return [
-        cached_for_return.get(tuple([row.get(k) for k in ordered_lookup]))
+        cached_for_return.get(tuple([row.get(k) for k in ordered_lookup]), [])
         for row in queries
     ]
 
@@ -170,8 +178,9 @@ async def get_context(connection=get_projectless_db_connection):
         ),
         'loader_projects_for_ids': DataLoader(load_projects_for_ids(connection)),
         'loader_analyses_for_samples_ids': DataLoader(
-            load_analyses_for_samples, cache=False
+            load_analyses_for_samples(connection), cache=False
         ),
+        'loader_families_for_participants': DataLoader(load_families_for_participants(connection))
     }
 
 
@@ -230,7 +239,9 @@ class GraphQLProject:
         return participants
 
     @strawberry.field()
-    async def samples(self, info: Info, root: 'Project' -> list['GraphQLSample']):
+    async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
+        return []
+
 
 
 
@@ -248,12 +259,12 @@ class GraphQLAnalysis:
     author: str
 
     @strawberry.field
-    async def samples(self, info: Info, root) -> list['Sample']:
+    async def samples(self, info: Info, root) -> list['GraphQLSample']:
         loader = info.context['loader_samples_for_analysis_ids']
         return await loader.load(root.id)
 
     @strawberry.field
-    async def project(self, info: Info, root: 'Analysis'):
+    async def project(self, info: Info, root: 'Analysis') -> GraphQLProject:
         loader = info.context['loader_projects_for_ids']
         return await loader.load(root.project)
 
@@ -261,9 +272,9 @@ class GraphQLAnalysis:
 class GraphQLFamily:
     id: int
     external_id: str
-    
-    description: Optional[str] = None
-    coded_phenotype: Optional[str] = None
+
+    description: str | None = None
+    coded_phenotype: str | None = None
 
     @strawberry.field
     async def project(self, info: Info, root: 'Family') -> GraphQLProject:
@@ -272,13 +283,13 @@ class GraphQLFamily:
 
     @strawberry.field
     async def participants(self, info: Info, root: 'Family') -> list['GraphQLParticipant']:
-        pass
-
-    @strawberry.field
-    async def pedigree_rows(info: Info, root: 'Family') -> list[strawberry.scalar.JSON]:
         return []
 
-        
+    @strawberry.field
+    async def pedigree_rows(self, info: Info, root: 'Family') -> list[strawberry.scalars.JSON]:
+        return []
+
+
 
 
 @strawberry.type
@@ -294,7 +305,9 @@ class GraphQLParticipant:
         return await info.context['loader_samples_for_participants'].load(root.id)
 
     @strawberry.field
-    async def families(self, info: Info, root) -> list[GraphQLFamily]
+    async def families(self, info: Info, root) -> list[GraphQLFamily]:
+        fams = await info.context['loader_families_for_participants'].load(root.id)
+        return fams
 
 
 @strawberry.type
@@ -309,7 +322,7 @@ class GraphQLSample:
     author: str | None
 
     @strawberry.field
-    async def participant(self, info: Info, root: Sample) -> GraphQLParticipant | None:
+    async def participant(self, info: Info, root: 'Sample') -> GraphQLParticipant | None:
         loader_participants_for_ids = info.context['loader_participants_for_ids']
         if root.participant is None:
             return None
@@ -360,7 +373,7 @@ class GraphQLSampleSequencing:
 
 
 @strawberry.type
-class GraphQLQuery:
+class Query:
     """GraphQL Queries"""
 
     @strawberry.field
@@ -382,7 +395,7 @@ class GraphQLQuery:
         return ps[0]
 
     @strawberry.field()
-    async def project(self, info: Info, name: str) -> Project:
+    async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
         project_id = await ptable.get_project_id_from_name_and_user(
