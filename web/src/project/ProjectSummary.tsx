@@ -16,12 +16,12 @@ const PAGE_SIZES = [20, 40, 100, 1000];
 const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
 
 const REPORT_TYPES = {
-    "WGS Cram MultiQC": "/qc/cram/multiqc.html",
-    "WGS GVCF MultiQC": "/qc/gvcf/multiqc.html",
-    "WGS FASTQC MultiQC": "qc/fastqc/multiqc.html",
-    "Exome Cram MultiQC": "exome/qc/cram/multiqc.html",
-    "Exome GVCF MultiQC": "exome/qc/gvcf/multiqc.html",
-    "Exome FASTQC MultiQC": "exome/qc/fastqc/multiqc.html",
+    "WGS Cram": "/qc/cram/multiqc.html",
+    "WGS GVCF": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC": "qc/fastqc/multiqc.html",
+    "Exome Cram": "exome/qc/cram/multiqc.html",
+    "Exome GVCF": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC": "exome/qc/fastqc/multiqc.html",
 };
 
 const sanitiseValue = (value: any) => {
@@ -348,11 +348,13 @@ export const ProjectSummary = () => {
                             if (b[0] === "no-batch") {
                                 return -1;
                             }
-                            if (isNaN(+a[0]) && isNaN(+b[0])) {
-                                //if both numbers
-                                return +a[0] - +b[0];
+                            //@ts-ignore
+                            const difference = a[0] - b[0];
+                            if (isNaN(difference)) {
+                                // something couldn't be coerced to a number, so compare them directly
+                                return a[0] > b[0] ? 1 : -1;
                             }
-                            return a[0] > b[0] ? 1 : -1; //not both numbers
+                            return difference;
                         })
                         .map(([key, value]) => (
                             <Table.Row key={`body-${key}-${projectName}`}>
@@ -429,34 +431,44 @@ export const ProjectSummary = () => {
     };
 
     const multiQCReports = () => {
-        return Object.entries(REPORT_TYPES).map(([key, value]) => (
-            <a
-                href={`${REPORT_PREFIX}${projectName}${value}`}
-                className="ui button"
-                key={key}
-                target="_blank"
-                rel="noreferrer"
-            >
-                {key}
-            </a>
-        ));
+        return (
+            <>
+                <h4> MultiQC Links</h4>
+                {Object.entries(REPORT_TYPES).map(([key, value]) => (
+                    <a
+                        href={`${REPORT_PREFIX}${projectName}${value}`}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {key}
+                    </a>
+                ))}
+            </>
+        );
     };
 
     const seqrLinks = () => {
-        if (!summary?.seqr_links) {
+        if (!summary?.seqr_links.length) {
             return <></>;
         }
-        return Object.entries(summary.seqr_links).map(([key, value]) => (
-            <a
-                href={value}
-                className="ui button"
-                key={key}
-                target="_blank"
-                rel="noreferrer"
-            >
-                {`Seqr ${key}`}
-            </a>
-        ));
+        return (
+            <>
+                <h4> Seqr Links</h4>
+                {Object.entries(summary.seqr_links).map(([key, value]) => (
+                    <a
+                        href={value}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {titleCase(key)}
+                    </a>
+                ))}
+            </>
+        );
     };
 
     return (
