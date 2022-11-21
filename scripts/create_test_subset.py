@@ -4,7 +4,7 @@
 """ Example Invocation
 
 analysis-runner \
---dataset acute-care --description "reset acute care test" --output-dir "acute-care-test" \
+--dataset acute-care --description "populate acute care test subset" --output-dir "acute-care-test" \
 --access-level full \
 scripts/create_test_subset.py --project acute-care --families 4
 
