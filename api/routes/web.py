@@ -88,7 +88,6 @@ async def get_project_summary(
     print(token)
 
     summary = await st.get_project_summary(token=token, limit=limit)
-    print(summary.project)
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
