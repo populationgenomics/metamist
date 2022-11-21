@@ -246,7 +246,7 @@
                 <constraints nullable="false" foreignKeyName="fk_family_participant" references="family(id)"/>
             </column>
             <column name="participant_id" type="INT">
-                <constraints primaryKey="true" nullable="false" foreignKeyName="fk_family_participant_participant"
+                <constraints nullable="false" foreignKeyName="fk_family_participant_participant"
                              references="participant(id)"/>
             </column>
             <column name="paternal_participant_id" type="INT">
@@ -293,6 +293,12 @@
                 constraintName="PK_sample_sequencing_eid"
                 tableName="sample_sequencing_eid"
                 validate="true"
+        />
+        <addPrimaryKey
+            columnNames="family_id,participant_id"
+            constraintName="PK_family_participant"
+            tableName="family_participant"
+            validate="true"
         />
         <addUniqueConstraint
                 columnNames="project,external_id"
