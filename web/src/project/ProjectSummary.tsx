@@ -10,18 +10,19 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
 import { SampleLink } from "../Links";
+import MuckTheDuck from "../MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
 const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
 
 const REPORT_TYPES = {
-    "WGS Cram MultiQC": "/qc/cram/multiqc.html",
-    "WGS GVCF MultiQC": "/qc/gvcf/multiqc.html",
-    "WGS FASTQC MultiQC": "qc/fastqc/multiqc.html",
-    "Exome Cram MultiQC": "exome/qc/cram/multiqc.html",
-    "Exome GVCF MultiQC": "exome/qc/gvcf/multiqc.html",
-    "Exome FASTQC MultiQC": "exome/qc/fastqc/multiqc.html",
+    "WGS Cram": "/qc/cram/multiqc.html",
+    "WGS GVCF": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC": "qc/fastqc/multiqc.html",
+    "Exome Cram": "exome/qc/cram/multiqc.html",
+    "Exome GVCF": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC": "exome/qc/fastqc/multiqc.html",
 };
 
 const sanitiseValue = (value: any) => {
@@ -170,7 +171,11 @@ export const ProjectSummary = () => {
         if (summary.participants.length === 0) {
             return (
                 <p>
-                    <em>No samples</em>
+                    <em>Ah Muck, there aren't any samples in this project</em>
+                    <MuckTheDuck
+                        height={28}
+                        style={{ transform: "scaleY(-1)" }}
+                    />
                 </p>
             );
         }
@@ -348,7 +353,13 @@ export const ProjectSummary = () => {
                             if (b[0] === "no-batch") {
                                 return -1;
                             }
-                            return a[0] > b[0] ? 1 : -1;
+                            //@ts-ignore
+                            const difference = a[0] - b[0];
+                            if (isNaN(difference)) {
+                                // something couldn't be coerced to a number, so compare them directly
+                                return a[0] > b[0] ? 1 : -1;
+                            }
+                            return difference;
                         })
                         .map(([key, value]) => (
                             <Table.Row key={`body-${key}-${projectName}`}>
@@ -425,26 +436,44 @@ export const ProjectSummary = () => {
     };
 
     const multiQCReports = () => {
-        return Object.entries(REPORT_TYPES).map(([key, value]) => (
-            <a
-                href={`${REPORT_PREFIX}${projectName}${value}`}
-                className="ui button"
-                key={key}
-            >
-                {key}
-            </a>
-        ));
+        return (
+            <>
+                <h4> MultiQC Links</h4>
+                {Object.entries(REPORT_TYPES).map(([key, value]) => (
+                    <a
+                        href={`${REPORT_PREFIX}${projectName}${value}`}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {key}
+                    </a>
+                ))}
+            </>
+        );
     };
 
     const seqrLinks = () => {
-        if (!summary?.seqr_links) {
+        if (!summary?.seqr_links.length) {
             return <></>;
         }
-        return Object.entries(summary.seqr_links).map(([key, value]) => (
-            <a href={value} className="ui button" key={key}>
-                {key}
-            </a>
-        ));
+        return (
+            <>
+                <h4> Seqr Links</h4>
+                {Object.entries(summary.seqr_links).map(([key, value]) => (
+                    <a
+                        href={value}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {titleCase(key)}
+                    </a>
+                ))}
+            </>
+        );
     };
 
     return (
@@ -457,36 +486,38 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {totalsStats}
-            {seqStats()}
-            {batchTable()}
-            <hr />
-            {multiQCReports()}
-            <br />
-            <br />
-            {seqrLinks()}
-            <hr />
-            {projectName && (
-                <div
-                    style={{
-                        marginBottom: "10px",
-                        justifyContent: "flex-end",
-                        display: "flex",
-                        flexDirection: "row",
-                    }}
-                >
-                    <Dropdown
-                        selection
-                        onChange={setPageLimit}
-                        value={pageLimit}
-                        options={PAGE_SIZES.map((s) => ({
-                            key: s,
-                            text: `${s} samples`,
-                            value: s,
-                        }))}
-                    />
-                    {pageOptions}
-                </div>
+            {summary?.participants.length !== 0 && (
+                <>
+                    {totalsStats}
+                    {seqStats()}
+                    {batchTable()}
+                    <hr />
+                    {multiQCReports()}
+                    <br />
+                    <br />
+                    {seqrLinks()}
+                    <hr />
+                    <div
+                        style={{
+                            marginBottom: "10px",
+                            justifyContent: "flex-end",
+                            display: "flex",
+                            flexDirection: "row",
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
+                        />
+                        {pageOptions}
+                    </div>
+                </>
             )}
             {renderGrid()}
             {pageOptions}
