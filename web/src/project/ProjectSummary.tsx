@@ -10,6 +10,7 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
 import { SampleLink } from "../Links";
+import MuckTheDuck from "../MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
@@ -170,7 +171,11 @@ export const ProjectSummary = () => {
         if (summary.participants.length === 0) {
             return (
                 <p>
-                    <em>No samples</em>
+                    <em>Ah Muck, there aren't any samples in this project</em>
+                    <MuckTheDuck
+                        height={28}
+                        style={{ transform: "scaleY(-1)" }}
+                    />
                 </p>
             );
         }
