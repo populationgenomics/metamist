@@ -91,7 +91,7 @@ async def get_project_summary(
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
-            project=summary.project,
+            project=WebProject(**summary.project.__dict__),
             participants=[],
             participant_keys=[],
             sample_keys=[],
