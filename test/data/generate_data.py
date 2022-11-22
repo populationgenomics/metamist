@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
+import asyncio
 from pprint import pprint
 import random
 import argparse
 import datetime
+
+from sample_metadata.api.analysis_api import AnalysisApi
+
+from sample_metadata.model.analysis_status import AnalysisStatus
+
+from sample_metadata.model.analysis_type import AnalysisType
+
+from sample_metadata.model.analysis_model import AnalysisModel
 
 from sample_metadata.models import (
     SampleType,
@@ -11,6 +20,7 @@ from sample_metadata.models import (
     SampleBatchUpsert,
     SequenceUpsert,
     SequenceType,
+    SequenceTechnology,
 )
 
 from sample_metadata.apis import (
@@ -21,19 +31,24 @@ from sample_metadata.apis import (
 )
 
 # from sample_metadata.configuration import m
+from sample_metadata.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
 
 
-def main(
-    ped_path='greek-myth-forgeneration.ped', project='greek-myth', create_project=False
+async def main(
+    ped_path='greek-myth-forgeneration.ped', project='greek-myth'
 ):
     """Doing the generation for you"""
-    if create_project:
-        # gcp_id is ignored
-        ProjectApi().create_project(
-            name=project, dataset=project, gcp_id=project, create_test_project=False
-        )
+
+    sapi = SampleApi()
+
+    papi = ProjectApi()
+    existing_projects = await papi.get_my_projects_async()
+    if project not in existing_projects:
+        await papi.create_project_async(
+        name=project, dataset=project, gcp_id=project, create_test_project=False
+    )
 
     with open(ped_path, encoding='utf-8') as f:
         # skip the first line
@@ -41,11 +56,11 @@ def main(
         participant_eids = [line.split('\t')[1] for line in f]
 
     with open(ped_path) as f:
-        FamilyApi().import_pedigree(
+        await FamilyApi().import_pedigree_async(
             project=project, file=f, has_header=True, create_missing_participants=True
         )
 
-    id_map = ParticipantApi().get_participant_id_map_by_external_ids(
+    id_map = await ParticipantApi().get_participant_id_map_by_external_ids_async(
         project=project, request_body=participant_eids
     )
 
@@ -93,6 +108,15 @@ def main(
                                 )
                             )
                         ),
+                        technology=SequenceTechnology(
+                            random.choice(
+                                list(
+                                    next(
+                                        iter(SequenceTechnology.allowed_values.values())
+                                    ).values()
+                                )
+                            )
+                        ),
                         meta={
                             'facility': random.choice(
                                 [
@@ -114,9 +138,40 @@ def main(
             samples.append(sample)
 
     batch_samples = SampleBatchUpsertBody(samples=samples)
-    response = SampleApi().batch_upsert_samples(project, batch_samples)
-
+    response = await sapi.batch_upsert_samples_async(project, batch_samples)
     pprint(response)
+
+    sample_id_map = await sapi.get_all_sample_id_map_by_internal_async(project=project)
+    sample_ids = list(sample_id_map.keys())
+
+    analyses_to_insert = [
+        AnalysisModel(
+            sample_ids=[s],
+            type=AnalysisType('cram'),
+            status=AnalysisStatus('completed'),
+            output=f'FAKE://greek-myth/crams/{s}.cram',
+            meta={'sequencing_type': 'genome'},
+        )
+        for s in sample_ids
+    ]
+
+    # es-index
+    analyses_to_insert.append(
+        AnalysisModel(
+            sample_ids=random.sample(sample_ids, len(sample_ids) // 2),
+            type=AnalysisType('es-index'),
+            status=AnalysisStatus('completed'),
+            output=f'FAKE::greek-myth-genome-{datetime.date.today()}',
+            meta={},
+        )
+    )
+
+    aapi = AnalysisApi()
+    for ans in chunk(analyses_to_insert, 50):
+        print(f'Inserting {len(ans)} analysis entries')
+        await asyncio.gather(
+            *[aapi.create_new_analysis_async(project, analysis_model=a) for a in ans]
+        )
 
 
 if __name__ == '__main__':
@@ -130,6 +185,5 @@ if __name__ == '__main__':
         help='Path to the pedigree file',
     )
     parser.add_argument('--project', type=str, default='greek-myth')
-    parser.add_argument('--create-project', action='store_true')
     args = vars(parser.parse_args())
-    main(**args)
+    asyncio.new_event_loop().run_until_complete(main(**args))

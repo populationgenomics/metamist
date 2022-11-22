@@ -16,7 +16,7 @@ from db.python.layers.sample import SampleLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequence import SampleSequencingTable
-from models.enums import SampleType, SequenceType, SequenceStatus
+from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechnology
 
 
 class NestedSequence(BaseModel):
@@ -25,6 +25,7 @@ class NestedSequence(BaseModel):
     id: int
     type: SequenceType
     status: SequenceStatus
+    technology: SequenceTechnology
     meta: Dict
 
 
@@ -142,6 +143,7 @@ class WebDb(DbBase):
                 status=SequenceStatus(seq['status']),
                 type=SequenceType(seq['type']),
                 meta=json.loads(seq['meta']),
+                technology=SequenceTechnology(seq['technology']),
             )
             for seq in sequence_rows
         ]
@@ -276,7 +278,7 @@ class WebDb(DbBase):
 
         # sequences
 
-        seq_query = 'SELECT id, sample_id, meta, type, status FROM sample_sequencing WHERE sample_id IN :sids'
+        seq_query = 'SELECT id, sample_id, meta, type, status, technology FROM sample_sequencing WHERE sample_id IN :sids'
         sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
 
         # participant
@@ -421,8 +423,8 @@ WHERE fp.participant_id in :pids
             ('external_id', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
-        sequence_keys = sorted(
-            [('type', 'type')] + [('meta.' + k, k) for k in sequence_meta_keys]
+        sequence_keys = [('type', 'type'), ('technology', 'technology')] + sorted(
+            [('meta.' + k, k) for k in sequence_meta_keys]
         )
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(

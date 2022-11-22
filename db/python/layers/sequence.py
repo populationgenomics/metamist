@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequence import SampleSequencingTable
-from models.enums import SequenceStatus, SequenceType
+from models.enums import SequenceStatus, SequenceType, SequenceTechnology
 from models.models.sequence import SampleSequencing
 
 
@@ -127,8 +127,9 @@ class SampleSequenceLayer(BaseLayer):
         seq_meta: Dict[str, Any] = None,
         sample_meta: Dict[str, Any] = None,
         project_ids=None,
-        types: List[str] = None,
-        statuses: List[str] = None,
+        types: List[SequenceType] = None,
+        statuses: List[SequenceStatus] = None,
+        technologies: list[SequenceTechnology] = None,
         active=True,
     ):
         """Get sequences by some criteria"""
@@ -147,6 +148,7 @@ class SampleSequenceLayer(BaseLayer):
             active=active,
             types=types,
             statuses=statuses,
+            technologies=technologies,
         )
 
         if not project_ids:

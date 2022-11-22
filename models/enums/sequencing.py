@@ -6,8 +6,16 @@ class SequenceType(Enum):
 
     GENOME = 'genome'
     EXOME = 'exome'
-    SINGLE_CELL = 'single-cell'
+    TRANSCRIPTOME = 'transcriptome'
+    CHIP = 'chip'
     MT = 'mtseq'
+
+
+class SequenceTechnology(Enum):
+    SHORT_READ = 'short-read'
+    LONG_READ = 'long-read'
+    SINGLE_CELL_RNA_SEQ = 'single-cell-rna-seq'
+    BULK_RNA_SEQ = 'bulk-rna-seq'
     ONT = 'ont'
 
 

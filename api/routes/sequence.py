@@ -15,6 +15,7 @@ from db.python.layers.sequence import (
     SequenceUpdateModel,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from models.enums import SequenceTechnology
 from models.models.sample import (
     sample_id_format,
     sample_id_transform_to_raw,
@@ -34,6 +35,7 @@ class Sequence(BaseModel):
     status: SequenceStatus
     meta: Dict
     type: SequenceType
+    technology: SequenceTechnology
 
 
 class NewSequence(Sequence):
@@ -112,6 +114,7 @@ async def get_sequences_by_criteria(
     active: bool = True,
     types: List[str] = None,
     statuses: List[str] = None,
+    technologies: List[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
     """Get sequences by some criteria"""
@@ -136,8 +139,9 @@ async def get_sequences_by_criteria(
         sample_meta=sample_meta,
         project_ids=pids,
         active=active,
-        types=types,
-        statuses=statuses,
+        types=[SequenceType(s) for s in types] if types else None,
+        statuses=[SequenceStatus(s) for s in statuses] if statuses else None,
+        technologies=[SequenceTechnology(s) for s in technologies] if technologies else None,
     )
 
     return result
