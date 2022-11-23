@@ -11,7 +11,7 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 import logging
 import os
 import random
@@ -482,7 +482,7 @@ def get_fams_for_samples(
     additional_samples: Optional[List[str]] = None,
 ):
     """Returns the families that a list of samples belong to"""
-    fams: List[str] = []
+    fams: Set[str] = set()
     sample_objects = sapi.get_samples(
         body_get_samples={
             'project_ids': [project],
@@ -498,11 +498,11 @@ def get_fams_for_samples(
         replace_with_family_external_ids=True,
     )
 
-    fams = [
+    fams = {
         fam['family_id'] for fam in full_pedigree if str(fam['individual_id']) in pids
-    ]
+    }
 
-    return fams
+    return list(fams)
 
 
 def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
