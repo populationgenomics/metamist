@@ -16,7 +16,7 @@ from db.python.utils import (
     get_logger,
     to_db_json,
 )
-from models.models.project import ProjectRow
+from models.models.project import Project
 
 # minutes
 PROJECT_CACHE_LENGTH = 1
@@ -65,7 +65,7 @@ class ProjectPermissionsTable:
 
     _cache_expiry = None
     _cached_project_names: Dict[str, ProjectId] = {}
-    _cached_project_by_id: Dict[ProjectId, ProjectRow] = {}
+    _cached_project_by_id: Dict[ProjectId, Project] = {}
 
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
@@ -73,7 +73,7 @@ class ProjectPermissionsTable:
 
         if not isinstance(connection, Database):
             raise ValueError(
-                f'Invalid type connection, execpted Database, got {type(connection)}, did you forget to call connection.connection?'
+                f'Invalid type connection, expected Database, got {type(connection)}, did you forget to call connection.connection?'
             )
         self.connection: Database = connection
         self.allow_full_access = (
@@ -218,7 +218,7 @@ class ProjectPermissionsTable:
                 minutes=1
             )
 
-    async def get_project_id_map(self) -> Dict[int, ProjectRow]:
+    async def get_project_id_map(self) -> Dict[int, Project]:
         """Get {project_id: ProjectRow} map"""
         await self.ensure_project_id_cache_is_filled()
         return ProjectPermissionsTable._cached_project_by_id
@@ -292,14 +292,28 @@ class ProjectPermissionsTable:
 
     async def get_project_rows(
         self, author: Optional[str] = None, check_permissions=True
-    ) -> List[ProjectRow]:
+    ) -> List[Project]:
         """Get {name: id} project map"""
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
         _query = 'SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
         rows = await self.connection.fetch_all(_query)
-        return list(map(ProjectRow.from_db, rows))
+        return list(map(Project.from_db, rows))
+
+    async def get_project_by_id(self, project_id: ProjectId) -> Project:
+        """Get Project from id, NO auth checks are performed"""
+        if not project_id:
+            raise ValueError('Project ID is required for get_project_by_id')
+        _query = """
+        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
+        FROM project
+        WHERE id = :project_id
+        """
+        row = await self.connection.fetch_one(_query, {'project_id': project_id})
+        if not row:
+            raise ValueError('No project found')
+        return Project.from_db(row)
 
     async def get_projects_accessible_by_user(
         self, author: str, readonly=True
@@ -328,6 +342,23 @@ class ProjectPermissionsTable:
         }
 
         return relevant_project_map
+
+    async def get_projects_by_ids(self, project_ids: list[ProjectId]) -> list[Project]:
+        """
+        Get projects by IDs, NO authorization is performed here
+        """
+        _query = """
+        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
+        FROM project
+        WHERE id IN :project_ids
+        """
+        rows = await self.connection.fetch_all(_query, {'project_ids': project_ids})
+        projects = list(map(Project.from_db, rows))
+        if len(project_ids) != len(rows):
+            missing_projects = set(project_ids) - set(p.id for p in projects)
+            raise ValueError(f'Some projects were not found: {missing_projects}')
+
+        return projects
 
     async def create_project(
         self,
@@ -409,3 +440,26 @@ RETURNING ID"""
             projects.append(r)
 
         return projects
+
+    async def delete_project(self, project_id: int, author: str) -> bool:
+        """Delete metamist project, reuqires project_creator_permissions"""
+        await self.check_project_creator_permissions(author)
+
+        async with self.connection.transaction():
+            _query = """
+DELETE FROM participant_phenotypes where participant_id IN (SELECT id FROM participant WHERE project = :project);
+DELETE FROM family_participant WHERE family_id IN (SELECT id FROM family where project = :project);
+DELETE FROM family WHERE project = :project;
+DELETE FROM sample_sequencing_eid WHERE project = :project;
+DELETE FROM sample_sequencing WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM analysis_sample WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE project = :project);
+DELETE FROM sample WHERE project = :project;
+DELETE FROM participant WHERE project = :project;
+DELETE FROM analysis WHERE project = :project;
+DELETE FROM project WHERE id = :project;
+            """
+
+            await self.connection.execute(_query, {'project': project_id})
+
+        return True

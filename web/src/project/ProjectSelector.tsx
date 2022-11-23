@@ -7,7 +7,6 @@ import { Dropdown } from "semantic-ui-react";
 import { ProjectApi } from "../sm-api/api";
 
 interface ProjectSelectorProps {
-    // onChange?: (project: string) => void;
     setPageNumber: React.Dispatch<React.SetStateAction<number>>;
     setPageLimit: React.Dispatch<React.SetStateAction<number>>;
     pageLimit: number;
