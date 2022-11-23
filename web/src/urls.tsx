@@ -3,6 +3,7 @@ import * as React from "react";
 import DocumentationArticle from "./docs/Documentation";
 import SwaggerUI from "swagger-ui-react";
 import { DetailedInfoPage } from "./DetailedInfoPage";
+import { FamilyView } from "./FamilyView";
 import { Routes as Switch, Route } from "react-router-dom";
 import { ProjectSummary } from "./project/ProjectSummary";
 import ProjectsAdmin from "./admin/ProjectsAdmin";
@@ -44,7 +45,7 @@ export const Routes = () => {
                 />
                 <Route
                     path="project/:projectName/family/:familyName"
-                    element={<DetailedInfoPage />}
+                    element={<FamilyView />}
                 />
                 <Route
                     path="project/:projectName/participant/:participantName"
