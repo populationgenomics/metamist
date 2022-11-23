@@ -187,12 +187,14 @@ def main(
             )
 
         samples_to_subset = [
-            sample for sample in all_samples if sample['id'] not in _additional_samples
+            sample
+            for sample in all_samples
+            if sample['id'] not in set(_additional_samples)
         ]
         samples_to_add = [
-            sample for sample in all_samples if sample['id'] in _additional_samples
+            sample for sample in all_samples if sample['id'] in set(_additional_samples)
         ]
-        samples = random.sample(samples_to_subset, samples_n)
+        samples = random.sample(list(samples_to_subset), samples_n)
         samples.extend(samples_to_add)
         sample_ids = [s['id'] for s in samples]
 
