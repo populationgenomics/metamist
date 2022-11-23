@@ -1,3 +1,4 @@
+# pylint: disable=too-many-arguments
 from typing import Dict, List, Optional, Any
 
 from pydantic import BaseModel
@@ -12,11 +13,12 @@ from models.models.sequence import SampleSequencing
 class SequenceUpdateModel(BaseModel):
     """Update analysis model"""
 
-    external_ids: Optional[dict[str, str]] = None
-    sample_id: Optional[int] = None
-    status: Optional[SequenceStatus] = None
-    meta: Optional[Dict] = None
-    type: Optional[SequenceType] = None
+    external_ids: dict[str, str] | None = None
+    sample_id: int | None = None
+    status: SequenceStatus | None = None
+    technology: SequenceTechnology | None = None
+    meta: Dict | None = None
+    type: SequenceType | None = None
 
 
 class SequenceUpsert(SequenceUpdateModel):
@@ -182,6 +184,7 @@ class SampleSequenceLayer(BaseLayer):
         external_ids: Optional[dict[str, str]],
         sequence_type: SequenceType,
         status: SequenceStatus,
+        technology: SequenceTechnology | None,
         sequence_meta: Dict[str, Any] = None,
         author=None,
         check_project_id=True,
@@ -202,6 +205,7 @@ class SampleSequenceLayer(BaseLayer):
             sample_id=sample_id,
             external_ids=external_ids,
             sequence_type=sequence_type,
+            technology=technology,
             status=status,
             sequence_meta=sequence_meta,
             author=author,
@@ -215,10 +219,11 @@ class SampleSequenceLayer(BaseLayer):
     async def update_sequence(
         self,
         sequence_id: int,
-        external_ids: dict[str, str] = None,
-        status: Optional[SequenceStatus] = None,
-        meta: Optional[Dict] = None,
-        author=None,
+        external_ids: dict[str, str] | None = None,
+        status: SequenceStatus | None = None,
+        technology: SequenceTechnology | None = None,
+        meta: dict | None = None,
+        author: str | None = None,
         check_project_id=True,
     ):
         """Update a sequence"""
@@ -235,6 +240,7 @@ class SampleSequenceLayer(BaseLayer):
             external_ids=external_ids,
             status=status,
             meta=meta,
+            technology=technology,
             author=author,
             project=project_id,
         )
@@ -268,6 +274,7 @@ class SampleSequenceLayer(BaseLayer):
                 sequence_type=sequence.type,
                 sequence_meta=sequence.meta,
                 status=sequence.status,
+                technology=sequence.technology,
                 external_ids=sequence.external_ids,
             )
 

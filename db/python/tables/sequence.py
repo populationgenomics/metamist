@@ -1,4 +1,4 @@
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-arguments
 
 import re
 import asyncio
@@ -443,12 +443,20 @@ class SampleSequencingTable(DbBase):
         external_sequence_ids: List[str] = None,
         project_ids=None,
         active=True,
-        types: List[str] = None,
-            technologies: List[str] = None,
-        statuses: List[str] = None,
+        types: list[SequenceType] | list[str] = None,
+        technologies: list[SequenceTechnology] | list[str] = None,
+        statuses: list[SequenceStatus] | list[str] = None,
     ) -> Tuple[list[ProjectId], list[SampleSequencing]]:
         """Get sequences by some criteria"""
-        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.technology', 'sq.meta', 's.project']
+        keys = [
+            'sq.id',
+            'sq.sample_id',
+            'sq.type',
+            'sq.status',
+            'sq.technology',
+            'sq.meta',
+            's.project',
+        ]
         keys_str = ', '.join(keys)
 
         where = []
@@ -498,7 +506,10 @@ class SampleSequencingTable(DbBase):
             replacements['types'] = seq_types
 
         if technologies:
-            seq_techs = [s.value if isinstance(s, SequenceTechnology) else s for s in technologies]
+            seq_techs = [
+                s.value if isinstance(s, SequenceTechnology) else s
+                for s in technologies
+            ]
             where.append('sq.technology in :techs')
             replacements['techs'] = seq_techs
 

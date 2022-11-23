@@ -397,14 +397,14 @@
 			tableName="sample_sequencing">
 			<column
 				name="technology"
-				type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq', 'ont')"
+				type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')"
 			/>
 		</addColumn>
 		<sql>
 			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell');
 
 			UPDATE sample_sequencing SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
-			UPDATE sample_sequencing SET type = 'genome', technology = 'ont' WHERE type = 'ont';
+			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read', meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont';
 			UPDATE sample_sequencing SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type = 'single-cell';
 		</sql>
 	</changeSet>

@@ -50,4 +50,6 @@ class SampleSequencing(BaseModel):
                 meta = meta.decode()
             if isinstance(meta, str):
                 meta = json.loads(meta)
-        return SampleSequencing(type=type_, status=status, meta=meta, technology=technology, **d)
+        return SampleSequencing(
+            type=type_, status=status, meta=meta, technology=technology, **d
+        )

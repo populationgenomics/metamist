@@ -1,5 +1,6 @@
 from datetime import date
 
+from models.enums import SequenceTechnology
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.web import (
@@ -96,6 +97,7 @@ class TestWeb(DbIsolatedTest):
                                 '_class': SequenceUpsert,
                                 'type': SequenceType.GENOME,
                                 'status': SequenceStatus.UPLOADED,
+                                'technology': SequenceTechnology.SHORT_READ,
                                 'meta': {
                                     'reads': [
                                         [
@@ -186,13 +188,12 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=sorted(
-                [
-                    ('type', 'type'),
-                    ('meta.reads_type', 'reads_type'),
-                    ('meta.batch', 'batch'),
-                ]
-            ),
+            sequence_keys=[
+                ('type', 'type'),
+                ('technology', 'technology'),
+                ('meta.batch', 'batch'),
+                ('meta.reads_type', 'reads_type'),
+            ],
             seqr_links={},
         )
 

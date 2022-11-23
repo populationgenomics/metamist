@@ -12,11 +12,11 @@ class SequenceType(Enum):
 
 
 class SequenceTechnology(Enum):
+    """Sequencing technologies"""
     SHORT_READ = 'short-read'
     LONG_READ = 'long-read'
     SINGLE_CELL_RNA_SEQ = 'single-cell-rna-seq'
     BULK_RNA_SEQ = 'bulk-rna-seq'
-    ONT = 'ont'
 
 
 class SequenceStatus(Enum):

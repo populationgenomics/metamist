@@ -143,7 +143,7 @@ class WebDb(DbBase):
                 status=SequenceStatus(seq['status']),
                 type=SequenceType(seq['type']),
                 meta=json.loads(seq['meta']),
-                technology=SequenceTechnology(seq['technology']),
+                technology=SequenceTechnology(seq['technology']) if seq['technology'] else None,
             )
             for seq in sequence_rows
         ]

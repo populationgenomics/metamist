@@ -1,3 +1,4 @@
+# pylint: disable=too-many-arguments
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter
@@ -54,6 +55,7 @@ async def create_sequence(
         external_ids=sequence.external_ids,
         sample_id=sample_id_transform_to_raw(sequence.sample_id),
         sequence_type=sequence.type,
+        technology=sequence.technology,
         sequence_meta=sequence.meta,
         status=sequence.status,
     )
@@ -141,7 +143,9 @@ async def get_sequences_by_criteria(
         active=active,
         types=[SequenceType(s) for s in types] if types else None,
         statuses=[SequenceStatus(s) for s in statuses] if statuses else None,
-        technologies=[SequenceTechnology(s) for s in technologies] if technologies else None,
+        technologies=[SequenceTechnology(s) for s in technologies]
+        if technologies
+        else None,
     )
 
     return result
