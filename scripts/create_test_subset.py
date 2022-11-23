@@ -181,7 +181,6 @@ def main(
         samples = [s for s in all_samples if s['id'] in sample_set]
 
     else:
-        assert samples_n
         if _additional_families:
             _additional_samples.extend(
                 get_samples_for_families(project, _additional_families)
@@ -449,7 +448,6 @@ def get_map_ipid_esid(
 def get_samples_for_families(project: str, additional_families: List[str]):
     """Returns the samples that belong to a list of families"""
 
-    assert additional_families
     samples: List[str] = []
     full_pedigree = fapi.get_pedigree(
         project=project,
