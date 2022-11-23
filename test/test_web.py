@@ -1,6 +1,5 @@
 from datetime import date
 
-from models.enums import SequenceTechnology
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.web import (
@@ -19,8 +18,7 @@ from db.python.layers.participant import (
 from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 
-from models.enums.sample import SampleType
-from models.enums.sequencing import SequenceStatus, SequenceType
+from models.enums import SequenceTechnology, SampleType, SequenceStatus, SequenceType
 
 
 def data_to_class(data: dict | list) -> dict | list:

@@ -334,7 +334,10 @@ class GenericParser(
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
         return SequenceMetaGroup(
-            rows=[], sequence_type=self.default_sequence_type, meta={}
+            rows=[],
+            sequence_type=SequenceType(self.default_sequence_type),
+            sequence_technology=SequenceTechnology(self.default_sequence_technology),
+            meta={},
         )
 
     # @abstractmethod

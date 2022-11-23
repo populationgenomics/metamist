@@ -172,6 +172,7 @@ class GenericMetadataParser(GenericParser):
         ]
 
     def get_sequence_technologies(self, row: GroupedRow) -> list[SequenceTechnology]:
+        """Get list of sequence technologies for rows"""
         if isinstance(row, dict):
             return [self.get_sequence_technology(row)]
         return [
@@ -180,6 +181,7 @@ class GenericMetadataParser(GenericParser):
         ]
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
+        """Get sequence technology for single row"""
         value = row.get(self.seq_technology_column, None) or self.default_sequence_technology
         value = value.lower()
 
@@ -187,7 +189,6 @@ class GenericMetadataParser(GenericParser):
             value = 'long-reads'
 
         return SequenceTechnology(value)
-
 
     def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """Get sequence type from row"""
@@ -560,9 +561,11 @@ class GenericMetadataParser(GenericParser):
         resulting list of metadata
         """
         sequence_meta = []
-        # pylint: disable
-        keygen = lambda s: (str(self.get_sequence_type(s)), str(self.get_sequence_technology(s)))
-        for (stype, stech), row_group in group_by(rows, keygen).items():
+
+        def _seq_grouper(s):
+            return str(self.get_sequence_type(s)), str(self.get_sequence_technology(s))
+
+        for (stype, stech), row_group in group_by(rows, _seq_grouper).items():
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
                 sequence_type=SequenceType(stype),
