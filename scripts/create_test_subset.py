@@ -446,9 +446,7 @@ def get_map_ipid_esid(
     return external_sample_internal_participant_map
 
 
-def get_samples_for_families(
-    project: str, additional_families: Optional[List[str]] = None
-):
+def get_samples_for_families(project: str, additional_families: List[str]):
     """Returns the samples that belong to a list of families"""
 
     samples: List[str] = []
