@@ -18,6 +18,7 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
 
 import { TangledTree } from "./TangledTree";
+import MuckTheDuck from "./MuckTheDuck";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -71,6 +72,7 @@ interface Sample {
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
 const resetLoadingState = {
+    family: true,
     pedigree: true,
     participant_ids: true,
     samples: true,
@@ -104,7 +106,7 @@ export class FamilyView extends React.Component<{}, { error?: Error }> {
 }
 
 export const FamilyView_: React.FunctionComponent<{}> = () => {
-    const { projectName, familyName } = useParams();
+    const { projectName, familyID } = useParams();
     const navigate = useNavigate();
 
     const [loadingStates, setLoadingStates] = React.useState<{
@@ -112,6 +114,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     }>(resetLoadingState);
     const [error, setError] = React.useState<string | undefined>();
 
+    const [familyName, setFamilyName] = React.useState<string>();
     const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>();
     const [participantIDs, setParticipantIDs] = React.useState<string[]>();
     const [sampleIDsInFamily, setSampleIDsInFamily] =
@@ -128,6 +131,35 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     const [mostRecent, setMostRecent] = React.useState<string>();
     const [otherFamilies, setOtherFamilies] = React.useState<string[]>();
 
+    const getFamilies = React.useCallback(async () => {
+        if (!projectName || !familyID) return;
+        new FamilyApi()
+            .getFamilies(projectName)
+            .then((resp) => {
+                const entry = resp.data.find((d) => d.id === +familyID);
+                if (entry) {
+                    setFamilyName(entry.external_id);
+                    setOtherFamilies(
+                        Array.from(
+                            new Set(
+                                resp.data.filter(
+                                    (value) => value.id !== +familyID
+                                )
+                            )
+                        )
+                    );
+                } else {
+                    setError("ID did not exist in project families");
+                }
+            })
+            .then(() => {
+                setLoadingStates((prev) => ({ ...prev, family: false }));
+            })
+            .catch((er) => {
+                setError(er.message);
+            });
+    }, [projectName, familyID]);
+
     const getPedigree = React.useCallback(async () => {
         if (!projectName || !familyName) return;
         new FamilyApi()
@@ -137,19 +169,6 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                     (value: PedigreeEntry) =>
                         value.family_id.toUpperCase() ===
                         familyName.toUpperCase()
-                );
-                setOtherFamilies(
-                    Array.from(
-                        new Set(
-                            resp.data
-                                .filter(
-                                    (value: PedigreeEntry) =>
-                                        value.family_id.toUpperCase() !==
-                                        familyName.toUpperCase()
-                                )
-                                .map((item: PedigreeEntry) => item.family_id)
-                        )
-                    )
                 );
                 setPedigree(ped);
                 setParticipantIDs(
@@ -261,10 +280,18 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             });
     }, [projectName, sampleIDsInFamily]);
 
+    React.useEffect(() => {
+        setLoadingStates(resetLoadingState);
+    }, [projectName, familyID]);
+
     // retrigger if selections change
     React.useEffect(() => {
+        getFamilies();
+    }, [projectName, familyID, getFamilies]);
+
+    React.useEffect(() => {
         getPedigree();
-    }, [projectName, familyName, getPedigree]);
+    }, [familyName, getPedigree]);
 
     React.useEffect(() => {
         getParticipantIdToSampleId();
@@ -546,17 +573,17 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                     >
                         <Grid divided centered rows={3}>
                             {otherFamilies.map((item) => (
-                                <Grid.Row key={item} textAlign="center">
+                                <Grid.Row key={item.id} textAlign="center">
                                     <Button
                                         onClick={() => {
                                             setLoadingStates(resetLoadingState);
                                             setActiveIndices([-1]);
                                             navigate(
-                                                `/project/${projectName}/family/${item}`
+                                                `/project/${projectName}/family/${item.id}`
                                             );
                                         }}
                                     >
-                                        {item}
+                                        {item.external_id}
                                     </Button>
                                 </Grid.Row>
                             ))}
@@ -608,14 +635,17 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             <br />
             {!!error && <h1>{error}</h1>}
             {!error && isLoading() && (
-                <div className="familyView">
-                    <h1>LOADING</h1>
+                <div
+                    className="familyView"
+                    style={{ textAlign: "center", paddingTop: "200px" }}
+                >
+                    <MuckTheDuck height={28} className="loadingScreen" />
                     <br />
                     {Object.entries(loadingStates)
                         .filter(([key, value]) => value)
                         .map(([key, value]) => (
                             <React.Fragment key={key}>
-                                {` Retrieving ${key}`}
+                                <h5>{` Retrieving ${key}`}</h5>
                                 <br />
                             </React.Fragment>
                         ))}
@@ -647,7 +677,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                                                 }}
                                                 className={
                                                     mostRecent === key
-                                                        ? "selectedPartipant"
+                                                        ? "selectedParticipant"
                                                         : undefined
                                                 }
                                                 id={key}
@@ -659,7 +689,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                                             <PersonRoundedIcon
                                                 className={
                                                     mostRecent === key
-                                                        ? "selectedPartipant"
+                                                        ? "selectedParticipant"
                                                         : undefined
                                                 }
                                                 sx={iconStyle}

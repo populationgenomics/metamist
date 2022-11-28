@@ -64,8 +64,8 @@ const resultRenderer = ({ ...props }) => {
         available = `No access to this ${props.type}`;
         colour = "gray";
     }
-    if (props.type === "participant" || props.type === "family") {
-        available = `${_.capitalize(props.type)} result is not supported`
+    if (props.type === "participant") {
+        available = `${_.capitalize(props.type)} result is not supported`;
         colour = "gray";
     }
     const style = { fontSize: 50, color: colour, height: "33px" };
@@ -93,23 +93,21 @@ const resultRenderer = ({ ...props }) => {
         }
     }
 
-    components = components.filter(f => f !== props.title)
+    components = components.filter((f) => f !== props.title);
 
     let subtitle = components.length > 0 ? components.join(" · ") : null;
 
-    const key: string = String(props.data.id || `${props.data.project}|${props.data.title}`)
-
+    const key: string = String(
+        props.data.id || `${props.data.project}|${props.data.title}`
+    );
 
     // prefer early return for empty results
-    if (!props.title || !props.type) return <></>
-
+    if (!props.title || !props.type) return <></>;
 
     return (
         <div key={key} className="content">
             <div style={{ display: "flex" }}>
-                <div style={{ flex: 1, order: 1, width: "20%" }}>
-                    {icon}
-                </div>
+                <div style={{ flex: 1, order: 1, width: "20%" }}>{icon}</div>
                 <div
                     style={{
                         order: 2,
@@ -145,7 +143,7 @@ export const Searchbar: React.FunctionComponent = () => {
 
     const searchResultToRoute = (project: string, type: string, id: string) => {
         // handle "no access to this project"
-        if (!id) return
+        if (!id) return;
 
         switch (type) {
             case "participant":
@@ -156,8 +154,7 @@ export const Searchbar: React.FunctionComponent = () => {
                 navigate(`/project/${project}/sample/${id}`);
                 break;
             case "family":
-                // alert("Family page not implemented yet");
-                // navigate(`/project/${project}/family/${id}`);
+                navigate(`/project/${project}/family/${id}`);
                 break;
         }
     };

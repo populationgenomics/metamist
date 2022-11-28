@@ -44,7 +44,7 @@ export const Routes = () => {
                     element={<DetailedInfoPage />}
                 />
                 <Route
-                    path="project/:projectName/family/:familyName"
+                    path="project/:projectName/family/:familyID"
                     element={<FamilyView />}
                 />
                 <Route
