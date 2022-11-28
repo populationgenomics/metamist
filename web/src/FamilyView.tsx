@@ -1,5 +1,3 @@
-/* eslint react-hooks/exhaustive-deps: 0 */
-
 import * as React from "react";
 
 import { useParams, useNavigate } from "react-router-dom";
@@ -12,7 +10,14 @@ import {
     // Sample,
     // SampleSequencing,
 } from "./sm-api/api";
-import { Table } from "semantic-ui-react";
+import { Table, Accordion, Popup, Button, Grid } from "semantic-ui-react";
+
+import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
+import ScienceRoundedIcon from "@mui/icons-material/ScienceRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
+
+import { TangledTree } from "./TangledTree";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -38,15 +43,6 @@ interface SequenceMeta {
 }
 
 // temporary
-interface ParticipantModel {
-    id: number;
-    external_id: string;
-    reported_sex?: number;
-    reported_gender?: string;
-    karyotype?: string;
-    meta: { [key: string]: any };
-}
-
 interface SampleSequencing {
     id: number;
     external_ids?: { [name: string]: string };
@@ -74,6 +70,20 @@ interface Sample {
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
+const resetLoadingState = {
+    pedigree: true,
+    participant_ids: true,
+    samples: true,
+    sequences: true,
+};
+
+const iconStyle = {
+    fontSize: 30,
+    height: "33px",
+    verticalAlign: "bottom",
+    marginRight: "10px",
+};
+
 export class FamilyView extends React.Component<{}, { error?: Error }> {
     constructor(props: any) {
         super(props);
@@ -97,23 +107,26 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     const { projectName, familyName } = useParams();
     const navigate = useNavigate();
 
-    const [isLoading, setIsLoading] = React.useState<boolean>(true);
+    const [loadingStates, setLoadingStates] = React.useState<{
+        [key: string]: Boolean;
+    }>(resetLoadingState);
     const [error, setError] = React.useState<string | undefined>();
 
     const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>();
     const [participantIDs, setParticipantIDs] = React.useState<string[]>();
     const [sampleIDsInFamily, setSampleIDsInFamily] =
         React.useState<string[]>();
+    const [sampleIDsByParticipant, setSampleIDsByParticipant] = React.useState<{
+        [key: string]: string[];
+    }>();
+    const [samples, setSamples] = React.useState<{ [key: string]: Sample }>();
+    const [sequenceInfo, setSequenceInfo] = React.useState<{
+        [key: string]: SampleSequencing[];
+    }>();
 
-    const [samples, setSamples] = React.useState();
-    const [sample, setSample] = React.useState<string>();
-    const [sampleInfo, setSampleInfo] = React.useState<Sample>();
-    const [participants, setParticipants] =
-        React.useState<ParticipantModel[]>();
-    const [selectedExternalID, setSelectedExternalID] =
-        React.useState<string>();
-    const [sequenceInfo, setSequenceInfo] =
-        React.useState<SampleSequencing[]>();
+    const [activeIndices, setActiveIndices] = React.useState<number[]>([-1]);
+    const [mostRecent, setMostRecent] = React.useState<string>();
+    const [otherFamilies, setOtherFamilies] = React.useState<string[]>();
 
     const getPedigree = React.useCallback(async () => {
         if (!projectName || !familyName) return;
@@ -125,10 +138,26 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                         value.family_id.toUpperCase() ===
                         familyName.toUpperCase()
                 );
+                setOtherFamilies(
+                    Array.from(
+                        new Set(
+                            resp.data
+                                .filter(
+                                    (value: PedigreeEntry) =>
+                                        value.family_id.toUpperCase() !==
+                                        familyName.toUpperCase()
+                                )
+                                .map((item: PedigreeEntry) => item.family_id)
+                        )
+                    )
+                );
                 setPedigree(ped);
                 setParticipantIDs(
                     ped.map((item: PedigreeEntry) => item.individual_id)
                 );
+            })
+            .then(() => {
+                setLoadingStates((prev) => ({ ...prev, pedigree: false }));
             })
             .catch((er) => {
                 setError(er.message);
@@ -140,6 +169,20 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
         new ParticipantApi()
             .getExternalParticipantIdToInternalSampleId(projectName)
             .then((resp) => {
+                setSampleIDsByParticipant(
+                    resp.data.reduce(
+                        (
+                            obj: { [key: string]: string[] },
+                            [pid, sid]: [string, string]
+                        ) => {
+                            if (participantIDs.includes(pid)) {
+                                (obj[pid] = obj[pid] || []).push(sid);
+                            }
+                            return obj;
+                        },
+                        {}
+                    )
+                );
                 setSampleIDsInFamily(
                     resp.data.reduce(
                         (arr: string[], [pid, sid]: [string, string]) => {
@@ -151,98 +194,89 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                         []
                     )
                 );
-                setIsLoading(false);
+            })
+            .then(() => {
+                setLoadingStates((prev) => ({
+                    ...prev,
+                    participant_ids: false,
+                }));
             })
             .catch((er) => {
                 setError(er.message);
             });
     }, [projectName, participantIDs]);
 
-    const getSamplesFromProject = React.useCallback(async () => {
-        if (!projectName) return;
+    const getAllSamples = React.useCallback(async () => {
+        if (!projectName || !sampleIDsInFamily) return;
         new SampleApi()
-            .getAllSampleIdMapByInternal(projectName)
-            .then((resp) => {
-                setSamples(resp.data);
+            .getSamples({
+                sample_ids: sampleIDsInFamily,
+                project_ids: [projectName],
             })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [projectName]);
-
-    const getSamplesInfo = React.useCallback(async () => {
-        if (!sample) return;
-        if (!projectName) return;
-        if (!participants) return;
-        new SampleApi()
-            .getSampleByExternalId(sample, projectName)
             .then((resp) => {
-                setSampleInfo(resp.data);
-                setSelectedExternalID(
-                    participants.find(
-                        (item) => item.id === resp.data.participant_id
-                    )?.external_id
+                setSamples(
+                    resp.data.reduce(
+                        (obj: { [key: string]: Sample }, s: Sample) => {
+                            obj[s.id] = s;
+                            return obj;
+                        },
+                        {}
+                    )
                 );
             })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [projectName, sample, participants]);
-
-    const getParticipants = React.useCallback(async () => {
-        if (!projectName) return;
-        new ParticipantApi()
-            .getParticipants(projectName)
-            .then((resp) => {
-                setParticipants(resp.data);
+            .then(() => {
+                setLoadingStates((prev) => ({ ...prev, samples: false }));
             })
             .catch((er) => {
                 setError(er.message);
             });
-    }, [projectName]);
+    }, [projectName, sampleIDsInFamily]);
 
     const getSequenceInfo = React.useCallback(async () => {
-        if (!sampleInfo) return;
-        if (!projectName) return;
+        if (!projectName || !sampleIDsInFamily) return;
         new SequenceApi()
-            .getSequencesBySampleIds([sampleInfo.id.toString()])
+            .getSequencesBySampleIds(sampleIDsInFamily)
             .then((resp) => {
-                setSequenceInfo(resp.data);
+                setSequenceInfo(
+                    resp.data.reduce(
+                        (
+                            obj: { [key: string]: SampleSequencing[] },
+                            s: SampleSequencing
+                        ) => {
+                            (obj[s.sample_id] = obj[s.sample_id] || []).push(s);
+                            return obj;
+                        },
+                        {}
+                    )
+                );
+            })
+            .then(() => {
+                setLoadingStates((prev) => ({
+                    ...prev,
+                    sequences: false,
+                }));
             })
             .catch((er) => {
                 setError(er.message);
             });
-    }, [sampleInfo]);
+    }, [projectName, sampleIDsInFamily]);
 
     // retrigger if selections change
     React.useEffect(() => {
         getPedigree();
-    }, [projectName, familyName]);
+    }, [projectName, familyName, getPedigree]);
 
     React.useEffect(() => {
         getParticipantIdToSampleId();
-    }, [projectName, pedigree, participantIDs]);
+    }, [participantIDs, getParticipantIdToSampleId]);
 
     React.useEffect(() => {
-        getSamplesFromProject();
-    }, [projectName]);
-
-    React.useEffect(() => {
-        getSamplesInfo();
-    }, [sample, participants]);
-
-    React.useEffect(() => {
-        getParticipants();
-    }, [projectName]);
+        getAllSamples();
+    }, [sampleIDsInFamily, getAllSamples]);
 
     React.useEffect(() => {
         getSequenceInfo();
-    }, [sampleInfo]);
-
-    const getCPGID = (id: string) => {
-        const CPGID = idNameMap?.find(([name, _]) => name === id);
-        return CPGID![1]; // You'd expect this to always work. Should I add the case where it doesn't?
-    };
+    }, [sampleIDsInFamily, getSequenceInfo]);
 
     const formatBytes = (bytes: number, decimals = 2) => {
         if (!+bytes) return "0 Bytes";
@@ -294,83 +328,6 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
         );
     };
 
-    const drawTrio = (
-        paternal: string,
-        affectedPaternal: number,
-        maternal: string,
-        affectedMaternal: number,
-        proband: string,
-        affectedProband: number,
-        probandSex: number
-    ) => {
-        return (
-            <svg viewBox="75 90 250 200" width="250" height="200">
-                <rect
-                    x={100}
-                    y={100}
-                    width={50}
-                    height={50}
-                    stroke="black"
-                    cursor="pointer"
-                    fill={affectedPaternal === 2 ? "black" : "white"}
-                    onClick={() => {
-                        if (!samples) return;
-                        navigate(
-                            `/project/${projectName}/sample/${getCPGID(
-                                paternal
-                            )}`
-                        );
-                    }}
-                />
-                <text x={125} y={170} textAnchor="middle">
-                    {paternal}
-                </text>
-                <circle
-                    cx={250}
-                    cy={125}
-                    r={25}
-                    stroke="black"
-                    cursor="pointer"
-                    fill={affectedMaternal === 2 ? "black" : "white"}
-                    onClick={() => {
-                        if (!samples) return;
-                        navigate(
-                            `/project/${projectName}/sample/${getCPGID(
-                                maternal
-                            )}`
-                        );
-                    }}
-                />
-                <text x={250} y={170} textAnchor="middle">
-                    {maternal}
-                </text>
-                <line x1={150} y1={125} x2={225} y2={125} stroke="black" />
-                <line x1={187.5} y1={125} x2={187.5} y2={200} stroke="black" />
-                {probandSex === 1 ? (
-                    <rect
-                        x={162.5}
-                        y={200}
-                        width={50}
-                        height={50}
-                        stroke="black"
-                        fill={affectedProband === 2 ? "black" : "white"}
-                    />
-                ) : (
-                    <circle
-                        cx={187.5}
-                        cy={225}
-                        r={25}
-                        stroke="black"
-                        fill={affectedProband === 2 ? "black" : "white"}
-                    />
-                )}
-                <text x={187.5} y={270} textAnchor="middle">
-                    {proband}
-                </text>
-            </svg>
-        );
-    };
-
     const safeValue = (value: any): string => {
         if (!value) return value;
         if (Array.isArray(value)) {
@@ -391,170 +348,172 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     };
 
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return Object.entries(seqInfo)
-            .filter(([key, value]) => key !== "id")
-            .map(([key, value]) => {
-                if (key === "external_ids") {
-                    if (Object.keys(seqInfo.external_ids!).length) {
-                        return (
-                            <>
-                                <b>External Ids:</b>{" "}
-                                {Object.entries(seqInfo!.external_ids!)
-                                    .map(([k1, v1]) => (
-                                        <React.Fragment
-                                            key={`${v1} (${k1})`}
-                                        >{`${v1} (${k1})`}</React.Fragment>
-                                    ))
-                                    .join()}
-                            </>
-                        );
-                    }
-                    return <React.Fragment key="ExternalID"></React.Fragment>;
-                }
-                if (key === "meta") {
-                    return Object.entries(seqInfo.meta!)
-                        .filter(([k1, v1]) => k1 !== "reads")
-                        .map(([k1, v1]) => {
-                            if (
-                                Array.isArray(v1) &&
-                                v1.filter((v) => !!v.location && !!v.size)
-                                    .length === v1.length
-                            ) {
-                                // all are files coincidentally
-                                return (
-                                    <React.Fragment key={`${k1}`}>
-                                        <b>{k1}:</b>
-                                        {renderReadsMetadata(v1 as File[], key)}
-                                    </React.Fragment>
-                                );
-                            }
-                            if (
-                                v1 &&
-                                typeof v1 === "object" &&
-                                !Array.isArray(v1)
-                            ) {
-                                if (!!v1.location && !!v1.size) {
+        return (
+            <Table celled collapsing>
+                <Table.Body>
+                    {Object.entries(seqInfo)
+                        .filter(([key, value]) => key !== "id")
+                        .map(([key, value]) => {
+                            if (key === "external_ids") {
+                                if (Object.keys(seqInfo.external_ids!).length) {
                                     return (
-                                        <React.Fragment key={`${k1}`}>
-                                            <b>{k1}:</b>
-                                            {renderReadsMetadata(
-                                                [v1] as File[],
-                                                k1
-                                            )}
-                                        </React.Fragment>
+                                        <Table.Row>
+                                            <Table.Cell>
+                                                <b>External Ids</b>
+                                            </Table.Cell>
+                                            <Table.Cell>
+                                                {Object.entries(
+                                                    seqInfo!.external_ids!
+                                                )
+                                                    .map(([k1, v1]) => (
+                                                        <React.Fragment
+                                                            key={`${v1} (${k1})`}
+                                                        >{`${v1} (${k1})`}</React.Fragment>
+                                                    ))
+                                                    .join()}
+                                            </Table.Cell>
+                                        </Table.Row>
                                     );
                                 }
+                                return (
+                                    <React.Fragment key="ExternalID"></React.Fragment>
+                                );
                             }
-                            const stringifiedValue = safeValue(v1);
-                            return (
-                                <div key={`${k1}-${stringifiedValue}`}>
-                                    <b>{k1}:</b>{" "}
-                                    {stringifiedValue ?? <em>no-value</em>}
-                                </div>
-                            );
-                        });
-                }
+                            if (key === "meta") {
+                                return Object.entries(seqInfo.meta!)
+                                    .filter(([k1, v1]) => k1 !== "reads")
+                                    .map(([k1, v1]) => {
+                                        if (
+                                            Array.isArray(v1) &&
+                                            v1.filter(
+                                                (v) => !!v.location && !!v.size
+                                            ).length === v1.length
+                                        ) {
+                                            // all are files coincidentally
+                                            return (
+                                                <Table.Row key={`${k1}`}>
+                                                    <Table.Cell>
+                                                        <b>{k1}</b>
+                                                    </Table.Cell>
+                                                    <Table.Cell>
+                                                        {renderReadsMetadata(
+                                                            v1 as File[],
+                                                            key
+                                                        )}
+                                                    </Table.Cell>
+                                                </Table.Row>
+                                            );
+                                        }
+                                        if (
+                                            v1 &&
+                                            typeof v1 === "object" &&
+                                            !Array.isArray(v1)
+                                        ) {
+                                            if (!!v1.location && !!v1.size) {
+                                                return (
+                                                    <Table.Row key={`${k1}`}>
+                                                        <Table.Cell>
+                                                            <b>{k1}:</b>
+                                                        </Table.Cell>
+                                                        <Table.Cell>
+                                                            {renderReadsMetadata(
+                                                                [v1] as File[],
+                                                                k1
+                                                            )}
+                                                        </Table.Cell>
+                                                    </Table.Row>
+                                                );
+                                            }
+                                        }
+                                        const stringifiedValue = safeValue(v1);
+                                        return (
+                                            <Table.Row
+                                                key={`${k1}-${stringifiedValue}`}
+                                            >
+                                                <Table.Cell>
+                                                    <b>{k1}</b>
+                                                </Table.Cell>
+                                                <Table.Cell>
+                                                    {stringifiedValue ?? (
+                                                        <em>no-value</em>
+                                                    )}
+                                                </Table.Cell>
+                                            </Table.Row>
+                                        );
+                                    });
+                            }
 
-                const stringifiedValue = safeValue(value);
-                return (
-                    <div key={`${key}-${stringifiedValue}`}>
-                        <b>{key}:</b> {stringifiedValue ?? <em>no-value</em>}
-                    </div>
-                );
-            });
+                            const stringifiedValue = safeValue(value);
+                            return (
+                                <Table.Row key={`${key}-${stringifiedValue}`}>
+                                    <Table.Cell>
+                                        <b>{key}</b>
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                        {stringifiedValue ?? <em>no-value</em>}
+                                    </Table.Cell>
+                                </Table.Row>
+                            );
+                        })}
+                </Table.Body>
+            </Table>
+        );
     };
 
-    const renderSeqSection = () => {
-        if (!sample || !sequenceInfo) {
-            return <></>;
-        }
+    const renderSeqSection = (s: SampleSequencing[]) => {
         return (
-            <>
-                <h4
-                    style={{
-                        borderBottom: `1px solid black`,
-                    }}
-                >
-                    Sequence Information
-                </h4>
-                {sequenceInfo.map((seq) => {
-                    return (
-                        <React.Fragment key={seq.id}>
-                            <h6>
-                                <b>Sequence ID:</b> {seq.id}
-                            </h6>
-
+            <Accordion
+                styled
+                className="accordionStyle"
+                panels={s.map((seq) => ({
+                    key: seq.id,
+                    title: {
+                        content: (
+                            <h3
+                                style={{
+                                    display: "inline",
+                                }}
+                            >
+                                Sequence ID: {seq.id}
+                            </h3>
+                        ),
+                        icon: <ScienceRoundedIcon sx={iconStyle} />,
+                    },
+                    content: {
+                        content: (
                             <div style={{ marginLeft: "30px" }}>
                                 {renderSeqInfo(seq)}
                                 {prepReadMetadata(seq.meta || {})}
                             </div>
-                            <br />
-                        </React.Fragment>
-                    );
-                })}
-            </>
+                        ),
+                    },
+                }))}
+                exclusive={false}
+                fluid
+            />
         );
     };
 
-    const renderSampleSection = () => {
-        if (!sample || !sampleInfo) {
-            return <></>;
-        }
+    const renderSampleSection = (sample: Sample) => {
         return (
-            <>
-                <h4
-                    style={{
-                        borderBottom: `1px solid black`,
-                    }}
-                >
-                    Sample Information
-                </h4>
-                {Object.entries(sampleInfo)
-                    .filter(([key, value]) =>
-                        sampleFieldsToDisplay.includes(key)
-                    )
-                    .map(([key, value]) => (
-                        <div key={`${key}-${value}`}>
-                            <b>{key}:</b>{" "}
-                            {value?.toString() ?? <em>no value</em>}
-                        </div>
-                    ))}
-            </>
-        );
-    };
-
-    const renderPedigreeSection = () => {
-        if (!sample || !pedigree) {
-            return <></>;
-        }
-        return (
-            <>
-                {pedigree
-                    .filter((item) => item.individual_id === selectedExternalID)
-                    .map((item) => (
-                        <React.Fragment
-                            key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
-                        >
-                            {item.paternal_id &&
-                                item.maternal_id &&
-                                drawTrio(
-                                    item.paternal_id,
-                                    pedigree?.find(
-                                        (i) =>
-                                            i.individual_id === item.paternal_id
-                                    )!.affected,
-                                    item.maternal_id,
-                                    pedigree?.find(
-                                        (i) =>
-                                            i.individual_id === item.maternal_id
-                                    )!.affected,
-                                    item.individual_id,
-                                    item.affected,
-                                    item.sex
-                                )}
-                        </React.Fragment>
-                    ))}
-            </>
+            <Table celled collapsing>
+                <Table.Body>
+                    {Object.entries(sample)
+                        .filter(([key, value]) =>
+                            sampleFieldsToDisplay.includes(key)
+                        )
+                        .map(([key, value]) => (
+                            <Table.Row key={`${key}-${value}`}>
+                                <Table.Cell>
+                                    <b>{key}</b>
+                                </Table.Cell>
+                                <Table.Cell>
+                                    {value?.toString() ?? <em>no value</em>}
+                                </Table.Cell>
+                            </Table.Row>
+                        ))}
+                </Table.Body>
+            </Table>
         );
     };
 
@@ -564,60 +523,229 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                 borderBottom: `1px solid black`,
             }}
         >
-            {participants &&
-                participants
-                    .filter((item) => item.id === sampleInfo?.participant_id)
-                    .map((item) => {
-                        return (
-                            <React.Fragment key={item.external_id}>
-                                <h1
-                                    style={{
-                                        display: "inline",
-                                    }}
-                                    key={`${item.external_id}`}
-                                >
-                                    {`${item.external_id}\t`}
-                                </h1>
-                            </React.Fragment>
-                        );
-                    })}
-            {sampleInfo && (
-                <>
-                    <h3
-                        style={{
-                            display: "inline",
-                        }}
+            <h1
+                style={{
+                    display: "inline",
+                }}
+            >
+                {familyName}
+            </h1>
+            {otherFamilies && !!otherFamilies.length && (
+                <div style={{ float: "right" }}>
+                    {`Change Families within ${projectName}\t`}
+                    <Popup
+                        trigger={
+                            <Diversity3RoundedIcon
+                                sx={{
+                                    fontSize: 40,
+                                }}
+                            />
+                        }
+                        hoverable
+                        style={{ float: "right" }}
                     >
-                        {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}
-                    </h3>
-                </>
+                        <Grid divided centered rows={3}>
+                            {otherFamilies.map((item) => (
+                                <Grid.Row key={item} textAlign="center">
+                                    <Button
+                                        onClick={() => {
+                                            setLoadingStates(resetLoadingState);
+                                            setActiveIndices([-1]);
+                                            navigate(
+                                                `/project/${projectName}/family/${item}`
+                                            );
+                                        }}
+                                    >
+                                        {item}
+                                    </Button>
+                                </Grid.Row>
+                            ))}
+                        </Grid>
+                    </Popup>
+                </div>
             )}
         </div>
     );
 
+    const onClick = React.useCallback(
+        (e: string) => {
+            if (!sampleIDsByParticipant) return;
+            const indexToSet = Object.entries(sampleIDsByParticipant).findIndex(
+                (i) => i[0] === e
+            );
+            if (!activeIndices.includes(indexToSet)) {
+                setActiveIndices([...activeIndices, indexToSet]);
+            }
+            setMostRecent(e);
+            const element = document.getElementById(e);
+            if (element) {
+                const y =
+                    element.getBoundingClientRect().top +
+                    window.pageYOffset -
+                    100;
+                window.scrollTo({ top: y, behavior: "smooth" });
+            }
+        },
+        [sampleIDsByParticipant, activeIndices]
+    );
+
+    const handleTitleClick = (e, itemProps) => {
+        setMostRecent("");
+        const index = itemProps.index;
+        if (activeIndices.indexOf(index) > -1) {
+            setActiveIndices(activeIndices.filter((i) => i !== index));
+        } else {
+            setActiveIndices([...activeIndices, index]);
+        }
+    };
+
+    const isLoading = () => {
+        return Object.values(loadingStates).includes(true);
+    };
+
     return (
         <>
             <br />
-            {!!error && <h1>error</h1>}
-            {isLoading && !error && <h1>LOADING</h1>}
-            {projectName && !isLoading && !error && (
+            {!!error && <h1>{error}</h1>}
+            {!error && isLoading() && (
+                <div className="familyView">
+                    <h1>LOADING</h1>
+                    <br />
+                    {Object.entries(loadingStates)
+                        .filter(([key, value]) => value)
+                        .map(([key, value]) => (
+                            <React.Fragment key={key}>
+                                {` Retrieving ${key}`}
+                                <br />
+                            </React.Fragment>
+                        ))}
+                </div>
+            )}
+            {projectName && !isLoading() && !error && (
                 <>
-                    <div className="detailedInfo">
-                        {pedigree?.map((item) => JSON.stringify(item))}
-                        <br />
-                        {participantIDs?.map((item) => (
-                            <>
-                                {item}
-                                <br />
-                            </>
-                        ))}
-                        <br />
-                        {sampleIDsInFamily?.map((item) => (
-                            <>
-                                {item}
-                                <br />
-                            </>
-                        ))}
+                    <div className="familyView" style={{ width: "100%" }}>
+                        {renderTitle}
+                        {pedigree && (
+                            <TangledTree data={pedigree} click={onClick} />
+                        )}
+                        {samples && sequenceInfo && sampleIDsByParticipant && (
+                            <Accordion
+                                onTitleClick={handleTitleClick}
+                                activeIndex={activeIndices}
+                                styled
+                                className="accordionStyle"
+                                exclusive={false}
+                                panels={Object.entries(
+                                    sampleIDsByParticipant
+                                ).map(([key, value]) => ({
+                                    key: key,
+                                    title: {
+                                        content: (
+                                            <h2
+                                                style={{
+                                                    display: "inline",
+                                                }}
+                                                className={
+                                                    mostRecent === key
+                                                        ? "selectedPartipant"
+                                                        : undefined
+                                                }
+                                                id={key}
+                                            >
+                                                {key}
+                                            </h2>
+                                        ),
+                                        icon: (
+                                            <PersonRoundedIcon
+                                                className={
+                                                    mostRecent === key
+                                                        ? "selectedPartipant"
+                                                        : undefined
+                                                }
+                                                sx={iconStyle}
+                                            />
+                                        ),
+                                    },
+                                    content: {
+                                        content: (
+                                            <div
+                                                style={{
+                                                    marginLeft: "30px",
+                                                }}
+                                            >
+                                                <Accordion
+                                                    styled
+                                                    className="accordionStyle"
+                                                    panels={value.map(
+                                                        (item) => {
+                                                            const s =
+                                                                samples[item];
+                                                            return {
+                                                                key: s.id,
+                                                                title: {
+                                                                    content: (
+                                                                        <>
+                                                                            <h2
+                                                                                style={{
+                                                                                    display:
+                                                                                        "inline",
+                                                                                }}
+                                                                            >
+                                                                                {`${s.id}\t`}
+                                                                            </h2>
+
+                                                                            <h3
+                                                                                style={{
+                                                                                    display:
+                                                                                        "inline",
+                                                                                }}
+                                                                            >
+                                                                                {
+                                                                                    s.external_id
+                                                                                }
+                                                                            </h3>
+                                                                        </>
+                                                                    ),
+                                                                    icon: (
+                                                                        <BloodtypeRoundedIcon
+                                                                            sx={
+                                                                                iconStyle
+                                                                            }
+                                                                        />
+                                                                    ),
+                                                                },
+                                                                content: {
+                                                                    content: (
+                                                                        <>
+                                                                            <div
+                                                                                style={{
+                                                                                    marginLeft:
+                                                                                        "30px",
+                                                                                }}
+                                                                            >
+                                                                                {renderSampleSection(
+                                                                                    s
+                                                                                )}
+                                                                                {renderSeqSection(
+                                                                                    sequenceInfo[
+                                                                                        item
+                                                                                    ]
+                                                                                )}
+                                                                            </div>
+                                                                        </>
+                                                                    ),
+                                                                },
+                                                            };
+                                                        }
+                                                    )}
+                                                    exclusive={false}
+                                                />
+                                            </div>
+                                        ),
+                                    },
+                                }))}
+                            />
+                        )}
                     </div>
                 </>
             )}

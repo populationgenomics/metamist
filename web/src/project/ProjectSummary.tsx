@@ -9,7 +9,7 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
-import { SampleLink } from "../Links";
+import { SampleLink, FamilyLink } from "../Links";
 import MuckTheDuck from "../MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
@@ -220,9 +220,26 @@ export const ProjectSummary = () => {
                                                 style={{ backgroundColor }}
                                                 rowSpan={lengthOfParticipant}
                                             >
-                                                {p.families
-                                                    .map((f) => f.external_id)
-                                                    .join(", ")}
+                                                {
+                                                    <FamilyLink
+                                                        id={p.families
+                                                            .map(
+                                                                (f) =>
+                                                                    f.external_id
+                                                            )
+                                                            .join(", ")}
+                                                        projectName={
+                                                            projectName
+                                                        }
+                                                    >
+                                                        {p.families
+                                                            .map(
+                                                                (f) =>
+                                                                    f.external_id
+                                                            )
+                                                            .join(", ")}
+                                                    </FamilyLink>
+                                                }
                                             </Table.Cell>
                                         )}
                                         {isFirstOfGroup &&
