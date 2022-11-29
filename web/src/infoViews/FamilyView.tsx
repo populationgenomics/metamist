@@ -9,16 +9,25 @@ import {
     // ParticipantModel,
     // Sample,
     // SampleSequencing,
-} from "./sm-api/api";
-import { Table, Accordion, Popup, Button, Grid } from "semantic-ui-react";
+    Family,
+} from "../sm-api/api";
+import {
+    Table,
+    Accordion,
+    Popup,
+    Button,
+    Grid,
+    AccordionTitleProps,
+} from "semantic-ui-react";
 
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
 import ScienceRoundedIcon from "@mui/icons-material/ScienceRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
 
-import { TangledTree } from "./TangledTree";
-import MuckTheDuck from "./MuckTheDuck";
+import { TangledTree } from "../renders/TangledTree";
+import MuckTheDuck from "../renders/MuckTheDuck";
+import { SeqInfo } from "../renders/SeqInfo";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -129,10 +138,12 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
 
     const [activeIndices, setActiveIndices] = React.useState<number[]>([-1]);
     const [mostRecent, setMostRecent] = React.useState<string>();
-    const [otherFamilies, setOtherFamilies] = React.useState<string[]>();
+    const [otherFamilies, setOtherFamilies] = React.useState<Family[]>();
 
     const getFamilies = React.useCallback(async () => {
+        console.log("In getFamilies");
         if (!projectName || !familyID) return;
+        console.log("continued getFamilies");
         new FamilyApi()
             .getFamilies(projectName)
             .then((resp) => {
@@ -149,7 +160,9 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                         )
                     );
                 } else {
-                    setError("ID did not exist in project families");
+                    setError(
+                        `${familyID} ID does not exist in ${projectName} families`
+                    );
                 }
             })
             .then(() => {
@@ -161,7 +174,10 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     }, [projectName, familyID]);
 
     const getPedigree = React.useCallback(async () => {
+        console.log("In getPedigree");
+        console.log(projectName, familyName);
         if (!projectName || !familyName) return;
+        console.log("continued getPedigree");
         new FamilyApi()
             .getPedigree(projectName)
             .then((resp) => {
@@ -170,6 +186,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                         value.family_id.toUpperCase() ===
                         familyName.toUpperCase()
                 );
+                console.log(ped);
                 setPedigree(ped);
                 setParticipantIDs(
                     ped.map((item: PedigreeEntry) => item.individual_id)
@@ -181,7 +198,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             .catch((er) => {
                 setError(er.message);
             });
-    }, [projectName, familyName]);
+    }, [familyName]);
 
     const getParticipantIdToSampleId = React.useCallback(async () => {
         if (!projectName || !participantIDs) return;
@@ -223,7 +240,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             .catch((er) => {
                 setError(er.message);
             });
-    }, [projectName, participantIDs]);
+    }, [participantIDs]);
 
     const getAllSamples = React.useCallback(async () => {
         if (!projectName || !sampleIDsInFamily) return;
@@ -249,7 +266,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             .catch((er) => {
                 setError(er.message);
             });
-    }, [projectName, sampleIDsInFamily]);
+    }, [sampleIDsInFamily]);
 
     const getSequenceInfo = React.useCallback(async () => {
         if (!projectName || !sampleIDsInFamily) return;
@@ -278,214 +295,38 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             .catch((er) => {
                 setError(er.message);
             });
-    }, [projectName, sampleIDsInFamily]);
+    }, [sampleIDsInFamily]);
 
     React.useEffect(() => {
         setLoadingStates(resetLoadingState);
+        console.log("Updated Loading States");
     }, [projectName, familyID]);
 
     // retrigger if selections change
     React.useEffect(() => {
         getFamilies();
-    }, [projectName, familyID, getFamilies]);
+        console.log("Updated Families");
+    }, [getFamilies]);
 
     React.useEffect(() => {
         getPedigree();
-    }, [familyName, getPedigree]);
+        console.log("Updated Pedigree");
+    }, [getPedigree]);
 
     React.useEffect(() => {
         getParticipantIdToSampleId();
-    }, [participantIDs, getParticipantIdToSampleId]);
+        console.log("Updated PID");
+    }, [getParticipantIdToSampleId]);
 
     React.useEffect(() => {
         getAllSamples();
-    }, [sampleIDsInFamily, getAllSamples]);
+        console.log("Updated Samples");
+    }, [getAllSamples]);
 
     React.useEffect(() => {
         getSequenceInfo();
-    }, [sampleIDsInFamily, getSequenceInfo]);
-
-    const formatBytes = (bytes: number, decimals = 2) => {
-        if (!+bytes) return "0 Bytes";
-
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-            sizes[i]
-        }`;
-    };
-
-    const prepReadMetadata = (data: SequenceMeta) => {
-        if (!data.reads) return <></>;
-        if (!Array.isArray(data.reads))
-            return (
-                <>
-                    <b>reads:</b>
-                    {renderReadsMetadata([data.reads], 1)}
-                </>
-            );
-        return (
-            <>
-                <b>reads:</b>
-                {data.reads.map((v, i) => {
-                    return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
-                })}
-            </>
-        );
-    };
-
-    const renderReadsMetadata = (data: File[], key: number | string) => {
-        return (
-            <Table celled key={key}>
-                <Table.Body>
-                    {data.map((item: File) => (
-                        <Table.Row key={item.location}>
-                            <Table.Cell collapsing>{item.location}</Table.Cell>
-                            <Table.Cell collapsing>
-                                {formatBytes(item.size)}
-                            </Table.Cell>
-                        </Table.Row>
-                    ))}
-                </Table.Body>
-            </Table>
-        );
-    };
-
-    const safeValue = (value: any): string => {
-        if (!value) return value;
-        if (Array.isArray(value)) {
-            return value.map(safeValue).join(", ");
-        }
-        if (typeof value === "number") {
-            return value.toString();
-        }
-        if (typeof value === "string") {
-            return value;
-        }
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-            if (!!value.location && !!value.size) {
-                return `${value.location} (${formatBytes(value.size)})`;
-            }
-        }
-        return JSON.stringify(value);
-    };
-
-    const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return (
-            <Table celled collapsing>
-                <Table.Body>
-                    {Object.entries(seqInfo)
-                        .filter(([key, value]) => key !== "id")
-                        .map(([key, value]) => {
-                            if (key === "external_ids") {
-                                if (Object.keys(seqInfo.external_ids!).length) {
-                                    return (
-                                        <Table.Row>
-                                            <Table.Cell>
-                                                <b>External Ids</b>
-                                            </Table.Cell>
-                                            <Table.Cell>
-                                                {Object.entries(
-                                                    seqInfo!.external_ids!
-                                                )
-                                                    .map(([k1, v1]) => (
-                                                        <React.Fragment
-                                                            key={`${v1} (${k1})`}
-                                                        >{`${v1} (${k1})`}</React.Fragment>
-                                                    ))
-                                                    .join()}
-                                            </Table.Cell>
-                                        </Table.Row>
-                                    );
-                                }
-                                return (
-                                    <React.Fragment key="ExternalID"></React.Fragment>
-                                );
-                            }
-                            if (key === "meta") {
-                                return Object.entries(seqInfo.meta!)
-                                    .filter(([k1, v1]) => k1 !== "reads")
-                                    .map(([k1, v1]) => {
-                                        if (
-                                            Array.isArray(v1) &&
-                                            v1.filter(
-                                                (v) => !!v.location && !!v.size
-                                            ).length === v1.length
-                                        ) {
-                                            // all are files coincidentally
-                                            return (
-                                                <Table.Row key={`${k1}`}>
-                                                    <Table.Cell>
-                                                        <b>{k1}</b>
-                                                    </Table.Cell>
-                                                    <Table.Cell>
-                                                        {renderReadsMetadata(
-                                                            v1 as File[],
-                                                            key
-                                                        )}
-                                                    </Table.Cell>
-                                                </Table.Row>
-                                            );
-                                        }
-                                        if (
-                                            v1 &&
-                                            typeof v1 === "object" &&
-                                            !Array.isArray(v1)
-                                        ) {
-                                            if (!!v1.location && !!v1.size) {
-                                                return (
-                                                    <Table.Row key={`${k1}`}>
-                                                        <Table.Cell>
-                                                            <b>{k1}:</b>
-                                                        </Table.Cell>
-                                                        <Table.Cell>
-                                                            {renderReadsMetadata(
-                                                                [v1] as File[],
-                                                                k1
-                                                            )}
-                                                        </Table.Cell>
-                                                    </Table.Row>
-                                                );
-                                            }
-                                        }
-                                        const stringifiedValue = safeValue(v1);
-                                        return (
-                                            <Table.Row
-                                                key={`${k1}-${stringifiedValue}`}
-                                            >
-                                                <Table.Cell>
-                                                    <b>{k1}</b>
-                                                </Table.Cell>
-                                                <Table.Cell>
-                                                    {stringifiedValue ?? (
-                                                        <em>no-value</em>
-                                                    )}
-                                                </Table.Cell>
-                                            </Table.Row>
-                                        );
-                                    });
-                            }
-
-                            const stringifiedValue = safeValue(value);
-                            return (
-                                <Table.Row key={`${key}-${stringifiedValue}`}>
-                                    <Table.Cell>
-                                        <b>{key}</b>
-                                    </Table.Cell>
-                                    <Table.Cell>
-                                        {stringifiedValue ?? <em>no-value</em>}
-                                    </Table.Cell>
-                                </Table.Row>
-                            );
-                        })}
-                </Table.Body>
-            </Table>
-        );
-    };
+        console.log("Updated Sequences");
+    }, [getSequenceInfo]);
 
     const renderSeqSection = (s: SampleSequencing[]) => {
         return (
@@ -509,8 +350,7 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                     content: {
                         content: (
                             <div style={{ marginLeft: "30px" }}>
-                                {renderSeqInfo(seq)}
-                                {prepReadMetadata(seq.meta || {})}
+                                <SeqInfo data={seq} />
                             </div>
                         ),
                     },
@@ -616,13 +456,17 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
         [sampleIDsByParticipant, activeIndices]
     );
 
-    const handleTitleClick = (e, itemProps) => {
+    const handleTitleClick = (
+        e: React.MouseEvent,
+        itemProps: AccordionTitleProps
+    ) => {
         setMostRecent("");
-        const index = itemProps.index;
-        if (activeIndices.indexOf(index) > -1) {
+        const index = itemProps.index ?? -1;
+        if (index === -1) return;
+        if (activeIndices.indexOf(+index) > -1) {
             setActiveIndices(activeIndices.filter((i) => i !== index));
         } else {
-            setActiveIndices([...activeIndices, index]);
+            setActiveIndices([...activeIndices, +index]);
         }
     };
 
@@ -631,14 +475,11 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     };
 
     return (
-        <>
+        <div className="familyView" style={{ width: "100%" }}>
             <br />
             {!!error && <h1>{error}</h1>}
             {!error && isLoading() && (
-                <div
-                    className="familyView"
-                    style={{ textAlign: "center", paddingTop: "200px" }}
-                >
+                <div style={{ textAlign: "center", paddingTop: "200px" }}>
                     <MuckTheDuck height={28} className="loadingScreen" />
                     <br />
                     {Object.entries(loadingStates)
@@ -653,21 +494,19 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
             )}
             {projectName && !isLoading() && !error && (
                 <>
-                    <div className="familyView" style={{ width: "100%" }}>
-                        {renderTitle}
-                        {pedigree && (
-                            <TangledTree data={pedigree} click={onClick} />
-                        )}
-                        {samples && sequenceInfo && sampleIDsByParticipant && (
-                            <Accordion
-                                onTitleClick={handleTitleClick}
-                                activeIndex={activeIndices}
-                                styled
-                                className="accordionStyle"
-                                exclusive={false}
-                                panels={Object.entries(
-                                    sampleIDsByParticipant
-                                ).map(([key, value]) => ({
+                    {renderTitle}
+                    {pedigree && (
+                        <TangledTree data={pedigree} click={onClick} />
+                    )}
+                    {samples && sequenceInfo && sampleIDsByParticipant && (
+                        <Accordion
+                            onTitleClick={handleTitleClick}
+                            activeIndex={activeIndices}
+                            styled
+                            className="accordionStyle"
+                            exclusive={false}
+                            panels={Object.entries(sampleIDsByParticipant).map(
+                                ([key, value]) => ({
                                     key: key,
                                     title: {
                                         content: (
@@ -773,12 +612,12 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                                             </div>
                                         ),
                                     },
-                                }))}
-                            />
-                        )}
-                    </div>
+                                })
+                            )}
+                        />
+                    )}
                 </>
             )}
-        </>
+        </div>
     );
 };

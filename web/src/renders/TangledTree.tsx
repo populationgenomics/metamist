@@ -25,6 +25,7 @@ interface ModifiedPedEntry {
 const constructTangleLayout = (
     levels: { id: string; parents?: string[]; level?: number }[][]
 ) => {
+    console.log(levels);
     // precompute level depth
     levels.forEach((l, i) => l.forEach((n) => (n.level = i)));
     var nodes = levels.reduce((a, x) => a.concat(x), []);
@@ -615,7 +616,7 @@ const formatData = (data: PedigreeEntry[]) => {
 
 interface RenderPedigreeProps {
     data: PedigreeEntry[];
-    click(): void;
+    click(e: string): void;
 }
 
 export const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({
@@ -999,7 +1000,9 @@ export const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({
     //     .map((value) => ({ value, sort: Math.random() }))
     //     .sort((a, b) => a.sort - b.sort)
     //     .map(({ value }) => value);
+    console.log("Here");
     const trees = formatData(data);
+    console.log("There");
     const keyedData: { [name: string]: PedigreeEntry } = data.reduce(
         (obj: { [key: string]: PedigreeEntry }, s: PedigreeEntry) => {
             obj[s.individual_id] = s;
@@ -1007,17 +1010,21 @@ export const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({
         },
         {}
     );
+    console.log(trees[0]);
 
-    // return renderChart(data3, {}, click);
+    const r = renderChart(trees[0], keyedData, click);
+    console.log("Everywhere");
 
-    return (
-        <>
-            {trees.map((tree, i) => (
-                <React.Fragment key={`Tree-${i}`}>
-                    {renderChart(tree, keyedData, click)}
-                </React.Fragment>
-            ))}
-            <br />
-        </>
-    );
+    return r;
+
+    // return (
+    //     <>
+    //         {trees.map((tree, i) => (
+    //             <React.Fragment key={`Tree-${i}`}>
+    //                 {renderChart(tree, keyedData, click)}
+    //             </React.Fragment>
+    //         ))}
+    //         <br />
+    //     </>
+    // );
 };

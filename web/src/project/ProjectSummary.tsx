@@ -9,8 +9,8 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
-import { SampleLink, FamilyLink } from "../Links";
-import MuckTheDuck from "../MuckTheDuck";
+import { SampleLink, FamilyLink } from "../renders/Links";
+import MuckTheDuck from "../renders/MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
 
@@ -84,6 +84,7 @@ export const ProjectSummary = () => {
                 .then((resp) => {
                     setIsLoading(false);
                     setSummary(resp.data);
+                    console.log(resp.data);
                 })
                 .catch((er) => {
                     setIsLoading(false);
@@ -223,10 +224,7 @@ export const ProjectSummary = () => {
                                                 {
                                                     <FamilyLink
                                                         id={p.families
-                                                            .map(
-                                                                (f) =>
-                                                                    f.external_id
-                                                            )
+                                                            .map((f) => f.id)
                                                             .join(", ")}
                                                         projectName={
                                                             projectName

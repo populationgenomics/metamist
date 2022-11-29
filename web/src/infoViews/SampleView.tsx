@@ -11,8 +11,8 @@ import {
     // ParticipantModel,
     // Sample,
     // SampleSequencing,
-} from "./sm-api/api";
-import { Table } from "semantic-ui-react";
+} from "../sm-api/api";
+import { SeqInfo } from "../renders/SeqInfo";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -74,7 +74,7 @@ interface Sample {
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
-export class DetailedInfoPage extends React.Component<{}, { error?: Error }> {
+export class SampleView extends React.Component<{}, { error?: Error }> {
     constructor(props: any) {
         super(props);
         this.state = {};
@@ -89,11 +89,11 @@ export class DetailedInfoPage extends React.Component<{}, { error?: Error }> {
         if (this.state.error) {
             return <p>{this.state.error.toString()}</p>;
         }
-        return <DetailedInfoPage_ />; /* eslint react/jsx-pascal-case: 0 */
+        return <SampleView_ />; /* eslint react/jsx-pascal-case: 0 */
     }
 }
 
-export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
+export const SampleView_: React.FunctionComponent<{}> = () => {
     const { projectName, sampleName } = useParams();
     const navigate = useNavigate();
     const [samples, setSamples] = React.useState();
@@ -220,56 +220,6 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
         return CPGID![1]; // You'd expect this to always work. Should I add the case where it doesn't?
     };
 
-    const formatBytes = (bytes: number, decimals = 2) => {
-        if (!+bytes) return "0 Bytes";
-
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
-            sizes[i]
-        }`;
-    };
-
-    const prepReadMetadata = (data: SequenceMeta) => {
-        if (!data.reads) return <></>;
-        if (!Array.isArray(data.reads))
-            return (
-                <>
-                    <b>reads:</b>
-                    {renderReadsMetadata([data.reads], 1)}
-                </>
-            );
-        return (
-            <>
-                <b>reads:</b>
-                {data.reads.map((v, i) => {
-                    return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
-                })}
-            </>
-        );
-    };
-
-    const renderReadsMetadata = (data: File[], key: number | string) => {
-        return (
-            <Table celled key={key}>
-                <Table.Body>
-                    {data.map((item: File) => (
-                        <Table.Row key={item.location}>
-                            <Table.Cell collapsing>{item.location}</Table.Cell>
-                            <Table.Cell collapsing>
-                                {formatBytes(item.size)}
-                            </Table.Cell>
-                        </Table.Row>
-                    ))}
-                </Table.Body>
-            </Table>
-        );
-    };
-
     const drawTrio = (
         paternal: string,
         affectedPaternal: number,
@@ -354,99 +304,6 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
         setIsLoading(false);
     }, [projectName, samples, sampleName]);
 
-    const safeValue = (value: any): string => {
-        if (!value) return value;
-        if (Array.isArray(value)) {
-            return value.map(safeValue).join(", ");
-        }
-        if (typeof value === "number") {
-            return value.toString();
-        }
-        if (typeof value === "string") {
-            return value;
-        }
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-            if (!!value.location && !!value.size) {
-                return `${value.location} (${formatBytes(value.size)})`;
-            }
-        }
-        return JSON.stringify(value);
-    };
-
-    const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return Object.entries(seqInfo)
-            .filter(([key, value]) => key !== "id")
-            .map(([key, value]) => {
-                if (key === "external_ids") {
-                    if (Object.keys(seqInfo.external_ids!).length) {
-                        return (
-                            <>
-                                <b>External Ids:</b>{" "}
-                                {Object.entries(seqInfo!.external_ids!)
-                                    .map(([k1, v1]) => (
-                                        <React.Fragment
-                                            key={`${v1} (${k1})`}
-                                        >{`${v1} (${k1})`}</React.Fragment>
-                                    ))
-                                    .join()}
-                            </>
-                        );
-                    }
-                    return <React.Fragment key="ExternalID"></React.Fragment>;
-                }
-                if (key === "meta") {
-                    return Object.entries(seqInfo.meta!)
-                        .filter(([k1, v1]) => k1 !== "reads")
-                        .map(([k1, v1]) => {
-                            if (
-                                Array.isArray(v1) &&
-                                v1.filter((v) => !!v.location && !!v.size)
-                                    .length === v1.length
-                            ) {
-                                // all are files coincidentally
-                                return (
-                                    <React.Fragment key={`${k1}`}>
-                                        <b>{k1}:</b>
-                                        {renderReadsMetadata(v1 as File[], key)}
-                                    </React.Fragment>
-                                );
-                            }
-                            if (
-                                v1 &&
-                                typeof v1 === "object" &&
-                                !Array.isArray(v1)
-                            ) {
-                                if (!!v1.location && !!v1.size) {
-                                    return (
-                                        <React.Fragment key={`${k1}`}>
-                                            <b>{k1}:</b>
-                                            {renderReadsMetadata(
-                                                [v1] as File[],
-                                                k1
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                }
-                            }
-                            const stringifiedValue = safeValue(v1);
-                            return (
-                                <div key={`${k1}-${stringifiedValue}`}>
-                                    <b>{k1}:</b>{" "}
-                                    {stringifiedValue ?? <em>no-value</em>}
-                                </div>
-                            );
-                        });
-                }
-
-                const stringifiedValue = safeValue(value);
-                return (
-                    <div key={`${key}-${stringifiedValue}`}>
-                        <b>{key}:</b> {stringifiedValue ?? <em>no-value</em>}
-                    </div>
-                );
-            });
-    };
-
     const renderSeqSection = () => {
         if (!sample || !sequenceInfo) {
             return <></>;
@@ -468,8 +325,7 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                             </h6>
 
                             <div style={{ marginLeft: "30px" }}>
-                                {renderSeqInfo(seq)}
-                                {prepReadMetadata(seq.meta || {})}
+                                <SeqInfo data={seq} />
                             </div>
                             <br />
                         </React.Fragment>
