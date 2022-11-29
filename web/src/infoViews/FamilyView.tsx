@@ -26,8 +26,8 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import BloodtypeRoundedIcon from "@mui/icons-material/BloodtypeRounded";
 
 import { TangledTree } from "../renders/TangledTree";
-import MuckTheDuck from "../renders/MuckTheDuck";
 import { SeqInfo } from "../renders/SeqInfo";
+import LoadingDucks from "../renders/LoadingDucks";
 
 // TODO Move interfaces to appropriate API/routes
 interface PedigreeEntry {
@@ -78,9 +78,17 @@ interface Sample {
     author?: string;
 }
 
+interface LoadingStates {
+    family: boolean;
+    pedigree: boolean;
+    participant_ids: boolean;
+    samples: boolean;
+    sequences: boolean;
+}
+
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
-const resetLoadingState = {
+const resetLoadingState: LoadingStates = {
     family: true,
     pedigree: true,
     participant_ids: true,
@@ -118,215 +126,231 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
     const { projectName, familyID } = useParams();
     const navigate = useNavigate();
 
-    const [loadingStates, setLoadingStates] = React.useState<{
-        [key: string]: Boolean;
-    }>(resetLoadingState);
+    const [loadingStates, setLoadingStates] =
+        React.useState<LoadingStates>(resetLoadingState);
     const [error, setError] = React.useState<string | undefined>();
 
-    const [familyName, setFamilyName] = React.useState<string>();
-    const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>();
-    const [participantIDs, setParticipantIDs] = React.useState<string[]>();
-    const [sampleIDsInFamily, setSampleIDsInFamily] =
-        React.useState<string[]>();
+    const [familyName, setFamilyName] = React.useState<string>("");
+    const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>([]);
+    const [participantIDs, setParticipantIDs] = React.useState<string[]>([]);
+    const [sampleIDsInFamily, setSampleIDsInFamily] = React.useState<string[]>(
+        []
+    );
     const [sampleIDsByParticipant, setSampleIDsByParticipant] = React.useState<{
         [key: string]: string[];
-    }>();
-    const [samples, setSamples] = React.useState<{ [key: string]: Sample }>();
+    }>({});
+    const [samples, setSamples] = React.useState<{ [key: string]: Sample }>({});
     const [sequenceInfo, setSequenceInfo] = React.useState<{
         [key: string]: SampleSequencing[];
-    }>();
+    }>({});
 
     const [activeIndices, setActiveIndices] = React.useState<number[]>([-1]);
-    const [mostRecent, setMostRecent] = React.useState<string>();
-    const [otherFamilies, setOtherFamilies] = React.useState<Family[]>();
-
-    const getFamilies = React.useCallback(async () => {
-        console.log("In getFamilies");
-        if (!projectName || !familyID) return;
-        console.log("continued getFamilies");
-        new FamilyApi()
-            .getFamilies(projectName)
-            .then((resp) => {
-                const entry = resp.data.find((d) => d.id === +familyID);
-                if (entry) {
-                    setFamilyName(entry.external_id);
-                    setOtherFamilies(
-                        Array.from(
-                            new Set(
-                                resp.data.filter(
-                                    (value) => value.id !== +familyID
-                                )
-                            )
-                        )
-                    );
-                } else {
-                    setError(
-                        `${familyID} ID does not exist in ${projectName} families`
-                    );
-                }
-            })
-            .then(() => {
-                setLoadingStates((prev) => ({ ...prev, family: false }));
-            })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [projectName, familyID]);
-
-    const getPedigree = React.useCallback(async () => {
-        console.log("In getPedigree");
-        console.log(projectName, familyName);
-        if (!projectName || !familyName) return;
-        console.log("continued getPedigree");
-        new FamilyApi()
-            .getPedigree(projectName)
-            .then((resp) => {
-                const ped = resp.data.filter(
-                    (value: PedigreeEntry) =>
-                        value.family_id.toUpperCase() ===
-                        familyName.toUpperCase()
-                );
-                console.log(ped);
-                setPedigree(ped);
-                setParticipantIDs(
-                    ped.map((item: PedigreeEntry) => item.individual_id)
-                );
-            })
-            .then(() => {
-                setLoadingStates((prev) => ({ ...prev, pedigree: false }));
-            })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [familyName]);
-
-    const getParticipantIdToSampleId = React.useCallback(async () => {
-        if (!projectName || !participantIDs) return;
-        new ParticipantApi()
-            .getExternalParticipantIdToInternalSampleId(projectName)
-            .then((resp) => {
-                setSampleIDsByParticipant(
-                    resp.data.reduce(
-                        (
-                            obj: { [key: string]: string[] },
-                            [pid, sid]: [string, string]
-                        ) => {
-                            if (participantIDs.includes(pid)) {
-                                (obj[pid] = obj[pid] || []).push(sid);
-                            }
-                            return obj;
-                        },
-                        {}
-                    )
-                );
-                setSampleIDsInFamily(
-                    resp.data.reduce(
-                        (arr: string[], [pid, sid]: [string, string]) => {
-                            if (participantIDs.includes(pid)) {
-                                arr.push(sid);
-                            }
-                            return arr;
-                        },
-                        []
-                    )
-                );
-            })
-            .then(() => {
-                setLoadingStates((prev) => ({
-                    ...prev,
-                    participant_ids: false,
-                }));
-            })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [participantIDs]);
-
-    const getAllSamples = React.useCallback(async () => {
-        if (!projectName || !sampleIDsInFamily) return;
-        new SampleApi()
-            .getSamples({
-                sample_ids: sampleIDsInFamily,
-                project_ids: [projectName],
-            })
-            .then((resp) => {
-                setSamples(
-                    resp.data.reduce(
-                        (obj: { [key: string]: Sample }, s: Sample) => {
-                            obj[s.id] = s;
-                            return obj;
-                        },
-                        {}
-                    )
-                );
-            })
-            .then(() => {
-                setLoadingStates((prev) => ({ ...prev, samples: false }));
-            })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [sampleIDsInFamily]);
-
-    const getSequenceInfo = React.useCallback(async () => {
-        if (!projectName || !sampleIDsInFamily) return;
-        new SequenceApi()
-            .getSequencesBySampleIds(sampleIDsInFamily)
-            .then((resp) => {
-                setSequenceInfo(
-                    resp.data.reduce(
-                        (
-                            obj: { [key: string]: SampleSequencing[] },
-                            s: SampleSequencing
-                        ) => {
-                            (obj[s.sample_id] = obj[s.sample_id] || []).push(s);
-                            return obj;
-                        },
-                        {}
-                    )
-                );
-            })
-            .then(() => {
-                setLoadingStates((prev) => ({
-                    ...prev,
-                    sequences: false,
-                }));
-            })
-            .catch((er) => {
-                setError(er.message);
-            });
-    }, [sampleIDsInFamily]);
+    const [mostRecent, setMostRecent] = React.useState<string>("");
+    const [otherFamilies, setOtherFamilies] = React.useState<Family[]>([]);
 
     React.useEffect(() => {
         setLoadingStates(resetLoadingState);
-        console.log("Updated Loading States");
+        setFamilyName("");
+        setPedigree([]);
+        setParticipantIDs([]);
+        setSampleIDsInFamily([]);
+        setSampleIDsByParticipant({});
+        setSamples({});
+        setSequenceInfo({});
+        setActiveIndices([-1]);
+        setMostRecent("");
+        setOtherFamilies([]);
     }, [projectName, familyID]);
 
     // retrigger if selections change
     React.useEffect(() => {
+        const getFamilies = async () => {
+            if (!projectName || !familyID || !loadingStates.family) return;
+            new FamilyApi()
+                .getFamilies(projectName)
+                .then((resp) => {
+                    const entry = resp.data.find((d) => d.id === +familyID);
+                    if (entry) {
+                        setFamilyName(entry.external_id);
+                        setOtherFamilies(
+                            Array.from(
+                                new Set(
+                                    resp.data.filter(
+                                        (value) => value.id !== +familyID
+                                    )
+                                )
+                            )
+                        );
+                        setLoadingStates((prev) => ({
+                            ...prev,
+                            family: false,
+                        }));
+                    } else {
+                        setError(
+                            `${familyID} ID does not exist in ${projectName} families`
+                        );
+                    }
+                })
+                .catch((er) => {
+                    setError(er.message);
+                });
+        };
         getFamilies();
-        console.log("Updated Families");
-    }, [getFamilies]);
+    }, [projectName, familyID, loadingStates.family]);
 
     React.useEffect(() => {
+        const getPedigree = async () => {
+            if (!projectName || !familyName || !loadingStates.pedigree) return;
+            new FamilyApi()
+                .getPedigree(projectName)
+                .then((resp) => {
+                    const ped = resp.data.filter(
+                        (value: PedigreeEntry) =>
+                            value.family_id.toUpperCase() ===
+                            familyName.toUpperCase()
+                    );
+                    if (ped.length) {
+                        setPedigree(ped);
+                        setParticipantIDs(
+                            ped.map((item: PedigreeEntry) => item.individual_id)
+                        );
+                        setLoadingStates((prev) => ({
+                            ...prev,
+                            pedigree: false,
+                        }));
+                    }
+                })
+                .catch((er) => {
+                    setError(er.message);
+                });
+        };
         getPedigree();
-        console.log("Updated Pedigree");
-    }, [getPedigree]);
+    }, [projectName, familyName, loadingStates.pedigree]);
 
     React.useEffect(() => {
+        const getParticipantIdToSampleId = async () => {
+            if (
+                !projectName ||
+                !participantIDs.length ||
+                !loadingStates.participant_ids
+            ) {
+                return;
+            }
+            new ParticipantApi()
+                .getExternalParticipantIdToInternalSampleId(projectName)
+                .then((resp) => {
+                    setSampleIDsByParticipant(
+                        resp.data.reduce(
+                            (
+                                obj: { [key: string]: string[] },
+                                [pid, sid]: [string, string]
+                            ) => {
+                                if (participantIDs.includes(pid)) {
+                                    (obj[pid] = obj[pid] || []).push(sid);
+                                }
+                                return obj;
+                            },
+                            {}
+                        )
+                    );
+                    setSampleIDsInFamily(
+                        resp.data.reduce(
+                            (arr: string[], [pid, sid]: [string, string]) => {
+                                if (participantIDs.includes(pid)) {
+                                    arr.push(sid);
+                                }
+                                return arr;
+                            },
+                            []
+                        )
+                    );
+                })
+                .then(() => {
+                    setLoadingStates((prev) => ({
+                        ...prev,
+                        participant_ids: false,
+                    }));
+                })
+                .catch((er) => {
+                    setError(er.message);
+                });
+        };
         getParticipantIdToSampleId();
-        console.log("Updated PID");
-    }, [getParticipantIdToSampleId]);
+    }, [projectName, participantIDs, loadingStates.participant_ids]);
 
     React.useEffect(() => {
+        const getAllSamples = async () => {
+            if (
+                !projectName ||
+                !sampleIDsInFamily.length ||
+                !loadingStates.samples
+            ) {
+                return;
+            }
+            new SampleApi()
+                .getSamples({
+                    sample_ids: sampleIDsInFamily,
+                    project_ids: [projectName],
+                })
+                .then((resp) => {
+                    setSamples(
+                        resp.data.reduce(
+                            (obj: { [key: string]: Sample }, s: Sample) => {
+                                obj[s.id] = s;
+                                return obj;
+                            },
+                            {}
+                        )
+                    );
+                })
+                .then(() => {
+                    setLoadingStates((prev) => ({ ...prev, samples: false }));
+                })
+                .catch((er) => {
+                    setError(er.message);
+                });
+        };
         getAllSamples();
-        console.log("Updated Samples");
-    }, [getAllSamples]);
+    }, [projectName, sampleIDsInFamily, loadingStates.samples]);
 
     React.useEffect(() => {
+        const getSequenceInfo = async () => {
+            if (
+                !projectName ||
+                !sampleIDsInFamily.length ||
+                !loadingStates.sequences
+            ) {
+                return;
+            }
+            new SequenceApi()
+                .getSequencesBySampleIds(sampleIDsInFamily)
+                .then((resp) => {
+                    setSequenceInfo(
+                        resp.data.reduce(
+                            (
+                                obj: { [key: string]: SampleSequencing[] },
+                                s: SampleSequencing
+                            ) => {
+                                (obj[s.sample_id] =
+                                    obj[s.sample_id] || []).push(s);
+                                return obj;
+                            },
+                            {}
+                        )
+                    );
+                })
+                .then(() => {
+                    setLoadingStates((prev) => ({
+                        ...prev,
+                        sequences: false,
+                    }));
+                })
+                .catch((er) => {
+                    setError(er.message);
+                });
+        };
         getSequenceInfo();
-        console.log("Updated Sequences");
-    }, [getSequenceInfo]);
+    }, [projectName, sampleIDsInFamily, loadingStates.sequences]);
 
     const renderSeqSection = (s: SampleSequencing[]) => {
         return (
@@ -416,8 +440,6 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
                                 <Grid.Row key={item.id} textAlign="center">
                                     <Button
                                         onClick={() => {
-                                            setLoadingStates(resetLoadingState);
-                                            setActiveIndices([-1]);
                                             navigate(
                                                 `/project/${projectName}/family/${item.id}`
                                             );
@@ -474,30 +496,34 @@ export const FamilyView_: React.FunctionComponent<{}> = () => {
         return Object.values(loadingStates).includes(true);
     };
 
+    const renderedPedigree = React.useMemo(() => {
+        return pedigree && <TangledTree data={pedigree} click={onClick} />;
+    }, [pedigree, onClick]);
+
     return (
         <div className="familyView" style={{ width: "100%" }}>
             <br />
             {!!error && <h1>{error}</h1>}
             {!error && isLoading() && (
-                <div style={{ textAlign: "center", paddingTop: "200px" }}>
-                    <MuckTheDuck height={28} className="loadingScreen" />
+                <>
+                    <LoadingDucks />
                     <br />
-                    {Object.entries(loadingStates)
-                        .filter(([key, value]) => value)
-                        .map(([key, value]) => (
-                            <React.Fragment key={key}>
-                                <h5>{` Retrieving ${key}`}</h5>
-                                <br />
-                            </React.Fragment>
-                        ))}
-                </div>
+                    <div style={{ textAlign: "center", paddingTop: "200px" }}>
+                        {Object.entries(loadingStates)
+                            .filter(([key, value]) => value)
+                            .map(([key, value]) => (
+                                <React.Fragment key={key}>
+                                    <h5>{` Retrieving ${key}`}</h5>
+                                    <br />
+                                </React.Fragment>
+                            ))}
+                    </div>
+                </>
             )}
             {projectName && !isLoading() && !error && (
                 <>
                     {renderTitle}
-                    {pedigree && (
-                        <TangledTree data={pedigree} click={onClick} />
-                    )}
+                    {renderedPedigree}
                     {samples && sequenceInfo && sampleIDsByParticipant && (
                         <Accordion
                             onTitleClick={handleTitleClick}

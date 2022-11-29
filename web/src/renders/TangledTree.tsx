@@ -1,6 +1,7 @@
 import * as React from "react";
 import _ from "lodash";
 import { min, max, descending, sum, mean, extent } from "d3";
+import LoadingDucks from "./LoadingDucks";
 import MuckTheDuck from "./MuckTheDuck";
 
 interface PedigreeEntry {
@@ -25,7 +26,6 @@ interface ModifiedPedEntry {
 const constructTangleLayout = (
     levels: { id: string; parents?: string[]; level?: number }[][]
 ) => {
-    console.log(levels);
     // precompute level depth
     levels.forEach((l, i) => l.forEach((n) => (n.level = i)));
     var nodes = levels.reduce((a, x) => a.concat(x), []);
@@ -443,6 +443,7 @@ const formatData = (data: PedigreeEntry[]) => {
     if (!data.length) {
         return [];
     }
+
     const possibleRoots = data
         .filter((item) => !item.paternal_id && !item.maternal_id)
         .map((i) => i.individual_id);
@@ -501,7 +502,7 @@ const formatData = (data: PedigreeEntry[]) => {
                     parents: [
                         keyedData[next].paternal_id,
                         keyedData[next].maternal_id,
-                    ],
+                    ].filter((i) => i),
                 }),
             }); //add entry
             toAddToQueue.push(
@@ -537,7 +538,7 @@ const formatData = (data: PedigreeEntry[]) => {
                             parents: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
-                            ],
+                            ].filter((i) => i),
                         }),
                     });
                     couples = couples.filter(
@@ -568,7 +569,7 @@ const formatData = (data: PedigreeEntry[]) => {
                             parents: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
-                            ],
+                            ].filter((i) => i),
                         }),
                     },
                 ];
@@ -591,7 +592,7 @@ const formatData = (data: PedigreeEntry[]) => {
                             parents: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
-                            ],
+                            ].filter((i) => i),
                         }),
                     },
                 ];
@@ -623,408 +624,54 @@ export const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({
     data,
     click,
 }) => {
-    // const duo = [
-    //     [{ id: "Chaos" }],
-    //     [{ id: "Gaea", parents: ["Chaos"] }],
-    //     [
-    //         { id: "Child1", parents: ["Gaea"] },
-    //         { id: "Child2", parents: ["Gaea"] },
-    //     ],
-    // ];
+    const [trees, setTrees] = React.useState();
+    const [keyedData, setKeyedData] = React.useState<{
+        [name: string]: PedigreeEntry;
+    }>();
 
-    // const data3 = [
-    //     [{ id: "Chaos" }],
-    //     [{ id: "Gaea", parents: ["Chaos"] }, { id: "Uranus" }],
-    //     [
-    //         { id: "Oceanus", parents: ["Gaea", "Uranus"] },
-    //         { id: "Thethys", parents: ["Gaea", "Uranus"] },
-    //         { id: "Pontus" },
-    //         { id: "Rhea", parents: ["Gaea", "Uranus"] },
-    //         { id: "Cronus", parents: ["Gaea", "Uranus"] },
-    //         { id: "Coeus", parents: ["Gaea", "Uranus"] },
-    //         { id: "Phoebe", parents: ["Gaea", "Uranus"] },
-    //         { id: "Crius", parents: ["Gaea", "Uranus"] },
-    //         { id: "Hyperion", parents: ["Gaea", "Uranus"] },
-    //         { id: "Iapetus", parents: ["Gaea", "Uranus"] },
-    //         { id: "Thea", parents: ["Gaea", "Uranus"] },
-    //         { id: "Themis", parents: ["Gaea", "Uranus"] },
-    //         { id: "Mnemosyne", parents: ["Gaea", "Uranus"] },
-    //     ],
-    //     [
-    //         { id: "Doris", parents: ["Oceanus", "Thethys"] },
-    //         { id: "Neures", parents: ["Pontus", "Gaea"] },
-    //         { id: "Dionne" },
-    //         { id: "Demeter", parents: ["Rhea", "Cronus"] },
-    //         { id: "Hades", parents: ["Rhea", "Cronus"] },
-    //         { id: "Hera", parents: ["Rhea", "Cronus"] },
-    //         { id: "Alcmene" },
-    //         { id: "Zeus", parents: ["Rhea", "Cronus"] },
-    //         { id: "Eris" },
-    //         { id: "Leto", parents: ["Coeus", "Phoebe"] },
-    //         { id: "Amphitrite" },
-    //         { id: "Medusa" },
-    //         { id: "Poseidon", parents: ["Rhea", "Cronus"] },
-    //         { id: "Hestia", parents: ["Rhea", "Cronus"] },
-    //     ],
-    //     [
-    //         { id: "Thetis", parents: ["Doris", "Neures"] },
-    //         { id: "Peleus" },
-    //         { id: "Anchises" },
-    //         { id: "Adonis" },
-    //         { id: "Aphrodite", parents: ["Zeus", "Dionne"] },
-    //         { id: "Persephone", parents: ["Zeus", "Demeter"] },
-    //         { id: "Ares", parents: ["Zeus", "Hera"] },
-    //         { id: "Hephaestus", parents: ["Zeus", "Hera"] },
-    //         { id: "Hebe", parents: ["Zeus", "Hera"] },
-    //         { id: "Hercules", parents: ["Zeus", "Alcmene"] },
-    //         { id: "Megara" },
-    //         { id: "Deianira" },
-    //         { id: "Eileithya", parents: ["Zeus", "Hera"] },
-    //         { id: "Ate", parents: ["Zeus", "Eris"] },
-    //         { id: "Leda" },
-    //         { id: "Athena", parents: ["Zeus"] },
-    //         { id: "Apollo", parents: ["Zeus", "Leto"] },
-    //         { id: "Artemis", parents: ["Zeus", "Leto"] },
-    //         { id: "Triton", parents: ["Poseidon", "Amphitrite"] },
-    //         { id: "Pegasus", parents: ["Poseidon", "Medusa"] },
-    //         { id: "Orion", parents: ["Poseidon"] },
-    //         { id: "Polyphemus", parents: ["Poseidon"] },
-    //     ],
-    //     [
-    //         { id: "Deidamia" },
-    //         { id: "Achilles", parents: ["Peleus", "Thetis"] },
-    //         { id: "Creusa" },
-    //         { id: "Aeneas", parents: ["Anchises", "Aphrodite"] },
-    //         { id: "Lavinia" },
-    //         { id: "Eros", parents: ["Hephaestus", "Aphrodite"] },
-    //         { id: "Helen", parents: ["Leda", "Zeus"] },
-    //         { id: "Menelaus" },
-    //         { id: "Polydueces", parents: ["Leda", "Zeus"] },
-    //     ],
-    //     [
-    //         { id: "Andromache" },
-    //         { id: "Neoptolemus", parents: ["Deidamia", "Achilles"] },
-    //         { id: "Aeneas(2)", parents: ["Creusa", "Aeneas"] },
-    //         { id: "Pompilius", parents: ["Creusa", "Aeneas"] },
-    //         { id: "Iulus", parents: ["Lavinia", "Aeneas"] },
-    //         { id: "Hermione", parents: ["Helen", "Menelaus"] },
-    //     ],
-    // ];
+    React.useEffect(() => {
+        setTrees(formatData(data));
+        setKeyedData(
+            data.reduce(
+                (obj: { [key: string]: PedigreeEntry }, s: PedigreeEntry) => {
+                    obj[s.individual_id] = s;
+                    return obj;
+                },
+                {}
+            )
+        );
+    }, [data]);
 
-    // const data1 = [
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "D21-0075",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "D21-0074",
-    //         paternal_id: "8600.1",
-    //         maternal_id: "8600.2",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "D21-0076",
-    //         paternal_id: "D21-0075",
-    //         maternal_id: "D21-0074",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "D13-708",
-    //         paternal_id: "8600.1",
-    //         maternal_id: "8600.2",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "8600.1",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "8600",
-    //         individual_id: "8600.2",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    // ];
-
-    // const data2 = [
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_050129",
-    //         paternal_id: "CMT27_1",
-    //         maternal_id: "CMT27_2",
-    //         sex: 1,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_170151",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_140560",
-    //         paternal_id: "CMT27_1",
-    //         maternal_id: "CMT27_2",
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_090544",
-    //         paternal_id: "CMT27_14",
-    //         maternal_id: "CMT27_15",
-    //         sex: 1,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_050133",
-    //         paternal_id: "CMT27_050129",
-    //         maternal_id: "CMT27_8",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_150022",
-    //         paternal_id: "CMT27_170151",
-    //         maternal_id: "CMT27_050133",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_1",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 0,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_2",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 0,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_3",
-    //         paternal_id: "CMT27_1",
-    //         maternal_id: "CMT27_2",
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_4",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_6",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_8",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_9",
-    //         paternal_id: "CMT27_3",
-    //         maternal_id: "CMT27_4",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_10",
-    //         paternal_id: "CMT27_140560",
-    //         maternal_id: "CMT27_6",
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_11",
-    //         paternal_id: "CMT27_140560",
-    //         maternal_id: "CMT27_6",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_12",
-    //         paternal_id: "CMT27_140560",
-    //         maternal_id: "CMT27_6",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_13",
-    //         paternal_id: "CMT27_140560",
-    //         maternal_id: "CMT27_6",
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_14",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_15",
-    //         paternal_id: "CMT27_050129",
-    //         maternal_id: "CMT27_8",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_16",
-    //         paternal_id: "CMT27_050129",
-    //         maternal_id: "CMT27_8",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_17",
-    //         paternal_id: "CMT27_050129",
-    //         maternal_id: "CMT27_8",
-    //         sex: 1,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_18",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_22",
-    //         paternal_id: "CMT27_14",
-    //         maternal_id: "CMT27_15",
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_23",
-    //         paternal_id: "CMT27_14",
-    //         maternal_id: "CMT27_15",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_24",
-    //         paternal_id: "CMT27_17",
-    //         maternal_id: "CMT27_18",
-    //         sex: 1,
-    //         affected: 0,
-    //     },
-    //     {
-    //         family_id: "CMT27",
-    //         individual_id: "CMT27_26",
-    //         paternal_id: "CMT27_170151",
-    //         maternal_id: "CMT27_050133",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT274",
-    //         individual_id: "CMT274_120221",
-    //         paternal_id: "CMT274_1",
-    //         maternal_id: "CMT274_2",
-    //         sex: 2,
-    //         affected: 2,
-    //     },
-    //     {
-    //         family_id: "CMT274",
-    //         individual_id: "CMT274_1",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 1,
-    //         affected: 1,
-    //     },
-    //     {
-    //         family_id: "CMT274",
-    //         individual_id: "CMT274_2",
-    //         paternal_id: null,
-    //         maternal_id: null,
-    //         sex: 2,
-    //         affected: 1,
-    //     },
-    // ];
-    // const shuffled = duo
-    //     .map((value) => ({ value, sort: Math.random() }))
-    //     .sort((a, b) => a.sort - b.sort)
-    //     .map(({ value }) => value);
-    console.log("Here");
-    const trees = formatData(data);
-    console.log("There");
-    const keyedData: { [name: string]: PedigreeEntry } = data.reduce(
-        (obj: { [key: string]: PedigreeEntry }, s: PedigreeEntry) => {
-            obj[s.individual_id] = s;
-            return obj;
-        },
-        {}
+    return (
+        <>
+            {(!data || !data.length) && (
+                <p>
+                    <em>Ah Muck, there's no data for this pedigree!</em>
+                    <MuckTheDuck
+                        height={28}
+                        style={{ transform: "scaleY(-1)" }}
+                    />
+                </p>
+            )}
+            {data && !!data.length && !trees && (
+                <>
+                    <LoadingDucks />
+                    <div style={{ textAlign: "center" }}>
+                        <h5>Loading pedigrees</h5>
+                    </div>
+                </>
+            )}
+            {!!data.length &&
+                trees &&
+                keyedData &&
+                trees.map((tree, i) => (
+                    <React.Fragment key={`Tree-${i}`}>
+                        {trees.length > 1 && <h2>{`Pedigree #${i + 1}:`}</h2>}
+                        {renderChart(tree, keyedData, click)}
+                        <br />
+                    </React.Fragment>
+                ))}
+            <br />
+        </>
     );
-    console.log(trees[0]);
-
-    const r = renderChart(trees[0], keyedData, click);
-    console.log("Everywhere");
-
-    return r;
-
-    // return (
-    //     <>
-    //         {trees.map((tree, i) => (
-    //             <React.Fragment key={`Tree-${i}`}>
-    //                 {renderChart(tree, keyedData, click)}
-    //             </React.Fragment>
-    //         ))}
-    //         <br />
-    //     </>
-    // );
 };
