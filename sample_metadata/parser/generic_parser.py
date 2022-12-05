@@ -289,6 +289,11 @@ class GenericParser(
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
+    # @abstractmethod
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from row"""
+        return None
+
     @abstractmethod
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
@@ -383,6 +388,42 @@ class GenericParser(
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
+    @staticmethod
+    def get_existing_external_sequence_ids(
+        participant_map: Dict[str, Dict[Any, List[Any]]]
+    ):
+        """Pulls external sequence IDs from participant map"""
+        external_sequence_ids: list[str] = []
+        for participant in participant_map:
+            for sample in participant_map[participant]:
+                for sequence in participant_map[participant][sample]:
+                    external_sequence_ids.append((sequence.get('Sequence ID')))
+
+        return external_sequence_ids
+
+    @staticmethod
+    def get_existing_sequences(
+        sequences: list[dict[str, Any]], external_sequence_ids: list[str]
+    ):
+        """Accounts for external_sequence_ids when determining which sequences
+        need to be updated vs inserted"""
+
+        existing_sequences: list[dict[str, Any]] = []
+        for seq in sequences:
+            if not seq['external_ids'].values():
+                # No existing sequence ID, we can assume that replacement should happen
+                # Note: This means that you can't have a mix of sequences with and without
+                # external sequence IDs in one dataset.
+                existing_sequences.append(seq)
+
+            else:
+                for ext_id in seq['external_ids'].values():
+                    # If the external ID is already there, we want to upsert.
+                    if ext_id in external_sequence_ids:
+                        existing_sequences.append(seq)
+
+        return existing_sequences
+
     async def process_sample_group(
         self,
         rows: GroupedRow,
@@ -434,6 +475,10 @@ class GenericParser(
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
                 }
+
+                if self.get_sequence_id(seq.rows):
+                    seq_args['external_ids'] = self.get_sequence_id(seq.rows)
+
                 if sequence_id:
                     seq_args['id'] = sequence_id
 
@@ -737,6 +782,10 @@ class GenericParser(
                 set(k for s in participant_map.values() for k in s.keys())
             )
 
+            external_sequence_ids = self.get_existing_external_sequence_ids(
+                participant_map
+            )
+
             external_to_internal_sample_id_map = (
                 await self.sapi.get_sample_id_map_by_external_async(
                     self.project, sample_ids, allow_missing=True
@@ -744,13 +793,19 @@ class GenericParser(
             )
 
             sequences = []
+            existing_sequences: list[dict[str, Any]] = []
             if external_to_internal_sample_id_map:
                 sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                     list(external_to_internal_sample_id_map.values()),
                 )
 
+                # Accounts for multiple valid sequences per sample.
+                existing_sequences = self.get_existing_sequences(
+                    sequences, external_sequence_ids
+                )
+
             sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
-            for seq in sequences:
+            for seq in existing_sequences:
                 sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
             for external_pid in external_pids:
