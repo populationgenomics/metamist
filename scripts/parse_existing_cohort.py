@@ -40,6 +40,7 @@ import click
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     SingleRow,
+    GroupedRow,
     run_as_sync,
 )
 
@@ -56,6 +57,7 @@ COLUMN_MAP = {
     'Sex': 'sex',
     'Reference Genome': 'reference_genome',
     'Sample/Name': 'fluid_x_tube_id',
+    'Sequence ID': 'external_sequence_id',
 }
 
 
@@ -69,6 +71,7 @@ class Columns:
     SEX = 'Sex'
     MANIFEST_FLUID_X = 'Sample/Name'
     REFERENCE_GENOME = 'Reference Genome'
+    EXTERNAL_SEQUENCE_ID = 'Sequence ID'
 
     @staticmethod
     def sequence_meta_map():
@@ -106,6 +109,7 @@ class ExistingCohortParser(GenericMetadataParser):
             search_locations=search_locations,
             sample_name_column=Columns.EXTERNAL_ID,
             participant_column=Columns.EXTERNAL_ID,
+            sequence_id_column=Columns.EXTERNAL_SEQUENCE_ID,
             reported_gender_column=Columns.SEX,
             sample_meta_map={},
             qc_meta_map={},
@@ -135,6 +139,10 @@ class ExistingCohortParser(GenericMetadataParser):
             for filename, path in self.filename_map.items()
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
         ]
+
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from row"""
+        return {'kccg_id': row[0].get(self.sequence_id_column)}
 
 
 @click.command(help='GCS path to manifest file')
