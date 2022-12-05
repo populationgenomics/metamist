@@ -223,7 +223,9 @@ def get_existing_external_sequence_ids(participant_map):
     return external_sequence_ids
 
 
-def get_existing_sequences(sequences: list[str], external_sequence_ids: list[str]):
+def get_existing_sequences(
+    sequences: list[dict[str, Any]], external_sequence_ids: list[str]
+):
     """Accounts for external_sequence_ids when determining which sequences
     need to be updated vs inserted"""
 
