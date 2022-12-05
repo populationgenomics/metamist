@@ -229,7 +229,7 @@ def get_existing_sequences(
     """Accounts for external_sequence_ids when determining which sequences
     need to be updated vs inserted"""
 
-    existing_sequences: list[str] = []
+    existing_sequences: list[dict[str, Any]] = []
     for seq in sequences:
         if not seq['external_ids'].values():
             # No existing sequence ID, we can assume that replacement should happen
