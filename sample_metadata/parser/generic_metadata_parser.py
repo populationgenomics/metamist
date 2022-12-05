@@ -188,7 +188,8 @@ class GenericMetadataParser(GenericParser):
         return SequenceStatus(self.default_sequence_status)
 
     def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
-        """Get external sequence ID from row. Needs to be implemented per parser."""
+        """Get external sequence ID from row. Needs to be implemented per parser.
+        NOTE: To be re-thought after sequence group changes are applied"""
         return None
 
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
