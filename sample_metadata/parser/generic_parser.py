@@ -223,6 +223,27 @@ def get_existing_external_sequence_ids(participant_map):
     return external_sequence_ids
 
 
+def get_existing_sequences(sequences: list[str], external_sequence_ids: list[str]):
+    """Accounts for external_sequence_ids when determining which sequences
+    need to be updated vs inserted"""
+
+    existing_sequences: list[str] = []
+    for seq in sequences:
+        if not seq['external_ids'].values():
+            # No existing sequence ID, we can assume that replacement should happen
+            # Note: This means that you can't have a mix of sequences with and without
+            # external sequence IDs in one dataset.
+            existing_sequences.append(seq)
+
+        else:
+            for ext_id in seq['external_ids'].values():
+                # If the external ID is already there, we want to upsert.
+                if ext_id in external_sequence_ids:
+                    existing_sequences.append(seq)
+
+    return existing_sequences
+
+
 class GenericParser(
     CloudHelper
 ):  # pylint: disable=too-many-public-methods,too-many-arguments
@@ -300,7 +321,7 @@ class GenericParser(
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
 
-    @abstractmethod
+    # @abstractmethod
     def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from row"""
 
@@ -768,18 +789,10 @@ class GenericParser(
                     list(external_to_internal_sample_id_map.values()),
                 )
 
-                for seq in sequences:
-                    if not seq['external_ids'].values():
-                        # No existing sequence ID, we can assume that replacement should happen
-                        # Note: This means that you can't have a mix of sequences with and without
-                        # external sequence IDs in one dataset.
-                        existing_sequences.append(seq)
-
-                    else:
-                        for ext_id in seq['external_ids'].values():
-                            # If the external ID is already there, we want to upsert.
-                            if ext_id in external_sequence_ids:
-                                existing_sequences.append(seq)
+                # Accounts for multiple valid sequences per sample.
+                existing_sequences = get_existing_sequences(
+                    sequences, external_sequence_ids
+                )
 
             sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
             for seq in existing_sequences:
