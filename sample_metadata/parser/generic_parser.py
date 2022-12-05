@@ -326,6 +326,7 @@ class GenericParser(
     # @abstractmethod
     def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from row"""
+        return None
 
     @abstractmethod
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
@@ -471,8 +472,11 @@ class GenericParser(
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
-                    'external_ids': self.get_sequence_id(seq.rows),
                 }
+
+                if self.get_sequence_id(seq.rows):
+                    seq_args['external_ids'] = self.get_sequence_id(seq.rows)
+
                 if sequence_id:
                     seq_args['id'] = sequence_id
 
