@@ -212,40 +212,6 @@ def run_as_sync(f):
     return wrapper
 
 
-def get_existing_external_sequence_ids(participant_map):
-    """Pulls external sequence IDs from participant map"""
-    external_sequence_ids: list[str] = []
-    for participant in participant_map:
-        for sample in participant_map[participant]:
-            for sequence in participant_map[participant][sample]:
-                external_sequence_ids.append((sequence.get('Sequence ID')))
-
-    return external_sequence_ids
-
-
-def get_existing_sequences(
-    sequences: list[dict[str, Any]], external_sequence_ids: list[str]
-):
-    """Accounts for external_sequence_ids when determining which sequences
-    need to be updated vs inserted"""
-
-    existing_sequences: list[dict[str, Any]] = []
-    for seq in sequences:
-        if not seq['external_ids'].values():
-            # No existing sequence ID, we can assume that replacement should happen
-            # Note: This means that you can't have a mix of sequences with and without
-            # external sequence IDs in one dataset.
-            existing_sequences.append(seq)
-
-        else:
-            for ext_id in seq['external_ids'].values():
-                # If the external ID is already there, we want to upsert.
-                if ext_id in external_sequence_ids:
-                    existing_sequences.append(seq)
-
-    return existing_sequences
-
-
 class GenericParser(
     CloudHelper
 ):  # pylint: disable=too-many-public-methods,too-many-arguments
@@ -421,6 +387,42 @@ class GenericParser(
     def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
+
+    @staticmethod
+    def get_existing_external_sequence_ids(
+        participant_map: Dict[str, Dict[Any, List[Any]]]
+    ):
+        """Pulls external sequence IDs from participant map"""
+        external_sequence_ids: list[str] = []
+        for participant in participant_map:
+            for sample in participant_map[participant]:
+                for sequence in participant_map[participant][sample]:
+                    external_sequence_ids.append((sequence.get('Sequence ID')))
+
+        return external_sequence_ids
+
+    @staticmethod
+    def get_existing_sequences(
+        sequences: list[dict[str, Any]], external_sequence_ids: list[str]
+    ):
+        """Accounts for external_sequence_ids when determining which sequences
+        need to be updated vs inserted"""
+
+        existing_sequences: list[dict[str, Any]] = []
+        for seq in sequences:
+            if not seq['external_ids'].values():
+                # No existing sequence ID, we can assume that replacement should happen
+                # Note: This means that you can't have a mix of sequences with and without
+                # external sequence IDs in one dataset.
+                existing_sequences.append(seq)
+
+            else:
+                for ext_id in seq['external_ids'].values():
+                    # If the external ID is already there, we want to upsert.
+                    if ext_id in external_sequence_ids:
+                        existing_sequences.append(seq)
+
+        return existing_sequences
 
     async def process_sample_group(
         self,
@@ -780,7 +782,9 @@ class GenericParser(
                 set(k for s in participant_map.values() for k in s.keys())
             )
 
-            external_sequence_ids = get_existing_external_sequence_ids(participant_map)
+            external_sequence_ids = self.get_existing_external_sequence_ids(
+                participant_map
+            )
 
             external_to_internal_sample_id_map = (
                 await self.sapi.get_sample_id_map_by_external_async(
@@ -796,7 +800,7 @@ class GenericParser(
                 )
 
                 # Accounts for multiple valid sequences per sample.
-                existing_sequences = get_existing_sequences(
+                existing_sequences = self.get_existing_sequences(
                     sequences, external_sequence_ids
                 )
 
