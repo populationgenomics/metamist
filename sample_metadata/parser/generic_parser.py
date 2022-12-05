@@ -785,7 +785,7 @@ class GenericParser(
             )
 
             sequences = []
-            existing_sequences: list[str] = []
+            existing_sequences: list[dict[str, Any]] = []
             if external_to_internal_sample_id_map:
                 sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                     list(external_to_internal_sample_id_map.values()),
