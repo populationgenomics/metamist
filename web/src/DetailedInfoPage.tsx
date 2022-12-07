@@ -381,14 +381,15 @@ export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
                     if (Object.keys(seqInfo.external_ids!).length) {
                         return (
                             <>
-                                <b>External Ids:</b>{" "}
-                                {Object.entries(seqInfo!.external_ids!)
-                                    .map(([k1, v1]) => (
-                                        <React.Fragment
-                                            key={`${v1} (${k1})`}
-                                        >{`${v1} (${k1})`}</React.Fragment>
-                                    ))
-                                    .join()}
+                                <b>external_ids:</b>{" "}
+                                {Object.entries(seqInfo!.external_ids!).map(
+                                    ([k1, v1], i) => (
+                                        <React.Fragment key={`${v1} (${k1})`}>
+                                            {i > 0 && ", "}
+                                            {`${v1} (${k1})`}
+                                        </React.Fragment>
+                                    )
+                                )}
                             </>
                         );
                     }
