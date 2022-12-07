@@ -319,15 +319,13 @@ export const ProjectSummary = () => {
 
     const batchTable = () => {
         if (
-            !summary?.cram_seqr_stats ||
-            _.isEmpty(summary.cram_seqr_stats) ||
-            !summary?.batch_sequence_stats ||
-            _.isEmpty(summary.batch_sequence_stats)
+            !Object.keys(summary?.cram_seqr_stats ?? {}).length ||
+            !Object.keys(summary?.batch_sequence_stats ?? {}).length
         ) {
             return <></>;
         }
 
-        const seqTypes = Object.keys(summary?.cram_seqr_stats);
+        const seqTypes = Object.keys(summary!.cram_seqr_stats);
         return (
             <Table celled compact>
                 <Table.Header>
@@ -345,7 +343,7 @@ export const ProjectSummary = () => {
                 </Table.Header>
 
                 <Table.Body>
-                    {Object.entries(summary?.batch_sequence_stats)
+                    {Object.entries(summary!.batch_sequence_stats)
                         .sort((a, b) => {
                             if (a[0] === b[0]) {
                                 return 0;
@@ -403,9 +401,7 @@ export const ProjectSummary = () => {
     );
 
     const seqStats = () => {
-        if (!summary?.cram_seqr_stats || _.isEmpty(summary?.cram_seqr_stats)) {
-            return <></>;
-        }
+        if (!Object.keys(summary?.cram_seqr_stats ?? {}).length) return <></>;
         return (
             <Table celled>
                 <Table.Header>
@@ -417,7 +413,7 @@ export const ProjectSummary = () => {
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                    {Object.entries(summary?.cram_seqr_stats).map(
+                    {Object.entries(summary!.cram_seqr_stats).map(
                         ([key, value]) => (
                             <React.Fragment key={`${key}-${projectName}`}>
                                 <Table.Row>
@@ -458,13 +454,12 @@ export const ProjectSummary = () => {
     };
 
     const seqrLinks = () => {
-        if (!summary?.seqr_links || _.isEmpty(summary?.seqr_links)) {
-            return <></>;
-        }
+        if (!Object.keys(summary?.seqr_links ?? {}).length) return <></>;
+
         return (
             <>
                 <h4> Seqr Links</h4>
-                {Object.entries(summary.seqr_links).map(([key, value]) => (
+                {Object.entries(summary!.seqr_links).map(([key, value]) => (
                     <a
                         href={value}
                         className="ui button"
