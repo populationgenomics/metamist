@@ -75,7 +75,9 @@ async def load_samples_for_ids(sample_ids: list[int], connection) -> list['Sampl
     DataLoader: get_samples_for_ids
     """
     samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
-    return samples
+    # in case it's not ordered
+    s_by_id = {s.id: s for s in samples}
+    return [s_by_id.get(s) for s in sample_ids]
 
 
 @connected_data_loader
@@ -89,7 +91,8 @@ async def load_participants_for_ids(
     persons = await player.get_participants_by_ids(
         [p for p in participant_ids if p is not None]
     )
-    return persons
+    p_by_id = {p.id: p for p in persons}
+    return [p_by_id.get(p) for p in participant_ids]
 
 
 @connected_data_loader
@@ -108,7 +111,9 @@ async def load_samples_for_analysis_ids(
 @connected_data_loader
 async def load_projects_for_ids(project_ids: list[int], connection) -> list['Project']:
     pttable = ProjectPermissionsTable(connection.connection)
-    return await pttable.get_projects_by_ids(project_ids)
+    projects = await pttable.get_projects_by_ids(project_ids)
+    p_by_id = {p.id: p for p in projects}
+    return [p_by_id.get(p) for p in project_ids]
 
 
 @connected_data_loader
@@ -263,9 +268,9 @@ class GraphQLProject:
 
         return participants
 
-    @strawberry.field()
-    async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
-        return []
+    # @strawberry.field()
+    # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
+    #     return []
 
 
 @strawberry.type
