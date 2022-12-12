@@ -6,6 +6,7 @@ import { DetailedInfoPage } from "./DetailedInfoPage";
 import { Routes as Switch, Route } from "react-router-dom";
 import { ProjectSummary } from "./project/ProjectSummary";
 import ProjectsAdmin from "./admin/ProjectsAdmin";
+import { GraphQL } from "./graphQL";
 
 export const Routes = () => {
     return (
@@ -50,6 +51,7 @@ export const Routes = () => {
                     path="project/:projectName/participant/:participantName"
                     element={<DetailedInfoPage />}
                 />
+                <Route path="graphqltest" element={<GraphQL />} />
             </Switch>
         </>
     );
