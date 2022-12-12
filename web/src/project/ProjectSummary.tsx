@@ -10,8 +10,20 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
 import { SampleLink } from "../Links";
+import MuckTheDuck from "../MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
+
+const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
+
+const REPORT_TYPES = {
+    "WGS Cram": "/qc/cram/multiqc.html",
+    "WGS GVCF": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC": "qc/fastqc/multiqc.html",
+    "Exome Cram": "exome/qc/cram/multiqc.html",
+    "Exome GVCF": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC": "exome/qc/fastqc/multiqc.html",
+};
 
 const sanitiseValue = (value: any) => {
     const tvalue = typeof value;
@@ -63,7 +75,10 @@ export const ProjectSummary = () => {
 
     const getProjectSummary = React.useCallback(
         async (token: any) => {
-            if (!projectName) return;
+            if (!projectName) {
+                setSummary(undefined);
+                return;
+            }
             let sanitisedToken = !!token ? token : undefined;
             setError(undefined);
             setIsLoading(true);
@@ -159,7 +174,11 @@ export const ProjectSummary = () => {
         if (summary.participants.length === 0) {
             return (
                 <p>
-                    <em>No samples</em>
+                    <em>Ah Muck, there aren't any samples in this project</em>
+                    <MuckTheDuck
+                        height={28}
+                        style={{ transform: "scaleY(-1)" }}
+                    />
                 </p>
             );
         }
@@ -300,15 +319,13 @@ export const ProjectSummary = () => {
 
     const batchTable = () => {
         if (
-            !summary?.cram_seqr_stats ||
-            _.isEmpty(summary.cram_seqr_stats) ||
-            !summary?.batch_sequence_stats ||
-            _.isEmpty(summary.batch_sequence_stats)
+            !Object.keys(summary?.cram_seqr_stats ?? {}).length ||
+            !Object.keys(summary?.batch_sequence_stats ?? {}).length
         ) {
             return <></>;
         }
 
-        const seqTypes = Object.keys(summary?.cram_seqr_stats);
+        const seqTypes = Object.keys(summary!.cram_seqr_stats);
         return (
             <Table celled compact>
                 <Table.Header>
@@ -326,8 +343,26 @@ export const ProjectSummary = () => {
                 </Table.Header>
 
                 <Table.Body>
-                    {Object.entries(summary?.batch_sequence_stats).map(
-                        ([key, value]) => (
+                    {Object.entries(summary!.batch_sequence_stats)
+                        .sort((a, b) => {
+                            if (a[0] === b[0]) {
+                                return 0;
+                            }
+                            if (a[0] === "no-batch") {
+                                return 1;
+                            }
+                            if (b[0] === "no-batch") {
+                                return -1;
+                            }
+                            //@ts-ignore
+                            const difference = a[0] - b[0];
+                            if (isNaN(difference)) {
+                                // something couldn't be coerced to a number, so compare them directly
+                                return a[0] > b[0] ? 1 : -1;
+                            }
+                            return difference;
+                        })
+                        .map(([key, value]) => (
                             <Table.Row key={`body-${key}-${projectName}`}>
                                 <Table.Cell>{titleCase(key)}</Table.Cell>
                                 {seqTypes.map((seq) => (
@@ -342,8 +377,7 @@ export const ProjectSummary = () => {
                                     )}
                                 </Table.Cell>
                             </Table.Row>
-                        )
-                    )}
+                        ))}
                 </Table.Body>
             </Table>
         );
@@ -367,9 +401,7 @@ export const ProjectSummary = () => {
     );
 
     const seqStats = () => {
-        if (!summary?.cram_seqr_stats || _.isEmpty(summary?.cram_seqr_stats)) {
-            return <></>;
-        }
+        if (!Object.keys(summary?.cram_seqr_stats ?? {}).length) return <></>;
         return (
             <Table celled>
                 <Table.Header>
@@ -381,7 +413,7 @@ export const ProjectSummary = () => {
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                    {Object.entries(summary?.cram_seqr_stats).map(
+                    {Object.entries(summary!.cram_seqr_stats).map(
                         ([key, value]) => (
                             <React.Fragment key={`${key}-${projectName}`}>
                                 <Table.Row>
@@ -402,6 +434,46 @@ export const ProjectSummary = () => {
         );
     };
 
+    const multiQCReports = () => {
+        return (
+            <>
+                <h4> MultiQC Links</h4>
+                {Object.entries(REPORT_TYPES).map(([key, value]) => (
+                    <a
+                        href={`${REPORT_PREFIX}${projectName}${value}`}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {key}
+                    </a>
+                ))}
+            </>
+        );
+    };
+
+    const seqrLinks = () => {
+        if (!Object.keys(summary?.seqr_links ?? {}).length) return <></>;
+
+        return (
+            <>
+                <h4> Seqr Links</h4>
+                {Object.entries(summary!.seqr_links).map(([key, value]) => (
+                    <a
+                        href={value}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {titleCase(key)}
+                    </a>
+                ))}
+            </>
+        );
+    };
+
     return (
         <>
             <br />
@@ -412,31 +484,38 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {totalsStats}
-            {seqStats()}
-            {batchTable()}
-            <hr />
-            {projectName && (
-                <div
-                    style={{
-                        marginBottom: "10px",
-                        justifyContent: "flex-end",
-                        display: "flex",
-                        flexDirection: "row",
-                    }}
-                >
-                    <Dropdown
-                        selection
-                        onChange={setPageLimit}
-                        value={pageLimit}
-                        options={PAGE_SIZES.map((s) => ({
-                            key: s,
-                            text: `${s} samples`,
-                            value: s,
-                        }))}
-                    />
-                    {pageOptions}
-                </div>
+            {projectName && summary?.participants.length !== 0 && (
+                <>
+                    {totalsStats}
+                    {seqStats()}
+                    {batchTable()}
+                    <hr />
+                    {multiQCReports()}
+                    <br />
+                    <br />
+                    {seqrLinks()}
+                    <hr />
+                    <div
+                        style={{
+                            marginBottom: "10px",
+                            justifyContent: "flex-end",
+                            display: "flex",
+                            flexDirection: "row",
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
+                        />
+                        {pageOptions}
+                    </div>
+                </>
             )}
             {renderGrid()}
             {pageOptions}

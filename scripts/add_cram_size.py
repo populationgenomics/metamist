@@ -6,11 +6,12 @@ and updates the meta['size'] attribute on the analysis.
 import logging
 import os
 import asyncio
-from itertools import groupby
 from typing import Dict, List
 
 from google.cloud import storage
 from google.api_core.exceptions import NotFound
+
+from api.utils import group_by
 
 from sample_metadata.apis import AnalysisApi, ProjectApi
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
@@ -70,9 +71,9 @@ async def process_project(project: str):
         return
 
     base_paths = set(os.path.dirname(a) for a in analysis_by_file)
-    base_paths_by_bucket: Dict[str, List[str]] = {
-        k: list(v) for k, v in groupby(base_paths, get_bucket_name_from_path)
-    }
+    base_paths_by_bucket: Dict[str, List[str]] = group_by(
+        base_paths, get_bucket_name_from_path
+    )
 
     # the next few lines are equiv to `bucket.get_blob(path)`
     # but without requiring storage.objects.get permission

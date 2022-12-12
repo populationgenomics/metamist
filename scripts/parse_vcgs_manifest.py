@@ -128,7 +128,7 @@ class VcgsManifestParser(GenericMetadataParser):
                 f'Multiple library types for same sample {sample_id}, '
                 f'maybe there are multiples types of sequencing in the same '
                 f'manifest? If so, please raise an issue with mfranklin to '
-                f'change the groupby to include {Columns.LIBRARY_STRATEGY}.'
+                f'change the group_by to include {Columns.LIBRARY_STRATEGY}.'
             )
 
         type_ = types[0].lower()
