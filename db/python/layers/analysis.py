@@ -91,7 +91,6 @@ class AnalysisLayer(BaseLayer):
         check_project_ids=True,
     ):
         """Get the latest complete analysis for samples (one per sample)"""
-
         if check_project_ids:
             project_ids = await SampleTable(
                 self.connection
