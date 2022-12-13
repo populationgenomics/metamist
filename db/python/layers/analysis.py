@@ -35,24 +35,25 @@ class AnalysisLayer(BaseLayer):
             project_ids=project_ids, active_only=active_only
         )
 
-    async def get_analysis_for_sample(
+    async def get_analyses_for_samples(
         self,
-        sample_id: int,
+        sample_ids: list[int],
         analysis_type: AnalysisType | None,
         status: AnalysisStatus | None,
-        map_sample_ids: bool,
         check_project_id=True,
-    ):
+    ) -> list[Analysis]:
         """
         Get a list of all analysis that relevant for samples
 
         """
-        projects, analysis = await self.at.get_analysis_for_sample(
-            sample_id,
+        projects, analysis = await self.at.get_analyses_for_samples(
+            sample_ids,
             analysis_type=analysis_type,
             status=status,
-            map_sample_ids=map_sample_ids,
         )
+
+        if len(analysis) == 0:
+            return []
 
         if check_project_id:
             await self.ptable.check_access_to_project_ids(
@@ -90,7 +91,6 @@ class AnalysisLayer(BaseLayer):
         check_project_ids=True,
     ):
         """Get the latest complete analysis for samples (one per sample)"""
-
         if check_project_ids:
             project_ids = await SampleTable(
                 self.connection
