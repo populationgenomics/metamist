@@ -11,6 +11,8 @@ class AnalysisType(Enum):
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
     SV = 'sv'
+    WEB_REPORT = 'web'
+    ANALYSIS_RUNNER = 'analysis-runner'
 
 
 class AnalysisStatus(Enum):

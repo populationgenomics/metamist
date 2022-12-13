@@ -465,8 +465,7 @@ ORDER BY a.timestamp_completed DESC;
         """
         values: dict[str, Any] = {}
         wheres = [
-            "status = 'unknown'",
-            "json_extract(meta, '$.source') = 'analysis-runner'",
+            "type = 'analysis-runner'",
             'active',
         ]
         if project_ids:
