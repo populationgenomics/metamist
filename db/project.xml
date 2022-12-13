@@ -389,6 +389,30 @@
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-10-25_sequence-external-ids-correction">
 		<sql>ALTER TABLE sample_sequencing_eid ADD SYSTEM VERSIONING;</sql>
+
+	</changeSet>
+	<changeSet author="michael.franklin" id="2022-12-01_sequence-external-ids-pk-correction">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<dropUniqueConstraint
+			tableName="sample_sequencing_eid"
+			constraintName="external_id"
+		/>
+<!--		This was incorrect named, so delete and create on correct table -->
+		<dropUniqueConstraint
+			tableName="participant"
+			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
+		/>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="sample_sequencing_eid"
+			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
+			validate="true"
+		/>
+	</changeSet>
+	<changeSet author="michael.franklin" id="2022-12-12_more-analysis-types">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv', 'web', 'analysis-runner');</sql>
+		<sql>UPDATE analysis SET type = 'analysis-runner' WHERE type='custom' AND json_extract(meta, '$.source') = 'analysis-runner';</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-11-23_sequencing-technology">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>

@@ -89,6 +89,7 @@ class GenericMetadataParser(GenericParser):
         project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
+        sequence_id_column: Optional[str] = None,
         reported_sex_column: Optional[str] = None,
         reported_gender_column: Optional[str] = None,
         karyotype_column: Optional[str] = None,
@@ -126,6 +127,7 @@ class GenericMetadataParser(GenericParser):
 
         self.sample_name_column = sample_name_column
         self.participant_column = participant_column
+        self.sequence_id_column = sequence_id_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -207,6 +209,11 @@ class GenericMetadataParser(GenericParser):
     def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
+
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from row. Needs to be implemented per parser.
+        NOTE: To be re-thought after sequence group changes are applied"""
+        return None
 
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""

@@ -58,7 +58,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
                 fluid
                 onChange={handleOnClick}
                 placeholder="Select a project"
-                value={projectName}
+                value={projectName ?? ""}
                 options={projects.map((p) => ({ key: p, text: p, value: p }))}
             />
         </div>

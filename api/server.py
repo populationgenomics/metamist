@@ -19,7 +19,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.2.1'
+_VERSION = '5.3.0'
 
 logger = get_logger()
 
@@ -29,6 +29,11 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
+
+if os.getenv('SM_PROFILE_REQUESTS', 'false').upper() in ('1', 'y', 't', 'true'):
+    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+
+    app.add_middleware(PyInstrumentProfilerMiddleware)
 
 if is_full_access():
     app.add_middleware(

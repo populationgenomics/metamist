@@ -40,6 +40,7 @@ import click
 from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     SingleRow,
+    GroupedRow,
     run_as_sync,
 )
 
@@ -56,6 +57,7 @@ COLUMN_MAP = {
     'Sex': 'sex',
     'Reference Genome': 'reference_genome',
     'Sample/Name': 'fluid_x_tube_id',
+    'Participant ID': 'participant_id',
 }
 
 
@@ -69,6 +71,7 @@ class Columns:
     SEX = 'Sex'
     MANIFEST_FLUID_X = 'Sample/Name'
     REFERENCE_GENOME = 'Reference Genome'
+    PARTICIPANT_COLUMN = 'Participant ID'
 
     @staticmethod
     def sequence_meta_map():
@@ -99,13 +102,19 @@ class ExistingCohortParser(GenericMetadataParser):
         project,
         search_locations,
         batch_number,
+        include_participant_column,
     ):
+
+        if include_participant_column:
+            participant_column = Columns.PARTICIPANT_COLUMN
+        else:
+            participant_column = Columns.EXTERNAL_ID
 
         super().__init__(
             project=project,
             search_locations=search_locations,
             sample_name_column=Columns.EXTERNAL_ID,
-            participant_column=Columns.EXTERNAL_ID,
+            participant_column=participant_column,
             reported_gender_column=Columns.SEX,
             sample_meta_map={},
             qc_meta_map={},
@@ -136,6 +145,18 @@ class ExistingCohortParser(GenericMetadataParser):
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
         ]
 
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from sequence file name"""
+        for filename, _path in self.filename_map.items():
+            if (
+                fastq_file_name_to_sample_id(filename)
+                == row[0][Columns.MANIFEST_FLUID_X]
+            ):
+                split_filename = filename.split('_')[0:4]
+                external_sequence_id = '_'.join(split_filename)
+
+        return {'kccg_id': external_sequence_id}
+
 
 @click.command(help='GCS path to manifest file')
 @click.option(
@@ -148,6 +169,9 @@ class ExistingCohortParser(GenericMetadataParser):
 )
 @click.option('--batch-number', 'batch_number')
 @click.option('--dry-run', 'dry_run', is_flag=True)
+@click.option(
+    '--include-participant-column', 'include_participant_column', is_flag=True
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -157,6 +181,7 @@ async def main(
     batch_number: Optional[str],
     confirm=True,
     dry_run=False,
+    include_participant_column=False,
 ):
     """Run script from CLI arguments"""
 
@@ -164,6 +189,7 @@ async def main(
         project=project,
         search_locations=search_locations,
         batch_number=batch_number,
+        include_participant_column=include_participant_column,
     )
 
     for manifest_path in manifests:

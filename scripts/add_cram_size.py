@@ -3,6 +3,7 @@
 This script goes through all CRAMS in sample-metadata, gets the size,
 and updates the meta['size'] attribute on the analysis.
 """
+import re
 import logging
 import os
 import asyncio
@@ -26,6 +27,8 @@ logger.setLevel(logging.DEBUG)
 client = storage.Client()
 aapi = AnalysisApi()
 
+difficult_object_regex = re.compile(r"'cram'\: GSPath\('([A-z0-9\-\/\.\:]+)'\)")
+
 
 def get_bucket_name_from_path(path):
     """
@@ -33,16 +36,32 @@ def get_bucket_name_from_path(path):
     'my-bucket'
     """
 
-    if not path.startswith('gs://'):
-        raise ValueError(f'path does not start with gs://: {path}')
+    path = parse_cram_path_from_output(path)
 
     return path[len('gs://') :].split('/', maxsplit=1)[0]
+
+
+def parse_cram_path_from_output(output):
+    """
+    A few different cases, handle the regular case, or when
+    a dictionary is written to the output field.
+    """
+    if output.startswith('{'):
+        m = difficult_object_regex.findall(output)
+        if len(m) != 1:
+            return None
+        output = m[0]
+
+    if not output.startswith('gs://'):
+        raise ValueError(f'path does not start with gs://: {output}')
+
+    return output
 
 
 async def process_all_projects():
     """Process all projects"""
 
-    projects = await ProjectApi().get_my_projects_async()
+    projects = await ProjectApi().get_seqr_projects_async()
     for pobj in projects:
         pname = pobj['name']
         if pname.endswith('test'):
@@ -61,7 +80,11 @@ async def process_project(project: str):
         )
     )
 
-    analysis_by_file = {a['output']: a for a in analysis if not a['meta'].get('size')}
+    analysis_by_file = {
+        parse_cram_path_from_output(a['output']): a
+        for a in analysis
+        if not a['meta'].get('size')
+    }
     logger.info(
         f'{project} :: Found {len(analysis_by_file)}/{len(analysis)} actionable files'
     )
@@ -80,6 +103,12 @@ async def process_project(project: str):
     updaters: Dict[int, AnalysisUpdateModel] = {}
     missing_files: List[str] = []
     for bucket_name, bps in base_paths_by_bucket.items():
+        if bucket_name is None:
+            print(
+                f'A bunch of base paths could not be found because of invalid entries: {bps}'
+            )
+            continue
+
         file_size_by_name = {}
         try:
             bucket = client.get_bucket(bucket_name)
