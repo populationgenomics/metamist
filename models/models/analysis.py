@@ -19,6 +19,7 @@ class AnalysisInternal(SMBase):
     type: str
     status: AnalysisStatus
     output: str = None
+    outputs: dict[str, Any] = None
     sequencing_group_ids: list[int] = []
     timestamp_completed: str | None = None
     project: int | None = None

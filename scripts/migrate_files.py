@@ -26,11 +26,9 @@ async def migrate_analysis():
     rows = await connection.fetch_all(get_query)
     mapped_files = defaultdict(list)
     for r in rows:
-        \mapped_files[r['output']].append(r['id'])
+        mapped_files[r['output']].append(r['id'])
 
-    inserted_files = insert_files(list(mapped_files.keys()))
-
-    for f in inserted_files:
-        File(path=)
-
-
+    # inserted_files = insert_files(list(mapped_files.keys()))
+    #
+    # for f in inserted_files:
+    #     File(path=)

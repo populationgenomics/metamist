@@ -1,9 +1,10 @@
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
+
 class FileType(Enum):
+    """Type of File that we record"""
     FILE = 'file'
     DIRECTORY = 'directory'
 
@@ -17,3 +18,4 @@ class File(BaseModel):
     # in bytes
     size: int
     checksum: str | None
+    exists: bool

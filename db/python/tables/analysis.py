@@ -28,6 +28,7 @@ class AnalysisFilter(GenericFilterModel):
     status: GenericFilter[AnalysisStatus] = None
     meta: GenericMetaFilter = None
     output: GenericFilter[str] = None
+    outputs: GenericMetaFilter = None
     active: GenericFilter[bool] = None
 
     def __hash__(self):  # pylint: disable=useless-parent-delegation
@@ -58,6 +59,7 @@ class AnalysisTable(DbBase):
         sequencing_group_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
         output: str = None,
+        outputs: dict[str, Any] = None,
         active: bool = True,
         author: str = None,
         project: ProjectId = None,
