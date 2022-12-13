@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
-from strawberry.fastapi import GraphQLRouter
 
 from db.python.connect import SMConnections
 from db.python.tables.project import is_full_access
@@ -16,11 +15,11 @@ from db.python.utils import get_logger
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
-from api.graphql import schema as graphql
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.2.0'
+_VERSION = '5.3.0'
 
 logger = get_logger()
 
@@ -30,6 +29,11 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
+
+if os.getenv('SM_PROFILE_REQUESTS', 'false').upper() in ('1', 'y', 't', 'true'):
+    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+
+    app.add_middleware(PyInstrumentProfilerMiddleware)
 
 if is_full_access():
     app.add_middleware(
@@ -119,10 +123,7 @@ async def exception_handler(_: Request, e: Exception):
 
 
 # graphql
-graphql_app = GraphQLRouter(
-    graphql.schema, graphiql=True, context_getter=graphql.get_context
-)
-app.include_router(graphql_app, prefix='/graphql')
+app.include_router(MetamistGraphQLRouter, prefix='/graphql')
 
 
 for route in routes.__dict__.values():

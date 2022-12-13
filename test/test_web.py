@@ -8,6 +8,7 @@ from db.python.layers.web import (
     NestedParticipant,
     NestedSample,
     NestedSequence,
+    WebProject,
 )
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -61,13 +62,19 @@ class TestWeb(DbIsolatedTest):
 
         # Expect an empty project
         expected = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
             total_samples=0,
             total_participants=0,
-            sequence_stats={},
+            total_sequences=0,
+            batch_sequence_stats={},
+            cram_seqr_stats={},
             participants=[],
             participant_keys=[],
             sample_keys=[],
             sequence_keys=[],
+            seqr_links={},
         )
 
         self.assertEqual(expected, result)
@@ -109,6 +116,7 @@ class TestWeb(DbIsolatedTest):
                                         ]
                                     ],
                                     'reads_type': 'fastq',
+                                    'batch': 'M001',
                                 },
                             },
                         ],
@@ -157,15 +165,20 @@ class TestWeb(DbIsolatedTest):
         result = await self.webl.get_project_summary(token=None)
 
         expected = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
             total_samples=1,
             total_participants=1,
-            sequence_stats={
+            total_sequences=1,
+            cram_seqr_stats={
                 'genome': {
                     'Sequences': '1',
                     'Crams': '0',
                     'Seqr': '0',
                 }
             },
+            batch_sequence_stats={'M001': {'genome': '1'}},
             participants=data_to_class(expected_data),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
@@ -173,7 +186,14 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[('type', 'type'), ('meta.reads_type', 'reads_type')],
+            sequence_keys=sorted(
+                [
+                    ('type', 'type'),
+                    ('meta.reads_type', 'reads_type'),
+                    ('meta.batch', 'batch'),
+                ]
+            ),
+            seqr_links={},
         )
 
         self.assertEqual(expected, result)

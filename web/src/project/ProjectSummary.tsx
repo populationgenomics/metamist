@@ -10,8 +10,20 @@ import { WebApi, ProjectSummaryResponse } from "../sm-api/api";
 import { Table, Button, Dropdown } from "semantic-ui-react";
 
 import { SampleLink } from "../Links";
+import MuckTheDuck from "../MuckTheDuck";
 
 const PAGE_SIZES = [20, 40, 100, 1000];
+
+const REPORT_PREFIX = "https://main-web.populationgenomics.org.au/";
+
+const REPORT_TYPES = {
+    "WGS Cram": "/qc/cram/multiqc.html",
+    "WGS GVCF": "/qc/gvcf/multiqc.html",
+    "WGS FASTQC": "qc/fastqc/multiqc.html",
+    "Exome Cram": "exome/qc/cram/multiqc.html",
+    "Exome GVCF": "exome/qc/gvcf/multiqc.html",
+    "Exome FASTQC": "exome/qc/fastqc/multiqc.html",
+};
 
 const sanitiseValue = (value: any) => {
     const tvalue = typeof value;
@@ -63,7 +75,10 @@ export const ProjectSummary = () => {
 
     const getProjectSummary = React.useCallback(
         async (token: any) => {
-            if (!projectName) return;
+            if (!projectName) {
+                setSummary(undefined);
+                return;
+            }
             let sanitisedToken = !!token ? token : undefined;
             setError(undefined);
             setIsLoading(true);
@@ -101,8 +116,6 @@ export const ProjectSummary = () => {
         pageNumber,
     ]);
 
-    let table: React.ReactElement = <></>;
-
     const totalPageNumbers = Math.ceil(
         (summary?.total_samples || 0) / pageLimit
     );
@@ -126,7 +139,7 @@ export const ProjectSummary = () => {
                     {summary?.total_samples} samples)
                 </span>
             )}
-            {summary?._links?.token && (
+            {pageNumber < totalPageNumbers && (
                 <Button
                     disabled={isLoading}
                     onClick={() => {
@@ -138,180 +151,239 @@ export const ProjectSummary = () => {
             )}
         </>
     );
-    // }
 
-    if (error) {
-        table = (
-            <p>
-                <em>An error occurred when fetching samples: {error}</em>
-            </p>
-        );
-    } else if (!summary) {
-        if (projectName) {
-            table = <p>Loading...</p>;
-        } else {
-            table = (
+    const renderGrid = () => {
+        if (error) {
+            return (
                 <p>
-                    <em>Please select a project</em>
+                    <em>An error occurred when fetching samples: {error}</em>
                 </p>
             );
         }
-    } else {
+        if (!summary) {
+            if (projectName) {
+                return <p>Loading...</p>;
+            } else {
+                return (
+                    <p>
+                        <em>Please select a project</em>
+                    </p>
+                );
+            }
+        }
         if (summary.participants.length === 0) {
-            table = (
+            return (
                 <p>
-                    <em>No samples</em>
+                    <em>Ah Muck, there aren't any samples in this project</em>
+                    <MuckTheDuck
+                        height={28}
+                        style={{ transform: "scaleY(-1)" }}
+                    />
                 </p>
             );
-        } else {
-            const headers = [
-                "Family ID",
-                ...summary.participant_keys.map((field) => field[1]),
-                ...summary.sample_keys.map((field) => field[1]),
-                ...summary.sequence_keys.map((field) => "sequence." + field[1]),
-            ];
-
-            table = (
-                <Table celled>
-                    <Table.Header>
-                        <Table.Row>
-                            {headers.map((k, i) => (
-                                <Table.HeaderCell key={`${k}-${i}`}>
-                                    {k}
-                                </Table.HeaderCell>
-                            ))}
-                        </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                        {summary.participants.map((p, pidx) =>
-                            p.samples.map((s, sidx) => {
-                                // @ts-ignore
-                                const backgroundColor =
-                                    pidx % 2 === 0
-                                        ? "white"
-                                        : "var(--bs-table-striped-bg)";
-                                const lengthOfParticipant = p.samples
-                                    .map((s) => s.sequences.length)
-                                    .reduce((a, b) => a + b, 0);
-                                return s.sequences.map((seq, seqidx) => {
-                                    const isFirstOfGroup =
-                                        sidx === 0 && seqidx === 0;
-                                    return (
-                                        <Table.Row
-                                            key={`${p.external_id}-${s.id}-${seq.id}`}
-                                        >
-                                            {isFirstOfGroup && (
-                                                <Table.Cell
-                                                    style={{ backgroundColor }}
-                                                    rowSpan={
-                                                        lengthOfParticipant
-                                                    }
-                                                >
-                                                    {p.families
-                                                        .map(
-                                                            (f) => f.external_id
-                                                        )
-                                                        .join(", ")}
-                                                </Table.Cell>
-                                            )}
-                                            {isFirstOfGroup &&
-                                                summary.participant_keys.map(
-                                                    ([k, dn]) => (
-                                                        <Table.Cell
-                                                            style={{
-                                                                backgroundColor,
-                                                            }}
-                                                            key={
-                                                                p.id +
-                                                                "participant." +
-                                                                k
-                                                            }
-                                                            rowSpan={
-                                                                lengthOfParticipant
-                                                            }
-                                                        >
-                                                            {sanitiseValue(
-                                                                _.get(p, k)
-                                                            )}
-                                                        </Table.Cell>
-                                                    )
-                                                )}
-                                            {seqidx === 0 &&
-                                                summary.sample_keys.map(
-                                                    ([k, dn]) => (
-                                                        <Table.Cell
-                                                            style={{
-                                                                backgroundColor,
-                                                            }}
-                                                            key={
-                                                                s.id +
-                                                                "sample." +
-                                                                k
-                                                            }
-                                                            rowSpan={
-                                                                s.sequences
-                                                                    .length
-                                                            }
-                                                        >
-                                                            {k ===
-                                                                "external_id" ||
-                                                            k === "id" ? (
-                                                                <SampleLink
-                                                                    id={s.id}
-                                                                    projectName={
-                                                                        projectName
-                                                                    }
-                                                                >
-                                                                    {sanitiseValue(
-                                                                        _.get(
-                                                                            s,
-                                                                            k
-                                                                        )
-                                                                    )}
-                                                                </SampleLink>
-                                                            ) : (
-                                                                sanitiseValue(
-                                                                    _.get(s, k)
-                                                                )
-                                                            )}
-                                                        </Table.Cell>
-                                                    )
-                                                )}
-                                            {seq &&
-                                                summary.sequence_keys.map(
-                                                    ([k, dn]) => (
-                                                        <Table.Cell
-                                                            style={{
-                                                                backgroundColor,
-                                                            }}
-                                                            key={
-                                                                s.id +
-                                                                "sequence." +
-                                                                k
-                                                            }
-                                                        >
-                                                            {sanitiseValue(
-                                                                _.get(seq, k)
-                                                            )}
-                                                        </Table.Cell>
-                                                    )
-                                                )}
-                                        </Table.Row>
-                                    );
-                                });
-                            })
-                        )}
-                    </Table.Body>
-                </Table>
-            );
         }
-    }
+        const headers = [
+            "Family ID",
+            ...summary.participant_keys.map((field) => field[1]),
+            ...summary.sample_keys.map((field) => field[1]),
+            ...summary.sequence_keys.map((field) => "sequence." + field[1]),
+        ];
+
+        return (
+            <Table celled>
+                <Table.Header>
+                    <Table.Row>
+                        {headers.map((k, i) => (
+                            <Table.HeaderCell key={`${k}-${i}`}>
+                                {k}
+                            </Table.HeaderCell>
+                        ))}
+                    </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                    {summary.participants.map((p, pidx) =>
+                        p.samples.map((s, sidx) => {
+                            // @ts-ignore
+                            const backgroundColor =
+                                pidx % 2 === 0
+                                    ? "white"
+                                    : "var(--bs-table-striped-bg)";
+                            const lengthOfParticipant = p.samples
+                                .map((s) => s.sequences.length)
+                                .reduce((a, b) => a + b, 0);
+                            return s.sequences.map((seq, seqidx) => {
+                                const isFirstOfGroup =
+                                    sidx === 0 && seqidx === 0;
+                                return (
+                                    <Table.Row
+                                        key={`${p.external_id}-${s.id}-${seq.id}`}
+                                    >
+                                        {isFirstOfGroup && (
+                                            <Table.Cell
+                                                style={{ backgroundColor }}
+                                                rowSpan={lengthOfParticipant}
+                                            >
+                                                {p.families
+                                                    .map((f) => f.external_id)
+                                                    .join(", ")}
+                                            </Table.Cell>
+                                        )}
+                                        {isFirstOfGroup &&
+                                            summary.participant_keys.map(
+                                                ([k, dn]) => (
+                                                    <Table.Cell
+                                                        style={{
+                                                            backgroundColor,
+                                                        }}
+                                                        key={
+                                                            p.id +
+                                                            "participant." +
+                                                            k
+                                                        }
+                                                        rowSpan={
+                                                            lengthOfParticipant
+                                                        }
+                                                    >
+                                                        {sanitiseValue(
+                                                            _.get(p, k)
+                                                        )}
+                                                    </Table.Cell>
+                                                )
+                                            )}
+                                        {seqidx === 0 &&
+                                            summary.sample_keys.map(
+                                                ([k, dn]) => (
+                                                    <Table.Cell
+                                                        style={{
+                                                            backgroundColor,
+                                                        }}
+                                                        key={
+                                                            s.id + "sample." + k
+                                                        }
+                                                        rowSpan={
+                                                            s.sequences.length
+                                                        }
+                                                    >
+                                                        {k === "external_id" ||
+                                                        k === "id" ? (
+                                                            <SampleLink
+                                                                id={s.id}
+                                                                projectName={
+                                                                    projectName
+                                                                }
+                                                            >
+                                                                {sanitiseValue(
+                                                                    _.get(s, k)
+                                                                )}
+                                                            </SampleLink>
+                                                        ) : (
+                                                            sanitiseValue(
+                                                                _.get(s, k)
+                                                            )
+                                                        )}
+                                                    </Table.Cell>
+                                                )
+                                            )}
+                                        {seq &&
+                                            summary.sequence_keys.map(
+                                                ([k, dn]) => (
+                                                    <Table.Cell
+                                                        style={{
+                                                            backgroundColor,
+                                                        }}
+                                                        key={
+                                                            s.id +
+                                                            "sequence." +
+                                                            k
+                                                        }
+                                                    >
+                                                        {sanitiseValue(
+                                                            _.get(seq, k)
+                                                        )}
+                                                    </Table.Cell>
+                                                )
+                                            )}
+                                    </Table.Row>
+                                );
+                            });
+                        })
+                    )}
+                </Table.Body>
+            </Table>
+        );
+    };
 
     const titleCase = (s: string) => {
         return s[0].toUpperCase() + s.slice(1).toLowerCase();
     };
 
-    const projectSummaryStats: React.ReactElement = (
+    const batchTable = () => {
+        if (
+            !Object.keys(summary?.cram_seqr_stats ?? {}).length ||
+            !Object.keys(summary?.batch_sequence_stats ?? {}).length
+        ) {
+            return <></>;
+        }
+
+        const seqTypes = Object.keys(summary!.cram_seqr_stats);
+        return (
+            <Table celled compact>
+                <Table.Header>
+                    <Table.Row>
+                        <Table.HeaderCell>Batch</Table.HeaderCell>
+                        {seqTypes.map((item) => (
+                            <Table.HeaderCell
+                                key={`header-${item}-${projectName}`}
+                            >
+                                {titleCase(item)}
+                            </Table.HeaderCell>
+                        ))}
+                        <Table.HeaderCell>Total</Table.HeaderCell>
+                    </Table.Row>
+                </Table.Header>
+
+                <Table.Body>
+                    {Object.entries(summary!.batch_sequence_stats)
+                        .sort((a, b) => {
+                            if (a[0] === b[0]) {
+                                return 0;
+                            }
+                            if (a[0] === "no-batch") {
+                                return 1;
+                            }
+                            if (b[0] === "no-batch") {
+                                return -1;
+                            }
+                            //@ts-ignore
+                            const difference = a[0] - b[0];
+                            if (isNaN(difference)) {
+                                // something couldn't be coerced to a number, so compare them directly
+                                return a[0] > b[0] ? 1 : -1;
+                            }
+                            return difference;
+                        })
+                        .map(([key, value]) => (
+                            <Table.Row key={`body-${key}-${projectName}`}>
+                                <Table.Cell>{titleCase(key)}</Table.Cell>
+                                {seqTypes.map((seq) => (
+                                    <Table.Cell
+                                        key={`${key}-${seq}`}
+                                    >{`${value[seq]}`}</Table.Cell>
+                                ))}
+                                <Table.Cell>
+                                    {Object.values(value).reduce(
+                                        (a, b) => +a + +b,
+                                        0
+                                    )}
+                                </Table.Cell>
+                            </Table.Row>
+                        ))}
+                </Table.Body>
+            </Table>
+        );
+    };
+
+    const totalsStats: React.ReactElement = (
         <>
             <h2>Project Summary Stats</h2>
             <b>Total Participants: </b>
@@ -321,6 +393,16 @@ export const ProjectSummary = () => {
             {"    "}
             {summary?.total_samples}
             <br />
+            <b>Total Sequences: </b>
+            {"    "}
+            {summary?.total_sequences}
+            <br />
+        </>
+    );
+
+    const seqStats = () => {
+        if (!Object.keys(summary?.cram_seqr_stats ?? {}).length) return <></>;
+        return (
             <Table celled>
                 <Table.Header>
                     <Table.Row>
@@ -330,25 +412,67 @@ export const ProjectSummary = () => {
                         <Table.HeaderCell>Seqr</Table.HeaderCell>
                     </Table.Row>
                 </Table.Header>
-
                 <Table.Body>
-                    {summary?.sequence_stats &&
-                        Object.entries(summary?.sequence_stats).map(
-                            ([key, value]) => (
-                                <Table.Row key={key}>
+                    {Object.entries(summary!.cram_seqr_stats).map(
+                        ([key, value]) => (
+                            <React.Fragment key={`${key}-${projectName}`}>
+                                <Table.Row>
                                     <Table.Cell>{titleCase(key)}</Table.Cell>
                                     {Object.entries(value).map(([k1, v1]) => (
-                                        <Table.Cell key={`${key}-${k1}`}>
+                                        <Table.Cell
+                                            key={`${key}-${k1}-${projectName}`}
+                                        >
                                             {`${v1}`}
                                         </Table.Cell>
                                     ))}
                                 </Table.Row>
-                            )
-                        )}
+                            </React.Fragment>
+                        )
+                    )}
                 </Table.Body>
             </Table>
-        </>
-    );
+        );
+    };
+
+    const multiQCReports = () => {
+        return (
+            <>
+                <h4> MultiQC Links</h4>
+                {Object.entries(REPORT_TYPES).map(([key, value]) => (
+                    <a
+                        href={`${REPORT_PREFIX}${projectName}${value}`}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {key}
+                    </a>
+                ))}
+            </>
+        );
+    };
+
+    const seqrLinks = () => {
+        if (!Object.keys(summary?.seqr_links ?? {}).length) return <></>;
+
+        return (
+            <>
+                <h4> Seqr Links</h4>
+                {Object.entries(summary!.seqr_links).map(([key, value]) => (
+                    <a
+                        href={value}
+                        className="ui button"
+                        key={key}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {titleCase(key)}
+                    </a>
+                ))}
+            </>
+        );
+    };
 
     return (
         <>
@@ -360,31 +484,40 @@ export const ProjectSummary = () => {
             />
             <br />
             <hr />
-            {summary && projectSummaryStats}
-            <hr />
-            {projectName && (
-                <div
-                    style={{
-                        marginBottom: "10px",
-                        justifyContent: "flex-end",
-                        display: "flex",
-                        flexDirection: "row",
-                    }}
-                >
-                    <Dropdown
-                        selection
-                        onChange={setPageLimit}
-                        value={pageLimit}
-                        options={PAGE_SIZES.map((s) => ({
-                            key: s,
-                            text: `${s} samples`,
-                            value: s,
-                        }))}
-                    />
-                    {pageOptions}
-                </div>
+            {projectName && summary?.participants.length !== 0 && (
+                <>
+                    {totalsStats}
+                    {seqStats()}
+                    {batchTable()}
+                    <hr />
+                    {multiQCReports()}
+                    <br />
+                    <br />
+                    {seqrLinks()}
+                    <hr />
+                    <div
+                        style={{
+                            marginBottom: "10px",
+                            justifyContent: "flex-end",
+                            display: "flex",
+                            flexDirection: "row",
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
+                        />
+                        {pageOptions}
+                    </div>
+                </>
             )}
-            {table}
+            {renderGrid()}
             {pageOptions}
         </>
     );

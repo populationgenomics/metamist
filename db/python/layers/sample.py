@@ -2,12 +2,12 @@ from typing import Dict, List, Any, Optional, Union
 
 from pydantic import BaseModel
 
+from api.utils import group_by
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
-
 from models.enums import SampleType
 from models.models.sample import (
     Sample,
@@ -58,17 +58,46 @@ class SampleLayer(BaseLayer):
 
         return sample
 
-    async def get_samples_by_analysis_id(self, analysis_id: int) -> list[Sample]:
-        project, samples = await self.st.get_samples_by_analysis_id(analysis_id)
+    async def get_samples_by_analysis_ids(
+        self, analysis_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[Sample]]:
+        """
+        Get samples by analysis_ids (map).
+        Note: It's not guaranteed that analysis has samples, so some
+        analysis_ids may NOT be present in the final map
+        """
+        projects, analysis_sample_map = await self.st.get_samples_by_analysis_ids(
+            analysis_ids
+        )
 
-        return samples
+        if not analysis_sample_map:
+            return {}
 
-    async def get_samples_by_participant(self, participant_id: int) -> list[Sample]:
-        projects, samples = await self.st.get_samples_for_participant(participant_id)
+        if check_project_ids:
+            await self.pt.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
 
-        # TODO: project check
+        return analysis_sample_map
 
-        return samples
+    async def get_samples_by_participants(
+        self, participant_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[Sample]]:
+        """Get map of samples by participants"""
+
+        projects, samples = await self.st.get_samples_for_participants(participant_ids)
+
+        if not samples:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        grouped_samples = group_by(samples, lambda s: s.participant_id)
+
+        return grouped_samples
 
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Return the projects associated with the sample ids"""
@@ -117,30 +146,37 @@ class SampleLayer(BaseLayer):
         )
 
     async def get_sample_id_map_by_internal_ids(
-        self, sample_ids: List[int], check_project_ids=True
+        self, sample_ids: List[int], check_project_ids=True, allow_missing=False
     ) -> Dict[int, str]:
         """Get map of external sample id to internal id"""
 
         sample_ids_set = set(sample_ids)
+
+        if not sample_ids_set:
+            return {}
+
         # could make a preflight request to self.st.get_project_ids_for_sample_ids
         # but this can do it one request, only one request to the database
         projects, sample_id_map = await self.st.get_sample_id_map_by_internal_ids(
             list(sample_ids_set)
         )
 
+        if not allow_missing and len(sample_id_map) != len(sample_ids):
+            # we have samples missing from the map, so we'll 404 the whole thing
+            missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
+            raise NotFoundError(
+                f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
+            )
+
+        if not sample_id_map:
+            return {}
+
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
             )
 
-        if len(sample_id_map) == len(sample_ids):
-            return sample_id_map
-
-        # we have samples missing from the map, so we'll 404 the whole thing
-        missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
-        raise NotFoundError(
-            f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
-        )
+        return sample_id_map
 
     async def get_all_sample_id_map_by_internal_ids(
         self, project: ProjectId
@@ -269,7 +305,7 @@ class SampleLayer(BaseLayer):
             author=author,
         )
 
-    async def upsert_sample(self, sample: SampleUpsert):
+    async def upsert_sample(self, sample: SampleBatchUpsert):
         """Upsert a sample"""
         if not sample.id:
             internal_id = await self.insert_sample(
@@ -284,7 +320,7 @@ class SampleLayer(BaseLayer):
 
         # Otherwise update
         internal_id = await self.update_sample(
-            id_=sample.id,
+            id_=sample.id,  # type: ignore
             meta=sample.meta,
             participant_id=sample.participant_id,
             type_=sample.type,

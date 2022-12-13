@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import List, Dict, Tuple, Any, Optional
 
 from db.python.connect import DbBase, NotFoundError
@@ -23,7 +24,7 @@ class ParticipantTable(DbBase):
     async def get_participants_by_ids(
         self, ids: list[int]
     ) -> tuple[set[ProjectId], list[Participant]]:
-        """Get related participants from a set of ids"""
+        """Get participants by IDs"""
         _query = 'SELECT project, id, external_id, reported_sex, reported_gender, karyotype, meta FROM participant WHERE id in :ids'
         rows = await self.connection.fetch_all(_query, {'ids': ids})
 
@@ -211,6 +212,27 @@ RETURNING id
                 )
 
         return id_map
+
+    async def get_participants_by_families(
+        self, family_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[Participant]]]:
+        """Get list of participants keyed by families, duplicates results"""
+        _query = f"""
+            SELECT project, fp.family_id, p.id, p.external_id, p.reported_sex, p.reported_gender, p.karyotype, p.meta
+            FROM participant p
+            INNER JOIN family_participant fp ON fp.participant_id = p.id
+            WHERE fp.family_id IN :fids
+        """
+        rows = await self.connection.fetch_all(_query, {'fids': family_ids})
+        retmap = defaultdict(list)
+        projects: set[ProjectId] = set()
+        for row in rows:
+            drow = dict(row)
+            projects.add(row['project'])
+            fid = drow.pop('family_id')
+            retmap[fid].append(Participant(**drow))
+
+        return projects, retmap
 
     async def update_many_participant_external_ids(
         self, internal_to_external_id: Dict[int, str]

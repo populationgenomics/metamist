@@ -5,7 +5,7 @@ import re
 import shlex
 from functools import reduce
 from io import StringIO
-from itertools import groupby
+from api.utils import group_by
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
@@ -88,6 +88,7 @@ class GenericMetadataParser(GenericParser):
         project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
+        sequence_id_column: Optional[str] = None,
         reported_sex_column: Optional[str] = None,
         reported_gender_column: Optional[str] = None,
         karyotype_column: Optional[str] = None,
@@ -123,6 +124,7 @@ class GenericMetadataParser(GenericParser):
 
         self.sample_name_column = sample_name_column
         self.participant_column = participant_column
+        self.sequence_id_column = sequence_id_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -184,6 +186,11 @@ class GenericMetadataParser(GenericParser):
     def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
+
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from row. Needs to be implemented per parser.
+        NOTE: To be re-thought after sequence group changes are applied"""
+        return None
 
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
         """Get external participant ID from row"""
@@ -508,7 +515,7 @@ class GenericMetadataParser(GenericParser):
     async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
         """Return list of grouped by sample metadata from the rows"""
         sample_metadata = []
-        for sid, row_group in groupby(rows, self.get_sample_id):
+        for sid, row_group in group_by(rows, self.get_sample_id).items():
             sample_group = SampleMetaGroup(sample_id=sid, rows=row_group, meta=None)
             sample_metadata.append(await self.get_sample_meta(sample_group))
         return sample_metadata
@@ -538,10 +545,12 @@ class GenericMetadataParser(GenericParser):
         resulting list of metadata
         """
         sequence_meta = []
-        for stype, row_group in groupby(rows, self.get_sequence_type):
+        for stype, row_group in group_by(
+            rows, lambda s: str(self.get_sequence_type(s))
+        ).items():
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
-                sequence_type=stype,
+                sequence_type=SequenceType(stype),
             )
             sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta

@@ -2,11 +2,14 @@ from typing import Optional, Dict, Any
 import json
 from pydantic import BaseModel
 
+from db.python.utils import ProjectId
+
 
 class Participant(BaseModel):
     """Update participant model"""
 
     id: int
+    project: ProjectId
     external_id: str = None
     reported_sex: Optional[int] = None
     reported_gender: Optional[str] = None

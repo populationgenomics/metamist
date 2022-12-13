@@ -28,19 +28,32 @@ class PagingLinks(BaseModel):
     token: str | None
 
 
+class WebProject(BaseModel):
+    """Minimal class to hold web info"""
+
+    id: int
+    name: str
+    dataset: str
+    meta: dict
+
+
 class ProjectSummaryResponse(BaseModel):
     """Response for the project summary"""
 
+    project: WebProject
     # high level stats
     total_participants: int
     total_samples: int
-    sequence_stats: dict[str, dict[str, str]]
+    total_sequences: int
+    cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
+    batch_sequence_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
 
     # for display
     participants: list[NestedParticipant]
     participant_keys: list[list[str]]
     sample_keys: list[list[str]]
     sequence_keys: list[list[str]]
+    seqr_links: dict[str, str]
 
     links: PagingLinks | None
 
@@ -78,6 +91,7 @@ async def get_project_summary(
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
+            project=WebProject(**summary.project.__dict__),
             participants=[],
             participant_keys=[],
             sample_keys=[],
@@ -85,8 +99,10 @@ async def get_project_summary(
             _links=None,
             total_samples=0,
             total_participants=0,
-            participants_in_seqr=0,
-            sequence_stats={},
+            total_sequences=0,
+            cram_seqr_stats={},
+            batch_sequence_stats={},
+            seqr_links=summary.seqr_links,
         )
 
     participants = summary.participants
@@ -101,7 +117,9 @@ async def get_project_summary(
             sample.id = sample_id_format(sample.id)
 
     links = PagingLinks(
-        next=str(request.base_url) + request.url.path + f'?token={new_token}'
+        next=str(request.base_url)
+        + request.url.path.lstrip('/')
+        + f'?token={new_token}'
         if new_token
         else None,
         self=str(request.url),
@@ -109,14 +127,18 @@ async def get_project_summary(
     )
 
     return ProjectSummaryResponse(
+        project=WebProject(**summary.project.__dict__),
         total_samples=summary.total_samples,
         total_participants=summary.total_participants,
-        sequence_stats=summary.sequence_stats,
+        total_sequences=summary.total_sequences,
+        cram_seqr_stats=summary.cram_seqr_stats,
+        batch_sequence_stats=summary.batch_sequence_stats,
         # other stuff
         participants=participants,
         participant_keys=summary.participant_keys,
         sample_keys=summary.sample_keys,
         sequence_keys=summary.sequence_keys,
+        seqr_links=summary.seqr_links,
         _links=links,
     )
 

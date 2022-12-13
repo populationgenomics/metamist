@@ -9,7 +9,7 @@ import {
     ParticipantApi,
     SequenceApi,
     // ParticipantModel,
-    Sample,
+    // Sample,
     // SampleSequencing,
 } from "./sm-api/api";
 import { Table } from "semantic-ui-react";
@@ -27,36 +27,73 @@ interface File {
     location: string;
     basename: string;
     class: string;
-    checksum: string;
+    checksum: string | null;
     size: number;
+    secondaryFiles?: File[];
 }
 
 interface SequenceMeta {
     reads?: File | Array<File> | Array<Array<File>>;
+    [key: string]: any;
 }
 
 // temporary
 interface ParticipantModel {
-    id: number
-    external_id: string
-    reported_sex?: number
-    reported_gender?: string
-    karyotype?: string
-    meta: { [key: string]: any }
+    id: number;
+    external_id: string;
+    reported_sex?: number;
+    reported_gender?: string;
+    karyotype?: string;
+    meta: { [key: string]: any };
 }
 
 interface SampleSequencing {
-    id: number
-    external_ids?: { [name: string]: string }
-    sample_id: string
-    type: string
-    meta?: SequenceMeta
-    status: string
+    id: number;
+    external_ids?: { [name: string]: string };
+    sample_id: string;
+    type: string;
+    meta?: SequenceMeta;
+    status: string;
+}
+
+enum SampleType {
+    BLOOD = "blood",
+    SALIVA = "saliva",
+}
+
+interface Sample {
+    id: string;
+    external_id: string;
+    participant_id?: number;
+    active?: boolean;
+    meta?: { [key: string]: any };
+    type?: SampleType;
+    project?: number;
+    author?: string;
 }
 
 const sampleFieldsToDisplay = ["active", "type", "participant_id"];
 
-export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
+export class DetailedInfoPage extends React.Component<{}, { error?: Error }> {
+    constructor(props: any) {
+        super(props);
+        this.state = {};
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        // Update state so the next render will show the fallback UI.
+        return { error: error };
+    }
+
+    render() {
+        if (this.state.error) {
+            return <p>{this.state.error.toString()}</p>;
+        }
+        return <DetailedInfoPage_ />; /* eslint react/jsx-pascal-case: 0 */
+    }
+}
+
+export const DetailedInfoPage_: React.FunctionComponent<{}> = () => {
     const { projectName, sampleName } = useParams();
     const navigate = useNavigate();
     const [samples, setSamples] = React.useState();
@@ -70,7 +107,8 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     const [selectedExternalID, setSelectedExternalID] =
         React.useState<string>();
     const [idNameMap, setIdNameMap] = React.useState<[string, string][]>();
-    const [sequenceInfo, setSequenceInfo] = React.useState<SampleSequencing>();
+    const [sequenceInfo, setSequenceInfo] =
+        React.useState<SampleSequencing[]>();
 
     const getSamplesFromProject = React.useCallback(async () => {
         if (!projectName) return;
@@ -106,8 +144,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                 setSampleInfo(resp.data);
                 setSelectedExternalID(
                     participants.find(
-                        (item) =>
-                            item.id.toString() === resp.data.participant_id
+                        (item) => item.id === resp.data.participant_id
                     )?.external_id
                 );
             })
@@ -146,8 +183,7 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
         new SequenceApi()
             .getSequencesBySampleIds([sampleInfo.id.toString()])
             .then((resp) => {
-                setSequenceInfo(resp.data[0]);
-                setIsLoading(false);
+                setSequenceInfo(resp.data);
             })
             .catch((er) => {
                 setError(er.message);
@@ -193,17 +229,28 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
 
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]
-            }`;
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${
+            sizes[i]
+        }`;
     };
 
     const prepReadMetadata = (data: SequenceMeta) => {
         if (!data.reads) return <></>;
         if (!Array.isArray(data.reads))
-            return renderReadsMetadata([data.reads], 1);
-        return data.reads.map((v, i) => {
-            return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
-        });
+            return (
+                <>
+                    <b>reads:</b>
+                    {renderReadsMetadata([data.reads], 1)}
+                </>
+            );
+        return (
+            <>
+                <b>reads:</b>
+                {data.reads.map((v, i) => {
+                    return renderReadsMetadata(Array.isArray(v) ? v : [v], i);
+                })}
+            </>
+        );
     };
 
     const renderReadsMetadata = (data: File[], key: number | string) => {
@@ -212,8 +259,10 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
                 <Table.Body>
                     {data.map((item: File) => (
                         <Table.Row key={item.location}>
-                            <Table.Cell>{item.location}</Table.Cell>
-                            <Table.Cell>{formatBytes(item.size)}</Table.Cell>
+                            <Table.Cell collapsing>{item.location}</Table.Cell>
+                            <Table.Cell collapsing>
+                                {formatBytes(item.size)}
+                            </Table.Cell>
                         </Table.Row>
                     ))}
                 </Table.Body>
@@ -306,71 +355,229 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
     }, [projectName, samples, sampleName]);
 
     const safeValue = (value: any): string => {
-        if (!value) return value
+        if (!value) return value;
         if (Array.isArray(value)) {
-            debugger
-            return value.map(safeValue).join(", ")
+            return value.map(safeValue).join(", ");
         }
         if (typeof value === "number") {
-            return value.toString()
+            return value.toString();
         }
         if (typeof value === "string") {
-            return value
+            return value;
         }
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-            debugger
+        if (value && typeof value === "object" && !Array.isArray(value)) {
             if (!!value.location && !!value.size) {
-                return `${value.location} (${formatBytes(value.size)})`
+                return `${value.location} (${formatBytes(value.size)})`;
             }
-
         }
-        debugger
-        return JSON.stringify(value)
-
-    }
+        return JSON.stringify(value);
+    };
 
     const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return Object.entries(seqInfo).map(([key, value]) => {
-            if (key === "external_ids") {
-                if (Object.keys(seqInfo.external_ids!).length) {
-                    return (
-                        <>
-                            <b>External Ids:</b>{" "}
-                            {Object.entries(seqInfo!.external_ids!)
-                                .map(([k1, v1]) => (
-                                    <React.Fragment
-                                        key={`${v1} (${k1})`}
-                                    >{`${v1} (${k1})`}</React.Fragment>
-                                ))
-                                .join()}
-                        </>
-                    );
+        return Object.entries(seqInfo)
+            .filter(([key, value]) => key !== "id")
+            .map(([key, value]) => {
+                if (key === "external_ids") {
+                    if (Object.keys(seqInfo.external_ids!).length) {
+                        return (
+                            <>
+                                <b>external_ids:</b>{" "}
+                                {Object.entries(seqInfo!.external_ids!).map(
+                                    ([k1, v1], i) => (
+                                        <React.Fragment key={`${v1} (${k1})`}>
+                                            {i > 0 && ", "}
+                                            {`${v1} (${k1})`}
+                                        </React.Fragment>
+                                    )
+                                )}
+                            </>
+                        );
+                    }
+                    return <React.Fragment key="ExternalID"></React.Fragment>;
                 }
-                return <React.Fragment key="ExternalID"></React.Fragment>;
-            }
-            if (key === "meta") {
-                return Object.entries(seqInfo.meta!)
-                    .filter(([k1, v1]) => k1 !== "reads")
-                    .map(([k1, v1]) => {
-                        if (Array.isArray(v1) && v1.filter(v => !!v.location && !!v.size).length === v1.length) {
-                            // all are files coincidentally
-                            return renderReadsMetadata(value as File[], key)
-                        }
-                        const stringifiedValue = safeValue(v1)
-                        return (<div key={`${k1}-${stringifiedValue}`}>
-                            <b>{k1}:</b> {stringifiedValue}
-                        </div>)
-                    });
-            }
+                if (key === "meta") {
+                    return Object.entries(seqInfo.meta!)
+                        .filter(([k1, v1]) => k1 !== "reads")
+                        .map(([k1, v1]) => {
+                            if (
+                                Array.isArray(v1) &&
+                                v1.filter((v) => !!v.location && !!v.size)
+                                    .length === v1.length
+                            ) {
+                                // all are files coincidentally
+                                return (
+                                    <React.Fragment key={`${k1}`}>
+                                        <b>{k1}:</b>
+                                        {renderReadsMetadata(v1 as File[], key)}
+                                    </React.Fragment>
+                                );
+                            }
+                            if (
+                                v1 &&
+                                typeof v1 === "object" &&
+                                !Array.isArray(v1)
+                            ) {
+                                if (!!v1.location && !!v1.size) {
+                                    return (
+                                        <React.Fragment key={`${k1}`}>
+                                            <b>{k1}:</b>
+                                            {renderReadsMetadata(
+                                                [v1] as File[],
+                                                k1
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                }
+                            }
+                            const stringifiedValue = safeValue(v1);
+                            return (
+                                <div key={`${k1}-${stringifiedValue}`}>
+                                    <b>{k1}:</b>{" "}
+                                    {stringifiedValue ?? <em>no-value</em>}
+                                </div>
+                            );
+                        });
+                }
 
-            const stringifiedValue = safeValue(value)
-            return (
-                <div key={`${key}-${stringifiedValue}`}>
-                    <b>{key}:</b> {stringifiedValue}
-                </div>
-            );
-        });
+                const stringifiedValue = safeValue(value);
+                return (
+                    <div key={`${key}-${stringifiedValue}`}>
+                        <b>{key}:</b> {stringifiedValue ?? <em>no-value</em>}
+                    </div>
+                );
+            });
     };
+
+    const renderSeqSection = () => {
+        if (!sample || !sequenceInfo) {
+            return <></>;
+        }
+        return (
+            <>
+                <h4
+                    style={{
+                        borderBottom: `1px solid black`,
+                    }}
+                >
+                    Sequence Information
+                </h4>
+                {sequenceInfo.map((seq) => {
+                    return (
+                        <React.Fragment key={seq.id}>
+                            <h6>
+                                <b>Sequence ID:</b> {seq.id}
+                            </h6>
+
+                            <div style={{ marginLeft: "30px" }}>
+                                {renderSeqInfo(seq)}
+                                {prepReadMetadata(seq.meta || {})}
+                            </div>
+                            <br />
+                        </React.Fragment>
+                    );
+                })}
+            </>
+        );
+    };
+
+    const renderSampleSection = () => {
+        if (!sample || !sampleInfo) {
+            return <></>;
+        }
+        return (
+            <>
+                <h4
+                    style={{
+                        borderBottom: `1px solid black`,
+                    }}
+                >
+                    Sample Information
+                </h4>
+                {Object.entries(sampleInfo)
+                    .filter(([key, value]) =>
+                        sampleFieldsToDisplay.includes(key)
+                    )
+                    .map(([key, value]) => (
+                        <div key={`${key}-${value}`}>
+                            <b>{key}:</b>{" "}
+                            {value?.toString() ?? <em>no value</em>}
+                        </div>
+                    ))}
+            </>
+        );
+    };
+
+    const renderPedigreeSection = () => {
+        if (!sample || !pedigree) {
+            return <></>;
+        }
+        return (
+            <>
+                {pedigree
+                    .filter((item) => item.individual_id === selectedExternalID)
+                    .map((item) => (
+                        <React.Fragment
+                            key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
+                        >
+                            {item.paternal_id &&
+                                item.maternal_id &&
+                                drawTrio(
+                                    item.paternal_id,
+                                    pedigree?.find(
+                                        (i) =>
+                                            i.individual_id === item.paternal_id
+                                    )!.affected,
+                                    item.maternal_id,
+                                    pedigree?.find(
+                                        (i) =>
+                                            i.individual_id === item.maternal_id
+                                    )!.affected,
+                                    item.individual_id,
+                                    item.affected,
+                                    item.sex
+                                )}
+                        </React.Fragment>
+                    ))}
+            </>
+        );
+    };
+
+    const renderTitle = (
+        <div
+            style={{
+                borderBottom: `1px solid black`,
+            }}
+        >
+            {participants &&
+                participants
+                    .filter((item) => item.id === sampleInfo?.participant_id)
+                    .map((item) => {
+                        return (
+                            <React.Fragment key={item.external_id}>
+                                <h1
+                                    style={{
+                                        display: "inline",
+                                    }}
+                                    key={`${item.external_id}`}
+                                >
+                                    {`${item.external_id}\t`}
+                                </h1>
+                            </React.Fragment>
+                        );
+                    })}
+            {sampleInfo && (
+                <>
+                    <h3
+                        style={{
+                            display: "inline",
+                        }}
+                    >
+                        {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}
+                    </h3>
+                </>
+            )}
+        </div>
+    );
 
     return (
         <>
@@ -380,136 +587,13 @@ export const DetailedInfoPage: React.FunctionComponent<{}> = () => {
             {projectName && !isLoading && !error && (
                 <>
                     <div className="detailedInfo">
-                        {sample && (
-                            <>
-                                <div
-                                    style={{
-                                        borderBottom: `1px solid black`,
-                                    }}
-                                >
-                                    {participants &&
-                                        participants
-                                            .filter(
-                                                (item) =>
-                                                    item.id.toString() ===
-                                                    sampleInfo?.participant_id
-                                            )
-                                            .map((item) => {
-                                                return (
-                                                    <React.Fragment
-                                                        key={item.external_id}
-                                                    >
-                                                        <h1
-                                                            style={{
-                                                                display:
-                                                                    "inline",
-                                                            }}
-                                                            key={`${item.external_id}`}
-                                                        >
-                                                            {`${item.external_id}\t`}
-                                                        </h1>
-                                                        <h3
-                                                            style={{
-                                                                display:
-                                                                    "inline",
-                                                            }}
-                                                        >
-                                                            {`${sampleInfo?.id}\t
-                                                                ${sampleInfo?.external_id}`}
-                                                        </h3>
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                </div>
-                                <br />
-                                <div>
-                                    {sample && (
-                                        <>
-                                            {pedigree &&
-                                                pedigree
-                                                    .filter(
-                                                        (item) =>
-                                                            item.individual_id ===
-                                                            selectedExternalID
-                                                    )
-                                                    .map((item) => (
-                                                        <React.Fragment
-                                                            key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
-                                                        >
-                                                            {item.paternal_id &&
-                                                                item.maternal_id &&
-                                                                drawTrio(
-                                                                    item.paternal_id,
-                                                                    pedigree?.find(
-                                                                        (i) =>
-                                                                            i.individual_id ===
-                                                                            item.paternal_id
-                                                                    )!.affected,
-                                                                    item.maternal_id,
-                                                                    pedigree?.find(
-                                                                        (i) =>
-                                                                            i.individual_id ===
-                                                                            item.maternal_id
-                                                                    )!.affected,
-                                                                    item.individual_id,
-                                                                    item.affected,
-                                                                    item.sex
-                                                                )}
-                                                        </React.Fragment>
-                                                    ))}
-                                        </>
-                                    )}
-                                </div>
-                                <div>
-                                    {sample && (
-                                        <>
-                                            <h4
-                                                style={{
-                                                    borderBottom: `1px solid black`,
-                                                }}
-                                            >
-                                                Sample Information
-                                            </h4>
-                                            {sampleInfo &&
-                                                Object.entries(sampleInfo)
-                                                    .filter(([key, value]) =>
-                                                        sampleFieldsToDisplay.includes(
-                                                            key
-                                                        )
-                                                    )
-                                                    .map(([key, value]) => (
-                                                        <div
-                                                            key={`${key}-${value}`}
-                                                        >
-                                                            <b>{key}:</b>{" "}
-                                                            {value.toString()}
-                                                        </div>
-                                                    ))}
-                                        </>
-                                    )}
-                                </div>
-                                <br />
-                                <div>
-                                    {sample && (
-                                        <>
-                                            <h4
-                                                style={{
-                                                    borderBottom: `1px solid black`,
-                                                }}
-                                            >
-                                                Sequence Information
-                                            </h4>
-                                            {sequenceInfo &&
-                                                renderSeqInfo(sequenceInfo)}
-                                            {sequenceInfo &&
-                                                prepReadMetadata(
-                                                    sequenceInfo.meta || {}
-                                                )}
-                                        </>
-                                    )}
-                                </div>
-                            </>
-                        )}
+                        <div>{renderTitle}</div>
+                        <br />
+                        <div>{renderPedigreeSection()}</div>
+                        <br />
+                        <div>{renderSampleSection()}</div>
+                        <br />
+                        <div>{renderSeqSection()}</div>
                     </div>
                 </>
             )}

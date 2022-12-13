@@ -7,7 +7,6 @@ import { Dropdown } from "semantic-ui-react";
 import { ProjectApi } from "../sm-api/api";
 
 interface ProjectSelectorProps {
-    // onChange?: (project: string) => void;
     setPageNumber: React.Dispatch<React.SetStateAction<number>>;
     setPageLimit: React.Dispatch<React.SetStateAction<number>>;
     pageLimit: number;
@@ -59,7 +58,7 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
                 fluid
                 onChange={handleOnClick}
                 placeholder="Select a project"
-                value={projectName}
+                value={projectName ?? ""}
                 options={projects.map((p) => ({ key: p, text: p, value: p }))}
             />
         </div>

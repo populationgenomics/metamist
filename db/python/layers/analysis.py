@@ -35,16 +35,30 @@ class AnalysisLayer(BaseLayer):
             project_ids=project_ids, active_only=active_only
         )
 
-    async def get_analysis_for_sample(
+    async def get_analyses_for_samples(
         self,
-        sample_id: int,
-        map_sample_ids: bool,
-        check_project_id=True,  # pylint: disable=unused-argument
-    ):
-        """Get related analyses from this sample"""
-        _, analysis = await self.at.get_analysis_for_sample(
-            sample_id, map_sample_ids=map_sample_ids
+        sample_ids: list[int],
+        analysis_type: AnalysisType | None,
+        status: AnalysisStatus | None,
+        check_project_id=True,
+    ) -> list[Analysis]:
+        """
+        Get a list of all analysis that relevant for samples
+
+        """
+        projects, analysis = await self.at.get_analyses_for_samples(
+            sample_ids,
+            analysis_type=analysis_type,
+            status=status,
         )
+
+        if len(analysis) == 0:
+            return []
+
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         return analysis
 
@@ -77,7 +91,6 @@ class AnalysisLayer(BaseLayer):
         check_project_ids=True,
     ):
         """Get the latest complete analysis for samples (one per sample)"""
-
         if check_project_ids:
             project_ids = await SampleTable(
                 self.connection
@@ -212,7 +225,7 @@ class AnalysisLayer(BaseLayer):
             size = cram.meta.get('size')
 
             if len(sids) > 1:
-                affected_analyses.append(cram['id'])
+                affected_analyses.append(cram.id)
                 continue
 
             if not isinstance(seqtype, list) and seqtype and size:
@@ -221,8 +234,8 @@ class AnalysisLayer(BaseLayer):
                 crams_by_sid[sid][seqtype].append(cram)
 
         # Log weird crams
-        for cram in affected_analyses:
-            logger.error(f'Cram with multiple sids ignored: {cram}')
+        for _cram in affected_analyses:
+            logger.error(f'Cram with multiple sids ignored: {_cram}')
 
         # Format output
         result: dict[int, list] = defaultdict(list)
