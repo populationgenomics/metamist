@@ -19,7 +19,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.3.0'
+_VERSION = '5.4.0'
 
 logger = get_logger()
 
