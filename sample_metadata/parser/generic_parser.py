@@ -27,6 +27,7 @@ from functools import wraps
 from cloudpathlib import AnyPath
 
 from api.utils import group_by
+from sample_metadata.model.sequence_technology import SequenceTechnology
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -170,10 +171,12 @@ class SequenceMetaGroup:
         self,
         rows: GroupedRow,
         sequence_type: SequenceType,
+        sequence_technology: SequenceTechnology,
         meta: Optional[Dict[str, Any]] = None,
     ):
         self.rows = rows
         self.sequence_type = sequence_type
+        self.sequence_technology = sequence_technology
         self.meta = meta
 
 
@@ -223,6 +226,7 @@ class GenericParser(
         search_paths: list[str],
         project: str,
         default_sequence_type='genome',
+        default_sequence_technology='short-read',
         default_sequence_status='uploaded',
         default_sample_type='blood',
         default_analysis_type='qc',
@@ -248,6 +252,7 @@ class GenericParser(
         self.project = project
 
         self.default_sequence_type: str = default_sequence_type
+        self.default_sequence_technology: str = default_sequence_technology
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
         self.default_analysis_type: str = default_analysis_type
@@ -334,7 +339,10 @@ class GenericParser(
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
         return SequenceMetaGroup(
-            rows=[], sequence_type=self.default_sequence_type, meta={}
+            rows=[],
+            sequence_type=SequenceType(self.default_sequence_type),
+            sequence_technology=SequenceTechnology(self.default_sequence_technology),
+            meta={},
         )
 
     # @abstractmethod

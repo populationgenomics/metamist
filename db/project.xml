@@ -414,4 +414,23 @@
 		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv', 'web', 'analysis-runner');</sql>
 		<sql>UPDATE analysis SET type = 'analysis-runner' WHERE type='custom' AND json_extract(meta, '$.source') = 'analysis-runner';</sql>
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-11-23_sequencing-technology">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<addColumn
+			tableName="sample_sequencing">
+			<column
+				name="technology"
+				type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')"
+			/>
+		</addColumn>
+		<sql>
+			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell');
+
+			UPDATE sample_sequencing SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
+			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read', meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont';
+			UPDATE sample_sequencing SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type = 'single-cell';
+		</sql>
+	</changeSet>
+
 </databaseChangeLog>
