@@ -433,4 +433,61 @@
 		</sql>
 	</changeSet>
 
+	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="sequencing_group">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
+			</column>
+			<column name="type" type="<TODO>">
+				<constraints nullable="false" />
+			</column>
+			<column name="technology" type="<TODO>">
+				<constraints nullable="false" />
+			</column>
+			<column name="meta" type="JSON" />
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+		<createTable tableName="sequencing_group_sequence">
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id" references="sequencing_group(id)" />
+			</column>
+			<column name="sequencing_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id" references="sample_sequencing(id)" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+		<createTable tableName="sequencing_group_external_ids">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
+			</column>
+			<column name="sequencing_group" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_sequencing_group_id" references="sequencing_group(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+					<constraints nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="sequencing_group_external_ids"
+			constraintName="UK_SEQUENCING_GROUP_EXTERNALID"
+			validate="true"
+		/>
+
+	</changeSet>
+
 </databaseChangeLog>
