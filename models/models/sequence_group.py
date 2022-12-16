@@ -22,6 +22,7 @@ class SequenceGroup(SMBase):
     id: int | str
     type: SequenceType
     technology: SequenceTechnology
+    platform: str   # uppercase
     meta: dict[str, str]
 
 

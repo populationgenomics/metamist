@@ -488,6 +488,16 @@
 			validate="true"
 		/>
 
+		<!-- Replaces the analysis_sample table-->
+		<createTable tableName="analysis_sequence_group">
+			<column name="analysis_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_analysis" references="analysis(id)"/>
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_sequence_group" references="sequencing_group(id)"/>
+			</column>
+		</createTable>
+
 	</changeSet>
 
 </databaseChangeLog>
