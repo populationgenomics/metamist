@@ -1,23 +1,26 @@
 import * as React from "react";
-import { useQuery, gql } from "@apollo/client";
+import { useQuery } from "@apollo/client";
 
-const GET_PROJECTS = gql`
+import { gql } from "../src/__generated__/gql";
+
+const GET_PROJECTS = gql(`
     query getProjects {
         myProjects {
             id
         }
     }
-`;
+`);
 export const GraphQL: React.FunctionComponent<{}> = () => {
     const { loading, error, data } = useQuery(GET_PROJECTS);
     if (loading) return <>"Loading..."</>;
     if (error) return <>`Error! ${error.message}`</>;
-    console.log(data.myProjects);
+    // console.log(data.myProjects);
     return (
         <>
-            {data.myProjects.map((item: { id: string }) => (
-                <option key={item.id}>{item.id}</option>
-            ))}
+            {data &&
+                data.myProjects.map((item) => (
+                    <option key={item.id}>{item.id}</option>
+                ))}
         </>
     );
 };

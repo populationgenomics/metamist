@@ -33,3 +33,6 @@ coverage.xml
 temp.json
 data-dump.sql
 local.py
+
+web/schema.graphql
+web/src/__generated__
