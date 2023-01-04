@@ -14,7 +14,7 @@ import {
 
 // 2
 const httpLink = createHttpLink({
-    uri: "http://localhost:8000/graphql",
+    uri: "/graphql",
 });
 
 // 3
