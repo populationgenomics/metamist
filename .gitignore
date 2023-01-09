@@ -33,3 +33,5 @@ coverage.xml
 temp.json
 data-dump.sql
 local.py
+cram-map/
+graphql-types/

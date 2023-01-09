@@ -1,4 +1,5 @@
 # pylint: disable=too-many-arguments
+import asyncio
 from typing import Dict, List, Optional, Any
 
 from pydantic import BaseModel
@@ -265,11 +266,11 @@ class SampleSequenceLayer(BaseLayer):
 
     # region UPSERTS
 
-    async def upsert_sequence(self, iid: int, sequence: SequenceUpsert):
+    async def upsert_sequence(self, sample_id: int, sequence: SequenceUpsert):
         """Upsert a single sequence to the given sample_id (sid)"""
-        sequence.sample_id = iid
+        sequence.sample_id = sample_id
         if not sequence.id:
-            return await self.insert_sequencing(
+            seq_id = await self.insert_sequencing(
                 sample_id=sequence.sample_id,
                 sequence_type=sequence.type,
                 sequence_meta=sequence.meta,
@@ -277,6 +278,8 @@ class SampleSequenceLayer(BaseLayer):
                 technology=sequence.technology,
                 external_ids=sequence.external_ids,
             )
+            sequence.id = seq_id
+            return seq_id
 
         # Otherwise update
         await self.update_sequence(
@@ -286,7 +289,7 @@ class SampleSequenceLayer(BaseLayer):
 
     async def upsert_sequences(self, iid: int, sequences: List[SequenceUpsert]):
         """Upsert multiple sequences to the given sample (sid)"""
-        upserts = [await self.upsert_sequence(iid, s) for s in sequences]
+        upserts = await asyncio.gather(*[self.upsert_sequence(iid, s) for s in sequences])
         return upserts
 
     # endregion UPSERTS

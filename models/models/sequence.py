@@ -17,6 +17,7 @@ class SampleSequencing(BaseModel):
     meta: Optional[Dict[str, Any]] = None
     status: SequenceStatus
     technology: SequenceTechnology
+    platform: str
 
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())
