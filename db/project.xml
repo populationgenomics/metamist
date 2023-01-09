@@ -448,7 +448,11 @@
 			<column name="technology" type="<TODO>">
 				<constraints nullable="false" />
 			</column>
+			<column name="platform" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
 			<column name="meta" type="JSON" />
+			<column name="archived" type="BIT" />
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
