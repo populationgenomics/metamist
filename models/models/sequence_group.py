@@ -2,6 +2,7 @@
 from models.base import SMBase
 from models.enums import SequenceType, SequenceTechnology
 
+
 class SequenceGroup(SMBase):
     """
     A group of sequences that would be aligned and analysed together.
@@ -24,5 +25,3 @@ class SequenceGroup(SMBase):
     technology: SequenceTechnology
     platform: str   # uppercase
     meta: dict[str, str]
-
-
