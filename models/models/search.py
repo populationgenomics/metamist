@@ -33,9 +33,15 @@ class SampleSearchResponseData(SearchResponseData):
     sample_external_ids: list[str]
 
 
+class ErrorSearchResponseData(SearchResponseData):
+    """Error search response data"""
+
+    error: str
+
+
 class SearchResponse(SMBase):
     """Response class for each search result"""
 
     type: SearchResponseType
     title: str
-    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
+    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData | ErrorSearchResponseData
