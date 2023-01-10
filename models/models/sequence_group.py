@@ -1,4 +1,3 @@
-
 from models.base import SMBase
 from models.enums import SequenceType, SequenceTechnology
 
@@ -18,10 +17,11 @@ class SequenceGroup(SMBase):
     - We probably should only have one active sequence group per type / tech / sample
     - This is also the ID we should use in analysis, instead of samples
     """
+
     # similar to a sample ID, this is stored internally as an integer,
     # but displayed as a string
     id: int | str
     type: SequenceType
     technology: SequenceTechnology
-    platform: str   # uppercase
+    platform: str  # uppercase
     meta: dict[str, str]

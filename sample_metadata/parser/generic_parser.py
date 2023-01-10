@@ -27,7 +27,6 @@ from functools import wraps
 from cloudpathlib import AnyPath
 
 from api.utils import group_by
-from sample_metadata.model.sequence_technology import SequenceTechnology
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -45,6 +44,7 @@ from sample_metadata.models import (
     SampleBatchUpsert,
     SampleBatchUpsertBody,
     SequenceUpsert,
+    SequenceTechnology,
 )
 
 
@@ -172,11 +172,29 @@ class SequenceMetaGroup:
         rows: GroupedRow,
         sequence_type: SequenceType,
         sequence_technology: SequenceTechnology,
-        meta: Optional[Dict[str, Any]] = None,
+        sequence_platform: str | None,
+        meta: dict[str, Any] | None,
     ):
         self.rows = rows
         self.sequence_type = sequence_type
         self.sequence_technology = sequence_technology
+        self.sequence_platform = (sequence_platform,)
+        self.meta = meta
+
+
+class SequenceMeta:
+    def __init__(
+        self,
+        rows: GroupedRow,
+        sequence_type: SequenceType,
+        sequence_technology: SequenceTechnology,
+        sequence_platform: str | None,
+        meta: dict[str, Any] | None,
+    ):
+        self.rows = rows
+        self.sequence_type = sequence_type
+        self.sequence_technology = sequence_technology
+        self.sequence_platform = sequence_platform
         self.meta = meta
 
 
@@ -228,7 +246,8 @@ class GenericParser(
         default_sequence_type='genome',
         default_sequence_technology='short-read',
         default_sequence_status='uploaded',
-        default_sample_type='blood',
+        default_sequence_platform: str | None = None,
+        default_sample_type=None,
         default_analysis_type='qc',
         default_analysis_status='completed',
         skip_checking_gcs_objects=False,
@@ -253,6 +272,7 @@ class GenericParser(
 
         self.default_sequence_type: str = default_sequence_type
         self.default_sequence_technology: str = default_sequence_technology
+        self.default_sequence_platform: str | None = default_sequence_platform
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
         self.default_analysis_type: str = default_analysis_type
@@ -375,6 +395,12 @@ class GenericParser(
     def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
         """Get sequence types from row"""
         return [SequenceType(self.default_sequence_type)]
+
+    def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology | str:
+        return self.default_sequence_technology
+
+    def get_sequence_platform(self, row: SingleRow) -> str | None:
+        pass
 
     # @abstractmethod
     def get_sequence_type(self, row: SingleRow) -> SequenceType:

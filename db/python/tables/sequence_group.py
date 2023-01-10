@@ -1,6 +1,5 @@
 from collections import defaultdict
 
-from api.utils import group_by
 from db.python.connect import DbBase
 from db.python.tables.sequence import NoOpAenter
 from db.python.utils import ProjectId, to_db_json
@@ -53,7 +52,9 @@ class SequenceGroupTable(DbBase):
 
         return projects, rows
 
-    async def get_sequence_ids_by_sequence_group_ids(self, ids: list[int]) -> dict[int, list[int]]:
+    async def get_sequence_ids_by_sequence_group_ids(
+        self, ids: list[int]
+    ) -> dict[int, list[int]]:
         _query = """
             SELECT sequencing_group_id, sequencing_id
             FROM sequencing_group_sequence
@@ -65,9 +66,6 @@ class SequenceGroupTable(DbBase):
             sequence_groups[row['sequencing_group_id']].append(row['sequencing_id'])
 
         return dict(sequence_groups)
-
-
-
 
     async def create_sequence_group(
         self,
@@ -123,10 +121,14 @@ class SequenceGroupTable(DbBase):
 
             return id_of_seq_group
 
-    async def update_sequence_group(self, sequence_group_id: int, meta: dict, platform: str):
+    async def update_sequence_group(
+        self, sequence_group_id: int, meta: dict, platform: str
+    ):
         updaters = ['JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)']
+        values = {'seqgid': sequence_group_id, 'meta': to_db_json(meta)}
         if platform:
             updaters.append('platform = :platform')
+            values['platform'] = platform
 
         _query = f"""
         UPDATE sequence_group
@@ -134,9 +136,7 @@ class SequenceGroupTable(DbBase):
         WHERE id = :seqgid
         """
 
-        await self.connection.execute()
-
-
+        await self.connection.execute(_query, values)
 
     async def archive_sequence_group(self, sequence_group_id):
         _query = """

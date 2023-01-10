@@ -375,7 +375,10 @@ class SampleLayer(BaseLayer):
         # Upsert all sequence groups with paired sids, this will
         # also upsert sequences
         sequence_groups = zip(sids, [x.sequence_groups for x in samples.samples])
-        seqs = [await seqglayer.upsert_sequence_groups(sid, seqg) for sid, seqg in sequence_groups]
+        seqs = [
+            await seqglayer.upsert_sequence_groups(sid, seqg)
+            for sid, seqg in sequence_groups
+        ]
 
         # Format and return response
         return dict(zip(sids, seqs))

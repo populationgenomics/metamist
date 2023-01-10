@@ -97,8 +97,9 @@ def split_generic_terms(string: str) -> List[str]:
     if not string:
         return []
     if isinstance(string, list):
-        return sorted(set(r for f in string for r in split_generic_terms(f)))
+        return sorted(set(r.strip() for f in string for r in split_generic_terms(f)))
 
+    # strip, because sometimes collaborators use ', ' instead of ','
     filenames = [f.strip() for f in RE_FILENAME_SPLITTER.split(string)]
     filenames = [f for f in filenames if f]
 

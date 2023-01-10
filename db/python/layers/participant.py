@@ -240,7 +240,7 @@ class SeqrMetadataKeys(Enum):
         def process_hpo_term(term):
             if '|' in term:
                 return term.split('|', maxsplit=1)[0].strip()
-            return term
+            return term.strip()
 
         # mfranklin (2021-09-06): There were no IDs that didn't start with HP
         # https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.obo
@@ -253,7 +253,6 @@ class SeqrMetadataKeys(Enum):
                 + ', '.join(failing_terms)
             )
 
-        # do this, because sometimes collaborators use ', ' instead of ','
         return terms
 
 
@@ -890,7 +889,9 @@ class ParticipantLayer(BaseLayer):
                     sample.participant_id = ipid
 
             # Upsert all samples with sequences for each participant
-            samples = [SampleBatchUpsertBody(samples=p.samples) for p in all_participants]
+            samples = [
+                SampleBatchUpsertBody(samples=p.samples) for p in all_participants
+            ]
             results = [await sampt.batch_upsert_samples(s) for s in samples]
 
         # Format and return response

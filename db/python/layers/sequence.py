@@ -289,7 +289,9 @@ class SampleSequenceLayer(BaseLayer):
 
     async def upsert_sequences(self, iid: int, sequences: List[SequenceUpsert]):
         """Upsert multiple sequences to the given sample (sid)"""
-        upserts = await asyncio.gather(*[self.upsert_sequence(iid, s) for s in sequences])
+        upserts = await asyncio.gather(
+            *[self.upsert_sequence(iid, s) for s in sequences]
+        )
         return upserts
 
     # endregion UPSERTS

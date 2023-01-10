@@ -68,7 +68,9 @@ class SequenceGroupLayer(BaseLayer):
 
     # region CREATE / MUTATE
 
-    async def create_sequence_group_from_sequences(self, sequence_ids: list[int], meta: dict):
+    async def create_sequence_group_from_sequences(
+        self, sequence_ids: list[int], meta: dict
+    ):
         """
         Create a sequence group from a list of sequences,
         return an exception if they're not of the same type
@@ -110,13 +112,19 @@ class SequenceGroupLayer(BaseLayer):
         return sequence
 
     async def modify_sequences_in_group(
-        self, sequence_group_id: int, sequences: list[int], meta: dict, open_transaction=True
+        self,
+        sequence_group_id: int,
+        sequences: list[int],
+        meta: dict,
+        open_transaction=True,
     ):
         """
         Change the list of sequences in a sequence group, this first
         archives the existing group, and returns a new sequence group.
         """
-        with_function = self.connection.connection.transaction if open_transaction else NoOpAenter
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
 
         seqgroup = await self.get_sequence_group_by_id(sequence_group_id)
         async with with_function:
@@ -142,10 +150,17 @@ class SequenceGroupLayer(BaseLayer):
         """
         return await self.archive_sequence_group(sequence_group_id)
 
-    async def upsert_sequence_groups(self, sample_id: int, sequence_groups: list[SequenceGroupUpsert]):
+    async def upsert_sequence_groups(
+        self, sample_id: int, sequence_groups: list[SequenceGroupUpsert]
+    ):
         # first determine if any groups have different sequences
         slayer = SampleSequenceLayer(self.connection)
-        await asyncio.gather(*[slayer.upsert_sequences(sample_id, sg.sequences) for sg in sequence_groups])
+        await asyncio.gather(
+            *[
+                slayer.upsert_sequences(sample_id, sg.sequences)
+                for sg in sequence_groups
+            ]
+        )
 
         to_insert = [sg for sg in sequence_groups if not sg.id]
         to_update = []
@@ -156,7 +171,9 @@ class SequenceGroupLayer(BaseLayer):
             seq_group_ids = [sg.id for sg in sequence_groups_that_exist if sg.id]
             # TODO: Fix the cast from sequence_group_id to integers correctly
             seq_group_ids = list(map(int, seq_group_ids))
-            sequence_to_group = await self.seqgt.get_sequence_ids_by_sequence_group_ids(seq_group_ids)
+            sequence_to_group = await self.seqgt.get_sequence_ids_by_sequence_group_ids(
+                seq_group_ids
+            )
 
             for sg in sequence_groups_that_exist:
                 # if we need to insert any sequences, then the group will have to change
@@ -187,14 +204,18 @@ class SequenceGroupLayer(BaseLayer):
         promises.extend(map(insert, to_insert))
 
         for sg in to_update:
-            promises.append(self.seqgt.update_sequence_group(int(sg.id), sg.meta, sg.platform))
+            promises.append(
+                self.seqgt.update_sequence_group(int(sg.id), sg.meta, sg.platform)
+            )
 
         for sg in to_replace:
-            promises.append(self.modify_sequences_in_group(
-                sequence_group_id=int(sg.id),
-                sequences=[s.id for s in sg.sequences],
-                open_transaction=False,
-                meta=sg.meta,
-            ))
+            promises.append(
+                self.modify_sequences_in_group(
+                    sequence_group_id=int(sg.id),
+                    sequences=[s.id for s in sg.sequences],
+                    open_transaction=False,
+                    meta=sg.meta,
+                )
+            )
 
     # endregion
