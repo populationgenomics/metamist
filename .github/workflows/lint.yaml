@@ -9,18 +9,18 @@ jobs:
         shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
-        cache: 'pip'
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+          cache: "pip"
 
-    - name: Install packages
-      run: |
-        pip install -r requirements-dev.txt
-        pip install -r requirements-server.txt
-        pip install .
+      - name: Install packages
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements-server.txt
+          pip install .
 
-    - name: pre-commit
-      run: pre-commit run --all-files
+      - name: pre-commit
+        run: pre-commit run --all-files
