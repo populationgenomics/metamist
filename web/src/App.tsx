@@ -9,6 +9,8 @@ import Routes from './Routes'
 import Searchbar from './Search'
 import MuckTheDuck from './MuckTheDuck'
 
+const invalid_name = "";
+
 const App: React.FunctionComponent = () => {
     return (
         <Router>
