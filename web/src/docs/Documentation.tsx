@@ -96,7 +96,7 @@ const DocumentationArticle: React.FunctionComponent<
                                 // showLineNumbers={true}
                                 customStyle={{
                                     margin: 0,
-                                    background: '#f8f8f8'
+                                    background: '#f8f8f8',
                                 }}
                                 {...props_}
                             >
@@ -107,7 +107,7 @@ const DocumentationArticle: React.FunctionComponent<
                                 {children}
                             </code>
                         )
-                    }
+                    },
                 }}
             >
                 {text}

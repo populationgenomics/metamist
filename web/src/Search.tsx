@@ -22,7 +22,7 @@ enum ActionKind {
     Finish = 'FINISH_SEARCH',
     Update = 'UPDATE_SELECTION',
     Short = 'QUERY_TOO_SHORT',
-    Error = 'ERROR'
+    Error = 'ERROR',
 }
 
 type Action = {
@@ -35,7 +35,7 @@ type Action = {
 const initialState: State = {
     loading: false,
     results: [],
-    value: ''
+    value: '',
 }
 
 /* eslint-disable consistent-return */
@@ -47,13 +47,13 @@ const SearchReducer = (state: State, action: Action): State => {
             return {
                 ...state,
                 loading: true,
-                value: action.query
+                value: action.query,
             }
         case ActionKind.Finish:
             return {
                 ...state,
                 loading: false,
-                results: action.results
+                results: action.results,
             }
         case ActionKind.Update:
             return { ...state, value: action.selection }
@@ -63,7 +63,7 @@ const SearchReducer = (state: State, action: Action): State => {
             return {
                 ...state,
                 loading: false,
-                results: action.results
+                results: action.results,
             }
         // no default
     }
@@ -129,7 +129,7 @@ const resultRenderer = ({ ...props }) => {
                     style={{
                         order: 2,
                         flex: 3,
-                        display: 'inline'
+                        display: 'inline',
                     }}
                 >
                     <div className="title">{props.title}</div>
@@ -143,7 +143,7 @@ const resultRenderer = ({ ...props }) => {
                         order: 3,
                         flex: 2,
                         textAlign: 'right',
-                        fontStyle: 'italic'
+                        fontStyle: 'italic',
                     }}
                 >
                     {props.data.project}
@@ -192,7 +192,7 @@ const Searchbar: React.FunctionComponent = () => {
             type: ActionKind.Start,
             query: data.value,
             selection: '',
-            results: {}
+            results: {},
         } as Action)
 
         timeoutRef.current = setTimeout(async () => {
@@ -201,7 +201,7 @@ const Searchbar: React.FunctionComponent = () => {
                     type: ActionKind.Clear,
                     query: '',
                     selection: '',
-                    results: {}
+                    results: {},
                 } as Action)
                 return
             }
@@ -210,7 +210,7 @@ const Searchbar: React.FunctionComponent = () => {
                     type: ActionKind.Short,
                     query: '',
                     selection: '',
-                    results: {}
+                    results: {},
                 } as Action)
                 return
             }
@@ -221,7 +221,7 @@ const Searchbar: React.FunctionComponent = () => {
                         type: ActionKind.Finish,
                         results: resp.data.responses,
                         query: '',
-                        selection: ''
+                        selection: '',
                     } as Action)
                 })
                 .catch((er) => {
@@ -231,21 +231,22 @@ const Searchbar: React.FunctionComponent = () => {
                             {
                                 title: 'Error',
                                 type: 'error',
-                                data: { error: er.message }
-                            }
+                                error: { error: er.message },
+                            },
                         ] as SearchResponse[],
                         query: '',
-                        selection: ''
+                        selection: '',
                     } as Action)
                 })
         }, 300)
     }, [])
 
-    React.useEffect(() => {
-        return () => {
+    React.useEffect(
+        () => () => {
             clearTimeout(timeoutRef.current as NodeJS.Timeout)
-        }
-    }, [])
+        },
+        []
+    )
 
     return (
         <Search
@@ -260,7 +261,7 @@ const Searchbar: React.FunctionComponent = () => {
                     type: ActionKind.Update,
                     selection: data.result.title,
                     query: '',
-                    results: {}
+                    results: {},
                 } as Action)
                 searchResultToRoute(
                     data.result.data.project,

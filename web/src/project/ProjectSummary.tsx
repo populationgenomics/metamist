@@ -19,7 +19,7 @@ const REPORT_TYPES = {
     'WGS FASTQC': 'qc/fastqc/multiqc.html',
     'Exome Cram': 'exome/qc/cram/multiqc.html',
     'Exome GVCF': 'exome/qc/gvcf/multiqc.html',
-    'Exome FASTQC': 'exome/qc/fastqc/multiqc.html'
+    'Exome FASTQC': 'exome/qc/fastqc/multiqc.html',
 }
 
 const sanitiseValue = (value: any) => {
@@ -113,7 +113,7 @@ const ProjectSummary: React.FunctionComponent = () => {
         projectName,
         pageLimit,
         pageNumber,
-        _updateProjectSummary
+        _updateProjectSummary,
     ])
 
     const totalPageNumbers = Math.ceil(
@@ -190,7 +190,9 @@ const ProjectSummary: React.FunctionComponent = () => {
             'Family ID',
             ...summary.participant_keys.map((field) => field[1]),
             ...summary.sample_keys.map((field) => field[1]),
-            ...summary.sequence_keys.map((field) => `sequence.${field[1]}`)
+            ...summary.sequence_keys.map(
+                (field) => `sequence.${field[1]}`
+            ),
         ]
 
         return (
@@ -241,7 +243,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                                                 ([k]) => (
                                                     <Table.Cell
                                                         style={{
-                                                            backgroundColor
+                                                            backgroundColor,
                                                         }}
                                                         key={`${p.id}participant.${k}`}
                                                         rowSpan={
@@ -259,7 +261,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                                                 ([k]) => (
                                                     <Table.Cell
                                                         style={{
-                                                            backgroundColor
+                                                            backgroundColor,
                                                         }}
                                                         key={`${s.id}sample.${k}`}
                                                         rowSpan={
@@ -296,7 +298,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                                                 ([k]) => (
                                                     <Table.Cell
                                                         style={{
-                                                            backgroundColor
+                                                            backgroundColor,
                                                         }}
                                                         key={`${s.id}sequence.${k}`}
                                                     >
@@ -316,9 +318,8 @@ const ProjectSummary: React.FunctionComponent = () => {
         )
     }
 
-    const titleCase = (s: string) => {
-        return s[0].toUpperCase() + s.slice(1).toLowerCase()
-    }
+    const titleCase = (s: string) =>
+        s[0].toUpperCase() + s.slice(1).toLowerCase()
 
     const batchTable = () => {
         const seqTypes = Object.keys(summary?.cram_seqr_stats ?? {})
@@ -359,7 +360,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                                 return -1
                             }
                             return a[0].localeCompare(b[0], undefined, {
-                                numeric: true
+                                numeric: true,
                             })
                         })
                         .map(([key, value]) => (
@@ -433,24 +434,22 @@ const ProjectSummary: React.FunctionComponent = () => {
         )
     }
 
-    const multiQcReports = () => {
-        return (
-            <>
-                <h4> MultiQC Links</h4>
-                {Object.entries(REPORT_TYPES).map(([key, value]) => (
-                    <a
-                        href={`${REPORT_PREFIX}${projectName}${value}`}
-                        className="ui button"
-                        key={key}
-                        target="_blank"
-                        rel="noreferrer"
-                    >
-                        {key}
-                    </a>
-                ))}
-            </>
-        )
-    }
+    const multiQcReports = () => (
+        <>
+            <h4> MultiQC Links</h4>
+            {Object.entries(REPORT_TYPES).map(([key, value]) => (
+                <a
+                    href={`${REPORT_PREFIX}${projectName}${value}`}
+                    className="ui button"
+                    key={key}
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    {key}
+                </a>
+            ))}
+        </>
+    )
 
     const seqrLinks = () => {
         const seqrLinkEntries = Object.entries(summary?.seqr_links ?? {})
@@ -500,7 +499,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                             marginBottom: '10px',
                             justifyContent: 'flex-end',
                             display: 'flex',
-                            flexDirection: 'row'
+                            flexDirection: 'row',
                         }}
                     >
                         <Dropdown
@@ -510,7 +509,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                             options={PAGE_SIZES.map((s) => ({
                                 key: s,
                                 text: `${s} samples`,
-                                value: s
+                                value: s,
                             }))}
                         />
                         {pageOptions}

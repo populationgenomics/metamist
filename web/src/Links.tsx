@@ -10,7 +10,7 @@ interface LinkProps {
 export const SampleLink: React.FunctionComponent<LinkProps> = ({
     id,
     projectName,
-    children
+    children,
 }) => (
     <Link to={`/project/${projectName}/sample/${id}`}>
         {children || id}
@@ -20,7 +20,7 @@ export const SampleLink: React.FunctionComponent<LinkProps> = ({
 export const FamilyLink: React.FunctionComponent<LinkProps> = ({
     id,
     projectName,
-    children
+    children,
 }) => (
     <Link to={`/project/${projectName}/family/${id}`}>
         {children || id}
@@ -30,7 +30,7 @@ export const FamilyLink: React.FunctionComponent<LinkProps> = ({
 export const ParticipantLink: React.FunctionComponent<LinkProps> = ({
     id,
     projectName,
-    children
+    children,
 }) => (
     <Link to={`/project/${projectName}/participant/${id}`}>
         {children || id}

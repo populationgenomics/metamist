@@ -6,7 +6,7 @@ import {
     FamilyApi,
     SampleApi,
     ParticipantApi,
-    SequenceApi
+    SequenceApi,
     // ParticipantModel,
     // Sample,
     // SampleSequencing,
@@ -56,7 +56,7 @@ interface SampleSequencing {
 
 enum SampleType {
     BLOOD = 'blood',
-    SALIVA = 'saliva'
+    SALIVA = 'saliva',
 }
 
 interface Sample {
@@ -216,7 +216,7 @@ const DetailedInfoPage_: React.FunctionComponent<
             'PB',
             'EB',
             'ZB',
-            'YB'
+            'YB',
         ]
 
         const i = Math.floor(Math.log(bytes) / Math.log(k))
@@ -224,24 +224,20 @@ const DetailedInfoPage_: React.FunctionComponent<
         return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
     }
 
-    const renderReadsMetadata = (data: File[], key: number | string) => {
-        return (
-            <Table celled key={key}>
-                <Table.Body>
-                    {data.map((item: File) => (
-                        <Table.Row key={item.location}>
-                            <Table.Cell collapsing>
-                                {item.location}
-                            </Table.Cell>
-                            <Table.Cell collapsing>
-                                {formatBytes(item.size)}
-                            </Table.Cell>
-                        </Table.Row>
-                    ))}
-                </Table.Body>
-            </Table>
-        )
-    }
+    const renderReadsMetadata = (data: File[], key: number | string) => (
+        <Table celled key={key}>
+            <Table.Body>
+                {data.map((item: File) => (
+                    <Table.Row key={item.location}>
+                        <Table.Cell collapsing>{item.location}</Table.Cell>
+                        <Table.Cell collapsing>
+                            {formatBytes(item.size)}
+                        </Table.Cell>
+                    </Table.Row>
+                ))}
+            </Table.Body>
+        </Table>
+    )
 
     const prepReadMetadata = (data: SequenceMeta) => {
         if (!data.reads) return <></>
@@ -255,12 +251,9 @@ const DetailedInfoPage_: React.FunctionComponent<
         return (
             <>
                 <b>reads:</b>
-                {data.reads.map((v, i) => {
-                    return renderReadsMetadata(
-                        Array.isArray(v) ? v : [v],
-                        i
-                    )
-                })}
+                {data.reads.map((v, i) =>
+                    renderReadsMetadata(Array.isArray(v) ? v : [v], i)
+                )}
             </>
         )
     }
@@ -273,80 +266,72 @@ const DetailedInfoPage_: React.FunctionComponent<
         proband: string,
         affectedProband: number,
         probandSex: number
-    ) => {
-        return (
-            <svg viewBox="75 90 250 200" width="250" height="200">
+    ) => (
+        <svg viewBox="75 90 250 200" width="250" height="200">
+            <rect
+                x={100}
+                y={100}
+                width={50}
+                height={50}
+                stroke="black"
+                cursor="pointer"
+                fill={affectedPaternal === 2 ? 'black' : 'white'}
+                onClick={() => {
+                    if (!samples) return
+                    navigate(
+                        `/project/${projectName}/sample/${getCPGID(
+                            paternal
+                        )}`
+                    )
+                }}
+            />
+            <text x={125} y={170} textAnchor="middle">
+                {paternal}
+            </text>
+            <circle
+                cx={250}
+                cy={125}
+                r={25}
+                stroke="black"
+                cursor="pointer"
+                fill={affectedMaternal === 2 ? 'black' : 'white'}
+                onClick={() => {
+                    if (!samples) return
+                    navigate(
+                        `/project/${projectName}/sample/${getCPGID(
+                            maternal
+                        )}`
+                    )
+                }}
+            />
+            <text x={250} y={170} textAnchor="middle">
+                {maternal}
+            </text>
+            <line x1={150} y1={125} x2={225} y2={125} stroke="black" />
+            <line x1={187.5} y1={125} x2={187.5} y2={200} stroke="black" />
+            {probandSex === 1 ? (
                 <rect
-                    x={100}
-                    y={100}
+                    x={162.5}
+                    y={200}
                     width={50}
                     height={50}
                     stroke="black"
-                    cursor="pointer"
-                    fill={affectedPaternal === 2 ? 'black' : 'white'}
-                    onClick={() => {
-                        if (!samples) return
-                        navigate(
-                            `/project/${projectName}/sample/${getCPGID(
-                                paternal
-                            )}`
-                        )
-                    }}
+                    fill={affectedProband === 2 ? 'black' : 'white'}
                 />
-                <text x={125} y={170} textAnchor="middle">
-                    {paternal}
-                </text>
+            ) : (
                 <circle
-                    cx={250}
-                    cy={125}
+                    cx={187.5}
+                    cy={225}
                     r={25}
                     stroke="black"
-                    cursor="pointer"
-                    fill={affectedMaternal === 2 ? 'black' : 'white'}
-                    onClick={() => {
-                        if (!samples) return
-                        navigate(
-                            `/project/${projectName}/sample/${getCPGID(
-                                maternal
-                            )}`
-                        )
-                    }}
+                    fill={affectedProband === 2 ? 'black' : 'white'}
                 />
-                <text x={250} y={170} textAnchor="middle">
-                    {maternal}
-                </text>
-                <line x1={150} y1={125} x2={225} y2={125} stroke="black" />
-                <line
-                    x1={187.5}
-                    y1={125}
-                    x2={187.5}
-                    y2={200}
-                    stroke="black"
-                />
-                {probandSex === 1 ? (
-                    <rect
-                        x={162.5}
-                        y={200}
-                        width={50}
-                        height={50}
-                        stroke="black"
-                        fill={affectedProband === 2 ? 'black' : 'white'}
-                    />
-                ) : (
-                    <circle
-                        cx={187.5}
-                        cy={225}
-                        r={25}
-                        stroke="black"
-                        fill={affectedProband === 2 ? 'black' : 'white'}
-                    />
-                )}
-                <text x={187.5} y={270} textAnchor="middle">
-                    {proband}
-                </text>
-            </svg>
-        )
-    }
+            )}
+            <text x={187.5} y={270} textAnchor="middle">
+                {proband}
+            </text>
+        </svg>
+    )
 
     React.useEffect(() => {
         if (!samples || !sampleName) return
@@ -374,8 +359,8 @@ const DetailedInfoPage_: React.FunctionComponent<
         return JSON.stringify(value)
     }
 
-    const renderSeqInfo = (seqInfo: SampleSequencing) => {
-        return Object.entries(seqInfo)
+    const renderSeqInfo = (seqInfo: SampleSequencing) =>
+        Object.entries(seqInfo)
             .filter(([key]) => key !== 'id')
             .map(([key, value]) => {
                 if (key === 'external_ids') {
@@ -453,7 +438,6 @@ const DetailedInfoPage_: React.FunctionComponent<
                     </div>
                 )
             })
-    }
 
     const renderSeqSection = () => {
         if (!sample || !sequenceInfo) {
@@ -463,26 +447,24 @@ const DetailedInfoPage_: React.FunctionComponent<
             <>
                 <h4
                     style={{
-                        borderBottom: `1px solid black`
+                        borderBottom: `1px solid black`,
                     }}
                 >
                     Sequence Information
                 </h4>
-                {sequenceInfo.map((seq) => {
-                    return (
-                        <React.Fragment key={seq.id}>
-                            <h6>
-                                <b>Sequence ID:</b> {seq.id}
-                            </h6>
+                {sequenceInfo.map((seq) => (
+                    <React.Fragment key={seq.id}>
+                        <h6>
+                            <b>Sequence ID:</b> {seq.id}
+                        </h6>
 
-                            <div style={{ marginLeft: '30px' }}>
-                                {renderSeqInfo(seq)}
-                                {prepReadMetadata(seq.meta || {})}
-                            </div>
-                            <br />
-                        </React.Fragment>
-                    )
-                })}
+                        <div style={{ marginLeft: '30px' }}>
+                            {renderSeqInfo(seq)}
+                            {prepReadMetadata(seq.meta || {})}
+                        </div>
+                        <br />
+                    </React.Fragment>
+                ))}
             </>
         )
     }
@@ -495,7 +477,7 @@ const DetailedInfoPage_: React.FunctionComponent<
             <>
                 <h4
                     style={{
-                        borderBottom: `1px solid black`
+                        borderBottom: `1px solid black`,
                     }}
                 >
                     Sample Information
@@ -554,7 +536,7 @@ const DetailedInfoPage_: React.FunctionComponent<
     const renderTitle = (
         <div
             style={{
-                borderBottom: `1px solid black`
+                borderBottom: `1px solid black`,
             }}
         >
             {participants &&
@@ -562,25 +544,23 @@ const DetailedInfoPage_: React.FunctionComponent<
                     .filter(
                         (item) => item.id === sampleInfo?.participant_id
                     )
-                    .map((item) => {
-                        return (
-                            <React.Fragment key={item.external_id}>
-                                <h1
-                                    style={{
-                                        display: 'inline'
-                                    }}
-                                    key={`${item.external_id}`}
-                                >
-                                    {`${item.external_id}\t`}
-                                </h1>
-                            </React.Fragment>
-                        )
-                    })}
+                    .map((item) => (
+                        <React.Fragment key={item.external_id}>
+                            <h1
+                                style={{
+                                    display: 'inline',
+                                }}
+                                key={`${item.external_id}`}
+                            >
+                                {`${item.external_id}\t`}
+                            </h1>
+                        </React.Fragment>
+                    ))}
             {sampleInfo && (
                 <>
                     <h3
                         style={{
-                            display: 'inline'
+                            display: 'inline',
                         }}
                     >
                         {`${sampleInfo?.id}\t${sampleInfo?.external_id}`}

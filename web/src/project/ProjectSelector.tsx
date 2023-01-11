@@ -15,7 +15,7 @@ interface ProjectSelectorProps {
 const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     setPageNumber,
     setPageLimit,
-    pageLimit
+    pageLimit,
 }) => {
     const { projectName } = useParams()
     const navigate = useNavigate()
@@ -62,7 +62,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
                 options={projects.map((p) => ({
                     key: p,
                     text: p,
-                    value: p
+                    value: p,
                 }))}
             />
         </div>

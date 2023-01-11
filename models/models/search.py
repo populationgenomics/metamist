@@ -44,4 +44,5 @@ class SearchResponse(SMBase):
 
     type: SearchResponseType
     title: str
-    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData | ErrorSearchResponseData
+    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
+    error: ErrorSearchResponseData | None

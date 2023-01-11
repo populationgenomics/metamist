@@ -7,7 +7,7 @@ import {
     Button,
     Checkbox,
     Input,
-    InputProps
+    InputProps,
 } from 'semantic-ui-react'
 import { ProjectApi, Project, SequenceType } from '../sm-api'
 

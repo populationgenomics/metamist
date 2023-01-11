@@ -9,39 +9,37 @@ import Routes from './Routes'
 import Searchbar from './Search'
 import MuckTheDuck from './MuckTheDuck'
 
-const App: React.FunctionComponent = () => {
-    return (
-        <Router>
-            <div className="App">
-                <header className="App-header">
-                    <div className="header">
-                        <Link className="metamist-img" to="/">
-                            <MuckTheDuck
-                                height={28}
-                                style={{ marginRight: '5px' }}
-                            />
-                        </Link>
-                        <Link className="metamist" to="/">
-                            METAMIST
-                        </Link>
-                        <Link className="navbarLink" to="/project">
-                            Explore
-                        </Link>
-                        <Link className="navbarLink" to="/swagger">
-                            Swagger
-                        </Link>
-                        <Link className="navbarLink" to="/documentation">
-                            Docs
-                        </Link>
-                        <Searchbar />
-                    </div>
-                </header>
-                <div className="body">
-                    <Routes />
+const App: React.FunctionComponent = () => (
+    <Router>
+        <div className="App">
+            <header className="App-header">
+                <div className="header">
+                    <Link className="metamist-img" to="/">
+                        <MuckTheDuck
+                            height={28}
+                            style={{ marginRight: '5px' }}
+                        />
+                    </Link>
+                    <Link className="metamist" to="/">
+                        METAMIST
+                    </Link>
+                    <Link className="navbarLink" to="/project">
+                        Explore
+                    </Link>
+                    <Link className="navbarLink" to="/swagger">
+                        Swagger
+                    </Link>
+                    <Link className="navbarLink" to="/documentation">
+                        Docs
+                    </Link>
+                    <Searchbar />
                 </div>
+            </header>
+            <div className="body">
+                <Routes />
             </div>
-        </Router>
-    )
-}
+        </div>
+    </Router>
+)
 
 export default App
