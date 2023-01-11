@@ -59,12 +59,16 @@ repos:
           ]
         additional_dependencies:
           - strawberry-graphql[fastapi]==0.138.1
+
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: "v2.7.1"
-
     hooks:
       - id: prettier
-        entry: bash -c 'cd web && prettier --write --list-different --ignore-unknown'
+        # I'm not exactly sure why it changes behaviour, but
+        # calling `cd web`, then calling `ls src/**/*.tsx`
+        # returns different results to `cd web && ls src/**/*.tsx`
+        # so just include both patterns here
+        entry: bash -c 'cd web && prettier --write --ignore-unknown --check src/*.{ts,tsx,css} src/**/*.{ts,tsx,css}'
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: "v8.31.0"
