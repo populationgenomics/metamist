@@ -72,9 +72,7 @@ interface Sample {
 
 const sampleFieldsToDisplay = ['active', 'type', 'participant_id']
 
-const DetailedInfoPage_: React.FunctionComponent<
-    Record<string, unknown>
-> = () => {
+const DetailedInfoPage_: React.FunctionComponent<Record<string, unknown>> = () => {
     const { projectName, sampleName } = useParams()
     const navigate = useNavigate()
     const [samples, setSamples] = React.useState()
@@ -83,13 +81,10 @@ const DetailedInfoPage_: React.FunctionComponent<
     const [sample, setSample] = React.useState<string>()
     const [sampleInfo, setSampleInfo] = React.useState<Sample>()
     const [pedigree, setPedigree] = React.useState<PedigreeEntry[]>()
-    const [participants, setParticipants] =
-        React.useState<ParticipantModel[]>()
-    const [selectedExternalID, setSelectedExternalID] =
-        React.useState<string>()
+    const [participants, setParticipants] = React.useState<ParticipantModel[]>()
+    const [selectedExternalID, setSelectedExternalID] = React.useState<string>()
     const [idNameMap, setIdNameMap] = React.useState<[string, string][]>()
-    const [sequenceInfo, setSequenceInfo] =
-        React.useState<SampleSequencing[]>()
+    const [sequenceInfo, setSequenceInfo] = React.useState<SampleSequencing[]>()
 
     const getSamplesFromProject = React.useCallback(async () => {
         if (!projectName) return
@@ -124,9 +119,7 @@ const DetailedInfoPage_: React.FunctionComponent<
             .then((resp) => {
                 setSampleInfo(resp.data)
                 setSelectedExternalID(
-                    participants.find(
-                        (item) => item.id === resp.data.participant_id
-                    )?.external_id
+                    participants.find((item) => item.id === resp.data.participant_id)?.external_id
                 )
             })
             .catch((er) => {
@@ -207,17 +200,7 @@ const DetailedInfoPage_: React.FunctionComponent<
 
         const k = 1024
         const dm = decimals < 0 ? 0 : decimals
-        const sizes = [
-            'Bytes',
-            'KB',
-            'MB',
-            'GB',
-            'TB',
-            'PB',
-            'EB',
-            'ZB',
-            'YB',
-        ]
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
 
         const i = Math.floor(Math.log(bytes) / Math.log(k))
 
@@ -230,9 +213,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                 {data.map((item: File) => (
                     <Table.Row key={item.location}>
                         <Table.Cell collapsing>{item.location}</Table.Cell>
-                        <Table.Cell collapsing>
-                            {formatBytes(item.size)}
-                        </Table.Cell>
+                        <Table.Cell collapsing>{formatBytes(item.size)}</Table.Cell>
                     </Table.Row>
                 ))}
             </Table.Body>
@@ -251,9 +232,7 @@ const DetailedInfoPage_: React.FunctionComponent<
         return (
             <>
                 <b>reads:</b>
-                {data.reads.map((v, i) =>
-                    renderReadsMetadata(Array.isArray(v) ? v : [v], i)
-                )}
+                {data.reads.map((v, i) => renderReadsMetadata(Array.isArray(v) ? v : [v], i))}
             </>
         )
     }
@@ -278,11 +257,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                 fill={affectedPaternal === 2 ? 'black' : 'white'}
                 onClick={() => {
                     if (!samples) return
-                    navigate(
-                        `/project/${projectName}/sample/${getCPGID(
-                            paternal
-                        )}`
-                    )
+                    navigate(`/project/${projectName}/sample/${getCPGID(paternal)}`)
                 }}
             />
             <text x={125} y={170} textAnchor="middle">
@@ -297,11 +272,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                 fill={affectedMaternal === 2 ? 'black' : 'white'}
                 onClick={() => {
                     if (!samples) return
-                    navigate(
-                        `/project/${projectName}/sample/${getCPGID(
-                            maternal
-                        )}`
-                    )
+                    navigate(`/project/${projectName}/sample/${getCPGID(maternal)}`)
                 }}
             />
             <text x={250} y={170} textAnchor="middle">
@@ -368,9 +339,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                         return (
                             <>
                                 <b>external_ids:</b>{' '}
-                                {Object.entries(
-                                    seqInfo?.external_ids ?? {}
-                                ).map(([k1, v1], i) => (
+                                {Object.entries(seqInfo?.external_ids ?? {}).map(([k1, v1], i) => (
                                     <React.Fragment key={`${v1} (${k1})`}>
                                         {i > 0 && ', '}
                                         {`${v1} (${k1})`}
@@ -379,9 +348,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                             </>
                         )
                     }
-                    return (
-                        <React.Fragment key="ExternalID"></React.Fragment>
-                    )
+                    return <React.Fragment key="ExternalID"></React.Fragment>
                 }
                 if (key === 'meta') {
                     return Object.entries(seqInfo.meta ?? {})
@@ -389,33 +356,22 @@ const DetailedInfoPage_: React.FunctionComponent<
                         .map(([k1, v1]) => {
                             if (
                                 Array.isArray(v1) &&
-                                v1.filter((v) => !!v.location && !!v.size)
-                                    .length === v1.length
+                                v1.filter((v) => !!v.location && !!v.size).length === v1.length
                             ) {
                                 // all are files coincidentally
                                 return (
                                     <React.Fragment key={`${k1}`}>
                                         <b>{k1}:</b>
-                                        {renderReadsMetadata(
-                                            v1 as File[],
-                                            key
-                                        )}
+                                        {renderReadsMetadata(v1 as File[], key)}
                                     </React.Fragment>
                                 )
                             }
-                            if (
-                                v1 &&
-                                typeof v1 === 'object' &&
-                                !Array.isArray(v1)
-                            ) {
+                            if (v1 && typeof v1 === 'object' && !Array.isArray(v1)) {
                                 if (!!v1.location && !!v1.size) {
                                     return (
                                         <React.Fragment key={`${k1}`}>
                                             <b>{k1}:</b>
-                                            {renderReadsMetadata(
-                                                [v1] as File[],
-                                                k1
-                                            )}
+                                            {renderReadsMetadata([v1] as File[], k1)}
                                         </React.Fragment>
                                     )
                                 }
@@ -423,8 +379,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                             const stringifiedValue = safeValue(v1)
                             return (
                                 <div key={`${k1}-${stringifiedValue}`}>
-                                    <b>{k1}:</b>{' '}
-                                    {stringifiedValue ?? <em>no-value</em>}
+                                    <b>{k1}:</b> {stringifiedValue ?? <em>no-value</em>}
                                 </div>
                             )
                         })
@@ -433,8 +388,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                 const stringifiedValue = safeValue(value)
                 return (
                     <div key={`${key}-${stringifiedValue}`}>
-                        <b>{key}:</b>{' '}
-                        {stringifiedValue ?? <em>no-value</em>}
+                        <b>{key}:</b> {stringifiedValue ?? <em>no-value</em>}
                     </div>
                 )
             })
@@ -486,8 +440,7 @@ const DetailedInfoPage_: React.FunctionComponent<
                     .filter(([key]) => sampleFieldsToDisplay.includes(key))
                     .map(([key, value]) => (
                         <div key={`${key}-${value}`}>
-                            <b>{key}:</b>{' '}
-                            {value?.toString() ?? <em>no value</em>}
+                            <b>{key}:</b> {value?.toString() ?? <em>no value</em>}
                         </div>
                     ))}
             </>
@@ -501,9 +454,7 @@ const DetailedInfoPage_: React.FunctionComponent<
         return (
             <>
                 {pedigree
-                    .filter(
-                        (item) => item.individual_id === selectedExternalID
-                    )
+                    .filter((item) => item.individual_id === selectedExternalID)
                     .map((item) => (
                         <React.Fragment
                             key={`${item.individual_id}-${item.maternal_id}-${item.paternal_id}`}
@@ -512,17 +463,11 @@ const DetailedInfoPage_: React.FunctionComponent<
                                 item.maternal_id &&
                                 drawTrio(
                                     item.paternal_id,
-                                    pedigree?.find(
-                                        (i) =>
-                                            i.individual_id ===
-                                            item.paternal_id
-                                    )?.affected ?? -1,
+                                    pedigree?.find((i) => i.individual_id === item.paternal_id)
+                                        ?.affected ?? -1,
                                     item.maternal_id,
-                                    pedigree?.find(
-                                        (i) =>
-                                            i.individual_id ===
-                                            item.maternal_id
-                                    )?.affected ?? -1,
+                                    pedigree?.find((i) => i.individual_id === item.maternal_id)
+                                        ?.affected ?? -1,
                                     item.individual_id,
                                     item.affected,
                                     item.sex
@@ -541,9 +486,7 @@ const DetailedInfoPage_: React.FunctionComponent<
         >
             {participants &&
                 participants
-                    .filter(
-                        (item) => item.id === sampleInfo?.participant_id
-                    )
+                    .filter((item) => item.id === sampleInfo?.participant_id)
                     .map((item) => (
                         <React.Fragment key={item.external_id}>
                             <h1

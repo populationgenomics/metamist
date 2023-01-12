@@ -42,20 +42,10 @@ const ProjectSummary: React.FunctionComponent = () => {
         directToken = +page * +pageSize - +pageSize
     }
 
-    const validPages = !!(
-        page &&
-        +page &&
-        pageSize &&
-        +pageSize &&
-        PAGE_SIZES.includes(+pageSize)
-    )
+    const validPages = !!(page && +page && pageSize && +pageSize && PAGE_SIZES.includes(+pageSize))
 
-    const [summary, setSummary] = React.useState<
-        ProjectSummaryResponse | undefined
-    >()
-    const [pageNumber, setPageNumber] = React.useState<number>(
-        validPages ? +page : 1
-    )
+    const [summary, setSummary] = React.useState<ProjectSummaryResponse | undefined>()
+    const [pageNumber, setPageNumber] = React.useState<number>(validPages ? +page : 1)
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     const [error, setError] = React.useState<string | undefined>()
     const [pageLimit, _setPageLimit] = React.useState<number>(
@@ -95,9 +85,7 @@ const ProjectSummary: React.FunctionComponent = () => {
 
     const setPageLimit = React.useCallback(
         (e: React.SyntheticEvent<HTMLElement>, { value }) => {
-            navigate(
-                `/project/${projectName}/1?size=${parseInt(value, 10)}`
-            )
+            navigate(`/project/${projectName}/1?size=${parseInt(value, 10)}`)
             _setPageLimit(parseInt(value, 10))
             setPageNumber(1)
         },
@@ -116,9 +104,7 @@ const ProjectSummary: React.FunctionComponent = () => {
         _updateProjectSummary,
     ])
 
-    const totalPageNumbers = Math.ceil(
-        (summary?.total_samples || 0) / pageLimit
-    )
+    const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
 
     const pageOptions = (
         <>
@@ -135,8 +121,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             )}
             {!!summary?.total_samples && (
                 <span style={{ padding: '8px 10px 0 10px' }}>
-                    Page {pageNumber} / {totalPageNumbers} (
-                    {summary?.total_samples} samples)
+                    Page {pageNumber} / {totalPageNumbers} ({summary?.total_samples} samples)
                 </span>
             )}
             {pageNumber < totalPageNumbers && (
@@ -163,9 +148,7 @@ const ProjectSummary: React.FunctionComponent = () => {
         if (error) {
             return (
                 <p>
-                    <em>
-                        An error occurred when fetching samples: {error}
-                    </em>
+                    <em>An error occurred when fetching samples: {error}</em>
                 </p>
             )
         }
@@ -175,14 +158,8 @@ const ProjectSummary: React.FunctionComponent = () => {
         if (summary.participants.length === 0) {
             return (
                 <p>
-                    <em>
-                        Ah Muck, there aren&apos;t any samples in this
-                        project
-                    </em>
-                    <MuckTheDuck
-                        height={28}
-                        style={{ transform: 'scaleY(-1)' }}
-                    />
+                    <em>Ah Muck, there aren&apos;t any samples in this project</em>
+                    <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
                 </p>
             )
         }
@@ -190,9 +167,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             'Family ID',
             ...summary.participant_keys.map((field) => field[1]),
             ...summary.sample_keys.map((field) => field[1]),
-            ...summary.sequence_keys.map(
-                (field) => `sequence.${field[1]}`
-            ),
+            ...summary.sequence_keys.map((field) => `sequence.${field[1]}`),
         ]
 
         return (
@@ -200,9 +175,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                 <Table.Header>
                     <Table.Row>
                         {headers.map((k, i) => (
-                            <Table.HeaderCell key={`${k}-${i}`}>
-                                {k}
-                            </Table.HeaderCell>
+                            <Table.HeaderCell key={`${k}-${i}`}>{k}</Table.HeaderCell>
                         ))}
                     </Table.Row>
                 </Table.Header>
@@ -210,104 +183,66 @@ const ProjectSummary: React.FunctionComponent = () => {
                     {summary.participants.map((p, pidx) =>
                         p.samples.map((s, sidx) => {
                             const backgroundColor =
-                                pidx % 2 === 0
-                                    ? 'white'
-                                    : 'var(--bs-table-striped-bg)'
+                                pidx % 2 === 0 ? 'white' : 'var(--bs-table-striped-bg)'
                             const lengthOfParticipant = p.samples
                                 .map((s_) => s_.sequences.length)
                                 .reduce((a, b) => a + b, 0)
                             return s.sequences.map((seq, seqidx) => {
-                                const isFirstOfGroup =
-                                    sidx === 0 && seqidx === 0
+                                const isFirstOfGroup = sidx === 0 && seqidx === 0
                                 return (
-                                    <Table.Row
-                                        key={`${p.external_id}-${s.id}-${seq.id}`}
-                                    >
+                                    <Table.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
                                         {isFirstOfGroup && (
                                             <Table.Cell
                                                 style={{ backgroundColor }}
-                                                rowSpan={
-                                                    lengthOfParticipant
-                                                }
+                                                rowSpan={lengthOfParticipant}
                                             >
-                                                {p.families
-                                                    .map(
-                                                        (f) =>
-                                                            f.external_id
-                                                    )
-                                                    .join(', ')}
+                                                {p.families.map((f) => f.external_id).join(', ')}
                                             </Table.Cell>
                                         )}
                                         {isFirstOfGroup &&
-                                            summary.participant_keys.map(
-                                                ([k]) => (
-                                                    <Table.Cell
-                                                        style={{
-                                                            backgroundColor,
-                                                        }}
-                                                        key={`${p.id}participant.${k}`}
-                                                        rowSpan={
-                                                            lengthOfParticipant
-                                                        }
-                                                    >
-                                                        {sanitiseValue(
-                                                            _.get(p, k)
-                                                        )}
-                                                    </Table.Cell>
-                                                )
-                                            )}
+                                            summary.participant_keys.map(([k]) => (
+                                                <Table.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${p.id}participant.${k}`}
+                                                    rowSpan={lengthOfParticipant}
+                                                >
+                                                    {sanitiseValue(_.get(p, k))}
+                                                </Table.Cell>
+                                            ))}
                                         {seqidx === 0 &&
-                                            summary.sample_keys.map(
-                                                ([k]) => (
-                                                    <Table.Cell
-                                                        style={{
-                                                            backgroundColor,
-                                                        }}
-                                                        key={`${s.id}sample.${k}`}
-                                                        rowSpan={
-                                                            s.sequences
-                                                                .length
-                                                        }
-                                                    >
-                                                        {k ===
-                                                            'external_id' ||
-                                                        k === 'id' ? (
-                                                            <SampleLink
-                                                                id={s.id}
-                                                                projectName={
-                                                                    projectName
-                                                                }
-                                                            >
-                                                                {sanitiseValue(
-                                                                    _.get(
-                                                                        s,
-                                                                        k
-                                                                    )
-                                                                )}
-                                                            </SampleLink>
-                                                        ) : (
-                                                            sanitiseValue(
-                                                                _.get(s, k)
-                                                            )
-                                                        )}
-                                                    </Table.Cell>
-                                                )
-                                            )}
+                                            summary.sample_keys.map(([k]) => (
+                                                <Table.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${s.id}sample.${k}`}
+                                                    rowSpan={s.sequences.length}
+                                                >
+                                                    {k === 'external_id' || k === 'id' ? (
+                                                        <SampleLink
+                                                            id={s.id}
+                                                            projectName={projectName}
+                                                        >
+                                                            {sanitiseValue(_.get(s, k))}
+                                                        </SampleLink>
+                                                    ) : (
+                                                        sanitiseValue(_.get(s, k))
+                                                    )}
+                                                </Table.Cell>
+                                            ))}
                                         {seq &&
-                                            summary.sequence_keys.map(
-                                                ([k]) => (
-                                                    <Table.Cell
-                                                        style={{
-                                                            backgroundColor,
-                                                        }}
-                                                        key={`${s.id}sequence.${k}`}
-                                                    >
-                                                        {sanitiseValue(
-                                                            _.get(seq, k)
-                                                        )}
-                                                    </Table.Cell>
-                                                )
-                                            )}
+                                            summary.sequence_keys.map(([k]) => (
+                                                <Table.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${s.id}sequence.${k}`}
+                                                >
+                                                    {sanitiseValue(_.get(seq, k))}
+                                                </Table.Cell>
+                                            ))}
                                     </Table.Row>
                                 )
                             })
@@ -318,14 +253,11 @@ const ProjectSummary: React.FunctionComponent = () => {
         )
     }
 
-    const titleCase = (s: string) =>
-        s[0].toUpperCase() + s.slice(1).toLowerCase()
+    const titleCase = (s: string) => s[0].toUpperCase() + s.slice(1).toLowerCase()
 
     const batchTable = () => {
         const seqTypes = Object.keys(summary?.cram_seqr_stats ?? {})
-        const batchEntries = Object.entries(
-            summary?.batch_sequence_stats ?? {}
-        )
+        const batchEntries = Object.entries(summary?.batch_sequence_stats ?? {})
 
         if (!seqTypes.length || !batchEntries.length) {
             return <></>
@@ -337,9 +269,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                     <Table.Row>
                         <Table.HeaderCell>Batch</Table.HeaderCell>
                         {seqTypes.map((item) => (
-                            <Table.HeaderCell
-                                key={`header-${item}-${projectName}`}
-                            >
+                            <Table.HeaderCell key={`header-${item}-${projectName}`}>
                                 {titleCase(item)}
                             </Table.HeaderCell>
                         ))}
@@ -367,15 +297,10 @@ const ProjectSummary: React.FunctionComponent = () => {
                             <Table.Row key={`body-${key}-${projectName}`}>
                                 <Table.Cell>{titleCase(key)}</Table.Cell>
                                 {seqTypes.map((seq) => (
-                                    <Table.Cell
-                                        key={`${key}-${seq}`}
-                                    >{`${value[seq]}`}</Table.Cell>
+                                    <Table.Cell key={`${key}-${seq}`}>{`${value[seq]}`}</Table.Cell>
                                 ))}
                                 <Table.Cell>
-                                    {Object.values(value).reduce(
-                                        (a, b) => +a + +b,
-                                        0
-                                    )}
+                                    {Object.values(value).reduce((a, b) => +a + +b, 0)}
                                 </Table.Cell>
                             </Table.Row>
                         ))}
@@ -420,9 +345,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                             <Table.Row>
                                 <Table.Cell>{titleCase(key)}</Table.Cell>
                                 {Object.entries(value).map(([k1, v1]) => (
-                                    <Table.Cell
-                                        key={`${key}-${k1}-${projectName}`}
-                                    >
+                                    <Table.Cell key={`${key}-${k1}-${projectName}`}>
                                         {`${v1}`}
                                     </Table.Cell>
                                 ))}

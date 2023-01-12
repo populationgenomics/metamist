@@ -15,10 +15,7 @@ const App: React.FunctionComponent = () => (
             <header className="App-header">
                 <div className="header">
                     <Link className="metamist-img" to="/">
-                        <MuckTheDuck
-                            height={28}
-                            style={{ marginRight: '5px' }}
-                        />
+                        <MuckTheDuck height={28} style={{ marginRight: '5px' }} />
                     </Link>
                     <Link className="metamist" to="/">
                         METAMIST

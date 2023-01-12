@@ -14,33 +14,18 @@ const Routes: React.FunctionComponent = () => (
             <Route path=":id" element={<DocumentationArticle />} />
         </Route>
 
-        <Route
-            path="/swagger"
-            element={<SwaggerUI url="/openapi.json" />}
-        />
+        <Route path="/swagger" element={<SwaggerUI url="/openapi.json" />} />
 
         <Route path="project/" element={<ProjectSummary />} />
         <Route path="project/:projectName" element={<ProjectSummary />} />
-        <Route
-            path="project/:projectName/:page/"
-            element={<ProjectSummary />}
-        />
+        <Route path="project/:projectName/:page/" element={<ProjectSummary />} />
 
         <Route path="admin" element={<ProjectsAdmin />} />
 
-        <Route
-            path="/"
-            element={<DocumentationArticle articleid="index" />}
-        />
+        <Route path="/" element={<DocumentationArticle articleid="index" />} />
 
-        <Route
-            path="project/:projectName/sample/:sampleName"
-            element={<DetailedInfoPage />}
-        />
-        <Route
-            path="project/:projectName/family/:familyName"
-            element={<DetailedInfoPage />}
-        />
+        <Route path="project/:projectName/sample/:sampleName" element={<DetailedInfoPage />} />
+        <Route path="project/:projectName/family/:familyName" element={<DetailedInfoPage />} />
         <Route
             path="project/:projectName/participant/:participantName"
             element={<DetailedInfoPage />}

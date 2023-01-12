@@ -2,13 +2,7 @@
 // Since this is for admin only
 
 import * as React from 'react'
-import {
-    Message,
-    Button,
-    Checkbox,
-    Input,
-    InputProps,
-} from 'semantic-ui-react'
+import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
 import { ProjectApi, Project, SequenceType } from '../sm-api'
 
 interface ControlledInputProps extends InputProps {
@@ -49,19 +43,17 @@ const ProjectsAdmin = () => {
 
     if (!projects) return <div>Loading...</div>
 
-    const updateMetaValue = (
-        projectName: string,
-        metaKey: string,
-        metaValue: any
-    ) => {
+    const updateMetaValue = (projectName: string, metaKey: string, metaValue: any) => {
         new ProjectApi()
             .updateProject(projectName, { meta: { [metaKey]: metaValue } })
             .then(() => getProjects())
     }
 
-    const ControlledInput: React.FunctionComponent<
-        ControlledInputProps
-    > = ({ project, metaKey, ...props }) => {
+    const ControlledInput: React.FunctionComponent<ControlledInputProps> = ({
+        project,
+        metaKey,
+        ...props
+    }) => {
         // const projStateMeta: any = projectStateValue[project.name!]?.meta || {}
         const projectMeta: any = project?.meta || {}
         return (
@@ -74,14 +66,10 @@ const ProjectsAdmin = () => {
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                     const newValue = e.currentTarget.value
                     if (newValue === projectMeta[metaKey]) {
-                        console.log(
-                            `Skip update to meta.${metaKey} as the value did not change`
-                        )
+                        console.log(`Skip update to meta.${metaKey} as the value did not change`)
                         return
                     }
-                    console.log(
-                        `Updating ${project.name}: meta.${metaKey} to ${newValue}`
-                    )
+                    console.log(`Updating ${project.name}: meta.${metaKey} to ${newValue}`)
                     updateMetaValue(project.name!, metaKey, newValue)
                 }}
                 {...props}
@@ -105,28 +93,19 @@ const ProjectsAdmin = () => {
                 <tbody>
                     {projects
                         .map((p) => {
-                            const meta: { [key: string]: any } =
-                                p?.meta || {}
+                            const meta: { [key: string]: any } = p?.meta || {}
 
                             const isSeqr = meta?.is_seqr || false
                             const types = isSeqr ? seqTypes : [null]
-                            const rowSpan = isSeqr
-                                ? seqTypes.length
-                                : undefined
+                            const rowSpan = isSeqr ? seqTypes.length : undefined
 
                             return types.map((seqType, idx) => (
                                 <tr key={`${p.id}-${seqType}`}>
                                     {idx === 0 && (
                                         <>
-                                            <td rowSpan={rowSpan}>
-                                                {p.id}
-                                            </td>
-                                            <td rowSpan={rowSpan}>
-                                                {p.name}
-                                            </td>
-                                            <td rowSpan={rowSpan}>
-                                                {p.dataset}
-                                            </td>
+                                            <td rowSpan={rowSpan}>{p.id}</td>
+                                            <td rowSpan={rowSpan}>{p.name}</td>
+                                            <td rowSpan={rowSpan}>{p.dataset}</td>
                                             <td rowSpan={rowSpan}>
                                                 <Checkbox
                                                     checked={meta?.is_seqr}

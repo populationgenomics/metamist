@@ -112,9 +112,7 @@ const resultRenderer = ({ ...props }) => {
 
     const subtitle = components.length > 0 ? components.join(' · ') : null
 
-    const key = String(
-        props.data.id || `${props.data.project}|${props.data.title}`
-    )
+    const key = String(props.data.id || `${props.data.project}|${props.data.title}`)
 
     // prefer early return for empty results
     if (!props.title || !props.type) return <></>
@@ -122,9 +120,7 @@ const resultRenderer = ({ ...props }) => {
     return (
         <div key={key} className="content">
             <div style={{ display: 'flex' }}>
-                <div style={{ flex: 1, order: 1, width: '20%' }}>
-                    {icon}
-                </div>
+                <div style={{ flex: 1, order: 1, width: '20%' }}>{icon}</div>
                 <div
                     style={{
                         order: 2,
@@ -133,9 +129,7 @@ const resultRenderer = ({ ...props }) => {
                     }}
                 >
                     <div className="title">{props.title}</div>
-                    {subtitle && (
-                        <div className="description">{subtitle}</div>
-                    )}
+                    {subtitle && <div className="description">{subtitle}</div>}
                     {available && <div>{available}</div>}
                 </div>
                 <div
@@ -155,16 +149,9 @@ const resultRenderer = ({ ...props }) => {
 
 const Searchbar: React.FunctionComponent = () => {
     const navigate = useNavigate()
-    const [{ loading, results, value }, dispatch] = React.useReducer(
-        SearchReducer,
-        initialState
-    )
+    const [{ loading, results, value }, dispatch] = React.useReducer(SearchReducer, initialState)
 
-    const searchResultToRoute = (
-        project: string,
-        type: string,
-        id: string
-    ) => {
+    const searchResultToRoute = (project: string, type: string, id: string) => {
         // handle "no access to this project"
         if (!id) return
 
@@ -263,11 +250,7 @@ const Searchbar: React.FunctionComponent = () => {
                     query: '',
                     results: {},
                 } as Action)
-                searchResultToRoute(
-                    data.result.data.project,
-                    data.result.type,
-                    data.result.data.id
-                )
+                searchResultToRoute(data.result.data.project, data.result.type, data.result.data.id)
             }}
             resultRenderer={resultRenderer}
             onSearchChange={handleSearchChange}

@@ -13,8 +13,7 @@ interface IDocumentationArticleProps {
 
 const RouterLink = (props: any) => {
     // use an anchor for external links
-    if (props.href.match(/^(https?:)?\/\//))
-        return <a href={props.href}>{props.children}</a>
+    if (props.href.match(/^(https?:)?\/\//)) return <a href={props.href}>{props.children}</a>
 
     let link: string = props.href
     // rewrite the internal link here if it's a relative link
@@ -26,9 +25,9 @@ const RouterLink = (props: any) => {
     return <Link to={link}>{props.children}</Link>
 }
 
-const DocumentationArticle: React.FunctionComponent<
-    IDocumentationArticleProps
-> = (props: IDocumentationArticleProps) => {
+const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> = (
+    props: IDocumentationArticleProps
+) => {
     const [text, setText] = React.useState<string | null>(null)
 
     const match = useParams()
@@ -78,16 +77,8 @@ const DocumentationArticle: React.FunctionComponent<
                 remarkPlugins={[remarkGfm, remarkToc]}
                 components={{
                     a: RouterLink,
-                    code({
-                        node,
-                        inline,
-                        className,
-                        children,
-                        ...props_
-                    }) {
-                        const match_ = /language-(\w+)/.exec(
-                            className || ''
-                        )
+                    code({ node, inline, className, children, ...props_ }) {
+                        const match_ = /language-(\w+)/.exec(className || '')
                         return !inline && match_ ? (
                             <SyntaxHighlighter
                                 // style={syntaxStyle}
