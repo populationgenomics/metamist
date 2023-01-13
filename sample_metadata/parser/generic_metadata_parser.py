@@ -4,8 +4,6 @@ import logging
 import re
 import shlex
 from functools import reduce
-from io import StringIO
-from api.utils import group_by
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
@@ -17,11 +15,10 @@ from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
-    ParticipantMetaGroup,
-    SampleMetaGroup,
-    SequenceMetaGroup,
+    ParsedSequenceGroup,
+    ParsedSequence,
     SingleRow,
-    run_as_sync,
+    run_as_sync, ParsedAnalysis,
 )  # noqa
 
 __DOC = """
@@ -148,9 +145,9 @@ class GenericMetadataParser(GenericParser):
         self.allow_extra_files_in_search_path = allow_extra_files_in_search_path
         self.batch_number = batch_number
 
-    def get_sample_id(self, row: SingleRow) -> Optional[str]:
+    def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
-        return row.get(self.sample_name_column, None)
+        return row[self.sample_name_column].strip()
 
     async def get_cpg_sample_id_from_row(self, row: SingleRow) -> Optional[str]:
         """Get internal cpg id from a row using get_sample_id and an api call"""
@@ -170,15 +167,6 @@ class GenericMetadataParser(GenericParser):
             return [self.get_sequence_type(row)]
         return [
             SequenceType(r.get(self.seq_type_column, self.default_sequence_type))
-            for r in row
-        ]
-
-    def get_sequence_technologies(self, row: GroupedRow) -> list[SequenceTechnology]:
-        """Get list of sequence technologies for rows"""
-        if isinstance(row, dict):
-            return [self.get_sequence_technology(row)]
-        return [
-            self.get_sequence_technology(r)
             for r in row
         ]
 
@@ -250,53 +238,16 @@ class GenericMetadataParser(GenericParser):
         """Get karyotype from grouped row"""
         return row[0].get(self.karyotype_column, None)
 
-    def has_participants(self, file_pointer, delimiter: str) -> bool:
+    def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
-        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        first_line = next(reader)
-        has_participants = self.participant_column in first_line
-        file_pointer.seek(0)
-        return has_participants
+        return self.participant_column in rows[0]
 
-    async def validate_participant_map(
-        self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
-    ):
-        await super().validate_participant_map(participant_map)
-        if not self.reads_column:
-            return
-
-        ungrouped_rows: List[Dict[str, Any]] = []
-        for sample_map in participant_map.values():
-            for row in sample_map.values():
-                if isinstance(row, list):
-                    ungrouped_rows.extend(row)
-                elif isinstance(row, dict):
-                    ungrouped_rows.append(row)
-                else:
-                    raise ValueError(f'Unexpected type {type(row)} {row}')
+    async def validate_rows(self, rows):
+        await super().validate_rows(rows)
 
         errors = []
-        errors.extend(await self.check_files_covered_by_rows(ungrouped_rows))
-        if errors:
-            raise ValueError(', '.join(errors))
+        errors.extend(await self.check_files_covered_by_rows(rows))
 
-    async def validate_sample_map(self, sample_map: Dict[str, List[Dict[str, Any]]]):
-        await super().validate_sample_map(sample_map)
-
-        if not self.reads_column:
-            return
-
-        ungrouped_rows: List[Dict[str, Any]] = []
-        for row in sample_map.values():
-            if isinstance(row, list):
-                ungrouped_rows.extend(row)
-            elif isinstance(row, dict):
-                ungrouped_rows.append(row)
-            else:
-                raise ValueError(f'Unexpected type {type(row)} {row}')
-
-        errors = []
-        errors.extend(await self.check_files_covered_by_rows(ungrouped_rows))
         if errors:
             raise ValueError(', '.join(errors))
 
@@ -535,79 +486,78 @@ class GenericMetadataParser(GenericParser):
 
         return gvcf_filenames
 
-    async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
-        """Return list of grouped by sample metadata from the rows"""
-        sample_metadata = []
-        for sid, row_group in group_by(rows, self.get_sample_id).items():
-            sample_group = SampleMetaGroup(sample_id=sid, rows=row_group, meta=None)
-            sample_metadata.append(await self.get_sample_meta(sample_group))
-        return sample_metadata
-
-    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
+    async def get_sample_meta_from_group(self, rows: GroupedRow):
         """Get sample-metadata from row"""
-        rows = sample_group.rows
-        meta = self.collapse_arbitrary_meta(self.sample_meta_map, rows)
-        sample_group.meta = meta
-        return sample_group
+        return self.collapse_arbitrary_meta(self.sample_meta_map, rows)
 
-    async def get_participant_meta(
-        self, participant_id: int, rows: GroupedRow
-    ) -> ParticipantMetaGroup:
+    async def get_participant_meta_from_group(self, rows: GroupedRow):
+
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
-        meta = self.collapse_arbitrary_meta(self.participant_meta_map, rows)
-        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta=meta)
+        return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
-    async def get_grouped_sequence_meta(
-        self,
-        sample_id: str,
-        rows: GroupedRow,
-    ) -> List[SequenceMetaGroup]:
-        """
-        Takes a collection of SingleRows and groups them by sequence type
-        For each sequence type, get_sequence_meta for that group and return the
-        resulting list of metadata
-        """
-        sequence_meta = []
+    async def get_sequence_group_meta(self, sequence_group: ParsedSequenceGroup) -> dict:
 
-        def _seq_grouper(s):
-            return str(self.get_sequence_type(s)), str(self.get_sequence_technology(s))
+        meta = {}
 
-        for (stype, stech), row_group in group_by(rows, _seq_grouper).items():
-            seq_group = SequenceMetaGroup(
-                rows=list(row_group),
-                sequence_type=SequenceType(stype),
-                sequence_technology=SequenceTechnology(stech)
+        if not sequence_group.sample.external_sid:
+            sequence_group.sample.external_sid = await self.get_cpg_sample_id_from_row(sequence_group.rows[0])
+
+        gvcf_filenames: List[str] = []
+
+        for r in sequence_group.rows:
+            if self.gvcf_column and self.gvcf_column in r:
+                gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
+
+        # strip in case collaborator put "file1, file2"
+        full_gvcf_filenames: List[str] = []
+
+        if gvcf_filenames:
+            full_gvcf_filenames.extend(
+                self.file_path(f.strip()) for f in gvcf_filenames if f.strip()
             )
-            sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
-        return sequence_meta
 
-    async def get_sequence_meta(
-        self,
-        seq_group: SequenceMetaGroup,
-        sample_id: Optional[str] = None,
-    ) -> SequenceMetaGroup:
-        """Get sequence-metadata from row"""
-        rows = seq_group.rows
+        variant_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
+            sequence_group.sample.external_sid, full_gvcf_filenames, None
+        )
+        variants: Dict[str, List] = variant_file_types.get('variants')
+
+        if variants:
+            if 'gvcf' in variants:
+                meta['gvcfs'] = variants.get('gvcf')
+                meta['gvcf_types'] = 'gvcf'
+
+            if 'vcf' in variants:
+                meta['vcfs'] = variants['vcf']
+                meta['vcf_type'] = 'vcf'
+
+        return meta
+
+    async def get_sequences_from_group(self, sequence_group: ParsedSequenceGroup) -> list[ParsedSequence]:
+        """Get sequences from sequence group + rows"""
+        sample = sequence_group.sample
+        rows = sequence_group.rows
+
+        if not sample.external_sid:
+            sample.external_sid = await self.get_cpg_sample_id_from_row(rows[0])
 
         collapsed_sequence_meta = self.collapse_arbitrary_meta(
             self.sequence_meta_map, rows
         )
 
+        sequences = []
+
         read_filenames: List[str] = []
-        gvcf_filenames: List[str] = []
         read_checksums: List[str] = []
         reference_assemblies: set[str] = set()
 
         for r in rows:
-            _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
+            _rfilenames = await self.get_read_filenames(sample_id=sample.external_sid, row=r)
             read_filenames.extend(_rfilenames)
             if self.checksum_column and self.checksum_column in r:
-                checksums = await self.get_checksums_from_row(sample_id, r, _rfilenames)
+                checksums = await self.get_checksums_from_row(sample.external_sid, r, _rfilenames)
                 if not checksums:
                     checksums = [None] * len(_rfilenames)
                 read_checksums.extend(checksums)
-            if self.gvcf_column and self.gvcf_column in r:
-                gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
             if self.reference_assembly_location_column:
                 ref = r.get(self.reference_assembly_location_column)
@@ -616,113 +566,94 @@ class GenericMetadataParser(GenericParser):
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: List[str] = []
-        full_gvcf_filenames: List[str] = []
         if read_filenames:
             full_read_filenames.extend(
                 self.file_path(f.strip()) for f in read_filenames if f.strip()
             )
-        if gvcf_filenames:
-            full_gvcf_filenames.extend(
-                self.file_path(f.strip()) for f in gvcf_filenames if f.strip()
-            )
-
-        if not sample_id:
-            sample_id = await self.get_cpg_sample_id_from_row(rows[0])
-
         read_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
-            sample_id, full_read_filenames, read_checksums
-        )
-        variant_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
-            sample_id, full_gvcf_filenames, None
+            sample.external_sid, full_read_filenames, read_checksums
         )
         reads: Dict[str, List] = read_file_types.get('reads')
-        variants: Dict[str, List] = variant_file_types.get('variants')
-        if reads:
-            keys = list(reads.keys())
-            if len(keys) > 1:
-                # 2021-12-14 mfranklin: In future we should return multiple
-                #       sequence meta, and handle that in the generic parser
+        if not reads:
+            return []
+
+        keys = list(reads.keys())
+        if len(keys) > 1:
+            # 2021-12-14 mfranklin: In future we should return multiple
+            #       sequence meta, and handle that in the generic parser
+            raise ValueError(
+                f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
+            )
+
+        reads_type = keys[0]
+        collapsed_sequence_meta['reads_type'] = reads_type
+        # collapsed_sequence_meta['reads'] = reads[reads_type]
+
+        if reads_type == 'cram':
+            if len(reference_assemblies) > 1:
+                # sorted for consistent testing
+                str_ref_assemblies = ', '.join(sorted(reference_assemblies))
                 raise ValueError(
-                    f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
+                    f'Multiple reference assemblies were defined for {sample.external_sid}: {str_ref_assemblies}'
+                )
+            if len(reference_assemblies) == 1:
+                ref = next(iter(reference_assemblies))
+            else:
+                ref = self.default_reference_assembly_location
+
+            if not ref:
+                raise ValueError(
+                    f'Reads type for "{sample.external_sid}" is CRAM, but a reference is not defined, please set the default reference assembly path'
                 )
 
-            reads_type = keys[0]
-            collapsed_sequence_meta['reads_type'] = reads_type
-            collapsed_sequence_meta['reads'] = reads[reads_type]
-
-            if reads_type == 'cram':
-                if len(reference_assemblies) > 1:
-                    # sorted for consistent testing
-                    str_ref_assemblies = ', '.join(sorted(reference_assemblies))
-                    raise ValueError(
-                        f'Multiple reference assemblies were defined for {sample_id}: {str_ref_assemblies}'
-                    )
-                if len(reference_assemblies) == 1:
-                    ref = next(iter(reference_assemblies))
-                else:
-                    ref = self.default_reference_assembly_location
-
-                if not ref:
-                    raise ValueError(
-                        f'Reads type for "{sample_id}" is CRAM, but a reference is not defined, please set the default reference assembly path'
-                    )
-
-                ref_fp = self.file_path(ref)
-                secondary_files = (
-                    await self.create_secondary_file_objects_by_potential_pattern(
-                        ref_fp, ['.fai']
-                    )
+            ref_fp = self.file_path(ref)
+            secondary_files = (
+                await self.create_secondary_file_objects_by_potential_pattern(
+                    ref_fp, ['.fai']
                 )
-                cram_reference = await self.create_file_object(
-                    ref_fp, secondary_files=secondary_files
-                )
-                collapsed_sequence_meta['reference_assembly'] = cram_reference
-
-        if variants:
-            if 'gvcf' in variants:
-                collapsed_sequence_meta['gvcfs'] = variants.get('gvcf')
-                collapsed_sequence_meta['gvcf_types'] = 'gvcf'
-
-            if 'vcf' in variants:
-                collapsed_sequence_meta['vcfs'] = variants['vcf']
-                collapsed_sequence_meta['vcf_type'] = 'vcf'
+            )
+            cram_reference = await self.create_file_object(
+                ref_fp, secondary_files=secondary_files
+            )
+            collapsed_sequence_meta['reference_assembly'] = cram_reference
 
         if self.batch_number is not None:
             collapsed_sequence_meta['batch'] = self.batch_number
 
-        seq_group.meta = collapsed_sequence_meta
-        return seq_group
+        for read in reads[reads_type]:
+            sequences.append(
+                ParsedSequence(
+                    group=sequence_group,
+                    # we don't determine which set of rows belong to a sequence,
+                    # as we grab all reads, and then determine sequence
+                    # grouping from there.
+                    rows=sequence_group.rows,
+                    internal_seq_id=None,
+                    external_seq_ids={},
+                    sequence_type=sequence_group.sequence_type,
+                    sequence_technology=sequence_group.sequence_technology,
+                    sequence_platform=sequence_group.sequence_platform,
+                    meta={**collapsed_sequence_meta, 'reads': read}
+                )
+            )
 
-    async def get_qc_meta(
-        self, sample_id: str, row: GroupedRow
-    ) -> Optional[Dict[str, Any]]:
-        """Get collapsed qc meta"""
+        return sequences
+
+    async def get_analyses_from_sequence_group(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> list[ParsedAnalysis]:
         if not self.qc_meta_map:
-            return None
+            return []
 
-        return self.collapse_arbitrary_meta(self.qc_meta_map, row)
+        sample_id = sequence_group.sample.external_sid
 
-    async def from_manifest_path(
-        self,
-        manifest: str,
-        confirm=False,
-        delimiter=None,
-        dry_run=False,
-    ):
-        """Parse manifest from path, and return result of parsing manifest"""
-        file = self.file_path(manifest)
-
-        _delimiter = delimiter or GenericMetadataParser.guess_delimiter_from_filename(
-            file
-        )
-
-        file_contents = await self.file_contents(file)
-        return await self.parse_manifest(
-            StringIO(file_contents),
-            delimiter=_delimiter,
-            confirm=confirm,
-            dry_run=dry_run,
-        )
+        return [ParsedAnalysis(
+            sequence_group=sequence_group,
+            status=self.get_analysis_status(sample_id, sequence_group.rows),
+            type_=self.get_analysis_type(sample_id, sequence_group.rows),
+            meta=self.collapse_arbitrary_meta(self.qc_meta_map, sequence_group.rows),
+            rows=sequence_group.rows
+        )]
 
 
 @click.command(help=__DOC)

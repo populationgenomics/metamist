@@ -39,47 +39,42 @@ class TestSampleMapParser(unittest.TestCase):
         parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        participants_to_add = resp['participants']['insert']
-        participants_to_update = resp['participants']['update']
-        samples_to_add = resp['samples']['insert']
-        samples_to_update = resp['samples']['update']
-        sequencing_to_add = resp['sequences']['insert']
-        sequencing_to_update = resp['sequences']['update']
+        self.assertEqual(1, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(1, summary['sequence_groups']['insert'])
+        self.assertEqual(0, summary['sequence_groups']['update'])
+        self.assertEqual(1, summary['sequences']['insert'])
+        self.assertEqual(0, summary['sequences']['update'])
 
-        self.assertEqual(1, len(participants_to_add))
-        self.assertEqual(0, len(participants_to_update))
-        self.assertEqual(1, len(samples_to_add))
-        self.assertEqual(0, len(samples_to_update))
-        self.assertEqual(1, len(sequencing_to_add))
-        self.assertEqual(0, len(sequencing_to_update))
+        sequence = participants[0].samples[0].sequence_groups[0].sequences[0]
 
-        self.assertDictEqual({}, samples_to_add[0].meta)
+        self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence_dict = {
             'reads': [
-                [
-                    {
-                        'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
-                        'basename': '<sample-id>.filename-R1.fastq.gz',
-                        'class': 'File',
-                        'checksum': None,
-                        'size': None,
-                    },
-                    {
-                        'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
-                        'basename': '<sample-id>.filename-R2.fastq.gz',
-                        'class': 'File',
-                        'checksum': None,
-                        'size': None,
-                    },
-                ]
+                {
+                    'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
+                    'basename': '<sample-id>.filename-R1.fastq.gz',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': None,
+                },
+                {
+                    'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
+                    'basename': '<sample-id>.filename-R2.fastq.gz',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': None,
+                },
             ],
             'reads_type': 'fastq',
         }
-        self.assertDictEqual(expected_sequence_dict, sequencing_to_add[0].meta)
+        self.assertDictEqual(expected_sequence_dict, sequence.meta)
 
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
@@ -117,25 +112,18 @@ class TestSampleMapParser(unittest.TestCase):
         parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        participants_to_add = resp['participants']['insert']
-        participants_to_update = resp['participants']['update']
-        samples_to_add = resp['samples']['insert']
-        samples_to_update = resp['samples']['update']
-        sequencing_to_add = resp['sequences']['insert']
-        sequencing_to_update = resp['sequences']['update']
+        self.assertEqual(2, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(2, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(2, summary['sequences']['insert'])
+        self.assertEqual(0, summary['sequences']['update'])
 
-        self.assertEqual(2, len(participants_to_add))
-        self.assertEqual(0, len(participants_to_update))
-        self.assertEqual(2, len(samples_to_add))
-        self.assertEqual(0, len(samples_to_update))
-        self.assertEqual(2, len(sequencing_to_add))
-        self.assertEqual(0, len(sequencing_to_update))
-
-        self.assertDictEqual({}, samples_to_add[0].meta)
+        self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence1_reads = [
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
@@ -154,7 +142,8 @@ class TestSampleMapParser(unittest.TestCase):
         ]
 
         self.assertListEqual(
-            expected_sequence1_reads, sequencing_to_add[0].meta['reads'][0]
+            expected_sequence1_reads,
+            participants[0].samples[0].sequence_groups[0].sequences[0].meta['reads'],
         )
 
         expected_sequence2_reads = [
@@ -174,5 +163,6 @@ class TestSampleMapParser(unittest.TestCase):
             },
         ]
         self.assertListEqual(
-            expected_sequence2_reads, sequencing_to_add[1].meta['reads'][0]
+            expected_sequence2_reads,
+            participants[1].samples[0].sequence_groups[0].sequences[0].meta['reads'],
         )

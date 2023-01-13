@@ -9,6 +9,7 @@ from sample_metadata.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
+from sample_metadata.parser.generic_parser import SingleRow
 
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
@@ -103,6 +104,16 @@ class SampleFileMapParser(GenericMetadataParser):
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
             key_map=KeyMap,
         )
+
+    def get_sample_id(self, row: SingleRow) -> str:
+        """Get external sample ID from row"""
+
+        if self.sample_name_column and self.sample_name_column in row:
+            return row[self.sample_name_column]
+
+        return self.get_participant_id(row)
+
+
 
 
 @click.command(help=__DOC)

@@ -11,6 +11,12 @@ from sample_metadata.parser.generic_metadata_parser import (
     SingleRow,
     run_as_sync,
 )
+from sample_metadata.parser.generic_parser import (
+    ParsedSequenceGroup,
+    ParsedAnalysis,
+    ParsedSample,
+    ParsedSequence,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -109,14 +115,18 @@ class TobWgsParser(GenericMetadataParser):
 
         return None
 
-    async def get_analyses(
-        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
-    ) -> List[AnalysisModel]:
+    async def get_analyses_from_sequence_group(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> list[ParsedAnalysis]:
+
         """
         Get Analysis entries from a row.
         cpg_id is known for previously added samples.
         """
-        analyses = await super().get_analyses(sample_id, row, cpg_id)
+        analyses = await super().get_analyses_from_sequence_group(sequence_group)
+
+        sample_id = sequence_group.sample.external_sid
+        cpg_id = sequence_group.sample.internal_sid
 
         for analysis_type in ['gvcf', 'cram']:
             if analysis_type == 'gvcf':
@@ -129,9 +139,9 @@ class TobWgsParser(GenericMetadataParser):
                 continue
 
             analyses.append(
-                AnalysisModel(
-                    sample_ids=['<none>'],
-                    type=AnalysisType(analysis_type),
+                ParsedAnalysis(
+                    sequence_group=sequence_group,
+                    type_=AnalysisType(analysis_type),
                     status=AnalysisStatus('completed'),
                     output=file_path,
                     meta={
@@ -143,9 +153,22 @@ class TobWgsParser(GenericMetadataParser):
                         # need to reblock):
                         'staging': True,
                     },
+                    rows=[],
                 )
             )
         return analyses
+
+    async def get_sequences_from_group(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> list[ParsedSequence]:
+        sequences = await super().get_sequences_from_group(sequence_group)
+
+        for sequence in sequences:
+            row = sequence.rows[0]
+            sequence.meta['batch'] = int(row['batch.batch_name'][-3:])
+            sequence.meta['batch_name'] = row['batch.batch_name'][:-5]
+
+        return sequences
 
     async def get_sequence_meta(
         self, seq_group: SequenceMetaGroup, sample_id: Optional[str] = None
@@ -154,7 +177,6 @@ class TobWgsParser(GenericMetadataParser):
         rows = seq_group.rows
         if isinstance(rows, list):
             row = rows[0]
-
         result = await super().get_sequence_meta(seq_group, sample_id=sample_id)
         collapsed_sequence_meta = result.meta or {}
 

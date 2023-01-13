@@ -55,7 +55,9 @@ class SequenceGroupLayer(BaseLayer):
         )
 
         if check_project_ids:
-            await self.ptable.check_access_to_project_ids(self.author, projects)
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
 
         if len(groups) != len(sequence_group_ids):
             missing_ids = set(sequence_group_ids) - set(sg['id'] for sg in groups)
@@ -102,7 +104,7 @@ class SequenceGroupLayer(BaseLayer):
 
         seq0 = sequences[0]
         sequence = await self.seqgt.create_sequence_group(
-            sample_id=seq0.sample_id,
+            sample_id=int(seq0.sample_id),
             type_=seq0.type,
             technology=seq0.technology,
             platform=seq0.platform,

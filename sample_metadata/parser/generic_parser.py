@@ -1,4 +1,5 @@
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,assignment-from-none,invalid-name,ungrouped-imports
+import json
 import sys
 import asyncio
 import csv
@@ -7,6 +8,7 @@ import os
 import re
 from abc import abstractmethod
 from collections import defaultdict
+from io import StringIO
 from typing import (
     List,
     Dict,
@@ -27,6 +29,7 @@ from functools import wraps
 from cloudpathlib import AnyPath
 
 from api.utils import group_by
+from sample_metadata.model.sequence_group_upsert import SequenceGroupUpsert
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -136,66 +139,157 @@ class CustomDictReader(csv.DictReader):
         return fieldname.strip()
 
 
-class ParticipantMetaGroup:
+class ParsedParticipant:
     """Class for holding participant metadata grouped by id"""
 
     def __init__(
         self,
-        participant_id: int,
         rows: GroupedRow,
+        internal_pid: int | None,
+        external_pid: str,
         meta: Dict[str, Any],
+        reported_sex,
+        reported_gender,
+        karyotype,
     ):
-        self.id = participant_id
         self.rows = rows
+
+        self.internal_pid = internal_pid
+        self.external_pid = external_pid
+
+        self.reported_sex = reported_sex
+        self.reported_gender = reported_gender
+        self.karyotype = karyotype
         self.meta = meta
 
+        self.samples: list[ParsedSample] = []
 
-class SampleMetaGroup:
+    def to_sm(self) -> ParticipantUpsert:
+        return ParticipantUpsert(samples=[s.to_sm() for s in self.samples])
+
+
+class ParsedSample:
     """Class for holding sample metadata grouped by id"""
 
     def __init__(
         self,
-        sample_id: str,
+        participant: ParsedParticipant | None,
         rows: GroupedRow,
+        internal_sid: str | None,
+        external_sid: str,
+        sample_type: str | SampleType,
         meta: Dict[str, Any] = None,
     ):
-        self.id = sample_id
+        self.participant = participant
         self.rows = rows
+
+        self.internal_sid = internal_sid
+        self.external_sid = external_sid
+        self.sample_type = sample_type
         self.meta = meta
 
+        self.sequence_groups: list[ParsedSequenceGroup] = []
 
-class SequenceMetaGroup:
+    def to_sm(self) -> SampleBatchUpsert:
+        return SampleBatchUpsert(
+            id=self.internal_sid,
+            external_id=self.external_sid,
+            type=SampleType(self.sample_type),
+            meta=self.meta,
+            # participant_id=self.par,
+            active=True,
+            sequence_groups=[sg.to_sm() for sg in self.sequence_groups],
+        )
+
+
+class ParsedSequenceGroup:
     """Class for holding sequence metadata grouped by type"""
 
     def __init__(
         self,
+        sample: ParsedSample,
         rows: GroupedRow,
+        internal_seqgroup_id: int | None,
+        external_seqgroup_id: str | None,
         sequence_type: SequenceType,
         sequence_technology: SequenceTechnology,
         sequence_platform: str | None,
         meta: dict[str, Any] | None,
     ):
+        self.sample = sample
         self.rows = rows
-        self.sequence_type = sequence_type
-        self.sequence_technology = sequence_technology
-        self.sequence_platform = (sequence_platform,)
-        self.meta = meta
 
-
-class SequenceMeta:
-    def __init__(
-        self,
-        rows: GroupedRow,
-        sequence_type: SequenceType,
-        sequence_technology: SequenceTechnology,
-        sequence_platform: str | None,
-        meta: dict[str, Any] | None,
-    ):
-        self.rows = rows
+        self.internal_seqgroup_id = internal_seqgroup_id
+        self.external_seqgroup_id = external_seqgroup_id
         self.sequence_type = sequence_type
         self.sequence_technology = sequence_technology
         self.sequence_platform = sequence_platform
         self.meta = meta
+
+        self.sequences: list[ParsedSequence] = []
+        self.analyses: list[ParsedAnalysis] = []
+
+    def to_sm(self) -> SequenceGroupUpsert:
+        return SequenceGroupUpsert(
+            type=SequenceType(self.sequence_type),
+            technology=SequenceTechnology(self.sequence_technology),
+            platform=self.sequence_platform,
+            meta=self.meta,
+            sequences=[sq.to_sm() for sq in self.sequences],
+            id=self.internal_seqgroup_id,
+        )
+
+
+class ParsedSequence:
+    def __init__(
+        self,
+        group: ParsedSequenceGroup,
+        rows: GroupedRow,
+        internal_seq_id: int | None,
+        external_seq_ids: dict[str, str],
+        sequence_type: SequenceType,
+        sequence_technology: SequenceTechnology,
+        sequence_platform: str | None,
+        meta: dict[str, Any] | None,
+    ):
+        self.sequence_group = group
+        self.rows = rows
+
+        self.internal_seq_id = internal_seq_id
+        self.external_seq_ids = external_seq_ids
+        self.sequence_type = sequence_type
+        self.sequence_technology = sequence_technology
+        self.sequence_platform = sequence_platform
+        self.meta = meta
+
+    def to_sm(self) -> SequenceUpsert:
+        return SequenceUpsert(
+            id=self.internal_seq_id,
+            external_ids=self.external_seq_ids,
+            # sample_id=self.s,
+            status=SequenceStatus(self.sequence_status),
+            technology=SequenceTechnology(self.sequence_technology),
+            meta=self.meta,
+            type=SequenceType(self.sequence_type),
+        )
+
+
+class ParsedAnalysis:
+    def __init__(
+        self,
+        sequence_group: ParsedSequenceGroup,
+        rows: GroupedRow,
+        status: AnalysisStatus,
+        type_: AnalysisType,
+        meta: dict,
+        output: str | None,
+    ):
+        self.sequence_group = sequence_group
+        self.rows = rows
+        self.status = status
+        self.type_ = type_
+        self.meta = meta
+        self.output = output
 
 
 def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
@@ -290,6 +384,8 @@ class GenericParser(
 
         super().__init__(search_paths)
 
+    # region generic utils
+
     def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
         """
         Get complete filepath of filename:
@@ -310,8 +406,271 @@ class GenericParser(
 
         return os.path.join(self.path_prefix or '', filename)
 
+    # endregion
+
+    # region file management
+
+    async def from_manifest_path(
+        self,
+        manifest: str,
+        confirm=False,
+        delimiter=None,
+        dry_run=False,
+    ):
+        """Parse manifest from path, and return result of parsing manifest"""
+        file = self.file_path(manifest)
+
+        _delimiter = delimiter or self.guess_delimiter_from_filename(file)
+
+        file_contents = await self.file_contents(file)
+        return await self.parse_manifest(
+            StringIO(file_contents),
+            delimiter=_delimiter,
+            confirm=confirm,
+            dry_run=dry_run,
+        )
+
+    async def parse_manifest(  # pylint: disable=too-many-branches
+        self, file_pointer, delimiter=',', confirm=False, dry_run=False
+    ) -> Any:
+        """
+        Parse manifest from iterable (file pointer / String.IO)
+
+        Returns a dict mapping external sample ID to CPG sample ID
+        """
+        rows = await self.file_pointer_to_rows(
+            file_pointer=file_pointer, delimiter=delimiter
+        )
+        await self.validate_rows(rows)
+
+        # one participant with no value
+        participants = []
+        if self.has_participants(rows):
+            # start with participants
+            participants = await self.group_participants(rows)
+            await self.match_participant_ids(participants)
+
+            samples: list[ParsedSample] = []
+            for pchunk in chunk(participants):
+                samples_for_chunk = await asyncio.gather(
+                    *[self.group_samples(p, p.rows) for p in pchunk]
+                )
+
+                for participant, psamples in zip(pchunk, samples_for_chunk):
+                    participant.samples = psamples
+                    samples.extend(psamples)
+
+        else:
+            samples = await self.group_samples(None, rows=rows)
+
+        await self.match_sample_ids(samples)
+
+        sequence_groups: list[ParsedSequenceGroup] = []
+        for schunk in chunk(samples):
+            seq_groups_for_chunk = await asyncio.gather(
+                *map(self.group_sequences, schunk)
+            )
+
+            for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
+                sample.sequence_groups = seqgroups
+                sequence_groups.extend(seqgroups)
+
+        await self.match_sequence_group_ids(sequence_groups)
+
+        sequences: list[ParsedSequence] = []
+        for sgchunk in chunk(sequence_groups):
+            sequences_for_chunk = await asyncio.gather(
+                *map(self.get_sequences_from_group, sgchunk)
+            )
+            analyses_for_chunk = await asyncio.gather(
+                *map(self.get_analyses_from_sequence_group, sgchunk)
+            )
+
+            for sequence_group, seqs, analyses in zip(
+                sgchunk, sequences_for_chunk, analyses_for_chunk
+            ):
+                sequence_group.sequences = seqs
+                sequences.extend(seqs)
+                sequence_group.analyses = analyses
+
+        await self.match_sequence_ids(sequences)
+
+        summary = self.prepare_summary(
+            participants, samples, sequence_groups, sequences
+        )
+        message = self.prepare_message(
+            summary, participants, samples, sequence_groups, sequences
+        )
+
+        if dry_run:
+            logger.info('Dry run, so returning without inserting / updating metadata')
+            return summary, (participants if participants else samples)
+
+        if confirm:
+            resp = str(input(message + '\n\nConfirm (y): '))
+            if resp.lower() != 'y':
+                raise SystemExit()
+        else:
+            logger.info(message)
+
+        if participants:
+            result = self.papi.batch_upsert_participants(
+                self.project,
+                ParticipantUpsertBody(participants=[p.to_sm() for p in participants]),
+            )
+        else:
+            result = await self.sapi.batch_upsert_samples_async(
+                self.project,
+                SampleBatchUpsertBody(samples=[s.to_sm() for s in samples]),
+            )
+
+        print(json.dumps(result, indent=2))
+
+    def _get_dict_reader(self, file_pointer, delimiter: str):
+        """
+        Return a DictReader from file_pointer
+        Override this method if you can't use the default implementation that simply
+        calls csv.DictReader
+        """
+        reader = CustomDictReader(
+            file_pointer,
+            delimiter=delimiter,
+            key_map=self.key_map,
+            required_keys=self.required_keys,
+            ignore_extra_keys=self.ignore_extra_keys,
+        )
+        return reader
+
+    async def file_pointer_to_rows(self, file_pointer, delimiter) -> list[SingleRow]:
+        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
+        return [r for r in reader]
+
+    def prepare_summary(
+        self,
+        participants: list[ParsedParticipant],
+        samples: list[ParsedSample],
+        sequence_groups: list[ParsedSequenceGroup],
+        sequences: list[ParsedSequence],
+    ):
+        participants_to_insert = sum(1 for p in participants if not p.internal_pid)
+        samples_to_insert = sum(1 for s in samples if not s.internal_sid)
+        sgs_to_insert = sum(1 for sg in sequence_groups if not sg.internal_seqgroup_id)
+        sequences_to_insert = sum(1 for sq in sequences if not sq.internal_seq_id)
+        analyses_to_insert = sum(len(sg.analyses or []) for sg in sequence_groups)
+        summary = {
+            'participants': {
+                'insert': participants_to_insert,
+                'update': len(participants) - participants_to_insert,
+            },
+            'samples': {
+                'insert': samples_to_insert,
+                'update': len(samples) - samples_to_insert,
+            },
+            'sequence_groups': {
+                'insert': sgs_to_insert,
+                'update': len(sequence_groups) - sgs_to_insert,
+            },
+            'sequences': {
+                'insert': sequences_to_insert,
+                'update': len(sequences) - sequences_to_insert,
+            },
+            'analyses': {'insert': analyses_to_insert},
+        }
+
+        return summary
+
+    def prepare_message(
+        self,
+        summary,
+        participants: list[ParsedParticipant],
+        samples: list[ParsedSample],
+        sequence_groups: list[ParsedSequenceGroup],
+        sequences: list[ParsedSequence],
+    ):
+        if participants:
+            external_participant_ids = ', '.join(
+                set(p.external_pid for p in participants)
+            )
+            header = f'Processing participants: {external_participant_ids}'
+        else:
+            external_sample_ids = ', '.join(set(s.external_sid for s in samples))
+            header = f'Processing samples: {external_sample_ids}'
+
+        sequences_count: dict[str, int] = defaultdict(int)
+        sequence_group_counts: dict[str, int] = defaultdict(int)
+        for s in sequences:
+            sequences_count[str(s.sequence_type)] += 1
+        for sg in sequence_groups:
+            sequence_group_counts[str(sg.sequence_type)] += 1
+
+        str_seq_count = ', '.join(f'{k}={v}' for k, v in sequences_count.items())
+        str_seqg_count = ', '.join(f'{k}={v}' for k, v in sequence_group_counts.items())
+
+        message = f"""\
+                {self.project}: {header}
+
+                Sequence types: {str_seq_count}
+                Sequence group types: {str_seqg_count}
+
+                Adding {summary['participants']['insert']} participants
+                Adding {summary['samples']['insert']} samples
+                Adding {summary['sequence_groups']['insert']} sequence groups
+                Adding {summary['sequences']['insert']} sequences
+                Adding {summary['analyses']['insert']} analysis
+
+                Updating {summary['participants']['update']} participants
+                Updating {summary['samples']['update']} samples
+                Updating {summary['sequence_groups']['update']} sequence groups
+                Updating {summary['sequences']['update']} sequences
+                """
+        return message
+
+    # region MATCHING
+
+    async def match_participant_ids(self, participants: list[ParsedParticipant]):
+        external_pids = {p.external_pid for p in participants}
+
+        papi = ParticipantApi()
+        pid_map = await papi.get_participant_id_map_by_external_ids_async(
+            list(external_pids), allow_missing=True
+        )
+
+        for participant in participants:
+            participant.internal_pid = pid_map.get(participant.external_pid)
+
+    async def match_sample_ids(self, samples: list[ParsedSample]):
+        external_sids = {s.external_sid for s in samples}
+        sapi = SampleApi()
+        sid_map = await sapi.get_sample_id_map_by_external_async(
+            list(external_sids), allow_missing=True
+        )
+
+        for sample in samples:
+            sample.internal_sid = sid_map.get(sample.external_sid)
+
+    async def match_sequence_group_ids(
+        self, sequence_groups: list[ParsedSequenceGroup]
+    ):
+        pass
+
+    async def match_sequence_ids(self, sequences: list[ParsedSequence]):
+        pass
+
+    # endregion MATCHING
+
+    async def validate_rows(self, rows: list[SingleRow]):
+        """
+        Validate sample rows:
+        - throw an exception if an error occurs
+        - log a warning for all other issues
+        """
+        if len(rows) == 0:
+            raise ValueError('The manifest contains no records')
+
+    # endregion
+
     @abstractmethod
-    def get_sample_id(self, row: SingleRow) -> Optional[str]:
+    def get_sample_id(self, row: SingleRow) -> str:
         """Get external sample ID from row"""
 
     # @abstractmethod
@@ -336,88 +695,128 @@ class GenericParser(
         return None
 
     # @abstractmethod
-    def has_participants(self, file_pointer, delimiter: str) -> bool:
+    def has_participants(self, rows: list[SingleRow]) -> bool:
         """Returns True if the file has a Participants column"""
 
-    # @abstractmethod
-    async def get_grouped_sample_meta(self, rows: GroupedRow) -> List[SampleMetaGroup]:
-        """Return list of grouped by sample metadata from the rows"""
+    async def group_participants(
+        self, rows: list[SingleRow]
+    ) -> list[ParsedParticipant]:
 
-    @abstractmethod
-    async def get_sample_meta(self, sample_group: SampleMetaGroup) -> SampleMetaGroup:
-        """Get sample-metadata from row"""
+        participant_groups: list[ParsedParticipant] = []
+        for pid, rows in group_by(rows, self.get_participant_id).items():
+            participant_groups.append(
+                ParsedParticipant(
+                    internal_pid=None,
+                    external_pid=pid,
+                    rows=rows,
+                    meta=await self.get_participant_meta_from_group(rows),
+                    reported_sex=self.get_reported_sex(rows),
+                    reported_gender=self.get_reported_gender(rows),
+                    karyotype=self.get_karyotype(rows),
+                )
+            )
 
-    # @abstractmethod
-    async def get_grouped_sequence_meta(
-        self, sample_id: str, rows: GroupedRow
-    ) -> List[SequenceMetaGroup]:
-        """Return list of grouped by type sequence metadata from the rows"""
+        return participant_groups
 
-    @abstractmethod
-    async def get_sequence_meta(
-        self, seq_group: SequenceMetaGroup
-    ) -> SequenceMetaGroup:
-        """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
-        return SequenceMetaGroup(
-            rows=[],
-            sequence_type=SequenceType(self.default_sequence_type),
-            sequence_technology=SequenceTechnology(self.default_sequence_technology),
-            meta={},
+    async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:
+        return {}
+
+    async def group_samples(
+        self, participant: ParsedParticipant | None, rows
+    ) -> list[ParsedSample]:
+        samples = []
+        for sid, sample_rows in group_by(rows, self.get_sample_id).items():
+            samples.append(
+                ParsedSample(
+                    rows=sample_rows,
+                    participant=participant,
+                    internal_sid=None,
+                    external_sid=sid,
+                    sample_type=self.get_sample_type(sample_rows),
+                    meta=await self.get_sample_meta_from_group(sample_rows),
+                )
+            )
+
+        return samples
+
+    async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:
+        return {}
+
+    def get_sequence_group_key(self, row):
+        if seq_group_id := self.get_sequence_group_id(row):
+            return seq_group_id
+
+        return (
+            str(self.get_sequence_type(row)),
+            str(self.get_sequence_technology(row)),
+            str(self.get_sequence_platform(row)),
         )
 
-    # @abstractmethod
-    async def get_participant_meta(
-        self, participant_id: int, rows: GroupedRow
-    ) -> ParticipantMetaGroup:
-        """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
-        return ParticipantMetaGroup(participant_id=participant_id, rows=rows, meta={})
+    async def group_sequences(self, sample: ParsedSample) -> list[ParsedSequenceGroup]:
 
-    # @abstractmethod
-    async def get_analyses(
-        self, sample_id: str, row: SingleRow, cpg_id: Optional[str]
-    ) -> List[AnalysisModel]:
-        """
-        Get analysis objects from row. Optionally, a CPG ID can be passed for
-        to help finding files for previously added samples that were already renamed.
-        """
+        sequence_groups = []
+        for seq_rows in group_by(sample.rows, self.get_sequence_group_key).values():
+            seq_type = self.get_sequence_type(seq_rows[0])
+            seq_tech = self.get_sequence_technology(seq_rows[0])
+            seq_platform = self.get_sequence_platform(seq_rows[0])
+
+            seq_group = ParsedSequenceGroup(
+                internal_seqgroup_id=None,
+                external_seqgroup_id=self.get_sequence_group_id(seq_rows[0]),
+                sequence_type=seq_type,
+                sequence_technology=seq_tech,
+                sequence_platform=seq_platform,
+                meta={},
+                sample=sample,
+                rows=seq_rows,
+            )
+
+            seq_group.meta = await self.get_sequence_group_meta(seq_group)
+            sequence_groups.append(seq_group)
+
+        return sequence_groups
+
+    async def get_analyses_from_sequence_group(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> list[ParsedAnalysis]:
         return []
 
-    @abstractmethod
-    async def get_qc_meta(self, sample_id: str, row: SingleRow) -> Optional[SingleRow]:
-        """Get qc-meta from row, creates a Analysis object of type QC"""
+    async def get_sequence_group_meta(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> dict:
+        return {}
 
-    # @abstractmethod
+    @abstractmethod
+    async def get_sequences_from_group(
+        self, sequence_group: ParsedSequenceGroup
+    ) -> list[ParsedSequence]:
+        pass
+
     def get_sample_type(self, row: GroupedRow) -> SampleType:
         """Get sample type from row"""
         return SampleType(self.default_sample_type)
 
-    # @abstractmethod
-    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+    def get_sequence_group_id(self, row: SingleRow) -> str | None:
+        return None
+
+    def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """Get sequence types from row"""
-        return [SequenceType(self.default_sequence_type)]
+        return SequenceType(self.default_sequence_type)
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology | str:
         return self.default_sequence_technology
 
     def get_sequence_platform(self, row: SingleRow) -> str | None:
-        pass
+        return None
 
-    # @abstractmethod
-    def get_sequence_type(self, row: SingleRow) -> SequenceType:
-        """Get sequence types from row"""
-        return SequenceType(self.default_sequence_type)
-
-    # @abstractmethod
     def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
         """Get sequence status from row"""
         return SequenceStatus(self.default_sequence_status)
 
-    # @abstractmethod
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> AnalysisType:
         """Get analysis type from row"""
         return AnalysisType(self.default_analysis_type)
 
-    # @abstractmethod
     def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
@@ -458,302 +857,6 @@ class GenericParser(
 
         return existing_sequences
 
-    async def process_sample_group(
-        self,
-        rows: GroupedRow,
-        external_sample_id: str,
-        cpg_sample_id: Optional[str],
-        sequences: Dict[Any, Any],
-    ):
-        """
-        ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
-            (
-                sample_to_upsert,
-                sequences_to_upsert,
-                analyses_to_add,
-            )
-
-        Then the calling function does the (reduce).
-        """
-
-        # now we have sample / sequencing meta across 4 different rows, so collapse them
-        (
-            collapsed_sequencing_meta,
-            collapsed_sample_meta,
-            collapsed_qc,
-            collapsed_analyses,
-        ) = await asyncio.gather(
-            self.get_grouped_sequence_meta(external_sample_id, rows),
-            self.get_sample_meta(SampleMetaGroup(sample_id=cpg_sample_id, rows=rows)),
-            self.get_qc_meta(external_sample_id, rows[0]),
-            self.get_analyses(external_sample_id, rows[0], cpg_id=cpg_sample_id),
-        )
-
-        sample_to_upsert = None
-        sequences_to_upsert = []
-        analyses_to_add = []
-
-        # should we add or update sequencing
-        if collapsed_sequencing_meta:
-            for seq in collapsed_sequencing_meta:
-                sequence_id = sequences.get(str(seq.sequence_type), None)
-                if isinstance(sequence_id, list):
-                    if len(sequence_id) > 1:
-                        raise ValueError(
-                            f'Unhandled case with more than one sequence ID for the type {seq.sequence_type}'
-                        )
-                    sequence_id = sequence_id[0]
-
-                seq_args: Dict[str, Any] = {
-                    'meta': seq.meta,
-                    'type': seq.sequence_type,
-                    'status': self.get_sequence_status(seq.rows),
-                }
-
-                if self.get_sequence_id(seq.rows):
-                    seq_args['external_ids'] = self.get_sequence_id(seq.rows)
-
-                if sequence_id:
-                    seq_args['id'] = sequence_id
-
-                sequences_to_upsert.append(SequenceUpsert(**seq_args))
-
-        # Should we add or update sample
-        sample_args: Dict[str, Any] = {
-            'meta': collapsed_sample_meta.meta,
-            'external_id': external_sample_id,
-            'type': self.get_sample_type(rows),
-            'sequences': sequences_to_upsert,
-        }
-        if cpg_sample_id:
-            sample_args['id'] = cpg_sample_id
-
-        sample_to_upsert = SampleBatchUpsert(**sample_args)
-
-        if collapsed_analyses:
-            analyses_to_add.extend(collapsed_analyses)
-
-        if collapsed_qc:
-            analyses_to_add.append(
-                AnalysisModel(
-                    sample_ids=['<none>'],
-                    type=self.get_analysis_type(external_sample_id, rows),
-                    status=self.get_analysis_status(external_sample_id, rows),
-                    meta=collapsed_qc,
-                )
-            )
-
-        return (
-            sample_to_upsert,
-            sequences_to_upsert,
-            analyses_to_add,
-        )
-
-    async def process_participant_group(
-        self,
-        participant_name: str,
-        sample_map,
-        external_to_internal_sample_id_map: Dict[str, Any],
-        internal_pid: Optional[int],
-        sequence_map: Dict[str, Dict[str, int]] = None,
-    ):
-        """
-        ASYNC function that (maps) transforms one GroupedRow, and returns a Tuple of:
-            (
-                participants_to_upsert,
-                samples_to_upsert,
-                sequences_to_upsert,
-                analyses_to_add,
-            )
-
-        Then the calling function does the (reduce).
-        """
-
-        all_rows = [r for row in sample_map.values() for r in row]
-
-        # Get all the samples and sequences to upsert first
-        samples_to_upsert = []
-        sequences_to_upsert = []
-        analyses_to_add = []
-
-        for sample_id, rows in sample_map.items():
-            cpg_id = external_to_internal_sample_id_map.get(sample_id, None)
-            sample, seqs, analyses = await self.process_sample_group(
-                rows=rows,
-                external_sample_id=sample_id,
-                cpg_sample_id=cpg_id,
-                sequences=sequence_map.get(cpg_id, {}),
-            )
-            samples_to_upsert.append(sample)
-            sequences_to_upsert.extend(seqs)
-            analyses_to_add.extend(analyses)
-
-        # pull relevant participant fields
-        reported_sex = self.get_reported_sex(all_rows)
-        reported_gender = self.get_reported_gender(all_rows)
-        karyotype = self.get_karyotype(all_rows)
-
-        # now we have sample / sequencing meta across 4 different rows, so collapse them
-        collapsed_participant_meta = await self.get_participant_meta(
-            internal_pid, all_rows
-        )
-
-        args: Dict[str, Any] = {
-            'external_id': participant_name,
-            'meta': collapsed_participant_meta.meta,
-            'samples': samples_to_upsert,
-        }
-        if internal_pid:
-            args['id'] = internal_pid
-
-        if reported_sex:
-            args['reported_sex'] = reported_sex
-        if reported_gender:
-            args['reported_gender'] = reported_gender
-        if karyotype:
-            args['karyotype'] = karyotype
-
-        participant_to_upsert = ParticipantUpsert(**args)
-
-        return (
-            participant_to_upsert,
-            samples_to_upsert,
-            sequences_to_upsert,
-            analyses_to_add,
-        )
-
-    async def file_pointer_to_sample_map(
-        self,
-        file_pointer,
-        delimiter: str,
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """
-        Parse manifest file into a list of dicts, indexed by sample name.
-        """
-        sample_map = defaultdict(list)
-        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        for row in reader:
-            sid = self.get_sample_id(row)
-            sample_map[sid].append(row)
-        return sample_map
-
-    def _get_dict_reader(self, file_pointer, delimiter: str):
-        """
-        Return a DictReader from file_pointer
-        Override this method if you can't use the default implementation that simply
-        calls csv.DictReader
-        """
-        reader = CustomDictReader(
-            file_pointer,
-            delimiter=delimiter,
-            key_map=self.key_map,
-            required_keys=self.required_keys,
-            ignore_extra_keys=self.ignore_extra_keys,
-        )
-        return reader
-
-    async def file_pointer_to_participant_map(
-        self,
-        file_pointer,
-        delimiter: str,
-    ) -> Dict[Any, Dict[str, List[Dict[str, Any]]]]:
-        """
-        Parse manifest file into a list of dicts, indexed by participant id.
-        """
-
-        participant_map: Dict[str, Dict[Any, List[Any]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
-        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        for row in reader:
-            participant_eid = self.get_participant_id(row)
-
-            if not participant_eid:
-                raise ValueError(f'Participant not found in row: {row}')
-
-            # business rule to default sample ID to participant ID if not provided
-            sid = self.get_sample_id(row) or participant_eid
-            participant_map[participant_eid][sid].append(row)
-
-        return participant_map
-
-    async def validate_participant_map(
-        self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
-    ):
-        """
-        Validate sample rows:
-        - throw an exception if an error occurs
-        - log a warning for all other issues
-        """
-        if len(participant_map) == 0:
-            raise ValueError('The manifest contains no records')
-
-    async def validate_sample_map(self, sample_map: Dict[str, List[Dict[str, Any]]]):
-        """
-        Validate sample rows:
-        - throw an exception if an error occurs
-        - log a warning for all other issues
-        """
-        if len(sample_map) == 0:
-            raise ValueError('The manifest contains no records')
-
-    async def parse_manifest(  # pylint: disable=too-many-branches
-        self, file_pointer, delimiter=',', confirm=False, dry_run=False
-    ) -> Dict[str, Dict]:
-        """
-        Parse manifest from iterable (file pointer / String.IO)
-
-        Returns a dict mapping external sample ID to CPG sample ID
-        """
-        if self.has_participants(file_pointer, delimiter):
-            participant_map = await self.file_pointer_to_participant_map(
-                file_pointer, delimiter
-            )
-            await self.validate_participant_map(participant_map)
-            return await self.parse_manifest_by_participants(
-                participant_map, confirm=confirm, dry_run=dry_run
-            )
-
-        sample_map = await self.file_pointer_to_sample_map(file_pointer, delimiter)
-        await self.validate_sample_map(sample_map)
-
-        return await self.parse_manifest_by_samples(
-            sample_map, confirm=confirm, dry_run=dry_run
-        )
-
-    def upsert_summary(
-        self,
-        existing_summary: Dict[str, Dict[str, List[Any]]],
-        participants_to_upsert: List[ParticipantUpsert],
-        samples_to_upsert: List[SampleBatchUpsert],
-        sequences_to_upsert: List[SequenceUpsert],
-        analyses_to_add: Dict[str, List[AnalysisModel]],
-    ) -> Dict[str, Dict[str, List[Any]]]:
-        """Given lists of values to upsert return grouped summary of updates and inserts"""
-
-        def upsert_type(item: Dict[str, Any]) -> str:
-            return 'update' if hasattr(item, 'id') else 'insert'
-
-        # Set initial dictionary value
-        summary: Dict[str, Dict[str, List[Any]]] = (
-            existing_summary.copy()
-            if existing_summary
-            else defaultdict(lambda: defaultdict(list))
-        )
-
-        for participant in participants_to_upsert:
-            summary['participants'][upsert_type(participant)].append(participant)
-
-        for sample in samples_to_upsert:
-            summary['samples'][upsert_type(sample)].append(sample)
-
-        for sequence in sequences_to_upsert:
-            summary['sequences'][upsert_type(sequence)].append(sequence)
-
-        for sid, analyses in analyses_to_add.items():
-            summary['analyses'][sid].extend(analyses)
-
-        return summary
 
     async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
         """Given an analyses dictionary add analyses"""
@@ -782,259 +885,6 @@ class GenericParser(
             results.append(await asyncio.gather(*promises))
 
         return results
-
-    async def parse_manifest_by_participants(
-        self,
-        participant_map: Dict[str, Any],
-        confirm: bool = False,
-        dry_run: bool = False,
-    ) -> Dict[str, Any]:
-        """Parses a manifest of data that is keyed on participant id and sample id"""
-
-        proj = self.project
-
-        # all dicts indexed by external_sample_id
-        summary: Dict[str, Dict[str, List[Any]]] = None
-        all_participants: List[ParticipantUpsert] = []
-        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-
-        # we'll batch process the samples as not to open too many threads
-        for external_pids in chunk(list(participant_map.keys())):
-
-            current_batch_promises = {}
-            if self.verbose:
-                logger.info(f'{proj}:Preparing {", ".join(external_pids)}')
-
-            # Construct participant to upsert
-            existing_participant_ids = (
-                await self.papi.get_participant_id_map_by_external_ids_async(
-                    self.project, external_pids, allow_missing=True
-                )
-            )
-
-            sample_ids = list(
-                set(k for s in participant_map.values() for k in s.keys())
-            )
-
-            external_sequence_ids = self.get_existing_external_sequence_ids(
-                participant_map
-            )
-
-            external_to_internal_sample_id_map = (
-                await self.sapi.get_sample_id_map_by_external_async(
-                    self.project, sample_ids, allow_missing=True
-                )
-            )
-
-            sequences = []
-            existing_sequences: list[dict[str, Any]] = []
-            if external_to_internal_sample_id_map:
-                sequences = await self.seqapi.get_sequences_by_sample_ids_async(
-                    list(external_to_internal_sample_id_map.values()),
-                )
-
-                # Accounts for multiple valid sequences per sample.
-                existing_sequences = self.get_existing_sequences(
-                    sequences, external_sequence_ids
-                )
-
-            sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
-            for seq in existing_sequences:
-                sequence_map[seq['sample_id']][seq['type']] = seq['id']
-
-            for external_pid in external_pids:
-                sample_map = participant_map[external_pid]
-                promise = self.process_participant_group(
-                    participant_name=external_pid,
-                    sample_map=sample_map,
-                    internal_pid=existing_participant_ids.get(external_pid),
-                    sequence_map=sequence_map,
-                    external_to_internal_sample_id_map=external_to_internal_sample_id_map,
-                )
-                current_batch_promises[external_pid] = promise
-
-            processed_ex_pids = list(current_batch_promises.keys())
-            batch_promises = list(current_batch_promises.values())
-            resolved_promises = await asyncio.gather(*batch_promises)
-
-            for external_pid, resolved_promise in zip(
-                processed_ex_pids, resolved_promises
-            ):
-                (
-                    participant_to_upsert,
-                    samples_to_upsert,
-                    sequences_to_upsert,
-                    analysis_to_add,
-                ) = resolved_promise
-
-                if analysis_to_add:
-                    analyses_to_add[external_pid] = analysis_to_add
-
-                if participant_to_upsert:
-                    all_participants.append(participant_to_upsert)
-
-                # Get summary information
-                summary = self.upsert_summary(
-                    summary,
-                    [participant_to_upsert],
-                    samples_to_upsert,
-                    sequences_to_upsert,
-                    {external_pid: analysis_to_add},
-                )
-
-        sequences_count: Dict[str, int] = defaultdict(int)
-        for s in summary['sequences']['insert'] + summary['sequences']['update']:
-            sequences_count[str(s['type'])] += 1
-
-        str_seq_count = ', '.join(f'{k}={v}' for k, v in sequences_count.items())
-        message = f"""\
-    {proj}: Processing participants: {', '.join(participant_map.keys())}
-
-    Sequence types: {str_seq_count}
-
-    Adding {len(summary['participants']['insert'])} participants
-    Adding {len(summary['samples']['insert'])} samples
-    Adding {len(summary['sequences']['insert'])} sequences
-    Adding {len(summary['analyses']['insert'])} analysis
-
-    Updating {len(summary['participants']['update'])} participants
-    Updating {len(summary['samples']['update'])} samples
-    Updating {len(summary['sequences']['update'])} sequences
-        """
-
-        if dry_run:
-            logger.info('Dry run, so returning without inserting / updating metadata')
-            return summary
-
-        if confirm:
-            resp = str(input(message + '\n\nConfirm (y): '))
-            if resp.lower() != 'y':
-                raise SystemExit()
-        else:
-            logger.info(message)
-
-        # Batch update
-        result = self.papi.batch_upsert_participants(
-            proj, ParticipantUpsertBody(participants=all_participants)
-        )
-
-        return result
-
-    async def parse_manifest_by_samples(
-        self, sample_map: Dict[str, Any], confirm: bool = False, dry_run: bool = False
-    ) -> Dict[str, Any]:
-        """Parses a manifest of data that is keyed on sample id"""
-        proj = self.project
-
-        # now we can start adding!!
-
-        # Map external sids into cpg ids
-
-        external_to_internal_sample_id_map = (
-            await self.sapi.get_sample_id_map_by_external_async(
-                self.project, list(sample_map.keys()), allow_missing=True
-            )
-        )
-
-        sequences = []
-        if external_to_internal_sample_id_map:
-            sequences = await self.seqapi.get_sequences_by_sample_ids_async(
-                list(external_to_internal_sample_id_map.values()),
-            )
-
-        sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
-        for seq in sequences:
-            sequence_map[seq['sample_id']][seq['type']] = seq['id']
-
-        # all dicts indexed by external_sample_id
-        summary: Dict[str, Dict[str, List[Any]]] = None
-        all_samples: List[SampleBatchUpsert] = []
-        analyses_to_add: Dict[str, List[AnalysisModel]] = defaultdict(list)
-
-        # we'll batch process the samples as not to open too many threads
-        for external_sids in chunk(list(sample_map.keys())):
-
-            current_batch_promises = {}
-            if self.verbose:
-                logger.info(f'{proj}:Preparing {", ".join(external_sids)}')
-
-            for external_sid in external_sids:
-                rows: GroupedRow = sample_map[external_sid]
-                cpg_id = external_to_internal_sample_id_map.get(external_sid)
-                promise = self.process_sample_group(
-                    rows=rows,
-                    external_sample_id=external_sid,
-                    cpg_sample_id=cpg_id,
-                    sequences=sequence_map[cpg_id],
-                )
-                current_batch_promises[external_sid] = promise
-
-            processed_ex_sids = list(current_batch_promises.keys())
-            batch_promises = list(current_batch_promises.values())
-            resolved_promises = await asyncio.gather(*batch_promises)
-
-            for external_sid, resolved_promise in zip(
-                processed_ex_sids, resolved_promises
-            ):
-                (
-                    sample_to_upsert,
-                    sequences_to_upsert,
-                    analysis_to_add,
-                ) = resolved_promise
-
-                # Extract Upsert items and add to an array
-                if analysis_to_add:
-                    analyses_to_add[external_sid] = analysis_to_add
-
-                if sample_to_upsert:
-                    all_samples.append(sample_to_upsert)
-
-                # Get summary information
-                summary = self.upsert_summary(
-                    summary,
-                    [],
-                    [sample_to_upsert],
-                    sequences_to_upsert,
-                    {external_sid: analysis_to_add},
-                )
-
-        message = f"""\
-            {proj}: Processing samples: {', '.join(sample_map.keys())}
-
-            Adding {len(summary['samples']['insert'])} samples
-            Adding {len(summary['sequences']['insert'])} sequences
-            Adding {len(summary['analyses']['insert'])} analyses
-
-            Updating {len(summary['samples']['update'])} samples
-            Updating {len(summary['sequences']['update'])} sequences
-        """
-
-        if dry_run:
-            logger.info('Dry run, so returning without inserting / updating metadata')
-            return summary
-
-        if confirm:
-            resp = str(input(message + '\n\nConfirm (y): '))
-            if resp.lower() != 'y':
-                raise SystemExit()
-        else:
-            logger.info(message)
-
-        # Batch update
-        result = await self.sapi.batch_upsert_samples_async(
-            proj, SampleBatchUpsertBody(samples=all_samples)
-        )
-
-        # Add analyses
-        # Map external sids into cpg ids
-        existing_external_id_to_cpgid = (
-            await self.sapi.get_sample_id_map_by_external_async(
-                proj, list(sample_map.keys()), allow_missing=True
-            )
-        )
-        _ = await self.add_analyses(analyses_to_add, existing_external_id_to_cpgid)
-
-        return result
 
     async def parse_files(
         self, sample_id: str, reads: List[str], checksums: List[str] = None

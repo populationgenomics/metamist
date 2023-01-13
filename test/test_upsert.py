@@ -5,7 +5,7 @@ from db.python.layers.participant import (
     ParticipantUpsert,
     ParticipantUpsertBody,
 )
-from db.python.layers.sample import SampleUpsert, SequenceUpsert
+from db.python.layers.sample import SampleUpsert, SequenceGroupUpsert
 from models.enums import SequenceType, SampleType, SequenceStatus
 
 

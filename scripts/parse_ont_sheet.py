@@ -9,7 +9,6 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
 )
-from sample_metadata.parser.generic_parser import SequenceMetaGroup
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -69,6 +68,7 @@ class OntParser(GenericMetadataParser):
             reads_column=Columns.PASS_FASTQ_FILENAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            default_sequence_technology=default_sequence_technology,
             participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map=sequence_meta_map,

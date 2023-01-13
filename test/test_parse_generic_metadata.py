@@ -1,6 +1,8 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
+
+from sample_metadata.parser.generic_parser import ParsedParticipant, ParsedSample
 from test.testbase import run_as_sync
 
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
@@ -50,15 +52,15 @@ class TestParseGenericMetadata(unittest.TestCase):
             '<sample-id>-R1.fastq.gz': 'gs://<sample-id>-R1.fastq.gz',
             '<sample-id>-R2.fastq.gz': 'gs://<sample-id>-R2.fastq.gz',
         }
-
-        resp = await parser.parse_manifest(
+        samples: list[ParsedSample]
+        summary, samples = await parser.parse_manifest(
             StringIO('\n'.join(rows)), delimiter=',', dry_run=True
         )
 
-        self.assertEqual(1, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(1, summary['sequences']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(0, summary['sequences']['update'])
 
         parser.ignore_extra_keys = False
         rows = [
@@ -127,21 +129,17 @@ class TestParseGenericMetadata(unittest.TestCase):
         }
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
-        self.assertEqual(1, len(sum(resp['analyses'].values(), [])))
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(1, summary['sequences']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(1, summary['analyses']['insert'])
 
-        samples_to_add = resp['samples']['insert']
-        sequences_to_add = resp['sequences']['insert']
-        analyses_to_add = resp['analyses']
-
-        self.assertDictEqual({'centre': 'KCCG'}, samples_to_add[0].meta)
+        self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
         expected_sequence_dict = {
             'qc': {
                 'median_insert_size': '400',
@@ -149,16 +147,18 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'freemix': '0.01',
                 'pct_chimeras': '0.01',
             },
-            'reads': [
-                {
-                    'location': '/path/to/<sample-id>.bam',
-                    'basename': '<sample-id>.bam',
-                    'class': 'File',
-                    'checksum': None,
-                    'size': 111,
-                }
-            ],
             'reads_type': 'bam',
+            'reads': {
+                'location': '/path/to/<sample-id>.bam',
+                'basename': '<sample-id>.bam',
+                'class': 'File',
+                'checksum': None,
+                'size': 111,
+            },
+        }
+
+        sequence_group_dict = {
+            'gvcf_types': 'gvcf',
             'gvcfs': [
                 {
                     'location': '/path/to/<sample-id>.g.vcf.gz',
@@ -168,10 +168,12 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'size': 111,
                 }
             ],
-            'gvcf_types': 'gvcf',
         }
-        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
-        analysis = analyses_to_add['<sample-id>'][0]
+        self.assertDictEqual(sequence_group_dict, samples[0].sequence_groups[0].meta)
+        self.assertDictEqual(
+            expected_sequence_dict, samples[0].sequence_groups[0].sequences[0].meta
+        )
+        analysis = samples[0].sequence_groups[0].analyses[0]
         self.assertDictEqual(
             {
                 'median_insert_size': '400',
@@ -242,48 +244,46 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(3, len(resp['participants']['insert']))
-        self.assertEqual(0, len(resp['participants']['update']))
-        self.assertEqual(4, len(resp['samples']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(5, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['sequences']['update']))
-        self.assertEqual(0, len(sum(resp['analyses'].values(), [])))
+        participants: list[ParsedParticipant] = participants
 
-        participants_to_add = resp['participants']['insert']
-        sequences_to_add = resp['sequences']['insert']
+        self.assertEqual(3, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(4, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(5, summary['sequences']['insert'])
+        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(0, summary['analyses']['insert'])
 
         expected_sequence_dict = {
             'reads': [
-                [
-                    {
-                        'basename': 'sample_id001.filename-R1.fastq.gz',
-                        'checksum': None,
-                        'class': 'File',
-                        'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                        'size': None,
-                    },
-                    {
-                        'basename': 'sample_id001.filename-R2.fastq.gz',
-                        'checksum': None,
-                        'class': 'File',
-                        'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                        'size': None,
-                    },
-                ]
+                {
+                    'basename': 'sample_id001.filename-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                    'size': None,
+                },
+                {
+                    'basename': 'sample_id001.filename-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                    'size': None,
+                },
             ],
             'reads_type': 'fastq',
         }
-        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
+        sequence = participants[0].samples[0].sequence_groups[0].sequences[0]
+        self.assertDictEqual(expected_sequence_dict, sequence.meta)
 
         # Check that both of Demeter's sequences are there
-        self.assertEqual(participants_to_add[0].external_id, 'Demeter')
-        self.assertEqual(len(participants_to_add[0].samples), 1)
-        self.assertEqual(len(participants_to_add[0].samples[0].sequences), 2)
+        self.assertEqual(participants[0].external_pid, 'Demeter')
+        self.assertEqual(len(participants[0].samples), 1)
+        self.assertEqual(len(participants[0].samples[0].sequence_groups), 2)
 
         return
 
@@ -334,23 +334,23 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        participants: list[ParsedParticipant]
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
-        participants_to_add = resp['participants']['insert']
 
         # Assert that the participant meta is there.
-        self.assertEqual(participants_to_add[0].reported_gender, 'Non-binary')
-        self.assertEqual(participants_to_add[0].reported_sex, 1)
-        self.assertEqual(participants_to_add[0].karyotype, 'XY')
-        self.assertEqual(participants_to_add[1].reported_gender, 'Female')
-        self.assertEqual(participants_to_add[1].reported_sex, 2)
-        self.assertEqual(participants_to_add[1].karyotype, 'XX')
-        self.assertEqual(participants_to_add[2].reported_sex, 2)
-        self.assertEqual(participants_to_add[2].get('reported_gender'), None)
-        self.assertEqual(participants_to_add[2].get('karyotype'), None)
-        self.assertEqual(participants_to_add[3].reported_gender, 'Male')
-        self.assertEqual(participants_to_add[3].karyotype, 'XX')
+        self.assertEqual(participants[0].reported_gender, 'Non-binary')
+        self.assertEqual(participants[0].reported_sex, 1)
+        self.assertEqual(participants[0].karyotype, 'XY')
+        self.assertEqual(participants[1].reported_gender, 'Female')
+        self.assertEqual(participants[1].reported_sex, 2)
+        self.assertEqual(participants[1].karyotype, 'XX')
+        self.assertEqual(participants[2].reported_sex, 2)
+        self.assertIsNone(participants[2].reported_gender)
+        self.assertIsNone(participants[2].karyotype)
+        self.assertEqual(participants[3].reported_gender, 'Male')
+        self.assertEqual(participants[3].karyotype, 'XX')
         return
 
     @run_as_sync
@@ -498,7 +498,8 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        samples: list[ParsedSample]
+        summary, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -521,7 +522,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['reference_assembly'],
+            samples[0].sequence_groups[0].sequences[0].meta['reference_assembly'],
         )
 
     @run_as_sync
@@ -572,7 +573,8 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        samples: list[ParsedSample]
+        summary, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -595,7 +597,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            resp['sequences']['insert'][0]['meta']['reference_assembly'],
+            samples[0].sequence_groups[0].sequences[0].meta['reference_assembly'],
         )
 
     @run_as_sync

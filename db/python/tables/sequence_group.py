@@ -40,6 +40,9 @@ class SequenceGroupTable(DbBase):
     async def get_sequence_groups_by_ids(
         self, ids: list[int]
     ) -> tuple[set[ProjectId], list[dict]]:
+        """
+        Get sequence groups by internal identifiers
+        """
         _query = """
             SELECT project, sample_id, type, technology, platform, meta, author
             FROM sequencing_group
