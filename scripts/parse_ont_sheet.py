@@ -9,6 +9,11 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
 )
+from sample_metadata.parser.generic_parser import (
+    ParsedSequencingGroup,
+    ParsedSequencing,
+    ParsedSample,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -93,39 +98,37 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
-    async def get_sequence_meta(
-        self,
-        seq_group: SequenceMetaGroup,
-        sample_id: str | None = None,
-    ) -> SequenceMetaGroup:
-        """
-        Get sequence meta, override to include formed failed_fastqs
-        """
-        seq_group = await super().get_sequence_meta(seq_group, sample_id)
+    async def group_sequences(
+        self, sample: ParsedSample
+    ) -> list[ParsedSequencingGroup]:
 
-        failed_fastqs: list[str] = []
+        sequence_groups = await super().group_sequences(sample)
 
-        for r in seq_group.rows:
-            parsed_failed_fastqs = await self.parse_files(
-                sample_id, r[Columns.FAIL_FASTQ_FILENAME]
-            )
-            if 'reads' not in parsed_failed_fastqs:
-                raise ValueError(
-                    f'Could not find "reads" key in parsed failed fastqs: {parsed_failed_fastqs}'
+        for sequence_group in sequence_groups:
+
+            failed_fastqs: list[str] = []
+
+            for r in sequence_group.rows:
+                parsed_failed_fastqs = await self.parse_files(
+                    sequence_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
                 )
-            parsed_failed_fastq_reads = parsed_failed_fastqs['reads']
-            if (
-                len(parsed_failed_fastq_reads) != 1
-                or 'fastq' not in parsed_failed_fastq_reads
-            ):
-                raise ValueError(
-                    f'Failed to parse ONT failed fastqs, expected 1 key "fastq": {parsed_failed_fastq_reads}'
-                )
-            failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
+                if 'reads' not in parsed_failed_fastqs:
+                    raise ValueError(
+                        f'Could not find "reads" key in parsed failed fastqs: {parsed_failed_fastqs}'
+                    )
+                parsed_failed_fastq_reads = parsed_failed_fastqs['reads']
+                if (
+                    len(parsed_failed_fastq_reads) != 1
+                    or 'fastq' not in parsed_failed_fastq_reads
+                ):
+                    raise ValueError(
+                        f'Failed to parse ONT failed fastqs, expected 1 key "fastq": {parsed_failed_fastq_reads}'
+                    )
+                failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
 
-        seq_group.meta['failed_reads'] = failed_fastqs
+            sequence_group.meta['failed_reads'] = failed_fastqs
 
-        return seq_group
+        return sequence_groups
 
 
 @click.command()

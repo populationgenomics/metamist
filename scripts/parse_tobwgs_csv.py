@@ -12,10 +12,10 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
 )
 from sample_metadata.parser.generic_parser import (
-    ParsedSequenceGroup,
+    ParsedSequencingGroup,
     ParsedAnalysis,
     ParsedSample,
-    ParsedSequence,
+    ParsedSequencing,
 )
 
 logger = logging.getLogger(__file__)
@@ -116,7 +116,7 @@ class TobWgsParser(GenericMetadataParser):
         return None
 
     async def get_analyses_from_sequence_group(
-        self, sequence_group: ParsedSequenceGroup
+        self, sequence_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
 
         """
@@ -159,8 +159,8 @@ class TobWgsParser(GenericMetadataParser):
         return analyses
 
     async def get_sequences_from_group(
-        self, sequence_group: ParsedSequenceGroup
-    ) -> list[ParsedSequence]:
+        self, sequence_group: ParsedSequencingGroup
+    ) -> list[ParsedSequencing]:
         sequences = await super().get_sequences_from_group(sequence_group)
 
         for sequence in sequences:

@@ -54,6 +54,7 @@ class SampleSequencingTable(DbBase):
         'meta',
         'status',
         'technology',
+        'platform',
     ]
 
     async def get_projects_by_sequence_ids(

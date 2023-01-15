@@ -114,8 +114,6 @@ class SampleFileMapParser(GenericMetadataParser):
         return self.get_participant_id(row)
 
 
-
-
 @click.command(help=__DOC)
 @click.option(
     '--project',

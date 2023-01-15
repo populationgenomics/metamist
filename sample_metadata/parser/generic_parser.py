@@ -188,7 +188,7 @@ class ParsedSample:
         self.sample_type = sample_type
         self.meta = meta
 
-        self.sequence_groups: list[ParsedSequenceGroup] = []
+        self.sequence_groups: list[ParsedSequencingGroup] = []
 
     def to_sm(self) -> SampleBatchUpsert:
         return SampleBatchUpsert(
@@ -202,7 +202,7 @@ class ParsedSample:
         )
 
 
-class ParsedSequenceGroup:
+class ParsedSequencingGroup:
     """Class for holding sequence metadata grouped by type"""
 
     def __init__(
@@ -226,7 +226,7 @@ class ParsedSequenceGroup:
         self.sequence_platform = sequence_platform
         self.meta = meta
 
-        self.sequences: list[ParsedSequence] = []
+        self.sequences: list[ParsedSequencing] = []
         self.analyses: list[ParsedAnalysis] = []
 
     def to_sm(self) -> SequenceGroupUpsert:
@@ -240,10 +240,10 @@ class ParsedSequenceGroup:
         )
 
 
-class ParsedSequence:
+class ParsedSequencing:
     def __init__(
         self,
-        group: ParsedSequenceGroup,
+        group: ParsedSequencingGroup,
         rows: GroupedRow,
         internal_seq_id: int | None,
         external_seq_ids: dict[str, str],
@@ -277,7 +277,7 @@ class ParsedSequence:
 class ParsedAnalysis:
     def __init__(
         self,
-        sequence_group: ParsedSequenceGroup,
+        sequence_group: ParsedSequencingGroup,
         rows: GroupedRow,
         status: AnalysisStatus,
         type_: AnalysisType,
@@ -465,7 +465,7 @@ class GenericParser(
 
         await self.match_sample_ids(samples)
 
-        sequence_groups: list[ParsedSequenceGroup] = []
+        sequence_groups: list[ParsedSequencingGroup] = []
         for schunk in chunk(samples):
             seq_groups_for_chunk = await asyncio.gather(
                 *map(self.group_sequences, schunk)
@@ -477,7 +477,7 @@ class GenericParser(
 
         await self.match_sequence_group_ids(sequence_groups)
 
-        sequences: list[ParsedSequence] = []
+        sequences: list[ParsedSequencing] = []
         for sgchunk in chunk(sequence_groups):
             sequences_for_chunk = await asyncio.gather(
                 *map(self.get_sequences_from_group, sgchunk)
@@ -549,8 +549,8 @@ class GenericParser(
         self,
         participants: list[ParsedParticipant],
         samples: list[ParsedSample],
-        sequence_groups: list[ParsedSequenceGroup],
-        sequences: list[ParsedSequence],
+        sequence_groups: list[ParsedSequencingGroup],
+        sequences: list[ParsedSequencing],
     ):
         participants_to_insert = sum(1 for p in participants if not p.internal_pid)
         samples_to_insert = sum(1 for s in samples if not s.internal_sid)
@@ -584,8 +584,8 @@ class GenericParser(
         summary,
         participants: list[ParsedParticipant],
         samples: list[ParsedSample],
-        sequence_groups: list[ParsedSequenceGroup],
-        sequences: list[ParsedSequence],
+        sequence_groups: list[ParsedSequencingGroup],
+        sequences: list[ParsedSequencing],
     ):
         if participants:
             external_participant_ids = ', '.join(
@@ -649,11 +649,11 @@ class GenericParser(
             sample.internal_sid = sid_map.get(sample.external_sid)
 
     async def match_sequence_group_ids(
-        self, sequence_groups: list[ParsedSequenceGroup]
+        self, sequence_groups: list[ParsedSequencingGroup]
     ):
         pass
 
-    async def match_sequence_ids(self, sequences: list[ParsedSequence]):
+    async def match_sequence_ids(self, sequences: list[ParsedSequencing]):
         pass
 
     # endregion MATCHING
@@ -752,7 +752,7 @@ class GenericParser(
             str(self.get_sequence_platform(row)),
         )
 
-    async def group_sequences(self, sample: ParsedSample) -> list[ParsedSequenceGroup]:
+    async def group_sequences(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
 
         sequence_groups = []
         for seq_rows in group_by(sample.rows, self.get_sequence_group_key).values():
@@ -760,7 +760,7 @@ class GenericParser(
             seq_tech = self.get_sequence_technology(seq_rows[0])
             seq_platform = self.get_sequence_platform(seq_rows[0])
 
-            seq_group = ParsedSequenceGroup(
+            seq_group = ParsedSequencingGroup(
                 internal_seqgroup_id=None,
                 external_seqgroup_id=self.get_sequence_group_id(seq_rows[0]),
                 sequence_type=seq_type,
@@ -777,19 +777,19 @@ class GenericParser(
         return sequence_groups
 
     async def get_analyses_from_sequence_group(
-        self, sequence_group: ParsedSequenceGroup
+        self, sequence_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
         return []
 
     async def get_sequence_group_meta(
-        self, sequence_group: ParsedSequenceGroup
+        self, sequence_group: ParsedSequencingGroup
     ) -> dict:
         return {}
 
     @abstractmethod
     async def get_sequences_from_group(
-        self, sequence_group: ParsedSequenceGroup
-    ) -> list[ParsedSequence]:
+        self, sequence_group: ParsedSequencingGroup
+    ) -> list[ParsedSequencing]:
         pass
 
     def get_sample_type(self, row: GroupedRow) -> SampleType:
@@ -856,7 +856,6 @@ class GenericParser(
                         existing_sequences.append(seq)
 
         return existing_sequences
-
 
     async def add_analyses(self, analyses_to_add, external_to_internal_id_map):
         """Given an analyses dictionary add analyses"""

@@ -436,16 +436,19 @@
 	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<createTable tableName="sequencing_group">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />
 			</column>
 			<column name="sample_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
 			</column>
-			<column name="type" type="<TODO>">
+			<column name="type" type="ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell')">
 				<constraints nullable="false" />
 			</column>
-			<column name="technology" type="<TODO>">
+			<column name="technology" type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')">
 				<constraints nullable="false" />
 			</column>
 			<column name="platform" type="VARCHAR(255)">
@@ -457,6 +460,10 @@
 				<constraints nullable="false" />
 			</column>
 		</createTable>
+		<addColumn
+			tableName="sample_sequencing">
+			<column name="platform" type="VARCHAR(255)" />
+		</addColumn>
 		<createTable tableName="sequencing_group_sequence">
 			<column name="sequencing_group_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id" references="sequencing_group(id)" />

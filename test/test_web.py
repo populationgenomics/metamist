@@ -17,6 +17,7 @@ from db.python.layers.participant import (
 )
 from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
+from db.python.layers.sequence_group import SequenceGroupUpsert
 
 from models.enums import SequenceTechnology, SampleType, SequenceStatus, SequenceType
 
@@ -90,35 +91,44 @@ class TestWeb(DbIsolatedTest):
                         'external_id': 'sample_id001',
                         'meta': {},
                         'type': SampleType.BLOOD,
-                        'sequences': [
+                        'sequence_groups': [
                             {
-                                '_class': SequenceUpsert,
+                                '_class': SequenceGroupUpsert,
                                 'type': SequenceType.GENOME,
                                 'status': SequenceStatus.UPLOADED,
                                 'technology': SequenceTechnology.SHORT_READ,
-                                'meta': {
-                                    'reads': [
-                                        [
-                                            {
-                                                'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                'size': 111,
-                                            },
-                                            {
-                                                'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                'size': 111,
-                                            },
-                                        ]
-                                    ],
-                                    'reads_type': 'fastq',
-                                    'batch': 'M001',
-                                },
-                            },
+                                'platform': None,
+                                'sequences': [
+                                    {
+                                        '_class': SequenceUpsert,
+                                        'type': SequenceType.GENOME,
+                                        'status': SequenceStatus.UPLOADED,
+                                        'technology': SequenceTechnology.SHORT_READ,
+                                        'meta': {
+                                            'reads': [
+                                                [
+                                                    {
+                                                        'basename': 'sample_id001.filename-R1.fastq.gz',
+                                                        'checksum': None,
+                                                        'class': 'File',
+                                                        'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                                        'size': 111,
+                                                    },
+                                                    {
+                                                        'basename': 'sample_id001.filename-R2.fastq.gz',
+                                                        'checksum': None,
+                                                        'class': 'File',
+                                                        'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                                        'size': 111,
+                                                    },
+                                                ]
+                                            ],
+                                            'reads_type': 'fastq',
+                                            'batch': 'M001',
+                                        },
+                                    },
+                                ],
+                            }
                         ],
                     }
                 ],

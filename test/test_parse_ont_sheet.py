@@ -2,6 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
+from sample_metadata.parser.generic_parser import ParsedParticipant
 from test.testbase import run_as_sync
 
 from scripts.parse_ont_sheet import OntParser
@@ -50,29 +51,48 @@ class TestOntSampleSheetParser(unittest.TestCase):
         parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        participants: list[ParsedParticipant]
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter=',', dry_run=True
         )
 
-        participants_to_add = resp['participants']['insert']
-        participants_to_update = resp['participants']['update']
-        samples_to_add = resp['samples']['insert']
-        samples_to_update = resp['samples']['update']
-        sequencing_to_add = resp['sequences']['insert']
-        sequencing_to_update = resp['sequences']['update']
+        participants_to_add = summary['participants']['insert']
+        participants_to_update = summary['participants']['update']
+        samples_to_add = summary['samples']['insert']
+        samples_to_update = summary['samples']['update']
+        sequencing_to_add = summary['sequences']['insert']
+        sequencing_to_update = summary['sequences']['update']
 
-        self.assertEqual(1, len(participants_to_add))
-        self.assertEqual(1, len(participants_to_update))
-        self.assertEqual(1, len(samples_to_add))
-        self.assertEqual(2, len(sequencing_to_add))
-        self.assertEqual(1, len(samples_to_update))
-        self.assertEqual(0, len(sequencing_to_update))
+        self.assertEqual(1, participants_to_add)
+        self.assertEqual(1, participants_to_update)
+        self.assertEqual(1, samples_to_add)
+        self.assertEqual(2, sequencing_to_add)
+        self.assertEqual(1, samples_to_update)
+        self.assertEqual(0, sequencing_to_update)
 
         meta_dict = {
             'barcoding': 'None',
             'basecalling': '4.0.11+f1071ce',
             'device': 'PromethION',
             'experiment_name': 'PBXP_Awesome',
+            'flow_cell': 'PRO002',
+            'flowcell_id': 'XYZ1',
+            'mux_total': '7107',
+            'protocol': 'LSK1',
+            'reads': [
+                {
+                    'basename': 'Sample01_pass.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': 'gs://BUCKET/FAKE/Sample01_pass.fastq.gz',
+                    'size': None,
+                }
+            ],
+            'reads_type': 'fastq',
+            'sequencing_date': '10/12/2034',
+        }
+
+        seqgroup_meta = {
             'failed_reads': [
                 [
                     {
@@ -84,23 +104,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
                     }
                 ]
             ],
-            'flow_cell': 'PRO002',
-            'flowcell_id': 'XYZ1',
-            'mux_total': '7107',
-            'protocol': 'LSK1',
-            'reads': [
-                [
-                    {
-                        'basename': 'Sample01_pass.fastq.gz',
-                        'checksum': None,
-                        'class': 'File',
-                        'location': 'gs://BUCKET/FAKE/Sample01_pass.fastq.gz',
-                        'size': None,
-                    }
-                ]
-            ],
-            'reads_type': 'fastq',
-            'sequencing_date': '10/12/2034',
         }
-
-        self.assertDictEqual(meta_dict, sequencing_to_add[0].meta)
+        sequence_group = participants[0].samples[0].sequence_groups[0]
+        self.assertDictEqual(seqgroup_meta, sequence_group.meta)
+        self.assertDictEqual(meta_dict, sequence_group.sequences[0].meta)

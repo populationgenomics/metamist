@@ -15,10 +15,11 @@ from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
-    ParsedSequenceGroup,
-    ParsedSequence,
+    ParsedSequencingGroup,
+    ParsedSequencing,
     SingleRow,
-    run_as_sync, ParsedAnalysis,
+    run_as_sync,
+    ParsedAnalysis,
 )  # noqa
 
 __DOC = """
@@ -172,7 +173,10 @@ class GenericMetadataParser(GenericParser):
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
         """Get sequence technology for single row"""
-        value = row.get(self.seq_technology_column, None) or self.default_sequence_technology
+        value = (
+            row.get(self.seq_technology_column, None)
+            or self.default_sequence_technology
+        )
         value = value.lower()
 
         if value == 'ont':
@@ -495,12 +499,16 @@ class GenericMetadataParser(GenericParser):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
-    async def get_sequence_group_meta(self, sequence_group: ParsedSequenceGroup) -> dict:
+    async def get_sequence_group_meta(
+        self, sequence_group: ParsedSequencingGroup
+    ) -> dict:
 
         meta = {}
 
         if not sequence_group.sample.external_sid:
-            sequence_group.sample.external_sid = await self.get_cpg_sample_id_from_row(sequence_group.rows[0])
+            sequence_group.sample.external_sid = await self.get_cpg_sample_id_from_row(
+                sequence_group.rows[0]
+            )
 
         gvcf_filenames: List[str] = []
 
@@ -532,7 +540,9 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_sequences_from_group(self, sequence_group: ParsedSequenceGroup) -> list[ParsedSequence]:
+    async def get_sequences_from_group(
+        self, sequence_group: ParsedSequencingGroup
+    ) -> list[ParsedSequencing]:
         """Get sequences from sequence group + rows"""
         sample = sequence_group.sample
         rows = sequence_group.rows
@@ -551,10 +561,14 @@ class GenericMetadataParser(GenericParser):
         reference_assemblies: set[str] = set()
 
         for r in rows:
-            _rfilenames = await self.get_read_filenames(sample_id=sample.external_sid, row=r)
+            _rfilenames = await self.get_read_filenames(
+                sample_id=sample.external_sid, row=r
+            )
             read_filenames.extend(_rfilenames)
             if self.checksum_column and self.checksum_column in r:
-                checksums = await self.get_checksums_from_row(sample.external_sid, r, _rfilenames)
+                checksums = await self.get_checksums_from_row(
+                    sample.external_sid, r, _rfilenames
+                )
                 if not checksums:
                     checksums = [None] * len(_rfilenames)
                 read_checksums.extend(checksums)
@@ -622,7 +636,7 @@ class GenericMetadataParser(GenericParser):
 
         for read in reads[reads_type]:
             sequences.append(
-                ParsedSequence(
+                ParsedSequencing(
                     group=sequence_group,
                     # we don't determine which set of rows belong to a sequence,
                     # as we grab all reads, and then determine sequence
@@ -633,27 +647,32 @@ class GenericMetadataParser(GenericParser):
                     sequence_type=sequence_group.sequence_type,
                     sequence_technology=sequence_group.sequence_technology,
                     sequence_platform=sequence_group.sequence_platform,
-                    meta={**collapsed_sequence_meta, 'reads': read}
+                    meta={**collapsed_sequence_meta, 'reads': read},
                 )
             )
 
         return sequences
 
     async def get_analyses_from_sequence_group(
-        self, sequence_group: ParsedSequenceGroup
+        self, sequence_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
         if not self.qc_meta_map:
             return []
 
         sample_id = sequence_group.sample.external_sid
 
-        return [ParsedAnalysis(
-            sequence_group=sequence_group,
-            status=self.get_analysis_status(sample_id, sequence_group.rows),
-            type_=self.get_analysis_type(sample_id, sequence_group.rows),
-            meta=self.collapse_arbitrary_meta(self.qc_meta_map, sequence_group.rows),
-            rows=sequence_group.rows
-        )]
+        return [
+            ParsedAnalysis(
+                sequence_group=sequence_group,
+                status=self.get_analysis_status(sample_id, sequence_group.rows),
+                type_=self.get_analysis_type(sample_id, sequence_group.rows),
+                meta=self.collapse_arbitrary_meta(
+                    self.qc_meta_map, sequence_group.rows
+                ),
+                rows=sequence_group.rows,
+                output=None,
+            )
+        ]
 
 
 @click.command(help=__DOC)
