@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List, Any, Optional, Union
 
 from pydantic import BaseModel
@@ -5,7 +6,7 @@ from pydantic import BaseModel
 from api.utils import group_by
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
-from db.python.layers.sequence_group import SequenceGroupUpsert, SequenceGroupLayer
+from db.python.layers.sequence_group import SequencingGroupUpsert, SequenceGroupLayer
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from models.enums import SampleType
@@ -18,25 +19,19 @@ from models.models.sample import (
 class SampleUpsert(BaseModel):
     """Update model for Sample"""
 
-    external_id: Optional[str]
-    type: Optional[SampleType] = None
-    meta: Optional[Dict] = {}
-    participant_id: Optional[int] = None
-    active: Optional[bool] = None
+    id: str | int | None
+    external_id: str | None
+    type: SampleType | None = None
+    meta: dict = {}
+    participant_id: int | None = None
+    active: bool | None = None
+    sequencing_groups: list[SequencingGroupUpsert] = []
 
 
-class SampleBatchUpsert(SampleUpsert):
-    """Update model for sample with sequences list"""
-
-    id: Optional[Union[str, int]]
-    sequence_groups: list[SequenceGroupUpsert]
-    # sequences: List[SequenceUpsert]
-
-
-class SampleBatchUpsertBody(BaseModel):
+class SamplesUpsertBody(BaseModel):
     """Upsert model for batch Samples"""
 
-    samples: List[SampleBatchUpsert]
+    samples: List[SampleUpsert]
 
 
 class SampleLayer(BaseLayer):
@@ -306,7 +301,7 @@ class SampleLayer(BaseLayer):
             author=author,
         )
 
-    async def upsert_sample(self, sample: SampleBatchUpsert):
+    async def upsert_sample(self, sample: SampleUpsert):
         """Upsert a sample"""
         if not sample.id:
             internal_id = await self.insert_sample(
@@ -365,16 +360,16 @@ class SampleLayer(BaseLayer):
 
         return rows
 
-    async def batch_upsert_samples(self, samples: SampleBatchUpsertBody):
+    async def batch_upsert_samples(self, samples: list[SampleUpsert]):
         """Batch upsert a list of samples with sequences"""
         seqglayer: SequenceGroupLayer = SequenceGroupLayer(self.connection)
 
         # Create or update samples
-        sids = [await self.upsert_sample(s) for s in samples.samples]
+        sids = [await self.upsert_sample(s) for s in samples]
 
         # Upsert all sequence groups with paired sids, this will
         # also upsert sequences
-        sequence_groups = zip(sids, [x.sequence_groups for x in samples.samples])
+        sequence_groups = zip(sids, [x.sequencing_groups for x in samples])
         seqs = [
             await seqglayer.upsert_sequence_groups(sid, seqg)
             for sid, seqg in sequence_groups

@@ -1,4 +1,5 @@
 # pylint: disable=invalid-name
+import asyncio
 from typing import Dict, List, Tuple, Optional, Any
 
 import re
@@ -10,8 +11,7 @@ from pydantic import BaseModel
 from db.python.connect import NotFoundError
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import (
-    SampleBatchUpsert,
-    SampleBatchUpsertBody,
+    SampleUpsert,
     SampleLayer,
 )
 from db.python.tables.family import FamilyTable
@@ -22,7 +22,7 @@ from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId, split_generic_terms
 from models.models.participant import Participant
 
-HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
+HPO_REGEX_MATCHER = re.compile(r'HP:\d+$')
 
 
 class ParticipantUpdateModel(BaseModel):
@@ -38,14 +38,14 @@ class ParticipantUpdateModel(BaseModel):
 class ParticipantUpsert(ParticipantUpdateModel):
     """Update model for sample with sequences list"""
 
-    id: Optional[int]
-    samples: List[SampleBatchUpsert]
+    id: int | None
+    samples: list[SampleUpsert]
 
 
 class ParticipantUpsertBody(BaseModel):
     """Upsert model for batch Participants"""
 
-    participants: List[ParticipantUpsert]
+    participants: list[ParticipantUpsert]
 
 
 class ExtraParticipantImporterHandler(Enum):
@@ -889,10 +889,7 @@ class ParticipantLayer(BaseLayer):
                     sample.participant_id = ipid
 
             # Upsert all samples with sequences for each participant
-            samples = [
-                SampleBatchUpsertBody(samples=p.samples) for p in all_participants
-            ]
-            results = [await sampt.batch_upsert_samples(s) for s in samples]
+            results = [ await sampt.batch_upsert_samples(p.samples) for p in all_participants]
 
         # Format and return response
         return dict(zip(pids, results))

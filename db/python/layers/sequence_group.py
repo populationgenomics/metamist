@@ -4,21 +4,21 @@ from pydantic import BaseModel
 
 from db.python.connect import Connection, NotFoundError
 from db.python.layers.base import BaseLayer
-from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
+from db.python.layers.sequence import SampleSequenceLayer, SequencingUpsert
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequence import SampleSequencingTable, NoOpAenter
 from db.python.tables.sequence_group import SequenceGroupTable
 from models.enums import SequenceType, SequenceTechnology
 
 
-class SequenceGroupUpsert(BaseModel):
+class SequencingGroupUpsert(BaseModel):
     id: str | None
     type: SequenceType
     technology: SequenceTechnology
-    platform: str  # uppercase
+    platform: str | None  # uppercase
     meta: dict[str, str]
 
-    sequences: list[SequenceUpsert]
+    sequencing: list[SequencingUpsert]
 
 
 class SequenceGroupLayer(BaseLayer):
@@ -153,16 +153,16 @@ class SequenceGroupLayer(BaseLayer):
         return await self.archive_sequence_group(sequence_group_id)
 
     async def upsert_sequence_groups(
-        self, sample_id: int, sequence_groups: list[SequenceGroupUpsert]
+        self, sample_id: int, sequence_groups: list[SequencingGroupUpsert]
     ):
+        if not isinstance(sequence_groups, list):
+            raise ValueError('Sequencing groups is not a list')
         # first determine if any groups have different sequences
         slayer = SampleSequenceLayer(self.connection)
-        await asyncio.gather(
-            *[
-                slayer.upsert_sequences(sample_id, sg.sequences)
-                for sg in sequence_groups
-            ]
-        )
+        [
+            await slayer.upsert_sequences(sample_id, sg.sequencing)
+            for sg in sequence_groups
+        ]
 
         to_insert = [sg for sg in sequence_groups if not sg.id]
         to_update = []
@@ -179,12 +179,12 @@ class SequenceGroupLayer(BaseLayer):
 
             for sg in sequence_groups_that_exist:
                 # if we need to insert any sequences, then the group will have to change
-                if any(not sq.id for sq in sg.sequences):
+                if any(not sq.id for sq in sg.sequencing):
                     to_replace.append(sg)
                     continue
 
                 existing_sequences = set(sequence_to_group.get(int(sg.id), []))
-                new_sequences = set(sq.id for sq in sg.sequences)
+                new_sequences = set(sq.id for sq in sg.sequencing)
                 if new_sequences == existing_sequences:
                     to_update.append(sg)
                 else:

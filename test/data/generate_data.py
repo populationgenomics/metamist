@@ -6,11 +6,8 @@ import argparse
 import datetime
 
 from sample_metadata.api.analysis_api import AnalysisApi
-
 from sample_metadata.model.analysis_status import AnalysisStatus
-
 from sample_metadata.model.analysis_type import AnalysisType
-
 from sample_metadata.model.analysis_model import AnalysisModel
 
 from sample_metadata.models import (

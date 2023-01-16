@@ -16,8 +16,8 @@ from db.python.layers.participant import (
     ParticipantUpsertBody,
 )
 from db.python.layers.sample import SampleBatchUpsert, SampleLayer
-from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
-from db.python.layers.sequence_group import SequenceGroupUpsert
+from db.python.layers.sequence import SampleSequenceLayer, SequencingUpsert
+from db.python.layers.sequence_group import SequencingGroupUpsert
 
 from models.enums import SequenceTechnology, SampleType, SequenceStatus, SequenceType
 
@@ -93,14 +93,14 @@ class TestWeb(DbIsolatedTest):
                         'type': SampleType.BLOOD,
                         'sequence_groups': [
                             {
-                                '_class': SequenceGroupUpsert,
+                                '_class': SequencingGroupUpsert,
                                 'type': SequenceType.GENOME,
                                 'status': SequenceStatus.UPLOADED,
                                 'technology': SequenceTechnology.SHORT_READ,
                                 'platform': None,
                                 'sequences': [
                                     {
-                                        '_class': SequenceUpsert,
+                                        '_class': SequencingUpsert,
                                         'type': SequenceType.GENOME,
                                         'status': SequenceStatus.UPLOADED,
                                         'technology': SequenceTechnology.SHORT_READ,

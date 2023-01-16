@@ -22,7 +22,7 @@ class SequenceUpdateModel(BaseModel):
     type: SequenceType | None = None
 
 
-class SequenceUpsert(SequenceUpdateModel):
+class SequencingUpsert(SequenceUpdateModel):
     """Update model for Sequence with internal id"""
 
     id: Optional[int]
@@ -266,7 +266,7 @@ class SampleSequenceLayer(BaseLayer):
 
     # region UPSERTS
 
-    async def upsert_sequence(self, sample_id: int, sequence: SequenceUpsert):
+    async def upsert_sequence(self, sample_id: int, sequence: SequencingUpsert):
         """Upsert a single sequence to the given sample_id (sid)"""
         sequence.sample_id = sample_id
         if not sequence.id:
@@ -287,7 +287,7 @@ class SampleSequenceLayer(BaseLayer):
         )
         return sequence.id
 
-    async def upsert_sequences(self, iid: int, sequences: List[SequenceUpsert]):
+    async def upsert_sequences(self, iid: int, sequences: List[SequencingUpsert]):
         """Upsert multiple sequences to the given sample (sid)"""
         upserts = await asyncio.gather(
             *[self.upsert_sequence(iid, s) for s in sequences]

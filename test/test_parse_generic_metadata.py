@@ -169,11 +169,11 @@ class TestParseGenericMetadata(unittest.TestCase):
                 }
             ],
         }
-        self.assertDictEqual(sequence_group_dict, samples[0].sequence_groups[0].meta)
+        self.assertDictEqual(sequence_group_dict, samples[0].sequencing_groups[0].meta)
         self.assertDictEqual(
-            expected_sequence_dict, samples[0].sequence_groups[0].sequences[0].meta
+            expected_sequence_dict, samples[0].sequencing_groups[0].sequences[0].meta
         )
-        analysis = samples[0].sequence_groups[0].analyses[0]
+        analysis = samples[0].sequencing_groups[0].analyses[0]
         self.assertDictEqual(
             {
                 'median_insert_size': '400',

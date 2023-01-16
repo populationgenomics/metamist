@@ -52,7 +52,7 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertEqual(1, summary['sequences']['insert'])
         self.assertEqual(0, summary['sequences']['update'])
 
-        sequence = participants[0].samples[0].sequence_groups[0].sequences[0]
+        sequence = participants[0].samples[0].sequencing_groups[0].sequences[0]
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence_dict = {
@@ -143,7 +143,7 @@ class TestSampleMapParser(unittest.TestCase):
 
         self.assertListEqual(
             expected_sequence1_reads,
-            participants[0].samples[0].sequence_groups[0].sequences[0].meta['reads'],
+            participants[0].samples[0].sequencing_groups[0].sequences[0].meta['reads'],
         )
 
         expected_sequence2_reads = [
@@ -164,5 +164,5 @@ class TestSampleMapParser(unittest.TestCase):
         ]
         self.assertListEqual(
             expected_sequence2_reads,
-            participants[1].samples[0].sequence_groups[0].sequences[0].meta['reads'],
+            participants[1].samples[0].sequencing_groups[0].sequences[0].meta['reads'],
         )

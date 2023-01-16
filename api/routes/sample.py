@@ -11,7 +11,7 @@ from models.models.sample import (
     sample_id_transform_to_raw_list,
 )
 
-from db.python.layers.sample import SampleBatchUpsertBody, SampleLayer
+from db.python.layers.sample import SamplesUpsertBody, SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
@@ -66,7 +66,7 @@ async def create_new_sample(
     '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
 )
 async def batch_upsert_samples(
-    samples: SampleBatchUpsertBody,
+    samples: SamplesUpsertBody,
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
     """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
@@ -80,7 +80,7 @@ async def batch_upsert_samples(
         # Table interfaces
         st = SampleLayer(connection)
 
-        results = await st.batch_upsert_samples(samples)
+        results = await st.batch_upsert_samples(samples.samples)
 
         # Map sids back from ints to strs
         for iid, seqs in results.items():
