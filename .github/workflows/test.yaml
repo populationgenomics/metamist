@@ -76,6 +76,16 @@ jobs:
         with:
           files: ./coverage.xml
 
+      - name: "build web front-end"
+        run: |
+          set -eo pipefail
+          pushd web
+          # installs package-lock, not what it thinks it should be
+          npm ci
+          npm run build
+          # eventually run web front-end tests
+          popd
+
       - name: Fail if tests are not passing
         if: ${{ steps.runtests.outputs.rc != 0 }}
         uses: actions/github-script@v3
