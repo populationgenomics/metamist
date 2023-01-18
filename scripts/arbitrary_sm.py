@@ -50,7 +50,7 @@ def run_sm(
     for k in params_to_open:
         potential_path = kwargs.get(k)
         if potential_path and os.path.exists(potential_path):
-            logging.info(f'Opening "{k}": {potential_path}')
+            logging.info(f'Opening {k!r}: {potential_path}')
             files_to_close.append(open(potential_path))
             modified_kwargs[k] = files_to_close[-1]
         else:

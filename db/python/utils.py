@@ -26,7 +26,7 @@ class ProjectDoesNotExist(Forbidden):
 
     def __init__(self, project_name, *args: object) -> None:
         super().__init__(
-            f'Project with id "{project_name}" does not exist, '
+            f'Project with id {project_name!r} does not exist, '
             'or you do not have the appropriate permissions',
             *args,
         )
