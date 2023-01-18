@@ -56,6 +56,8 @@ repos:
                     --ignore-missing-imports,
                     --install-types,
                     --non-interactive,
+                    --cache-dir,
+                    .mypy_cache,
                 ]
             additional_dependencies:
                 - strawberry-graphql[fastapi]==0.138.1
