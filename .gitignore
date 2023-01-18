@@ -33,3 +33,6 @@ coverage.xml
 temp.json
 data-dump.sql
 local.py
+lcov-report/
+coverage/
+cram-map/
