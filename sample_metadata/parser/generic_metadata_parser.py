@@ -615,10 +615,11 @@ class GenericMetadataParser(GenericParser):
             else:
                 ref = self.default_reference_assembly_location
 
-            if not ref:
-                raise ValueError(
-                    f'Reads type for "{sample.external_sid}" is CRAM, but a reference is not defined, please set the default reference assembly path'
-                )
+                if not ref:
+                    raise ValueError(
+                        f'Reads type for {sample.external_sid!r} is CRAM, but a reference '
+                        f'is not defined, please set the default reference assembly path'
+                    )
 
             ref_fp = self.file_path(ref)
             secondary_files = (

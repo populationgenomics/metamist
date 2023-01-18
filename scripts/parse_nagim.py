@@ -936,7 +936,7 @@ def _run_multiqc(
         ending_list = ', '.join(f'.{ending}' for ending in qc_endings)
         mqc_conf = f'extra_fn_clean_exts: [{ending_list}]'
         j.command(
-            f'multiqc inputs -o output -f --fn_as_s_name --cl_config "{mqc_conf}"'
+            f'multiqc inputs -o output -f --fn_as_s_name --cl_config {mqc_conf!r}'
         )
         j.command(f'cp output/multiqc_report.html {j.report_html}')
         j.command(f'cp output/multiqc_data/multiqc_data.json {j.json}')
@@ -1310,14 +1310,14 @@ def move_uploads(
         def _move(j, file):
             j.command(
                 f"""\
-if gsutil -q stat "{file.moved_path}"
+if gsutil -q stat {file.moved_path!r}
 then
     echo "target file already exists"
 else
-    if gsutil -q stat "{file.upload_path}"
+    if gsutil -q stat {file.upload_path!r}
     then
         echo "source file exists, target does not, safely moving"
-        gsutil mv "{file.upload_path}" "{file.moved_path}"
+        gsutil mv {file.upload_path!r} {file.moved_path!r}
     else
         echo "source file does not exist"
         exit 1

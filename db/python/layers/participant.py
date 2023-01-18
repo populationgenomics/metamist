@@ -249,7 +249,7 @@ class SeqrMetadataKeys(Enum):
         failing_terms = [term for term in terms if not HPO_REGEX_MATCHER.match(term)]
         if failing_terms:
             raise ValueError(
-                f'HPO terms must follow the format "{HPO_REGEX_MATCHER.pattern}": '
+                f'HPO terms must follow the format {HPO_REGEX_MATCHER.pattern!r}: '
                 + ', '.join(failing_terms)
             )
 

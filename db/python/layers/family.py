@@ -128,10 +128,10 @@ class PedRow:
 
         if sl == 'sex':
             raise ValueError(
-                f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
+                f'Unknown sex {sex!r}, did you mean to call import_pedigree with has_headers=True?'
             )
         raise ValueError(
-            f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
+            f'Unknown sex {sex!r}, please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
         )
 
     @staticmethod
@@ -282,7 +282,8 @@ class PedRow:
                 unmatched.append(item)
 
         if unmatched:
-            unmatched_headers_str = ', '.join(f'"{u}"' for u in unmatched)
+            # repr casts to string and quotes if applicable
+            unmatched_headers_str = ', '.join(map(repr, unmatched))
             raise ValueError(
                 'Unable to identity header elements: ' + unmatched_headers_str
             )

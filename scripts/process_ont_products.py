@@ -186,7 +186,7 @@ class OntProductParser(CloudHelper):
             dest = os.path.join(output_bucket, fn)
             if not src:
                 logging.info(
-                    f'File for key "{preparer.fn_column}" at source "{src}" '
+                    f'File for key {preparer.fn_column!r} at source {src!r} '
                     'does not exist, skipping analysis item'
                 )
                 continue
