@@ -664,7 +664,8 @@ class GenericMetadataParser(GenericParser):
 
                 if not ref:
                     raise ValueError(
-                        f'Reads type for "{sample_id}" is CRAM, but a reference is not defined, please set the default reference assembly path'
+                        f'Reads type for {sample_id!r} is CRAM, but a reference is '
+                        f'not defined, please set the default reference assembly path'
                     )
 
                 ref_fp = self.file_path(ref)

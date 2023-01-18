@@ -326,7 +326,7 @@ ORDER BY a.timestamp_completed DESC
         if analysis_type not in expected_type:
             expected_types_str = ', '.join(a.value for a in expected_type)
             raise ValueError(
-                f'Received analysis type "{analysis_type.value}", received {expected_types_str}'
+                f'Received analysis type {analysis_type.value!r}", received {expected_types_str!r}'
             )
 
         values = {'sample_ids': sample_ids, 'type': analysis_type.value}
