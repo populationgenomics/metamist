@@ -73,7 +73,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
         except ValueError as e:
             self.assertEqual(
-                'Key "extra" not found in provided key map: fn, sample', str(e)
+                "Key 'extra' not found in provided key map: fn, sample", str(e)
             )
 
     @run_as_sync
@@ -447,7 +447,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
         self.assertEqual(
-            'Reads type for "sample_id003" is CRAM, but a reference is not defined, please set the default reference assembly path',
+            "Reads type for 'sample_id003' is CRAM, but a reference is not defined, please set the default reference assembly path",
             str(ctx.exception),
         )
 
