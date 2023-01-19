@@ -20,12 +20,12 @@ jobs:
 
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - uses: actions/setup-java@v2
         with:
-          distribution: 'temurin' # See 'Supported distributions' for available options
-          java-version: '17'
+          distribution: "temurin" # See 'Supported distributions' for available options
+          java-version: "17"
 
       - name: Setup build env
         run: |
@@ -75,6 +75,16 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           files: ./coverage.xml
+
+      - name: "build web front-end"
+        run: |
+          set -eo pipefail
+          pushd web
+          # installs package-lock, not what it thinks it should be
+          npm ci
+          npm run build
+          # eventually run web front-end tests
+          popd
 
       - name: Fail if tests are not passing
         if: ${{ steps.runtests.outputs.rc != 0 }}
