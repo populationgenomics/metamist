@@ -165,6 +165,7 @@ class ParsedParticipant:
         self.samples: list[ParsedSample] = []
 
     def to_sm(self) -> ParticipantUpsert:
+        """Convert to SM upsert model"""
         return ParticipantUpsert(samples=[s.to_sm() for s in self.samples])
 
 
@@ -191,6 +192,7 @@ class ParsedSample:
         self.sequence_groups: list[ParsedSequencingGroup] = []
 
     def to_sm(self) -> SampleBatchUpsert:
+        """Convert to SM upsert model"""
         return SampleBatchUpsert(
             id=self.internal_sid,
             external_id=self.external_sid,
@@ -230,6 +232,7 @@ class ParsedSequencingGroup:
         self.analyses: list[ParsedAnalysis] = []
 
     def to_sm(self) -> SequenceGroupUpsert:
+        """Convert to SM upsert model"""
         return SequenceGroupUpsert(
             type=SequenceType(self.sequence_type),
             technology=SequenceTechnology(self.sequence_technology),
@@ -241,12 +244,14 @@ class ParsedSequencingGroup:
 
 
 class ParsedSequencing:
+    """Parsed Sequencing object, internal to parsers"""
     def __init__(
         self,
         group: ParsedSequencingGroup,
         rows: GroupedRow,
         internal_seq_id: int | None,
         external_seq_ids: dict[str, str],
+        sequence_status: SequenceStatus,
         sequence_type: SequenceType,
         sequence_technology: SequenceTechnology,
         sequence_platform: str | None,
@@ -257,12 +262,14 @@ class ParsedSequencing:
 
         self.internal_seq_id = internal_seq_id
         self.external_seq_ids = external_seq_ids
+        self.sequence_status = sequence_status
         self.sequence_type = sequence_type
         self.sequence_technology = sequence_technology
         self.sequence_platform = sequence_platform
         self.meta = meta
 
     def to_sm(self) -> SequenceUpsert:
+        """Convert to SM upsert model"""
         return SequenceUpsert(
             id=self.internal_seq_id,
             external_ids=self.external_seq_ids,
@@ -275,6 +282,7 @@ class ParsedSequencing:
 
 
 class ParsedAnalysis:
+    """Parsed Analysis, ready to create an entry in SM"""
     def __init__(
         self,
         sequence_group: ParsedSequencingGroup,
@@ -287,9 +295,22 @@ class ParsedAnalysis:
         self.sequence_group = sequence_group
         self.rows = rows
         self.status = status
-        self.type_ = type_
+        self.type = type_
         self.meta = meta
         self.output = output
+
+    def to_sm(self):
+        """To SM model"""
+        if not self.sequence_group.internal_seqgroup_id:
+            raise ValueError('Sequence group ID must be filled in by now')
+        return AnalysisModel(
+            status=AnalysisStatus(self.status),
+            type=AnalysisType(self.type),
+            meta=self.meta,
+            output=self.output,
+            sequence_group_ids=[self.sequence_group.internal_seqgroup_id]
+
+        )
 
 
 def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
@@ -543,7 +564,7 @@ class GenericParser(
 
     async def file_pointer_to_rows(self, file_pointer, delimiter) -> list[SingleRow]:
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        return [r for r in reader]
+        return list(reader)
 
     def prepare_summary(
         self,
@@ -703,12 +724,12 @@ class GenericParser(
     ) -> list[ParsedParticipant]:
 
         participant_groups: list[ParsedParticipant] = []
-        for pid, rows in group_by(rows, self.get_participant_id).items():
+        for pid, prows in group_by(rows, self.get_participant_id).items():
             participant_groups.append(
                 ParsedParticipant(
                     internal_pid=None,
                     external_pid=pid,
-                    rows=rows,
+                    rows=prows,
                     meta=await self.get_participant_meta_from_group(rows),
                     reported_sex=self.get_reported_sex(rows),
                     reported_gender=self.get_reported_gender(rows),

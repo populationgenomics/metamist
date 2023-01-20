@@ -1,5 +1,4 @@
 # pylint: disable=invalid-name
-import asyncio
 from typing import Dict, List, Tuple, Optional, Any
 
 import re
@@ -889,7 +888,9 @@ class ParticipantLayer(BaseLayer):
                     sample.participant_id = ipid
 
             # Upsert all samples with sequences for each participant
-            results = [ await sampt.batch_upsert_samples(p.samples) for p in all_participants]
+            results = [
+                await sampt.batch_upsert_samples(p.samples) for p in all_participants
+            ]
 
         # Format and return response
         return dict(zip(pids, results))

@@ -1,5 +1,4 @@
-import asyncio
-from typing import Dict, List, Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -31,7 +30,7 @@ class SampleUpsert(BaseModel):
 class SamplesUpsertBody(BaseModel):
     """Upsert model for batch Samples"""
 
-    samples: List[SampleUpsert]
+    samples: list[SampleUpsert]
 
 
 class SampleLayer(BaseLayer):
@@ -119,7 +118,7 @@ class SampleLayer(BaseLayer):
 
     async def get_sample_id_map_by_external_ids(
         self,
-        external_ids: List[str],
+        external_ids: list[str],
         project: ProjectId = None,
         allow_missing=False,
     ):
@@ -142,8 +141,8 @@ class SampleLayer(BaseLayer):
         )
 
     async def get_sample_id_map_by_internal_ids(
-        self, sample_ids: List[int], check_project_ids=True, allow_missing=False
-    ) -> Dict[int, str]:
+        self, sample_ids: list[int], check_project_ids=True, allow_missing=False
+    ) -> dict[int, str]:
         """Get map of external sample id to internal id"""
 
         sample_ids_set = set(sample_ids)
@@ -176,19 +175,19 @@ class SampleLayer(BaseLayer):
 
     async def get_all_sample_id_map_by_internal_ids(
         self, project: ProjectId
-    ) -> Dict[int, str]:
+    ) -> dict[int, str]:
         """Get sample id map for all samples in project"""
         return await self.st.get_all_sample_id_map_by_internal_ids(project=project)
 
     async def get_samples_by(
         self,
-        sample_ids: List[int] = None,
-        meta: Dict[str, Any] = None,
-        participant_ids: List[int] = None,
+        sample_ids: list[int] = None,
+        meta: dict[str, Any] = None,
+        participant_ids: list[int] = None,
         project_ids=None,
         active=True,
         check_project_ids=True,
-    ) -> List[Sample]:
+    ) -> list[Sample]:
         """Get samples by some criteria"""
         if not sample_ids and not project_ids:
             raise ValueError('Must specify one of "project_ids" or "sample_ids"')
@@ -214,12 +213,12 @@ class SampleLayer(BaseLayer):
 
     async def get_sample_with_missing_participants_by_internal_id(
         self, project: ProjectId
-    ) -> Dict[int, str]:
+    ) -> dict[int, str]:
         """Get samples with missing participants in project"""
         m = await self.st.get_sample_with_missing_participants_by_internal_id(project)
         return dict(m)
 
-    async def get_samples_create_date(self, sample_ids: List[int]):
+    async def get_samples_create_date(self, sample_ids: list[int]):
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         pjcts = await self.st.get_project_ids_for_sample_ids(sample_ids)
         await self.pt.check_access_to_project_ids(self.author, pjcts, readonly=True)
@@ -258,7 +257,7 @@ class SampleLayer(BaseLayer):
     async def update_sample(
         self,
         id_: int,
-        meta: Dict = None,
+        meta: dict = None,
         participant_id: int = None,
         type_: SampleType = None,
         author: str = None,
@@ -325,7 +324,7 @@ class SampleLayer(BaseLayer):
         return int(internal_id)
 
     async def update_many_participant_ids(
-        self, ids: List[int], participant_ids: List[int], check_sample_ids=True
+        self, ids: list[int], participant_ids: list[int], check_sample_ids=True
     ) -> bool:
         """
         Update participant IDs for many samples
@@ -348,7 +347,7 @@ class SampleLayer(BaseLayer):
 
     async def get_history_of_sample(
         self, id_: int, check_sample_ids: bool = True
-    ) -> List[Sample]:
+    ) -> list[Sample]:
         """Get the full history of a sample"""
         rows = await self.st.get_history_of_sample(id_)
 

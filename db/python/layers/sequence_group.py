@@ -1,4 +1,4 @@
-import asyncio
+from typing import Awaitable
 
 from pydantic import BaseModel
 
@@ -12,6 +12,8 @@ from models.enums import SequenceType, SequenceTechnology
 
 
 class SequencingGroupUpsert(BaseModel):
+    """Model for upserting a SequenceGroup"""
+
     id: str | None
     type: SequenceType
     technology: SequenceTechnology
@@ -155,18 +157,17 @@ class SequenceGroupLayer(BaseLayer):
     async def upsert_sequence_groups(
         self, sample_id: int, sequence_groups: list[SequencingGroupUpsert]
     ):
+        """Upsert a list of sequence groups"""
         if not isinstance(sequence_groups, list):
             raise ValueError('Sequencing groups is not a list')
         # first determine if any groups have different sequences
         slayer = SampleSequenceLayer(self.connection)
-        [
+        for sg in sequence_groups:
             await slayer.upsert_sequences(sample_id, sg.sequencing)
-            for sg in sequence_groups
-        ]
 
         to_insert = [sg for sg in sequence_groups if not sg.id]
         to_update = []
-        to_replace = []
+        to_replace: list[SequencingGroupUpsert] = []
 
         sequence_groups_that_exist = [sg for sg in sequence_groups if sg.id]
         if sequence_groups_that_exist:
@@ -190,10 +191,10 @@ class SequenceGroupLayer(BaseLayer):
                 else:
                     to_replace.append(sg)
 
-        promises = []
+        promises: list[Awaitable] = []
 
-        async def insert(sg):
-            sequence_ids = [s.id for s in sg.sequences]
+        async def insert(sg: SequencingGroupUpsert):
+            sequence_ids = [s.id for s in sg.sequencing]
             sg.id = await self.seqgt.create_sequence_group(
                 sample_id=sample_id,
                 type_=sg.type,
@@ -214,7 +215,7 @@ class SequenceGroupLayer(BaseLayer):
             promises.append(
                 self.modify_sequences_in_group(
                     sequence_group_id=int(sg.id),
-                    sequences=[s.id for s in sg.sequences],
+                    sequences=[s.id for s in sg.sequencing],
                     open_transaction=False,
                     meta=sg.meta,
                 )

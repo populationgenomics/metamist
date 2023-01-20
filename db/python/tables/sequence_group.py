@@ -58,13 +58,16 @@ class SequenceGroupTable(DbBase):
     async def get_sequence_ids_by_sequence_group_ids(
         self, ids: list[int]
     ) -> dict[int, list[int]]:
+        """
+        Get sequence IDs in a sequence_group
+        """
         _query = """
             SELECT sequencing_group_id, sequencing_id
             FROM sequencing_group_sequence
             WHERE sequencing_group_id IN :sqgids
         """
         rows = await self.connection.fetch_all(_query, {'sqgids': ids})
-        sequence_groups = defaultdict(list)
+        sequence_groups: dict[int, list[int]] = defaultdict(list)
         for row in rows:
             sequence_groups[row['sequencing_group_id']].append(row['sequencing_id'])
 
@@ -81,7 +84,7 @@ class SequenceGroupTable(DbBase):
         author: str = None,
         open_transaction=True,
     ):
-
+        """Create sequence group"""
         _query = """
         INSERT INTO sequence_group
             (sample_id, type, technology, platform, meta, author)
@@ -127,6 +130,9 @@ class SequenceGroupTable(DbBase):
     async def update_sequence_group(
         self, sequence_group_id: int, meta: dict, platform: str
     ):
+        """
+        Update meta / platform on sequence_group
+        """
         updaters = ['JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)']
         values = {'seqgid': sequence_group_id, 'meta': to_db_json(meta)}
         if platform:
@@ -141,7 +147,10 @@ class SequenceGroupTable(DbBase):
 
         await self.connection.execute(_query, values)
 
-    async def archive_sequence_group(self, sequence_group_id):
+    async def archive_sequence_groups(self, sequence_group_id: list[int]):
+        """
+        Archive sequence group by setting archive flag to TRUE
+        """
         _query = """
         UPDATE sequence_group
         SET archive = 1, author = :author

@@ -2,9 +2,8 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from sample_metadata.parser.generic_parser import ParsedParticipant
 from test.testbase import run_as_sync
-
+from sample_metadata.parser.generic_parser import ParsedParticipant
 from scripts.parse_ont_sheet import OntParser
 
 

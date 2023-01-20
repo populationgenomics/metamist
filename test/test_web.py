@@ -15,7 +15,7 @@ from db.python.layers.participant import (
     ParticipantUpsert,
     ParticipantUpsertBody,
 )
-from db.python.layers.sample import SampleBatchUpsert, SampleLayer
+from db.python.layers.sample import SampleLayer, SampleUpsert
 from db.python.layers.sequence import SampleSequenceLayer, SequencingUpsert
 from db.python.layers.sequence_group import SequencingGroupUpsert
 
@@ -87,7 +87,7 @@ class TestWeb(DbIsolatedTest):
                 'meta': {},
                 'samples': [
                     {
-                        '_class': SampleBatchUpsert,
+                        '_class': SampleUpsert,
                         'external_id': 'sample_id001',
                         'meta': {},
                         'type': SampleType.BLOOD,

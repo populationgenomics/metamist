@@ -8,10 +8,7 @@ import click
 from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
-)
-from sample_metadata.parser.generic_parser import (
     ParsedSequencingGroup,
-    ParsedSequencing,
     ParsedSample,
 )
 

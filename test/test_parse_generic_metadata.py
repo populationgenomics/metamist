@@ -2,9 +2,9 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from sample_metadata.parser.generic_parser import ParsedParticipant, ParsedSample
 from test.testbase import run_as_sync
 
+from sample_metadata.parser.generic_parser import ParsedParticipant, ParsedSample
 from sample_metadata.parser.generic_metadata_parser import GenericMetadataParser
 
 
@@ -52,8 +52,8 @@ class TestParseGenericMetadata(unittest.TestCase):
             '<sample-id>-R1.fastq.gz': 'gs://<sample-id>-R1.fastq.gz',
             '<sample-id>-R2.fastq.gz': 'gs://<sample-id>-R2.fastq.gz',
         }
-        samples: list[ParsedSample]
-        summary, samples = await parser.parse_manifest(
+        # samples: list[ParsedSample]
+        summary, _ = await parser.parse_manifest(
             StringIO('\n'.join(rows)), delimiter=',', dry_run=True
         )
 
@@ -335,7 +335,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         # Call generic parser
         file_contents = '\n'.join(rows)
         participants: list[ParsedParticipant]
-        summary, participants = await parser.parse_manifest(
+        _, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -499,7 +499,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         # Call generic parser
         file_contents = '\n'.join(rows)
         samples: list[ParsedSample]
-        summary, samples = await parser.parse_manifest(
+        _, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
@@ -574,7 +574,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         # Call generic parser
         file_contents = '\n'.join(rows)
         samples: list[ParsedSample]
-        summary, samples = await parser.parse_manifest(
+        _, samples = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 

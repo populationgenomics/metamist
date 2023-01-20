@@ -35,3 +35,5 @@ data-dump.sql
 local.py
 cram-map/
 graphql-types/
+openapi-generator-cli.jar
+scripts/*.json

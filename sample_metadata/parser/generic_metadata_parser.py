@@ -17,6 +17,7 @@ from sample_metadata.parser.generic_parser import (
     GroupedRow,
     ParsedSequencingGroup,
     ParsedSequencing,
+    ParsedSample,
     SingleRow,
     run_as_sync,
     ParsedAnalysis,
