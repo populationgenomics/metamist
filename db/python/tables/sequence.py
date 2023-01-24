@@ -1,4 +1,4 @@
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-arguments
 
 import re
 import asyncio
@@ -9,7 +9,7 @@ from api.utils import group_by
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
-from models.enums import SequenceType, SequenceStatus
+from models.enums import SequenceType, SequenceStatus, SequenceTechnology
 from models.models.sequence import SampleSequencing
 
 
@@ -53,6 +53,7 @@ class SampleSequencingTable(DbBase):
         'type',
         'meta',
         'status',
+        'technology',
     ]
 
     async def get_projects_by_sequence_ids(
@@ -93,6 +94,7 @@ class SampleSequencingTable(DbBase):
                         external_ids=sequence.external_ids,
                         sequence_type=sequence.type,
                         status=sequence.status,
+                        technology=sequence.technology,
                         sequence_meta=sequence.meta,
                         author=author,
                         open_transaction=False,
@@ -105,6 +107,7 @@ class SampleSequencingTable(DbBase):
         sample_id,
         external_ids: Optional[dict[str, str]],
         sequence_type: SequenceType,
+        technology: SequenceTechnology | None,
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
@@ -117,8 +120,8 @@ class SampleSequencingTable(DbBase):
 
         _query = """\
             INSERT INTO sample_sequencing
-                (sample_id, type, meta, status, author)
-            VALUES (:sample_id, :type, :meta, :status, :author)
+                (sample_id, type, technology, meta, status, author)
+            VALUES (:sample_id, :type, :technology, :meta, :status, :author)
             RETURNING id;
         """
 
@@ -131,6 +134,7 @@ class SampleSequencingTable(DbBase):
                 {
                     'sample_id': sample_id,
                     'type': sequence_type.value,
+                    'technology': technology.value if technology else None,
                     'meta': to_db_json(sequence_meta),
                     'status': status.value,
                     'author': author or self.author,
@@ -219,6 +223,7 @@ class SampleSequencingTable(DbBase):
         Get the sequence IDs from internal sample_id and sequence type
         Map them to be keyed on sequence type
         """
+        # TODO: how should we address this, because we ultimately want to split on the technology I think
         _query = """\
             SELECT sq.id, s.project, sq.type
             FROM sample_sequencing sq
@@ -348,6 +353,7 @@ class SampleSequencingTable(DbBase):
         *,
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
+        technology: Optional[SequenceTechnology] = None,
         meta: Optional[Dict] = None,
         project: Optional[ProjectId] = None,
         author=None,
@@ -367,6 +373,9 @@ class SampleSequencingTable(DbBase):
             if meta is not None:
                 updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
                 fields['meta'] = to_db_json(meta)
+            if technology:
+                updaters.append('technology = :technology')
+                fields['technology'] = technology.value
 
             _query = f"""
                 UPDATE sample_sequencing
@@ -434,11 +443,20 @@ class SampleSequencingTable(DbBase):
         external_sequence_ids: List[str] = None,
         project_ids=None,
         active=True,
-        types: List[str] = None,
-        statuses: List[str] = None,
+        types: list[SequenceType] | list[str] = None,
+        technologies: list[SequenceTechnology] | list[str] = None,
+        statuses: list[SequenceStatus] | list[str] = None,
     ) -> Tuple[list[ProjectId], list[SampleSequencing]]:
         """Get sequences by some criteria"""
-        keys = ['sq.id', 'sq.sample_id', 'sq.type', 'sq.status', 'sq.meta', 's.project']
+        keys = [
+            'sq.id',
+            'sq.sample_id',
+            'sq.type',
+            'sq.status',
+            'sq.technology',
+            'sq.meta',
+            's.project',
+        ]
         keys_str = ', '.join(keys)
 
         where = []
@@ -486,6 +504,14 @@ class SampleSequencingTable(DbBase):
             seq_types = [s.value if isinstance(s, SequenceType) else s for s in types]
             where.append('sq.type in :types')
             replacements['types'] = seq_types
+
+        if technologies:
+            seq_techs = [
+                s.value if isinstance(s, SequenceTechnology) else s
+                for s in technologies
+            ]
+            where.append('sq.technology in :techs')
+            replacements['techs'] = seq_techs
 
         if statuses:
             where.append('sq.status in :statuses')

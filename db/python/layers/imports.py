@@ -85,7 +85,7 @@ class ImportLayer(BaseLayer):
     def parse_specimen_type_to_sample_type(specimen_type: Optional[str]) -> SampleType:
         """Take the airtable 'Specimen Type' and return a SampleType"""
         if not specimen_type:
-            raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
+            raise Exception(f"Couldn't determine sample type from {specimen_type!r}")
 
         if 'blood' in specimen_type.lower():
             return SampleType.BLOOD
@@ -93,7 +93,7 @@ class ImportLayer(BaseLayer):
         if 'saliva' in specimen_type.lower():
             return SampleType.SALIVA
 
-        raise Exception(f"Couldn't determine sample type from '{specimen_type}'")
+        raise Exception(f"Couldn't determine sample type from {specimen_type!r}")
 
     @staticmethod
     def parse_row_status(row_status: Optional[str]) -> SequenceStatus:
@@ -112,7 +112,7 @@ class ImportLayer(BaseLayer):
         if row_status_lower == '':
             return SequenceStatus.UNKNOWN
 
-        raise ValueError(f"Couldn't parse sequencing status '{row_status}'")
+        raise ValueError(f"Couldn't parse sequencing status {row_status!r}")
 
 
 # if __name__ == '__main__':

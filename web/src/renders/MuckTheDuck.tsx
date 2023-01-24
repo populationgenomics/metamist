@@ -1,15 +1,7 @@
-import * as React from "react";
+import * as React from 'react'
+import muck from '../static/muck-the-duck.svg'
 
-const MuckTheDuck = (
-    props: React.DetailedHTMLProps<
-        React.ImgHTMLAttributes<HTMLImageElement>,
-        HTMLImageElement
-    >
-) => (
-    <img
-        src={require("../static/muck-the-duck.svg").default}
-        alt="Muck the duck"
-        {...props}
-    />
-);
-export default MuckTheDuck;
+const MuckTheDuck: React.FunctionComponent<
+    React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>
+> = (props) => <img src={muck} alt="Muck the duck" {...props} />
+export default MuckTheDuck

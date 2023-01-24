@@ -1,98 +1,98 @@
-import * as React from "react";
-import { tree, hierarchy } from "d3";
+import * as React from 'react'
+import { tree, hierarchy } from 'd3'
 
 interface PedigreeEntry {
-    affected: number;
-    family_id: string;
-    individual_id: string;
-    maternal_id: string;
-    paternal_id: string;
-    sex: number;
+    affected: number
+    family_id: string
+    individual_id: string
+    maternal_id: string
+    paternal_id: string
+    sex: number
 }
 
 interface RenderPedigreeProps {
-    data: PedigreeEntry[];
+    data: PedigreeEntry[]
 }
 
 const connect = (d) => {
     return (
-        "M" +
+        'M' +
         (d.source.x - 30) +
-        "," +
+        ',' +
         d.source.y +
-        "H" +
+        'H' +
         (d.source.x + 60) +
-        "H" +
+        'H' +
         d.source.x +
-        "V" +
+        'V' +
         (3 * d.source.y + 4 * d.target.y) / 7 +
-        "H" +
+        'H' +
         d.target.x +
-        "V" +
+        'V' +
         d.target.y
-    );
-};
+    )
+}
 
 const reshapeData = (data1: PedigreeEntry[]) => {
     const data: PedigreeEntry[] = [
         {
-            family_id: "8600",
-            individual_id: "D21-0075",
+            family_id: '8600',
+            individual_id: 'D21-0075',
             paternal_id: null,
             maternal_id: null,
             sex: 1,
             affected: 1,
         },
         {
-            family_id: "8600",
-            individual_id: "D21-0074",
-            paternal_id: "8600.1",
-            maternal_id: "8600.2",
+            family_id: '8600',
+            individual_id: 'D21-0074',
+            paternal_id: '8600.1',
+            maternal_id: '8600.2',
             sex: 2,
             affected: 1,
         },
         {
-            family_id: "8600",
-            individual_id: "D21-0076",
-            paternal_id: "D21-0075",
-            maternal_id: "D21-0074",
+            family_id: '8600',
+            individual_id: 'D21-0076',
+            paternal_id: 'D21-0075',
+            maternal_id: 'D21-0074',
             sex: 2,
             affected: 2,
         },
         {
-            family_id: "8600",
-            individual_id: "D13-708",
-            paternal_id: "8600.1",
-            maternal_id: "8600.2",
+            family_id: '8600',
+            individual_id: 'D13-708',
+            paternal_id: '8600.1',
+            maternal_id: '8600.2',
             sex: 2,
             affected: 1,
         },
         {
-            family_id: "8600",
-            individual_id: "8600.1",
+            family_id: '8600',
+            individual_id: '8600.1',
             paternal_id: null,
             maternal_id: null,
             sex: 1,
             affected: 1,
         },
         {
-            family_id: "8600",
-            individual_id: "8600.2",
+            family_id: '8600',
+            individual_id: '8600.2',
             paternal_id: null,
             maternal_id: null,
             sex: 2,
             affected: 1,
         },
-    ];
+    ]
 
     if (data.length === 1) {
-        const { individual_id, affected, sex } = data[0];
+        const { individual_id, affected, sex } = data[0]
         return {
             name: individual_id,
             affected: affected,
             gender: sex,
             children: [],
-        };
+        }
     }
 
     // const couples = Array.from(
@@ -113,20 +113,18 @@ const reshapeData = (data1: PedigreeEntry[]) => {
     // newData = {name: item, children: siblings}
     // });
 
-    const children = data.filter(
-        (item) => item.paternal_id && item.maternal_id
-    );
+    const children = data.filter((item) => item.paternal_id && item.maternal_id)
     const collapsedChildren = children.reduce(
         (arr: { name?: string; children?: {}[] }[], item: PedigreeEntry) => {
             const exists = arr.findIndex(
                 (i) => i.name === `${item.paternal_id}+${item.maternal_id}`
-            );
+            )
             if (exists > -1) {
-                arr[exists]["children"]?.push({
+                arr[exists]['children']?.push({
                     name: item.individual_id,
                     affected: item.affected,
                     gender: item.sex,
-                });
+                })
             } else {
                 arr.push({
                     name: `${item.paternal_id}+${item.maternal_id}`,
@@ -137,32 +135,27 @@ const reshapeData = (data1: PedigreeEntry[]) => {
                             gender: item.sex,
                         },
                     ],
-                });
+                })
             }
-            return arr;
+            return arr
         },
         []
-    );
+    )
 
-    return collapsedChildren[0];
-};
+    return collapsedChildren[0]
+}
 
-export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
-    data,
-}) => {
-    const reshapedData = reshapeData(data);
-    const margin = React.useMemo(
-        () => ({ top: 100, right: 50, bottom: 100, left: 50 }),
-        []
-    );
-    const width = 900 - margin.left - margin.right;
-    const height = 500 - margin.top - margin.bottom;
+export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({ data }) => {
+    const reshapedData = reshapeData(data)
+    const margin = React.useMemo(() => ({ top: 100, right: 50, bottom: 100, left: 50 }), [])
+    const width = 900 - margin.left - margin.right
+    const height = 500 - margin.top - margin.bottom
 
     const ped = tree()
         .separation(function (a, b) {
-            return a.parent === b.parent ? 1 : 1.2;
+            return a.parent === b.parent ? 1 : 1.2
         })
-        .size([width, height]);
+        .size([width, height])
 
     return (
         <>
@@ -175,7 +168,7 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                         .links()
                         .map((item) => (
                             <path
-                                fill={"none"}
+                                fill={'none'}
                                 stroke="black"
                                 shapeRendering="crispEdges"
                                 d={connect(item)}
@@ -185,7 +178,7 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                         .descendants()
                         .map((item) => (
                             <g>
-                                {item.data.name.includes("+") ? (
+                                {item.data.name.includes('+') ? (
                                     <>
                                         <rect
                                             width={80}
@@ -194,12 +187,10 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                                 data.find(
                                                     (i) =>
                                                         i.individual_id ===
-                                                        item.data.name.split(
-                                                            "+"
-                                                        )[0]
+                                                        item.data.name.split('+')[0]
                                                 )?.affected === 1
-                                                    ? "black"
-                                                    : "white"
+                                                    ? 'black'
+                                                    : 'white'
                                             }
                                             stroke="black"
                                             x={item.x - 110}
@@ -210,9 +201,9 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                             fill="black"
                                             x={item.x - 70}
                                             y={item.y + 60}
-                                            style={{ textAnchor: "middle" }}
+                                            style={{ textAnchor: 'middle' }}
                                         >
-                                            {item.data.name.split("+")[0]}
+                                            {item.data.name.split('+')[0]}
                                         </text>
                                         <rect
                                             width={80}
@@ -221,12 +212,10 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                                 data.find(
                                                     (i) =>
                                                         i.individual_id ===
-                                                        item.data.name.split(
-                                                            "+"
-                                                        )[1]
+                                                        item.data.name.split('+')[1]
                                                 )?.affected === 1
-                                                    ? "black"
-                                                    : "white"
+                                                    ? 'black'
+                                                    : 'white'
                                             }
                                             stroke="black"
                                             x={item.x + 30}
@@ -237,9 +226,9 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                             fill="black"
                                             x={item.x + 70}
                                             y={item.y + 60}
-                                            style={{ textAnchor: "middle" }}
+                                            style={{ textAnchor: 'middle' }}
                                         >
-                                            {item.data.name.split("+")[1]}
+                                            {item.data.name.split('+')[1]}
                                         </text>
                                     </>
                                 ) : (
@@ -247,11 +236,7 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                         <rect
                                             width={80}
                                             height={80}
-                                            fill={
-                                                item.data.affected === 1
-                                                    ? "black"
-                                                    : "white"
-                                            }
+                                            fill={item.data.affected === 1 ? 'black' : 'white'}
                                             stroke="black"
                                             x={item.x - 40}
                                             y={item.y - 40}
@@ -262,7 +247,7 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                                             fill="black"
                                             x={item.x}
                                             y={item.y + 60}
-                                            style={{ textAnchor: "middle" }}
+                                            style={{ textAnchor: 'middle' }}
                                         >
                                             {item.data.name}
                                         </text>
@@ -273,5 +258,5 @@ export const RenderPedigree: React.FunctionComponent<RenderPedigreeProps> = ({
                 </g>
             </svg>
         </>
-    );
-};
+    )
+}

@@ -99,7 +99,7 @@ class TestDatabaseBackup(unittest.TestCase):
         )
         prod_count = get_results(
             self.prod_conn,
-            f"SELECT COUNT(*) FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}'",
+            f'SELECT COUNT(*) FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP{self.timestamp!r}',
         )
 
         self.assertEqual(restored_count, prod_count)
@@ -113,7 +113,7 @@ class TestDatabaseBackup(unittest.TestCase):
         )
         prod_results = get_results(
             self.prod_conn,
-            f"SELECT * FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}' LIMIT 10;",
+            f'SELECT * FROM {table} FOR SYSTEM_TIME AS OF TIMESTAMP{self.timestamp!r} LIMIT 10;',
         )
         self.assertEqual(restored_results, prod_results)
 
@@ -136,7 +136,7 @@ class TestDatabaseBackup(unittest.TestCase):
             _query = f"""\
 SELECT {id_fields_str}
 FROM {table}
-FOR SYSTEM_TIME AS OF TIMESTAMP'{self.timestamp}'
+FOR SYSTEM_TIME AS OF TIMESTAMP{self.timestamp!r}
 WHERE {wheres_str};"""
 
             prod_random_results = get_results(

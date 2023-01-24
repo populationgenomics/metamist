@@ -1,52 +1,52 @@
-import * as React from "react";
+import * as React from 'react'
 
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from 'react-router-dom'
 
-import { Dropdown } from "semantic-ui-react";
+import { Dropdown } from 'semantic-ui-react'
 
-import { ProjectApi } from "../sm-api/api";
+import { ProjectApi } from '../sm-api/api'
 
 interface ProjectSelectorProps {
-    setPageNumber: React.Dispatch<React.SetStateAction<number>>;
-    setPageLimit: React.Dispatch<React.SetStateAction<number>>;
-    pageLimit: number;
+    setPageNumber: React.Dispatch<React.SetStateAction<number>>
+    setPageLimit: React.Dispatch<React.SetStateAction<number>>
+    pageLimit: number
 }
 
-export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
+const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     setPageNumber,
     setPageLimit,
     pageLimit,
 }) => {
-    const { projectName } = useParams();
-    const navigate = useNavigate();
+    const { projectName } = useParams()
+    const navigate = useNavigate()
     const handleOnClick = React.useCallback(
         (_, { value }) => {
-            navigate(`/project/${value}`);
-            setPageNumber(1);
-            setPageLimit(pageLimit);
+            navigate(`/project/${value}`)
+            setPageNumber(1)
+            setPageLimit(pageLimit)
         },
         [navigate, setPageLimit, setPageNumber, pageLimit]
-    );
+    )
 
-    const [projects, setProjects] = React.useState<string[] | undefined>();
-    const [error, setError] = React.useState<string | undefined>();
+    const [projects, setProjects] = React.useState<string[] | undefined>()
+    const [error, setError] = React.useState<string | undefined>()
 
     React.useEffect(() => {
         new ProjectApi()
             .getMyProjects()
-            .then((projects) => setProjects(projects.data))
-            .catch((er) => setError(er.message));
+            .then((myProjects) => setProjects(myProjects.data))
+            .catch((er) => setError(er.message))
 
         // empty array means only do the on first load,
-        //no props change should cause this to retrigger
-    }, []);
+        // no props change should cause this to retrigger
+    }, [])
 
     if (error) {
-        return <p>An error occurred while getting projects: {error}</p>;
+        return <p>An error occurred while getting projects: {error}</p>
     }
 
     if (projects === undefined) {
-        return <p>Loading projects...</p>;
+        return <p>Loading projects...</p>
     }
 
     return (
@@ -58,9 +58,15 @@ export const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
                 fluid
                 onChange={handleOnClick}
                 placeholder="Select a project"
-                value={projectName}
-                options={projects.map((p) => ({ key: p, text: p, value: p }))}
+                value={projectName ?? ''}
+                options={projects.map((p) => ({
+                    key: p,
+                    text: p,
+                    value: p,
+                }))}
             />
         </div>
-    );
-};
+    )
+}
+
+export default ProjectSelector
