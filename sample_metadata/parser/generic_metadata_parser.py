@@ -17,7 +17,7 @@ from sample_metadata.parser.generic_parser import (
     GroupedRow,
     ParsedSequencingGroup,
     ParsedSequencing,
-    ParsedSample,
+    ParsedSample,   # noqa
     SingleRow,
     run_as_sync,
     ParsedAnalysis,
@@ -646,6 +646,8 @@ class GenericMetadataParser(GenericParser):
                     rows=sequence_group.rows,
                     internal_seq_id=None,
                     external_seq_ids={},
+                    # unfortunately hard to break them up by row in the current format
+                    sequence_status=self.get_sequence_status(rows),
                     sequence_type=sequence_group.sequence_type,
                     sequence_technology=sequence_group.sequence_technology,
                     sequence_platform=sequence_group.sequence_platform,
