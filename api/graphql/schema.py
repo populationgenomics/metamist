@@ -214,8 +214,8 @@ class GraphQLProject:
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
-    read_secret_name: str | None = None
-    write_secret_name: str | None = None
+    read_group_name: str | None = None
+    write_group_name: str | None = None
 
     @strawberry.field()
     async def pedigree(
