@@ -1,14 +1,8 @@
 # pylint: disable=unused-import
-import os
 
 from google.auth.exceptions import DefaultCredentialsError
 
-
-IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in (
-    'y',
-    'true',
-    '1',
-)
+from api.settings import IGNORE_GCP_CREDENTIALS_ERROR
 
 # 2021-06-02 mfranklin:
 #   Sometimes it's useful to start the server without a GCP context,
