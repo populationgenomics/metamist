@@ -12,6 +12,7 @@ import click
 
 from sample_metadata.model.sample_type import SampleType
 from sample_metadata.model.sequence_status import SequenceStatus
+from sample_metadata.model.sequence_technology import SequenceTechnology
 from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.parser.generic_parser import (
     GenericParser,
@@ -95,6 +96,7 @@ class GenericMetadataParser(GenericParser):
         reads_column: Optional[str] = None,
         checksum_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
+        seq_technology_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
@@ -104,6 +106,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
+        default_sequence_technology='long-reads',
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -129,6 +132,7 @@ class GenericMetadataParser(GenericParser):
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
         self.seq_type_column = seq_type_column
+        self.seq_technology_column = seq_technology_column
         self.reference_assembly_location_column = reference_assembly_location_column
         self.default_reference_assembly_location = default_reference_assembly_location
 
@@ -168,6 +172,25 @@ class GenericMetadataParser(GenericParser):
             SequenceType(r.get(self.seq_type_column, self.default_sequence_type))
             for r in row
         ]
+
+    def get_sequence_technologies(self, row: GroupedRow) -> list[SequenceTechnology]:
+        """Get list of sequence technologies for rows"""
+        if isinstance(row, dict):
+            return [self.get_sequence_technology(row)]
+        return [
+            self.get_sequence_technology(r)
+            for r in row
+        ]
+
+    def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
+        """Get sequence technology for single row"""
+        value = row.get(self.seq_technology_column, None) or self.default_sequence_technology
+        value = value.lower()
+
+        if value == 'ont':
+            value = 'long-reads'
+
+        return SequenceTechnology(value)
 
     def get_sequence_type(self, row: SingleRow) -> SequenceType:
         """Get sequence type from row"""
@@ -545,12 +568,15 @@ class GenericMetadataParser(GenericParser):
         resulting list of metadata
         """
         sequence_meta = []
-        for stype, row_group in group_by(
-            rows, lambda s: str(self.get_sequence_type(s))
-        ).items():
+
+        def _seq_grouper(s):
+            return str(self.get_sequence_type(s)), str(self.get_sequence_technology(s))
+
+        for (stype, stech), row_group in group_by(rows, _seq_grouper).items():
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
                 sequence_type=SequenceType(stype),
+                sequence_technology=SequenceTechnology(stech)
             )
             sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta
@@ -638,7 +664,8 @@ class GenericMetadataParser(GenericParser):
 
                 if not ref:
                     raise ValueError(
-                        f'Reads type for "{sample_id}" is CRAM, but a reference is not defined, please set the default reference assembly path'
+                        f'Reads type for {sample_id!r} is CRAM, but a reference is '
+                        f'not defined, please set the default reference assembly path'
                     )
 
                 ref_fp = self.file_path(ref)

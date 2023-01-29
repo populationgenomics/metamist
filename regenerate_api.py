@@ -112,7 +112,7 @@ def check_openapi_version():
 
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
     if not version_match:
-        raise Exception(f'Could not detect version of openapi-generator from "{out}"')
+        raise Exception(f'Could not detect version of openapi-generator from {out!r}')
 
     version = version_match.group()
     major = version.split('.')[0]
@@ -140,7 +140,8 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
         *('--artifact-version', version),
         '--skip-validate-spec',
     ]
-    jcom = ' '.join(f"'{c}'" for c in command)
+    # quotes commands by calling repr on each element
+    jcom = ' '.join(map(repr, command))
     logger.info('Generating with command: ' + jcom)
     # 5 attempts
     n_attempts = 1

@@ -14,13 +14,14 @@ from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
+from api.settings import set_full_access
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
     Connection,
     SMConnections,
     TABLES_ORDERED_BY_FK_DEPS,
 )
-from db.python.tables.project import ProjectPermissionsTable, set_full_access
+from db.python.tables.project import ProjectPermissionsTable
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -82,13 +83,12 @@ class DbTest(unittest.TestCase):
             This starts a mariadb container, applies liquibase schema and inserts a project
             MAYBE, the best way in the future would be to only ever create ONE connection
             between all Test classes, and create a new database per test, new set of a connections,
-            but that certaintly has a host of it's own problems
+            but that certainly has a host of its own problems.
 
             Then you can destroy the database within tearDownClass as all tests have been completed.
             """
             logger = logging.getLogger()
             try:
-                os.environ['SM_ALLOWALLACCESS'] = '1'
                 set_full_access(True)
                 db = MySqlContainer('mariadb:10.8.3')
                 port_to_expose = find_free_port()
@@ -138,10 +138,9 @@ class DbTest(unittest.TestCase):
                     project_name='test',
                     dataset_name='test',
                     create_test_project=False,
-                    gcp_project_id='None',
                     author='testuser',
-                    read_secret_name='None',
-                    write_secret_name='None',
+                    read_group_name='None',
+                    write_group_name='None',
                     check_permissions=False,
                 )
 
@@ -188,7 +187,9 @@ class DbIsolatedTest(DbTest):
             if table in ignore:
                 continue
             try:
-                await self.connection.connection.execute(f'DELETE FROM {table}')
+                await self.connection.connection.execute(
+                    f'DELETE FROM {table} WHERE 1;'
+                )
                 await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e

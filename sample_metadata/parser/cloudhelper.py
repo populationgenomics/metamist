@@ -68,7 +68,7 @@ class CloudHelper:
         if filename not in self.filename_map:
             if raise_exception:
                 raise FileNotFoundError(
-                    f'Could not find file "{filename}" in search paths'
+                    f'Could not find file {filename!r} in search paths'
                 )
             return None
 
@@ -87,7 +87,7 @@ class CloudHelper:
         if path.startswith('/'):
             return [os.path.join(path, f) for f in os.listdir(path)]
 
-        raise ValueError(f'Could not handle listing directory of "{directory_name}"')
+        raise ValueError(f'Could not handle listing directory of {directory_name!r}')
 
     async def file_contents(self, filename) -> str | None:
         """Get contents of file (decoded as utf8)"""
@@ -117,7 +117,7 @@ class CloudHelper:
                 file_base = os.path.basename(file)
                 if file_base in fn_map:
                     logging.warning(
-                        f'File "{file}" from "{directory}" already exists in directory map: {fn_map[file_base]}'
+                        f'File {file!r} from {directory!r} already exists in directory map: {fn_map[file_base]}'
                     )
                     continue
                 fn_map[file_base] = file

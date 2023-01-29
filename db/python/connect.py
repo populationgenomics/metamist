@@ -184,7 +184,7 @@ class SMConnections:
     async def get_connection(*, author: str, project_name: str, readonly: bool):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
-        logger.debug(f'Authenticate connection to {project_name} with "{author}"')
+        logger.debug(f'Authenticate connection to {project_name} with {author!r}')
 
         conn = await SMConnections._get_made_connection()
         pt = ProjectPermissionsTable(connection=conn)
@@ -199,7 +199,7 @@ class SMConnections:
     async def get_connection_no_project(author: str):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
-        logger.debug(f'Authenticate no-project connection with "{author}"')
+        logger.debug(f'Authenticate no-project connection with {author!r}')
 
         conn = await SMConnections._get_made_connection()
 
@@ -224,7 +224,7 @@ class DbBase:
     def __init__(self, connection: Connection):
         if connection is None:
             raise Exception(
-                f'No connection was provided to the table "{self.__class__.__name__}"'
+                f'No connection was provided to the table {self.__class__.__name__!r}'
             )
         if not isinstance(connection, Connection):
             raise Exception(

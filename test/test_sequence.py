@@ -6,7 +6,7 @@ from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceType, SequenceStatus
 from models.models.sequence import SampleSequencing
-from models.enums import SampleType
+from models.enums import SampleType, SequenceTechnology
 
 
 class TestSequence(DbIsolatedTest):
@@ -53,6 +53,7 @@ class TestSequence(DbIsolatedTest):
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
             status=SequenceStatus.UPLOADED,
+            technology=SequenceTechnology.SHORT_READ,
             sequence_meta=meta,
             external_ids=external_ids,
         )
@@ -65,6 +66,7 @@ class TestSequence(DbIsolatedTest):
         self.assertEqual(self.sample_id_raw, int(sequence.sample_id))
         self.assertEqual('genome', sequence.type.value)
         self.assertEqual('uploaded', sequence.status.value)
+        self.assertEqual('short-read', sequence.technology.value)
         self.assertDictEqual(external_ids, sequence.external_ids)
         self.assertDictEqual(meta, sequence.meta)
 
@@ -82,6 +84,7 @@ class TestSequence(DbIsolatedTest):
                     type=stype,
                     meta=meta,
                     status=SequenceStatus.COMPLETED_SEQUENCING,
+                    technology=SequenceTechnology.SHORT_READ,
                 )
                 for stype in SequenceType
             ]
@@ -105,6 +108,7 @@ class TestSequence(DbIsolatedTest):
             status=SequenceStatus.UPLOADED,
             sequence_meta={},
             external_ids=external_ids,
+            technology=SequenceTechnology.SHORT_READ,
         )
 
         @run_as_sync
@@ -115,6 +119,7 @@ class TestSequence(DbIsolatedTest):
                 status=SequenceStatus.UPLOADED,
                 sequence_meta={},
                 external_ids=external_ids,
+                technology=SequenceTechnology.SHORT_READ,
             )
 
         _n_sequences_query = 'SELECT COUNT(*) from sample_sequencing'
@@ -145,6 +150,7 @@ class TestSequence(DbIsolatedTest):
                         type=SequenceType.EXOME,
                         meta={},
                         status=SequenceStatus.COMPLETED_SEQUENCING,
+                        technology=SequenceTechnology.SHORT_READ,
                     )
                     for _ in range(2)
                 ]
@@ -171,6 +177,7 @@ class TestSequence(DbIsolatedTest):
             status=SequenceStatus.UPLOADED,
             sequence_meta={},
             external_ids={'default': 'SEQ01', 'other': 'EXT_SEQ1'},
+            technology=SequenceTechnology.SHORT_READ,
         )
         seq2_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
@@ -178,6 +185,7 @@ class TestSequence(DbIsolatedTest):
             status=SequenceStatus.UPLOADED,
             sequence_meta={},
             external_ids={'default': 'SEQ02'},
+            technology=SequenceTechnology.SHORT_READ,
         )
 
         self.assertEqual(
@@ -195,6 +203,7 @@ class TestSequence(DbIsolatedTest):
         seq1_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
+            technology=SequenceTechnology.SHORT_READ,
             status=SequenceStatus.UPLOADED,
             sequence_meta={},
             external_ids={},
@@ -202,6 +211,7 @@ class TestSequence(DbIsolatedTest):
         seq2_id = await self.seqlayer.insert_sequencing(
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.EXOME,
+            technology=SequenceTechnology.SHORT_READ,
             status=SequenceStatus.UPLOADED,
             sequence_meta={},
             external_ids={},
@@ -235,6 +245,7 @@ class TestSequence(DbIsolatedTest):
             status=SequenceStatus.UPLOADED,
             sequence_meta={'unique': 'a', 'common': 'common'},
             external_ids={'default': 'SEQ01'},
+            technology=SequenceTechnology.LONG_READ,
         )
         seq2_id = await self.seqlayer.insert_sequencing(
             sample_id=sample_id_for_test,
@@ -242,6 +253,7 @@ class TestSequence(DbIsolatedTest):
             status=SequenceStatus.RECEIVED,
             sequence_meta={'unique': 'b', 'common': 'common'},
             external_ids={'default': 'SEQ02'},
+            technology=SequenceTechnology.SHORT_READ,
         )
 
         async def search_result_to_ids(**query):
@@ -324,6 +336,7 @@ class TestSequence(DbIsolatedTest):
             sequence_type=SequenceType.GENOME,
             status=SequenceStatus.RECEIVED,
             sequence_meta={'a': 1, 'b': 2},
+            technology=SequenceTechnology.SHORT_READ,
             external_ids={
                 'default': 'SEQ01',
                 'untouched': 'UTC+1',
@@ -361,6 +374,7 @@ class TestSequence(DbIsolatedTest):
             sample_id=self.sample_id_raw,
             sequence_type=SequenceType.GENOME,
             status=SequenceStatus.UPLOADED,
+            technology=SequenceTechnology.SHORT_READ,
             sequence_meta={},
             external_ids={},
         )
@@ -372,3 +386,28 @@ class TestSequence(DbIsolatedTest):
                 'SELECT status FROM sample_sequencing WHERE id = :id', {'id': seq_id}
             )
             self.assertEqual(status.value, status_to_check['status'])
+
+    @run_as_sync
+    async def test_update_technologies(self):
+        """
+        Test update all sequence statuses
+        """
+        seq_id = await self.seqlayer.insert_sequencing(
+            sample_id=self.sample_id_raw,
+            sequence_type=SequenceType.GENOME,
+            status=SequenceStatus.UPLOADED,
+            technology=SequenceTechnology.SHORT_READ,
+            sequence_meta={},
+            external_ids={},
+        )
+
+        # cycle through all statuses, and check that works
+        for tech in SequenceTechnology:
+            await self.seqlayer.update_sequence(
+                seq_id, technology=tech, check_project_id=False
+            )
+            status_to_check = await self.connection.connection.fetch_one(
+                'SELECT technology FROM sample_sequencing WHERE id = :id',
+                {'id': seq_id},
+            )
+            self.assertEqual(tech.value, status_to_check['technology'])

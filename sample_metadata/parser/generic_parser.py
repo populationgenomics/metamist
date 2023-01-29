@@ -27,6 +27,7 @@ from functools import wraps
 from cloudpathlib import AnyPath
 
 from api.utils import group_by
+from sample_metadata.model.sequence_technology import SequenceTechnology
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -129,7 +130,7 @@ class CustomDictReader(csv.DictReader):
 
             if not self.ignore_extra_keys:
                 raise ValueError(
-                    f'Key "{fieldname}" not found in provided key map: {", ".join(self.key_map.keys())}'
+                    f'Key {fieldname!r} not found in provided key map: {", ".join(self.key_map.keys())}'
                 )
 
         return fieldname.strip()
@@ -170,10 +171,12 @@ class SequenceMetaGroup:
         self,
         rows: GroupedRow,
         sequence_type: SequenceType,
+        sequence_technology: SequenceTechnology,
         meta: Optional[Dict[str, Any]] = None,
     ):
         self.rows = rows
         self.sequence_type = sequence_type
+        self.sequence_technology = sequence_technology
         self.meta = meta
 
 
@@ -223,6 +226,7 @@ class GenericParser(
         search_paths: list[str],
         project: str,
         default_sequence_type='genome',
+        default_sequence_technology='short-read',
         default_sequence_status='uploaded',
         default_sample_type='blood',
         default_analysis_type='qc',
@@ -248,6 +252,7 @@ class GenericParser(
         self.project = project
 
         self.default_sequence_type: str = default_sequence_type
+        self.default_sequence_technology: str = default_sequence_technology
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
         self.default_analysis_type: str = default_analysis_type
@@ -278,7 +283,7 @@ class GenericParser(
             fn = super().file_path(filename, raise_exception=raise_exception)
             if not fn:
                 raise FileNotFoundError(
-                    f'Cannot form full path to "{filename}" as '
+                    f'Cannot form full path to {filename!r} as '
                     'no path_prefix was defined'
                 )
             return fn
@@ -334,7 +339,10 @@ class GenericParser(
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
         return SequenceMetaGroup(
-            rows=[], sequence_type=self.default_sequence_type, meta={}
+            rows=[],
+            sequence_type=SequenceType(self.default_sequence_type),
+            sequence_technology=SequenceTechnology(self.default_sequence_technology),
+            meta={},
         )
 
     # @abstractmethod
@@ -1164,7 +1172,7 @@ class GenericParser(
         if no_r_match:
             no_r_match_str = ', '.join(no_r_match)
             raise ValueError(
-                f"Couldn't detect the format of FASTQs (expected match for regex '{rmatch.pattern}'): {no_r_match_str}"
+                f"Couldn't detect the format of FASTQs (expected match for regex {rmatch.pattern!r}): {no_r_match_str!r}"
             )
 
         values = []
@@ -1251,7 +1259,7 @@ class GenericParser(
             delimiter = csv.Sniffer().sniff(first_line).delimiter
             if delimiter:
                 logger.info(
-                    f'Guessing delimiter based on first line, got "{delimiter}"'
+                    f'Guessing delimiter based on first line, got {delimiter!r}'
                 )
                 return delimiter
 
