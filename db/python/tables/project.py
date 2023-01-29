@@ -34,7 +34,7 @@ class ProjectPermissionCacheObject:
     """
 
     def __init__(self, users: Set[str], expiry=None):
-        self.users = users
+        self.users = set(users or [])
         self.expiry = expiry or (
             datetime.utcnow() + timedelta(minutes=PERMISSIONS_CACHE_LENGTH)
         )
