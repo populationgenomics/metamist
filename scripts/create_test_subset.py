@@ -153,10 +153,11 @@ def main(
                 )
             )
         fams = fapi.get_families(project)
+        _additional_families_set = set(_additional_families)
         families_to_subset = [
             family['id']
             for family in fams
-            if family['external_id'] not in set(_additional_families)
+            if family['external_id'] not in _additional_families_set
         ]
         full_pedigree = fapi.get_pedigree(
             project=project, internal_family_ids=families_to_subset
@@ -186,13 +187,14 @@ def main(
                 get_samples_for_families(project, _additional_families)
             )
 
+        _additional_samples_set = set(_additional_samples)
         samples_to_subset = [
             sample
             for sample in all_samples
-            if sample['id'] not in set(_additional_samples)
+            if sample['id'] not in _additional_samples_set
         ]
         samples_to_add = [
-            sample for sample in all_samples if sample['id'] in set(_additional_samples)
+            sample for sample in all_samples if sample['id'] in _additional_samples_set
         ]
         samples = random.sample(list(samples_to_subset), samples_n)
         samples.extend(samples_to_add)
