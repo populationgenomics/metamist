@@ -11,7 +11,7 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Dict, Optional, Tuple, Set
+from typing import Optional, Tuple
 import logging
 import os
 import random
@@ -212,16 +212,21 @@ def main(
     test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
 
     try:
-        seq_infos: list[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
+        seq_infos: list[dict[str, str]] = seqapi.get_sequences_by_sample_ids(sample_ids)
     except exceptions.ApiException:
         seq_info_by_s_id = {}
     else:
         seq_info_by_s_id = {seq['sample_id']: seq for seq in seq_infos}
 
-    analysis_by_sid_by_type: Dict[str, Dict] = {'cram': {}, 'gvcf': {}}
+    analysis_by_sid_by_type: dict[str, dict[str, dict[str, str]]] = {
+        'cram': {},
+        'gvcf': {},
+    }
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
-            analyses: list[Dict] = aapi.get_latest_analysis_for_samples_and_type(
+            analyses: list[
+                dict[str, str]
+            ] = aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
                 analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
@@ -407,7 +412,7 @@ def transfer_participants(
 
 def get_map_ipid_esid(
     project: str, target_project: str, external_participant_ids: list[str]
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Intermediate steps to determine the mapping of esid to ipid
     Acronyms
     ep : external participant id
@@ -483,7 +488,7 @@ def get_fams_for_samples(
     additional_samples: Optional[list[str]] = None,
 ):
     """Returns the families that a list of samples belong to"""
-    fams: Set[str] = set()
+    fams: set[str] = set()
     sample_objects = sapi.get_samples(
         body_get_samples={
             'project_ids': [project],
@@ -506,7 +511,7 @@ def get_fams_for_samples(
     return list(fams)
 
 
-def _normalise_map(unformatted_map: list[list[str]]) -> Dict[str, str]:
+def _normalise_map(unformatted_map: list[list[str]]) -> dict[str, str]:
     """Input format: [[value1,key1,key2],[value2,key4]]
     Output format: {key1:value1, key2: value1, key3:value2}"""
 
@@ -601,7 +606,7 @@ def _get_random_families(
     ]
 
     # Get family size distribution, i.e. {1:[FAM1, FAM2], 2:[FAM3], 3:[FAM4,FAM5, FAM6]}
-    distributed_by_size: Dict[int, list[str]] = {}
+    distributed_by_size: dict[int, list[str]] = {}
     for k, v in family_sizes.items():
         if k in families_within_threshold:
             if distributed_by_size.get(v):
@@ -671,13 +676,13 @@ def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None
     return d
 
 
-def _pretty_format_samples(samples: list[Dict]) -> str:
+def _pretty_format_samples(samples: list[dict[str, str]]) -> str:
     return ', '.join(f"{s['id']}/{s['external_id']}" for s in samples)
 
 
 def _process_existing_test_samples(
     test_project: str, samples: list[dict[str, str]]
-) -> Dict:
+) -> dict[str, dict[str, str]]:
     """
     Removes samples that need to be removed and returns those that need to be kept
     """
