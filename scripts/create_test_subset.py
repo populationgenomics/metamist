@@ -41,6 +41,7 @@ from sample_metadata.models import (
     SequenceType,
     SampleType,
     SequenceStatus,
+    SequenceTechnology,
     AnalysisStatus,
 )
 
@@ -293,6 +294,7 @@ def main(
                         type=SequenceType(seq_info['type']),
                         external_ids=seq_info['external_ids'],
                         status=SequenceStatus(seq_info['status']),
+                        technology=SequenceTechnology(seq_info['technology']),
                     ),
                 )
 
