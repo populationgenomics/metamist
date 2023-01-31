@@ -648,7 +648,7 @@ def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
         if not file_exists(new_path):
-            cmd = f'gsutil cp "{old_path}" "{new_path}"'
+            cmd = f'gsutil cp {old_path!r} {new_path!r}'
             logger.info(f'Copying file in metadata: {cmd}')
             subprocess.run(cmd, check=False, shell=True)
         extra_exts = ['.md5']
@@ -658,7 +658,7 @@ def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = f'gsutil cp "{old_path + ext}" "{new_path + ext}"'
+                cmd = f'gsutil cp {old_path + ext!r} {new_path + ext!r}'
                 logger.info(f'Copying extra file in metadata: {cmd}')
                 subprocess.run(cmd, check=False, shell=True)
         return new_path

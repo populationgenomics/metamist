@@ -1,11 +1,13 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring
 # type: ignore
+# flake8: noqa
+# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring,unused-argument
 """
 Schema for GraphQL.
 
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+from collections import defaultdict
 
 import strawberry
 from strawberry.dataloader import DataLoader
@@ -73,7 +75,9 @@ async def load_samples_for_ids(sample_ids: list[int], connection) -> list['Sampl
     DataLoader: get_samples_for_ids
     """
     samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
-    return samples
+    # in case it's not ordered
+    s_by_id = {s.id: s for s in samples}
+    return [s_by_id.get(s) for s in sample_ids]
 
 
 @connected_data_loader
@@ -84,7 +88,11 @@ async def load_participants_for_ids(
     DataLoader: get_participants_by_ids
     """
     player = ParticipantLayer(connection)
-    return await player.get_participants_by_ids(participant_ids)
+    persons = await player.get_participants_by_ids(
+        [p for p in participant_ids if p is not None]
+    )
+    p_by_id = {p.id: p for p in persons}
+    return [p_by_id.get(p) for p in participant_ids]
 
 
 @connected_data_loader
@@ -103,7 +111,70 @@ async def load_samples_for_analysis_ids(
 @connected_data_loader
 async def load_projects_for_ids(project_ids: list[int], connection) -> list['Project']:
     pttable = ProjectPermissionsTable(connection.connection)
-    return await pttable.get_projects_by_ids(project_ids)
+    projects = await pttable.get_projects_by_ids(project_ids)
+    p_by_id = {p.id: p for p in projects}
+    return [p_by_id.get(p) for p in project_ids]
+
+
+@connected_data_loader
+async def load_families_for_participants(
+    participant_ids: list[int], connection
+) -> list[list['Family']]:
+    flayer = FamilyLayer(connection)
+    fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
+    return [fam_map.get(p) for p in participant_ids]
+
+
+@connected_data_loader
+async def load_participants_for_families(
+    family_ids: list[int], connection
+) -> list[list['Participant']]:
+    player = ParticipantLayer(connection)
+    pmap = await player.get_participants_by_families(family_ids)
+    return [pmap.get(fid) for fid in family_ids]
+
+
+@connected_data_loader
+async def load_analyses_for_samples(queries: list[dict], connection):
+    """
+    It's a little awkward, but we want extra parameter,
+    """
+    # supported params
+    supported_params = ['type', 'status']
+    ordered_lookup = ['sample', *supported_params]
+
+    grouped_by_params = group_by(
+        queries, lambda q: tuple((k, q.get(k)) for k in supported_params)
+    )
+    alayer = AnalysisLayer(connection)
+    cached_for_return = defaultdict(list)
+    for group in grouped_by_params.values():
+        analysis_type = group[0].get('type')
+        status = group[0].get('status')
+        sample_ids = [r['sample'] for r in group]
+
+        by_sample = defaultdict(list)
+
+        analyses = await alayer.get_analyses_for_samples(
+            sample_ids,
+            analysis_type=analysis_type,
+            status=status,
+        )
+
+        for a in analyses:
+            for sample_id in a.sample_ids:
+                by_sample[sample_id].append(a)
+
+        for row in group:
+            # use tuple
+            if result_for_sample := by_sample.get(row['sample']):
+                key = tuple(row.get(k) for k in ordered_lookup)
+                cached_for_return[key] = result_for_sample
+
+    return [
+        cached_for_return.get(tuple(row.get(k) for k in ordered_lookup), [])
+        for row in queries
+    ]
 
 
 async def get_context(connection=get_projectless_db_connection):
@@ -123,19 +194,28 @@ async def get_context(connection=get_projectless_db_connection):
             load_participants_for_ids(connection)
         ),
         'loader_projects_for_ids': DataLoader(load_projects_for_ids(connection)),
+        'loader_analyses_for_samples_ids': DataLoader(
+            load_analyses_for_samples(connection), cache=False
+        ),
+        'loader_families_for_participants': DataLoader(
+            load_families_for_participants(connection)
+        ),
+        'loader_participants_for_families': DataLoader(
+            load_participants_for_families(connection)
+        ),
     }
 
 
 @strawberry.type
-class Project:
+class GraphQLProject:
     """Project GraphQL model"""
 
     id: int
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
-    read_secret_name: str | None = None
-    write_secret_name: str | None = None
+    read_group_name: str | None = None
+    write_group_name: str | None = None
 
     @strawberry.field()
     async def pedigree(
@@ -163,7 +243,24 @@ class Project:
         return pedigree_dicts
 
     @strawberry.field()
-    async def participants(self, info: Info, root: 'Project') -> list['Participant']:
+    async def family(
+        self, info: Info, root: 'Project', external_id: str
+    ) -> 'GraphQLFamily':
+        connection = info.context['connection']
+        connection.project = root.id
+        return await FamilyLayer(connection).get_family_by_external_id(external_id)
+
+    @strawberry.field()
+    async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
+        connection = info.context['connection']
+        participants = await FamilyLayer(connection).get_families(project=root.id)
+
+        return participants
+
+    @strawberry.field()
+    async def participants(
+        self, info: Info, root: 'Project'
+    ) -> list['GraphQLParticipant']:
         connection = info.context['connection']
         participants = await ParticipantLayer(connection).get_participants(
             project=root.id
@@ -171,30 +268,59 @@ class Project:
 
         return participants
 
+    # @strawberry.field()
+    # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
+    #     return []
+
 
 @strawberry.type
-class Analysis:
+class GraphQLAnalysis:
     """Analysis GraphQL model"""
 
     id: int
     type: strawberry.enum(AnalysisType)
     status: strawberry.enum(AnalysisStatus)
     output: str | None
-    timestamp_completed: str | str = None
+    timestamp_completed: str | None = None
     active: bool
     meta: strawberry.scalars.JSON
     author: str
 
-    project: int
-
     @strawberry.field
-    async def samples(self, info: Info, root) -> list['Sample']:
+    async def samples(self, info: Info, root) -> list['GraphQLSample']:
         loader = info.context['loader_samples_for_analysis_ids']
         return await loader.load(root.id)
 
+    @strawberry.field
+    async def project(self, info: Info, root: 'Analysis') -> GraphQLProject:
+        loader = info.context['loader_projects_for_ids']
+        return await loader.load(root.project)
+
 
 @strawberry.type
-class Participant:
+class GraphQLFamily:
+    """GraphQL Family"""
+
+    id: int
+    external_id: str
+
+    description: str | None = None
+    coded_phenotype: str | None = None
+
+    @strawberry.field
+    async def project(self, info: Info, root: 'Family') -> GraphQLProject:
+        loader = info.context['loader_projects_for_ids']
+        return await loader.load(root.project)
+
+    @strawberry.field
+    async def participants(
+        self, info: Info, root: 'Family'
+    ) -> list['GraphQLParticipant']:
+        return await info.context['loader_participants_for_families'].load(root.id)
+
+
+@strawberry.type
+class GraphQLParticipant:
     """Participant GraphQL model"""
 
     id: int
@@ -202,12 +328,22 @@ class Participant:
     meta: strawberry.scalars.JSON
 
     @strawberry.field
-    async def samples(self, info: Info, root) -> list['Sample']:
+    async def samples(self, info: Info, root) -> list['GraphQLSample']:
         return await info.context['loader_samples_for_participants'].load(root.id)
+
+    @strawberry.field
+    async def families(self, info: Info, root) -> list[GraphQLFamily]:
+        fams = await info.context['loader_families_for_participants'].load(root.id)
+        return fams
+
+    @strawberry.field
+    async def project(self, info: Info, root: 'Participant') -> GraphQLProject:
+        loader = info.context['loader_projects_for_ids']
+        return await loader.load(root.project)
 
 
 @strawberry.type
-class Sample:
+class GraphQLSample:
     """Sample GraphQL model"""
 
     id: str
@@ -218,19 +354,23 @@ class Sample:
     author: str | None
 
     @strawberry.field
-    async def participant(self, info: Info, root: 'Sample') -> Participant:
+    async def participant(
+        self, info: Info, root: 'Sample'
+    ) -> GraphQLParticipant | None:
         loader_participants_for_ids = info.context['loader_participants_for_ids']
+        if root.participant is None:
+            return None
         return await loader_participants_for_ids.load(root.participant_id)
 
     @strawberry.field
-    async def sequences(self, info: Info, root) -> list['SampleSequencing']:
+    async def sequences(self, info: Info, root) -> list['GraphQLSampleSequencing']:
         loader_sequences_for_samples = info.context['loader_sequences_for_samples']
         return await loader_sequences_for_samples.load(
             sample_id_transform_to_raw(root.id)
         )
 
     @strawberry.field
-    async def project(self, info: Info, root) -> Project:
+    async def project(self, info: Info, root) -> GraphQLProject:
         return await info.context['loader_projects_for_ids'].load(root.project)
 
     @strawberry.field
@@ -240,21 +380,19 @@ class Sample:
         root: 'Sample',
         type: strawberry.enum(AnalysisType) | None = None,
         status: strawberry.enum(AnalysisStatus) | None = None,
-    ) -> list[Analysis]:
-        connection = info.context['connection']
-        alayer = AnalysisLayer(connection)
-        analyses = await alayer.get_analysis_for_sample(
-            sample_id_transform_to_raw(root.id),
-            analysis_type=type,
-            status=status,
-            map_sample_ids=False,
+    ) -> list[GraphQLAnalysis]:
+        loader = info.context['loader_analyses_for_samples_ids']
+        return await loader.load(
+            {
+                'sample': sample_id_transform_to_raw(root.id),
+                'type': type,
+                'status': status,
+            }
         )
-
-        return analyses
 
 
 @strawberry.type
-class SampleSequencing:
+class GraphQLSampleSequencing:
     """SampleSequencing GraphQL model"""
 
     id: int
@@ -263,7 +401,7 @@ class SampleSequencing:
     external_ids: strawberry.scalars.JSON
 
     @strawberry.field
-    async def sample(self, info: Info, root) -> 'Sample':
+    async def sample(self, info: Info, root) -> GraphQLSample:
         loader = info.context['loader_samples_for_ids']
         return await loader.load(root.sample_id)
 
@@ -273,25 +411,25 @@ class Query:
     """GraphQL Queries"""
 
     @strawberry.field
-    async def sample(self, info: Info, id: str) -> Sample:
+    async def sample(self, info: Info, id: str) -> GraphQLSample:
         loader = info.context['loader_samples_for_ids']
         return await loader.load(sample_id_transform_to_raw(id))
 
     @strawberry.field
-    async def sample_sequence(self, info: Info, id: int) -> SampleSequencing:
+    async def sample_sequence(self, info: Info, id: int) -> GraphQLSampleSequencing:
         connection = info.context['connection']
         slayer = SampleSequenceLayer(connection)
         return await slayer.get_sequence_by_id(id)
 
     @strawberry.field
-    async def participant(self, info: Info, id: int) -> Participant:
+    async def participant(self, info: Info, id: int) -> GraphQLParticipant:
         connection = info.context['connection']
         player = ParticipantLayer(connection)
         ps = await player.get_participants_by_ids([id])
         return ps[0]
 
     @strawberry.field()
-    async def project(self, info: Info, name: str) -> Project:
+    async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
         project_id = await ptable.get_project_id_from_name_and_user(
@@ -300,8 +438,13 @@ class Query:
         presponse = await ptable.get_projects_by_ids([project_id])
         return presponse[0]
 
+    @strawberry.field()
+    async def family(self, info: Info, family_id: int) -> GraphQLFamily:
+        connection = info.context['connection']
+        return await FamilyLayer(connection).get_family_by_internal_id(family_id)
+
     @strawberry.field
-    async def my_projects(self, info: Info) -> list[Project]:
+    async def my_projects(self, info: Info) -> list[GraphQLProject]:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
         project_map = await ptable.get_projects_accessible_by_user(

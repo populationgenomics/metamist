@@ -1,34 +1,36 @@
-import * as React from "react";
-import { ProjectApi, ProjectRow, SequenceType } from "../sm-api";
+/* eslint-disable */
+// Since this is for admin only
 
-import { Message, Button, Checkbox, Input, InputProps } from "semantic-ui-react";
+import * as React from 'react'
+import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
+import { ProjectApi, Project, SequenceType } from '../sm-api'
 
 interface ControlledInputProps extends InputProps {
-    project: ProjectRow;
-    metaKey: string;
+    project: Project
+    metaKey: string
 }
 
-const ProjectsAdmin = (props: any) => {
-    const [projects, setProjects] = React.useState<ProjectRow[]>([]);
-    const [error, setError] = React.useState<string | undefined>();
+const ProjectsAdmin = () => {
+    const [projects, setProjects] = React.useState<Project[]>([])
+    const [error, setError] = React.useState<string | undefined>()
 
     const getProjects = () => {
-        setError(undefined);
+        setError(undefined)
         new ProjectApi()
             .getAllProjects()
             .then((response) => {
-                setProjects(response.data);
+                setProjects(response.data)
             })
-            .catch((er) => setError(er.message));
-    };
+            .catch((er) => setError(er.message))
+    }
 
     React.useEffect(() => {
-        getProjects();
-    }, []);
+        getProjects()
+    }, [])
 
-    const headers = ["Id", "Name", "Dataset", "Seqr", "Seqr GUID"];
+    const headers = ['Id', 'Name', 'Dataset', 'Seqr', 'Seqr GUID']
 
-    if (!!error)
+    if (error)
         return (
             <Message negative>
                 {error}
@@ -37,24 +39,23 @@ const ProjectsAdmin = (props: any) => {
                     Retry
                 </Button>
             </Message>
-        );
+        )
 
-    if (!projects) return <div>Loading...</div>;
+    if (!projects) return <div>Loading...</div>
 
-    const updateMetaValue = (
-        projectName: string,
-        metaKey: string,
-        metaValue: any
-    ) => {
+    const updateMetaValue = (projectName: string, metaKey: string, metaValue: any) => {
         new ProjectApi()
             .updateProject(projectName, { meta: { [metaKey]: metaValue } })
-            .then(() => getProjects());
-    };
+            .then(() => getProjects())
+    }
 
-
-    const ControlledInput: React.FunctionComponent<ControlledInputProps> = ({ project, metaKey, ...props }) => {
+    const ControlledInput: React.FunctionComponent<ControlledInputProps> = ({
+        project,
+        metaKey,
+        ...props
+    }) => {
         // const projStateMeta: any = projectStateValue[project.name!]?.meta || {}
-        const projectMeta: any = project?.meta || {};
+        const projectMeta: any = project?.meta || {}
         return (
             <Input
                 fluid
@@ -63,22 +64,18 @@ const ProjectsAdmin = (props: any) => {
                 defaultValue={projectMeta[metaKey]}
                 // onChange={(e) => setProjectMetaState({ [project.name!]: { meta: { ...projStateMeta, [metaKey]: e.target.value } } })}
                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-                    const newValue = e.currentTarget.value;
+                    const newValue = e.currentTarget.value
                     if (newValue === projectMeta[metaKey]) {
-                        console.log(
-                            `Skip update to meta.${metaKey} as the value did not change`
-                        );
-                        return;
+                        console.log(`Skip update to meta.${metaKey} as the value did not change`)
+                        return
                     }
-                    console.log(
-                        `Updating ${project.name}: meta.${metaKey} to ${newValue}`
-                    );
-                    updateMetaValue(project.name!, metaKey, newValue);
+                    console.log(`Updating ${project.name}: meta.${metaKey} to ${newValue}`)
+                    updateMetaValue(project.name!, metaKey, newValue)
                 }}
                 {...props}
             />
-        );
-    };
+        )
+    }
 
     const seqTypes = Object.values(SequenceType)
 
@@ -94,50 +91,55 @@ const ProjectsAdmin = (props: any) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {projects.map((p) => {
-                        // @ts-ignore
-                        const meta: { [key: string]: any } = p?.meta || {};
+                    {projects
+                        .map((p) => {
+                            const meta: { [key: string]: any } = p?.meta || {}
 
-                        const isSeqr = meta?.is_seqr || false
-                        const types = isSeqr ? seqTypes : [null]
-                        const rowSpan = isSeqr ? seqTypes.length : undefined
+                            const isSeqr = meta?.is_seqr || false
+                            const types = isSeqr ? seqTypes : [null]
+                            const rowSpan = isSeqr ? seqTypes.length : undefined
 
-                        return types.map((seqType, idx) => (
-                            <tr key={`${p.id}-${seqType}`}>
-                                {idx === 0 && (<>
-                                    <td rowSpan={rowSpan}>{p.id}</td>
-                                    <td rowSpan={rowSpan}>{p.name}</td>
-                                    <td rowSpan={rowSpan}>{p.dataset}</td>
-                                    <td rowSpan={rowSpan}>
-                                        <Checkbox
-                                            checked={meta?.is_seqr}
-                                            onChange={(e, data) =>
-                                                updateMetaValue(
-                                                    p.name!,
-                                                    "is_seqr",
-                                                    data.checked
-                                                )
-                                            }
-                                        />
-                                    </td>
-                                </>)}
-                                {!seqType && <td></td>}
-                                {!!seqType && (<td>
-                                    <ControlledInput
-                                        key={`controlled-${p.name!}-${seqType}-seqr-guid}`}
-                                        project={p}
-                                        metaKey={`seqr-project-${seqType}`}
-                                        placeholder={`Seqr ${seqType} project GUID`}
-                                        label={seqType}
-                                    />
-                                </td>)}
-                            </tr>
-                        ))
-                    }).flat()}
+                            return types.map((seqType, idx) => (
+                                <tr key={`${p.id}-${seqType}`}>
+                                    {idx === 0 && (
+                                        <>
+                                            <td rowSpan={rowSpan}>{p.id}</td>
+                                            <td rowSpan={rowSpan}>{p.name}</td>
+                                            <td rowSpan={rowSpan}>{p.dataset}</td>
+                                            <td rowSpan={rowSpan}>
+                                                <Checkbox
+                                                    checked={meta?.is_seqr}
+                                                    onChange={(e, data) =>
+                                                        updateMetaValue(
+                                                            p.name!,
+                                                            'is_seqr',
+                                                            data.checked
+                                                        )
+                                                    }
+                                                />
+                                            </td>
+                                        </>
+                                    )}
+                                    {!seqType && <td />}
+                                    {!!seqType && (
+                                        <td>
+                                            <ControlledInput
+                                                key={`controlled-${p.name!}-${seqType}-seqr-guid}`}
+                                                project={p}
+                                                metaKey={`seqr-project-${seqType}`}
+                                                placeholder={`Seqr ${seqType} project GUID`}
+                                                label={seqType}
+                                            />
+                                        </td>
+                                    )}
+                                </tr>
+                            ))
+                        })
+                        .flat()}
                 </tbody>
             </table>
         </>
-    );
-};
+    )
+}
 
-export default ProjectsAdmin;
+export default ProjectsAdmin

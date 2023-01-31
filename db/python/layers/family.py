@@ -10,6 +10,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from models.models.family import Family
 
 
 class PedRow:
@@ -127,10 +128,10 @@ class PedRow:
 
         if sl == 'sex':
             raise ValueError(
-                f'Unknown sex "{sex}", did you mean to call import_pedigree with has_headers=True?'
+                f'Unknown sex {sex!r}, did you mean to call import_pedigree with has_headers=True?'
             )
         raise ValueError(
-            f'Unknown sex "{sex}", please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
+            f'Unknown sex {sex!r}, please ensure sex is in {PedRow.ALLOWED_SEX_VALUES}'
         )
 
     @staticmethod
@@ -281,7 +282,8 @@ class PedRow:
                 unmatched.append(item)
 
         if unmatched:
-            unmatched_headers_str = ', '.join(f'"{u}"' for u in unmatched)
+            # repr casts to string and quotes if applicable
+            unmatched_headers_str = ', '.join(map(repr, unmatched))
             raise ValueError(
                 'Unable to identity header elements: ' + unmatched_headers_str
             )
@@ -307,6 +309,24 @@ class FamilyLayer(BaseLayer):
             description=description,
             coded_phenotype=coded_phenotype,
         )
+
+    async def get_family_by_internal_id(
+        self, family_id: int, check_project_id: bool = True
+    ) -> Family:
+        """Get family by internal ID"""
+        project, family = await self.ftable.get_family_by_internal_id(family_id)
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                self.author, [project], readonly=True
+            )
+
+        return family
+
+    async def get_family_by_external_id(
+        self, external_id: str, project: ProjectId = None
+    ):
+        """Get family by external ID, requires project scope"""
+        return await self.ftable.get_family_by_external_id(external_id, project=project)
 
     async def get_families(
         self,
@@ -334,6 +354,25 @@ class FamilyLayer(BaseLayer):
         return await self.ftable.get_families(
             project=project, participant_ids=all_participants
         )
+
+    async def get_families_by_participants(
+        self, participant_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[Family]]:
+        """
+        Get families keyed by participant_ids, this will duplicate families
+        """
+        projects, participant_map = await self.ftable.get_families_by_participants(
+            participant_ids=participant_ids
+        )
+        if not participant_map:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return participant_map
 
     async def update_family(
         self,

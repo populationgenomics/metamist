@@ -71,7 +71,7 @@ def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
     expected_type = str if strict else (str, int)
     if not isinstance(identifier, expected_type):  # type: ignore
         raise TypeError(
-            f'Expected identifier type to be "{expected_type}", received "{type(identifier)}"'
+            f'Expected identifier type to be {expected_type!r}, received {type(identifier)!r}'
         )
 
     if isinstance(identifier, int):
@@ -82,16 +82,16 @@ def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
 
     if not identifier.startswith(SAMPLE_PREFIX):
         raise ValueError(
-            f'Invalid prefix found for {SAMPLE_PREFIX} sample identifier "{identifier}"'
+            f'Invalid prefix found for {SAMPLE_PREFIX} sample identifier {identifier!r}'
         )
 
     stripped_identifier = identifier.lstrip(SAMPLE_PREFIX)
     if not stripped_identifier.isdigit():
-        raise ValueError(f'Invalid sample identifier "{identifier}"')
+        raise ValueError(f'Invalid sample identifier {identifier!r}')
 
     sample_id_with_checksum = int(stripped_identifier)
     if not luhn_is_valid(sample_id_with_checksum, offset=CHECKSUM_OFFSET):
-        raise ValueError(f'The provided sample ID was not valid: "{identifier}"')
+        raise ValueError(f'The provided sample ID was not valid: {identifier!r}')
 
     return int(stripped_identifier[:-1])
 
@@ -123,7 +123,7 @@ def sample_id_format(sample_id: Union[int, str]) -> str:
     if isinstance(sample_id, str) and not sample_id.isdigit():
         if sample_id.startswith(SAMPLE_PREFIX):
             return sample_id
-        raise ValueError(f'Unexpected format for sample identifier "{sample_id}"')
+        raise ValueError(f'Unexpected format for sample identifier {sample_id!r}')
 
     sample_id = int(sample_id)
 
