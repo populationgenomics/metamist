@@ -11,7 +11,7 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 import logging
 import os
 import random
@@ -108,8 +108,8 @@ def main(
     samples_n: Optional[int],
     families_n: Optional[int],
     skip_ped: Optional[bool] = True,
-    additional_families: Optional[Tuple[str]] = None,
-    additional_samples: Optional[Tuple[str]] = None,
+    additional_families: Optional[tuple[str]] = None,
+    additional_samples: Optional[tuple[str]] = None,
 ):
     """
     Script creates a test subset for a given project.
@@ -305,7 +305,7 @@ def main(
                     output=_copy_files_in_dict(
                         analysis['output'],
                         project,
-                        (s['id'], new_sample_map[s['id']]),
+                        (str(s['id']), new_sample_map[s['id']]),
                     ),
                     status=AnalysisStatus(analysis['status']),
                     sample_ids=[new_sample_map[s['id']]],
@@ -526,7 +526,7 @@ def _normalise_map(unformatted_map: list[list[str]]) -> dict[str, str]:
 
 def _validate_opts(
     samples_n: int, families_n: int
-) -> Tuple[Optional[int], Optional[int]]:
+) -> tuple[Optional[int], Optional[int]]:
     if samples_n is not None and families_n is not None:
         raise click.BadParameter('Please specify only one of --samples or --families')
 
@@ -631,7 +631,7 @@ def _get_random_families(
     return returned_families
 
 
-def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None):
+def _copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
