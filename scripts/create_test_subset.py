@@ -11,7 +11,7 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, Optional, Tuple, Set
 import logging
 import os
 import random
@@ -117,8 +117,8 @@ def main(
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
     samples_n, families_n = _validate_opts(samples_n, families_n)
-    _additional_families: List[str] = list(additional_families)
-    _additional_samples: List[str] = list(additional_samples)
+    _additional_families: list[str] = list(additional_families)
+    _additional_samples: list[str] = list(additional_samples)
 
     all_samples = sapi.get_samples(
         body_get_samples={
@@ -212,7 +212,7 @@ def main(
     test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
 
     try:
-        seq_infos: List[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
+        seq_infos: list[Dict] = seqapi.get_sequences_by_sample_ids(sample_ids)
     except exceptions.ApiException:
         seq_info_by_s_id = {}
     else:
@@ -221,7 +221,7 @@ def main(
     analysis_by_sid_by_type: Dict[str, Dict] = {'cram': {}, 'gvcf': {}}
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
-            analyses: List[Dict] = aapi.get_latest_analysis_for_samples_and_type(
+            analyses: list[Dict] = aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
                 analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
@@ -311,8 +311,8 @@ def main(
 
 
 def transfer_families(
-    initial_project: str, target_project: str, participant_ids: List[int]
-) -> List[int]:
+    initial_project: str, target_project: str, participant_ids: list[int]
+) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     families = fapi.get_families(
         project=initial_project,
@@ -343,8 +343,8 @@ def transfer_families(
 
 
 def transfer_ped(
-    initial_project: str, target_project: str, family_ids: List[int]
-) -> List[str]:
+    initial_project: str, target_project: str, family_ids: list[int]
+) -> list[str]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
         initial_project,
@@ -375,8 +375,8 @@ def transfer_ped(
 
 
 def transfer_participants(
-    initial_project: str, target_project: str, participant_ids: List[int]
-) -> List[str]:
+    initial_project: str, target_project: str, participant_ids: list[int]
+) -> list[str]:
     """Transfers relevant participants between projects"""
 
     current_participants = papi.get_participants(
@@ -406,7 +406,7 @@ def transfer_participants(
 
 
 def get_map_ipid_esid(
-    project: str, target_project: str, external_participant_ids: List[str]
+    project: str, target_project: str, external_participant_ids: list[str]
 ) -> Dict[str, str]:
     """Intermediate steps to determine the mapping of esid to ipid
     Acronyms
@@ -449,10 +449,10 @@ def get_map_ipid_esid(
     return external_sample_internal_participant_map
 
 
-def get_samples_for_families(project: str, additional_families: List[str]):
+def get_samples_for_families(project: str, additional_families: list[str]):
     """Returns the samples that belong to a list of families"""
 
-    samples: List[str] = []
+    samples: list[str] = []
     full_pedigree = fapi.get_pedigree(
         project=project,
         replace_with_participant_external_ids=False,
@@ -480,7 +480,7 @@ def get_samples_for_families(project: str, additional_families: List[str]):
 
 def get_fams_for_samples(
     project: str,
-    additional_samples: Optional[List[str]] = None,
+    additional_samples: Optional[list[str]] = None,
 ):
     """Returns the families that a list of samples belong to"""
     fams: Set[str] = set()
@@ -506,7 +506,7 @@ def get_fams_for_samples(
     return list(fams)
 
 
-def _normalise_map(unformatted_map: List[List[str]]) -> Dict[str, str]:
+def _normalise_map(unformatted_map: list[list[str]]) -> Dict[str, str]:
     """Input format: [[value1,key1,key2],[value2,key4]]
     Output format: {key1:value1, key2: value1, key3:value2}"""
 
@@ -560,7 +560,7 @@ def _validate_opts(
     return samples_n, families_n
 
 
-def _print_fam_stats(families: List):
+def _print_fam_stats(families: list[dict[str, str]]):
     family_sizes = Counter([fam['family_id'] for fam in families])
     fam_by_size: typing.Counter[int] = Counter()
     # determine number of singles, duos, trios, etc
@@ -579,10 +579,10 @@ def _print_fam_stats(families: List):
 
 
 def _get_random_families(
-    families: List,
+    families: list[dict[str, str]],
     families_n: int,
     include_single_person_families: Optional[bool] = False,
-) -> List[str]:
+) -> list[str]:
     """Obtains a subset of families, that are a little less random.
     By default single-person families are discarded.
     The function aims to evenly distribute the families chosen by size.
@@ -601,7 +601,7 @@ def _get_random_families(
     ]
 
     # Get family size distribution, i.e. {1:[FAM1, FAM2], 2:[FAM3], 3:[FAM4,FAM5, FAM6]}
-    distributed_by_size: Dict[int, List[str]] = {}
+    distributed_by_size: Dict[int, list[str]] = {}
     for k, v in family_sizes.items():
         if k in families_within_threshold:
             if distributed_by_size.get(v):
@@ -610,7 +610,7 @@ def _get_random_families(
                 distributed_by_size[v] = [k]
 
     sizes = len(list(distributed_by_size.keys()))
-    returned_families: List[str] = []
+    returned_families: list[str] = []
 
     proportion = families_n / len(families_within_threshold)
 
@@ -671,11 +671,13 @@ def _copy_files_in_dict(d, dataset: str, sid_replacement: Optional[Tuple] = None
     return d
 
 
-def _pretty_format_samples(samples: List[Dict]) -> str:
+def _pretty_format_samples(samples: list[Dict]) -> str:
     return ', '.join(f"{s['id']}/{s['external_id']}" for s in samples)
 
 
-def _process_existing_test_samples(test_project: str, samples: List) -> Dict:
+def _process_existing_test_samples(
+    test_project: str, samples: list[dict[str, str]]
+) -> Dict:
     """
     Removes samples that need to be removed and returns those that need to be kept
     """
