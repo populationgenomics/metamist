@@ -27,6 +27,7 @@ from functools import wraps
 from cloudpathlib import AnyPath
 
 from api.utils import group_by
+from sample_metadata.model.sequence_technology import SequenceTechnology
 
 from sample_metadata.parser.cloudhelper import CloudHelper
 
@@ -129,7 +130,7 @@ class CustomDictReader(csv.DictReader):
 
             if not self.ignore_extra_keys:
                 raise ValueError(
-                    f'Key "{fieldname}" not found in provided key map: {", ".join(self.key_map.keys())}'
+                    f'Key {fieldname!r} not found in provided key map: {", ".join(self.key_map.keys())}'
                 )
 
         return fieldname.strip()
@@ -170,10 +171,12 @@ class SequenceMetaGroup:
         self,
         rows: GroupedRow,
         sequence_type: SequenceType,
+        sequence_technology: SequenceTechnology,
         meta: Optional[Dict[str, Any]] = None,
     ):
         self.rows = rows
         self.sequence_type = sequence_type
+        self.sequence_technology = sequence_technology
         self.meta = meta
 
 
@@ -223,6 +226,7 @@ class GenericParser(
         search_paths: list[str],
         project: str,
         default_sequence_type='genome',
+        default_sequence_technology='short-read',
         default_sequence_status='uploaded',
         default_sample_type='blood',
         default_analysis_type='qc',
@@ -248,6 +252,7 @@ class GenericParser(
         self.project = project
 
         self.default_sequence_type: str = default_sequence_type
+        self.default_sequence_technology: str = default_sequence_technology
         self.default_sequence_status: str = default_sequence_status
         self.default_sample_type: str = default_sample_type
         self.default_analysis_type: str = default_analysis_type
@@ -278,7 +283,7 @@ class GenericParser(
             fn = super().file_path(filename, raise_exception=raise_exception)
             if not fn:
                 raise FileNotFoundError(
-                    f'Cannot form full path to "{filename}" as '
+                    f'Cannot form full path to {filename!r} as '
                     'no path_prefix was defined'
                 )
             return fn
@@ -288,6 +293,11 @@ class GenericParser(
     @abstractmethod
     def get_sample_id(self, row: SingleRow) -> Optional[str]:
         """Get external sample ID from row"""
+
+    # @abstractmethod
+    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external sequence ID from row"""
+        return None
 
     @abstractmethod
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
@@ -329,7 +339,10 @@ class GenericParser(
     ) -> SequenceMetaGroup:
         """Get sequence-metadata from row then set it in the SequenceMetaGroup"""
         return SequenceMetaGroup(
-            rows=[], sequence_type=self.default_sequence_type, meta={}
+            rows=[],
+            sequence_type=SequenceType(self.default_sequence_type),
+            sequence_technology=SequenceTechnology(self.default_sequence_technology),
+            meta={},
         )
 
     # @abstractmethod
@@ -383,6 +396,42 @@ class GenericParser(
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
+    @staticmethod
+    def get_existing_external_sequence_ids(
+        participant_map: Dict[str, Dict[Any, List[Any]]]
+    ):
+        """Pulls external sequence IDs from participant map"""
+        external_sequence_ids: list[str] = []
+        for participant in participant_map:
+            for sample in participant_map[participant]:
+                for sequence in participant_map[participant][sample]:
+                    external_sequence_ids.append((sequence.get('Sequence ID')))
+
+        return external_sequence_ids
+
+    @staticmethod
+    def get_existing_sequences(
+        sequences: list[dict[str, Any]], external_sequence_ids: list[str]
+    ):
+        """Accounts for external_sequence_ids when determining which sequences
+        need to be updated vs inserted"""
+
+        existing_sequences: list[dict[str, Any]] = []
+        for seq in sequences:
+            if not seq['external_ids'].values():
+                # No existing sequence ID, we can assume that replacement should happen
+                # Note: This means that you can't have a mix of sequences with and without
+                # external sequence IDs in one dataset.
+                existing_sequences.append(seq)
+
+            else:
+                for ext_id in seq['external_ids'].values():
+                    # If the external ID is already there, we want to upsert.
+                    if ext_id in external_sequence_ids:
+                        existing_sequences.append(seq)
+
+        return existing_sequences
+
     async def process_sample_group(
         self,
         rows: GroupedRow,
@@ -434,6 +483,10 @@ class GenericParser(
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
                 }
+
+                if self.get_sequence_id(seq.rows):
+                    seq_args['external_ids'] = self.get_sequence_id(seq.rows)
+
                 if sequence_id:
                     seq_args['id'] = sequence_id
 
@@ -737,6 +790,10 @@ class GenericParser(
                 set(k for s in participant_map.values() for k in s.keys())
             )
 
+            external_sequence_ids = self.get_existing_external_sequence_ids(
+                participant_map
+            )
+
             external_to_internal_sample_id_map = (
                 await self.sapi.get_sample_id_map_by_external_async(
                     self.project, sample_ids, allow_missing=True
@@ -744,13 +801,19 @@ class GenericParser(
             )
 
             sequences = []
+            existing_sequences: list[dict[str, Any]] = []
             if external_to_internal_sample_id_map:
                 sequences = await self.seqapi.get_sequences_by_sample_ids_async(
                     list(external_to_internal_sample_id_map.values()),
                 )
 
+                # Accounts for multiple valid sequences per sample.
+                existing_sequences = self.get_existing_sequences(
+                    sequences, external_sequence_ids
+                )
+
             sequence_map: Dict[str, Dict[str, int]] = defaultdict(dict)
-            for seq in sequences:
+            for seq in existing_sequences:
                 sequence_map[seq['sample_id']][seq['type']] = seq['id']
 
             for external_pid in external_pids:
@@ -1109,7 +1172,7 @@ class GenericParser(
         if no_r_match:
             no_r_match_str = ', '.join(no_r_match)
             raise ValueError(
-                f"Couldn't detect the format of FASTQs (expected match for regex '{rmatch.pattern}'): {no_r_match_str}"
+                f"Couldn't detect the format of FASTQs (expected match for regex {rmatch.pattern!r}): {no_r_match_str!r}"
             )
 
         values = []
@@ -1196,7 +1259,7 @@ class GenericParser(
             delimiter = csv.Sniffer().sniff(first_line).delimiter
             if delimiter:
                 logger.info(
-                    f'Guessing delimiter based on first line, got "{delimiter}"'
+                    f'Guessing delimiter based on first line, got {delimiter!r}'
                 )
                 return delimiter
 

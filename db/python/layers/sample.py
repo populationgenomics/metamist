@@ -146,30 +146,37 @@ class SampleLayer(BaseLayer):
         )
 
     async def get_sample_id_map_by_internal_ids(
-        self, sample_ids: List[int], check_project_ids=True
+        self, sample_ids: List[int], check_project_ids=True, allow_missing=False
     ) -> Dict[int, str]:
         """Get map of external sample id to internal id"""
 
         sample_ids_set = set(sample_ids)
+
+        if not sample_ids_set:
+            return {}
+
         # could make a preflight request to self.st.get_project_ids_for_sample_ids
         # but this can do it one request, only one request to the database
         projects, sample_id_map = await self.st.get_sample_id_map_by_internal_ids(
             list(sample_ids_set)
         )
 
+        if not allow_missing and len(sample_id_map) != len(sample_ids):
+            # we have samples missing from the map, so we'll 404 the whole thing
+            missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
+            raise NotFoundError(
+                f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
+            )
+
+        if not sample_id_map:
+            return {}
+
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
             )
 
-        if len(sample_id_map) == len(sample_ids):
-            return sample_id_map
-
-        # we have samples missing from the map, so we'll 404 the whole thing
-        missing_sample_ids = sample_ids_set - set(sample_id_map.keys())
-        raise NotFoundError(
-            f"Couldn't find samples with IDS: {', '.join(sample_id_format_list(list(missing_sample_ids)))}"
-        )
+        return sample_id_map
 
     async def get_all_sample_id_map_by_internal_ids(
         self, project: ProjectId

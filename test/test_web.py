@@ -18,8 +18,7 @@ from db.python.layers.participant import (
 from db.python.layers.sample import SampleBatchUpsert, SampleLayer
 from db.python.layers.sequence import SampleSequenceLayer, SequenceUpsert
 
-from models.enums.sample import SampleType
-from models.enums.sequencing import SequenceStatus, SequenceType
+from models.enums import SequenceTechnology, SampleType, SequenceStatus, SequenceType
 
 
 def data_to_class(data: dict | list) -> dict | list:
@@ -96,6 +95,7 @@ class TestWeb(DbIsolatedTest):
                                 '_class': SequenceUpsert,
                                 'type': SequenceType.GENOME,
                                 'status': SequenceStatus.UPLOADED,
+                                'technology': SequenceTechnology.SHORT_READ,
                                 'meta': {
                                     'reads': [
                                         [
@@ -186,13 +186,12 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=sorted(
-                [
-                    ('type', 'type'),
-                    ('meta.reads_type', 'reads_type'),
-                    ('meta.batch', 'batch'),
-                ]
-            ),
+            sequence_keys=[
+                ('type', 'type'),
+                ('technology', 'technology'),
+                ('meta.batch', 'batch'),
+                ('meta.reads_type', 'reads_type'),
+            ],
             seqr_links={},
         )
 

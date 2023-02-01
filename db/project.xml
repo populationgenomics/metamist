@@ -389,5 +389,73 @@
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-10-25_sequence-external-ids-correction">
 		<sql>ALTER TABLE sample_sequencing_eid ADD SYSTEM VERSIONING;</sql>
+
 	</changeSet>
+	<changeSet author="michael.franklin" id="2022-12-01_sequence-external-ids-pk-correction">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<dropUniqueConstraint
+			tableName="sample_sequencing_eid"
+			constraintName="external_id"
+		/>
+<!--		This was incorrect named, so delete and create on correct table -->
+		<dropUniqueConstraint
+			tableName="participant"
+			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
+		/>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="sample_sequencing_eid"
+			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
+			validate="true"
+		/>
+	</changeSet>
+	<changeSet author="michael.franklin" id="2022-12-12_more-analysis-types">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv', 'web', 'analysis-runner');</sql>
+		<sql>UPDATE analysis SET type = 'analysis-runner' WHERE type='custom' AND json_extract(meta, '$.source') = 'analysis-runner';</sql>
+	</changeSet>
+	<changeSet author="michael.franklin" id="2022-11-23_sequencing-technology">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+		<addColumn
+			tableName="sample_sequencing">
+			<column
+				name="technology"
+				type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')"
+			/>
+		</addColumn>
+		<sql>
+			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell');
+
+			UPDATE sample_sequencing SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
+			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read', meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont';
+			UPDATE sample_sequencing SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type = 'single-cell';
+		</sql>
+	</changeSet>
+	<changeSet author="michael.franklin" id="2023-01-25_">
+		    <renameColumn
+				columnDataType="VARCHAR(255)"
+				newColumnName="read_group_name"
+				oldColumnName="read_secret_name"
+				remarks="Migration of groups membership cache to blobs"
+				tableName="project"
+			/>
+		<renameColumn
+				columnDataType="VARCHAR(255)"
+				newColumnName="write_group_name"
+				oldColumnName="write_secret_name"
+				remarks="Migration of groups membership cache to blobs"
+				tableName="project"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="gcp_id"
+		/>
+		<sql>
+			UPDATE project SET
+			read_group_name=SUBSTRING(read_group_name, 1, LENGTH(read_group_name) - 14),
+			write_group_name=SUBSTRING(write_group_name, 1, LENGTH(write_group_name) - 14)
+		</sql>
+	</changeSet>
+
 </databaseChangeLog>

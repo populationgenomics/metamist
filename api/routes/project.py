@@ -32,27 +32,25 @@ async def get_my_projects(connection=get_projectless_db_connection):
 async def create_project(
     name: str,
     dataset: str,
-    gcp_id: str,
-    read_secret_name: Optional[str] = None,
-    write_secret_name: Optional[str] = None,
+    read_group_name: Optional[str] = None,
+    write_group_name: Optional[str] = None,
     create_test_project: bool = True,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
     """
     Create a new project
     """
-    if not read_secret_name:
-        read_secret_name = f'{dataset}-sample-metadata-main-read-members-cache'
-    if not write_secret_name:
-        write_secret_name = f'{dataset}-sample-metadata-main-write-members-cache'
+    if not read_group_name:
+        read_group_name = f'{dataset}-sample-metadata-main-read'
+    if not write_group_name:
+        write_group_name = f'{dataset}-sample-metadata-main-write'
 
     ptable = ProjectPermissionsTable(connection.connection)
     pid = await ptable.create_project(
         project_name=name,
         dataset_name=dataset,
-        gcp_project_id=gcp_id,
-        read_secret_name=read_secret_name,
-        write_secret_name=write_secret_name,
+        read_group_name=read_group_name,
+        write_group_name=write_group_name,
         create_test_project=create_test_project,
         author=connection.author,
     )

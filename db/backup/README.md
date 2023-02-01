@@ -4,16 +4,16 @@ This document defines the procedures defined for database recovery, backup and v
 
 ## Table of Contents
 
-1. [Recovery Procedures](#Recovery-Procedures)
-   1. [Recover Sample Metadata Database](#Recover-Sample-Metadata-Database)
-      1. [Rebuild the VM](#Rebuild-VM)
-      2. [Install MariaDB 10.5](#Install-MariaDB-10.5)
-2. [Current Systems](#Current-Systems)
-   1. [Daily Backup](#Daily-Backup)
-   2. [Monitoring and Alerts](#Monitoring-and-Alerts)
-3. [Validation](#Validation)
-   1. [Validation Procedure](#Validation-Procedure)
-   2. [Validation Plan](#Validation-Plan)
+1. [Recovery Procedures](#recovery-procedures)
+   1. [Recover Sample Metadata Database](#recover-sample-metadata-database)
+      1. [Rebuild the VM](#rebuild-database-vm)
+      2. [Install MariaDB 10.5](#install-mariadb-105)
+2. [Current Systems](#current-systems)
+   1. [Daily Backup](#daily-backup)
+   2. [Monitoring and Alerts](#monitoring-and-alerts)
+3. [Validation](#validation)
+   1. [Validation Procedure](#validation-procedure)
+   2. [Validation Plan](#validation-plan)
 
 ## Recovery Procedures
 
@@ -21,14 +21,14 @@ The full recovery process is detailed below. Follow the recovery stages that are
 
 ### Recover Sample Metadata Database
 
-1. If the `sm-dm-vm-instance` needs to be restored, create a new instance from the [sm-db-vm-image](https://console.cloud.google.com/compute/machineImages/details/sm-dm-vm-image?project=sample-metadata). If you can't access the image, you can rebuild the instance from scratch. See [Rebuild Database VM](#Rebuild-Database-VM) for further instructions.
+1. If the `sm-dm-vm-instance` needs to be restored, create a new instance from the [sm-db-vm-image](https://console.cloud.google.com/compute/machineImages/details/sm-dm-vm-image?project=sample-metadata). If you can't access the image, you can rebuild the instance from scratch. See [Rebuild Database VM](#rebuild-database-vm) for further instructions.
 2. Validate that MariaDB 10.5 is running on the vm.
 
    > ```bash
    > > mariadb --version
    > ```
    >
-   > If MariaDB 10.5 is not installed, see [Install-MariaDB-10.5](#Install-MariaDB-10.5)
+   > If MariaDB 10.5 is not installed, see [Install-MariaDB-10.5](#install-mariadb-105)
 
 3. Clone this repo
 
@@ -164,7 +164,7 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
 
 #### First Time Set-Up
 
-1. Use a VM with MariaDB 10.5 installed. For instructions, see [Install MariaDB 10.5](#Install-MariaDB-10.5) in the recovery procedures.
+1. Use a VM with MariaDB 10.5 installed. For instructions, see [Install MariaDB 10.5](#install-mariadb-105) in the recovery procedures.
 2. In the production instance of the database, create a user that has read access to all of the tables.
 3. In the Secret Manager, create a secret `db-validate-backup`, with a JSON config as follows, where p_username and p_password matches the user created in step 2 above.
 
@@ -193,7 +193,7 @@ This includes:
 
 To test our monitoring and alerting policy, once a year our database backups will be disabled for 24 hours. In the case that an alert isn’t triggered, an investigation should take place. In the case of failure, this activity should be repeated within 7 days to ensure relevant changes have taken effect.
 
-Further, alongside the procedure to validate the [database restoration](#Running-the-validation-script), the SM API will be validated.
+Further, alongside the procedure to validate the [database restoration](#running-the-validation-script), the SM API will be validated.
 
 1. Update the configuration to point to the new VM as the production VM.
 2. Run the test script, currently under construction [#35](https://github.com/populationgenomics/sample-metadata/pull/35)
