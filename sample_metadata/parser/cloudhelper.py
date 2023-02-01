@@ -15,7 +15,7 @@ X = TypeVar('X')
 
 def group_by(iterable: Iterable[T], selector: Callable[[T], X]) -> dict[X, list[T]]:
     """Simple group by implementation"""
-    ret: dict[T, list[T]] = defaultdict(list)
+    ret: dict[X, list[T]] = defaultdict(list)
     for k in iterable:
         ret[selector(k)].append(k)
 
