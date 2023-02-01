@@ -46,6 +46,10 @@ logger.setLevel(logging.INFO)
     help='Search path to search for files within',
 )
 @click.option(
+    '--ref',
+    help='default_reference_assembly_location',
+)
+@click.option(
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
 )
 @click.option(
@@ -65,6 +69,7 @@ async def main(
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
+    ref=None
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -80,6 +85,7 @@ async def main(
         default_sequence_type=default_sequence_type,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
+        default_reference_assembly_location=ref
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
