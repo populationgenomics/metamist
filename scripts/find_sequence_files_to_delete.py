@@ -163,7 +163,7 @@ async def get_sequences_for_which_crams_exist(
             return []
 
         sequences = await seqapi.get_sequences_by_sample_ids_async(
-            get_latest_sequence_only=False, request_body=sapis_to_remove
+            request_body=sapis_to_remove
         )
 
         sequences_to_remove = [
@@ -185,11 +185,11 @@ def find_existing_files_in_bucket(
     """
     Find set of files from filenames in bucket
     """
-    bucket = client.get_bucket(bucket_name)
     if not bucket_name.endswith('-main-upload'):
         logging.error(f'Got a non main-upload bucket? {bucket_name}, {filenames}')
         return {}
 
+    bucket = client.get_bucket(bucket_name)
     logging.info(f'Loading {bucket_name}')
 
     # no prefix means it will get all blobs in the bucket (regardless of path)
@@ -272,7 +272,8 @@ async def find_files_to_delete(
     '--sequence-type',
     type=click.Choice(['genome', 'exome']),
     multiple=True,
-    required=True,
+    # required=True,
+    default=['genome', 'exome'],
 )
 @click.option('--project-to-ignore', multiple=True)
 @click.option('--output-path', default='files-to-remove.txt')
