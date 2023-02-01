@@ -100,7 +100,7 @@ class CloudHelper:
         path = self.file_path(filename)
         if path.startswith('gs://'):
             # add a specific case for GCS as the AnyPath implementation calls
-            # bucket.get_blob which triggers a read (which humans don't have)
+            # bucket.get_blob which triggers a read (which humans are not permitted)
             blob = self.get_gcs_blob(path)
             return blob is not None
 
