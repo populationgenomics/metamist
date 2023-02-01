@@ -612,7 +612,9 @@ class ParticipantLayer(BaseLayer):
         return {
             'rows': rows,
             # get ordered headers if we have data for it
-            'headers': [h for h in SeqrMetadataKeys.get_ordered_headers() if h in set_headers],
+            'headers': [
+                h for h in SeqrMetadataKeys.get_ordered_headers() if h in set_headers
+            ],
             'header_map': json_header_map,
         }
 

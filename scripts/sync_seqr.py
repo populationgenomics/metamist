@@ -1,3 +1,4 @@
+# pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel
 import csv
 import io
 import os
@@ -6,9 +7,9 @@ import json
 import datetime
 import logging
 from typing import Any
-import yaml
 from io import StringIO
 
+import yaml
 import requests
 from cloudpathlib import AnyPath
 from sample_metadata.model.analysis_type import AnalysisType
@@ -19,7 +20,6 @@ from sample_metadata.model.body_get_samples import BodyGetSamples
 from sample_metadata.model.body_get_participants import BodyGetParticipants
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
 from sample_metadata.configuration import get_google_identity_token, TOKEN_AUDIENCE
-
 from sample_metadata.apis import (
     SeqrApi,
     ProjectApi,
@@ -55,8 +55,8 @@ ENVS = {
     ),
     'reanalysis-dev': (
         'seqr-reanalysis-dev.populationgenomics.org.au'
-'1021400127367-4vch8s8kc9opeg4v14b2n70se55jpao4.apps.googleusercontent.com'
-    )
+        '1021400127367-4vch8s8kc9opeg4v14b2n70se55jpao4.apps.googleusercontent.com'
+    ),
 }
 
 SAMPLES_TO_IGNORE = {'CPG227355', 'CPG227397'}
@@ -300,6 +300,10 @@ def sync_families(
 def sync_individual_metadata(
     dataset, project_guid, headers, participant_eids: set[str]
 ):
+    """
+    Sync individual participant metadata (eg: phenotypes)
+    for a dataset into a seqr project
+    """
 
     IS_OLD = False
 
@@ -376,7 +380,7 @@ def sync_individual_metadata(
     ):
         print('No individual metadata needed updating')
         return
-    elif not resp_1.ok:
+    if not resp_1.ok:
         print(f'{dataset} :: Request failed with information: {resp_1.text}')
         resp_1.raise_for_status()
 
@@ -407,11 +411,10 @@ def sync_individual_metadata(
     print(f'{dataset} :: Uploaded individual metadata')
 
 
-def update_es_index(dataset, sequence_type: str, project_guid, headers):
-
-    # person_sample_map_rows = (
-    #     seqapi.get_external_participant_id_to_internal_sample_id_export(project=dataset, export_type='tsv')
-    # )
+def update_es_index(
+    dataset, sequence_type: str, project_guid, headers, check_metamist=False
+):
+    """Update seqr samples for latest elastic-search index"""
 
     person_sample_map_rows = seqrapi.get_external_participant_id_to_internal_sample_id(
         project=dataset
@@ -431,23 +434,23 @@ def update_es_index(dataset, sequence_type: str, project_guid, headers):
     with AnyPath(fn_path).open('w+') as f:
         f.write('\n'.join(rows_to_write))
 
-    es_index_analyses = sorted(
-        aapi.query_analyses(
-            AnalysisQueryModel(
-                projects=[dataset],
-                type=AnalysisType('es-index'),
-                meta={'sequencing_type': sequence_type},
-                status=AnalysisStatus('completed'),
-            )
-        ),
-        key=lambda el: el['timestamp_completed'],
-    )
+    if check_metamist:  # len(es_index_analyses) > 0:
+        es_index_analyses = sorted(
+            aapi.query_analyses(
+                AnalysisQueryModel(
+                    projects=[dataset],
+                    type=AnalysisType('es-index'),
+                    meta={'sequencing_type': sequence_type},
+                    status=AnalysisStatus('completed'),
+                )
+            ),
+            key=lambda el: el['timestamp_completed'],
+        )
 
-    if False:  # len(es_index_analyses) > 0:
         es_index = es_index_analyses[-1]['output']
     else:
         es_index = ES_INDICES[sequence_type][dataset]
-        print(f'{dataset} :: Falling back to YAML es-index: "{es_index}"')
+        print(f'{dataset} :: Falling back to YAML es-index: {es_index!r}')
 
     data = {
         'elasticsearchIndex': es_index,
@@ -501,6 +504,7 @@ def _get_pedigree_csv_from_sm(dataset: str, family_eids: set[str]) -> str | None
 
 
 def get_cram_map(dataset, participant_eids: list[str], sequence_type):
+    """Get map of participant EID to cram path"""
     logger.info(f'{dataset} :: Getting cram map')
 
     IS_OLD = False
@@ -526,31 +530,32 @@ def get_cram_map(dataset, participant_eids: list[str], sequence_type):
         print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
-    reads_list = set(
-        l.strip()
-        for l in list(set(reads_map.split("\n")))
-        if not any(s in l for s in SAMPLES_TO_IGNORE)
+    reads_set = set(
+        line.strip()
+        for line in set(reads_map.split('\n'))
+        if not any(s in line for s in SAMPLES_TO_IGNORE)
     )
-    sequence_filter = lambda row: True
+    sequence_filter = lambda row: True  # noqa
     if sequence_type == 'genome':
-        sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]
+        sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]  # noqa
     elif sequence_type == 'exome':
-        sequence_filter = lambda row: len(row) > 2 and 'exome' in row[1]
+        sequence_filter = lambda row: len(row) > 2 and 'exome' in row[1]  # noqa
 
     reads_list = [
-        "\t".join(l.split("\t")[:2])
-        for l in reads_list
-        if (not participant_eids or l.split("\t")[0] in participant_eids)
-        and sequence_filter(l.split("\t"))
+        '\t'.join(line.split('\t')[:2])
+        for line in reads_set
+        if (not participant_eids or line.split('\t')[0] in participant_eids)
+        and sequence_filter(line.split('\t'))
     ]
 
     # temporarily
     d = '/Users/mfranklin/source/sample-metadata/cram-map/'
     with open(os.path.join(d, dataset + f'-{sequence_type}-cram-map.tsv'), 'w+') as f:
-        f.write("\n".join(reads_list))
+        f.write('\n'.join(reads_list))
 
 
 def get_token():
+    """Get identity-token for seqr specific service-credentials"""
     import google.auth.exceptions
     import google.auth.transport.requests
 
@@ -569,6 +574,9 @@ def get_token():
 
 
 def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
+    """
+    Sync all datasets
+    """
     seqr_projects = ProjectApi().get_seqr_projects()
     error_projects = []
     for project in seqr_projects:
@@ -580,12 +588,12 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
         meta_key = f'seqr-project-{sequence_type}'
         seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
-            print(f'Skipping "{project_name}" as meta.{meta_key} is not set')
+            print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
             continue
 
         try:
             sync_dataset(project_name, seqr_guid, sequence_type=sequence_type)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             error_projects.append((project_name, e))
 
     if error_projects:
@@ -598,6 +606,7 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
 
 
 def sync_single_dataset_from_name(dataset, sequence_type: str):
+    """Sync dataset, and fetch seqr guid"""
     seqr_projects = ProjectApi().get_seqr_projects()
     for project in seqr_projects:
         project_name = project['name']
