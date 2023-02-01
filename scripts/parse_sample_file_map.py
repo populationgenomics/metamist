@@ -47,7 +47,7 @@ logger.setLevel(logging.INFO)
 )
 @click.option(
     '--ref',
-    help='default_reference_assembly_location',
+    help='Path to genome reference used for crams. Required when ingesting crams. ',
 )
 @click.option(
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
