@@ -5,7 +5,6 @@ import re
 import shlex
 from functools import reduce
 from io import StringIO
-from api.utils import group_by
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
@@ -22,6 +21,7 @@ from sample_metadata.parser.generic_parser import (
     SequenceMetaGroup,
     SingleRow,
     run_as_sync,
+    group_by,
 )  # noqa
 
 __DOC = """

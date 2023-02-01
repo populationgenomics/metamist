@@ -1,9 +1,25 @@
 # pylint: disable=no-member
 import os
 import logging
+from typing import Iterable, Callable, TypeVar
+from collections import defaultdict
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
+
+
+# type declarations for GroupBy
+T = TypeVar('T')
+X = TypeVar('X')
+
+
+def group_by(iterable: Iterable[T], selector: Callable[[T], X]) -> dict[X, list[T]]:
+    """Simple group by implementation"""
+    ret: dict[T, list[T]] = defaultdict(list)
+    for k in iterable:
+        ret[selector(k)].append(k)
+
+    return dict(ret)
 
 
 class CloudHelper:
