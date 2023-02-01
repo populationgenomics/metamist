@@ -69,7 +69,7 @@ async def main(
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
-    ref=None
+    ref=None,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -85,7 +85,7 @@ async def main(
         default_sequence_type=default_sequence_type,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
-        default_reference_assembly_location=ref
+        default_reference_assembly_location=ref,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
