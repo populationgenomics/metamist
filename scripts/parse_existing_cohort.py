@@ -104,7 +104,6 @@ class ExistingCohortParser(GenericMetadataParser):
         batch_number,
         include_participant_column,
     ):
-
         if include_participant_column:
             participant_column = Columns.PARTICIPANT_COLUMN
         else:

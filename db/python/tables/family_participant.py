@@ -83,7 +83,6 @@ VALUES
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
 
         for d_keys, remapped_ds in remapped_ds_by_keys.items():
-
             str_keys = ', '.join(d_keys)
             placeholder_keys = ', '.join(f':{k}' for k in d_keys)
             update_keys = ', '.join(

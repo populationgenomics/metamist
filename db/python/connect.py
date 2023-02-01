@@ -12,6 +12,7 @@ from typing import Optional
 import databases
 
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import InternalError
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class Connection:
     def assert_requires_project(self):
         """Assert the project is set, or return an exception"""
         if self.project is None:
-            raise Exception(
+            raise InternalError(
                 'An internal error has occurred when passing the project context, '
                 'please send this stacktrace to your system administrator'
             )
@@ -171,7 +172,7 @@ class SMConnections:
         credentials = SMConnections._get_config()
 
         if credentials is None:
-            raise Exception(
+            raise InternalError(
                 'The server has been misconfigured, please '
                 'contact your system administrator'
             )
@@ -223,11 +224,11 @@ class DbBase:
 
     def __init__(self, connection: Connection):
         if connection is None:
-            raise Exception(
+            raise InternalError(
                 f'No connection was provided to the table {self.__class__.__name__!r}'
             )
         if not isinstance(connection, Connection):
-            raise Exception(
+            raise InternalError(
                 f'Expected connection type Connection, received {type(connection)}, '
                 f'did you mean to call self._connection?'
             )
@@ -238,7 +239,7 @@ class DbBase:
         self.project = connection.project
 
         if self.author is None:
-            raise Exception(f'Must provide author to {self.__class__.__name__}')
+            raise InternalError(f'Must provide author to {self.__class__.__name__}')
 
     # piped from the connection
 
