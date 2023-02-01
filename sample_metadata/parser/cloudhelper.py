@@ -99,6 +99,8 @@ class CloudHelper:
         """Determines whether a file exists"""
         path = self.file_path(filename)
         if path.startswith('gs://'):
+            # add a specific case for GCS as the AnyPath implementation calls
+            # bucket.get_blob which triggers a read (which humans don't have)
             blob = self.get_gcs_blob(path)
             return blob is not None
 
