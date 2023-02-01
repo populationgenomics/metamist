@@ -97,7 +97,12 @@ class CloudHelper:
 
     async def file_exists(self, filename: str) -> bool:
         """Determines whether a file exists"""
-        return AnyPath(self.file_path(filename)).exists()
+        path = self.file_path(filename)
+        if path.startswith('gs://'):
+            blob = self.get_gcs_blob(filename)
+            return blob is not None
+
+        return AnyPath(path).exists()
 
     async def file_size(self, filename) -> int:
         """Get size of file in bytes"""
