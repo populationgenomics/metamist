@@ -7,6 +7,7 @@ import SampleView from './infoViews/SampleView'
 import { FamilyView } from './infoViews/FamilyView'
 import ProjectSummary from './project/ProjectSummary'
 import ProjectsAdmin from './admin/ProjectsAdmin'
+import { GraphQL } from "./graphQL";
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -30,6 +31,8 @@ const Routes: React.FunctionComponent = () => (
         <Route path="project/:projectName/sample/:sampleName" element={<SampleView />} />
         <Route path="project/:projectName/family/:familyID" element={<FamilyView />} />
         <Route path="project/:projectName/participant/:participantName" element={<SampleView />} />
+
+        <Route path="graphqltest" element={<GraphQL />} />
     </Switch>
 )
 
