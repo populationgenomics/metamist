@@ -99,7 +99,7 @@ class CloudHelper:
         """Determines whether a file exists"""
         path = self.file_path(filename)
         if path.startswith('gs://'):
-            blob = self.get_gcs_blob(filename)
+            blob = self.get_gcs_blob(path)
             return blob is not None
 
         return AnyPath(path).exists()
@@ -145,19 +145,18 @@ class CloudHelper:
 
         return self.gcs_bucket_refs[bucket_name]
 
-    async def get_gcs_blob(self, filename: str) -> storage.Blob:
+    async def get_gcs_blob(self, filename: str) -> storage.Blob | None:
         """Convenience function for getting blob from fully qualified GCS path"""
         if not filename.startswith(self.GCS_PREFIX):
             raise ValueError('No blob available')
 
-        bucket_name, path = filename[5:].split('/', maxsplit=1)
-        bucket = self.get_gcs_bucket(bucket_name)
+        blob = storage.Blob.from_string(filename, client=self.gcs_client)
 
-        # the next few lines are equiv to `bucket.get_blob(path)`
-        # but without requiring storage.objects.get permission
-        blobs = list(self.gcs_client.list_blobs(bucket, prefix=path))
-        # first where r.name == path (or None)
-        return next((r for r in blobs if r.name == path), None)
+        if not blob.exists():
+            # maintain existing behaviour
+            return None
+
+        return blob
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:
 
