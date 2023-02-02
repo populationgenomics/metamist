@@ -506,7 +506,6 @@ ORDER BY a.timestamp_completed DESC;
                 try:
                     seq_type = json.loads(seq_type)
                 finally:
-
                     if isinstance(seq_type, str):
                         n_counts[seq_type.lower()] += r['number_of_crams']
                     elif isinstance(seq_type, dict) and isinstance(

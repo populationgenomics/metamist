@@ -2,7 +2,7 @@ from datetime import datetime, date
 from collections import defaultdict
 from typing import List, Optional, Dict, Any
 
-from db.python.connect import Connection
+from db.python.connect import Connection, NotFoundError
 from db.python.layers.base import BaseLayer
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
@@ -113,7 +113,7 @@ class AnalysisLayer(BaseLayer):
             missing_sample_ids = set(sample_ids).difference(seen_sample_ids)
             sample_ids_str = ', '.join(sample_id_format_list(list(missing_sample_ids)))
 
-            raise Exception(
+            raise NotFoundError(
                 f'Missing gvcfs for the following sample IDs: {sample_ids_str}'
             )
 

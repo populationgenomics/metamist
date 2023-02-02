@@ -21,6 +21,10 @@ class Forbidden(Exception):
     """Forbidden action"""
 
 
+class InternalError(Exception):
+    """An internal programming error"""
+
+
 class ProjectDoesNotExist(Forbidden):
     """Custom error for ProjectDoesNotExist"""
 
@@ -73,7 +77,6 @@ def get_logger():
     _logger.setLevel(level=LOGGING_LEVEL)
 
     if USE_GCP_LOGGING:
-
         # pylint: disable=import-outside-toplevel,c-extension-no-member
         import google.cloud.logging
 
