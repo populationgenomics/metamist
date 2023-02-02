@@ -82,7 +82,6 @@ class VcgsManifestParser(GenericMetadataParser):
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
-
         super().__init__(
             project=project,
             search_locations=search_locations,

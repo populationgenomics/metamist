@@ -128,7 +128,6 @@ class SampleSequencingTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-
             id_of_new_sequence = await self.connection.fetch_val(
                 _query,
                 {
@@ -142,7 +141,6 @@ class SampleSequencingTable(DbBase):
             )
 
             if external_ids:
-
                 _project = project or self.project
                 if not _project:
                     raise ValueError(
@@ -361,7 +359,6 @@ class SampleSequencingTable(DbBase):
         """Update a sequence"""
 
         async with self.connection.transaction():
-
             promises = []
 
             fields = {'sequencing_id': sequencing_id, 'author': author or self.author}
@@ -407,7 +404,6 @@ class SampleSequencingTable(DbBase):
                         )
                     )
                 if to_update:
-
                     # we actually need the project here, get first value from list
                     project = next(
                         iter(await self.get_projects_by_sequence_ids([sequencing_id]))
