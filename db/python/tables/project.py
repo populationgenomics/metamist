@@ -16,6 +16,7 @@ from db.python.utils import (
     NoProjectAccess,
     get_logger,
     to_db_json,
+    InternalError,
 )
 from models.models.project import Project
 
@@ -59,7 +60,6 @@ class ProjectPermissionsTable:
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
     def __init__(self, connection: Database, allow_full_access=None):
-
         if not isinstance(connection, Database):
             raise ValueError(
                 f'Invalid type connection, expected Database, got {type(connection)}, did you forget to call connection.connection?'
@@ -165,7 +165,7 @@ class ProjectPermissionsTable:
             if group_name is None:
                 project_name = (await self.get_project_id_map())[project_id].name
                 read_or_write = 'read' if readonly else 'write'
-                raise Exception(
+                raise InternalError(
                     f'An internal error occurred when validating access to {project_name}, '
                     f'there must be a value in the DB for "{read_or_write}_secret_name" to lookup'
                 )
@@ -179,7 +179,7 @@ class ProjectPermissionsTable:
                 )
 
             except Exception as e:
-                raise Exception(
+                raise type(e)(
                     f'An error occurred when determining access to this project: {e}'
                 ) from e
 
@@ -236,7 +236,7 @@ class ProjectPermissionsTable:
     ) -> List[ProjectId]:
         """Get project ids from project names and the user"""
         if not user:
-            raise Exception('An internal error occurred during authorization')
+            raise InternalError('An internal error occurred during authorization')
 
         project_name_map = await self.get_project_name_map()
         project_ids = []
@@ -260,7 +260,7 @@ class ProjectPermissionsTable:
             raise NoProjectAccess(invalid_project_names, readonly=readonly, author=user)
 
         if len(project_ids) != len(project_names):
-            raise Exception(
+            raise InternalError(
                 'An internal error occurred when mapping project names to IDs'
             )
 

@@ -1,9 +1,25 @@
 # pylint: disable=no-member
 import os
 import logging
+from typing import Iterable, Callable, TypeVar
+from collections import defaultdict
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
+
+
+# type declarations for GroupBy
+T = TypeVar('T')
+X = TypeVar('X')
+
+
+def group_by(iterable: Iterable[T], selector: Callable[[T], X]) -> dict[X, list[T]]:
+    """Simple group by implementation"""
+    ret: dict[X, list[T]] = defaultdict(list)
+    for k in iterable:
+        ret[selector(k)].append(k)
+
+    return dict(ret)
 
 
 class CloudHelper:
@@ -97,7 +113,14 @@ class CloudHelper:
 
     async def file_exists(self, filename: str) -> bool:
         """Determines whether a file exists"""
-        return AnyPath(self.file_path(filename)).exists()
+        path = self.file_path(filename)
+        if path.startswith('gs://'):
+            # add a specific case for GCS as the AnyPath implementation calls
+            # bucket.get_blob which triggers a read (which humans are not permitted)
+            blob = await self.get_gcs_blob(path)
+            return blob is not None
+
+        return AnyPath(path).exists()
 
     async def file_size(self, filename) -> int:
         """Get size of file in bytes"""
@@ -140,19 +163,18 @@ class CloudHelper:
 
         return self.gcs_bucket_refs[bucket_name]
 
-    async def get_gcs_blob(self, filename: str) -> storage.Blob:
+    async def get_gcs_blob(self, filename: str) -> storage.Blob | None:
         """Convenience function for getting blob from fully qualified GCS path"""
         if not filename.startswith(self.GCS_PREFIX):
             raise ValueError('No blob available')
 
-        bucket_name, path = filename[5:].split('/', maxsplit=1)
-        bucket = self.get_gcs_bucket(bucket_name)
+        blob = storage.Blob.from_string(filename, client=self.gcs_client)
 
-        # the next few lines are equiv to `bucket.get_blob(path)`
-        # but without requiring storage.objects.get permission
-        blobs = list(self.gcs_client.list_blobs(bucket, prefix=path))
-        # first where r.name == path (or None)
-        return next((r for r in blobs if r.name == path), None)
+        if not blob.exists():
+            # maintain existing behaviour
+            return None
+
+        return blob
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:
 

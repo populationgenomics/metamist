@@ -41,7 +41,6 @@ class SearchLayer(BaseLayer):
     async def _get_search_result_for_sample(
         self, sample_id: int, project_ids: list[int]
     ) -> SearchResponse | None:
-
         stable = SampleTable(self.connection)
         ptable = ParticipantTable(self.connection)
         ftable = FamilyTable(self.connection)
@@ -66,7 +65,6 @@ class SearchLayer(BaseLayer):
             id_field = None
 
         if participant_id:
-
             p_eids_map, f_eids_map = await asyncio.gather(
                 ptable.get_external_ids_by_participant([participant_id]),
                 ftable.get_family_external_ids_by_participant_ids([participant_id]),

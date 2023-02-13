@@ -36,6 +36,7 @@ logger.setLevel(logging.INFO)
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
+@click.option('--default-sequence-technology', default='short-read')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -44,6 +45,10 @@ logger.setLevel(logging.INFO)
     multiple=True,
     required=True,
     help='Search path to search for files within',
+)
+@click.option(
+    '--ref',
+    help='Path to genome reference used for crams. Required when ingesting crams. ',
 )
 @click.option(
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
@@ -62,9 +67,11 @@ async def main(
     project,
     default_sample_type='blood',
     default_sequence_type='wgs',
+    default_sequence_technology='short-read',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
+    ref=None,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -78,8 +85,10 @@ async def main(
         project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
+        default_sequence_technology=default_sequence_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
+        default_reference_assembly_location=ref,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')

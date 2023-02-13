@@ -20,7 +20,7 @@ repos:
             args: ["--config", ".markdownlint.json"]
 
     - repo: https://github.com/ambv/black
-      rev: 22.12.0
+      rev: 23.1.0
       hooks:
           - id: black
             args: [.]
@@ -61,7 +61,7 @@ repos:
             - strawberry-graphql[fastapi]==0.138.1
 
     - repo: https://github.com/pre-commit/mirrors-prettier
-      rev: "v2.7.1"
+      rev: "v3.0.0-alpha.4"
       hooks:
         - id: prettier
           # I'm not exactly sure why it changes behaviour, but
@@ -71,7 +71,7 @@ repos:
           entry: bash -c 'cd web && prettier --write --ignore-unknown --check src/*.{ts,tsx,css} src/**/*.{ts,tsx,css}'
 
     - repo: https://github.com/pre-commit/mirrors-eslint
-      rev: "v8.31.0"
+      rev: "v8.33.0"
       hooks:
         - id: eslint
           entry: bash -c 'cd web && eslint'
