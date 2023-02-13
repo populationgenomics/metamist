@@ -105,9 +105,11 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     # sync people first
     token = get_token()
     headers: dict[str, str] = {'Authorization': f'Bearer {token}'}
-    params: dict[str, Any] = dict(
-        dataset=dataset, project_guid=seqr_guid, headers=headers
-    )
+    params: dict[str, Any] = {
+        'dataset': dataset,
+        'project_guid': seqr_guid,
+        'headers': headers,
+    }
 
     # check sequence type is valid
     _ = SequenceType(sequence_type)
@@ -395,7 +397,12 @@ def sync_individual_metadata(
 
 
 def update_es_index(
-    dataset, sequence_type: str, project_guid, headers, check_metamist=True, allow_skip=False
+    dataset,
+    sequence_type: str,
+    project_guid,
+    headers,
+    check_metamist=True,
+    allow_skip=False,
 ):
     """Update seqr samples for latest elastic-search index"""
 
@@ -419,16 +426,19 @@ def update_es_index(
 
     if check_metamist:  # len(es_index_analyses) > 0:
         es_index_analyses = aapi.query_analyses(
-                    AnalysisQueryModel(
-                        projects=[dataset, 'seqr'],
-                        type=AnalysisType('es-index'),
-                        meta={'sequencing_type': sequence_type},
-                        status=AnalysisStatus('completed'),
-                    )
-                )
+            AnalysisQueryModel(
+                projects=[dataset, 'seqr'],
+                type=AnalysisType('es-index'),
+                meta={'sequencing_type': sequence_type},
+                status=AnalysisStatus('completed'),
+            )
+        )
 
-        es_index_analyses = filter(lambda a: a['meta'].get('dataset') == dataset, es_index_analyses)
-        es_index_analyses = sorted(es_index_analyses,
+        es_index_analyses = filter(
+            lambda a: a['meta'].get('dataset') == dataset, es_index_analyses
+        )
+        es_index_analyses = sorted(
+            es_index_analyses,
             key=lambda el: el['timestamp_completed'],
         )
 
