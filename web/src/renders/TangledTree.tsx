@@ -1,7 +1,9 @@
+/* Inspired by https://observablehq.com/@nitaku/tangled-tree-visualization-ii */
+
 /* eslint-disable no-param-reassign */
 import * as React from 'react'
 import _ from 'lodash'
-import { min, max, descending, sum, mean, extent } from 'd3'
+import { min, max, sum, mean, extent } from 'd3'
 import LoadingDucks from './LoadingDucks'
 import MuckTheDuck from './MuckTheDuck'
 
@@ -24,29 +26,71 @@ interface ModifiedPedEntry {
     children: string[]
 }
 
-const constructTangleLayout = (levels: { id: string; parents?: string[]; level?: number }[][]) => {
+interface Node {
+    id: string
+    x: number
+    y: number
+    parents: Node[]
+    parentsList: string[]
+    level: number
+    bundle?: Node
+    bundles: Node[][]
+    i?: number
+    bundles_index?: { [key: string]: Node[] }
+    span?: number
+    height?: number
+    links: Link[]
+}
+
+interface NodeList {
+    nodes: Node[]
+    bundles: Node[]
+}
+
+interface Link {
+    source: Node
+    target: Node
+    xb: number
+    xs: number
+    xt: number
+    yb: number
+    ys: number
+    yt: number
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+    bundle?: Node
+}
+
+// layout
+const yPadding = 50
+const xPadding = 50
+const node_height = 22
+const node_width = 70
+const bundle_width = 14
+const level_y_padding = 100
+const horizontal_spacing = 100
+
+const constructTangleLayout = (levels: NodeList[]) => {
+    const nodes_index: Record<string, any> = {}
     // precompute level depth
     levels.forEach((l, i) =>
-        l.forEach((n) => {
+        l.nodes.forEach((n) => {
             n.level = i
+            nodes_index[n.id] = n
         })
     )
-    const nodes = levels.reduce((a, x) => a.concat(x), [])
-    const nodes_index = {}
+    const nodes: Node[] = levels.map((l) => l.nodes).flat()
     nodes.forEach((d) => {
-        nodes_index[d.id] = d
-    })
-
-    // objectification
-    nodes.forEach((d) => {
-        d.parents = (d.parents === undefined ? [] : d.parents).map((p) => nodes_index[p])
+        d.parents = (d.parentsList === undefined ? [] : d.parentsList).map((p) => nodes_index[p])
     })
 
     // precompute bundles
     levels.forEach((l, i) => {
-        const index = {}
-        l.forEach((n) => {
-            if (n.parents.length === 0) {
+        const index: Record<string, any> = {}
+        l.nodes.forEach((n) => {
+            if (!n.parents || n.parents.length === 0) {
                 return
             }
             const id = n.parents
@@ -60,7 +104,7 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
                     id,
                     parents: n.parents.slice(),
                     level: i,
-                    span: i - min(n.parents, (p) => p.level),
+                    span: i - (min(n.parents, (p) => p.level) ?? 0),
                 }
             }
             n.bundle = index[id]
@@ -71,59 +115,64 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
         })
     })
 
-    const links = []
+    const links: Link[] = []
     nodes.forEach((d) => {
-        d.parents.forEach((p) => links.push({ source: d, bundle: d.bundle, target: p }))
+        if (d.parents) {
+            d.parents.forEach((p) =>
+                links.push({
+                    source: d,
+                    bundle: d.bundle,
+                    target: p,
+                    xt: p.x,
+                    yt: p.y,
+                    xb: d.bundle?.x ?? p.x,
+                    yb: d.bundle?.y ?? p.y,
+                    x1: d.bundle?.x ?? p.x,
+                    y1: d.y - level_y_padding / 2,
+                    x2: d.x,
+                    y2: d.y - level_y_padding / 2,
+                    xs: d.x,
+                    ys: d.y,
+                })
+            )
+        }
     })
 
-    const bundles = levels.reduce((a, x) => a.concat(x.bundles), [])
+    const bundles = levels.map((l) => l.bundles).flat()
 
     // reverse pointer from parent to bundles
-    bundles.forEach((b) =>
-        b.parents.forEach((p) => {
-            if (p.bundles_index === undefined) {
-                p.bundles_index = {}
-            }
-            if (!(b.id in p.bundles_index)) {
-                p.bundles_index[b.id] = []
-            }
-            p.bundles_index[b.id].push(b)
-        })
-    )
+    bundles.forEach((b) => {
+        if (b && b.parents) {
+            b.parents.forEach((p) => {
+                if (p.bundles_index === undefined) {
+                    p.bundles_index = {}
+                }
+                if (!(b.id in p.bundles_index)) {
+                    p.bundles_index[b.id] = []
+                }
+                p.bundles_index[b.id].push(b)
+            })
+        }
+    })
 
     nodes.forEach((n) => {
         if (n.bundles_index !== undefined) {
-            n.bundles = Object.keys(n.bundles_index).map((k) => n.bundles_index[k])
+            n.bundles = Object.values(n.bundles_index)
         } else {
             n.bundles_index = {}
             n.bundles = []
         }
-        n.bundles.sort((a, b) =>
-            descending(
-                max(a, (d) => d.span),
-                max(b, (d) => d.span)
-            )
-        )
-        n.bundles.forEach((b, i) => {
-            b.i = i
-        })
     })
 
     links.forEach((l) => {
+        if (!l.bundle) {
+            return
+        }
         if (l.bundle.links === undefined) {
             l.bundle.links = []
         }
         l.bundle.links.push(l)
     })
-
-    // layout
-    const yPadding = 50
-    const xPadding = 50
-    const node_height = 22
-    const node_width = 70
-    const bundle_width = 14
-    const level_y_padding = 100
-    const horizontal_spacing = 100
 
     nodes.forEach((n) => {
         n.height = Math.max(1, n.bundles.length) - 1
@@ -133,7 +182,7 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
     let y_offset = yPadding
     levels.forEach((l) => {
         x_offset = xPadding
-        l.forEach((n) => {
+        l.nodes.forEach((n) => {
             n.x = x_offset
             n.y = y_offset
 
@@ -147,17 +196,17 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
         const movedBundles: string[] = []
         const movedChildren: string[] = []
         levels.forEach((level) => {
-            level.forEach((currentNode, movedIndex) => {
-                const oldLevel = [...level]
-                level.sort(
+            level.nodes.forEach((currentNode, movedIndex) => {
+                const oldLevel = [...level.nodes]
+                level.nodes.sort(
                     (a, b) =>
                         a.x - b.x ||
                         oldLevel.findIndex((c) => a.id === c.id) -
                             oldLevel.findIndex((c) => b.id === c.id)
                 )
-                if (movedIndex < level.length - 1) {
+                if (movedIndex < level.nodes.length - 1) {
                     // not the last node
-                    const nextNode = level[movedIndex + 1]
+                    const nextNode = level.nodes[movedIndex + 1]
                     if (Math.abs(currentNode.x - nextNode.x) < horizontal_spacing) {
                         moved = true
                         const oldX = nextNode.x
@@ -190,12 +239,13 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
     }
 
     levels.reverse().forEach((l) => {
-        const seenBundles = []
-        l.forEach((node) => {
-            if (!('bundle' in node) || seenBundles.includes(node.bundle.id)) {
+        const seenBundles: string[] = []
+        l.nodes.forEach((node) => {
+            if (!node.bundle || seenBundles.includes(node.bundle.id)) {
                 return
             }
-            const minXParent = min(node.parents.map((p) => p.x))
+
+            const minXParent = min(node.parents.map((p) => p.x)) || 0
             if (minXParent < node.x) {
                 const amountToMove = node.x - minXParent
                 node.parents.forEach((p) => {
@@ -227,9 +277,9 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
     links.forEach((l) => {
         l.xt = l.target.x
         l.yt = l.target.y
-        l.xb = l.bundle.x
-        l.yb = l.bundle.y
-        l.x1 = l.bundle.x
+        l.xb = l.bundle?.x ?? l.target.x
+        l.yb = l.bundle?.y ?? l.target.y
+        l.x1 = l.bundle?.x ?? l.target.x
         l.y1 = l.source.y - level_y_padding / 2
         l.x2 = l.source.x
         l.y2 = l.source.y - level_y_padding / 2
@@ -245,7 +295,7 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
         /* eslint-disable @typescript-eslint/no-loop-func */
         levels.reverse().forEach((l) => {
             l.bundles.forEach((b) => {
-                const avgX = mean(extent(b.links.map((li) => li.source.x)))
+                const avgX = mean(extent(b.links.map((li) => li.source.x))) || 0
                 b.links.forEach((p) => {
                     if (p.x1 !== avgX) {
                         const oldxb = p.xb
@@ -274,16 +324,18 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
     }
 
     if (numLoops === 1000) {
-        return { error: 'Infinite Loop' }
+        return { error: 'Infinite loop - could not generate pedigree' }
     }
 
-    const width_dim = extent(nodes, (n) => n.x)
-    const height_dim = extent(nodes, (n) => n.y)
+    const minWidth = min(nodes, (n) => n.x) ?? 0
+    const maxWidth = max(nodes, (n) => n.x) ?? 0
+    const minHeight = min(nodes, (n) => n.y) ?? 0
+    const maxHeight = max(nodes, (n) => n.y) ?? 0
     const layout = {
-        width_dimensions: [width_dim[0] - node_width, width_dim[1] + node_width + 2 * xPadding],
+        width_dimensions: [minWidth - node_width, maxWidth + node_width + 2 * xPadding],
         height_dimensions: [
-            height_dim[0] - node_height / 2 - yPadding,
-            height_dim[1] + node_height / 2 + 2 * yPadding,
+            minHeight - node_height / 2 - yPadding,
+            maxHeight + node_height / 2 + 2 * yPadding,
         ],
         node_height,
         node_width,
@@ -295,7 +347,7 @@ const constructTangleLayout = (levels: { id: string; parents?: string[]; level?:
 }
 
 const renderChart = (
-    data: { id: string; parents?: string[] }[][],
+    data: NodeList[],
     originalData: { [name: string]: PedigreeEntry },
     click: (e: string) => void
 ) => {
@@ -405,10 +457,9 @@ const calculateDepth = (
 // };
 
 /* eslint-disable no-restricted-syntax */
-const findInHeirarchy = (id, heirarchy) => {
+const findInHeirarchy = (id: string, heirarchy: Record<string, any>) => {
     for (const [index, level] of heirarchy.entries()) {
         for (const person of level) {
-            // console.log(person);
             if (person.id === id) {
                 return index
             }
@@ -461,13 +512,13 @@ const formatData = (data: PedigreeEntry[]) => {
     const yetToSee = new Set(data.map((i) => i.individual_id))
     let queue = [[bestRoots[0]]]
 
-    const toReturn = []
+    const toReturn: { id: string; parentsList?: string[] }[][] = []
 
     /* eslint no-loop-func: 0 */
 
     // create 1 lineage spine
     while (queue.flat().length) {
-        const toAdd: { id: string; parents?: string[] }[] = []
+        const toAdd: { id: string; parentsList?: string[] }[] = []
         const toAddToQueue: string[] = []
         const nextList = queue.shift() ?? []
         nextList.forEach((next) => {
@@ -478,7 +529,7 @@ const formatData = (data: PedigreeEntry[]) => {
             toAdd.push({
                 id: next,
                 ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                    parents: [keyedData[next].paternal_id, keyedData[next].maternal_id].filter(
+                    parentsList: [keyedData[next].paternal_id, keyedData[next].maternal_id].filter(
                         (i) => i
                     ),
                 }),
@@ -509,7 +560,7 @@ const formatData = (data: PedigreeEntry[]) => {
                     toReturn[partnerLevel].splice(partnerPosition + 1, 0, {
                         id: next,
                         ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parents: [
+                            parentsList: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
                             ].filter((k) => k),
@@ -536,7 +587,7 @@ const formatData = (data: PedigreeEntry[]) => {
                     {
                         id: next,
                         ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parents: [
+                            parentsList: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
                             ].filter((l) => l),
@@ -558,7 +609,7 @@ const formatData = (data: PedigreeEntry[]) => {
                     {
                         id: next,
                         ...((keyedData[next].paternal_id || keyedData[next].maternal_id) && {
-                            parents: [
+                            parentsList: [
                                 keyedData[next].paternal_id,
                                 keyedData[next].maternal_id,
                             ].filter((m) => m),
@@ -576,9 +627,20 @@ const formatData = (data: PedigreeEntry[]) => {
         updatedList = false
     }
 
-    return yetToSee.size
-        ? [toReturn, ...formatData(data.filter((i) => yetToSee.has(i.individual_id)))]
-        : [toReturn]
+    const nodeDefaults = {
+        x: 0,
+        y: 0,
+        parents: [],
+        level: -1,
+        bundles: [],
+        links: [],
+        parentsList: [],
+    }
+
+    return toReturn.map((l) => ({
+        nodes: l.map((m) => ({ ...nodeDefaults, ...m })),
+        bundles: [],
+    }))
 }
 
 interface RenderPedigreeProps {
@@ -587,13 +649,13 @@ interface RenderPedigreeProps {
 }
 
 const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click }) => {
-    const [trees, setTrees] = React.useState()
+    const [tree, setTree] = React.useState<NodeList[]>([])
     const [keyedData, setKeyedData] = React.useState<{
         [name: string]: PedigreeEntry
     }>()
 
     React.useEffect(() => {
-        setTrees(formatData(data))
+        setTree(formatData(data))
         setKeyedData(
             data.reduce((obj: { [key: string]: PedigreeEntry }, s: PedigreeEntry) => {
                 obj[s.individual_id] = s
@@ -610,7 +672,7 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
                     <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
                 </p>
             )}
-            {data && !!data.length && !trees && (
+            {data && !!data.length && !tree && (
                 <>
                     <LoadingDucks />
                     <div style={{ textAlign: 'center' }}>
@@ -618,16 +680,7 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
                     </div>
                 </>
             )}
-            {!!data.length &&
-                trees &&
-                keyedData &&
-                trees.map((tree, i) => (
-                    <React.Fragment key={`Tree-${i}`}>
-                        {trees.length > 1 && <h2>{`Pedigree #${i + 1}:`}</h2>}
-                        {renderChart(tree, keyedData, click)}
-                        <br />
-                    </React.Fragment>
-                ))}
+            {!!data.length && tree && keyedData && renderChart(tree, keyedData, click)}
             <br />
         </>
     )

@@ -7,7 +7,7 @@ import SampleView from './infoViews/SampleView'
 import { FamilyView } from './infoViews/FamilyView'
 import ProjectSummary from './project/ProjectSummary'
 import ProjectsAdmin from './admin/ProjectsAdmin'
-import { GraphQL } from "./graphQL";
+import GraphQL from './graphQL'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>

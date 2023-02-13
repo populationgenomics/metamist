@@ -76,7 +76,7 @@ async def load_samples_for_ids(sample_ids: list[int], connection) -> list['Sampl
     """
     samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
     # in case it's not ordered
-    s_by_id = {s.id: s for s in samples}
+    s_by_id = {sample_id_transform_to_raw(s.id): s for s in samples}
     return [s_by_id.get(s) for s in sample_ids]
 
 
@@ -352,13 +352,14 @@ class GraphQLSample:
     meta: strawberry.scalars.JSON
     type: strawberry.enum(SampleType)
     author: str | None
+    participant_id: int
 
     @strawberry.field
     async def participant(
         self, info: Info, root: 'Sample'
     ) -> GraphQLParticipant | None:
         loader_participants_for_ids = info.context['loader_participants_for_ids']
-        if root.participant is None:
+        if root.participant_id is None:
             return None
         return await loader_participants_for_ids.load(root.participant_id)
 
@@ -403,7 +404,7 @@ class GraphQLSampleSequencing:
     @strawberry.field
     async def sample(self, info: Info, root) -> GraphQLSample:
         loader = info.context['loader_samples_for_ids']
-        return await loader.load(root.sample_id)
+        return await loader.load(int(root.sample_id))
 
 
 @strawberry.type

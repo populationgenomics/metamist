@@ -37,5 +37,5 @@ lcov-report/
 coverage/
 cram-map/
 
-web/src/schema.graphql
+web/schema.graphql
 web/src/__generated__

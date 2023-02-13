@@ -4,7 +4,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 
 import { Dropdown } from 'semantic-ui-react'
 
-import { ProjectApi } from '../sm-api/api'
+import { useQuery } from '@apollo/client'
+
+import { gql } from '../__generated__/gql'
+
+const GET_PROJECTS = gql(`
+    query getProjects {
+        myProjects {
+            name
+        }
+    }
+`)
 
 interface ProjectSelectorProps {
     setPageNumber: React.Dispatch<React.SetStateAction<number>>
@@ -17,6 +27,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     setPageLimit,
     pageLimit,
 }) => {
+    const { loading, error, data } = useQuery(GET_PROJECTS)
     const { projectName } = useParams()
     const navigate = useNavigate()
     const handleOnClick = React.useCallback(
@@ -28,24 +39,11 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
         [navigate, setPageLimit, setPageNumber, pageLimit]
     )
 
-    const [projects, setProjects] = React.useState<string[] | undefined>()
-    const [error, setError] = React.useState<string | undefined>()
-
-    React.useEffect(() => {
-        new ProjectApi()
-            .getMyProjects()
-            .then((myProjects) => setProjects(myProjects.data))
-            .catch((er) => setError(er.message))
-
-        // empty array means only do the on first load,
-        // no props change should cause this to retrigger
-    }, [])
-
     if (error) {
         return <p>An error occurred while getting projects: {error}</p>
     }
 
-    if (projects === undefined) {
+    if (loading) {
         return <p>Loading projects...</p>
     }
 
@@ -59,11 +57,14 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
                 onChange={handleOnClick}
                 placeholder="Select a project"
                 value={projectName ?? ''}
-                options={projects.map((p) => ({
-                    key: p,
-                    text: p,
-                    value: p,
-                }))}
+                options={
+                    data &&
+                    data.myProjects.map((p) => ({
+                        key: p.name,
+                        text: p.name,
+                        value: p.name,
+                    }))
+                }
             />
         </div>
     )
