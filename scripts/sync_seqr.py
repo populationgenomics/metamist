@@ -86,27 +86,10 @@ aapi = AnalysisApi()
 
 ES_INDICES_YAML = """
 exome:
-    hereditary-neuro: hereditary-neuro-exome-2022_0915_1407_zvg8e
-    mito-disease: mito-disease-exome-2022_0915_1407_zvg8e
-    kidgen: kidgen-exome-2022_0915_1407_zvg8e
-    acute-care: acute-care-exome-2022_0915_1407_zvg8e
-    validation: validation-exome-2022_0915_1315_htupt
+    test: test
 
 genome:
-    perth-neuro: perth-neuro-genome-2022_1113_1641_4xt4v
-    ravenscroft-rdstudy: ravenscroft-rdstudy-genome-2022_1113_1641_4xt4v
-    mito-disease: mito-disease-genome-2022_1113_1641_4xt4v
-    ag-hidden: ag-hidden-genome-2022_1111_1947_54vza
-    hereditary-neuro: hereditary-neuro-genome-2022_1111_1947_54vza
-    kidgen: kidgen-genome-2022_1111_1947_54vza
-    ravenscroft-arch: ravenscroft-arch-genome-2022_1111_1947_54vza
-    ohmr4-epilepsy: ohmr4-epilepsy-genome-2022_1111_1947_54vza
-    heartkids: heartkids-genome-2022_1111_1947_54vza
-    schr-neuro: schr-neuro-genome-2022_1111_1947_54vza
-    ohmr3-mendelian: ohmr3-mendelian-genome-2022_1111_1947_54vza
-    rdp-kidney: rdp-kidney-genome-2022_1111_1947_54vza
-    ibmdx: ibmdx-genome-2022_1111_1947_54vza
-    circa: circa-genome-2022_1111_1947_54vza
+    example: example
 """
 
 ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
@@ -165,12 +148,12 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
 
     # sync_pedigree(**params, family_eids=filtered_family_eids)
     # sync_families(**params, family_eids=filtered_family_eids)
-    sync_individual_metadata(**params, participant_eids=set(participant_eids))
-    # update_es_index(**params, sequence_type=sequence_type)
+    # sync_individual_metadata(**params, participant_eids=set(participant_eids))
+    update_es_index(**params, sequence_type=sequence_type)
 
-    # get_cram_map(
-    #     dataset, participant_eids=participant_eids, sequence_type=sequence_type
-    # )
+    get_cram_map(
+        dataset, participant_eids=participant_eids, sequence_type=sequence_type
+    )
 
 
 def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
@@ -412,7 +395,7 @@ def sync_individual_metadata(
 
 
 def update_es_index(
-    dataset, sequence_type: str, project_guid, headers, check_metamist=False
+    dataset, sequence_type: str, project_guid, headers, check_metamist=True, allow_skip=False
 ):
     """Update seqr samples for latest elastic-search index"""
 
@@ -435,17 +418,25 @@ def update_es_index(
         f.write('\n'.join(rows_to_write))
 
     if check_metamist:  # len(es_index_analyses) > 0:
-        es_index_analyses = sorted(
-            aapi.query_analyses(
-                AnalysisQueryModel(
-                    projects=[dataset],
-                    type=AnalysisType('es-index'),
-                    meta={'sequencing_type': sequence_type},
-                    status=AnalysisStatus('completed'),
+        es_index_analyses = aapi.query_analyses(
+                    AnalysisQueryModel(
+                        projects=[dataset, 'seqr'],
+                        type=AnalysisType('es-index'),
+                        meta={'sequencing_type': sequence_type},
+                        status=AnalysisStatus('completed'),
+                    )
                 )
-            ),
+
+        es_index_analyses = filter(lambda a: a['meta'].get('dataset') == dataset, es_index_analyses)
+        es_index_analyses = sorted(es_index_analyses,
             key=lambda el: el['timestamp_completed'],
         )
+
+        if len(es_index_analyses) == 0:
+            if allow_skip:
+                logger.warning(f'No ES index for {dataset!r}')
+
+            raise ValueError(f'No ES index for {dataset!r} to synchronise')
 
         es_index = es_index_analyses[-1]['output']
     else:
@@ -626,6 +617,6 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
 
 
 if __name__ == '__main__':
-    # sync_single_dataset_from_name('ohmr4-epilepsy', 'genome')
+    sync_single_dataset_from_name('acute-care', 'exome')
 
-    sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
+    # sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
