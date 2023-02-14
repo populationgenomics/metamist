@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@apollo/client'
 import _ from 'lodash'
 import { SeqInfo } from '../renders/SeqInfo'
+import LoadingDucks from '../renders/LoadingDucks'
 
 import { gql } from '../__generated__/gql'
 
@@ -32,14 +33,13 @@ const sampleFieldsToDisplay = ['active', 'type', 'participantId']
 
 const SampleView_: React.FunctionComponent<Record<string, unknown>> = () => {
     const { sampleName } = useParams()
-    // const sampleID = sampleName || ''
-    const sampleID = sampleName || 'CPGLCL978'
+    const sampleID = sampleName || ''
 
     const { loading, error, data } = useQuery(GET_SAMPLE_INFO, {
         variables: { sample_id: sampleID },
     })
-    if (loading) return <>Loading...</>
-    if (error) return <>Error! ${error.message}</>
+    if (loading) return <LoadingDucks />
+    if (error) return <>Error! {error.message}</>
 
     const renderSeqSection = () => {
         if (!data) {
