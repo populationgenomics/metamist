@@ -23,11 +23,9 @@ module.exports = {
         tsconfigRootDir: __dirname,
     },
     plugins: ['react', '@typescript-eslint', 'prettier'],
+    ignorePatterns: ['__generated__'],
     rules: {
-        'react/jsx-filename-extension': [
-            2,
-            { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
-        ],
+        'react/jsx-filename-extension': [2, { extensions: ['.js', '.jsx', '.ts', '.tsx'] }],
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/naming-convention': [
             'error',
