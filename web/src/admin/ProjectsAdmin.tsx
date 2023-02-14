@@ -77,7 +77,7 @@ const ProjectsAdmin = () => {
         )
     }
 
-    const seqTypes = Object.values(SequenceType);
+    const seqTypes = Object.values(SequenceType)
 
     return (
         <>

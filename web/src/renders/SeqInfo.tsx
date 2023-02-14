@@ -1,6 +1,9 @@
 import * as React from 'react'
 import { Table } from 'semantic-ui-react'
 
+import _ from 'lodash'
+import { GraphQlSampleSequencing } from '../__generated__/graphql'
+
 interface File {
     location: string
     basename: string
@@ -15,17 +18,10 @@ interface SequenceMeta {
     [key: string]: any
 }
 
-interface SampleSequencing {
-    id: number
-    external_ids?: { [name: string]: string }
-    sample_id: string
-    type: string
-    meta?: SequenceMeta
-    status: string
-}
+const excludedSequenceFields = ['id', '__typename']
 
 export const SeqInfo_: React.FunctionComponent<{
-    data: SampleSequencing
+    data: Partial<GraphQlSampleSequencing>
 }> = ({ data }) => {
     const formatBytes = (bytes: number, decimals = 2) => {
         if (!+bytes) return '0 Bytes'
@@ -58,7 +54,7 @@ export const SeqInfo_: React.FunctionComponent<{
             return (
                 <Table.Row>
                     <Table.Cell>
-                        <b>reads</b>
+                        <b>Reads</b>
                     </Table.Cell>
                     <Table.Cell>{renderReadsMetadata([metadata.reads], 1)}</Table.Cell>
                 </Table.Row>
@@ -66,7 +62,7 @@ export const SeqInfo_: React.FunctionComponent<{
         return (
             <Table.Row>
                 <Table.Cell>
-                    <b>reads</b>
+                    <b>Reads</b>
                 </Table.Cell>
                 <Table.Cell>
                     {metadata.reads.map((v, i) =>
@@ -96,25 +92,21 @@ export const SeqInfo_: React.FunctionComponent<{
         return JSON.stringify(value)
     }
 
-    const renderSeqInfo = (seqInfo: SampleSequencing) =>
+    const renderSeqInfo = (seqInfo: Partial<GraphQlSampleSequencing>) =>
         Object.entries(seqInfo)
-            .filter(([key]) => key !== 'id')
+            .filter(([key]) => !excludedSequenceFields.includes(key))
             .map(([key, value]) => {
-                if (key === 'external_ids') {
-                    if (Object.keys(seqInfo.external_ids ?? {}).length) {
+                if (key === 'externalIds') {
+                    if (Object.keys(seqInfo.externalIds ?? {}).length) {
                         return (
                             <Table.Row key={key}>
                                 <Table.Cell>
                                     <b>External Ids</b>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    {Object.entries(seqInfo.external_ids ?? {})
-                                        .map(([k1, v1]) => (
-                                            <React.Fragment
-                                                key={`${v1} (${k1})`}
-                                            >{`${v1} (${k1})`}</React.Fragment>
-                                        ))
-                                        .join()}
+                                    {Object.entries(seqInfo.externalIds ?? {})
+                                        .map(([k1, v1]) => `${v1} (${k1})`)
+                                        .join(', ')}
                                 </Table.Cell>
                             </Table.Row>
                         )
@@ -122,7 +114,7 @@ export const SeqInfo_: React.FunctionComponent<{
                     return <React.Fragment key="ExternalID"></React.Fragment>
                 }
                 if (key === 'meta') {
-                    return Object.entries(seqInfo.meta ?? {})
+                    return Object.entries((seqInfo.meta as SequenceMeta) ?? {})
                         .filter(([k1]) => k1 !== 'reads')
                         .map(([k1, v1]) => {
                             if (
@@ -133,7 +125,7 @@ export const SeqInfo_: React.FunctionComponent<{
                                 return (
                                     <Table.Row key={`${k1}`}>
                                         <Table.Cell>
-                                            <b>{k1}</b>
+                                            <b>{_.capitalize(k1)}</b>
                                         </Table.Cell>
                                         <Table.Cell>
                                             {renderReadsMetadata(v1 as File[], key)}
@@ -146,7 +138,7 @@ export const SeqInfo_: React.FunctionComponent<{
                                     return (
                                         <Table.Row key={`${k1}`}>
                                             <Table.Cell>
-                                                <b>{k1}:</b>
+                                                <b>{_.capitalize(k1)}:</b>
                                             </Table.Cell>
                                             <Table.Cell>
                                                 {renderReadsMetadata([v1] as File[], k1)}
@@ -159,7 +151,7 @@ export const SeqInfo_: React.FunctionComponent<{
                             return (
                                 <Table.Row key={`${k1}-${stringifiedValue}`}>
                                     <Table.Cell>
-                                        <b>{k1}</b>
+                                        <b>{_.capitalize(k1)}</b>
                                     </Table.Cell>
                                     <Table.Cell>{stringifiedValue ?? <em>no-value</em>}</Table.Cell>
                                 </Table.Row>
@@ -171,7 +163,7 @@ export const SeqInfo_: React.FunctionComponent<{
                 return (
                     <Table.Row key={`${key}-${stringifiedValue}`}>
                         <Table.Cell>
-                            <b>{key}</b>
+                            <b>{_.capitalize(key)}</b>
                         </Table.Cell>
                         <Table.Cell>{stringifiedValue ?? <em>no-value</em>}</Table.Cell>
                     </Table.Row>
@@ -188,8 +180,11 @@ export const SeqInfo_: React.FunctionComponent<{
     )
 }
 
-export class SeqInfo extends React.Component<{ data: SampleSequencing }, { error?: Error }> {
-    constructor(props: Record<'data', SampleSequencing>) {
+export class SeqInfo extends React.Component<
+    { data: Partial<GraphQlSampleSequencing> },
+    { error?: Error }
+> {
+    constructor(props: Record<'data', GraphQlSampleSequencing>) {
         super(props)
         this.state = {}
     }

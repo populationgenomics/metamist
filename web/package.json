@@ -3,10 +3,11 @@
     "version": "0.1.0",
     "private": true,
     "dependencies": {
-        "@graphql-codegen/cli": "2.16.2",
         "@apollo/client": "^3.7.3",
         "@emotion/react": "^11.10.4",
         "@emotion/styled": "^11.10.4",
+        "@graphql-codegen/cli": "2.16.2",
+        "@graphql-typed-document-node/core": "^3.1.1",
         "@mui/icons-material": "^5.10.9",
         "@mui/material": "^5.10.9",
         "@testing-library/jest-dom": "^5.15.0",
@@ -62,7 +63,6 @@
     ],
     "devDependencies": {
         "@graphql-codegen/client-preset": "1.2.4",
-        "@whatwg-node/fetch": "0.5.4",
         "@graphql-tools/apollo-engine-loader": "7.3.21",
         "@graphql-tools/executor-http": "0.0.8",
         "@graphql-tools/git-loader": "7.2.15",
@@ -80,6 +80,7 @@
         "@types/swagger-ui-react": "^3.35.3",
         "@typescript-eslint/eslint-plugin": "^5.48.0",
         "@typescript-eslint/parser": "^5.48.0",
+        "@whatwg-node/fetch": "0.5.4",
         "eslint": "^7.32.0",
         "eslint-config-airbnb": "^19.0.4",
         "eslint-config-airbnb-base": "^15.0.0",

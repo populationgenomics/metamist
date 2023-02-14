@@ -28,7 +28,7 @@ const Routes: React.FunctionComponent = () => (
 
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
 
-        <Route path="project/:projectName/sample/:sampleName" element={<SampleView />} />
+        <Route path="sample/:sampleName" element={<SampleView />} />
         <Route path="project/:projectName/family/:familyID" element={<FamilyView />} />
         <Route path="project/:projectName/participant/:participantName" element={<SampleView />} />
 

@@ -7,8 +7,8 @@ interface LinkProps {
     children: React.ReactNode
 }
 
-export const SampleLink: React.FunctionComponent<LinkProps> = ({ id, projectName, children }) => (
-    <Link to={`/project/${projectName}/sample/${id}`}>{children || id}</Link>
+export const SampleLink: React.FunctionComponent<LinkProps> = ({ id, children }) => (
+    <Link to={`/sample/${id}`}>{children || id}</Link>
 )
 
 export const FamilyLink: React.FunctionComponent<LinkProps> = ({ id, projectName, children }) => (
