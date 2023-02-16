@@ -232,6 +232,7 @@ def main(
                 analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
             )
+            print(analyses)
         except exceptions.ApiException:
             traceback.print_exc()
         else:
@@ -311,6 +312,7 @@ def main(
                     ),
                     status=AnalysisStatus(analysis['status']),
                     sample_ids=[new_sample_map[s['id']]],
+                    meta=analysis['meta'],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_new_analysis(project=target_project, analysis_model=am)
