@@ -117,6 +117,7 @@ class GenericMetadataParser(GenericParser):
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
+            default_sequence_technology=default_sequence_technology,
             **kwargs,
         )
 
@@ -184,7 +185,7 @@ class GenericMetadataParser(GenericParser):
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
         """Get sequence technology for single row"""
-        value = row.get(self.seq_technology_column, None) or self.default_sequence_technology
+        value = row.get(self.seq_technology_column) or self.default_sequence_technology
         value = value.lower()
 
         if value == 'ont':

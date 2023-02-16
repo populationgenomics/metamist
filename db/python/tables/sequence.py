@@ -107,7 +107,7 @@ class SampleSequencingTable(DbBase):
         sample_id,
         external_ids: Optional[dict[str, str]],
         sequence_type: SequenceType,
-        technology: SequenceTechnology | None,
+        technology: SequenceTechnology,
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
@@ -117,6 +117,9 @@ class SampleSequencingTable(DbBase):
         """
         Create a new sequence for a sample, and add it to database
         """
+
+        if technology is None:
+            raise ValueError('Sequence technology cannot be null')
 
         _query = """\
             INSERT INTO sample_sequencing
