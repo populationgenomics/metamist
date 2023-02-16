@@ -33,6 +33,7 @@ class TestSampleMapParser(unittest.TestCase):
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
             project='dev',
+            default_sequence_technology='short-read',
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -79,6 +80,7 @@ class TestSampleMapParser(unittest.TestCase):
             ],
             'reads_type': 'fastq',
         }
+        self.assertEqual('short-read', str(sequencing_to_add[0].technology))
         self.assertDictEqual(expected_sequence_dict, sequencing_to_add[0].meta)
 
     @run_as_sync
