@@ -20,7 +20,7 @@ from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.5.1'
+_VERSION = '5.5.3'
 
 logger = get_logger()
 

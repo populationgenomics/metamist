@@ -481,6 +481,9 @@ class GenericParser(
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
+                    'technology': seq.sequence_technology
+                    if isinstance(seq.sequence_technology, SequenceTechnology)
+                    else SequenceTechnology(seq.sequence_technology),
                 }
 
                 if self.get_sequence_id(seq.rows):
