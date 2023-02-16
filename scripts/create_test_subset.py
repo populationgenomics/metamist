@@ -232,7 +232,6 @@ def main(
                 analysis_type=AnalysisType(a_type),
                 request_body=sample_ids,
             )
-            print(analyses)
         except exceptions.ApiException:
             traceback.print_exc()
         else:
