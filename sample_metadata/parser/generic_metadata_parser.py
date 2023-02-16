@@ -106,7 +106,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
-        default_sequence_technology='long-reads',
+        default_sequence_technology='short-read',
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -189,7 +189,7 @@ class GenericMetadataParser(GenericParser):
         value = value.lower()
 
         if value == 'ont':
-            value = 'long-reads'
+            value = 'long-read'
 
         return SequenceTechnology(value)
 
