@@ -6,7 +6,7 @@ import { Dropdown } from 'semantic-ui-react'
 
 import { useQuery } from '@apollo/client'
 
-import { gql } from '../__generated__/gql'
+import { gql } from '../../__generated__/gql'
 
 const GET_PROJECTS = gql(`
     query getProjects {

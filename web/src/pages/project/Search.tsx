@@ -8,7 +8,7 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
 
-import { SearchResponse, WebApi } from '../sm-api/api'
+import { SearchResponse, WebApi } from '../../sm-api/api'
 
 type State = {
     loading: boolean

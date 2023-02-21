@@ -122,7 +122,7 @@ async def load_families_for_participants(
 ) -> list[list['Family']]:
     flayer = FamilyLayer(connection)
     fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
-    return [fam_map.get(p) for p in participant_ids]
+    return [fam_map.get(p) for p in participant_ids if p in fam_map] or [[]]
 
 
 @connected_data_loader
@@ -254,7 +254,6 @@ class GraphQLProject:
     async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
         connection = info.context['connection']
         participants = await FamilyLayer(connection).get_families(project=root.id)
-
         return participants
 
     @strawberry.field()

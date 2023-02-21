@@ -4,8 +4,8 @@
 import * as React from 'react'
 import _ from 'lodash'
 import { min, max, sum, mean, extent } from 'd3'
-import LoadingDucks from './LoadingDucks'
-import MuckTheDuck from './MuckTheDuck'
+import LoadingDucks from '../LoadingDucks'
+import MuckError from '../MuckError'
 
 interface PedigreeEntry {
     affected: number
@@ -354,12 +354,7 @@ const renderChart = (
     const tangleLayout = constructTangleLayout(_.cloneDeep(data))
 
     if ('error' in tangleLayout) {
-        return (
-            <p>
-                <em>Ah Muck, couldn`&apos;`t resolve this pedigree</em>
-                <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
-            </p>
-        )
+        return <MuckError message={`Ah Muck, couldn't resolve this pedigree`} />
     }
 
     return (
@@ -645,7 +640,7 @@ const formatData = (data: PedigreeEntry[]) => {
 
 interface RenderPedigreeProps {
     data: PedigreeEntry[]
-    click(e: string): void
+    click?(e: string): void
 }
 
 const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click }) => {
@@ -653,6 +648,11 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
     const [keyedData, setKeyedData] = React.useState<{
         [name: string]: PedigreeEntry
     }>()
+    const onClick =
+        click ??
+        function defaultClick() {
+            return undefined
+        }
 
     React.useEffect(() => {
         setTree(formatData(data))
@@ -667,10 +667,7 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
     return (
         <>
             {(!data || !data.length) && (
-                <p>
-                    <em>Ah Muck, there`&apos;`s no data for this pedigree!</em>
-                    <MuckTheDuck height={28} style={{ transform: 'scaleY(-1)' }} />
-                </p>
+                <MuckError message={`Ah Muck, there's no data for this pedigree!`} />
             )}
             {data && !!data.length && !tree && (
                 <>
@@ -680,7 +677,7 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
                     </div>
                 </>
             )}
-            {!!data.length && tree && keyedData && renderChart(tree, keyedData, click)}
+            {!!data.length && tree && keyedData && renderChart(tree, keyedData, onClick)}
             <br />
         </>
     )

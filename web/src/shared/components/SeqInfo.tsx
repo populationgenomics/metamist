@@ -2,7 +2,9 @@ import * as React from 'react'
 import { Table } from 'semantic-ui-react'
 
 import _ from 'lodash'
-import { GraphQlSampleSequencing } from '../__generated__/graphql'
+import { GraphQlSampleSequencing } from '../../__generated__/graphql'
+import formatBytes from '../utilities/formatBytes'
+import safeValue from '../utilities/safeValue'
 
 interface File {
     location: string
@@ -20,21 +22,9 @@ interface SequenceMeta {
 
 const excludedSequenceFields = ['id', '__typename']
 
-export const SeqInfo_: React.FunctionComponent<{
+const SeqInfo: React.FunctionComponent<{
     data: Partial<GraphQlSampleSequencing>
 }> = ({ data }) => {
-    const formatBytes = (bytes: number, decimals = 2) => {
-        if (!+bytes) return '0 Bytes'
-
-        const k = 1024
-        const dm = decimals < 0 ? 0 : decimals
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-
-        const i = Math.floor(Math.log(bytes) / Math.log(k))
-
-        return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
-    }
-
     const renderReadsMetadata = (readsMetadata: File[], key: number | string) => (
         <Table celled key={key}>
             <Table.Body>
@@ -71,25 +61,6 @@ export const SeqInfo_: React.FunctionComponent<{
                 </Table.Cell>
             </Table.Row>
         )
-    }
-
-    const safeValue = (value: any): string => {
-        if (!value) return value
-        if (Array.isArray(value)) {
-            return value.map(safeValue).join(', ')
-        }
-        if (typeof value === 'number') {
-            return value.toString()
-        }
-        if (typeof value === 'string') {
-            return value
-        }
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-            if (!!value.location && !!value.size) {
-                return `${value.location} (${formatBytes(value.size)})`
-            }
-        }
-        return JSON.stringify(value)
     }
 
     const renderSeqInfo = (seqInfo: Partial<GraphQlSampleSequencing>) =>
@@ -180,24 +151,4 @@ export const SeqInfo_: React.FunctionComponent<{
     )
 }
 
-export class SeqInfo extends React.Component<
-    { data: Partial<GraphQlSampleSequencing> },
-    { error?: Error }
-> {
-    constructor(props: Record<'data', GraphQlSampleSequencing>) {
-        super(props)
-        this.state = {}
-    }
-
-    static getDerivedStateFromError(error: Error): { error: Error } {
-        // Update state so the next render will show the fallback UI.
-        return { error }
-    }
-
-    render(): React.ReactNode {
-        if (this.state.error) {
-            return <p>{this.state.error.toString()}</p>
-        }
-        return <SeqInfo_ data={this.props.data} /> /* eslint react/jsx-pascal-case: 0 */
-    }
-}
+export default SeqInfo

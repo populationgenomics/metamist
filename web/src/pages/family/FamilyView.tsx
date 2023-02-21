@@ -1,30 +1,23 @@
 import * as React from 'react'
 
-import { useParams, useNavigate } from 'react-router-dom'
-import { Table, Accordion, Popup, Button, Grid, AccordionTitleProps } from 'semantic-ui-react'
+import { useParams } from 'react-router-dom'
+import { Accordion, AccordionTitleProps } from 'semantic-ui-react'
 
-import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
-import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 
 import { useQuery } from '@apollo/client'
-import _ from 'lodash'
-import TangledTree from '../renders/TangledTree'
-import { SeqInfo } from '../renders/SeqInfo'
-import LoadingDucks from '../renders/LoadingDucks'
+import Pedigree from '../../shared/components/pedigree/Pedigree'
+import LoadingDucks from '../../shared/components/LoadingDucks'
 
-import { gql } from '../__generated__/gql'
-import { GraphQlSampleSequencing, GraphQlSample } from '../__generated__/graphql'
+import { gql } from '../../__generated__/gql'
+import FamilyViewTitle from './FamilyViewTitle'
+
+import iconStyle from '../../shared/iconStyle'
+import SeqPanel from '../../shared/components/SeqPanel'
+import SampleInfo from '../../shared/components/SampleInfo'
 
 const sampleFieldsToDisplay = ['active', 'type', 'participantId']
-
-const iconStyle = {
-    fontSize: 30,
-    height: '33px',
-    verticalAlign: 'bottom',
-    marginRight: '10px',
-}
 
 const GET_FAMILY_INFO = gql(`
 query FamilyInfo($family_id: Int!) {
@@ -61,10 +54,9 @@ query FamilyInfo($family_id: Int!) {
   }
 }`)
 
-const FamilyView_: React.FunctionComponent<Record<string, unknown>> = () => {
-    const { projectName, familyID } = useParams()
+const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
+    const { familyID } = useParams()
     const family_ID = familyID ? +familyID : -1
-    const navigate = useNavigate()
 
     const [activeIndices, setActiveIndices] = React.useState<number[]>([-1])
     const [mostRecent, setMostRecent] = React.useState<string>('')
@@ -73,106 +65,7 @@ const FamilyView_: React.FunctionComponent<Record<string, unknown>> = () => {
         variables: { family_id: family_ID },
     })
 
-    const renderSeqSection = (s: Partial<GraphQlSampleSequencing>[]) => (
-        <Accordion
-            styled
-            className="accordionStyle"
-            panels={s.map((seq) => ({
-                key: seq.id,
-                title: {
-                    content: (
-                        <h3
-                            style={{
-                                display: 'inline',
-                            }}
-                        >
-                            Sequence ID: {seq.id}
-                        </h3>
-                    ),
-                    icon: <ScienceRoundedIcon sx={iconStyle} />,
-                },
-                content: {
-                    content: (
-                        <div style={{ marginLeft: '30px' }}>
-                            <SeqInfo data={seq} />
-                        </div>
-                    ),
-                },
-            }))}
-            exclusive={false}
-            fluid
-        />
-    )
-
-    const renderSampleSection = (sample: Partial<GraphQlSample>) => (
-        <Table celled collapsing>
-            <Table.Body>
-                {Object.entries(sample).map(([key, value]) => (
-                    <Table.Row key={`${key}-${value}`}>
-                        <Table.Cell>
-                            <b>{_.capitalize(key)}</b>
-                        </Table.Cell>
-                        <Table.Cell>{value?.toString() ?? <em>no value</em>}</Table.Cell>
-                    </Table.Row>
-                ))}
-            </Table.Body>
-        </Table>
-    )
-
-    const renderTitle = () => {
-        if (!data) {
-            return <></>
-        }
-        return (
-            <div
-                style={{
-                    borderBottom: `1px solid black`,
-                }}
-            >
-                <h1
-                    style={{
-                        display: 'inline',
-                    }}
-                >
-                    {data?.family.externalId}
-                </h1>
-                {data.family.project.families.length > 1 && (
-                    <div style={{ float: 'right' }}>
-                        {`Change Families within ${data.family.project.name}\t`}
-                        <Popup
-                            trigger={
-                                <Diversity3RoundedIcon
-                                    sx={{
-                                        fontSize: 40,
-                                    }}
-                                />
-                            }
-                            hoverable
-                            style={{ float: 'right' }}
-                        >
-                            <Grid divided centered rows={3}>
-                                {data.family.project.families.map((item) => (
-                                    <Grid.Row key={item.id} textAlign="center">
-                                        <Button
-                                            onClick={() => {
-                                                navigate(
-                                                    `/project/${projectName}/family/${item.id}`
-                                                )
-                                            }}
-                                        >
-                                            {item.externalId}
-                                        </Button>
-                                    </Grid.Row>
-                                ))}
-                            </Grid>
-                        </Popup>
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    const onClick = React.useCallback(
+    const onPedigreeClick = React.useCallback(
         (e: string) => {
             if (!data) return
             const indexToSet = Object.entries(data?.family.participants)
@@ -202,22 +95,18 @@ const FamilyView_: React.FunctionComponent<Record<string, unknown>> = () => {
         }
     }
 
-    const renderedPedigree = React.useMemo(
-        () =>
-            data?.family.project.pedigree && (
-                <TangledTree data={data?.family.project.pedigree} click={onClick} />
-            ),
-        [data, onClick]
-    )
-
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
 
-    return (
-        <div className="familyView" style={{ width: '100%' }}>
+    return data ? (
+        <div className="dataStyle" style={{ width: '100%' }}>
             <>
-                {renderTitle()}
-                {renderedPedigree}
+                <FamilyViewTitle
+                    projectName={data?.family.project.name}
+                    families={data?.family.project.families}
+                    externalId={data?.family.externalId}
+                />
+                <Pedigree familyID={family_ID} onClick={onPedigreeClick} />
                 <Accordion
                     onTitleClick={handleTitleClick}
                     activeIndex={activeIndices}
@@ -295,17 +184,18 @@ const FamilyView_: React.FunctionComponent<Record<string, unknown>> = () => {
                                                                 marginLeft: '30px',
                                                             }}
                                                         >
-                                                            {renderSampleSection(
-                                                                Object.fromEntries(
+                                                            <SampleInfo
+                                                                sample={Object.fromEntries(
                                                                     Object.entries(s).filter(
                                                                         ([key]) =>
                                                                             sampleFieldsToDisplay.includes(
                                                                                 key
                                                                             )
                                                                     )
-                                                                )
-                                                            )}
-                                                            {renderSeqSection(s.sequences)}
+                                                                )}
+                                                            />
+
+                                                            <SeqPanel sequences={s.sequences} />
                                                         </div>
                                                     </>
                                                 ),
@@ -320,27 +210,9 @@ const FamilyView_: React.FunctionComponent<Record<string, unknown>> = () => {
                 />
             </>
         </div>
+    ) : (
+        <></>
     )
 }
 
-export default class FamilyView extends React.Component<
-    Record<string, unknown>,
-    { error?: Error }
-> {
-    constructor(props: Record<string, unknown>) {
-        super(props)
-        this.state = {}
-    }
-
-    static getDerivedStateFromError(error: Error): { error: Error } {
-        // Update state so the next render will show the fallback UI.
-        return { error }
-    }
-
-    render(): React.ReactNode {
-        if (this.state.error) {
-            return <p>{this.state.error.toString()}</p>
-        }
-        return <FamilyView_ /> /* eslint react/jsx-pascal-case: 0 */
-    }
-}
+export default FamilyView

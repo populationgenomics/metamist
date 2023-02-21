@@ -1,5 +1,5 @@
 import * as React from 'react'
-import muck from '../static/muck-the-duck.svg'
+import muck from '../../static/muck-the-duck.svg'
 
 const MuckTheDuck: React.FunctionComponent<
     React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>
