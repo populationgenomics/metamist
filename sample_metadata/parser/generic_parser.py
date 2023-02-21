@@ -73,7 +73,7 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12]('
+    r'[_\.-][Rr]?[12](_\d+)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
     + ')$'
 )
