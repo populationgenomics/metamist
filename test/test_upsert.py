@@ -58,6 +58,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('genome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     ),
                                     SequenceUpsert.construct(
@@ -85,6 +88,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('exome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     ),
                                 ],
