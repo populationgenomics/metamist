@@ -73,7 +73,7 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12](_\d+)?('
+    r'[_\.-][Rr]?[12](?:_\d+)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
     + ')$'
 )
@@ -1154,6 +1154,9 @@ class GenericParser(
         >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'])
         [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz'])
+        [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'], ['21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz']]
+
         >>> GenericParser.parse_fastqs_structure(['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz', 'Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz'])
         [['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz'], ['Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz']]
 
@@ -1180,11 +1183,22 @@ class GenericParser(
                 f"Couldn't detect the format of FASTQs (expected match for regex {rmatch.pattern!r}): {no_r_match_str!r}"
             )
 
+        # Create a dict with filenames as keys and prefixes and suffixes as values
+        filename_prefix_suffix = {}
+        for filename in sorted_fastqs:
+            # use only file path basename to define prefix first
+            prefix = re.split(rmatch_str, os.path.basename(filename))[0]+"_"
+            suffix = os.path.basename(filename).removeprefix(prefix)
+
+            # now redefine prefix to include full file path
+            prefix = filename.removesuffix(suffix)
+            filename_prefix_suffix[filename] = (prefix,suffix)
+        
         values = []
-        for _, grouped in group_by(
-            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
-        ).items():
-            values.append(sorted(grouped))
+        groups = group_fastqs_by_common_filename_components(filename_prefix_suffix)
+        for v in groups.values():
+            values.append(v)
+
         invalid_fastq_groups = [grp for grp in values if len(grp) != 2]
         if invalid_fastq_groups:
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
@@ -1270,6 +1284,40 @@ class GenericParser(
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
 
+def group_fastqs_by_common_filename_components(d: dict) -> dict:
+    """Groups key-value pairs by common prefix components and suffix components
+    Where the key is the fastq filename and the value is a tuple of the filename split at R1/R2/1/2
+    
+    Returns a dict with grouping term constructed from extracted prefix+suffix identifiers as key
+    and a list of filenames matching the group as value.
+    Sample input: {
+        'S70_L001_R1_001.fastq.gz': ('S70_L001_', 'R1_001.fastq.gz'),    
+        'S70_L001_R2_001.fastq.gz': ('S70_L001_', 'R2_001.fastq.gz'),
+        'S70_L001_R1.fastq.gz': ('S70_L001_', 'R1.fastq.gz'),    
+        'S70_L001_R2.fastq.gz': ('S70_L001_', 'R1.fastq.gz')
+        }
+    Sample output: {
+        'S70_L001_001.fastq.gz': ['S70_L001_R1_001.fastq.gz', 'S70_L001_R2_001.fastq.gz'],
+        'S70_L001_fastq.gz': ['S70_L001_R1.fastq.gz', 'S70_L001_R2.fastq.gz']
+        }
+    """
+    def key_selector(kv: Tuple[str, str]) -> Tuple[str, str]:
+        k, v = kv
+        try:
+            common_component = v[1].split("_")[1]  # get the component after the first underscore if there is a trailing underscore
+        except IndexError:
+            common_component = v[1].split(".",1)[1] # or get the file extension if there is no trailing underscore after R1/R2
+        
+        return v[1], common_component
+    grouping = group_by(d.items(), key_selector)
+    
+    fastq_groups = defaultdict(list)
+    for k,v in grouping.items():
+        for matching in v:
+            common_components = os.path.basename(matching[1][0]) + k[1]
+            fastq_groups[common_components].append(matching[0])
+    
+    return fastq_groups
 
 def _apply_secondary_file_format_to_filename(
     filepath: Optional[str], secondary_file: str
