@@ -135,7 +135,6 @@ async def get_pedigree(
 @router.get(
     '/{project}/',
     operation_id='getFamilies',
-    response_model=List[Family],
     tags=['seqr'],
 )
 async def get_families(
