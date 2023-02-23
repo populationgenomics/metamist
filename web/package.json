@@ -33,7 +33,7 @@
     "proxy": "http://localhost:8000",
     "scripts": {
         "start": "react-scripts start",
-        "build": "SET NODE_OPTIONS=--openssl-legacy-provider && react-scripts build",
+        "build": "NODE_OPTIONS=--openssl-legacy-provider && react-scripts build",
         "postbuild": "npm run copy:buildartifacts",
         "test": "react-scripts test",
         "eject": "react-scripts eject",
