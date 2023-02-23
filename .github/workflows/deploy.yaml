@@ -79,6 +79,9 @@ jobs:
           python regenerate_api.py
           ls -lGh sample_metadata
 
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
         # also copies build artifacts to api/public
       - name: "build web front-end"
         run: |
