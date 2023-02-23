@@ -18,8 +18,10 @@ interface RenderPedigreeProps {
 
 const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click }) => (
     <>
-        Temporary Pedigree Stub component
+        Temporary Pedigree component
+        <br />
         {JSON.stringify(data)}
+        <br />
         {JSON.stringify(click)}
     </>
 )
