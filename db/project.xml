@@ -432,13 +432,14 @@
 		</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2023-01-25_">
-		    <renameColumn
-				columnDataType="VARCHAR(255)"
-				newColumnName="read_group_name"
-				oldColumnName="read_secret_name"
-				remarks="Migration of groups membership cache to blobs"
-				tableName="project"
-			/>
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<renameColumn
+			columnDataType="VARCHAR(255)"
+			newColumnName="read_group_name"
+			oldColumnName="read_secret_name"
+			remarks="Migration of groups membership cache to blobs"
+			tableName="project"
+		/>
 		<renameColumn
 				columnDataType="VARCHAR(255)"
 				newColumnName="write_group_name"
