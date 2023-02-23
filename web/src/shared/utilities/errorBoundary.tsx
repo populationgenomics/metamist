@@ -16,7 +16,7 @@ class ErrorBoundary extends Component<Props, State> {
         return { error }
     }
 
-    public render() {
+    public render(): React.ReactNode {
         if (this.state.error) {
             return <p>{this.state.error.toString()}</p>
         }

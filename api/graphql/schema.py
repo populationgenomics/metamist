@@ -122,7 +122,7 @@ async def load_families_for_participants(
 ) -> list[list['Family']]:
     flayer = FamilyLayer(connection)
     fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
-    return [fam_map.get(p) for p in participant_ids if p in fam_map] or [[]]
+    return [fam_map.get(p, []) for p in participant_ids]
 
 
 @connected_data_loader
