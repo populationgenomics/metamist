@@ -36,7 +36,7 @@
         "build": "vite build --config vite.config.js",
         "preview": "vite preview --config vite.config.js",
         "postbuild": "npm run copy:buildartifacts",
-        "copy:buildartifacts": "rm -rf ../api/public/ && mkdir -p ../api/public && cp -r build/* ../api/public/",
+        "copy:buildartifacts": "rm -rf ../api/public/ && mkdir -p ../api/public && cp -r dist/* ../api/public/",
         "lint": "eslint . --ext .ts,.tsx",
         "lint:fix": "eslint --fix . --ext .ts,.tsx",
         "format": "prettier --write src/**/*.{ts,tsx,css} --config ./.prettierrc"
