@@ -82,8 +82,9 @@ class SampleFileMapParser(GenericMetadataParser):
         project: str,
         default_sequence_type='genome',
         default_sample_type='blood',
+        default_sequence_technology='short-read',
         allow_extra_files_in_search_path=False,
-        default_reference_assembly_location: str = None,
+        default_reference_assembly_location: str | None = None,
     ):
         super().__init__(
             search_locations=search_locations,
@@ -95,6 +96,7 @@ class SampleFileMapParser(GenericMetadataParser):
             seq_type_column=SEQ_TYPE_COL_NAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            default_sequence_technology=default_sequence_technology,
             default_reference_assembly_location=default_reference_assembly_location,
             participant_meta_map={},
             sample_meta_map={},
@@ -112,6 +114,7 @@ class SampleFileMapParser(GenericMetadataParser):
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
+@click.option('--default-sequence-technology', default='short-read')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -146,6 +149,7 @@ async def main(
     project,
     default_sample_type='blood',
     default_sequence_type='genome',
+    default_sequence_technology='short-read',
     default_reference_assembly: str = None,
     confirm=False,
     dry_run=False,
@@ -163,6 +167,7 @@ async def main(
         project=project,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
+        default_sequence_technology=default_sequence_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         default_reference_assembly_location=default_reference_assembly,

@@ -194,7 +194,7 @@ class PedRow:
                     f'{r.individual_id} ({r.paternal_id} | {r.maternal_id})'
                     for r in rows_to_order
                 )
-                raise Exception(
+                raise ValueError(
                     "There was an issue in the pedigree, either a parent wasn't "
                     'found in the pedigree, or a circular dependency detected '
                     "(eg: someone's child is an ancestor's parent). "
@@ -529,7 +529,6 @@ class FamilyLayer(BaseLayer):
         )
 
         async with self.connection.connection.transaction():
-
             if create_missing_participants:
                 missing_participant_ids = set(external_participant_ids) - set(
                     external_participant_ids_map

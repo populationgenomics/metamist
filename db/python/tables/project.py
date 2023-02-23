@@ -2,37 +2,27 @@
 import asyncio
 from typing import Dict, List, Set, Iterable, Optional, Tuple, Any
 
-import os
 import json
 from datetime import datetime, timedelta
 
 from databases import Database
 from google.cloud import secretmanager
+from cpg_utils.cloud import get_cached_group_members
 
+from api.settings import MEMBERS_CACHE_LOCATION, is_full_access
 from db.python.utils import (
     ProjectId,
     Forbidden,
     NoProjectAccess,
     get_logger,
     to_db_json,
+    InternalError,
 )
 from models.models.project import Project
 
 # minutes
 PROJECT_CACHE_LENGTH = 1
 PERMISSIONS_CACHE_LENGTH = 1
-_ALLOW_FULL_ACCESS = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in ('y', 'true', '1')
-
-
-def is_full_access():
-    """Does SM have full access"""
-    return _ALLOW_FULL_ACCESS
-
-
-def set_full_access(access):
-    """Set full_access for future use"""
-    global _ALLOW_FULL_ACCESS
-    _ALLOW_FULL_ACCESS = access
 
 
 logger = get_logger()
@@ -45,7 +35,7 @@ class ProjectPermissionCacheObject:
     """
 
     def __init__(self, users: Set[str], expiry=None):
-        self.users = users
+        self.users = set(users or [])
         self.expiry = expiry or (
             datetime.utcnow() + timedelta(minutes=PERMISSIONS_CACHE_LENGTH)
         )
@@ -70,7 +60,6 @@ class ProjectPermissionsTable:
     _cached_permissions: Dict[Tuple[ProjectId, bool], ProjectPermissionCacheObject] = {}
 
     def __init__(self, connection: Database, allow_full_access=None):
-
         if not isinstance(connection, Database):
             raise ValueError(
                 f'Invalid type connection, expected Database, got {type(connection)}, did you forget to call connection.connection?'
@@ -170,31 +159,30 @@ class ProjectPermissionsTable:
         ):
             project_id_map = await self.get_project_id_map()
             project = project_id_map[project_id]
-            secret_name = (
-                project.read_secret_name if readonly else project.write_secret_name
+            group_name = (
+                project.read_group_name if readonly else project.write_group_name
             )
-            if secret_name is None:
+            if group_name is None:
                 project_name = (await self.get_project_id_map())[project_id].name
                 read_or_write = 'read' if readonly else 'write'
-                raise Exception(
+                raise InternalError(
                     f'An internal error occurred when validating access to {project_name}, '
                     f'there must be a value in the DB for "{read_or_write}_secret_name" to lookup'
                 )
 
             try:
-                start = datetime.utcnow()
-                assert project.gcp_id is not None
-                response = self._read_secret(project.gcp_id, secret_name)
-                logger.debug(
-                    f'Took {(datetime.utcnow() - start).total_seconds():.2f} seconds to check sm://{secret_name}'
+                assert (
+                    MEMBERS_CACHE_LOCATION is not None
+                ), 'Requires "SM_MEMBERS_CACHE_LOCATION" to be set'
+                users = get_cached_group_members(
+                    group_name, members_cache_location=MEMBERS_CACHE_LOCATION
                 )
 
             except Exception as e:
-                raise Exception(
+                raise type(e)(
                     f'An error occurred when determining access to this project: {e}'
                 ) from e
 
-            users = set(response.split(','))
             self._cached_permissions[cache_key] = ProjectPermissionCacheObject(
                 users=users
             )
@@ -248,7 +236,7 @@ class ProjectPermissionsTable:
     ) -> List[ProjectId]:
         """Get project ids from project names and the user"""
         if not user:
-            raise Exception('An internal error occurred during authorization')
+            raise InternalError('An internal error occurred during authorization')
 
         project_name_map = await self.get_project_name_map()
         project_ids = []
@@ -272,7 +260,7 @@ class ProjectPermissionsTable:
             raise NoProjectAccess(invalid_project_names, readonly=readonly, author=user)
 
         if len(project_ids) != len(project_names):
-            raise Exception(
+            raise InternalError(
                 'An internal error occurred when mapping project names to IDs'
             )
 
@@ -297,7 +285,7 @@ class ProjectPermissionsTable:
         if check_permissions:
             await self.check_project_creator_permissions(author)
 
-        _query = 'SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name FROM project'
+        _query = 'SELECT id, name, meta, dataset, read_group_name, write_group_name FROM project'
         rows = await self.connection.fetch_all(_query)
         return list(map(Project.from_db, rows))
 
@@ -306,7 +294,7 @@ class ProjectPermissionsTable:
         if not project_id:
             raise ValueError('Project ID is required for get_project_by_id')
         _query = """
-        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
+        SELECT id, name, meta, dataset, read_group_name, write_group_name
         FROM project
         WHERE id = :project_id
         """
@@ -348,7 +336,7 @@ class ProjectPermissionsTable:
         Get projects by IDs, NO authorization is performed here
         """
         _query = """
-        SELECT id, name, meta, gcp_id, dataset, read_secret_name, write_secret_name
+        SELECT id, name, meta, dataset, read_group_name, write_group_name
         FROM project
         WHERE id IN :project_ids
         """
@@ -364,10 +352,9 @@ class ProjectPermissionsTable:
         self,
         project_name: str,
         dataset_name: str,
-        gcp_project_id: str,
         author: str,
-        read_secret_name: str,
-        write_secret_name: str,
+        read_group_name: str,
+        write_group_name: str,
         create_test_project: bool,
         check_permissions=True,
     ):
@@ -376,16 +363,15 @@ class ProjectPermissionsTable:
             await self.check_project_creator_permissions(author)
 
         _query = """\
-INSERT INTO project (name, gcp_id, dataset, author, read_secret_name, write_secret_name)
-VALUES (:name, :gcp_id, :dataset, :author, :read_secret_name, :write_secret_name)
+INSERT INTO project (name, dataset, author, read_group_name, write_group_name)
+VALUES (:name, :dataset, :author, :read_group_name, :write_group_name)
 RETURNING ID"""
         values = {
             'name': project_name,
             'dataset': dataset_name,
-            'gcp_id': gcp_project_id,
             'author': author,
-            'read_secret_name': read_secret_name,
-            'write_secret_name': write_secret_name,
+            'read_group_name': read_group_name,
+            'write_group_name': write_group_name,
         }
 
         project_id = await self.connection.fetch_val(_query, values)
@@ -394,10 +380,9 @@ RETURNING ID"""
             values = {
                 'name': project_name + '-test',
                 'dataset': dataset_name,
-                'gcp_id': gcp_project_id,
                 'author': author,
-                'read_secret_name': read_secret_name.replace('-main-', '-test-'),
-                'write_secret_name': write_secret_name.replace('-main-', '-test-'),
+                'read_group_name': read_group_name.replace('-main-', '-test-'),
+                'write_group_name': write_group_name.replace('-main-', '-test-'),
             }
 
             project_id = await self.connection.fetch_val(_query, values)

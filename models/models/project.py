@@ -9,11 +9,10 @@ class Project(SMBase):
 
     id: Optional[int] = None
     name: Optional[str] = None
-    gcp_id: Optional[str] = None
     dataset: Optional[str] = None
     meta: Optional[dict] = None
-    read_secret_name: Optional[str] = None
-    write_secret_name: Optional[str] = None
+    read_group_name: Optional[str] = None
+    write_group_name: Optional[str] = None
 
     @staticmethod
     def from_db(kwargs):

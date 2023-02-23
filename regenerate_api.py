@@ -112,12 +112,14 @@ def check_openapi_version():
 
     version_match = re.search(pattern=r'\d+\.\d+\.\d+', string=out)
     if not version_match:
-        raise Exception(f'Could not detect version of openapi-generator from {out!r}')
+        raise ValueError(f'Could not detect version of openapi-generator from {out!r}')
 
     version = version_match.group()
     major = version.split('.')[0]
     if int(major) != 5:
-        raise Exception(f'openapi-generator must be version 5.x.x, received: {version}')
+        raise ValueError(
+            f'openapi-generator must be version 5.x.x, received: {version}'
+        )
     logger.info(f'Got openapi version: {version}')
 
 

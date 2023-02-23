@@ -767,11 +767,11 @@ async def parse(  # pylint: disable=too-many-locals
             if s.project_id != proj:
                 continue
 
-            row = dict(
-                cpg_id=s.cpg_id,
-                ext_id=s.ext_id,
-                project=s.project_id,
-            )
+            row = {
+                'cpg_id': s.cpg_id,
+                'ext_id': s.ext_id,
+                'project': s.project_id,
+            }
             if 'GVCF' in SOURCES_TO_PROCESS:
                 if not s.gvcf:
                     logger.error(
@@ -955,7 +955,7 @@ def _run_multiqc(
         for tool_d in d['report_general_stats_data']:
             for sample, val_by_metric in tool_d.items():
                 if sample not in row_by_sample:
-                    row_by_sample[sample] = dict(s=sample)
+                    row_by_sample[sample] = {'s': sample}
                 row = row_by_sample[sample]
                 for metric, multiqc_metric in QC_METRICS:
                     if multiqc_metric in val_by_metric:
@@ -1042,7 +1042,7 @@ def _parse_sample_project_map(tsv_path: str) -> List[Sample]:
     """
     sample_by_nagim_id = {}
     df = pd.read_csv(tsv_path, sep='\t', header=None, names=['nagim_id', 'proj'])
-    for (nagim_id, proj) in zip(df.nagim_id, df.proj):
+    for nagim_id, proj in zip(df.nagim_id, df.proj):
         cpg_proj = PROJECT_ID_MAP.get(proj)
         if cpg_proj is None:
             raise ValueError(

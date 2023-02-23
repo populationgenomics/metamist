@@ -26,10 +26,9 @@ from functools import wraps
 
 from cloudpathlib import AnyPath
 
-from api.utils import group_by
 from sample_metadata.model.sequence_technology import SequenceTechnology
 
-from sample_metadata.parser.cloudhelper import CloudHelper
+from sample_metadata.parser.cloudhelper import CloudHelper, group_by
 
 from sample_metadata.model.participant_upsert_body import ParticipantUpsertBody
 
@@ -482,6 +481,9 @@ class GenericParser(
                     'meta': seq.meta,
                     'type': seq.sequence_type,
                     'status': self.get_sequence_status(seq.rows),
+                    'technology': seq.sequence_technology
+                    if isinstance(seq.sequence_technology, SequenceTechnology)
+                    else SequenceTechnology(seq.sequence_technology),
                 }
 
                 if self.get_sequence_id(seq.rows):
