@@ -663,3 +663,38 @@ class TestParseGenericMetadata(unittest.TestCase):
             'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
             str(ctx.exception),
         )
+
+
+class FastqPairMatcher(unittest.TestCase):
+    """Test Fastq pair matching logic explictly"""
+
+    def test_simple(self):
+        """Simple fastq pair matching case"""
+        entries = [
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
+        ]
+
+        grouped = GenericMetadataParser.parse_fastqs_structure(entries)
+
+        self.assertEqual(1, len(grouped))
+        self.assertEqual(2, len(grouped[0]))
+        self.assertListEqual(sorted(grouped[0]), grouped[0])
+
+    def test_post_r_value_matcher(self):
+        """Test entries with post R values, eg: R1_001.fastq"""
+        entries = [
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2_001.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1_001.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1_002.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2_002.fastq.gz',
+        ]
+
+        grouped = GenericMetadataParser.parse_fastqs_structure(entries)
+
+        self.assertEqual(2, len(grouped))
+        self.assertEqual(2, len(grouped[0]))
+
+        # check that the 002 got grouped together
+        self.assertIn('002', grouped[1][0])
+        self.assertIn('002', grouped[1][1])
