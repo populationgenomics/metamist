@@ -9,13 +9,14 @@ FAMILY_METADATA_HEADERS = ['Family ID', 'Display Name', 'Description', 'Coded Ph
 FILEMAP_HEADERS = ["Individual ID", "Sample ID", "Filenames", "Type"]
 
 
-class Facility(Enum):
+class Facility(str, Enum):
     GARVAN = "Garvan"
     VCGS = "VCGS"
+    NSWPath = "NSWPath"
 
 
 class SeqType(Enum):
-    """ Sequnce types """
+    """ Sequence types """
     GENOME = "genome"
     EXOME = "exome"
     TRNA = "totalRNA"
@@ -54,11 +55,10 @@ class FacilityFastq:
             self.parse_vcgs_fastq_name()
         elif facility == Facility.GARVAN:
             self.parse_garvan_fastq_name()
+        elif facility == Facility.NSWPath:
+            self.parse_nswpath_fastq_name()
         else:
             assert False, f"Facility {facility} not supported"
-
-        # Determine sequence type
-        self.seq_type = self.get_seq_type()
 
     def parse_vcgs_fastq_name(self):
         """
@@ -89,6 +89,8 @@ class FacilityFastq:
         self.library_type = library_type
         self.library_id = library_id
 
+        self.seq_type = VCGS_SEQTYPE_BY_LIBRARY_TYPE[self.library_type]
+
     def parse_garvan_fastq_name(self):
         """
             Parse a standard Garvan sequencing facility fastq file name of format:
@@ -111,19 +113,40 @@ class FacilityFastq:
         self.read_pair_prefix = self.path.name.rsplit('_', 1)[0]
         self.sample_type = self.path.name.split('_')[9]
 
-    def get_seq_type(self):
-        "Divine the correct seq type based on what we know"
+        self.seq_type = SeqType.EXOME
 
-        if self.facility == Facility.GARVAN:
-            if self.sample_type == 'DNA':
-                # logic: Garvan do not provide exome seq service
-                return SeqType.GENOME
-            else:
-                assert False, f"Sample type {self.sample_type} not supported."
-        elif self.facility == Facility.VCGS:
-            return VCGS_SEQTYPE_BY_LIBRARY_TYPE[self.library_type]
+        if self.sample_type == 'DNA':
+            # logic: Garvan do not provide exome seq service
+            self.seq_type = SeqType.GENOME
         else:
-            assert False, f"Facility {self.facility} not supported"
+            assert False, f"Sample type {self.sample_type} not supported for GARVAN."
+
+    def parse_nswpath_fastq_name(self):
+        """
+            Parse a standard NSWpath fastq file name of format:
+                21R2140258-20210326-A00712_S70_L001_R1_001.fastq.gz
+            Where:
+                - 21R2140258 is a unique individual/biological sample ID
+                - 21R2140258-20210326-A00712 is a unique sequence ID
+
+            Sets the following properties:
+                sample_id: set to individualID (eg 21R2140258)
+                read_pair_prefix: set to sequence ID (eg 21R2140258-20210326-A00712).
+
+            Notes:
+                - NSWpath currently only accredited for exomes, so we will assume all data is exome for now
+                - Fastqs can be grouped by read_pair_prefix to find all read pairs
+        """
+
+        # Sanity checks
+        assert self.path.match('*.fastq.gz')
+        assert len(self.path.name.split('_')) == 5
+
+        self.read_pair_prefix = self.path.name.rsplit('_', 1)[0]
+        self.sample_id = self.path.name.split('-')[0]
+
+        self.sample_type = 'DNA'
+        self.seq_type = SeqType.EXOME
 
 
 def find_fastq_pairs(search_path: str, facility: Facility, recursive: bool = False, ):

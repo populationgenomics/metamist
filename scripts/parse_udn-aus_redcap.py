@@ -2,7 +2,7 @@
 
 import csv
 import tempfile
-import subprocess
+import sys
 from collections import defaultdict
 import click
 
@@ -16,7 +16,7 @@ from redcap_parsing_utils import (
     FAMILY_METADATA_HEADERS,
     FILEMAP_HEADERS,
     Facility,
-    find_fastq_pairs
+    find_fastq_pairs,
 )
 
 PROJECT = "udn-aus"
@@ -48,7 +48,6 @@ def parse_redcap(redcap_csv: str):
                     row['redcap_event_name'].split('_infor')[0].replace('_', '')
                 )
                 individual_id = family_rows['family_metadata'][individual_label + '_id']
-
 
                 if row['redcap_repeat_instrument'] == "":
                     row_type = 'individual_metadata'
@@ -123,10 +122,17 @@ def prepare_ind_row(individual_id, individual_metadata, family_metadata):
 
 @click.command()
 @click.option('-p', '--search_path')
-@click.option('-d', '--dry_run',  is_flag=True, default=False)
+@click.option('-d', '--dry_run', is_flag=True, default=False)
+@click.option(
+    '-f',
+    '--facility',
+    type=click.Choice(list(map(lambda x: x.name, Facility)), case_sensitive=False),
+    default="VCGS",
+    help="Facility to use for fastq file parsing."
+)
 @click.argument('redcap_csv')
 @run_as_sync
-async def main(redcap_csv: str, search_path: str, dry_run: bool):
+async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
     """
     Parse a custom formatted CSV dump from the UDN-Aus Redcap database
     and import metadata into metamist.
@@ -225,16 +231,20 @@ async def main(redcap_csv: str, search_path: str, dry_run: bool):
     else:
         # Find all fastqs in search path
         found_files = False
-        for sample_id, fastq_pairs in find_fastq_pairs(search_path, Facility.VCGS, recursive=False).items():
+        for sample_id, fastq_pairs in find_fastq_pairs(
+            search_path, Facility(facility), recursive=False
+        ).items():
             if sample_id in samples:
 
                 for fastq_pair in fastq_pairs:
                     row = {
-                            'Individual ID': samples[sample_id],
-                            'Sample ID': sample_id,
-                            'Filenames': ','.join(sorted([x.path.name for x in fastq_pair])),
-                            'Type': fastq_pair[0].seq_type.value
-                        }
+                        'Individual ID': samples[sample_id],
+                        'Sample ID': sample_id,
+                        'Filenames': ','.join(
+                            sorted([x.path.name for x in fastq_pair])
+                        ),
+                        'Type': fastq_pair[0].seq_type.value,
+                    }
                     filemap_writer.writerow(row)
                     found_files = True
 
@@ -257,7 +267,9 @@ async def main(redcap_csv: str, search_path: str, dry_run: bool):
             )
             print(resp)
         else:
-            print('WARNING: did not find any read files to ingest. Remember I do not do recursive search')
+            print(
+                'WARNING: did not find any read files to ingest. Remember I do not do recursive search'
+            )
 
 
 if __name__ == '__main__':
