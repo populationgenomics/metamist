@@ -7,7 +7,6 @@ from sample_metadata.model.analysis_type import AnalysisType
 
 import logging
 import click
-import warnings
 import json
 from google.cloud import storage
 
@@ -43,17 +42,37 @@ def main(analysis_type, dry_run):
     analyses, ids_to_delete, duplicate_analyses = deduplicate_analyses(analyses)
 
     # TODO remove analysis from analyses dict if analysis id in ids_to_delete
-    print(len(analyses), "total analyses")
-    print(len(ids_to_delete), "duplicates detected")
+    all_analysis_ids = set()
+    for analysis in analyses:
+        all_analysis_ids.add(analysis['id'])
+
+    print(len(all_analysis_ids), "total analyses entries")
+
+    all_ids_to_delete = set(ids_to_delete)
+    print(len(all_ids_to_delete), 'unique duplicates')
+
+    remaining_analyses_ids = all_analysis_ids.difference(all_ids_to_delete)
+
+    remaining_analyses = []
+    for analysis in analyses:
+        if analysis['id'] in  remaining_analyses_ids:
+            remaining_analyses.append(analysis)
+
+    print(len(remaining_analyses), 'analysis entries remaining after duplicates removed')
 
     # example = duplicate_analyses[0]
     # print(example)
     # exit()
 
     # throw warnings if the analyses['project'] doesn't match the bucket name, `cpg-{dataset}-{main/test}`
-    # check_all_analyses_belongs_to_project(analyses, project_id_map)
+    # check_all_analyses_belongs_to_project(remaining_analyses, project_id_map)
 
-    analysis_by_path = {a['output'] for a in analyses}
+    analysis_by_path = cleanup_analysis_output_paths(remaining_analyses)
+    exit()
+    for analysis in remaining_analyses:
+        analysis_output = analysis['output'].replace("'","\"")
+
+    
     print(len(analysis_by_path), "unique paths found")
  
     # TODO just write a function to check if paths are valid, too much dictionary passing in main
@@ -73,8 +92,7 @@ def main(analysis_type, dry_run):
 
     # invalid_paths = [a['cram'] for a in analysis_by_path if not a.startswith('gs://')]
     if invalid_paths != []:
-        # warnings.warn(f'{len(invalid_paths)} invalid paths found. Check log for details.')
-        print(f'{len(invalid_paths)} invalid paths found. Check log for details.')
+        logging.error(f'Invalid paths found: {invalid_paths}')
     # TODO: error handling for invalid paths
 
     # let's check which files exist
@@ -120,37 +138,35 @@ def get_path_components_from_path(path):
     >>> get_bucket_name_path_from_path('gs://cpg-dataset-main/subfolder/subfolder2/my.cram')
     {bucket_name:'cpg-dataset-main', dataset:'dataset', subdir:'subfolder/subfolder2'}
     """
-    if path.startswith('gs://'):
-        short_path = path.removeprefix('gs://').split('/', maxsplit=1)
-        bucket_name = short_path[0]
+    if not path.startswith('gs://'):
+        # raise warnings.warn(f'Analysis path {path} not bucket storage.')
+        pass
+    short_path = path.removeprefix('gs://').split('/', maxsplit=1)
+    bucket_name = short_path[0]
 
-        dataset_with_bucket_type = bucket_name.removeprefix('cpg-')
-        bucket_type = dataset_with_bucket_type.split('-')[-1]
-        dataset = dataset_with_bucket_type.removesuffix(bucket_type)[:-1]
+    dataset_with_bucket_type = bucket_name.removeprefix('cpg-')
+    bucket_type = dataset_with_bucket_type.split('-')[-1]
+    dataset = dataset_with_bucket_type.removesuffix(bucket_type)[:-1]
 
-        file_name = short_path[1].split('/')[-1]
-        subdir = short_path[1].removesuffix(file_name)[:-1]
-
-    else:
-        raise warnings.warn(f'Analysis path {path} not bucket storage.')
+    _, subdir = short_path[1].rsplit('/',1)
     
     return {'bucket_name':bucket_name, 'dataset':dataset, 'subdir':subdir}
+
 
 def deduplicate_analyses(analyses: list[dict]) -> tuple[list[dict], list[int], list[list]]:
     # Check which analysis IDs point to the same analysis output path
     # Keep the smallest ID pointing to a given analysis output, duplicates can be scheduled for deletion
 
-    all_analyses = defaultdict(str)
-    # map each analysis id to its output path
-    for analysis in analyses:
-        all_analyses[analysis['id']]=analysis['output']
+    all_analyses = defaultdict(set)
     
-    # map each output path to the analysis entries which point to it
-    reversed_analyses_dict = {}
-    for k, v in all_analyses.items():
-        reversed_analyses_dict.setdefault(v, set()).add(k)
+    # map each output path to the analysis ids that point to it
+    for analysis in analyses:
+        all_analyses[analysis['output']].add(analysis['id'])
 
-    duplicate_analyses = [vals for vals in reversed_analyses_dict.values() if len(vals)>1]
+    duplicate_analyses = [vals for vals in all_analyses.values() if len(vals)>1]
+    print('Path with most analysis entries pointing to it:',
+          sorted(all_analyses.items(), key=lambda x: len(x[1]), reverse=True)[0]
+          )
     
     # keep the first entry pointing to a path, duplicates can be deleted
     duplicate_analyses_ids = []
@@ -164,19 +180,15 @@ def deduplicate_analyses(analyses: list[dict]) -> tuple[list[dict], list[int], l
 def check_all_analyses_belongs_to_project(analyses: list[dict], project_id_map: dict):
     # Check the analyses ['project'] matches the bucket name, `cpg-{dataset}-{main/test}`
 
-    # bad_mappings = [] # Use logger for this
-
     for analysis in analyses:
         project_id = analysis['project']
         project_name = project_id_map[project_id]
         dataset_name = get_path_components_from_path(analysis['output'])['dataset']
         if dataset_name == project_name:
             continue
-        else:
-            pass
-            # bad_mappings.append(analysis["id"])
-            # print(f'Analysis ID: {str(analysis["id"])} has project ID: {project_id} which maps to: {project_name}, but analysis dataset is: {dataset_name}')
-            # raise warnings.warn(f'Analysis ID: {str(analysis["id"])} has project ID: {project_id} which maps to: {project_name}, but analysis dataset is: {dataset_name}')
+        logging.error(f'Analysis ID: {str(analysis["id"])} has project ID: {project_id} which maps to: {project_name}, but analysis dataset is: {dataset_name}')
+
+    return True
 
 
 def validate_paths(paths: iter) -> dict[str, bool]:
@@ -194,9 +206,9 @@ def validate_paths(paths: iter) -> dict[str, bool]:
     invalid_paths = {}
     # Check if each subdirectory/path in a bucket is valid or not
     for bucket_name, paths in paths_by_bucket.items():
-        vp, ivp = validate_paths_for_bucket(bucket_name, paths)
-        valid_paths.update(vp)
-        invalid_paths.update(ivp)
+        valid, invalid = validate_paths_for_bucket(bucket_name, paths)
+        valid_paths.update(valid)
+        invalid_paths.update(invalid)
 
     path_exists = {'valid': valid_paths, 'invalid': invalid_paths}
     
@@ -205,7 +217,7 @@ def validate_paths(paths: iter) -> dict[str, bool]:
 def validate_paths_for_bucket(bucket_name, paths: list[str]) -> tuple[set[str], set[str]]:
     # group by path prefix
 
-    path_set = {}
+    path_set = set()
     for p in paths:
         # subdir = p.removeprefix(f'gs://{bucket_name}/')
         pc = get_path_components_from_path(p)
@@ -230,6 +242,29 @@ def validate_paths_for_bucket(bucket_name, paths: list[str]) -> tuple[set[str], 
     valid_entries = path_set.intersect(files_set)
 
     return valid_entries, analysis_entries_missing_files
+
+
+def cleanup_analysis_output_paths(analyses):
+    analysis_paths = set()
+    for analysis in analyses:
+        analysis_output = analysis['output'].replace("'","\"")
+        analysis_output = analysis_output.replace('GSPath("','"')
+        analysis_output = analysis_output.replace(')','')
+
+        try:
+            output_dict = json.loads(analysis_output)
+            ap = str(output_dict['cram'])
+            print('JSON cram output:', ap)
+            
+        except json.decoder.JSONDecodeError:
+            #print('JSON decode error')
+            ap = analysis['output']
+            print('Simple output:',ap)
+        ap = analysis['output']
+        analysis_paths.add(ap)
+    
+    return analysis_paths
+
 
 def get_paths_for_subdir(client, bucket_name, subdirectory):
     # bucket = client.get_bucket(bucket_name)
