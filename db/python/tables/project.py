@@ -101,14 +101,20 @@ class ProjectPermissionsTable:
             )
         if self.allow_full_access:
             return True
-        missing_project_ids = []
-        spids = set(project_ids)
-        for project_id in spids:
-            has_access = await self.check_access_to_project_id(
+        spids = list(set(project_ids))
+        # do this all at once to save time
+        has_access_map = await asyncio.gather(
+            self.check_access_to_project_id(
                 user, project_id, readonly=readonly, raise_exception=False
             )
-            if not has_access:
-                missing_project_ids.append(project_id)
+            for project_id in spids
+        )
+
+        missing_project_ids = [
+            project_id
+            for project_id, has_access in zip(spids, has_access_map)
+            if not has_access
+        ]
 
         if missing_project_ids:
             if raise_exception:
