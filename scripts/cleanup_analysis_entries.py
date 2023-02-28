@@ -26,6 +26,7 @@ def get_datasets() -> list[dict]:
 @click.command()
 @click.option('--analysis-type', default='cram')
 @click.option('--dry-run', is_flag=True)
+@click.option('--print-dupes', is_flag=True)
 def main(analysis_type, dry_run):
     # get all projects
     projects = get_datasets()
@@ -42,6 +43,7 @@ def main(analysis_type, dry_run):
     analyses, ids_to_delete, duplicate_analyses = deduplicate_analyses(analyses)
 
     # TODO remove analysis from analyses dict if analysis id in ids_to_delete
+    # Move this stuff into deduplicate analyses
     all_analysis_ids = set()
     for analysis in analyses:
         all_analysis_ids.add(analysis['id'])
@@ -68,27 +70,6 @@ def main(analysis_type, dry_run):
     # check_all_analyses_belongs_to_project(remaining_analyses, project_id_map)
 
     analysis_by_path = cleanup_analysis_output_paths(remaining_analyses)
-    exit()
-    for analysis in remaining_analyses:
-        analysis_output = analysis['output'].replace("'","\"")
-
-    
-    print(len(analysis_by_path), "unique paths found")
- 
-    # TODO just write a function to check if paths are valid, too much dictionary passing in main
-    invalid_paths = []
-    for a in analysis_by_path:
-        a_json_str = a.replace("'","\"")
-        try:
-            a_dict = json.loads(a_json_str)
-            ap = str(a_dict['cram'])
-            print("dict read:", ap)
-        except json.decoder.JSONDecodeError:
-            ap = a
-            print("string read:", ap)
-
-        #if not ap.startswith('gs://'):
-        #    invalid_paths.append(ap)
 
     # invalid_paths = [a['cram'] for a in analysis_by_path if not a.startswith('gs://')]
     if invalid_paths != []:
@@ -139,8 +120,9 @@ def get_path_components_from_path(path):
     {bucket_name:'cpg-dataset-main', dataset:'dataset', subdir:'subfolder/subfolder2'}
     """
     if not path.startswith('gs://'):
-        # raise warnings.warn(f'Analysis path {path} not bucket storage.')
-        pass
+        logging.error(f'Analysis path {path} not bucket storage.')
+        return
+
     short_path = path.removeprefix('gs://').split('/', maxsplit=1)
     bucket_name = short_path[0]
 
@@ -173,9 +155,35 @@ def deduplicate_analyses(analyses: list[dict]) -> tuple[list[dict], list[int], l
     for duplicate_ids in duplicate_analyses:
         duplicate_analyses_ids.append(sorted(duplicate_ids)[1:])
 
+    # flatten a list of all the duplicate ids which can be deleted
     ids_to_delete = [e for sublist in duplicate_analyses_ids for e in sublist]
 
     return (analyses, ids_to_delete, duplicate_analyses_ids)
+
+
+def remove_dupes_from_analyses(analyses: list[dict], ids_to_delete: list[int], print_dupes: bool) -> list[dict]:
+    # Takes all analyses objects and removes any analysis if the analysis id is in the delete list
+    all_ids_to_delete = set(ids_to_delete)
+    all_analysis_ids = set()
+
+    for analysis in analyses:
+        all_analysis_ids.add(analysis['id'])
+
+    # use set difference to filter out all duplicate ids from the master list
+    remaining_analyses_ids = all_analysis_ids.difference(all_ids_to_delete)
+
+    remaining_analyses = []
+    for analysis in analyses:
+        if analysis['id'] in remaining_analyses_ids:
+            remaining_analyses.append(analysis)
+
+    if print_dupes:
+        print(len(all_analysis_ids), "total analyses entries")
+        print(len(all_ids_to_delete), 'total duplicates')
+        print(len(remaining_analyses), 'analysis entries remaining after duplicates removed')
+
+    return remaining_analyses
+
 
 def check_all_analyses_belongs_to_project(analyses: list[dict], project_id_map: dict):
     # Check the analyses ['project'] matches the bucket name, `cpg-{dataset}-{main/test}`
@@ -201,7 +209,6 @@ def validate_paths(paths: iter) -> dict[str, bool]:
         bucket_name = p.removeprefix('gs://').split('/', maxsplit=1)[0]
         paths_by_bucket[bucket_name].append(p)
 
-
     valid_paths = {}
     invalid_paths = {}
     # Check if each subdirectory/path in a bucket is valid or not
@@ -214,67 +221,41 @@ def validate_paths(paths: iter) -> dict[str, bool]:
     
     return path_exists
 
-def validate_paths_for_bucket(bucket_name, paths: list[str]) -> tuple[set[str], set[str]]:
-    # group by path prefix
+def validate_paths_for_bucket(bucket_name, paths: list[str], analysis_type: str) -> tuple[set[str], set[str]]:
+    # Takes a bucket name and list of paths found in metamist analysis objects
+    # Returns a set of paths from Metamist 
+    # paths = all paths found in Metamist for a given bucket name from analysis['output']
 
-    path_set = set()
+    path_set = set(paths)
+    
+    subdirs_from_analysis_paths = set()
     for p in paths:
-        # subdir = p.removeprefix(f'gs://{bucket_name}/')
         pc = get_path_components_from_path(p)
-        path_set.add(pc['subdir'])
+        subdirs_from_analysis_paths.add(pc['subdir'])
 
+    # Read all file paths with the specified analysis type in the gcp bucket, grouping by subdir
     files_by_subdir = {}
-    for subdir in path_set:
+    for subdir in subdirs_from_analysis_paths:
         # don't ever read a directory with a path component that ends in [.ht, .mt]
         if '.mt' in subdir or '.ht' in subdir:
             continue
         
-        files_by_subdir[subdir] = get_paths_for_subdir(client, bucket_name, subdir) 
+        files_by_subdir[subdir] = get_paths_for_subdir(client, bucket_name, subdir, analysis_type) 
 
     # paths = all paths found in Metamist for a given bucket name from analysis['output']
-    # files_by_subdir = all paths found in gcloud storage for a given bucket grouped by bucket subdir
+    # files_by_subdir = all paths found in gcloud storage for a given bucket grouped by subdir
     files_set = set([e for sublist in files_by_subdir.values for e in sublist])
 
-    # Has analysis entry but file moved or deleted:
+    # Has analysis path but file moved or deleted:
     analysis_entries_missing_files = path_set.difference(files_set)
 
-    # valid entries are all analysis output paths that intersect with all gcp output paths
+    # valid paths are all analysis output paths that intersect with an existing gcp file
     valid_entries = path_set.intersect(files_set)
 
     return valid_entries, analysis_entries_missing_files
 
 
-def cleanup_analysis_output_paths(analyses: list[dict]) -> set[str]:
-    # Analysis output path is usually just a GS path: gs://some-bucket/file.cram
-    # Sometimes analysis output path is a key-value list of different output paths
-    # We need to parse the output paths into a dictionary then extract the relevant path
-    #
-    # Input - List of analysis objects
-    # Output - Set of paths to analysis objects
-
-    analysis_paths = set()
-    for analysis in analyses:
-        # json.loads required double quotes, and GSPath objects need to be converted to str
-        analysis_output = analysis['output'].replace("'","\"")
-        analysis_output = analysis_output.replace('GSPath("','"')
-        analysis_output = analysis_output.replace(')','')
-
-        try: 
-            output_dict = json.loads(analysis_output)
-            ap = str(output_dict['cram'])
-            print('JSON cram output:', ap)
-            
-        except json.decoder.JSONDecodeError:
-            #print('JSON decode error')
-            ap = analysis['output']
-            print('Simple output:',ap)
-        ap = analysis['output']
-        analysis_paths.add(ap)
-    
-    return analysis_paths
-
-
-def get_paths_for_subdir(client, bucket_name, subdirectory):
+def get_paths_for_subdir(client, bucket_name, subdirectory, analysis_type):
     # bucket = client.get_bucket(bucket_name)
 
     # no prefix means it will get all blobs in the bucket (regardless of path)
@@ -286,13 +267,42 @@ def get_paths_for_subdir(client, bucket_name, subdirectory):
 
         # todo: extra checks here,
         
-        
-
-        # you can decide to filter by extension, or you could cleverly decide which extension
-        # to look for based on the analyses['output'] paths.
-        if not any(blob.endswith(ext) for ext in EXTENSIONS):
+        # Check if file ends with .cram (or other specified analysis type)
+        if not blob.endswith(analysis_type):
             continue
         files_in_bucket_subdir.append(f'gs://{bucket_name}/{blob.name}')
+
+    return files_in_bucket_subdir
+
+def cleanup_analysis_output_paths(analyses: list[dict]) -> set[str]:
+    # Analysis output path is usually just a GS path: gs://some-bucket/file.cram
+    # Sometimes analysis output path is a key-value list of different output paths
+    # We need to parse the output paths into a dictionary then extract the relevant path
+    #
+    # Input - List of analysis objects
+    # Output - Set of paths pointing to analysis files
+
+    analysis_paths = set()
+    for analysis in analyses:
+        # json.loads required double quotes so we replace all single quotes
+        # GSPath objects need to be converted to str, e.g. GSPath('gs://...') -> "gs:/..."
+        # Not sure this is the best way to do this but json loads wont accept Path objects
+        analysis_output = analysis['output'].replace("'","\"")
+        analysis_output = analysis_output.replace('GSPath("','"')
+        analysis_output = analysis_output.replace(')','')
+
+        try: 
+            # For the case where the analysis output is a key-value list of paths
+            output_dict = json.loads(analysis_output)
+            analysis_path = str(output_dict['cram'])
+            
+        except json.decoder.JSONDecodeError:
+            # For the case where the analysis output is just the path
+            analysis_path = analysis['output']
+
+        analysis_paths.add(analysis_path)
+    
+    return analysis_paths
 
 
 if __name__ == "__main__":
