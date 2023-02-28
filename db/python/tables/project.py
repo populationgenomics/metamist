@@ -9,7 +9,7 @@ from databases import Database
 from google.cloud import secretmanager
 from cpg_utils.cloud import get_cached_group_members
 
-from api.settings import MEMBERS_CACHE_LOCATION, is_full_access
+from api.settings import MEMBERS_CACHE_LOCATION, is_all_access
 from db.python.utils import (
     ProjectId,
     Forbidden,
@@ -66,7 +66,7 @@ class ProjectPermissionsTable:
             )
         self.connection: Database = connection
         self.allow_full_access = (
-            allow_full_access if allow_full_access is not None else is_full_access()
+            allow_full_access if allow_full_access is not None else is_all_access()
         )
 
     def _get_secret_manager_client(self):

@@ -7,16 +7,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
+from api.settings import get_default_user
 from db.python.connect import SMConnections, Connection
-from db.python.tables.project import is_full_access
 
 from api.utils.gcp import email_from_id_token
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
-DEFAULT_USER = None
-_default_user = getenv('SM_LOCALONLY_DEFAULTUSER')
-if is_full_access() and _default_user:
-    DEFAULT_USER = _default_user
 
 
 def get_jwt_from_request(request: Request) -> Optional[str]:
@@ -49,10 +45,10 @@ def authenticate(
     if token:
         return email_from_id_token(token.credentials)
 
-    if DEFAULT_USER is not None:
+    if default_user := get_default_user():
         # this should only happen in LOCAL environments
-        logging.info(f'Using {DEFAULT_USER} as authenticated user')
-        return DEFAULT_USER
+        logging.info(f'Using {default_user} as authenticated user')
+        return default_user
 
     raise HTTPException(status_code=401, detail=f'Not authenticated :(')
 
