@@ -55,7 +55,7 @@ def main(analysis_type, dry_run):
 
     remaining_analyses = []
     for analysis in analyses:
-        if analysis['id'] in  remaining_analyses_ids:
+        if analysis['id'] in remaining_analyses_ids:
             remaining_analyses.append(analysis)
 
     print(len(remaining_analyses), 'analysis entries remaining after duplicates removed')
@@ -244,14 +244,22 @@ def validate_paths_for_bucket(bucket_name, paths: list[str]) -> tuple[set[str], 
     return valid_entries, analysis_entries_missing_files
 
 
-def cleanup_analysis_output_paths(analyses):
+def cleanup_analysis_output_paths(analyses: list[dict]) -> set[str]:
+    # Analysis output path is usually just a GS path: gs://some-bucket/file.cram
+    # Sometimes analysis output path is a key-value list of different output paths
+    # We need to parse the output paths into a dictionary then extract the relevant path
+    #
+    # Input - List of analysis objects
+    # Output - Set of paths to analysis objects
+
     analysis_paths = set()
     for analysis in analyses:
+        # json.loads required double quotes, and GSPath objects need to be converted to str
         analysis_output = analysis['output'].replace("'","\"")
         analysis_output = analysis_output.replace('GSPath("','"')
         analysis_output = analysis_output.replace(')','')
 
-        try:
+        try: 
             output_dict = json.loads(analysis_output)
             ap = str(output_dict['cram'])
             print('JSON cram output:', ap)
