@@ -29,6 +29,7 @@ class ParticipantUpdateModel(BaseModel):
     """Update participant model"""
 
     external_id: Optional[str] = None
+    family_id: Optional[str] = None
     reported_sex: Optional[int] = None
     reported_gender: Optional[str] = None
     karyotype: Optional[str] = None
