@@ -8,9 +8,9 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 
 from api.settings import get_default_user
+from api.utils.gcp import email_from_id_token
 from db.python.connect import SMConnections, Connection
 
-from api.utils.gcp import email_from_id_token
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 

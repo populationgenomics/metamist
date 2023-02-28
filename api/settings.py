@@ -11,8 +11,8 @@ IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in T
 MEMBERS_CACHE_LOCATION = os.getenv('SM_MEMBERS_CACHE_LOCATION')
 
 
-
 def get_default_user() -> str | None:
+    """Determine if a default user is available"""
     if is_all_access() and _DEFAULT_USER:
         return _DEFAULT_USER
     return None
