@@ -14,7 +14,7 @@ from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
-from api.settings import set_full_access
+from api.settings import set_all_access
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
     Connection,
@@ -89,7 +89,7 @@ class DbTest(unittest.TestCase):
             """
             logger = logging.getLogger()
             try:
-                set_full_access(True)
+                set_all_access(True)
                 db = MySqlContainer('mariadb:10.8.3')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
