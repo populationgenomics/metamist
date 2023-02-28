@@ -32,7 +32,7 @@
     "proxy": "http://localhost:8000",
     "type": "module",
     "scripts": {
-        "start": "vite serve --config vite.config.js",
+        "start": "vite --config vite.config.js",
         "build": "vite build --config vite.config.js",
         "preview": "vite preview --config vite.config.js",
         "postbuild": "npm run copy:buildartifacts",
