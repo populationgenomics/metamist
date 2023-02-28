@@ -103,12 +103,13 @@ class ProjectPermissionsTable:
             return True
         spids = list(set(project_ids))
         # do this all at once to save time
-        has_access_map = await asyncio.gather(
+        promises = [
             self.check_access_to_project_id(
                 user, project_id, readonly=readonly, raise_exception=False
             )
             for project_id in spids
-        )
+        ]
+        has_access_map = await asyncio.gather(*promises)
 
         missing_project_ids = [
             project_id
