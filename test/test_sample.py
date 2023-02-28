@@ -60,7 +60,7 @@ class TestSample(DbIsolatedTest):
         )
 
         new_external_id = 'Test02'
-        self.slayer.update_sample(s, external_id=new_external_id)
+        s = await self.slayer.update_sample(s, external_id=new_external_id)
 
         sample = await self.slayer.get_by_id(s, check_project_id=False)
 
