@@ -73,7 +73,7 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12](?:_\d+)?('
+    r'[_\.-][Rr]?[12](_\d+)?(?:'
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
     + ')$'
 )
@@ -1184,26 +1184,27 @@ class GenericParser(
             )
 
         # Create a dict with filenames as keys and prefixes and suffixes as values
-        filename_prefix_suffix = {}
-        for filename in sorted_fastqs:
+        fastq_groups = defaultdict(list)
+        for full_filename, (basename, matched) in r_matches.items():
             # use only file path basename to define prefix first
-            prefix = re.split(rmatch_str, os.path.basename(filename))[0]+'_'
-            suffix = os.path.basename(filename).removeprefix(prefix)
 
-            # now redefine prefix to include full file path
-            prefix = filename.removesuffix(suffix)
-            filename_prefix_suffix[filename] = (prefix, suffix)
+            pre_r_basename = basename[: matched.start()]
+            bits_to_group_on = [pre_r_basename]
+            for group in matched.groups():
+                bits_to_group_on.append(group)
 
-        values = []
-        groups = group_fastqs_by_common_filename_components(filename_prefix_suffix)
-        for v in groups.values():
-            values.append(v)
+            fastq_groups[tuple(bits_to_group_on)].append(full_filename)
 
-        invalid_fastq_groups = [grp for grp in values if len(grp) != 2]
+        invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
         if invalid_fastq_groups:
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
-        return sorted(values, key=lambda el: el[0])
+        sorted_groups = sorted(
+            (sorted(fastqgroup) for fastqgroup in fastq_groups.values()),
+            key=lambda el: os.path.basename(el[0]),
+        )
+
+        return sorted_groups
 
     async def create_file_object(
         self,
@@ -1302,13 +1303,18 @@ def group_fastqs_by_common_filename_components(d: dict) -> dict:
         'S70_L001_fastq.gz': ['S70_L001_R1.fastq.gz', 'S70_L001_R2.fastq.gz']
         }
     """
+
     def key_selector(kv: tuple[str, str]) -> tuple[str, str]:
         _, fastq_file_components = kv
         fastq_suffix = fastq_file_components[1]
         try:
-            common_component = fastq_suffix.split('_')[1]  # get the component of the file suffix after the first underscore if there
+            common_component = fastq_suffix.split('_')[
+                1
+            ]  # get the component of the file suffix after the first underscore if there
         except IndexError:
-            common_component = fastq_suffix.split('.', 1)[1]  # or get the file extension if there is no trailing underscore after R1/R2
+            common_component = fastq_suffix.split('.', 1)[
+                1
+            ]  # or get the file extension if there is no trailing underscore after R1/R2
 
         return fastq_suffix, common_component
 
