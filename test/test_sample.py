@@ -48,6 +48,24 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(SampleType.BLOOD, sample.type)
         self.assertDictEqual(meta_dict, sample.meta)
 
+    @run_as_sync
+    async def test_update_sample(self):
+        """Test updating a sample"""
+        meta_dict = {'meta': 'meta ;)'}
+        s = await self.slayer.insert_sample(
+            'Test01',
+            SampleType.BLOOD,
+            active=True,
+            meta=meta_dict,
+        )
+
+        new_external_id = 'Test02'
+        self.slayer.update_sample(s, external_id=new_external_id)
+
+        sample = await self.slayer.get_by_id(s, check_project_id=False)
+
+        self.assertEqual(new_external_id, sample.external_id)
+
     # @run_as_sync
     # async def test_update_sample(self):
     #     """Test to see what's in the database"""
