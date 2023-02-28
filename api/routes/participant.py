@@ -179,7 +179,6 @@ async def update_participant(
         'success': await participant_layer.update_single_participant(
             participant_id=participant_id,
             external_id=participant.external_id,
-            family_id=participant.family_id,
             reported_sex=participant.reported_sex,
             reported_gender=participant.reported_gender,
             karyotype=participant.karyotype,

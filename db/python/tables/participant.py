@@ -126,7 +126,6 @@ RETURNING id
         self,
         participant_id: int,
         external_id: str = None,
-        family_id: str = None,
         reported_sex: int = None,
         reported_gender: str = None,
         karyotype: str = None,
@@ -142,10 +141,6 @@ RETURNING id
         if external_id:
             updaters.append('external_id = :external_id')
             fields['external_id'] = external_id
-
-        if family_id:
-            updaters.append('family_id = :family_id')
-            fields['family_id'] = family_id
 
         if reported_sex:
             updaters.append('reported_sex = :reported_sex')

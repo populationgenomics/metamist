@@ -29,7 +29,6 @@ class ParticipantUpdateModel(BaseModel):
     """Update participant model"""
 
     external_id: Optional[str] = None
-    family_id: Optional[str] = None
     reported_sex: Optional[int] = None
     reported_gender: Optional[str] = None
     karyotype: Optional[str] = None
@@ -809,7 +808,6 @@ class ParticipantLayer(BaseLayer):
         self,
         participant_id: int,
         external_id: str = None,
-        family_id: str = None,
         reported_sex: int = None,
         reported_gender: str = None,
         karyotype: str = None,
@@ -852,7 +850,6 @@ class ParticipantLayer(BaseLayer):
         internal_id = await self.update_single_participant(
             participant_id=participant.id,
             external_id=participant.external_id,
-            family_id=participant.family_id,
             reported_sex=participant.reported_sex,
             reported_gender=participant.reported_gender,
             karyotype=participant.karyotype,
