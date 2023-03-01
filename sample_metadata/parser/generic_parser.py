@@ -73,7 +73,7 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12](_\d+)?('
+    r'[_\.-][Rr]?[12]('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
     + ')$'
 )
@@ -1150,9 +1150,6 @@ class GenericParser(
 
         >>> GenericParser.parse_fastqs_structure(['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz'])
         [['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz']]
-        
-        >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'])
-        [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz']]
 
         >>> GenericParser.parse_fastqs_structure(['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz', 'Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz'])
         [['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz'], ['Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz']]
