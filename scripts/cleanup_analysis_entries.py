@@ -11,7 +11,16 @@ from sample_metadata.model.analysis_type import AnalysisType
 
 # Global vars
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
-BUCKET_TYPES = ['main', 'test', 'archive',' release', 'upload', 'tmp', 'analysis', 'web']
+BUCKET_TYPES = [
+    'main',
+    'test',
+    'archive',
+    ' release',
+    'upload',
+    'tmp',
+    'analysis',
+    'web',
+]
 
 logger = logging.getLogger(__file__)
 logger.setLevel(level=logging.INFO)
@@ -60,7 +69,7 @@ def get_path_components_from_path(path):
         if bucket_component in BUCKET_TYPES:
             bt_index = split_bucket_name.index(bucket_component)
 
-    #bucket_type = '-'.join(split_bucket_name[bt_index:])
+    # bucket_type = '-'.join(split_bucket_name[bt_index:])
     dataset = '-'.join(split_bucket_name[:bt_index])
 
     subdir, _ = short_path[1].rsplit('/', 1)
@@ -91,7 +100,7 @@ def find_duplicate_analyses(
 
     # keep the first entry pointing to a path, the rest are duplicates
     ids_to_delete = set(chain.from_iterable(duplicate_analyses))
-    #for duplicate_ids in duplicate_analyses:
+    # for duplicate_ids in duplicate_analyses:
     #    ids_to_delete.update(sorted(duplicate_ids)[1:])
 
     return analyses, ids_to_delete
