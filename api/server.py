@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 
 from db.python.connect import SMConnections
-from db.python.tables.project import is_full_access
+from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 from api import routes
@@ -19,7 +19,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.5.3'
+_VERSION = '5.5.5'
 
 logger = get_logger()
 
@@ -34,7 +34,7 @@ if PROFILE_REQUESTS:
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 
-if is_full_access():
+if is_all_access():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

@@ -44,8 +44,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
                 // eg: /static/media/README.e3454f58.md
 
                 // eslint-disable-next-line
-                const file = require(`../../static/sm_docs/${filename}`)
-                const response = await fetch(file.default)
+                const response = await fetch(`/sm_docs/${filename}`)
                 let text_ = await response.text()
                 // Do some URL rewriting, because the openapi generator
                 // generates links in a way that's incompatible with this hosting
