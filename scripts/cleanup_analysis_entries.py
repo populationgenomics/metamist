@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 import logging
 import json
 import click
@@ -10,6 +11,7 @@ from sample_metadata.model.analysis_type import AnalysisType
 
 # Global vars
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
+BUCKET_TYPES = ['main', 'test', 'archive',' release', 'upload', 'tmp', 'analysis', 'web']
 
 logger = logging.getLogger(__file__)
 logger.setLevel(level=logging.INFO)
@@ -40,6 +42,9 @@ def get_path_components_from_path(path):
 
     >>> get_bucket_name_path_from_path('gs://cpg-dataset-main/subfolder/subfolder2/my.cram')
     {bucket_name:'cpg-dataset-main', dataset:'dataset', subdir:'subfolder/subfolder2'}
+
+    >>> get_bucket_name_path_from_path('gs://cpg-dataset-test-upload/my.cram')
+    {bucket_name:'cpg-dataset-test-upload', dataset:'dataset', subdir:''}
     """
     if not path.startswith('gs://'):
         logging.error(f'Analysis path {path} not bucket storage.')
@@ -49,8 +54,14 @@ def get_path_components_from_path(path):
     bucket_name = short_path[0]
 
     dataset_with_bucket_type = bucket_name.removeprefix('cpg-')
-    bucket_type = dataset_with_bucket_type.split('-')[-1]
-    dataset = dataset_with_bucket_type.removesuffix(bucket_type)[:-1]
+
+    split_bucket_name = dataset_with_bucket_type.split('-')
+    for bucket_component in split_bucket_name:
+        if bucket_component in BUCKET_TYPES:
+            bt_index = split_bucket_name.index(bucket_component)
+
+    #bucket_type = '-'.join(split_bucket_name[bt_index:])
+    dataset = '-'.join(split_bucket_name[:bt_index])
 
     subdir, _ = short_path[1].rsplit('/', 1)
 
@@ -59,7 +70,7 @@ def get_path_components_from_path(path):
 
 def find_duplicate_analyses(
     analyses: list[dict],
-) -> tuple[list[dict], list[int], list[list]]:
+) -> tuple[list[dict], set[int]]:
     """
     Check which analysis IDs point to the same analysis output path
     Keep the smallest ID pointing to a given analysis output, label the others as duplicates
@@ -79,14 +90,11 @@ def find_duplicate_analyses(
     )
 
     # keep the first entry pointing to a path, the rest are duplicates
-    duplicate_analyses_ids = []
-    for duplicate_ids in duplicate_analyses:
-        duplicate_analyses_ids.append(sorted(duplicate_ids)[1:])
+    ids_to_delete = set(chain.from_iterable(duplicate_analyses))
+    #for duplicate_ids in duplicate_analyses:
+    #    ids_to_delete.update(sorted(duplicate_ids)[1:])
 
-    # flatten a list of all the duplicate ids which can be deleted
-    ids_to_delete = [e for sublist in duplicate_analyses_ids for e in sublist]
-
-    return analyses, ids_to_delete, duplicate_analyses_ids
+    return analyses, ids_to_delete
 
 
 def remove_dupes_from_analyses(
@@ -314,7 +322,7 @@ def main(analysis_type, dry_run, print_dupes):
 
     analyses = get_analyses_for_datasets(datasets, analysis_type)
 
-    analyses, duplicate_ids, _ = find_duplicate_analyses(analyses)
+    analyses, duplicate_ids = find_duplicate_analyses(analyses)
 
     # Remove analysis from analyses list if analysis id in duplicate_ids
     remaining_analyses = remove_dupes_from_analyses(
