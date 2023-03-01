@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import chain
+#from itertools import chain
 import logging
 import json
 import click
@@ -99,9 +99,10 @@ def find_duplicate_analyses(
     )
 
     # keep the first entry pointing to a path, the rest are duplicates
-    ids_to_delete = set(chain.from_iterable(duplicate_analyses))
-    # for duplicate_ids in duplicate_analyses:
-    #    ids_to_delete.update(sorted(duplicate_ids)[1:])
+    #ids_to_delete = set(chain.from_iterable(duplicate_analyses))
+    ids_to_delete = set()
+    for duplicate_ids in duplicate_analyses:
+       ids_to_delete.update(sorted(duplicate_ids)[1:])
 
     return analyses, ids_to_delete
 
