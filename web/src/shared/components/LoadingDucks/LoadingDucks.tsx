@@ -1,5 +1,5 @@
 import * as React from 'react'
-import MuckTheDuck from './MuckTheDuck'
+import MuckTheDuck from '../MuckTheDuck'
 import './LoadingDucks.css'
 
 const LoadingDucks: React.FunctionComponent = () => (
