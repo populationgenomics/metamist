@@ -21,10 +21,9 @@ BUCKET_TYPES = [
 ]
 
 rmatch_str = (
-    r'gs://(?P<bucket>cpg-[a-zA-Z0-9\-]+(?:'
+    r'gs://(?P<bucket>cpg-(?P<dataset>[\w-]+)(?=-'
     + '|'.join(s for s in BUCKET_TYPES)
-    + r'))-?(?P<extension>[a-zA-Z0-9\-]*?)'
-    + r'/(?P<suffix>.+)/(?P<file>.*)$'
+    + r')[\w-]+)/(?P<suffix>.+)/(?P<file>.*)'
 )
 
 path_pattern = re.compile(rmatch_str)
@@ -59,21 +58,17 @@ def get_path_components_from_path(path):
     the subdirectory, and the file name.
 
     >>> get_bucket_name_path_from_path('gs://cpg-dataset-main/subfolder/subfolder2/my.cram')
-    {bucket_name:'cpg-dataset-main', dataset:'dataset-main', subdir:'subfolder/subfolder2'}
+    {bucket_name:'cpg-dataset-main', dataset:'dataset', subdir:'subfolder/subfolder2'}
 
     >>> get_bucket_name_path_from_path('gs://cpg-dataset-test-upload/my.cram')
-    {bucket_name:'cpg-dataset-test-upload', dataset:'dataset-test', subdir:''}
+    {bucket_name:'cpg-dataset-test-upload', dataset:'dataset', subdir:''}
     """
 
     path_components = (path_pattern.match(path)).groups()
 
-    dataset = path_components[0].removeprefix('cpg-')
+    bucket_name = path_components[0]
+    dataset = path_components[1]
     subdir = path_components[2]
-
-    if path_components[1]:
-        bucket_name = path_components[0] + '-' + path_components[1]
-    else:
-        bucket_name = path_components[0]
 
     return {'bucket_name': bucket_name, 'dataset': dataset, 'subdir': subdir}
 
@@ -279,7 +274,7 @@ def validate_paths_for_bucket(
     files_set = set([e for sublist in files_by_subdir.values() for e in sublist])
 
     # Has analysis path but file moved or deleted:
-    analysis_entries_missing_files = path_set.difference(files_set)
+    analysis_paths_missing_files = path_set.difference(files_set)
 
     # valid paths are all analysis output paths that intersect with an existing gcp file
     valid_entries = path_set.intersection(files_set)
@@ -287,7 +282,7 @@ def validate_paths_for_bucket(
     # any files found in subdirectories searched with no analysis paths pointing to them
     files_missing_analysis_entry = files_set.difference(path_set)
 
-    return valid_entries, analysis_entries_missing_files, files_missing_analysis_entry
+    return valid_entries, analysis_paths_missing_files, files_missing_analysis_entry
 
 
 def get_paths_for_subdir(bucket_name, subdirectory, analysis_type):
@@ -361,6 +356,8 @@ def main(analysis_type, dry_run, print_dupes):
 
     analyses = get_analyses_for_datasets(datasets, analysis_type)
 
+    analyses_samples = {a['id']: a['sample_ids'][0] for a in analyses}
+
     # Get all {analysis id : raw analysis path string}
     analysis_by_path = cleanup_analysis_output_paths(analyses)
 
@@ -391,7 +388,28 @@ def main(analysis_type, dry_run, print_dupes):
         + f'{len(file_missing_analysis_path)} files found with no analysis path'
     )
 
-    # print('Analysis paths with no file discovered:', path_validity['invalid_paths'])
+    # Remove duplicate samples by inverting the dictionary twice
+    temp = {val: key for key, val in analyses_samples.items()}
+    analyses_samples = {val: key for key, val in temp.items()}
+
+    # Now we can track all unique sample IDs and their corresponding analysis ID
+    samples_set = set(analyses_samples.values())
+    analysis_ids_for_samples = set(analyses_samples.keys())
+
+    print(len(samples_set), 'unique sample IDs in all analyses')
+    print(
+        len(analysis_ids_for_samples.intersection(id_validity['invalid_ids'])),
+        'samples with invalid paths',
+    )
+
+    # Print the invalid sample IDs and their paths
+    samples_invalid_path = analysis_ids_for_samples.intersection(
+        id_validity['invalid_ids']
+    )
+    for invalid_id in samples_invalid_path:
+        logging.error(
+            f'Sample missing file: {analyses_samples[invalid_id]} {analysis_by_path[invalid_id]}'
+        )
 
     # Combine the duplicates ids with the invalid ids
     ids_to_delete = set(duplicate_ids).union(id_validity['invalid_ids'])
