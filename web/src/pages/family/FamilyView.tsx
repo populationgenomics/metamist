@@ -8,7 +8,7 @@ import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 
 import { useQuery } from '@apollo/client'
 import Pedigree from '../../shared/components/pedigree/Pedigree'
-import LoadingDucks from '../../shared/components/LoadingDucks'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 import { gql } from '../../__generated__/gql'
 import FamilyViewTitle from './FamilyViewTitle'

@@ -9,7 +9,7 @@ from databases import Database
 from google.cloud import secretmanager
 from cpg_utils.cloud import get_cached_group_members
 
-from api.settings import MEMBERS_CACHE_LOCATION, is_full_access
+from api.settings import MEMBERS_CACHE_LOCATION, is_all_access
 from db.python.utils import (
     ProjectId,
     Forbidden,
@@ -66,7 +66,7 @@ class ProjectPermissionsTable:
             )
         self.connection: Database = connection
         self.allow_full_access = (
-            allow_full_access if allow_full_access is not None else is_full_access()
+            allow_full_access if allow_full_access is not None else is_all_access()
         )
 
     def _get_secret_manager_client(self):
@@ -101,14 +101,21 @@ class ProjectPermissionsTable:
             )
         if self.allow_full_access:
             return True
-        missing_project_ids = []
-        spids = set(project_ids)
-        for project_id in spids:
-            has_access = await self.check_access_to_project_id(
+        spids = list(set(project_ids))
+        # do this all at once to save time
+        promises = [
+            self.check_access_to_project_id(
                 user, project_id, readonly=readonly, raise_exception=False
             )
-            if not has_access:
-                missing_project_ids.append(project_id)
+            for project_id in spids
+        ]
+        has_access_map = await asyncio.gather(*promises)
+
+        missing_project_ids = [
+            project_id
+            for project_id, has_access in zip(spids, has_access_map)
+            if not has_access
+        ]
 
         if missing_project_ids:
             if raise_exception:

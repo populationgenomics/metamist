@@ -107,6 +107,7 @@ class SampleTable(DbBase):
         id_: int,
         meta: dict = None,
         participant_id: int = None,
+        external_id: str = None,
         type_: SampleType = None,
         author: str = None,
         active: bool = None,
@@ -122,6 +123,10 @@ class SampleTable(DbBase):
         if participant_id:
             values['participant_id'] = participant_id
             fields.append('participant_id = :participant_id')
+
+        if external_id:
+            values['external_id'] = external_id
+            fields.append('external_id = :external_id')
 
         if type_:
             values['type'] = type_.value

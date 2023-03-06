@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 import { useQuery } from '@apollo/client'
-import LoadingDucks from '../LoadingDucks'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import TangledTree from './TangledTree'
 
 import { gql } from '../../../__generated__/gql'

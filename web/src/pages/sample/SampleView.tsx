@@ -2,7 +2,7 @@ import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@apollo/client'
-import LoadingDucks from '../../shared/components/LoadingDucks'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 import { gql } from '../../__generated__/gql'
 import Pedigree from '../../shared/components/pedigree/Pedigree'

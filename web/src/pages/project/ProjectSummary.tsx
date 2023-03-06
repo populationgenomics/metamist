@@ -11,6 +11,7 @@ import MultiQCReports from './MultiQCReports'
 import SummaryStatistics from './SummaryStatistics'
 import BatchStatistics from './BatchStatistics'
 import ProjectGrid from './ProjectGrid'
+import TotalsStats from './TotalsStats'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -53,16 +54,18 @@ const ProjectSummary: React.FunctionComponent = () => {
             const sanitisedToken = token || undefined
             setError(undefined)
             setIsLoading(true)
-            new WebApi()
-                .getProjectSummary(projectName, pageLimit, sanitisedToken)
-                .then((resp) => {
-                    setIsLoading(false)
-                    setSummary(resp.data)
-                })
-                .catch((er) => {
-                    setIsLoading(false)
-                    setError(er.message)
-                })
+            try {
+                const response = await new WebApi().getProjectSummary(
+                    projectName,
+                    pageLimit,
+                    sanitisedToken
+                )
+                setSummary(response.data)
+            } catch (er: any) {
+                setError(er.message)
+            } finally {
+                setIsLoading(false)
+            }
         },
         [projectName, pageLimit]
     )
@@ -90,23 +93,6 @@ const ProjectSummary: React.FunctionComponent = () => {
 
     const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
 
-    const totalsStats: React.ReactElement = (
-        <>
-            <h2>Project Summary Stats</h2>
-            <b>Total Participants: </b>
-            {summary?.total_participants}
-            <br />
-            <b>Total Samples: </b>
-            {'    '}
-            {summary?.total_samples}
-            <br />
-            <b>Total Sequences: </b>
-            {'    '}
-            {summary?.total_sequences}
-            <br />
-        </>
-    )
-
     return (
         <>
             <ProjectSelector
@@ -117,7 +103,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             <hr />
             {projectName && summary?.participants.length !== 0 && (
                 <>
-                    {totalsStats}
+                    <TotalsStats summary={summary ?? {}} />
                     <SummaryStatistics
                         projectName={projectName}
                         cramSeqrStats={summary?.cram_seqr_stats ?? {}}
