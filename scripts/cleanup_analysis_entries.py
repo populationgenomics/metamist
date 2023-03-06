@@ -22,8 +22,49 @@ BUCKET_TYPES = [
     'release',
 ]
 # Samples Cas has been excluding from analysis runs
-EXCLUDED_SAMPLES = ['CPG11783', 'CPG253328', 'CPG13409', 'CPG243717', 'CPG246645', 'CPG246678', 'CPG246561', 'CPG261552','CPG261560','CPG261578','CPG261586','CPG261594','CPG261602','CPG261610','CPG261628','CPG261636','CPG261644','CPG261651','CPG261669','CPG261677','CPG261685','CPG261693','CPG261701','CPG261719','CPG261727','CPG261735','CPG261743',
-    'CPG261792', 'CPG259150','CPG258814','CPG258137','CPG258111','CPG258012', 'CPG221978', 'CPG222000', 'CPG261339','CPG261347', 'CPG265876', 'CPG261305', 'CPG261313', 'CPG261321']
+EXCLUDED_SAMPLES = [
+    'CPG11783',
+    'CPG253328',
+    'CPG13409',
+    'CPG243717',
+    'CPG246645',
+    'CPG246678',
+    'CPG246561',
+    'CPG261552',
+    'CPG261560',
+    'CPG261578',
+    'CPG261586',
+    'CPG261594',
+    'CPG261602',
+    'CPG261610',
+    'CPG261628',
+    'CPG261636',
+    'CPG261644',
+    'CPG261651',
+    'CPG261669',
+    'CPG261677',
+    'CPG261685',
+    'CPG261693',
+    'CPG261701',
+    'CPG261719',
+    'CPG261727',
+    'CPG261735',
+    'CPG261743',
+    'CPG261792',
+    'CPG259150',
+    'CPG258814',
+    'CPG258137',
+    'CPG258111',
+    'CPG258012',
+    'CPG221978',
+    'CPG222000',
+    'CPG261339',
+    'CPG261347',
+    'CPG265876',
+    'CPG261305',
+    'CPG261313',
+    'CPG261321',
+]
 
 # Pattern to match the file paths (e.g. 'gs://cpg-dataset-type/subdir/file.cram')
 rmatch_str = (
@@ -74,7 +115,7 @@ def get_path_components_from_path(path):
 
     bucket_name = path_components[0]
     dataset = path_components[1]
-    if dataset[-1]=='-':
+    if dataset[-1] == '-':
         dataset = dataset.removesuffix('-')
     subdir = path_components[2]
 
@@ -106,7 +147,7 @@ def find_duplicate_analyses(
     # ids_to_delete = set(chain.from_iterable(duplicate_analyses))
     ids_with_duplicates = set()
     for duplicate_ids in duplicate_analyses:
-        ids_with_duplicates.update(sorted(duplicate_ids))#[1:])
+        ids_with_duplicates.update(sorted(duplicate_ids))  # [1:])
 
     return analyses, ids_with_duplicates
 
@@ -141,7 +182,9 @@ def remove_dupes_from_analyses(
     return remaining_analyses
 
 
-def check_all_analyses_belongs_to_project(analyses: list[dict], project_id_map: dict) -> list[dict]:
+def check_all_analyses_belongs_to_project(
+    analyses: list[dict], project_id_map: dict
+) -> list[dict]:
     """
     Check the analysis['project'] matches the bucket name, `cpg-{dataset}-{main/test}`
     Uses the project id map to get the project name from the project id
@@ -152,7 +195,7 @@ def check_all_analyses_belongs_to_project(analyses: list[dict], project_id_map: 
         project_name = project_id_map[project_id]
         analysis['project_name'] = project_name
 
-        if analysis['valid_path'] == False:
+        if analysis['valid_path'] == 0:
             analysis['cram_location_project_name'] = ''
             continue
 
@@ -170,6 +213,7 @@ def check_all_analyses_belongs_to_project(analyses: list[dict], project_id_map: 
         )
 
     return analyses
+
 
 def replace_analysis_paths(analyses: list[dict], analysis_by_path: dict) -> list[dict]:
     """
@@ -319,7 +363,9 @@ def get_paths_for_subdir(bucket_name, subdirectory, analysis_type):
     return files_in_bucket_subdir
 
 
-def cleanup_analysis_output_paths(analyses: list[dict]) -> tuple[dict[int, str], list[dict]]:
+def cleanup_analysis_output_paths(
+    analyses: list[dict],
+) -> tuple[dict[int, str], list[dict]]:
     """
     Parses analysis output paths into simple path strings, storing the original output
     in the 'original_output' value and the cleaned output in the 'output' value.
@@ -333,7 +379,9 @@ def cleanup_analysis_output_paths(analyses: list[dict]) -> tuple[dict[int, str],
 
     analysis_paths = {}
     for analysis in analyses:
-        analysis['multiple_output_paths'] = 1 if analysis['output'].count(':')>1 else 0
+        analysis['multiple_output_paths'] = (
+            1 if analysis['output'].count(':') > 1 else 0
+        )
         analysis['original_output'] = analysis['output']
 
         # json.loads requires double quotes so we replace all single quotes
@@ -359,7 +407,9 @@ def cleanup_analysis_output_paths(analyses: list[dict]) -> tuple[dict[int, str],
     return analysis_paths, analyses
 
 
-def add_exclusions_duplicates_flags(analyses: list[dict], duplicate_ids: set[int]) -> list[dict]:
+def add_exclusions_duplicates_flags(
+    analyses: list[dict], duplicate_ids: set[int]
+) -> list[dict]:
     """
     Takes the analyses list and flags sample IDs which are in the exclude list or the duplicate list.
     Also transforms the sample ids array into the string value of the array for easier parsing.
@@ -374,8 +424,10 @@ def add_exclusions_duplicates_flags(analyses: list[dict], duplicate_ids: set[int
     return analyses
 
 
-def get_analysis_results_with_sql(analyses_df: pd.DataFrame) -> pd.DataFrame:
-    """"
+def get_analysis_results_with_sql(
+    analyses_df: pd.DataFrame,  # pylint: disable=unused-argument
+) -> pd.DataFrame:
+    """ "
     Uses a pandasql implementation to transform the analyses dataframe into the analyses results dataframe.
 
     First creates a flag for the latest completed sample by project, by filtering for completed analyses,
@@ -386,50 +438,50 @@ def get_analysis_results_with_sql(analyses_df: pd.DataFrame) -> pd.DataFrame:
     """
 
     # TODO: implement this transform without invoking SQL code for consistency with codebase.
-    query = """ SELECT a.id, a.sample_ids, a.status, a.output, a.timestamp_completed, 
+    query = """ SELECT a.id, a.sample_ids, a.status, a.output, a.timestamp_completed,
                 CASE WHEN a.timestamp_completed=a.last_completed_time_by_project and a.duplicate_path="1"
-                        then 1 
+                        then 1
                      WHEN a.duplicate_path<>"1"
                         then 1
-                     else 0 
+                     else 0
                 end as "latest_completed_sample_by_project",
                 CASE WHEN a.timestamp_completed=a.last_completed_time and a.duplicate_path="1"
-                        then 1 
+                        then 1
                      WHEN a.duplicate_path<>"1"
                         then 1
-                     else 0 
+                     else 0
                 end as "latest_completed_sample"
              FROM (
                     SELECT  a.id, a.status, a.timestamp_completed, a.output, a.project,
                             a.sample_ids, a1.last_completed_time_by_project, a2.last_completed_time,
                             a.duplicate_path
                     FROM analyses_df a
-                        JOIN (  SELECT  sample_ids, project, 
+                        JOIN (  SELECT  sample_ids, project,
                                         max(timestamp_completed) as last_completed_time_by_project
-                                FROM analyses_df 
+                                FROM analyses_df
                                 group by sample_ids, project) as a1
                         ON (a.sample_ids = a1.sample_ids and a.project=a1.project)
-                        JOIN (  SELECT  sample_ids, 
+                        JOIN (  SELECT  sample_ids,
                                         max(timestamp_completed) as last_completed_time
-                                FROM analyses_df 
+                                FROM analyses_df
                                 group by sample_ids) as a2
                         ON (a.sample_ids = a2.sample_ids)
                     WHERE status="completed"
                 ) a
             ;"""
-    completed_samples_latest_flag = sqldf(query) # noqa: Q000
+    completed_samples = sqldf(query)  # pylint: disable=unused-variable # noqa: F841
 
     query = """ SELECT  a.*,
-                        case when c.id is not null 
+                        case when c.id is not null
                              then c.latest_completed_sample
-                             else 0 
+                             else 0
                         end as 'latest_completed_sample',
                         case when c.id is not null
                              then c.latest_completed_sample_by_project
                              else 0
                         end as 'latest_completed_sample_by_project'
                 FROM analyses_df a
-                LEFT JOIN completed_samples_latest_flag c
+                LEFT JOIN completed_samples c
                     on (a.id = c.id)
             ;"""
 
@@ -459,9 +511,7 @@ def main(analysis_type, dry_run, print_dupes, output_path):
     datasets = [p['name'] for p in projects]
     project_id_map = {p['id']: p['name'] for p in projects}
 
-    analyses = get_analyses_for_datasets(datasets, analysis_type)        
-
-    analyses_samples = {a['id']: a['sample_ids'][0] for a in analyses}
+    analyses = get_analyses_for_datasets(datasets, analysis_type)
 
     # Get all {analysis id : raw analysis path string}
     analysis_by_path, analyses = cleanup_analysis_output_paths(analyses)
@@ -486,11 +536,10 @@ def main(analysis_type, dry_run, print_dupes, output_path):
 
     for analysis in analyses:
         analysis['valid_path'] = 1 if analysis['id'] in id_validity['valid_ids'] else 0
-          
+
     # log warnings if the analyses['project'] doesn't match the bucket name, `cpg-{dataset}-{main/test}`
     # lots of warnings here...
     analyses = check_all_analyses_belongs_to_project(analyses, project_id_map)
-
 
     print(
         f'{len(path_validity["valid_paths"])} valid paths, {len(path_validity["invalid_paths"])} invalid paths, '  # noqa: Q000
@@ -500,11 +549,15 @@ def main(analysis_type, dry_run, print_dupes, output_path):
     # Transform the analyses list into a dataframe with one row per analysis entry
     analyses_df = pd.DataFrame(analyses)
 
-    # Remove the meta field for now since its a nested dictionary which doesn't play nice 
+    # Remove the meta field for now since its a nested dictionary which doesn't play nice
     analyses_df = analyses_df.drop(labels='meta', axis=1)
 
     # Make sure the timestamp field is a datetime type, not string
-    analyses_df['timestamp_completed'] = pd.to_datetime(analyses_df['timestamp_completed'])
+    analyses_df[  # pylint: disable=unsupported-assignment-operation
+        'timestamp_completed'
+    ] = pd.to_datetime(
+        analyses_df['timestamp_completed']  # pylint: disable=unsubscriptable-object
+    )
 
     analyses_results = get_analysis_results_with_sql(analyses_df)
 
