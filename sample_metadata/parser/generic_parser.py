@@ -1155,6 +1155,9 @@ class GenericParser(
         >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'])
         [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz', 'ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz'])
+        [['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz'], ['ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz']]
+
         >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz'])
         [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'], ['21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz']]
 
