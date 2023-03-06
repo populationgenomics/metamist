@@ -1194,6 +1194,7 @@ class GenericParser(
             pre_r_basename = basename[: matched.end()]
             bits_to_group_on = [pre_r_basename]
             groups = matched.groups()
+            # group fasts based on the regex groups 1 / 2
             for i in (1, 2):
                 # index 1: optional _001 group. index 2: file extension
                 bits_to_group_on.append(groups[i])
