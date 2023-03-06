@@ -57,7 +57,7 @@ logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
-FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
+FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
@@ -73,9 +73,10 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12](_\d+)?(?:'
+    r'(?:\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
+    + r'(?=_([12]|R[12])?(_[0-9]*?)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
-    + ')$'
+    + '$))'
 )
 rmatch = re.compile(rmatch_str)
 SingleRow = Dict[str, Any]
@@ -1187,11 +1188,12 @@ class GenericParser(
         fastq_groups = defaultdict(list)
         for full_filename, (basename, matched) in r_matches.items():
             # use only file path basename to define prefix first
-
-            pre_r_basename = basename[: matched.start()]
+            pre_r_basename = basename[: matched.end()]
             bits_to_group_on = [pre_r_basename]
-            for group in matched.groups():
-                bits_to_group_on.append(group)
+            groups = matched.groups()
+            for i in range(1, 3):
+                # index 1: optional _001 group. index 2: file extension
+                bits_to_group_on.append(groups[i])
 
             fastq_groups[tuple(bits_to_group_on)].append(full_filename)
 
