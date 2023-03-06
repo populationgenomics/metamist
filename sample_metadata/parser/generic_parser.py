@@ -73,8 +73,8 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'(?:\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
-    + r'(?=_([12]|R[12])?(_[0-9]*?)?('
+    r'(?:[<>]|\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
+    + r'(?=[_|-]([12]|R[12])?(_[0-9]*?)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
     + '$))'
 )
@@ -1194,7 +1194,7 @@ class GenericParser(
             pre_r_basename = basename[: matched.end()]
             bits_to_group_on = [pre_r_basename]
             groups = matched.groups()
-            for i in range(1, 3):
+            for i in (1, 2):
                 # index 1: optional _001 group. index 2: file extension
                 bits_to_group_on.append(groups[i])
 
