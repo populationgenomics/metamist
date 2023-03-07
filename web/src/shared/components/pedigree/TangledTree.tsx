@@ -4,7 +4,7 @@
 import * as React from 'react'
 import _ from 'lodash'
 import { min, max, sum, mean, extent } from 'd3'
-import LoadingDucks from '../LoadingDucks'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import MuckError from '../MuckError'
 
 interface PedigreeEntry {
