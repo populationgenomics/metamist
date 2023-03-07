@@ -6,7 +6,7 @@ from db.python.layers.participant import (
     ParticipantUpsertBody,
 )
 from db.python.layers.sample import SampleUpsert, SequenceUpsert
-from models.enums import SequenceType, SampleType, SequenceStatus
+from models.enums import SequenceType, SampleType, SequenceStatus, SequenceTechnology
 
 
 class TestUpsert(DbIsolatedTest):
@@ -58,6 +58,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('genome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     ),
                                     SequenceUpsert.construct(
@@ -85,6 +88,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('exome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     ),
                                 ],
@@ -129,6 +135,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('genome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     )
                                 ],
@@ -165,6 +174,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('genome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     )
                                 ],
@@ -209,6 +221,9 @@ class TestUpsert(DbIsolatedTest):
                                             },
                                             'status': SequenceStatus('uploaded'),
                                             'type': SequenceType('genome'),
+                                            'technology': SequenceTechnology(
+                                                'short-read'
+                                            ),
                                         }
                                     )
                                 ],

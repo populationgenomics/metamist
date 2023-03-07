@@ -41,7 +41,7 @@ class OntParser(GenericMetadataParser):
         search_locations: List[str],
         project: str,
         default_sequence_type='genome',
-        default_sequence_technology='long-reads',
+        default_sequence_technology='long-read',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
@@ -69,6 +69,7 @@ class OntParser(GenericMetadataParser):
             reads_column=Columns.PASS_FASTQ_FILENAME,
             default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
+            default_sequence_technology=default_sequence_technology,
             participant_meta_map={},
             sample_meta_map={},
             sequence_meta_map=sequence_meta_map,

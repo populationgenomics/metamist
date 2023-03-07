@@ -37,6 +37,7 @@ class SampleUpdateModel(BaseModel):
     meta: Optional[Dict] = {}
     type: Optional[SampleType] = None
     participant_id: Optional[int] = None
+    external_id: Optional[str] = None
     active: Optional[bool] = None
 
 
@@ -198,6 +199,7 @@ async def update_sample(
         id_=sample_id_transform_to_raw(id_),
         meta=model.meta,
         participant_id=model.participant_id,
+        external_id=model.external_id,
         type_=model.type,
         active=model.active,
     )
