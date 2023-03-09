@@ -6,6 +6,7 @@ import re
 import json
 import datetime
 import logging
+from collections import defaultdict
 from typing import Any
 from io import StringIO
 
@@ -62,23 +63,14 @@ ENVS = {
 SAMPLES_TO_IGNORE = {'CPG227355', 'CPG227397'}
 BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
 
-url_individuals_table_upload = '/api/project/{projectGuid}/upload_individuals_table/sa'
-url_individuals_table_confirm = (
-    '/api/project/{projectGuid}/save_individuals_table/{uploadedFileId}/sa'
-)
+url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
+url_individual_metadata_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
+url_family_sync = '/api/project/sa/{projectGuid}/families/sync'
 
-url_individual_metadata_table_upload = (
-    '/api/project/{projectGuid}/upload_individuals_metadata_table/sa'
-)
-url_individual_metadata_table_confirm = (
-    '/api/project/{projectGuid}/save_individuals_metadata_table/{uploadedFileId}/sa'
-)
-
-url_family_table_upload = '/api/project/{projectGuid}/upload_families_table/sa'
-url_family_table_confirm = '/api/project/{projectGuid}/edit_families/sa'
-
-url_update_es_index = '/api/project/{projectGuid}/add_dataset/variants/sa'
-url_update_saved_variants = '/api/project/{projectGuid}/update_saved_variant_json/sa'
+url_update_es_index = '/api/project/sa/{projectGuid}/add_dataset/variants'
+url_update_saved_variants = '/api/project/sa/{projectGuid}/saved_variant/update'
+url_igv_diff = '/api/project/sa/{projectGuid}/igv/diff'
+url_igv_individual_update = '/api/individual/sa/{individualGuid}/igv/update'
 
 seqrapi = SeqrApi()
 papi = ProjectApi()
@@ -148,13 +140,13 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     if not filtered_family_eids:
         raise ValueError('No families to sync')
 
-    # sync_pedigree(**params, family_eids=filtered_family_eids)
     # sync_families(**params, family_eids=filtered_family_eids)
+    # sync_pedigree(**params, family_eids=filtered_family_eids)
     # sync_individual_metadata(**params, participant_eids=set(participant_eids))
-    update_es_index(**params, sequence_type=sequence_type)
+    # update_es_index(**params, sequence_type=sequence_type)
 
-    get_cram_map(
-        dataset, participant_eids=participant_eids, sequence_type=sequence_type
+    sync_cram_map(
+        **params, participant_eids=participant_eids, sequence_type=sequence_type
     )
 
 
@@ -168,46 +160,22 @@ def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
     """
 
     # 1. Get pedigree from SM
-    pedigree_data = _get_pedigree_csv_from_sm(dataset, family_eids=family_eids)
+    pedigree_data = _get_pedigree_from_sm(dataset, family_eids=family_eids)
     if not pedigree_data:
         return print(f'{dataset} :: Not updating pedigree because not data was found')
 
     # 2. Upload pedigree to seqr
 
-    # use a filename ending with .csv to signal to seqr it's comma-delimited
-    files = {'datafile': ('file.csv', pedigree_data)}
-    req1_url = BASE + url_individuals_table_upload.format(projectGuid=project_guid)
-    resp_1 = requests.post(req1_url, files=files, headers=headers)
-    logger.debug(
-        f'{dataset} :: Uploaded pedigree data with status: {resp_1.status_code}'
+    req_url = BASE + url_individuals_sync.format(
+        projectGuid=project_guid
     )
-    if not resp_1.ok:
-        logger.warning(f'{dataset} :: Uploading pedigree failed: {resp_1.text}')
-    resp_1.raise_for_status()
-    resp_1_json = resp_1.json()
-    if not resp_1_json or 'uploadedFileId' not in resp_1_json:
-        raise ValueError(
-            f'{dataset} :: Could not get uploadedFileId from {resp_1_json}'
+    resp = requests.post(req_url, json={'individuals': pedigree_data}, headers=headers)
+    is_ok = resp.ok
+    if not is_ok:
+        logger.warning(
+            f'{dataset} :: Confirming pedigree failed: {resp.text}'
         )
-    uploaded_file_id = resp_1_json['uploadedFileId']
-
-    # 3. Confirm the upload
-    req2_url = BASE + url_individuals_table_confirm.format(
-        projectGuid=project_guid, uploadedFileId=uploaded_file_id
-    )
-    is_ok = False
-    remaining_attempts = 5
-    while not is_ok:
-        resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
-        is_ok = resp_2.ok
-        if not is_ok:
-            logger.warning(
-                f'{dataset} :: Confirming pedigree failed, retrying '
-                f'({remaining_attempts} more times): {resp_2.text}'
-            )
-            remaining_attempts -= 1
-        if remaining_attempts <= 0:
-            resp_2.raise_for_status()
+    resp.raise_for_status()
 
     print(f'{dataset} :: Uploaded pedigree')
 
@@ -224,61 +192,27 @@ def sync_families(
     """
     logger.debug(f'{dataset} :: Uploading family template')
 
-    def _get_families_csv_from_sm(dataset: str):
+    def _get_families_from_sm(dataset: str):
 
         fam_rows = seqrapi.get_families(project=dataset)
-        fam_row_headers = [
-            'Family ID',
-            'Display Name',
-            'Description',
-            'Coded Phenotype',
-        ]
-        formatted_fam_rows = [','.join(fam_row_headers)]
-        keys = ['external_id', 'external_id', 'description', 'coded_phenotype']
-        formatted_fam_rows.extend(
-            [
-                ','.join(str(r[k] or '') for k in keys)
-                for r in fam_rows
-                if r['external_id'] in family_eids
-            ]
-        )
-
-        if len(formatted_fam_rows) == 1:
-            raise ValueError('No families to sync')
-
-        return '\n'.join(formatted_fam_rows)
+        fam_row_seqr_keys = {
+            'familyId': 'external_id',
+            'displayName': 'external_id',
+            'description': 'description',
+            'codedPhenotype': 'coded_phenotype',
+        }
+        if family_eids:
+            fam_rows = [f for f in fam_rows if f['external_id'] in family_eids]
+        rows = [{seqr_key: fam.get(mm_key) for seqr_key, mm_key in fam_row_seqr_keys.items()} for fam in fam_rows]
+        return rows
 
     # 1. Get family data from SM
-    family_data = _get_families_csv_from_sm(dataset)
+    family_data = _get_families_from_sm(dataset)
 
     # use a filename ending with .csv to signal to seqr it's comma-delimited
-    files = {'datafile': ('file.csv', family_data)}
-    req1_url = BASE + url_family_table_upload.format(projectGuid=project_guid)
-    resp_1 = requests.post(req1_url, files=files, headers=headers)
-    logger.debug(
-        f'{dataset} :: Uploaded new family template with status: {resp_1.status_code}'
-    )
-    if not resp_1.ok:
-        logger.warning(f'{dataset} :: Request failed with information: {resp_1.text}')
-    resp_1.raise_for_status()
-    resp_1_json = resp_1.json()
-
-    # 3. Confirm uploaded file
-
-    req2_url = BASE + url_family_table_confirm.format(projectGuid=project_guid)
-    is_ok = False
-    remaining_attempts = 5
-    while not is_ok:
-        resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
-        is_ok = resp_2.ok
-        if not is_ok:
-            logger.warning(
-                f'{dataset} :: Confirming family import failed: {resp_2.text}'
-            )
-            remaining_attempts -= 1
-        if remaining_attempts <= 0:
-            resp_2.raise_for_status()
-
+    req_url = BASE + url_family_sync.format(projectGuid=project_guid)
+    resp_2 = requests.post(req_url, json={'families': family_data}, headers=headers)
+    resp_2.raise_for_status()
     print(f'{dataset} :: Uploaded family template')
 
 
@@ -290,108 +224,95 @@ def sync_individual_metadata(
     for a dataset into a seqr project
     """
 
-    IS_OLD = False
+    individual_metadata_resp = seqrapi.get_individual_metadata_for_seqr(
+        project=dataset, export_type=ExportType('json')
+    )
 
-    if IS_OLD:
-        # TEMP
-        base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
-
-        resp = requests.get(
-            base
-            + f'/api/v1/participant/{dataset}/individual-metadata-seqr?export_typejson',
-            headers={
-                'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'
-            },
+    if individual_metadata_resp is None or isinstance(
+        individual_metadata_resp, str
+    ):
+        print(
+            f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
         )
-        resp.raise_for_status()
-        individual_metadata_resp = resp.json()
+        return
 
-    else:
-        individual_metadata_resp = seqrapi.get_individual_metadata_for_seqr(
-            project=dataset, export_type=ExportType('json')
-        )
+    json_rows: list[dict] = individual_metadata_resp['rows']
 
-        if individual_metadata_resp is None or isinstance(
-            individual_metadata_resp, str
-        ):
-            print(
-                f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
-            )
-            return
+    if participant_eids:
+        json_rows = [row for row in json_rows if row['individual_id'] in participant_eids]
 
-    json_rows = individual_metadata_resp['rows']
-    individual_meta_headers: list[str] = individual_metadata_resp['headers']
+    def _process_hpo_terms(terms: str):
+        return [t.strip() for t in terms.split(',')]
 
-    if 'individual_id' in individual_meta_headers:
-        individual_meta_headers.remove('individual_id')
-    if 'family_id' in individual_meta_headers:
-        individual_meta_headers.remove('family_id')
+    def _parse_affected(affected):
+        affected = str(affected)
+        if affected == '1' or affected.upper() == "U" or affected.lower() == 'unaffected':
+            return 'N'
+        elif affected == '2' or affected.upper().startswith('A'):
+            return 'A'
+        elif affected == '0' or not affected or affected.lower() == 'unknown':
+            return 'U'
 
-    # make sure individual_meta_headers always come first
-    individual_meta_headers = ['family_id', 'individual_id']
+        return None
 
-    col_header_map = individual_metadata_resp['header_map']
+    key_processor = {
+        'hpo_terms_present': _process_hpo_terms,
+        'hpo_terms_absent': _process_hpo_terms,
+        'affected': _parse_affected,
+    }
+
+    seqr_map = {
+        'family_id': 'family_id',
+        'individual_id': 'individual_id',
+        # 'individual_guid'
+        # 'hpo_number'
+        'affected': 'affected',
+        'features': 'hpo_terms_present',
+        'absent_features': 'hpo_terms_absent',
+        'birth_year': 'birth_year',
+        'death_year': 'death_year',
+        'onset_age': 'age_of_onset',
+        'notes': 'notes',
+        # 'assigned_analyst'
+        # 'consanguinity'
+        # 'affected_relatives'
+        # 'expected_inheritance'
+        'maternal_ethnicity': 'maternal_ancestry',
+        'paternal_ethnicity': 'paternal_ancestry',
+        # 'disorders'
+        # 'rejected_genes'
+        # 'candidate_genes'
+    }
 
     if len(json_rows) == 0:
         print(f'{dataset} :: No individual metadata to sync')
         return
 
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter='\t')
-    rows = [
-        [col_header_map[h] for h in individual_meta_headers],
-        *[
-            [row.get(kh, '') for kh in individual_meta_headers]
-            for row in json_rows
-            if row['individual_id'] in participant_eids
-        ],
-    ]
-    writer.writerows(rows)
-    file_tsv = output.getvalue()
+    def process_row(row):
+        return {
+            seqr_key: key_processor[sm_key](row[sm_key]) if sm_key in key_processor else row[sm_key]
+            for seqr_key, sm_key in seqr_map.items()
+            if sm_key in row
+        }
 
-    req1_url = BASE + url_individual_metadata_table_upload.format(
+    processed_records = list(map(process_row, json_rows))
+
+    req_url = BASE + url_individual_metadata_sync.format(
         projectGuid=project_guid
     )
-    resp_1 = requests.post(
-        req1_url, files={'datafile': ('file.tsv', file_tsv)}, headers=headers
+    resp = requests.post(
+        req_url, json={'individuals': processed_records}, headers=headers
     )
-    print(
-        f'{dataset} :: Uploaded individual metadata with status: {resp_1.status_code}'
-    )
+    # print(resp.text)
 
     if (
-        resp_1.status_code == 400
-        and 'Unable to find individuals to update' in resp_1.text
+        resp.status_code == 400
+        and 'Unable to find individuals to update' in resp.text
     ):
         print('No individual metadata needed updating')
         return
-    if not resp_1.ok:
-        print(f'{dataset} :: Request failed with information: {resp_1.text}')
-        resp_1.raise_for_status()
 
-    resp_1_json = resp_1.json()
-    if not resp_1_json or 'uploadedFileId' not in resp_1_json:
-        raise ValueError(
-            f'{dataset} :: Could not get uploadedFileId from {resp_1_json}'
-        )
-
-    uploaded_file_id = resp_1_json['uploadedFileId']
-
-    req2_url = BASE + url_individual_metadata_table_confirm.format(
-        projectGuid=project_guid, uploadedFileId=uploaded_file_id
-    )
-    is_ok = False
-    remaining_attempts = 5
-    while not is_ok:
-        resp_2 = requests.post(req2_url, json=resp_1_json, headers=headers)
-        is_ok = resp_2.ok
-        if not is_ok:
-            logger.warning(
-                f'{dataset} :: Confirming individual metadata import failed: {resp_2.text}'
-            )
-            remaining_attempts -= 1
-        if remaining_attempts <= 0:
-            resp_2.raise_for_status()
+    resp.raise_for_status()
 
     print(f'{dataset} :: Uploaded individual metadata')
 
@@ -476,83 +397,84 @@ def update_es_index(
     resp_2.raise_for_status()
 
 
-def _get_pedigree_csv_from_sm(dataset: str, family_eids: set[str]) -> str | None:
+def _get_pedigree_from_sm(dataset: str, family_eids: set[str]) -> list[dict] | None:
     """Call get_pedigree and return formatted string with header"""
 
     ped_rows = seqrapi.get_pedigree(project=dataset)
     if not ped_rows:
         return None
 
-    formatted_ped_rows = [
-        'Family ID,Individual ID,Paternal ID,Maternal ID,Sex,Affected Status,Notes'
-    ]
-    keys = [
-        'family_id',
-        'individual_id',
-        'paternal_id',
-        'maternal_id',
-        'sex',
-        'affected',
-        'notes',
-    ]
-    formatted_ped_rows.extend(
-        ','.join(str(r.get(k) or '') for k in keys)
-        for r in ped_rows
-        if r['family_id'] in family_eids
-    )
+    if family_eids:
+        ped_rows = [row for row in ped_rows if row['family_id'] in family_eids]
 
-    return '\n'.join(formatted_ped_rows)
+    def process_sex(value):
+        if not isinstance(value, int):
+            return value
+        if value == 0:
+            return 'U'
+        if value == 1:
+            return 'M'
+        if value == 2:
+            return 'F'
+        return 'U'
+
+    keys = {
+        'familyId': 'family_id',
+        'individualId': 'individual_id',
+        'paternalId': 'paternal_id',
+        'maternalId': 'maternal_id',
+        'sex': 'sex',
+        'affected': 'affected',
+        'notes': 'notes',
+    }
+
+    def get_row(row):
+        d = {seqr_key: row[sm_key] for seqr_key, sm_key in keys.items() if sm_key in row}
+        d['sex'] = process_sex(row['sex'])
+        return d
+
+    rows = list(map(get_row, ped_rows))
+
+    return rows
 
 
-def get_cram_map(dataset, participant_eids: list[str], sequence_type):
+def sync_cram_map(dataset, participant_eids: list[str], sequence_type,     project_guid,
+
+    headers,
+):
     """Get map of participant EID to cram path"""
     logger.info(f'{dataset} :: Getting cram map')
+    reads_map = aapi.get_samples_reads_map(project=dataset, export_type='json')
 
-    IS_OLD = False
+    sequence_filter = lambda row: True  # noqa
+    if sequence_type == 'genome':
+        sequence_filter = lambda row: 'exome' not in row[1]  # noqa
+    elif sequence_type == 'exome':
+        sequence_filter = lambda row: 'exome' in row[1]  # noqa
 
-    if IS_OLD:
-        base = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
+    parsed_records = defaultdict(list)
 
-        resp = requests.get(
-            base + f'/api/v1/analysis/{dataset}/sample-cram-path-map/tsv',
-            headers={
-                'Authorization': f'Bearer {get_google_identity_token(TOKEN_AUDIENCE)}'
-            },
-        )
-        resp.raise_for_status()
-        reads_map = resp.text
-    else:
-        reads_map = aapi.get_samples_reads_map(project=dataset, export_type='tsv')
+    for row in reads_map[:10]:
+        pid = row['participant_id']
+        output = row['output']
+        if not sequence_filter(output):
+            continue
 
-    if isinstance(reads_map, str) and reads_map.startswith('<!doctype html>'):
-        print(f'{dataset} :: Bad API format (404d) for reads map')
-        return
+        # eventually, we should add the sampleId back in here
+        parsed_records[pid].append({'filePath': output})
+
     if not reads_map:
         print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
-    reads_set = set(
-        line.strip()
-        for line in set(reads_map.split('\n'))
-        if not any(s in line for s in SAMPLES_TO_IGNORE)
-    )
-    sequence_filter = lambda row: True  # noqa
-    if sequence_type == 'genome':
-        sequence_filter = lambda row: len(row) > 2 and 'exome' not in row[1]  # noqa
-    elif sequence_type == 'exome':
-        sequence_filter = lambda row: len(row) > 2 and 'exome' in row[1]  # noqa
+    req1_url = BASE + url_igv_diff.format(projectGuid=project_guid)
+    resp_1 = requests.post(req1_url, json={'mapping': parsed_records}, headers=headers)
+    if not resp_1.ok:
+        print(resp_1.text)
+    resp_1.raise_for_status()
 
-    reads_list = [
-        '\t'.join(line.split('\t')[:2])
-        for line in reads_set
-        if (not participant_eids or line.split('\t')[0] in participant_eids)
-        and sequence_filter(line.split('\t'))
-    ]
-
-    # temporarily
-    d = '/Users/mfranklin/source/sample-metadata/cram-map/'
-    with open(os.path.join(d, dataset + f'-{sequence_type}-cram-map.tsv'), 'w+') as f:
-        f.write('\n'.join(reads_list))
+    response = resp_1.json()
+    print(response)
 
 
 def get_token():
