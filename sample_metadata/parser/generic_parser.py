@@ -57,7 +57,7 @@ logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
-FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
+FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
@@ -73,9 +73,10 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12]('
+    r'(?:[<>]|\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
+    + r'(?=[_|-]([12]|R[12])?(_[0-9]*?)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
-    + ')$'
+    + '$))'
 )
 rmatch = re.compile(rmatch_str)
 SingleRow = Dict[str, Any]
@@ -1151,6 +1152,15 @@ class GenericParser(
         >>> GenericParser.parse_fastqs_structure(['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz'])
         [['/directory1/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R1.fastq.gz', '/directory2/Z01_1234_HNXXXXX_TCATCCTT-AGCGAGCT_L001_R2.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'])
+        [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz']]
+
+        >>> GenericParser.parse_fastqs_structure(['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz', 'ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz'])
+        [['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz'], ['ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz']]
+
+        >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz'])
+        [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'], ['21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz']]
+
         >>> GenericParser.parse_fastqs_structure(['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz', 'Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz'])
         [['Sample_1_L01_1.fastq.gz', 'Sample_1_L01_2.fastq.gz'], ['Sample_1_L02_R1.fastq.gz', 'Sample_1_L02_R2.fastq.gz']]
 
@@ -1177,16 +1187,30 @@ class GenericParser(
                 f"Couldn't detect the format of FASTQs (expected match for regex {rmatch.pattern!r}): {no_r_match_str!r}"
             )
 
-        values = []
-        for _, grouped in group_by(
-            sorted_fastqs, lambda r: r_matches[r][0][: r_matches[r][1].start()]  # type: ignore
-        ).items():
-            values.append(sorted(grouped))
-        invalid_fastq_groups = [grp for grp in values if len(grp) != 2]
+        # Create a dict with filenames as keys and prefixes and suffixes as values
+        fastq_groups = defaultdict(list)
+        for full_filename, (basename, matched) in r_matches.items():
+            # use only file path basename to define prefix first
+            pre_r_basename = basename[: matched.end()]
+            bits_to_group_on = [pre_r_basename]
+            groups = matched.groups()
+            # group fasts based on the regex groups 1 / 2
+            for i in (1, 2):
+                # index 1: optional _001 group. index 2: file extension
+                bits_to_group_on.append(groups[i])
+
+            fastq_groups[tuple(bits_to_group_on)].append(full_filename)
+
+        invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
         if invalid_fastq_groups:
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
-        return sorted(values, key=lambda el: el[0])
+        sorted_groups = sorted(
+            (sorted(fastqgroup) for fastqgroup in fastq_groups.values()),
+            key=lambda el: os.path.basename(el[0]),
+        )
+
+        return sorted_groups
 
     async def create_file_object(
         self,
@@ -1266,6 +1290,49 @@ class GenericParser(
                 return delimiter
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
+
+
+def group_fastqs_by_common_filename_components(d: dict) -> dict:
+    """Groups key-value pairs by common prefix components and suffix components
+    Where the key is the fastq filename and the value is a tuple of the filename split at R1/R2/1/2
+
+    Returns a dict with grouping term constructed from extracted prefix+suffix identifiers as key
+    and a list of filenames matching the group as value.
+    Sample input: {
+        'S70_L001_R1_001.fastq.gz': ('S70_L001_', 'R1_001.fastq.gz'),
+        'S70_L001_R2_001.fastq.gz': ('S70_L001_', 'R2_001.fastq.gz'),
+        'S70_L001_R1.fastq.gz': ('S70_L001_', 'R1.fastq.gz'),
+        'S70_L001_R2.fastq.gz': ('S70_L001_', 'R1.fastq.gz')
+        }
+    Sample output: {
+        'S70_L001_001.fastq.gz': ['S70_L001_R1_001.fastq.gz', 'S70_L001_R2_001.fastq.gz'],
+        'S70_L001_fastq.gz': ['S70_L001_R1.fastq.gz', 'S70_L001_R2.fastq.gz']
+        }
+    """
+
+    def key_selector(kv: tuple[str, str]) -> tuple[str, str]:
+        _, fastq_file_components = kv
+        fastq_suffix = fastq_file_components[1]
+        try:
+            common_component = fastq_suffix.split('_')[
+                1
+            ]  # get the component of the file suffix after the first underscore if there
+        except IndexError:
+            common_component = fastq_suffix.split('.', 1)[
+                1
+            ]  # or get the file extension if there is no trailing underscore after R1/R2
+
+        return fastq_suffix, common_component
+
+    grouping = group_by(d.items(), key_selector)
+
+    fastq_groups = defaultdict(list)
+    for suffixes, matches in grouping.items():
+        for match in matches:
+            common_components = os.path.basename(match[1][0]) + suffixes[1]
+            fastq_groups[common_components].append(match[0])
+
+    return fastq_groups
 
 
 def _apply_secondary_file_format_to_filename(
