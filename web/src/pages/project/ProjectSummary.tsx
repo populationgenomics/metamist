@@ -12,6 +12,8 @@ import SummaryStatistics from './SummaryStatistics'
 import BatchStatistics from './BatchStatistics'
 import ProjectGrid from './ProjectGrid'
 import TotalsStats from './TotalsStats'
+import MuckError from '../../shared/components/MuckError'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -90,6 +92,7 @@ const ProjectSummary: React.FunctionComponent = () => {
         pageNumber,
         _updateProjectSummary,
     ])
+    console.log(summary)
 
     const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
 
@@ -101,40 +104,65 @@ const ProjectSummary: React.FunctionComponent = () => {
                 pageLimit={PAGE_SIZES[0]}
             />
             <hr />
-            {projectName && summary?.participants.length !== 0 && (
-                <>
-                    <TotalsStats summary={summary ?? {}} />
-                    <SummaryStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                    />
-                    <BatchStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                        batchSequenceStats={summary?.batch_sequence_stats ?? {}}
-                    />
-                    <hr />
-                    <MultiQCReports projectName={projectName} />
-                    <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
-                    <hr />
-                    <div
-                        style={{
-                            marginBottom: '10px',
-                            justifyContent: 'flex-end',
-                            display: 'flex',
-                            flexDirection: 'row',
-                        }}
-                    >
-                        <Dropdown
-                            selection
-                            onChange={setPageLimit}
-                            value={pageLimit}
-                            options={PAGE_SIZES.map((s) => ({
-                                key: s,
-                                text: `${s} samples`,
-                                value: s,
-                            }))}
+            {error && (
+                <MuckError message={`Ah Muck, An error occurred when fetching samples: ${error}`} />
+            )}
+            {isLoading && <LoadingDucks />}
+            {!projectName && (
+                <p>
+                    <em>Please select a project</em>
+                </p>
+            )}
+            {!isLoading && summary && summary.participants.length === 0 && (
+                <MuckError message={`Ah Muck, there aren't any samples in this project`} />
+            )}
+            {projectName &&
+                !error &&
+                !isLoading &&
+                summary &&
+                summary?.participants.length !== 0 && (
+                    <>
+                        <TotalsStats summary={summary ?? {}} />
+                        <SummaryStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
                         />
+                        <BatchStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                        />
+                        <hr />
+                        <MultiQCReports projectName={projectName} />
+                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                        <hr />
+                        <div
+                            style={{
+                                marginBottom: '10px',
+                                justifyContent: 'flex-end',
+                                display: 'flex',
+                                flexDirection: 'row',
+                            }}
+                        >
+                            <Dropdown
+                                selection
+                                onChange={setPageLimit}
+                                value={pageLimit}
+                                options={PAGE_SIZES.map((s) => ({
+                                    key: s,
+                                    text: `${s} samples`,
+                                    value: s,
+                                }))}
+                            />
+                            <PageOptions
+                                isLoading={isLoading}
+                                totalPageNumbers={totalPageNumbers}
+                                totalSamples={summary?.total_samples}
+                                pageNumber={pageNumber}
+                                handleOnClick={handleOnClick}
+                            />
+                        </div>
+                        <ProjectGrid summary={summary} projectName={projectName} />
                         <PageOptions
                             isLoading={isLoading}
                             totalPageNumbers={totalPageNumbers}
@@ -142,17 +170,8 @@ const ProjectSummary: React.FunctionComponent = () => {
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
                         />
-                    </div>
-                </>
-            )}
-            <ProjectGrid summary={summary} projectName={projectName} error={error} />
-            <PageOptions
-                isLoading={isLoading}
-                totalPageNumbers={totalPageNumbers}
-                totalSamples={summary?.total_samples}
-                pageNumber={pageNumber}
-                handleOnClick={handleOnClick}
-            />
+                    </>
+                )}
         </>
     )
 }

@@ -9,36 +9,11 @@ import { ProjectSummaryResponse } from '../../sm-api/api'
 import MuckError from '../../shared/components/MuckError'
 
 interface ProjectGridProps {
-    summary?: ProjectSummaryResponse
-    projectName?: string
-    error?: string
+    summary: ProjectSummaryResponse
+    projectName: string
 }
 
-const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
-    summary,
-    projectName,
-    error,
-}) => {
-    if (!projectName) {
-        return (
-            <p>
-                <em>Please select a project</em>
-            </p>
-        )
-    }
-    if (error) {
-        return (
-            <p>
-                <em>An error occurred when fetching samples: {error}</em>
-            </p>
-        )
-    }
-    if (!summary) {
-        return <p>Loading...</p>
-    }
-    if (summary.participants.length === 0) {
-        return <MuckError message={`Ah Muck, there aren't any samples in this project`} />
-    }
+const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, projectName }) => {
     const headers = [
         'Family ID',
         ...summary.participant_keys.map((field) => field[1]),
