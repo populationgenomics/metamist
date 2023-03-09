@@ -11,7 +11,6 @@ from io import StringIO
 
 import aiohttp
 import yaml
-import requests
 from cloudpathlib import AnyPath
 from sample_metadata.model.analysis_type import AnalysisType
 from sample_metadata.model.analysis_status import AnalysisStatus
