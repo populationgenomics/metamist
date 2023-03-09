@@ -1,6 +1,5 @@
 # pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel
-import csv
-import io
+import asyncio
 import os
 import re
 import json
@@ -10,6 +9,7 @@ from collections import defaultdict
 from typing import Any
 from io import StringIO
 
+import aiohttp
 import yaml
 import requests
 from cloudpathlib import AnyPath
@@ -20,7 +20,6 @@ from sample_metadata.model.export_type import ExportType
 from sample_metadata.model.body_get_samples import BodyGetSamples
 from sample_metadata.model.body_get_participants import BodyGetParticipants
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.configuration import get_google_identity_token, TOKEN_AUDIENCE
 from sample_metadata.apis import (
     SeqrApi,
     ProjectApi,
@@ -29,6 +28,7 @@ from sample_metadata.apis import (
     SampleApi,
     ParticipantApi,
 )
+from sample_metadata.parser.generic_parser import chunk
 
 loggers_to_silence = [
     'google.auth.transport.requests',
@@ -43,7 +43,7 @@ logger = logging.getLogger('sync-seqr')
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
-ENVIRONMENT = 'prod'  # 'staging'
+ENVIRONMENT = 'staging'  # 'staging'
 
 ENVS = {
     'staging': (
@@ -88,6 +88,13 @@ ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
 
 
 def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
+    """Sync single dataset without looking up seqr guid"""
+    return asyncio.get_event_loop().run_until_complete(
+        sync_dataset_async(dataset, seqr_guid, sequence_type)
+    )
+
+
+async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
     """
     Synchronisation driver for a single dataset
     """
@@ -96,61 +103,73 @@ def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
 
     # sync people first
     token = get_token()
-    headers: dict[str, str] = {'Authorization': f'Bearer {token}'}
-    params: dict[str, Any] = {
-        'dataset': dataset,
-        'project_guid': seqr_guid,
-        'headers': headers,
-    }
+    async with aiohttp.ClientSession() as client:
+        headers: dict[str, str] = {'Authorization': f'Bearer {token}'}
+        params: dict[str, Any] = {
+            'dataset': dataset,
+            'project_guid': seqr_guid,
+            'headers': headers,
+            'session': client,
+        }
 
-    # check sequence type is valid
-    _ = SequenceType(sequence_type)
+        # check sequence type is valid
+        _ = SequenceType(sequence_type)
 
-    samples = samapi.get_samples(body_get_samples=BodyGetSamples(project_ids=[dataset]))
-    sequences_all = seqapi.get_sequence_ids_for_sample_ids_by_type(
-        [s['id'] for s in samples if s['id'] not in SAMPLES_TO_IGNORE]
-    )
-    sample_ids = set(
-        [
-            sid
-            for sid, types in sequences_all.items()
-            if sequence_type in types and sid not in SAMPLES_TO_IGNORE
-        ]
-    )
-    participant_ids = set(
-        int(sample['participant_id'])
-        for sample in samples
-        if sample['id'] in sample_ids
-    )
-    participants = ParticipantApi().get_participants(
-        project=dataset,
-        body_get_participants=BodyGetParticipants(
-            internal_participant_ids=list(participant_ids)
-        ),
-    )
-    participant_eids = [p['external_id'] for p in participants]
+        samples = samapi.get_samples(
+            body_get_samples=BodyGetSamples(project_ids=[dataset])
+        )
+        sequences_all = seqapi.get_sequence_ids_for_sample_ids_by_type(
+            [s['id'] for s in samples if s['id'] not in SAMPLES_TO_IGNORE]
+        )
+        sample_ids = set(
+            [
+                sid
+                for sid, types in sequences_all.items()
+                if sequence_type in types and sid not in SAMPLES_TO_IGNORE
+            ]
+        )
+        participant_ids = set(
+            int(sample['participant_id'])
+            for sample in samples
+            if sample['id'] in sample_ids
+        )
+        participants = ParticipantApi().get_participants(
+            project=dataset,
+            body_get_participants=BodyGetParticipants(
+                internal_participant_ids=list(participant_ids)
+            ),
+        )
+        participant_eids = [p['external_id'] for p in participants]
 
-    ped_rows = seqrapi.get_pedigree(project=dataset)
-    filtered_family_eids = set(
-        row['family_id'] for row in ped_rows if row['individual_id'] in participant_eids
-    )
+        ped_rows = seqrapi.get_pedigree(project=dataset)
+        filtered_family_eids = set(
+            row['family_id']
+            for row in ped_rows
+            if row['individual_id'] in participant_eids
+        )
 
-    if not participant_eids:
-        raise ValueError('No participants to sync?')
-    if not filtered_family_eids:
-        raise ValueError('No families to sync')
+        if not participant_eids:
+            raise ValueError('No participants to sync?')
+        if not filtered_family_eids:
+            raise ValueError('No families to sync')
 
-    # sync_families(**params, family_eids=filtered_family_eids)
-    # sync_pedigree(**params, family_eids=filtered_family_eids)
-    # sync_individual_metadata(**params, participant_eids=set(participant_eids))
-    # update_es_index(**params, sequence_type=sequence_type)
+        # await sync_families(**params, family_eids=filtered_family_eids)
+        # await sync_pedigree(**params, family_eids=filtered_family_eids)
+        # await sync_individual_metadata(**params, participant_eids=set(participant_eids))
+        await update_es_index(**params, sequence_type=sequence_type)
 
-    sync_cram_map(
-        **params, participant_eids=participant_eids, sequence_type=sequence_type
-    )
+        # await sync_cram_map(
+        #     **params, participant_eids=participant_eids, sequence_type=sequence_type
+        # )
 
 
-def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
+async def sync_pedigree(
+    session: aiohttp.ClientSession,
+    dataset,
+    project_guid,
+    headers,
+    family_eids: set[str],
+):
     """
     Synchronise pedigree from SM -> seqr in 3 steps:
 
@@ -160,28 +179,29 @@ def sync_pedigree(dataset, project_guid, headers, family_eids: set[str]):
     """
 
     # 1. Get pedigree from SM
-    pedigree_data = _get_pedigree_from_sm(dataset, family_eids=family_eids)
+    pedigree_data = await _get_pedigree_from_sm(dataset, family_eids=family_eids)
     if not pedigree_data:
         return print(f'{dataset} :: Not updating pedigree because not data was found')
 
     # 2. Upload pedigree to seqr
 
-    req_url = BASE + url_individuals_sync.format(
-        projectGuid=project_guid
+    req_url = BASE + url_individuals_sync.format(projectGuid=project_guid)
+    resp = await session.post(
+        req_url, json={'individuals': pedigree_data}, headers=headers
     )
-    resp = requests.post(req_url, json={'individuals': pedigree_data}, headers=headers)
-    is_ok = resp.ok
-    if not is_ok:
-        logger.warning(
-            f'{dataset} :: Confirming pedigree failed: {resp.text}'
-        )
+    if not resp.ok:
+        logger.warning(f'{dataset} :: Confirming pedigree failed: {await resp.text()}')
     resp.raise_for_status()
 
     print(f'{dataset} :: Uploaded pedigree')
 
 
-def sync_families(
-    dataset, project_guid: str, headers: dict[str, str], family_eids: set[str]
+async def sync_families(
+    session: aiohttp.ClientSession,
+    dataset,
+    project_guid: str,
+    headers: dict[str, str],
+    family_eids: set[str],
 ):
     """
     Synchronise families template from SM -> seqr in 3 steps:
@@ -192,45 +212,49 @@ def sync_families(
     """
     logger.debug(f'{dataset} :: Uploading family template')
 
-    def _get_families_from_sm(dataset: str):
+    fam_rows = await seqrapi.get_families_async(project=dataset)
+    fam_row_seqr_keys = {
+        'familyId': 'external_id',
+        'displayName': 'external_id',
+        'description': 'description',
+        'codedPhenotype': 'coded_phenotype',
+    }
+    if family_eids:
+        fam_rows = [f for f in fam_rows if f['external_id'] in family_eids]
 
-        fam_rows = seqrapi.get_families(project=dataset)
-        fam_row_seqr_keys = {
-            'familyId': 'external_id',
-            'displayName': 'external_id',
-            'description': 'description',
-            'codedPhenotype': 'coded_phenotype',
-        }
-        if family_eids:
-            fam_rows = [f for f in fam_rows if f['external_id'] in family_eids]
-        rows = [{seqr_key: fam.get(mm_key) for seqr_key, mm_key in fam_row_seqr_keys.items()} for fam in fam_rows]
-        return rows
+    family_data = [
+        {seqr_key: fam.get(mm_key) for seqr_key, mm_key in fam_row_seqr_keys.items()}
+        for fam in fam_rows
+    ]
 
     # 1. Get family data from SM
-    family_data = _get_families_from_sm(dataset)
 
     # use a filename ending with .csv to signal to seqr it's comma-delimited
     req_url = BASE + url_family_sync.format(projectGuid=project_guid)
-    resp_2 = requests.post(req_url, json={'families': family_data}, headers=headers)
+    resp_2 = await session.post(
+        req_url, json={'families': family_data}, headers=headers
+    )
     resp_2.raise_for_status()
     print(f'{dataset} :: Uploaded family template')
 
 
-def sync_individual_metadata(
-    dataset, project_guid, headers, participant_eids: set[str]
+async def sync_individual_metadata(
+    session: aiohttp.ClientSession,
+    dataset,
+    project_guid,
+    headers,
+    participant_eids: set[str],
 ):
     """
     Sync individual participant metadata (eg: phenotypes)
     for a dataset into a seqr project
     """
 
-    individual_metadata_resp = seqrapi.get_individual_metadata_for_seqr(
+    individual_metadata_resp = await seqrapi.get_individual_metadata_for_seqr_async(
         project=dataset, export_type=ExportType('json')
     )
 
-    if individual_metadata_resp is None or isinstance(
-        individual_metadata_resp, str
-    ):
+    if individual_metadata_resp is None or isinstance(individual_metadata_resp, str):
         print(
             f'{dataset} :: There is an issue with getting individual metadata from SM, please try again later'
         )
@@ -239,18 +263,20 @@ def sync_individual_metadata(
     json_rows: list[dict] = individual_metadata_resp['rows']
 
     if participant_eids:
-        json_rows = [row for row in json_rows if row['individual_id'] in participant_eids]
+        json_rows = [
+            row for row in json_rows if row['individual_id'] in participant_eids
+        ]
 
     def _process_hpo_terms(terms: str):
         return [t.strip() for t in terms.split(',')]
 
     def _parse_affected(affected):
-        affected = str(affected)
-        if affected == '1' or affected.upper() == "U" or affected.lower() == 'unaffected':
+        affected = str(affected).upper()
+        if affected in ('1', 'U', 'UNAFFECTED'):
             return 'N'
-        elif affected == '2' or affected.upper().startswith('A'):
+        if affected == '2' or affected.startswith('A'):
             return 'A'
-        elif affected == '0' or not affected or affected.lower() == 'unknown':
+        if not affected or affected in ('0', 'UNKNOWN'):
             return 'U'
 
         return None
@@ -290,25 +316,22 @@ def sync_individual_metadata(
 
     def process_row(row):
         return {
-            seqr_key: key_processor[sm_key](row[sm_key]) if sm_key in key_processor else row[sm_key]
+            seqr_key: key_processor[sm_key](row[sm_key])
+            if sm_key in key_processor
+            else row[sm_key]
             for seqr_key, sm_key in seqr_map.items()
             if sm_key in row
         }
 
     processed_records = list(map(process_row, json_rows))
 
-    req_url = BASE + url_individual_metadata_sync.format(
-        projectGuid=project_guid
-    )
-    resp = requests.post(
+    req_url = BASE + url_individual_metadata_sync.format(projectGuid=project_guid)
+    resp = await session.post(
         req_url, json={'individuals': processed_records}, headers=headers
     )
     # print(resp.text)
 
-    if (
-        resp.status_code == 400
-        and 'Unable to find individuals to update' in resp.text
-    ):
+    if resp.status == 400 and 'Unable to find individuals to update' in resp.text:
         print('No individual metadata needed updating')
         return
 
@@ -317,7 +340,8 @@ def sync_individual_metadata(
     print(f'{dataset} :: Uploaded individual metadata')
 
 
-def update_es_index(
+async def update_es_index(
+    session: aiohttp.ClientSession,
     dataset,
     sequence_type: str,
     project_guid,
@@ -327,8 +351,10 @@ def update_es_index(
 ):
     """Update seqr samples for latest elastic-search index"""
 
-    person_sample_map_rows = seqrapi.get_external_participant_id_to_internal_sample_id(
-        project=dataset
+    person_sample_map_rows = (
+        await seqrapi.get_external_participant_id_to_internal_sample_id_async(
+            project=dataset
+        )
     )
 
     rows_to_write = [
@@ -346,9 +372,9 @@ def update_es_index(
         f.write('\n'.join(rows_to_write))
 
     if check_metamist:  # len(es_index_analyses) > 0:
-        es_index_analyses = aapi.query_analyses(
+        es_index_analyses = await aapi.query_analyses_async(
             AnalysisQueryModel(
-                projects=[dataset, 'seqr'],
+                projects=[dataset],
                 type=AnalysisType('es-index'),
                 meta={'sequencing_type': sequence_type},
                 status=AnalysisStatus('completed'),
@@ -380,27 +406,104 @@ def update_es_index(
         'mappingFilePath': fn_path,
         'ignoreExtraSamplesInCallset': True,
     }
-    print(data)
-
     req1_url = BASE + url_update_es_index.format(projectGuid=project_guid)
-    resp_1 = requests.post(req1_url, json=data, headers=headers)
-    print(f'{dataset} :: Updated ES index with status: {resp_1.status_code}')
+    resp_1 = await session.post(req1_url, json=data, headers=headers)
+    print(f'{dataset} :: Updated ES index with status: {resp_1.status}')
     if not resp_1.ok:
         print(f'{dataset} :: Request failed with information: {resp_1.text}')
     resp_1.raise_for_status()
 
     req2_url = BASE + url_update_saved_variants.format(projectGuid=project_guid)
-    resp_2 = requests.post(req2_url, json={}, headers=headers)
-    print(f'{dataset} :: Updated saved variants with status code: {resp_2.status_code}')
+    resp_2 = await session.post(req2_url, json={}, headers=headers)
+    print(f'{dataset} :: Updated saved variants with status code: {resp_2.status}')
     if not resp_2.ok:
         print(f'{dataset} :: Request failed with information: {resp_2.text}')
     resp_2.raise_for_status()
 
 
-def _get_pedigree_from_sm(dataset: str, family_eids: set[str]) -> list[dict] | None:
+async def sync_cram_map(
+    session: aiohttp.ClientSession,
+    dataset,
+    participant_eids: list[str],
+    sequence_type,
+    project_guid,
+    headers,
+):
+    """Get map of participant EID to cram path"""
+    logger.info(f'{dataset} :: Getting cram map')
+    reads_map = await aapi.get_samples_reads_map_async(
+        project=dataset, export_type='json'
+    )
+
+    sequence_filter = lambda row: True  # noqa
+    if sequence_type == 'genome':
+        sequence_filter = lambda row: 'exome' not in row[1]  # noqa
+    elif sequence_type == 'exome':
+        sequence_filter = lambda row: 'exome' in row[1]  # noqa
+
+    parsed_records = defaultdict(list)
+
+    for row in reads_map[:5]:
+        pid = row['participant_id']
+        output = row['output']
+        if not sequence_filter(output):
+            continue
+
+        if participant_eids and pid not in participant_eids:
+            continue
+
+        # eventually, we should add the sampleId back in here
+        parsed_records[pid].append({'filePath': output})
+
+    if not reads_map:
+        print(f'{dataset} :: No CRAMS to sync in for reads map')
+        return
+
+    req1_url = BASE + url_igv_diff.format(projectGuid=project_guid)
+    resp_1 = await session.post(
+        req1_url, json={'mapping': parsed_records}, headers=headers
+    )
+    if not resp_1.ok:
+        print(resp_1.text)
+    resp_1.raise_for_status()
+
+    response = await resp_1.json()
+    if 'updates' not in response:
+        print(f'{dataset} :: All CRAMS are up to date')
+        return
+
+    async def _make_update_igv_call(update):
+        individual_guid = update['individualGuid']
+        req_igv_update_url = BASE + url_igv_individual_update.format(
+            individualGuid=individual_guid
+        )
+        resp = await session.post(req_igv_update_url, json=update, headers=headers)
+
+        resp.raise_for_status()
+        return await resp.text()
+
+    chunk_size = 10
+    all_updates = response['updates']
+    for idx, updates in enumerate(chunk(all_updates, chunk_size=10)):
+        print(
+            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))}'
+        )
+
+        responses = await asyncio.gather(
+            *[_make_update_igv_call(update) for update in updates],
+            return_exceptions=True,
+        )
+        print(responses)
+
+    print(f'{dataset} :: Updated {len(all_updates)} CRAMs')
+
+
+async def _get_pedigree_from_sm(
+    dataset: str, family_eids: set[str]
+) -> list[dict] | None:
     """Call get_pedigree and return formatted string with header"""
 
-    ped_rows = seqrapi.get_pedigree(project=dataset)
+    ped_rows = await seqrapi.get_pedigree_async(project=dataset)
     if not ped_rows:
         return None
 
@@ -429,52 +532,15 @@ def _get_pedigree_from_sm(dataset: str, family_eids: set[str]) -> list[dict] | N
     }
 
     def get_row(row):
-        d = {seqr_key: row[sm_key] for seqr_key, sm_key in keys.items() if sm_key in row}
+        d = {
+            seqr_key: row[sm_key] for seqr_key, sm_key in keys.items() if sm_key in row
+        }
         d['sex'] = process_sex(row['sex'])
         return d
 
     rows = list(map(get_row, ped_rows))
 
     return rows
-
-
-def sync_cram_map(dataset, participant_eids: list[str], sequence_type,     project_guid,
-
-    headers,
-):
-    """Get map of participant EID to cram path"""
-    logger.info(f'{dataset} :: Getting cram map')
-    reads_map = aapi.get_samples_reads_map(project=dataset, export_type='json')
-
-    sequence_filter = lambda row: True  # noqa
-    if sequence_type == 'genome':
-        sequence_filter = lambda row: 'exome' not in row[1]  # noqa
-    elif sequence_type == 'exome':
-        sequence_filter = lambda row: 'exome' in row[1]  # noqa
-
-    parsed_records = defaultdict(list)
-
-    for row in reads_map[:10]:
-        pid = row['participant_id']
-        output = row['output']
-        if not sequence_filter(output):
-            continue
-
-        # eventually, we should add the sampleId back in here
-        parsed_records[pid].append({'filePath': output})
-
-    if not reads_map:
-        print(f'{dataset} :: No CRAMS to sync in for reads map')
-        return
-
-    req1_url = BASE + url_igv_diff.format(projectGuid=project_guid)
-    resp_1 = requests.post(req1_url, json={'mapping': parsed_records}, headers=headers)
-    if not resp_1.ok:
-        print(resp_1.text)
-    resp_1.raise_for_status()
-
-    response = resp_1.json()
-    print(response)
 
 
 def get_token():
@@ -513,10 +579,12 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
         if not seqr_guid:
             print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
             continue
-
+        el = asyncio.get_event_loop()
         try:
-            sync_dataset(project_name, seqr_guid, sequence_type=sequence_type)
-        except Exception as e:  # pylint: disable=broad-except
+            el.run_until_complete(
+                sync_dataset_async(project_name, seqr_guid, sequence_type=sequence_type)
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
             error_projects.append((project_name, e))
 
     if error_projects:
@@ -549,6 +617,6 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
 
 
 if __name__ == '__main__':
-    sync_single_dataset_from_name('acute-care', 'exome')
-
-    # sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
+    #     sync_single_dataset_from_name(dataset, 'genome')
+    sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
+    # sync_all_datasets(sequence_type='genome')
