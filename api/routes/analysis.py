@@ -319,6 +319,9 @@ async def get_sample_reads_map(
         project=connection.project, sequence_types=sequence_types
     )
 
+    for r in objs:
+        r['sample_id'] = sample_id_format(r['sample_id'])
+
     if export_type == ExportType.JSON:
         return objs
 
