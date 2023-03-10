@@ -31,7 +31,7 @@ def copy_to_release(project: str, path: str):
     logging.info(f'Copied {release_path}')
 
 @click.command()
-@click.option('--f', '--filename', help='Path for the project : external id mapping csv', required=True)
+@click.option('--filename', help='Path for the project : external id mapping csv', required=True)
 def main(filename: str,):
     """
 
