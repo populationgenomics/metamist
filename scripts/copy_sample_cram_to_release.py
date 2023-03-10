@@ -6,8 +6,6 @@ Given a csv with project IDs and  sample IDs, copies cram files for
 each sample listed into the project's release bucket.
 """
 
-from collections import defaultdict
-import csv
 import logging
 import sys
 import subprocess
@@ -31,34 +29,28 @@ def copy_to_release(project: str, path: str):
     logging.info(f'Copied {release_path}')
 
 @click.command()
-@click.option('--filename', help='Path for the project : external id mapping csv', required=True)
-def main(filename: str,):
+@click.option('--project', '-p', help='Metamist name of the project', required=True)
+@click.argument('samples', nargs=-1)
+def main(project: str, samples):
     """
 
     Parameters
     ----------
-    filename :  a path to a csv containing metmaist project names in column 1, sample ids in column 2, and
-                external participant ids in column 3. 
-                Only Columns 1 and 3 are required for this script.
+    project :   a metamist project name
+    samples :   a list of sample ids to copy
     """
-    # Create the { project : [sample_ids,] } dict mapping each project to all its sample IDs in the file
-    project_samples = defaultdict(list)
-    with open(filename, 'r') as mapping_file:
-        reader = csv.reader(mapping_file)
-        # Each project ID becomes a key with its list of sample IDs as its value
-        for row in reader:
-            project_samples[row[0]].append(row[1])
 
-    for project, sample_ids in project_samples.items():
-        # Retrieve latest crams for selected samples
-        latest_crams = AnalysisApi().get_latest_analysis_for_samples_and_type(
-            AnalysisType('cram'), project, request_body=sample_ids
-        )
+    sample_ids = list(samples)
 
-        # Copy files to test
-        for cram in latest_crams:
-            copy_to_release(project, cram['output'])
-            copy_to_release(project, cram['output'] + '.crai')
+    # Retrieve latest crams for selected samples
+    latest_crams = AnalysisApi().get_latest_analysis_for_samples_and_type(
+        AnalysisType('cram'), project, request_body=sample_ids
+    )
+
+    # Copy files to test
+    for cram in latest_crams:
+        copy_to_release(project, cram['output'])
+        copy_to_release(project, cram['output'] + '.crai')
 
 if __name__ == '__main__':
     logging.basicConfig(
