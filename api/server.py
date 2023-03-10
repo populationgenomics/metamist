@@ -18,7 +18,6 @@ from api.utils.exceptions import determine_code_from_error
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
-
 # This tag is automatically updated by bump2version
 _VERSION = '5.5.6'
 
@@ -124,7 +123,6 @@ async def exception_handler(_: Request, e: Exception):
 
 # graphql
 app.include_router(MetamistGraphQLRouter, prefix='/graphql')
-
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):

@@ -33,7 +33,7 @@ class SampleSearchResponseData(SearchResponseData):
     sample_external_ids: list[str]
 
 
-class ErrorSearchResponseData(SearchResponseData):
+class ErrorResponse(SMBase):
     """Error search response data"""
 
     error: str
@@ -45,4 +45,4 @@ class SearchResponse(SMBase):
     type: SearchResponseType
     title: str
     data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
-    error: ErrorSearchResponseData | None
+    error: ErrorResponse | None = None

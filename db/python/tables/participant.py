@@ -27,10 +27,8 @@ class ParticipantTable(DbBase):
         """Get participants by IDs"""
         _query = 'SELECT project, id, external_id, reported_sex, reported_gender, karyotype, meta FROM participant WHERE id in :ids'
         rows = await self.connection.fetch_all(_query, {'ids': ids})
-
         ds = [dict(r) for r in rows]
-        projects = set(d.pop('project') for d in ds)
-
+        projects = set(d.get('project') for d in ds)
         return projects, [Participant(**d) for d in ds]
 
     async def get_participants(

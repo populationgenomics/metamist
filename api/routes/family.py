@@ -132,7 +132,11 @@ async def get_pedigree(
     )
 
 
-@router.get('/{project}/', operation_id='getFamilies', tags=['seqr'])
+@router.get(
+    '/{project}/',
+    operation_id='getFamilies',
+    tags=['seqr'],
+)
 async def get_families(
     participant_ids: Optional[List[int]] = Query(None),
     sample_ids: Optional[List[str]] = Query(None),

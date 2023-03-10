@@ -8,7 +8,7 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
 
-import { SearchResponse, WebApi } from './sm-api/api'
+import { SearchResponse, WebApi } from '../../sm-api/api'
 
 type State = {
     loading: boolean
@@ -151,7 +151,7 @@ const Searchbar: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const [{ loading, results, value }, dispatch] = React.useReducer(SearchReducer, initialState)
 
-    const searchResultToRoute = (project: string, type: string, id: string) => {
+    const searchResultToRoute = (type: string, id: string) => {
         // handle "no access to this project"
         if (!id) return
 
@@ -161,11 +161,11 @@ const Searchbar: React.FunctionComponent = () => {
                 // navigate(`/project/${project}/participant/${id}`);
                 break
             case 'sample':
-                navigate(`/project/${project}/sample/${id}`)
+                navigate(`/sample/${id}`)
                 break
             case 'family':
                 // alert("Family page not implemented yet");
-                // navigate(`/project/${project}/family/${id}`);
+                navigate(`/family/${id}`)
                 break
             // no default
         }
@@ -250,7 +250,7 @@ const Searchbar: React.FunctionComponent = () => {
                     query: '',
                     results: {},
                 } as Action)
-                searchResultToRoute(data.result.data.project, data.result.type, data.result.data.id)
+                searchResultToRoute(data.result.type, data.result.data.id)
             }}
             resultRenderer={resultRenderer}
             onSearchChange={handleSearchChange}
