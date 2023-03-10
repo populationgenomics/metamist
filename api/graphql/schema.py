@@ -131,7 +131,7 @@ async def load_participants_for_families(
 ) -> list[list['Participant']]:
     player = ParticipantLayer(connection)
     pmap = await player.get_participants_by_families(family_ids)
-    return [pmap.get(fid) for fid in family_ids]
+    return [pmap.get(fid, []) for fid in family_ids]
 
 
 @connected_data_loader
