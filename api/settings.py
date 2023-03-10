@@ -10,6 +10,10 @@ PROFILE_REQUESTS = os.getenv('SM_PROFILE_REQUESTS', 'false').lower() in TRUTH_SE
 IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in TRUTH_SET
 MEMBERS_CACHE_LOCATION = os.getenv('SM_MEMBERS_CACHE_LOCATION')
 
+SEQR_URL = os.getenv('SM_SEQR_URL')
+SEQR_AUDIENCE = os.getenv('SM_SEQR_AUDIENCE')
+SEQR_MAP_LOCATION = os.getenv('SM_SEQR_MAP_LOCATION')
+
 
 def get_default_user() -> str | None:
     """Determine if a default user is available"""

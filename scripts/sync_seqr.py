@@ -42,7 +42,7 @@ logger = logging.getLogger('sync-seqr')
 
 MAP_LOCATION = 'gs://cpg-seqr-main-analysis/automation/'
 
-ENVIRONMENT = 'staging'  # 'staging'
+ENVIRONMENT = 'prod'  # 'staging'
 
 ENVS = {
     'staging': (
@@ -155,11 +155,11 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
         # await sync_families(**params, family_eids=filtered_family_eids)
         # await sync_pedigree(**params, family_eids=filtered_family_eids)
         # await sync_individual_metadata(**params, participant_eids=set(participant_eids))
-        await update_es_index(**params, sequence_type=sequence_type)
+        # await update_es_index(**params, sequence_type=sequence_type)
 
-        # await sync_cram_map(
-        #     **params, participant_eids=participant_eids, sequence_type=sequence_type
-        # )
+        await sync_cram_map(
+            **params, participant_eids=participant_eids, sequence_type=sequence_type
+        )
 
 
 async def sync_pedigree(
@@ -485,7 +485,7 @@ async def sync_cram_map(
     all_updates = response['updates']
     for idx, updates in enumerate(chunk(all_updates, chunk_size=10)):
         print(
-            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))}'
+            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))} (/{len(all_updates)}'
         )
 
         responses = await asyncio.gather(
@@ -616,6 +616,8 @@ def sync_single_dataset_from_name(dataset, sequence_type: str):
 
 
 if __name__ == '__main__':
+    # datasets = ['acute-care']
+    # for dataset in datasets:
     #     sync_single_dataset_from_name(dataset, 'genome')
-    sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
-    # sync_all_datasets(sequence_type='genome')
+    # sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
+    sync_all_datasets(sequence_type='exome')

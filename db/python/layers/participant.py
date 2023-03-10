@@ -534,6 +534,8 @@ class ParticipantLayer(BaseLayer):
     async def get_seqr_individual_template(
         self,
         project: int,
+        *,
+        internal_participant_ids: Optional[list[int]] = None,
         external_participant_ids: Optional[List[str]] = None,
         # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
@@ -549,28 +551,30 @@ class ParticipantLayer(BaseLayer):
         internal_to_external_pid_map = {}
         internal_to_external_fid_map = {}
 
-        if external_participant_ids:
+        if external_participant_ids or internal_participant_ids:
             assert self.connection.project
-            pids = await self.get_id_map_by_external_ids(
-                external_participant_ids,
-                project=self.connection.project,
-                allow_missing=False,
-            )
+            pids = set(internal_participant_ids or [])
+            if external_participant_ids:
+                pid_map = await self.get_id_map_by_external_ids(
+                    external_participant_ids,
+                    project=self.connection.project,
+                    allow_missing=False,
+                )
+                pids |= set(pid_map.values())
+
             pid_to_features = await ppttable.get_key_value_rows_for_participant_ids(
-                participant_ids=list(pids.values())
+                participant_ids=list(pids)
             )
-            if replace_with_participant_external_ids:
-                internal_to_external_pid_map = {v: k for k, v in pids.items()}
         else:
             pid_to_features = await ppttable.get_key_value_rows_for_all_participants(
                 project=project
             )
-            if replace_with_participant_external_ids:
-                internal_to_external_pid_map = (
-                    await self.pttable.get_id_map_by_internal_ids(
-                        list(pid_to_features.keys())
-                    )
+        if replace_with_participant_external_ids:
+            internal_to_external_pid_map = (
+                await self.pttable.get_id_map_by_internal_ids(
+                    list(pid_to_features.keys())
                 )
+            )
 
         flayer = FamilyLayer(self.connection)
         pid_to_fid = await flayer.get_participant_family_map(

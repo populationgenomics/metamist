@@ -409,12 +409,20 @@ WHERE a.id = :analysis_id
         return projects, list(analyses.values())
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId, sequence_types: list[SequenceType]
+        self,
+        project: ProjectId,
+        sequence_types: list[SequenceType],
+        participant_ids: list[int] = None,
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
         values: dict[str, Any] = {'project': project}
-        seq_filter = ''
+        filters = [
+            'a.active',
+            'a.type = "cram"',
+            'a.status = "completed"',
+            's.project = :project',
+        ]
         if sequence_types:
             if len(sequence_types) == 1:
                 seq_check = '= :seq_type'
@@ -423,7 +431,11 @@ WHERE a.id = :analysis_id
                 seq_check = 'IN :seq_types'
                 values['seq_types'] = [s.value for s in sequence_types]
 
-            seq_filter = f'AND JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check
+            filters.append(f'JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check)
+
+        if participant_ids:
+            filters.append('p.id IN :pids')
+            values['pids'] = list(participant_ids)
 
         _query = f"""
 SELECT p.external_id as participant_id, a.output as output, s.id as sample_id
@@ -432,11 +444,7 @@ INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
 INNER JOIN sample s ON a_s.sample_id = s.id
 INNER JOIN participant p ON s.participant_id = p.id
 WHERE
-    a.active
-    AND a.type = 'cram'
-    AND a.status = 'completed'
-    AND s.project = :project
-    {seq_filter}
+    {' AND '.join(filters)}
 ORDER BY a.timestamp_completed DESC;
 """
 

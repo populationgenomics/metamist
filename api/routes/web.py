@@ -7,8 +7,10 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from db.python.layers.search import SearchLayer
+from db.python.layers.seqr import SeqrLayer
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.layers.web import WebLayer, NestedParticipant
+from models.enums import SequenceType
 
 from models.models.sample import sample_id_format
 from models.models.search import SearchResponse
@@ -16,6 +18,7 @@ from models.models.search import SearchResponse
 from api.utils.db import (
     get_project_readonly_connection,
     get_projectless_db_connection,
+    get_project_write_connection,
     Connection,
 )
 
@@ -163,3 +166,15 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
         res.data.project = projects.get(res.data.project, res.data.project)  # type: ignore
 
     return SearchResponseModel(responses=responses)
+
+
+@router.post('/{project}/{sequence_type}/sync-dataset', operation_id='syncSeqrProject')
+async def sync_seqr_project(
+    sequence_type: SequenceType, connection=get_project_write_connection
+):
+    """
+    Sync a metamist project with its seqr project (for a specific sequence type)
+    """
+    seqr = SeqrLayer(connection)
+    messages = await seqr.sync_dataset(sequence_type)
+    return {'success': True, 'messages': messages}
