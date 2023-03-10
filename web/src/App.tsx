@@ -6,8 +6,8 @@ import 'semantic-ui-css/semantic.min.css'
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
 import Routes from './Routes'
-import Searchbar from './Search'
-import MuckTheDuck from './MuckTheDuck'
+import Searchbar from './shared/components/Search'
+import MuckTheDuck from './shared/components/MuckTheDuck'
 
 const App: React.FunctionComponent = () => (
     <Router>
