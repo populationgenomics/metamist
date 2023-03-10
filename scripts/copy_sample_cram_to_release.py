@@ -6,13 +6,12 @@ Given a csv with project IDs and  sample IDs, copies cram files for
 each sample listed into the project's release bucket.
 """
 
-
-from argparse import ArgumentParser
 from collections import defaultdict
 import csv
 import logging
 import sys
 import subprocess
+import click
 
 # pylint: disable=E0401,E0611
 from sample_metadata.apis import AnalysisApi
@@ -24,35 +23,42 @@ def copy_to_release(project: str, path: str):
     Copy a single file from a main bucket path to the equivalent release bucket
     """
     release_path = path.replace(
-        f'cpg-{project}-main',
+        f'cpg-{project}-test',#f'cpg-{project}-main',
         f'cpg-{project}-release',
     )
 
     subprocess.run(f'gsutil cp {path} {release_path}', shell=True, check=True)
     logging.info(f'Copied {release_path}')
 
-
-def main(
-    project: str,
-    sample_ids: list[str],
-):
+@click.command()
+@click.option('--f', '--filename', help='Path for the project : external id mapping csv', required=True)
+def main(filename: str,):
     """
 
     Parameters
     ----------
-    project : metamist project name
-    sample_ids : a list of internal sample IDs whose crams will be transferred to release
+    filename :  a path to a csv containing metmaist project names in column 1, sample ids in column 2, and
+                external participant ids in column 3. 
+                Only Columns 1 and 3 are required for this script.
     """
+    # Create the { project : [sample_ids,] } dict mapping each project to all its sample IDs in the file
+    project_samples = defaultdict(list)
+    with open(filename, 'r') as mapping_file:
+        reader = csv.reader(mapping_file)
+        # Each project ID becomes a key with its list of sample IDs as its value
+        for row in reader:
+            project_samples[row[0]].append(row[1])
 
-    # Retrieve latest crams for selected samples
-    latest_crams = AnalysisApi().get_latest_analysis_for_samples_and_type(
-        AnalysisType('cram'), project, request_body=sample_ids
-    )
+    for project, sample_ids in project_samples.items():
+        # Retrieve latest crams for selected samples
+        latest_crams = AnalysisApi().get_latest_analysis_for_samples_and_type(
+            AnalysisType('cram'), project, request_body=sample_ids
+        )
 
-    # Copy files to test
-    for cram in latest_crams:
-        copy_to_release(project, cram['output'])
-        copy_to_release(project, cram['output'] + '.crai')
+        # Copy files to test
+        for cram in latest_crams:
+            copy_to_release(project, cram['output'])
+            copy_to_release(project, cram['output'] + '.crai')
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -62,29 +68,4 @@ if __name__ == '__main__':
         stream=sys.stderr,
     )
 
-    parser = ArgumentParser()
-    parser.add_argument('-m', '--mapping', help='Path to file mapping projects to Sample IDs')
-    parser.add_argument('-h', '--headers', help='True/False flag if mapping file contains header row')
-
-    args, unknown = parser.parse_known_args()
-
-    if unknown:
-        raise ValueError(f'Unknown args, could not parse: "{unknown}"')
-
-    project_samples = defaultdict(list)
-    with open(args.mapping, 'r') as mapping_file:
-        reader = csv.reader(mapping_file)
-        if args.header:
-            next(reader) # skip the header
-        
-        # Each project ID becomes a key with its list of sample IDs as its value
-        for row in reader:
-            project_samples[row[0]].append(row[2])
-
-        mapping_file.close()
-
-    for project, sample_ids in project_samples.items():
-        main(
-            project=project,
-            sample_ids=sample_ids
-        )
+    main()
