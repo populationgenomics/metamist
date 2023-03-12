@@ -6,7 +6,6 @@ import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse } from '../../sm-api/api'
-import MuckError from '../../shared/components/MuckError'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
