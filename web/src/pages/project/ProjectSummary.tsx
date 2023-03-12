@@ -92,7 +92,6 @@ const ProjectSummary: React.FunctionComponent = () => {
         pageNumber,
         _updateProjectSummary,
     ])
-    console.log(summary)
 
     const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
 
