@@ -47,6 +47,9 @@ query FamilyInfo($family_id: Int!) {
       families {
         externalId
         id
+        participants {
+            id
+        }
       }
       pedigree(internalFamilyIds: [$family_id])
       name
@@ -103,7 +106,9 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
             <>
                 <FamilyViewTitle
                     projectName={data?.family.project.name}
-                    families={data?.family.project.families}
+                    families={data?.family.project.families.filter(
+                        (family) => family.participants.length
+                    )}
                     externalId={data?.family.externalId}
                 />
                 <Pedigree familyID={family_ID} onClick={onPedigreeClick} />

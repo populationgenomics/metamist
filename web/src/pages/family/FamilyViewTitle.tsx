@@ -7,7 +7,7 @@ import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 
 const FamilyViewTitle: React.FunctionComponent<{
     externalId: string
-    families: { id: number; externalId: string }[]
+    families: { id: number; externalId: string; participants: { id: number }[] }[]
     projectName: string
 }> = ({ externalId, families, projectName }) => {
     const navigate = useNavigate()
@@ -38,8 +38,17 @@ const FamilyViewTitle: React.FunctionComponent<{
                         }
                         hoverable
                         style={{ float: 'right' }}
+                        position="bottom left"
                     >
-                        <Grid divided centered rows={3}>
+                        <Grid
+                            divided
+                            centered
+                            rows={3}
+                            style={{
+                                overflow: 'auto',
+                                height: '400px',
+                            }}
+                        >
                             {families.map((item) => (
                                 <Grid.Row key={item.id} textAlign="center">
                                     <Button

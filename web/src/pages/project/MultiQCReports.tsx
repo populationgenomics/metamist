@@ -9,10 +9,10 @@ const REPORT_PREFIX = 'https://main-web.populationgenomics.org.au/'
 const REPORT_TYPES = {
     'WGS Cram': '/qc/cram/multiqc.html',
     'WGS GVCF': '/qc/gvcf/multiqc.html',
-    'WGS FASTQC': 'qc/fastqc/multiqc.html',
-    'Exome Cram': 'exome/qc/cram/multiqc.html',
-    'Exome GVCF': 'exome/qc/gvcf/multiqc.html',
-    'Exome FASTQC': 'exome/qc/fastqc/multiqc.html',
+    'WGS FASTQC': '/qc/fastqc/multiqc.html',
+    'Exome Cram': '/exome/qc/cram/multiqc.html',
+    'Exome GVCF': '/exome/qc/gvcf/multiqc.html',
+    'Exome FASTQC': '/exome/qc/fastqc/multiqc.html',
 }
 
 const MultiQCReports: React.FunctionComponent<MultiQCReportsProps> = ({ projectName }) => (
