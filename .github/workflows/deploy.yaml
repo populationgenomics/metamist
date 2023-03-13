@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - dev
+      - add-sync-seqr-script
 
 jobs:
   deploy:
