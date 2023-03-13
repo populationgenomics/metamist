@@ -9,8 +9,7 @@ from typing import Iterable, Iterator, TypeVar
 
 import aiohttp
 from cloudpathlib import AnyPath
-import google.auth.exceptions
-import google.auth.transport.requests
+from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import SEQR_URL, SEQR_AUDIENCE, SEQR_MAP_LOCATION
 from db.python.connect import Connection
@@ -120,21 +119,7 @@ class SeqrLayer(BaseLayer):
 
     def generate_seqr_auth_token(self):
         """Generate an OAUTH2 token for talking to seqr"""
-        # Leo do you have a snippet here for generating credentials from CloudRun
-        # pylint: disable=import-outside-toplevel
-        import json
-        from google.oauth2 import service_account
-
-        with open('/path/to/service-account-credentials.json') as f:
-            info = json.load(f)
-
-        credentials_content = (info.get('type') == 'service_account') and info or None
-        credentials = service_account.IDTokenCredentials.from_service_account_info(
-            credentials_content, target_audience=SEQR_AUDIENCE
-        )
-        auth_req = google.auth.transport.requests.Request()
-        credentials.refresh(auth_req)
-        return credentials.token
+        return get_google_identity_token(target_audience=SEQR_AUDIENCE)
 
     async def sync_families(
         self,
@@ -401,20 +386,32 @@ class SeqrLayer(BaseLayer):
 
         def process_sex(value):
             if not value:
-                return 'U'
+                return ''
+            if value == 'U':
+                return ''
             if isinstance(value, str):
                 return value[0]
             if not isinstance(value, int):
                 raise ValueError(f'Unexpected type for sex {type(value)}: {value}')
-            return {1: 'M', 2: 'F'}.get(value, 'U')
+            return {1: 'M', 2: 'F'}.get(value, '')
+
+        def process_affected(value):
+            if not isinstance(value, int):
+                raise ValueError(f'Unexpected affected value: {value}')
+            return {
+                -9: 'U',
+                0: 'U',
+                1: 'N',
+                2: 'A',
+            }[value]
 
         keys = {
             'familyId': 'family_id',
             'individualId': 'individual_id',
             'paternalId': 'paternal_id',
             'maternalId': 'maternal_id',
-            'sex': 'sex',
-            'affected': 'affected',
+            # 'sex': 'sex',
+            # 'affected': 'affected',
             'notes': 'notes',
         }
 
@@ -425,6 +422,8 @@ class SeqrLayer(BaseLayer):
                 if sm_key in row
             }
             d['sex'] = process_sex(row['sex'])
+            d['affected'] = process_affected(row['affected'])
+
             return d
 
         return list(map(get_row, ped_rows))

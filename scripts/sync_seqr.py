@@ -153,13 +153,13 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
             raise ValueError('No families to sync')
 
         # await sync_families(**params, family_eids=filtered_family_eids)
-        # await sync_pedigree(**params, family_eids=filtered_family_eids)
+        await sync_pedigree(**params, family_eids=filtered_family_eids)
         # await sync_individual_metadata(**params, participant_eids=set(participant_eids))
         # await update_es_index(**params, sequence_type=sequence_type)
 
-        await sync_cram_map(
-            **params, participant_eids=participant_eids, sequence_type=sequence_type
-        )
+        # await sync_cram_map(
+        #     **params, participant_eids=participant_eids, sequence_type=sequence_type
+        # )
 
 
 async def sync_pedigree(
@@ -190,6 +190,12 @@ async def sync_pedigree(
     )
     if not resp.ok:
         logger.warning(f'{dataset} :: Confirming pedigree failed: {await resp.text()}')
+        with open(f'{dataset}.ped', 'w+') as f:
+            import csv
+            writer = csv.writer(f, delimiter='\t')
+            headers = ['familyId','individualId','paternalId','maternalId','sex','affected']
+            writer.writerows([[row[h] for h in headers] for row in pedigree_data])
+
     resp.raise_for_status()
 
     print(f'{dataset} :: Uploaded pedigree')
@@ -330,7 +336,7 @@ async def sync_individual_metadata(
     )
     # print(resp.text)
 
-    if resp.status == 400 and 'Unable to find individuals to update' in resp.text:
+    if resp.status == 400 and 'Unable to find individuals to update' in await resp.text():
         print('No individual metadata needed updating')
         return
 
@@ -373,9 +379,9 @@ async def update_es_index(
     if check_metamist:  # len(es_index_analyses) > 0:
         es_index_analyses = await aapi.query_analyses_async(
             AnalysisQueryModel(
-                projects=[dataset],
+                projects=[dataset, 'seqr'],
                 type=AnalysisType('es-index'),
-                meta={'sequencing_type': sequence_type},
+                meta={'sequencing_type': sequence_type, 'dataset': dataset},
                 status=AnalysisStatus('completed'),
             )
         )
@@ -407,7 +413,7 @@ async def update_es_index(
     }
     req1_url = BASE + url_update_es_index.format(projectGuid=project_guid)
     resp_1 = await session.post(req1_url, json=data, headers=headers)
-    print(f'{dataset} :: Updated ES index with status: {resp_1.status}')
+    print(f'{dataset} :: Updated ES index {es_index!r} with status: {resp_1.status}')
     if not resp_1.ok:
         print(f'{dataset} :: Request failed with information: {resp_1.text}')
     resp_1.raise_for_status()
@@ -494,7 +500,7 @@ async def sync_cram_map(
         )
         print(responses)
 
-    print(f'{dataset} :: Updated {len(all_updates)} CRAMs')
+    print(f'{dataset} :: Updated {len(all_updates)} / {len(reads_map)} CRAMs')
 
 
 async def _get_pedigree_from_sm(
@@ -513,20 +519,30 @@ async def _get_pedigree_from_sm(
         if not isinstance(value, int):
             return value
         if value == 0:
-            return 'U'
+            return ''
         if value == 1:
             return 'M'
         if value == 2:
             return 'F'
-        return 'U'
+        return ''
+
+    def process_affected(value):
+        if not isinstance(value, int):
+            raise ValueError(f'Unexpected affected value: {value}')
+        return {
+            -9: 'U',
+            0: 'U',
+            1: 'N',
+            2: 'A',
+        }[value]
 
     keys = {
         'familyId': 'family_id',
         'individualId': 'individual_id',
         'paternalId': 'paternal_id',
         'maternalId': 'maternal_id',
-        'sex': 'sex',
-        'affected': 'affected',
+        # 'sex': 'sex',
+        # 'affected': 'affected',
         'notes': 'notes',
     }
 
@@ -535,6 +551,7 @@ async def _get_pedigree_from_sm(
             seqr_key: row[sm_key] for seqr_key, sm_key in keys.items() if sm_key in row
         }
         d['sex'] = process_sex(row['sex'])
+        d['affected'] = process_affected(row['affected'])
         return d
 
     rows = list(map(get_row, ped_rows))
@@ -570,13 +587,13 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
     for project in seqr_projects:
         project_name = project['name']
         if ignore and project_name in ignore:
-            print(f'Skipping {project_name}')
+            # print(f'Skipping {project_name}')
             continue
 
         meta_key = f'seqr-project-{sequence_type}'
         seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
-            print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
+            # print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
             continue
         el = asyncio.get_event_loop()
         try:
@@ -620,4 +637,5 @@ if __name__ == '__main__':
     # for dataset in datasets:
     #     sync_single_dataset_from_name(dataset, 'genome')
     # sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
-    sync_all_datasets(sequence_type='exome')
+    # sync_all_datasets(sequence_type='exome')
+    sync_single_dataset_from_name('hereditary-neuro', 'exome')
