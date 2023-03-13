@@ -3,7 +3,7 @@
 
 import * as React from 'react'
 import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
-import { ProjectApi, Project, SequenceType } from '../sm-api'
+import { ProjectApi, Project, SequenceType } from '../../sm-api'
 
 interface ControlledInputProps extends InputProps {
     project: Project

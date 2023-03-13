@@ -89,9 +89,31 @@ blockquote {
 }
 
 @media screen and (min-width: 1200px) {
-    .detailedInfo {
+    .dataStyle {
         max-width: 1200px;
         margin-left: auto;
         margin-right: auto;
+    }
+}
+
+.accordionStyle {
+    width: 100% !important;
+}
+
+.selectedParticipant {
+    animation-name: tempHighlight;
+    animation-duration: 4s;
+    animation-delay: 3s;
+    animation-fill-mode: forwards;
+    color: rgb(199, 27, 27);
+    /* animation-timing-function: ease-in; */
+}
+
+@keyframes tempHighlight {
+    from {
+        color: rgb(199, 27, 27);
+    }
+    to {
+        color: black;
     }
 }
