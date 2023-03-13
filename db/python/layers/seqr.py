@@ -200,7 +200,7 @@ class SeqrLayer(BaseLayer):
         # 1. Get pedigree from SM
         pedigree_data = await self._get_pedigree_from_sm(family_ids=family_ids)
         if not pedigree_data:
-            return ['Skipping pedigree update because no data was found']
+            return ['No pedigree to synchronise']
 
         # 2. Upload pedigree to seqr
         req_url = SEQR_URL + _url_individuals_sync.format(projectGuid=project_guid)
@@ -226,6 +226,9 @@ class SeqrLayer(BaseLayer):
         processed_records = await self.get_individual_meta_objs_for_seqr(
             participant_ids
         )
+
+        if not processed_records:
+            return ['No individual metadata to synchronise']
 
         req_url = SEQR_URL + _url_individual_meta_sync.format(projectGuid=project_guid)
         resp = await session.post(
@@ -276,12 +279,9 @@ class SeqrLayer(BaseLayer):
 
         fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
         # pylint: disable=no-member
-        with AnyPath(fn_path).open('w+') as f:
-            f.write('\n'.join(rows_to_write))
 
-        es_index_analyses = await AnalysisLayer(
-            connection=self.connection
-        ).query_analysis(
+        alayer = AnalysisLayer(connection=self.connection)
+        es_index_analyses = await alayer.query_analysis(
             project_ids=[self.connection.project],
             analysis_type=AnalysisType('es-index'),
             meta={'sequencing_type': sequence_type.value},
@@ -295,6 +295,9 @@ class SeqrLayer(BaseLayer):
 
         if len(es_index_analyses) == 0:
             return [f'No ES index to synchronise']
+
+        with AnyPath(fn_path).open('w+') as f:
+            f.write('\n'.join(rows_to_write))
 
         es_index = es_index_analyses[-1]['output']
 
@@ -353,7 +356,7 @@ class SeqrLayer(BaseLayer):
             )
 
         if not reads_map:
-            return ['No CRAMs to sync in for reads map']
+            return ['No CRAMs to synchronise']
 
         req_url = SEQR_URL + _url_igv_diff.format(projectGuid=project_guid)
         resp = await session.post(
@@ -363,7 +366,7 @@ class SeqrLayer(BaseLayer):
 
         response = await resp.json()
         if 'updates' not in response:
-            return ['All CRAMs are up to date']
+            return [f'All CRAMs ({len(reads_map)}) are up to date']
 
         async def _make_update_igv_call(update):
             individual_guid = update['individualGuid']
@@ -397,7 +400,7 @@ class SeqrLayer(BaseLayer):
             ps = '; '.join(f'{sid}: {ex}' for sid, ex in exceptions)
             return [f'Could not update {len(exceptions)} IGV paths: {ps}']
 
-        return [f'{len(all_updates)} CRAMs were updated in seqr']
+        return [f'{len(all_updates)} (/{len(reads_map)}) CRAMs were updated']
 
     async def _get_pedigree_from_sm(self, family_ids: set[int]) -> list[dict] | None:
         """Call get_pedigree and return formatted string with header"""
