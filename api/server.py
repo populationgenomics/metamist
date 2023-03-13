@@ -29,11 +29,6 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
-if PROFILE_REQUESTS:
-    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
-
-    app.add_middleware(PyInstrumentProfilerMiddleware)
-
 if is_all_access():
     app.add_middleware(
         CORSMiddleware,
@@ -96,8 +91,16 @@ async def not_found(request, exc):
     return request, exc
 
 
+def get_app_middleware(app: FastAPI, middleware_class):
+    middleware_index = None
+    for index, middleware in enumerate(app.user_middleware):
+        if middleware.cls == middleware_class:
+            middleware_index = index
+    return None if middleware_index is None else app.user_middleware[middleware_index]
+
+
 @app.exception_handler(Exception)
-async def exception_handler(_: Request, e: Exception):
+async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
     add_stacktrace = True
 
@@ -115,10 +118,20 @@ async def exception_handler(_: Request, e: Exception):
         st = traceback.format_exc()
         base_params['stacktrace'] = st
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=code,
         content=base_params,
     )
+
+    cors_middleware = get_app_middleware(app=app, middleware_class=CORSMiddleware)
+
+    request_origin = request.headers.get("origin", "")
+    if cors_middleware and "*" in cors_middleware.options["allow_origins"]:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    elif cors_middleware and request_origin in cors_middleware.options["allow_origins"]:
+        response.headers["Access-Control-Allow-Origin"] = request_origin
+
+    return response
 
 
 # graphql
