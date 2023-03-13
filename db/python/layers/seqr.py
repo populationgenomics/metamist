@@ -76,19 +76,25 @@ class SeqrLayer(BaseLayer):
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
         project = await pptable.get_project_by_id(project or self.connection.project)
 
-        sts = [st for st in SequenceType if self.get_meta_key_from_sequence_type(st) in project.meta]
+        sts = [
+            st
+            for st in SequenceType
+            if self.get_meta_key_from_sequence_type(st) in project.meta
+        ]
         return sts
 
     async def sync_dataset(self, sequence_type: SequenceType):
         """Sync a specific dataset for seqr"""
-        if not self.is_seqr_sync_setup():
+        if not await self.is_seqr_sync_setup():
             raise ValueError('Seqr synchronisation is not configured in metamist')
 
         token = self.generate_seqr_auth_token()
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
         project = await pptable.get_project_by_id(self.connection.project)
 
-        seqr_guid = project.meta.get(self.get_meta_key_from_sequence_type(sequence_type))
+        seqr_guid = project.meta.get(
+            self.get_meta_key_from_sequence_type(sequence_type)
+        )
 
         if not seqr_guid:
             raise ValueError(
@@ -105,36 +111,29 @@ class SeqrLayer(BaseLayer):
         family_ids = set(f.id for fams in families.values() for f in fams)
 
         messages = []
-        exception = None
         async with aiohttp.ClientSession() as session:
-            try:
-                params = {
-                    'headers': {'Authorization': f'Bearer {token}'},
-                    'project_guid': seqr_guid,
-                    'session': session,
-                }
-                messages.extend(await self.sync_families(family_ids=family_ids, **params))
-                messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
-                # messages.extend(
-                #     await self.sync_individual_metadata(
-                #         participant_ids=participant_ids, **params
-                #     )
-                # )
-                # messages.extend(
-                #     await self.update_es_index(sequence_type=sequence_type, **params)
-                # )
-                # messages.extend(
-                #     await self.sync_cram_map(
-                #         sequence_type=sequence_type,
-                #         participant_ids=participant_ids,
-                #         **params,
-                #     )
-                # )
-            except Exception as e:
-                exception = e
-
-        if exception:
-            raise exception
+            params = {
+                'headers': {'Authorization': f'Bearer {token}'},
+                'project_guid': seqr_guid,
+                'session': session,
+            }
+            messages.extend(await self.sync_families(family_ids=family_ids, **params))
+            messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
+            messages.extend(
+                await self.sync_individual_metadata(
+                    participant_ids=participant_ids, **params
+                )
+            )
+            messages.extend(
+                await self.update_es_index(sequence_type=sequence_type, **params)
+            )
+            messages.extend(
+                await self.sync_cram_map(
+                    sequence_type=sequence_type,
+                    participant_ids=participant_ids,
+                    **params,
+                )
+            )
 
         return messages
 

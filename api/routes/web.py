@@ -107,7 +107,7 @@ async def get_project_summary(
             cram_seqr_stats={},
             batch_sequence_stats={},
             seqr_links=summary.seqr_links,
-            seqr_sync_types=[]
+            seqr_sync_types=[],
         )
 
     participants = summary.participants
@@ -179,5 +179,8 @@ async def sync_seqr_project(
     Sync a metamist project with its seqr project (for a specific sequence type)
     """
     seqr = SeqrLayer(connection)
-    messages = await seqr.sync_dataset(sequence_type)
-    return {'success': True, 'messages': messages}
+    try:
+        messages = await seqr.sync_dataset(sequence_type)
+        return {'success': True, 'messages': messages}
+    except Exception as e:
+        raise Exception(f'Failed to synchronise seqr project: {str(e)}') from e
