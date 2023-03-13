@@ -133,7 +133,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                         />
                         <hr />
                         <MultiQCReports projectName={projectName} />
-                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} syncTypes={summary?.seqr_sync_types} project={projectName} />
                         <hr />
                         <div
                             style={{

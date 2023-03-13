@@ -57,6 +57,7 @@ class ProjectSummaryResponse(BaseModel):
     sample_keys: list[list[str]]
     sequence_keys: list[list[str]]
     seqr_links: dict[str, str]
+    seqr_sync_types: list[SequenceType]
 
     links: PagingLinks | None
 
@@ -106,6 +107,7 @@ async def get_project_summary(
             cram_seqr_stats={},
             batch_sequence_stats={},
             seqr_links=summary.seqr_links,
+            seqr_sync_types=[]
         )
 
     participants = summary.participants
@@ -142,6 +144,7 @@ async def get_project_summary(
         sample_keys=summary.sample_keys,
         sequence_keys=summary.sequence_keys,
         seqr_links=summary.seqr_links,
+        seqr_sync_types=summary.seqr_sync_types,
         _links=links,
     )
 

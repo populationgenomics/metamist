@@ -19,6 +19,7 @@ from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequence import SampleSequenceLayer
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import ProjectId
 from models.enums import SequenceType, AnalysisStatus, AnalysisType
 from models.models.sample import sample_id_format
 
@@ -64,6 +65,20 @@ class SeqrLayer(BaseLayer):
         """Check if metamist is configured to interact with seqr"""
         return SEQR_URL and SEQR_AUDIENCE
 
+    @staticmethod
+    def get_meta_key_from_sequence_type(sequence_type: SequenceType):
+        return f'seqr-project-{sequence_type.value}'
+
+    async def get_synchronisable_types(self, project: ProjectId | None = None):
+        if not await self.is_seqr_sync_setup():
+            return []
+
+        pptable = ProjectPermissionsTable(connection=self.connection.connection)
+        project = await pptable.get_project_by_id(project or self.connection.project)
+
+        sts = [st for st in SequenceType if self.get_meta_key_from_sequence_type(st) in project.meta]
+        return sts
+
     async def sync_dataset(self, sequence_type: SequenceType):
         """Sync a specific dataset for seqr"""
         if not self.is_seqr_sync_setup():
@@ -73,8 +88,7 @@ class SeqrLayer(BaseLayer):
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
         project = await pptable.get_project_by_id(self.connection.project)
 
-        meta_key = f'seqr-project-{sequence_type.value}'
-        seqr_guid = project.meta.get(meta_key)
+        seqr_guid = project.meta.get(self.get_meta_key_from_sequence_type(sequence_type))
 
         if not seqr_guid:
             raise ValueError(
@@ -91,29 +105,36 @@ class SeqrLayer(BaseLayer):
         family_ids = set(f.id for fams in families.values() for f in fams)
 
         messages = []
+        exception = None
         async with aiohttp.ClientSession() as session:
-            params = {
-                'headers': {'Authorization': f'Bearer {token}'},
-                'project_guid': seqr_guid,
-                'session': session,
-            }
-            messages.extend(await self.sync_families(family_ids=family_ids, **params))
-            messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
-            messages.extend(
-                await self.sync_individual_metadata(
-                    participant_ids=participant_ids, **params
-                )
-            )
-            messages.extend(
-                await self.update_es_index(sequence_type=sequence_type, **params)
-            )
-            messages.extend(
-                await self.sync_cram_map(
-                    sequence_type=sequence_type,
-                    participant_ids=participant_ids,
-                    **params,
-                )
-            )
+            try:
+                params = {
+                    'headers': {'Authorization': f'Bearer {token}'},
+                    'project_guid': seqr_guid,
+                    'session': session,
+                }
+                messages.extend(await self.sync_families(family_ids=family_ids, **params))
+                messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
+                # messages.extend(
+                #     await self.sync_individual_metadata(
+                #         participant_ids=participant_ids, **params
+                #     )
+                # )
+                # messages.extend(
+                #     await self.update_es_index(sequence_type=sequence_type, **params)
+                # )
+                # messages.extend(
+                #     await self.sync_cram_map(
+                #         sequence_type=sequence_type,
+                #         participant_ids=participant_ids,
+                #         **params,
+                #     )
+                # )
+            except Exception as e:
+                exception = e
+
+        if exception:
+            raise exception
 
         return messages
 
@@ -267,7 +288,8 @@ class SeqrLayer(BaseLayer):
         )
 
         if len(es_index_analyses) == 0:
-            raise ValueError(f'No ES index to synchronise')
+            return [f'No ES index to synchronise']
+
         es_index = es_index_analyses[-1]['output']
 
         req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)

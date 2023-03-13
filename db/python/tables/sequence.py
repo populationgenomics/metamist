@@ -555,7 +555,7 @@ class SampleSequencingTable(DbBase):
     SELECT s.project as project, s.participant_id as pid
     FROM sample_sequencing sq
     INNER JOIN sample s ON sq.sample_id = s.id
-    WHERE sq.type = :sqtype AND project = :project
+    WHERE sq.type = :seqtype AND project = :project
         """
 
         rows = list(
