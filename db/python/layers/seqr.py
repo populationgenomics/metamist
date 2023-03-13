@@ -67,14 +67,21 @@ class SeqrLayer(BaseLayer):
 
     @staticmethod
     def get_meta_key_from_sequence_type(sequence_type: SequenceType):
+        """
+        Convenience method for computing the key where the SEQR_GUID
+        is stored within the project.meta
+        """
         return f'seqr-project-{sequence_type.value}'
 
-    async def get_synchronisable_types(self, project: ProjectId | None = None):
+    async def get_synchronisable_types(self, project_id: ProjectId | None = None):
+        """
+        Check the project meta to find out which sequence_types are synchronisable
+        """
         if not await self.is_seqr_sync_setup():
             return []
 
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
-        project = await pptable.get_project_by_id(project or self.connection.project)
+        project = await pptable.get_project_by_id(project_id or self.connection.project)
 
         sts = [
             st

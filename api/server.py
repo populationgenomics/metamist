@@ -29,6 +29,11 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
+if PROFILE_REQUESTS:
+    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+
+    app.add_middleware(PyInstrumentProfilerMiddleware)
+
 if is_all_access():
     app.add_middleware(
         CORSMiddleware,
@@ -91,14 +96,6 @@ async def not_found(request, exc):
     return request, exc
 
 
-def get_app_middleware(app: FastAPI, middleware_class):
-    middleware_index = None
-    for index, middleware in enumerate(app.user_middleware):
-        if middleware.cls == middleware_class:
-            middleware_index = index
-    return None if middleware_index is None else app.user_middleware[middleware_index]
-
-
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
@@ -123,13 +120,22 @@ async def exception_handler(request: Request, e: Exception):
         content=base_params,
     )
 
-    cors_middleware = get_app_middleware(app=app, middleware_class=CORSMiddleware)
+    # https://github.com/tiangolo/fastapi/issues/457#issuecomment-851547205
+    # FastAPI doesn't run middleware on exception, but if we make a non-GET/INFO
+    # request, then we lose CORS and hence lose the exception in the body of the
+    # response. Grab it manually, and explicitly allow origin if so.
+    middlewares = [m for m in app.user_middleware if isinstance(m, CORSMiddleware)]
+    if middlewares:
+        cors_middleware = middlewares[0]
 
-    request_origin = request.headers.get("origin", "")
-    if cors_middleware and "*" in cors_middleware.options["allow_origins"]:
-        response.headers["Access-Control-Allow-Origin"] = "*"
-    elif cors_middleware and request_origin in cors_middleware.options["allow_origins"]:
-        response.headers["Access-Control-Allow-Origin"] = request_origin
+        request_origin = request.headers.get('origin', '')
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        elif (
+            cors_middleware
+            and request_origin in cors_middleware.options['allow_origins']
+        ):
+            response.headers['Access-Control-Allow-Origin'] = request_origin
 
     return response
 

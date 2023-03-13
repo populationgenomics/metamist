@@ -192,8 +192,16 @@ async def sync_pedigree(
         logger.warning(f'{dataset} :: Confirming pedigree failed: {await resp.text()}')
         with open(f'{dataset}.ped', 'w+') as f:
             import csv
+
             writer = csv.writer(f, delimiter='\t')
-            headers = ['familyId','individualId','paternalId','maternalId','sex','affected']
+            headers = [
+                'familyId',
+                'individualId',
+                'paternalId',
+                'maternalId',
+                'sex',
+                'affected',
+            ]
             writer.writerows([[row[h] for h in headers] for row in pedigree_data])
 
     resp.raise_for_status()
@@ -336,7 +344,10 @@ async def sync_individual_metadata(
     )
     # print(resp.text)
 
-    if resp.status == 400 and 'Unable to find individuals to update' in await resp.text():
+    if (
+        resp.status == 400
+        and 'Unable to find individuals to update' in await resp.text()
+    ):
         print('No individual metadata needed updating')
         return
 

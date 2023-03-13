@@ -183,4 +183,4 @@ async def sync_seqr_project(
         messages = await seqr.sync_dataset(sequence_type)
         return {'success': True, 'messages': messages}
     except Exception as e:
-        raise Exception(f'Failed to synchronise seqr project: {str(e)}') from e
+        raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e

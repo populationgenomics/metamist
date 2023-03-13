@@ -330,7 +330,7 @@ WHERE fp.participant_id in :pids
                 project=self.project
             ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
-            SeqrLayer(self._connection).get_synchronisable_types(self.project)
+            SeqrLayer(self._connection).get_synchronisable_types(self.project),
         )
 
         # post-processing
