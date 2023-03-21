@@ -99,7 +99,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
             if row['dem_sex_cdc'] == "male":
                 proband_sex = 1
             elif row['dem_sex_cdc'] == "female":
-                proband_sex = 1
+                proband_sex = 2
             else:
                 proband_sex = 0
 
@@ -130,7 +130,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
             if paternal_id:
                 ped_writer.writerow({
                     'Family ID': family_id,
-                    'Individual ID': maternal_id,
+                    'Individual ID': paternal_id,
                     'Paternal ID': "0",
                     'Maternal ID': "0",
                     'Sex': "1",
