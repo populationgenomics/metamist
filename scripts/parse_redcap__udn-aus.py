@@ -38,6 +38,7 @@ def parse_redcap(redcap_csv: str):
                     families.append(family_rows)
                     family_rows = {'individual_data': defaultdict(dict)}
 
+                row['fam_id'] = row['proband_id'].strip('PR')
                 family_rows['family_metadata'] = row
                 continue
 
