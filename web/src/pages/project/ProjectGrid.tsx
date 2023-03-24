@@ -7,6 +7,7 @@ import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse } from '../../sm-api/api'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
+import { red, black } from '@mui/material/colors'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -45,27 +46,54 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         <Table celled>
             <Table.Header>
                 <Table.Row>
-                    {headers.map((k, i) => (
-                        <Table.HeaderCell key={`filter-${k}-${i}`} style={{ borderBottom: 'none' }}>
-                            <div style={{ position: 'relative' }}>
-                                <div style={{ position: 'absolute', top: 0, right: 0 }}>
-                                    <Popup trigger={<FilterAltIcon />} hoverable>
-                                        <Form onSubmit={onSubmit}>
-                                            <Form.Input
-                                                icon="search"
-                                                placeholder="Filter..."
-                                                name={k}
-                                                value={
-                                                    k in tempFilterValues ? tempFilterValues[k] : ''
-                                                }
-                                                onChange={onChange}
-                                            />
-                                        </Form>
-                                    </Popup>
+                    {headers.map((k, i) => {
+                        if (k === 'Sample ID') {
+                            return (
+                                <Table.HeaderCell
+                                    key={`filter-${k}-${i}`}
+                                    style={{ borderBottom: 'none' }}
+                                ></Table.HeaderCell>
+                            )
+                        }
+                        return (
+                            <Table.HeaderCell
+                                key={`filter-${k}-${i}`}
+                                style={{ borderBottom: 'none' }}
+                            >
+                                <div style={{ position: 'relative' }}>
+                                    <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                                        <Popup
+                                            trigger={
+                                                <FilterAltIcon
+                                                    sx={{
+                                                        color:
+                                                            k in filterValues
+                                                                ? red[500]
+                                                                : '#000000',
+                                                    }}
+                                                />
+                                            }
+                                            hoverable
+                                        >
+                                            <Form onSubmit={onSubmit}>
+                                                <Form.Input
+                                                    icon="search"
+                                                    placeholder="Filter..."
+                                                    name={k}
+                                                    value={
+                                                        k in tempFilterValues
+                                                            ? tempFilterValues[k]
+                                                            : ''
+                                                    }
+                                                    onChange={onChange}
+                                                />
+                                            </Form>
+                                        </Popup>
+                                    </div>
                                 </div>
-                            </div>
-                        </Table.HeaderCell>
-                    ))}
+                            </Table.HeaderCell>
+                        )
+                    })}
                 </Table.Row>
                 <Table.Row>
                     {headers.map((k, i) => (

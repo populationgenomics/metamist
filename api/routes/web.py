@@ -44,6 +44,7 @@ class ProjectSummaryResponse(BaseModel):
     # high level stats
     total_participants: int
     total_samples: int
+    total_samples_in_query: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
     batch_sequence_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
@@ -72,7 +73,7 @@ class SearchResponseModel(BaseModel):
 router = APIRouter(prefix='/web', tags=['web'])
 
 
-@router.get(
+@router.post(
     '/{project}/summary',
     response_model=ProjectSummaryResponse,
     operation_id='getProjectSummary',
@@ -98,6 +99,7 @@ async def get_project_summary(
             sequence_keys=[],
             _links=None,
             total_samples=0,
+            total_samples_in_query=0,
             total_participants=0,
             total_sequences=0,
             cram_seqr_stats={},
@@ -129,6 +131,7 @@ async def get_project_summary(
     return ProjectSummaryResponse(
         project=WebProject(**summary.project.__dict__),
         total_samples=summary.total_samples,
+        total_samples_in_query=summary.total_samples_in_query,
         total_participants=summary.total_participants,
         total_sequences=summary.total_sequences,
         cram_seqr_stats=summary.cram_seqr_stats,

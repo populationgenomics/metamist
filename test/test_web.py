@@ -65,6 +65,7 @@ class TestWeb(DbIsolatedTest):
                 **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
             ),
             total_samples=0,
+            total_samples_in_query=0,
             total_participants=0,
             total_sequences=0,
             batch_sequence_stats={},
@@ -169,6 +170,7 @@ class TestWeb(DbIsolatedTest):
                 **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
             ),
             total_samples=1,
+            total_samples_in_query=1,
             total_participants=1,
             total_sequences=1,
             cram_seqr_stats={

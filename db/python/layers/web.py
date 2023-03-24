@@ -78,6 +78,7 @@ class ProjectSummary:
 
     # stats
     total_samples: int
+    total_samples_in_query: int
     total_participants: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
@@ -110,7 +111,7 @@ class WebLayer(BaseLayer):
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after, participant_metas: dict[str, str]):
+    def _project_summary_sample_query(self, limit, after, filter):
         """
         Get query for getting list of samples
         """
@@ -118,22 +119,39 @@ class WebDb(DbBase):
         values = {'limit': limit, 'project': self.project, 'after': after}
 
         where_str = ''
+        for category, rest in filter.items():
+            for is_meta, l in rest.items():
+                for query in l:
+                    field = query['field']
+                    value = query['value']
+                    key = f'{category}_{field}_{value}'.replace('-', '_').replace('.', '_')
+                    match category:
+                        case "sequence":
+                            prefix = "sq"
+                        case "participant":
+                            prefix = "p"
+                        case "sample":
+                            prefix = "s"
+                        case "family":
+                            prefix = "f"
+                            field = "external_id"
+                    
+                    if is_meta == 'non-meta':
+                        q =  f'{prefix}.{field} LIKE :{key}'
+                    else:
+                        q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
+                    wheres.append(q)
+                    values[key] = value + '%'
         if wheres:
-            where_str = 'WHERE ' + ' AND '.join(wheres)
-        for k, query in participant_metas.items():
-            pkey = f'participant_{k}'
-            wheres.append('JSON_VALUE(p.meta, "$.{k}" LIKE :{pkey}')
-            values[pkey] = query + '%'
-
-        JOINS = []
+                where_str = 'WHERE ' + ' AND '.join(wheres)
 
         sample_query = f"""
         SELECT s.id, s.external_id, s.type, s.meta, s.participant_id 
         FROM sample s
-        INNER JOIN sample_sequencing sq ON s.id = sq.sample_id
-        INNER JOIN participant p ON p.id = s.participant_id
-        INNER JOIN family_participant fp on s.participant_id = fp.participant_id
-        INNER JOIN family f ON f.id = fp.family_id
+        LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
+        LEFT JOIN participant p ON p.id = s.participant_id
+        LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
+        LEFT JOIN family f ON f.id = fp.family_id
         {where_str} 
         ORDER BY id 
         LIMIT :limit 
@@ -257,7 +275,7 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0), {}
+            limit, int(token or 0), filter
         )
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
@@ -269,10 +287,8 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        sample_rows = list(await self.connection.fetch_all(sample_query, values))
-        print(filter)
         print(sample_query, values)
-        print(sample_rows)
+        sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
         if len(sample_rows) == 0:
             return ProjectSummary(
@@ -283,6 +299,7 @@ class WebDb(DbBase):
                 sequence_keys=[],
                 # stats
                 total_samples=0,
+                total_samples_in_query=0,
                 total_participants=0,
                 total_sequences=0,
                 batch_sequence_stats={},
@@ -341,6 +358,10 @@ WHERE fp.participant_id in :pids
             ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
+        query_values = values
+        query_values['limit'] = total_samples
+        query_values['after'] = 0
+        total_samples_in_query = len(list(await self.connection.fetch_all(sample_query, query_values)))
 
         # post-processing
         seq_models_by_sample_id = (
@@ -472,6 +493,7 @@ WHERE fp.participant_id in :pids
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
             total_samples=total_samples,
+            total_samples_in_query=total_samples_in_query,
             total_participants=total_participants,
             total_sequences=total_sequences,
             batch_sequence_stats=sequence_stats,

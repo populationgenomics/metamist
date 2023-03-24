@@ -63,8 +63,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             try {
                 const response = await new WebApi().getProjectSummary(
                     projectName,
-                    // filterValues,
-                    { test: 'value' },
+                    filterValues,
                     pageLimit,
                     sanitisedToken
                 )
@@ -75,7 +74,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                 setIsLoading(false)
             }
         },
-        [projectName, pageLimit]
+        [projectName, pageLimit, filterValues]
     )
 
     const setPageLimit = React.useCallback(
@@ -83,6 +82,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             navigate(`/project/${projectName}/1?size=${parseInt(value, 10)}`)
             _setPageLimit(parseInt(value, 10))
             setPageNumber(1)
+            setFilterValues({})
         },
         [projectName, navigate]
     )
@@ -91,25 +91,29 @@ const ProjectSummary: React.FunctionComponent = () => {
         (e) => {
             if (!summary) return
             const processedFilter = Object.entries(e).reduce((filter, [column, v]) => {
-                const value = JSON.stringify(v)
+                if (!v) {
+                    return filter
+                }
+                const value = v as string
                 const participantIndex = summary.participant_keys.findIndex((i) => i[1] === column)
                 const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
                 const sequenceIndex = summary.sequence_keys.findIndex(
                     (i) => `sequence.${i[1]}` === column
                 )
-                const { category, field } = (participantIndex > 0 && {
+                const { category, oldField } = (participantIndex > -1 && {
                     category: 'participant',
-                    field: summary.participant_keys[participantIndex][0],
+                    oldField: summary.participant_keys[participantIndex][0],
                 }) ||
-                    (sampleIndex > 0 && {
+                    (sampleIndex > -1 && {
                         category: 'sample',
-                        field: summary.sample_keys[sampleIndex][0],
+                        oldField: summary.sample_keys[sampleIndex][0],
                     }) ||
-                    (sequenceIndex > 0 && {
+                    (sequenceIndex > -1 && {
                         category: 'sequence',
-                        field: summary.sequence_keys[sequenceIndex][0],
-                    }) || { category: 'family', field: 'family_ID' }
-                const metaKey = field.startsWith('meta.') ? 'meta' : 'non-meta'
+                        oldField: summary.sequence_keys[sequenceIndex][0],
+                    }) || { category: 'family', oldField: 'family_ID' }
+                const metaKey = oldField.startsWith('meta.') ? 'meta' : 'non-meta'
+                const field = oldField.startsWith('meta.') ? oldField.slice(5) : oldField
                 const categoryName = filter[category] || {}
                 const metaGroup = categoryName[metaKey] || []
                 metaGroup.push({ field, value })
@@ -117,8 +121,10 @@ const ProjectSummary: React.FunctionComponent = () => {
                 filter[category] = categoryName
                 return filter
             }, {} as Record<string, Record<string, Record<string, string>[]>>)
+            console.log(processedFilter)
+            console.log(e)
             setFilterValues(processedFilter)
-            setGridFilterValues(e)
+            setGridFilterValues(Object.entries(processedFilter).length ? e : {})
         },
         [summary]
     )
@@ -135,7 +141,7 @@ const ProjectSummary: React.FunctionComponent = () => {
         _updateProjectSummary,
     ])
 
-    const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
+    const totalPageNumbers = Math.ceil((summary?.total_samples_in_query || 0) / pageLimit)
 
     return (
         <>
@@ -198,7 +204,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                             <PageOptions
                                 isLoading={isLoading}
                                 totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples}
+                                totalSamples={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
                             />
@@ -212,7 +218,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                         <PageOptions
                             isLoading={isLoading}
                             totalPageNumbers={totalPageNumbers}
-                            totalSamples={summary?.total_samples}
+                            totalSamples={summary?.total_samples_in_query}
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
                         />
