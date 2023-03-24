@@ -38,6 +38,10 @@ const ProjectSummary: React.FunctionComponent = () => {
     const [pageLimit, _setPageLimit] = React.useState<number>(
         validPages ? +pageSize : PAGE_SIZES[0]
     )
+    const [filterValues, setFilterValues] = React.useState<
+        Record<string, Record<string, Record<string, string>[]>>
+    >({})
+    const [gridFilterValues, setGridFilterValues] = React.useState<Record<string, string>>({})
 
     const handleOnClick = React.useCallback(
         (p) => {
@@ -59,6 +63,8 @@ const ProjectSummary: React.FunctionComponent = () => {
             try {
                 const response = await new WebApi().getProjectSummary(
                     projectName,
+                    // filterValues,
+                    { test: 'value' },
                     pageLimit,
                     sanitisedToken
                 )
@@ -79,6 +85,42 @@ const ProjectSummary: React.FunctionComponent = () => {
             setPageNumber(1)
         },
         [projectName, navigate]
+    )
+
+    const updateFilters = React.useCallback(
+        (e) => {
+            if (!summary) return
+            const processedFilter = Object.entries(e).reduce((filter, [column, v]) => {
+                const value = JSON.stringify(v)
+                const participantIndex = summary.participant_keys.findIndex((i) => i[1] === column)
+                const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
+                const sequenceIndex = summary.sequence_keys.findIndex(
+                    (i) => `sequence.${i[1]}` === column
+                )
+                const { category, field } = (participantIndex > 0 && {
+                    category: 'participant',
+                    field: summary.participant_keys[participantIndex][0],
+                }) ||
+                    (sampleIndex > 0 && {
+                        category: 'sample',
+                        field: summary.sample_keys[sampleIndex][0],
+                    }) ||
+                    (sequenceIndex > 0 && {
+                        category: 'sequence',
+                        field: summary.sequence_keys[sequenceIndex][0],
+                    }) || { category: 'family', field: 'family_ID' }
+                const metaKey = field.startsWith('meta.') ? 'meta' : 'non-meta'
+                const categoryName = filter[category] || {}
+                const metaGroup = categoryName[metaKey] || []
+                metaGroup.push({ field, value })
+                categoryName[metaKey] = metaGroup
+                filter[category] = categoryName
+                return filter
+            }, {} as Record<string, Record<string, Record<string, string>[]>>)
+            setFilterValues(processedFilter)
+            setGridFilterValues(e)
+        },
+        [summary]
     )
 
     const _updateProjectSummary = React.useCallback(() => {
@@ -161,7 +203,12 @@ const ProjectSummary: React.FunctionComponent = () => {
                                 handleOnClick={handleOnClick}
                             />
                         </div>
-                        <ProjectGrid summary={summary} projectName={projectName} />
+                        <ProjectGrid
+                            summary={summary}
+                            projectName={projectName}
+                            updateFilters={updateFilters}
+                            filterValues={gridFilterValues}
+                        />
                         <PageOptions
                             isLoading={isLoading}
                             totalPageNumbers={totalPageNumbers}

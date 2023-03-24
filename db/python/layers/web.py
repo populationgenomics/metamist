@@ -97,35 +97,47 @@ class WebLayer(BaseLayer):
     """Web layer"""
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int = 50
+        self, filter: dict[str, any], token: Optional[str], limit: int = 50, 
     ) -> ProjectSummary:
         """
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_summary(token=token, limit=limit)
+        return await webdb.get_project_summary(token=token, limit=limit, filter=filter)
 
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after):
+    def _project_summary_sample_query(self, limit, after, participant_metas: dict[str, str]):
         """
         Get query for getting list of samples
         """
-        wheres = ['project = :project']
+        wheres = ['s.project = :project']
         values = {'limit': limit, 'project': self.project, 'after': after}
-        # if after:
-        #     values['after'] = after
-        #     # wheres.append('id > :after')
-        #     wheres.append('offset :after')
 
         where_str = ''
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
-        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit OFFSET :after'
+        for k, query in participant_metas.items():
+            pkey = f'participant_{k}'
+            wheres.append('JSON_VALUE(p.meta, "$.{k}" LIKE :{pkey}')
+            values[pkey] = query + '%'
 
+        JOINS = []
+
+        sample_query = f"""
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id 
+        FROM sample s
+        INNER JOIN sample_sequencing sq ON s.id = sq.sample_id
+        INNER JOIN participant p ON p.id = s.participant_id
+        INNER JOIN family_participant fp on s.participant_id = fp.participant_id
+        INNER JOIN family f ON f.id = fp.family_id
+        {where_str} 
+        ORDER BY id 
+        LIMIT :limit 
+        OFFSET :after"""
         return sample_query, values
 
     @staticmethod
@@ -234,7 +246,7 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int
+        self, filter: dict[str, any], token: Optional[str], limit: int
     ) -> ProjectSummary:
         """
         Get project summary
@@ -245,7 +257,7 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0)
+            limit, int(token or 0), {}
         )
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
@@ -258,6 +270,9 @@ class WebDb(DbBase):
         seqr_links = self.get_seqr_links_from_project(project)
 
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
+        print(filter)
+        print(sample_query, values)
+        print(sample_rows)
 
         if len(sample_rows) == 0:
             return ProjectSummary(

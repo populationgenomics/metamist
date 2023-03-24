@@ -1,18 +1,26 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Table } from 'semantic-ui-react'
+import { Table, Form, Popup } from 'semantic-ui-react'
 
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse } from '../../sm-api/api'
+import FilterAltIcon from '@mui/icons-material/FilterAlt'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
     projectName: string
+    filterValues: Record<string, string>
+    updateFilters: (e: { [k: string]: FormDataEntryValue }) => void
 }
 
-const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, projectName }) => {
+const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
+    summary,
+    projectName,
+    filterValues,
+    updateFilters,
+}) => {
     const headers = [
         'Family ID',
         ...summary.participant_keys.map((field) => field[1]),
@@ -20,9 +28,45 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, proje
         ...summary.sequence_keys.map((field) => `sequence.${field[1]}`),
     ]
 
+    const [tempFilterValues, setTempFilterValues] =
+        React.useState<Record<string, string>>(filterValues)
+
+    const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const name = e.target.name
+        const value = e.target.value
+        setTempFilterValues({ ...tempFilterValues, [name]: value })
+    }
+
+    const onSubmit = () => {
+        updateFilters(tempFilterValues)
+    }
+
     return (
         <Table celled>
             <Table.Header>
+                <Table.Row>
+                    {headers.map((k, i) => (
+                        <Table.HeaderCell key={`filter-${k}-${i}`} style={{ borderBottom: 'none' }}>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                                    <Popup trigger={<FilterAltIcon />} hoverable>
+                                        <Form onSubmit={onSubmit}>
+                                            <Form.Input
+                                                icon="search"
+                                                placeholder="Filter..."
+                                                name={k}
+                                                value={
+                                                    k in tempFilterValues ? tempFilterValues[k] : ''
+                                                }
+                                                onChange={onChange}
+                                            />
+                                        </Form>
+                                    </Popup>
+                                </div>
+                            </div>
+                        </Table.HeaderCell>
+                    ))}
+                </Table.Row>
                 <Table.Row>
                     {headers.map((k, i) => (
                         <Table.HeaderCell key={`${k}-${i}`}>{k}</Table.HeaderCell>
