@@ -99,7 +99,7 @@ class WebLayer(BaseLayer):
 
     async def get_project_summary(
         self,
-        filter: dict[str, any],
+        grid_filter: dict,
         token: Optional[str],
         limit: int = 50,
     ) -> ProjectSummary:
@@ -108,22 +108,20 @@ class WebLayer(BaseLayer):
         and limit to the number of results.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_summary(token=token, limit=limit, filter=filter)
+        return await webdb.get_project_summary(token=token, limit=limit, grid_filter=grid_filter)
 
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after, filter):
+    def _project_summary_sample_query(self, limit, after, grid_filter):
         """
         Get query for getting list of samples
         """
         wheres = ['s.project = :project']
         values = {'limit': limit, 'project': self.project, 'after': after}
-
-        print(filter)
         where_str = ''
-        for category, rest in filter.items():
+        for category, rest in grid_filter.items():
             for is_meta, queries in rest.items():
                 for query in queries:
                     field = query['field']
@@ -134,15 +132,15 @@ class WebDb(DbBase):
                         .replace(':', '_')
                     )
                     match category:
-                        case "sequence":
-                            prefix = "sq"
-                        case "participant":
-                            prefix = "p"
-                        case "sample":
-                            prefix = "s"
-                        case "family":
-                            prefix = "f"
-                            field = "external_id"
+                        case 'sequence':
+                            prefix = 'sq'
+                        case 'participant':
+                            prefix = 'p'
+                        case 'sample':
+                            prefix = 's'
+                        case 'family':
+                            prefix = 'f'
+                            field = 'external_id'
                     if field == 'created_date':
                         q = f'sample.row_start LIKE :{key}'
                     elif is_meta == 'non-meta':
@@ -275,7 +273,7 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, filter: dict[str, any], token: Optional[str], limit: int
+        self, grid_filter: dict, token: Optional[str], limit: int
     ) -> ProjectSummary:
         """
         Get project summary
@@ -286,7 +284,7 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0), filter
+            limit, int(token or 0), grid_filter
         )
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)

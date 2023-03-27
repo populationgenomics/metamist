@@ -57,7 +57,7 @@ class TestWeb(DbIsolatedTest):
     @run_as_sync
     async def test_project_summary(self):
         """Test getting the summary for a project"""
-        result = await self.webl.get_project_summary(token=None)
+        result = await self.webl.get_project_summary(token=None, grid_filter={})
 
         # Expect an empty project
         expected = ProjectSummary(
@@ -163,7 +163,7 @@ class TestWeb(DbIsolatedTest):
             for participant in data
         ]
 
-        result = await self.webl.get_project_summary(token=None)
+        result = await self.webl.get_project_summary(token=None, grid_filter={})
 
         expected = ProjectSummary(
             project=WebProject(

@@ -1,7 +1,7 @@
 """
 Web routes
 """
-from typing import Optional, Dict
+from typing import Optional
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -80,7 +80,7 @@ router = APIRouter(prefix='/web', tags=['web'])
 )
 async def get_project_summary(
     request: Request,
-    filter: dict,
+    grid_filter: dict,
     limit: int = 20,
     token: Optional[str] = None,
     connection: Connection = get_project_readonly_connection,
@@ -88,7 +88,7 @@ async def get_project_summary(
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
-    summary = await st.get_project_summary(token=token, limit=limit, filter=filter)
+    summary = await st.get_project_summary(token=token, limit=limit, grid_filter=grid_filter)
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
