@@ -108,7 +108,9 @@ class WebLayer(BaseLayer):
         and limit to the number of results.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_summary(token=token, limit=limit, grid_filter=grid_filter)
+        return await webdb.get_project_summary(
+            token=token, limit=limit, grid_filter=grid_filter
+        )
 
 
 class WebDb(DbBase):

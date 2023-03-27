@@ -88,7 +88,9 @@ async def get_project_summary(
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
-    summary = await st.get_project_summary(token=token, limit=limit, grid_filter=grid_filter)
+    summary = await st.get_project_summary(
+        token=token, limit=limit, grid_filter=grid_filter
+    )
 
     if len(summary.participants) == 0:
         return ProjectSummaryResponse(
