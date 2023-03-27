@@ -18,5 +18,5 @@
         "jsx": "react-jsx",
         "types": ["vite/client", "node"]
     },
-    "include": ["src", ".eslintrc.js", "codegen.ts"]
+    "include": ["src", ".eslintrc.cjs", "codegen.ts"]
 }

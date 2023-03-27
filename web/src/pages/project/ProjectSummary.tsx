@@ -89,6 +89,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     const updateFilters = React.useCallback(
         (e) => {
             if (!summary) return
+            /* eslint-disable no-param-reassign */
             const processedFilter = Object.entries(e).reduce((filter, [column, v]) => {
                 if (!v) {
                     return filter
@@ -120,10 +121,11 @@ const ProjectSummary: React.FunctionComponent = () => {
                 filter[category] = categoryName
                 return filter
             }, {} as Record<string, Record<string, Record<string, string>[]>>)
+            /* eslint-enable no-param-reassign */
             setFilterValues(processedFilter)
             setGridFilterValues(Object.entries(processedFilter).length ? e : {})
         },
-        [summary, projectName]
+        [summary]
     )
 
     const _updateProjectSummary = React.useCallback(() => {

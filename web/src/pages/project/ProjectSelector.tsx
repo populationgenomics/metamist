@@ -44,7 +44,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
             setFilterValues({})
             setGridFilterValues({})
         },
-        [navigate, setPageLimit, setPageNumber, pageLimit]
+        [navigate, setPageLimit, setPageNumber, pageLimit, setFilterValues, setGridFilterValues]
     )
 
     if (error) {

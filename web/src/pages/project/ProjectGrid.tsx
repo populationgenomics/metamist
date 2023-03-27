@@ -2,14 +2,14 @@ import * as React from 'react'
 import _ from 'lodash'
 import { Table, Form, Popup } from 'semantic-ui-react'
 
-import SampleLink from '../../shared/components/links/SampleLink'
-import FamilyLink from '../../shared/components/links/FamilyLink'
-import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { ProjectSummaryResponse } from '../../sm-api/api'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
 import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import { red } from '@mui/material/colors'
 import { IconButton } from '@mui/material'
+import SampleLink from '../../shared/components/links/SampleLink'
+import FamilyLink from '../../shared/components/links/FamilyLink'
+import sanitiseValue from '../../shared/utilities/sanitiseValue'
+import { ProjectSummaryResponse } from '../../sm-api/api'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -35,8 +35,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         React.useState<Record<string, string>>(filterValues)
 
     const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const name = e.target.name
-        const value = e.target.value
+        const { name } = e.target
+        const { value } = e.target
         setTempFilterValues({
             ...Object.keys(tempFilterValues)
                 .filter((key) => name !== key)
