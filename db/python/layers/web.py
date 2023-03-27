@@ -98,7 +98,10 @@ class WebLayer(BaseLayer):
     """Web layer"""
 
     async def get_project_summary(
-        self, filter: dict[str, any], token: Optional[str], limit: int = 50, 
+        self,
+        filter: dict[str, any],
+        token: Optional[str],
+        limit: int = 50,
     ) -> ProjectSummary:
         """
         Get a summary of a project, allowing some "after" token,
@@ -125,7 +128,11 @@ class WebDb(DbBase):
                 for query in queries:
                     field = query['field']
                     value = query['value']
-                    key = f'{category}_{field}_{value}'.replace('-', '_').replace('.', '_').replace(':', '_')
+                    key = (
+                        f'{category}_{field}_{value}'.replace('-', '_')
+                        .replace('.', '_')
+                        .replace(':', '_')
+                    )
                     match category:
                         case "sequence":
                             prefix = "sq"
@@ -139,26 +146,26 @@ class WebDb(DbBase):
                     if field == 'created_date':
                         q = f'sample.row_start LIKE :{key}'
                     elif is_meta == 'non-meta':
-                        q =  f'{prefix}.{field} LIKE :{key}'
+                        q = f'{prefix}.{field} LIKE :{key}'
                     else:
                         q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
                     wheres.append(q)
                     values[key] = self.escape_like_term(value) + '%'
         if wheres:
-                where_str = 'WHERE ' + ' AND '.join(wheres)
+            where_str = 'WHERE ' + ' AND '.join(wheres)
 
         sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, min(sample.row_start) as created_date 
-        FROM sample FOR SYSTEM_TIME ALL 
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, min(sample.row_start) as created_date
+        FROM sample FOR SYSTEM_TIME ALL
         INNER JOIN sample s ON sample.id = s.id
         LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
         LEFT JOIN family f ON f.id = fp.family_id
-        {where_str} 
+        {where_str}
         GROUP BY id
-        ORDER BY id 
-        LIMIT :limit 
+        ORDER BY id
+        LIMIT :limit
         OFFSET :after"""
         return sample_query, values
 
@@ -365,7 +372,9 @@ WHERE fp.participant_id in :pids
         query_values = values
         query_values['limit'] = total_samples
         query_values['after'] = 0
-        total_samples_in_query = len(list(await self.connection.fetch_all(sample_query, query_values)))
+        total_samples_in_query = len(
+            list(await self.connection.fetch_all(sample_query, query_values))
+        )
 
         # post-processing
         seq_models_by_sample_id = (

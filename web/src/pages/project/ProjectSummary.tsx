@@ -89,37 +89,42 @@ const ProjectSummary: React.FunctionComponent = () => {
     const updateFilters = React.useCallback(
         (e) => {
             if (!summary) return
-            const processedFilter = Object.entries(e).reduce((filter, [column, v]) => {
-                if (!v) {
-                    return filter
-                }
-                const value = v as string
-                const participantIndex = summary.participant_keys.findIndex((i) => i[1] === column)
-                const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
-                const sequenceIndex = summary.sequence_keys.findIndex(
-                    (i) => `sequence.${i[1]}` === column
-                )
-                const { category, oldField } = (participantIndex > -1 && {
-                    category: 'participant',
-                    oldField: summary.participant_keys[participantIndex][0],
-                }) ||
-                    (sampleIndex > -1 && {
-                        category: 'sample',
-                        oldField: summary.sample_keys[sampleIndex][0],
+            const processedFilter = Object.entries(e).reduce(
+                (filter, [column, v]) => {
+                    if (!v) {
+                        return filter
+                    }
+                    const value = v as string
+                    const participantIndex = summary.participant_keys.findIndex(
+                        (i) => i[1] === column
+                    )
+                    const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
+                    const sequenceIndex = summary.sequence_keys.findIndex(
+                        (i) => `sequence.${i[1]}` === column
+                    )
+                    const { category, oldField } = (participantIndex > -1 && {
+                        category: 'participant',
+                        oldField: summary.participant_keys[participantIndex][0],
                     }) ||
-                    (sequenceIndex > -1 && {
-                        category: 'sequence',
-                        oldField: summary.sequence_keys[sequenceIndex][0],
-                    }) || { category: 'family', oldField: 'family_ID' }
-                const metaKey = oldField.startsWith('meta.') ? 'meta' : 'non-meta'
-                const field = oldField.startsWith('meta.') ? oldField.slice(5) : oldField
-                const categoryName = filter[category] || {}
-                const metaGroup = categoryName[metaKey] || []
-                metaGroup.push({ field, value })
-                categoryName[metaKey] = metaGroup
-                filter[category] = categoryName
-                return filter
-            }, {} as Record<string, Record<string, Record<string, string>[]>>)
+                        (sampleIndex > -1 && {
+                            category: 'sample',
+                            oldField: summary.sample_keys[sampleIndex][0],
+                        }) ||
+                        (sequenceIndex > -1 && {
+                            category: 'sequence',
+                            oldField: summary.sequence_keys[sequenceIndex][0],
+                        }) || { category: 'family', oldField: 'family_ID' }
+                    const metaKey = oldField.startsWith('meta.') ? 'meta' : 'non-meta'
+                    const field = oldField.startsWith('meta.') ? oldField.slice(5) : oldField
+                    const categoryName = filter[category] || {}
+                    const metaGroup = categoryName[metaKey] || []
+                    metaGroup.push({ field, value })
+                    categoryName[metaKey] = metaGroup
+                    filter[category] = categoryName
+                    return filter
+                },
+                {} as Record<string, Record<string, Record<string, string>[]>>
+            )
             setFilterValues(processedFilter)
             setGridFilterValues(Object.entries(processedFilter).length ? e : {})
         },
