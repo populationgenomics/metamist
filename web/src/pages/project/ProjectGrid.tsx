@@ -7,7 +7,9 @@ import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse } from '../../sm-api/api'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
+import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
 import { red } from '@mui/material/colors'
+import { IconButton } from '@mui/material'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -35,7 +37,20 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const name = e.target.name
         const value = e.target.value
-        setTempFilterValues({ ...tempFilterValues, [name]: value })
+        setTempFilterValues({
+            ...Object.keys(tempFilterValues)
+                .filter((key) => name !== key)
+                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+            ...(value && { [name]: value }),
+        })
+    }
+
+    const onClear = (column: string) => {
+        updateFilters({
+            ...Object.keys(tempFilterValues)
+                .filter((key) => column !== key)
+                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+        })
     }
 
     const onSubmit = () => {
@@ -62,6 +77,14 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             >
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                                        {k in filterValues && (
+                                            <IconButton
+                                                onClick={() => onClear(k)}
+                                                style={{ padding: 0 }}
+                                            >
+                                                <FilterAltOffIcon />
+                                            </IconButton>
+                                        )}
                                         <Popup
                                             trigger={
                                                 <FilterAltIcon
@@ -77,7 +100,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                         >
                                             <Form onSubmit={onSubmit}>
                                                 <Form.Input
-                                                    icon="search"
+                                                    // icon={{ name: 'search', link: true }}
+                                                    action={{ icon: 'search' }}
                                                     placeholder="Filter..."
                                                     name={k}
                                                     value={
