@@ -13,11 +13,12 @@ const BatchStatistics: React.FunctionComponent<BatchStatisticsProps> = ({
     batchSequenceStats,
     projectName,
 }) => {
-    if (!cramSeqrStats.length || !batchSequenceStats.length) {
-        return <></>
-    }
     const seqTypes = Object.keys(cramSeqrStats)
     const batchEntries = Object.entries(batchSequenceStats)
+
+    if (!seqTypes.length || !batchEntries.length) {
+        return <></>
+    }
 
     return (
         <Table celled compact>

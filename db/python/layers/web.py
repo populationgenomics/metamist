@@ -298,7 +298,6 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        print(sample_query, values)
         sample_rows = list(await self.connection.fetch_all(sample_query, values))
 
         if len(sample_rows) == 0:
