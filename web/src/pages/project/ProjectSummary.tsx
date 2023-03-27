@@ -82,7 +82,6 @@ const ProjectSummary: React.FunctionComponent = () => {
             navigate(`/project/${projectName}/1?size=${parseInt(value, 10)}`)
             _setPageLimit(parseInt(value, 10))
             setPageNumber(1)
-            setFilterValues({})
         },
         [projectName, navigate]
     )
@@ -121,12 +120,10 @@ const ProjectSummary: React.FunctionComponent = () => {
                 filter[category] = categoryName
                 return filter
             }, {} as Record<string, Record<string, Record<string, string>[]>>)
-            console.log(processedFilter)
-            console.log(e)
             setFilterValues(processedFilter)
             setGridFilterValues(Object.entries(processedFilter).length ? e : {})
         },
-        [summary]
+        [summary, projectName]
     )
 
     const _updateProjectSummary = React.useCallback(() => {
@@ -148,6 +145,8 @@ const ProjectSummary: React.FunctionComponent = () => {
             <ProjectSelector
                 setPageLimit={_setPageLimit}
                 setPageNumber={setPageNumber}
+                setFilterValues={setFilterValues}
+                setGridFilterValues={setGridFilterValues}
                 pageLimit={PAGE_SIZES[0]}
             />
             <hr />

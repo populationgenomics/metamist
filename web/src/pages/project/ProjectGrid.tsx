@@ -7,7 +7,7 @@ import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse } from '../../sm-api/api'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
-import { red, black } from '@mui/material/colors'
+import { red } from '@mui/material/colors'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse

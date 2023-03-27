@@ -118,13 +118,14 @@ class WebDb(DbBase):
         wheres = ['s.project = :project']
         values = {'limit': limit, 'project': self.project, 'after': after}
 
+        print(filter)
         where_str = ''
         for category, rest in filter.items():
-            for is_meta, l in rest.items():
-                for query in l:
+            for is_meta, queries in rest.items():
+                for query in queries:
                     field = query['field']
                     value = query['value']
-                    key = f'{category}_{field}_{value}'.replace('-', '_').replace('.', '_')
+                    key = f'{category}_{field}_{value}'.replace('-', '_').replace('.', '_').replace(':', '_')
                     match category:
                         case "sequence":
                             prefix = "sq"
@@ -135,24 +136,27 @@ class WebDb(DbBase):
                         case "family":
                             prefix = "f"
                             field = "external_id"
-                    
-                    if is_meta == 'non-meta':
+                    if field == 'created_date':
+                        q = f'sample.row_start LIKE :{key}'
+                    elif is_meta == 'non-meta':
                         q =  f'{prefix}.{field} LIKE :{key}'
                     else:
                         q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
                     wheres.append(q)
-                    values[key] = value + '%'
+                    values[key] = self.escape_like_term(value) + '%'
         if wheres:
                 where_str = 'WHERE ' + ' AND '.join(wheres)
 
         sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id 
-        FROM sample s
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, min(sample.row_start) as created_date 
+        FROM sample FOR SYSTEM_TIME ALL 
+        INNER JOIN sample s ON sample.id = s.id
         LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
         LEFT JOIN family f ON f.id = fp.family_id
         {where_str} 
+        GROUP BY id
         ORDER BY id 
         LIMIT :limit 
         OFFSET :after"""

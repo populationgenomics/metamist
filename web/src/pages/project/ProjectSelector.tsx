@@ -19,12 +19,18 @@ const GET_PROJECTS = gql(`
 interface ProjectSelectorProps {
     setPageNumber: React.Dispatch<React.SetStateAction<number>>
     setPageLimit: React.Dispatch<React.SetStateAction<number>>
+    setFilterValues: React.Dispatch<
+        React.SetStateAction<Record<string, Record<string, Record<string, string>[]>>>
+    >
+    setGridFilterValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
     pageLimit: number
 }
 
 const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
     setPageNumber,
     setPageLimit,
+    setFilterValues,
+    setGridFilterValues,
     pageLimit,
 }) => {
     const { loading, error, data } = useQuery(GET_PROJECTS)
@@ -35,6 +41,8 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
             navigate(`/project/${value}`)
             setPageNumber(1)
             setPageLimit(pageLimit)
+            setFilterValues({})
+            setGridFilterValues({})
         },
         [navigate, setPageLimit, setPageNumber, pageLimit]
     )
