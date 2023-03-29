@@ -117,6 +117,9 @@ class SeqrLayer(BaseLayer):
         families = await self.flayer.get_families_by_participants(participant_ids)
         family_ids = set(f.id for fams in families.values() for f in fams)
 
+        # filter to only participants with a family
+        participant_ids = list(families.keys())
+
         messages = []
         async with aiohttp.ClientSession() as session:
             params = {
@@ -124,25 +127,33 @@ class SeqrLayer(BaseLayer):
                 'project_guid': seqr_guid,
                 'session': session,
             }
-            messages.extend(await self.sync_families(family_ids=family_ids, **params))
+
+            # sync pedigree first as it creates the families and individuals
             messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
-            messages.extend(
-                await self.sync_individual_metadata(
+            # now that families and individuals are created, sync the rest
+            _messages = await asyncio.gather(
+                self.sync_families(family_ids=family_ids, **params),
+                self.sync_individual_metadata(
                     participant_ids=participant_ids, **params
-                )
-            )
-            messages.extend(
-                await self.update_es_index(sequence_type=sequence_type, **params)
-            )
-            messages.extend(
-                await self.sync_cram_map(
+                ),
+                self.update_es_index(sequence_type=sequence_type, **params),
+                self.sync_cram_map(
                     sequence_type=sequence_type,
                     participant_ids=participant_ids,
                     **params,
-                )
+                ),
+                return_exceptions=True,
             )
+            errors = []
+            for m in _messages:
+                if isinstance(m, Exception):
+                    errors.append(m)
+                else:
+                    messages.extend(m)
 
-        return messages
+            if errors:
+                return {'errors': errors, 'messages': messages}
+        return {'messages': messages}
 
     def generate_seqr_auth_token(self):
         """Generate an OAUTH2 token for talking to seqr"""

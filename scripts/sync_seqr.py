@@ -5,6 +5,7 @@ import re
 import json
 import datetime
 import logging
+import traceback
 from collections import defaultdict
 from typing import Any
 from io import StringIO
@@ -54,8 +55,12 @@ ENVS = {
         '1021400127367-9uc4sikfsm0vqo38q1g6rclj91mm501r.apps.googleusercontent.com',
     ),
     'reanalysis-dev': (
-        'seqr-reanalysis-dev.populationgenomics.org.au'
+        'https://seqr-reanalysis-dev.populationgenomics.org.au'
         '1021400127367-4vch8s8kc9opeg4v14b2n70se55jpao4.apps.googleusercontent.com'
+    ),
+    'local': (
+        'http://127.0.0.1:8000',
+        '1021400127367-4vch8s8kc9opeg4v14b2n70se55jpao4.apps.googleusercontent.com',
     ),
 }
 
@@ -88,7 +93,7 @@ ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
 
 def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
     """Sync single dataset without looking up seqr guid"""
-    return asyncio.get_event_loop().run_until_complete(
+    return asyncio.new_event_loop().run_until_complete(
         sync_dataset_async(dataset, seqr_guid, sequence_type)
     )
 
@@ -97,6 +102,7 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
     """
     Synchronisation driver for a single dataset
     """
+    print(f'{dataset} ({sequence_type}) :: Syncing to {seqr_guid}')
     seqapi = SequenceApi()
     samapi = SampleApi()
 
@@ -144,7 +150,16 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
         filtered_family_eids = set(
             row['family_id']
             for row in ped_rows
-            if row['individual_id'] in participant_eids
+            if 'family_id' in row and row['individual_id'] in participant_eids
+        )
+        participants_with_families = set(
+            row['individual_id']
+            for row in ped_rows
+            if 'family_id' in row and row['family_id'] in filtered_family_eids
+        )
+
+        participant_eids = list(
+            set(participant_eids).intersection(participants_with_families)
         )
 
         if not participant_eids:
@@ -153,13 +168,13 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
             raise ValueError('No families to sync')
 
         # await sync_families(**params, family_eids=filtered_family_eids)
-        await sync_pedigree(**params, family_eids=filtered_family_eids)
+        # await sync_pedigree(**params, family_eids=filtered_family_eids)
         # await sync_individual_metadata(**params, participant_eids=set(participant_eids))
-        # await update_es_index(**params, sequence_type=sequence_type)
+        await update_es_index(**params, sequence_type=sequence_type)
 
-        # await sync_cram_map(
-        #     **params, participant_eids=participant_eids, sequence_type=sequence_type
-        # )
+        await sync_cram_map(
+            **params, participant_eids=participant_eids, sequence_type=sequence_type
+        )
 
 
 async def sync_pedigree(
@@ -298,24 +313,25 @@ async def sync_individual_metadata(
         'hpo_terms_present': _process_hpo_terms,
         'hpo_terms_absent': _process_hpo_terms,
         'affected': _parse_affected,
+        # 'individual_notes': lambda x: x + '.'
     }
 
     seqr_map = {
         'family_id': 'family_id',
         'individual_id': 'individual_id',
         # 'individual_guid'
-        # 'hpo_number'
+        # 'hpo_number',
         'affected': 'affected',
         'features': 'hpo_terms_present',
         'absent_features': 'hpo_terms_absent',
         'birth_year': 'birth_year',
         'death_year': 'death_year',
         'onset_age': 'age_of_onset',
-        'notes': 'notes',
+        'notes': 'individual_notes',
         # 'assigned_analyst'
-        # 'consanguinity'
-        # 'affected_relatives'
-        # 'expected_inheritance'
+        'consanguinity': 'consanguinity',
+        'affected_relatives': 'affected_relatives',
+        'expected_inheritance': 'expected_inheritance',
         'maternal_ethnicity': 'maternal_ancestry',
         'paternal_ethnicity': 'paternal_ancestry',
         # 'disorders'
@@ -343,15 +359,14 @@ async def sync_individual_metadata(
         req_url, json={'individuals': processed_records}, headers=headers
     )
     # print(resp.text)
-
-    if (
-        resp.status == 400
-        and 'Unable to find individuals to update' in await resp.text()
-    ):
-        print('No individual metadata needed updating')
+    resp_text = await resp.text()
+    if resp.status == 400 and 'Unable to find individuals to update' in resp_text:
+        print(f'{dataset} :: No individual metadata needed updating')
         return
 
-    resp.raise_for_status()
+    if not resp.ok:
+        print(f'{dataset} :: Error syncing individual metadata {resp_text}')
+        resp.raise_for_status()
 
     print(f'{dataset} :: Uploaded individual metadata')
 
@@ -451,27 +466,39 @@ async def sync_cram_map(
         project=dataset, export_type='json'
     )
 
-    sequence_filter = lambda row: True  # noqa
-    if sequence_type == 'genome':
-        sequence_filter = lambda row: 'exome' not in row[1]  # noqa
-    elif sequence_type == 'exome':
-        sequence_filter = lambda row: 'exome' in row[1]  # noqa
+    def _sequence_filter(output_path: str):
+        if output_path.removeprefix('gs://').split('/')[0].endswith('-test'):
+            return False
+        if sequence_type == 'genome' and 'exome' in output_path:
+            return False
+        if sequence_type == 'exome' and 'exome' not in output_path:
+            return False
+
+        return True
 
     parsed_records = defaultdict(list)
+    number_of_uploadable_reads = 0
+    already_added = set()
 
-    for row in reads_map[:5]:
+    for row in reads_map:
         pid = row['participant_id']
         output = row['output']
-        if not sequence_filter(output):
+        if output in already_added:
+            # don't add duplicates
+            continue
+
+        already_added.add(output)
+        if not _sequence_filter(output):
             continue
 
         if participant_eids and pid not in participant_eids:
             continue
 
         # eventually, we should add the sampleId back in here
+        number_of_uploadable_reads += 1
         parsed_records[pid].append({'filePath': output})
 
-    if not reads_map:
+    if not parsed_records:
         print(f'{dataset} :: No CRAMS to sync in for reads map')
         return
 
@@ -480,7 +507,8 @@ async def sync_cram_map(
         req1_url, json={'mapping': parsed_records}, headers=headers
     )
     if not resp_1.ok:
-        print(resp_1.text)
+        t = await resp_1.text()
+        print(f'{dataset} :: Failed to diff CRAM updates: {t!r}')
     resp_1.raise_for_status()
 
     response = await resp_1.json()
@@ -495,23 +523,43 @@ async def sync_cram_map(
         )
         resp = await session.post(req_igv_update_url, json=update, headers=headers)
 
-        resp.raise_for_status()
-        return await resp.text()
+        t = await resp.text()
+        if not resp.ok:
+            raise Exception(
+                f'{dataset} :: Failed to update {individual_guid} with response: {t!r})',
+                resp,
+            )
+
+        return t
 
     chunk_size = 10
+    wait_time = 3
     all_updates = response['updates']
+    exceptions = []
     for idx, updates in enumerate(chunk(all_updates, chunk_size=10)):
+        if not updates:
+            continue
         print(
-            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))} (/{len(all_updates)}'
+            f'{dataset} :: Updating CRAMs {idx * chunk_size + 1} -> {(min((idx + 1 ) * chunk_size, len(all_updates)))} (/{len(all_updates)})'
         )
 
         responses = await asyncio.gather(
             *[_make_update_igv_call(update) for update in updates],
             return_exceptions=True,
         )
-        print(responses)
+        exceptions.extend(
+            [(r, u) for u, r in zip(updates, responses) if isinstance(r, Exception)]
+        )
+        await asyncio.sleep(wait_time)
 
-    print(f'{dataset} :: Updated {len(all_updates)} / {len(reads_map)} CRAMs')
+    if exceptions:
+        exceptions_str = '\n'.join(f'\t{e} {u}' for e, u in exceptions)
+        print(
+            f'{dataset} :: Failed to update {len(exceptions)} CRAMs: \n{exceptions_str}'
+        )
+    print(
+        f'{dataset} :: Updated {len(all_updates)} / {number_of_uploadable_reads} CRAMs'
+    )
 
 
 async def _get_pedigree_from_sm(
@@ -595,6 +643,7 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
     """
     seqr_projects = ProjectApi().get_seqr_projects()
     error_projects = []
+    el = asyncio.new_event_loop()
     for project in seqr_projects:
         project_name = project['name']
         if ignore and project_name in ignore:
@@ -606,12 +655,14 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
         if not seqr_guid:
             # print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
             continue
-        el = asyncio.get_event_loop()
         try:
             el.run_until_complete(
                 sync_dataset_async(project_name, seqr_guid, sequence_type=sequence_type)
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
+            print(
+                f'Failed to sync {project_name} with error: {e!r}: {traceback.format_exc()}'
+            )
             error_projects.append((project_name, e))
 
     if error_projects:
@@ -648,5 +699,7 @@ if __name__ == '__main__':
     # for dataset in datasets:
     #     sync_single_dataset_from_name(dataset, 'genome')
     # sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
-    # sync_all_datasets(sequence_type='exome')
-    sync_single_dataset_from_name('hereditary-neuro', 'exome')
+    sync_single_dataset_from_name('ag-hidden', 'genome')
+    # sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
+    # sync_all_datasets(sequence_type='exome', ignore={'flinders-ophthal'})
+    # sync_single_dataset_from_name('udn-aus', 'exome')
