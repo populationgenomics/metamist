@@ -1,6 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Table } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
+import { Table as SUITable } from 'semantic-ui-react'
 
 interface SummaryStatisticsProps {
     cramSeqrStats: Record<string, Record<string, string>>
@@ -16,28 +17,28 @@ const SummaryStatistics: React.FunctionComponent<SummaryStatisticsProps> = ({
 
     return (
         <Table celled>
-            <Table.Header>
-                <Table.Row>
-                    <Table.HeaderCell>Type</Table.HeaderCell>
-                    <Table.HeaderCell>Sequences</Table.HeaderCell>
-                    <Table.HeaderCell>CRAMs</Table.HeaderCell>
-                    <Table.HeaderCell>Seqr</Table.HeaderCell>
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
+            <SUITable.Header>
+                <SUITable.Row>
+                    <SUITable.HeaderCell>Type</SUITable.HeaderCell>
+                    <SUITable.HeaderCell>Sequences</SUITable.HeaderCell>
+                    <SUITable.HeaderCell>CRAMs</SUITable.HeaderCell>
+                    <SUITable.HeaderCell>Seqr</SUITable.HeaderCell>
+                </SUITable.Row>
+            </SUITable.Header>
+            <SUITable.Body>
                 {statsEntries.map(([key, value]) => (
                     <React.Fragment key={`${key}-${projectName}`}>
-                        <Table.Row>
-                            <Table.Cell>{_.capitalize(key)}</Table.Cell>
+                        <SUITable.Row>
+                            <SUITable.Cell>{_.capitalize(key)}</SUITable.Cell>
                             {Object.entries(value).map(([k1, v1]) => (
-                                <Table.Cell key={`${key}-${k1}-${projectName}`}>
+                                <SUITable.Cell key={`${key}-${k1}-${projectName}`}>
                                     {`${v1}`}
-                                </Table.Cell>
+                                </SUITable.Cell>
                             ))}
-                        </Table.Row>
+                        </SUITable.Row>
                     </React.Fragment>
                 ))}
-            </Table.Body>
+            </SUITable.Body>
         </Table>
     )
 }
