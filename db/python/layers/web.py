@@ -6,10 +6,10 @@ from datetime import date
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
+from enum import Enum
 from pydantic import BaseModel
 
 from api.utils import group_by
-from enum import Enum
 
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
@@ -23,13 +23,17 @@ from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechn
 
 
 class MetaSearchEntityPrefix(Enum):
+    """Links prefixes to tables"""
+
     p = 'participant'
     s = 'sample'
     sq = 'sequence'
     f = 'family'
 
+
 class SearchItem(SMBase):
     """Summary Grid Filter Model"""
+
     model_type: str
     query: str
     field: str
@@ -138,7 +142,7 @@ class WebDb(DbBase):
         Get query for getting list of samples
         """
         wheres = ['s.project = :project']
-        values = { 'project': self.project }
+        values = {'project': self.project}
         where_str = ''
         for query in grid_filter:
             value = query.query
@@ -278,7 +282,10 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, grid_filter: List[SearchItem], token: Optional[str], limit: int
+        self,
+        grid_filter: List[SearchItem],
+        limit: int,
+        token: Optional[int] = 0,
     ) -> ProjectSummary:
         """
         Get project summary
@@ -288,9 +295,7 @@ class WebDb(DbBase):
         """
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
-        sample_query, values = self._project_summary_sample_query(
-            grid_filter
-        )
+        sample_query, values = self._project_summary_sample_query(grid_filter)
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
         project = WebProject(
@@ -302,10 +307,8 @@ class WebDb(DbBase):
         seqr_links = self.get_seqr_links_from_project(project)
 
         sample_rows_all = list(await self.connection.fetch_all(sample_query, values))
-        total_samples_in_query = len(
-            sample_rows_all
-        )
-        sample_rows = sample_rows_all[token:token+limit]
+        total_samples_in_query = len(sample_rows_all)
+        sample_rows = sample_rows_all[token : token + limit]
 
         if len(sample_rows) == 0:
             return ProjectSummary(
