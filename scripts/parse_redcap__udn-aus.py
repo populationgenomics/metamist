@@ -33,14 +33,18 @@ def parse_redcap(redcap_csv: str):
         for row in reader:
             # Identify first row of family (family_metadata)
             if row['redcap_event_name'] == 'family_information_arm_1':
-                # Save previous family
-                if 'family_metadata' in family_rows:
-                    families.append(family_rows)
-                    family_rows = {'individual_data': defaultdict(dict)}
+                if not row['redcap_repeat_instrument']:
+                    # Save previous family
+                    if 'family_metadata' in family_rows:
+                        families.append(family_rows)
+                        family_rows = {'individual_data': defaultdict(dict)}
 
-                row['fam_id'] = row['proband_id'].strip('PR')
-                family_rows['family_metadata'] = row
-                continue
+                    row['fam_id'] = row['proband_id'].strip('PR')
+                    family_rows['family_metadata'] = row
+                    continue
+                else:
+                    print(f'WARNING: redcap_event_name == "family_information_arm_1" AND redcap_repeat_instrument == {row["redcap_repeat_instrument"]}. SKIPPING')
+                    continue
 
             # Process individual level rows (sample_info and individual_metadata)
             if '_infor' in row['redcap_event_name']:
@@ -55,7 +59,6 @@ def parse_redcap(redcap_csv: str):
                 elif (
                     row['redcap_repeat_instrument']
                     == "biological_samples_and_diagnosis"
-                    and row['redcap_repeat_instance'] == "1"
                 ):
                     row_type = 'sample_metadata'
                     if row['sample_id']:
