@@ -155,3 +155,8 @@ blockquote {
         color: black;
     }
 }
+
+/* Turn off weird highlighting code blocks from react SyntaxHighlighter */
+[class^='language-'] {
+    border: none;
+}
