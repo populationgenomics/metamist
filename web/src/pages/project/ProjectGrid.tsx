@@ -1,6 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Table } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
@@ -22,27 +23,27 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, proje
 
     return (
         <Table celled>
-            <Table.Header>
-                <Table.Row>
+            <SUITable.Header>
+                <SUITable.Row>
                     {headers.map((k, i) => (
-                        <Table.HeaderCell key={`${k}-${i}`}>{k}</Table.HeaderCell>
+                        <SUITable.HeaderCell key={`${k}-${i}`}>{k}</SUITable.HeaderCell>
                     ))}
-                </Table.Row>
-            </Table.Header>
-            <Table.Body>
+                </SUITable.Row>
+            </SUITable.Header>
+            <SUITable.Body>
                 {summary.participants.map((p, pidx) =>
                     p.samples.map((s, sidx) => {
                         const backgroundColor =
-                            pidx % 2 === 0 ? 'white' : 'var(--bs-table-striped-bg)'
+                            pidx % 2 === 0 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
                         const lengthOfParticipant = p.samples
                             .map((s_) => s_.sequences.length)
                             .reduce((a, b) => a + b, 0)
                         return s.sequences.map((seq, seqidx) => {
                             const isFirstOfGroup = sidx === 0 && seqidx === 0
                             return (
-                                <Table.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
+                                <SUITable.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
                                     {isFirstOfGroup && (
-                                        <Table.Cell
+                                        <SUITable.Cell
                                             style={{ backgroundColor }}
                                             rowSpan={lengthOfParticipant}
                                         >
@@ -56,11 +57,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, proje
                                                         .join(', ')}
                                                 </FamilyLink>
                                             }
-                                        </Table.Cell>
+                                        </SUITable.Cell>
                                     )}
                                     {isFirstOfGroup &&
                                         summary.participant_keys.map(([k]) => (
-                                            <Table.Cell
+                                            <SUITable.Cell
                                                 style={{
                                                     backgroundColor,
                                                 }}
@@ -68,11 +69,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, proje
                                                 rowSpan={lengthOfParticipant}
                                             >
                                                 {sanitiseValue(_.get(p, k))}
-                                            </Table.Cell>
+                                            </SUITable.Cell>
                                         ))}
                                     {seqidx === 0 &&
                                         summary.sample_keys.map(([k]) => (
-                                            <Table.Cell
+                                            <SUITable.Cell
                                                 style={{
                                                     backgroundColor,
                                                 }}
@@ -86,25 +87,25 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, proje
                                                 ) : (
                                                     sanitiseValue(_.get(s, k))
                                                 )}
-                                            </Table.Cell>
+                                            </SUITable.Cell>
                                         ))}
                                     {seq &&
                                         summary.sequence_keys.map(([k]) => (
-                                            <Table.Cell
+                                            <SUITable.Cell
                                                 style={{
                                                     backgroundColor,
                                                 }}
                                                 key={`${s.id}sequence.${k}`}
                                             >
                                                 {sanitiseValue(_.get(seq, k))}
-                                            </Table.Cell>
+                                            </SUITable.Cell>
                                         ))}
-                                </Table.Row>
+                                </SUITable.Row>
                             )
                         })
                     })
                 )}
-            </Table.Body>
+            </SUITable.Body>
         </Table>
     )
 }
