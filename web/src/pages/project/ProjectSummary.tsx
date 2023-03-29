@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Dropdown, Button } from 'semantic-ui-react'
 import ProjectSelector from './ProjectSelector'
-import { WebApi, ProjectSummaryResponse } from '../../sm-api/api'
+import { WebApi, ProjectSummaryResponse, SearchItem } from '../../sm-api/api'
 
 import PageOptions from './PageOptions'
 import SeqrLinks from './SeqrLinks'
@@ -38,9 +38,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     const [pageLimit, _setPageLimit] = React.useState<number>(
         validPages ? +pageSize : PAGE_SIZES[0]
     )
-    const [filterValues, setFilterValues] = React.useState<
-        Record<string, Record<string, Record<string, string>[]>>
-    >({})
+    const [filterValues, setFilterValues] = React.useState<SearchItem[]>([])
     const [gridFilterValues, setGridFilterValues] = React.useState<Record<string, string>>({})
 
     const handleOnClick = React.useCallback(
@@ -52,7 +50,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
 
     const getProjectSummary = React.useCallback(
-        async (token: any) => {
+        async (token: number) => {
             if (!projectName) {
                 setSummary(undefined)
                 return
@@ -94,33 +92,29 @@ const ProjectSummary: React.FunctionComponent = () => {
                 if (!v) {
                     return filter
                 }
-                const value = v as string
+                const query = v as string
                 const participantIndex = summary.participant_keys.findIndex((i) => i[1] === column)
                 const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
                 const sequenceIndex = summary.sequence_keys.findIndex(
                     (i) => `sequence.${i[1]}` === column
                 )
-                const { category, oldField } = (participantIndex > -1 && {
-                    category: 'participant',
+                const { model_type, oldField } = (participantIndex > -1 && {
+                    model_type: 'participant',
                     oldField: summary.participant_keys[participantIndex][0],
                 }) ||
                     (sampleIndex > -1 && {
-                        category: 'sample',
+                        model_type: 'sample',
                         oldField: summary.sample_keys[sampleIndex][0],
                     }) ||
                     (sequenceIndex > -1 && {
-                        category: 'sequence',
+                        model_type: 'sequence',
                         oldField: summary.sequence_keys[sequenceIndex][0],
-                    }) || { category: 'family', oldField: 'family_ID' }
-                const metaKey = oldField.startsWith('meta.') ? 'meta' : 'non-meta'
-                const field = oldField.startsWith('meta.') ? oldField.slice(5) : oldField
-                const categoryName = filter[category] || {}
-                const metaGroup = categoryName[metaKey] || []
-                metaGroup.push({ field, value })
-                categoryName[metaKey] = metaGroup
-                filter[category] = categoryName
+                    }) || { model_type: 'family', oldField: 'family_ID' }
+                const is_meta = oldField.startsWith('meta.')
+                const field = is_meta ? oldField.slice(5) : oldField
+                filter.push({ query, is_meta, model_type, field })
                 return filter
-            }, {} as Record<string, Record<string, Record<string, string>[]>>)
+            }, [] as SearchItem[])
             /* eslint-enable no-param-reassign */
             setFilterValues(processedFilter)
             setGridFilterValues(Object.entries(processedFilter).length ? e : {})
@@ -175,7 +169,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                         <MuckError message={`Ah Muck, your filters are too restrictive!`} />
                         <Button
                             onClick={() => {
-                                setFilterValues({})
+                                setFilterValues([])
                                 setGridFilterValues({})
                             }}
                         >

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from db.python.layers.search import SearchLayer
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.layers.web import WebLayer, NestedParticipant
+from db.python.layers.web import WebLayer, NestedParticipant, SearchItem
 
 from models.models.sample import sample_id_format
 from models.models.search import SearchResponse
@@ -80,9 +80,9 @@ router = APIRouter(prefix='/web', tags=['web'])
 )
 async def get_project_summary(
     request: Request,
-    grid_filter: dict,
+    grid_filter: list[SearchItem],
     limit: int = 20,
-    token: Optional[str] = None,
+    token: Optional[int] = 0,
     connection: Connection = get_project_readonly_connection,
 ) -> ProjectSummaryResponse:
     """Creates a new sample, and returns the internal sample ID"""

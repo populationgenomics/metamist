@@ -3,8 +3,10 @@ import _ from 'lodash'
 import { Table, Form, Popup } from 'semantic-ui-react'
 
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
-import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
-import { red } from '@mui/material/colors'
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
+import CloseIcon from '@mui/icons-material/Close'
+// import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
+// import { red } from '@mui/material/colors'
 import { IconButton } from '@mui/material'
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
@@ -77,40 +79,45 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             >
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
-                                        {k in filterValues && (
-                                            <IconButton
-                                                onClick={() => onClear(k)}
-                                                style={{ padding: 0 }}
-                                            >
-                                                <FilterAltOffIcon />
-                                            </IconButton>
-                                        )}
                                         <Popup
                                             trigger={
-                                                <FilterAltIcon
-                                                    sx={{
-                                                        color:
-                                                            k in filterValues
-                                                                ? red[500]
-                                                                : '#000000',
-                                                    }}
-                                                />
+                                                k in filterValues ? (
+                                                    <FilterAltIcon />
+                                                ) : (
+                                                    <FilterAltOutlinedIcon />
+                                                )
                                             }
                                             hoverable
                                         >
                                             <Form onSubmit={onSubmit}>
-                                                <Form.Input
-                                                    // icon={{ name: 'search', link: true }}
-                                                    action={{ icon: 'search' }}
-                                                    placeholder="Filter..."
-                                                    name={k}
-                                                    value={
-                                                        k in tempFilterValues
-                                                            ? tempFilterValues[k]
-                                                            : ''
-                                                    }
-                                                    onChange={onChange}
-                                                />
+                                                <Form.Group
+                                                    inline
+                                                    style={{ padding: 0, margin: 0 }}
+                                                >
+                                                    <Form.Field style={{ padding: 0, margin: 0 }}>
+                                                        <Form.Input
+                                                            action={{ icon: 'search' }}
+                                                            placeholder="Filter..."
+                                                            name={k}
+                                                            value={
+                                                                k in tempFilterValues
+                                                                    ? tempFilterValues[k]
+                                                                    : ''
+                                                            }
+                                                            onChange={onChange}
+                                                        />
+                                                    </Form.Field>
+                                                    {k in filterValues && (
+                                                        <Form.Field style={{ padding: 0 }}>
+                                                            <IconButton
+                                                                onClick={() => onClear(k)}
+                                                                style={{ padding: 0 }}
+                                                            >
+                                                                <CloseIcon />
+                                                            </IconButton>
+                                                        </Form.Field>
+                                                    )}
+                                                </Form.Group>
                                             </Form>
                                         </Popup>
                                     </div>

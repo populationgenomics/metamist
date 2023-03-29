@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Set
 from pydantic import BaseModel
 
 from api.utils import group_by
+from enum import Enum
 
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
@@ -16,7 +17,23 @@ from db.python.layers.sample import SampleLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequence import SampleSequencingTable
+from models.base import SMBase
+
 from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechnology
+
+
+class MetaSearchEntityPrefix(Enum):
+    p = 'participant'
+    s = 'sample'
+    sq = 'sequence'
+    f = 'family'
+
+class SearchItem(SMBase):
+    """Summary Grid Filter Model"""
+    model_type: str
+    query: str
+    field: str
+    is_meta: bool
 
 
 class NestedSequence(BaseModel):
@@ -99,9 +116,9 @@ class WebLayer(BaseLayer):
 
     async def get_project_summary(
         self,
-        grid_filter: dict,
-        token: Optional[str],
-        limit: int = 50,
+        grid_filter: list[SearchItem],
+        token: Optional[int],
+        limit: int = 20,
     ) -> ProjectSummary:
         """
         Get a summary of a project, allowing some "after" token,
@@ -109,55 +126,42 @@ class WebLayer(BaseLayer):
         """
         webdb = WebDb(self.connection)
         return await webdb.get_project_summary(
-            token=token, limit=limit, grid_filter=grid_filter
+            grid_filter=grid_filter, token=token, limit=limit
         )
 
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after, grid_filter):
+    def _project_summary_sample_query(self, grid_filter: List[SearchItem]):
         """
         Get query for getting list of samples
         """
         wheres = ['s.project = :project']
-        values = {'limit': limit, 'project': self.project, 'after': after}
+        values = { 'project': self.project }
         where_str = ''
-        for category, rest in grid_filter.items():
-            for is_meta, queries in rest.items():
-                for query in queries:
-                    field = query['field']
-                    value = query['value']
-                    key = (
-                        f'{category}_{field}_{value}'.replace('-', '_')
-                        .replace('.', '_')
-                        .replace(':', '_')
-                    )
-                    match category:
-                        case 'sequence':
-                            prefix = 'sq'
-                        case 'participant':
-                            prefix = 'p'
-                        case 'sample':
-                            prefix = 's'
-                        case 'family':
-                            prefix = 'f'
-                            field = 'external_id'
-                    if field == 'created_date':
-                        q = f'sample.row_start LIKE :{key}'
-                    elif is_meta == 'non-meta':
-                        q = f'{prefix}.{field} LIKE :{key}'
-                    else:
-                        q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
-                    wheres.append(q)
-                    values[key] = self.escape_like_term(value) + '%'
+        for query in grid_filter:
+            value = query.query
+            field = query.field
+            prefix = MetaSearchEntityPrefix(query.model_type).name
+            key = (
+                f'{query.model_type}_{field}_{value}'.replace('-', '_')
+                .replace('.', '_')
+                .replace(':', '_')
+                .replace(' ', '_')
+            )
+            if not query.is_meta:
+                q = f'{prefix}.{field} LIKE :{key}'
+            else:
+                q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
+            wheres.append(q)
+            values[key] = self.escape_like_term(value) + '%'
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
 
         sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, min(sample.row_start) as created_date
-        FROM sample FOR SYSTEM_TIME ALL
-        INNER JOIN sample s ON sample.id = s.id
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
+        FROM sample s
         LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
@@ -165,8 +169,7 @@ class WebDb(DbBase):
         {where_str}
         GROUP BY id
         ORDER BY id
-        LIMIT :limit
-        OFFSET :after"""
+        """
         return sample_query, values
 
     @staticmethod
@@ -275,7 +278,7 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, grid_filter: dict, token: Optional[str], limit: int
+        self, grid_filter: List[SearchItem], token: Optional[str], limit: int
     ) -> ProjectSummary:
         """
         Get project summary
@@ -286,7 +289,7 @@ class WebDb(DbBase):
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0), grid_filter
+            grid_filter
         )
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
@@ -298,7 +301,11 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        sample_rows = list(await self.connection.fetch_all(sample_query, values))
+        sample_rows_all = list(await self.connection.fetch_all(sample_query, values))
+        total_samples_in_query = len(
+            sample_rows_all
+        )
+        sample_rows = sample_rows_all[token:token+limit]
 
         if len(sample_rows) == 0:
             return ProjectSummary(
@@ -367,12 +374,6 @@ WHERE fp.participant_id in :pids
                 project=self.project
             ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
-        )
-        query_values = values
-        query_values['limit'] = total_samples
-        query_values['after'] = 0
-        total_samples_in_query = len(
-            list(await self.connection.fetch_all(sample_query, query_values))
         )
 
         # post-processing

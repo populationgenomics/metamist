@@ -8,6 +8,8 @@ import { useQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__/gql'
 
+import { SearchItem } from '../../sm-api/api'
+
 const GET_PROJECTS = gql(`
     query getProjects {
         myProjects {
@@ -19,9 +21,7 @@ const GET_PROJECTS = gql(`
 interface ProjectSelectorProps {
     setPageNumber: React.Dispatch<React.SetStateAction<number>>
     setPageLimit: React.Dispatch<React.SetStateAction<number>>
-    setFilterValues: React.Dispatch<
-        React.SetStateAction<Record<string, Record<string, Record<string, string>[]>>>
-    >
+    setFilterValues: React.Dispatch<React.SetStateAction<SearchItem[]>>
     setGridFilterValues: React.Dispatch<React.SetStateAction<Record<string, string>>>
     pageLimit: number
 }
@@ -41,7 +41,7 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({
             navigate(`/project/${value}`)
             setPageNumber(1)
             setPageLimit(pageLimit)
-            setFilterValues({})
+            setFilterValues([])
             setGridFilterValues({})
         },
         [navigate, setPageLimit, setPageNumber, pageLimit, setFilterValues, setGridFilterValues]
