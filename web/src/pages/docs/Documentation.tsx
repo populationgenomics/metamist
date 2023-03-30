@@ -5,7 +5,8 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-// import { materialDark as syntaxStyle } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { vs, dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useMediaQuery } from 'react-responsive'
 
 interface IDocumentationArticleProps {
     articleid?: string
@@ -29,6 +30,7 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     props: IDocumentationArticleProps
 ) => {
     const [text, setText] = React.useState<string | null>(null)
+    const isDarkMode = useMediaQuery({ query: '(prefers-color-scheme: dark)' })
 
     const match = useParams()
 
@@ -80,14 +82,10 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
                         const match_ = /language-(\w+)/.exec(className || '')
                         return !inline && match_ ? (
                             <SyntaxHighlighter
-                                // style={syntaxStyle}
                                 language={match_[1]}
                                 PreTag="div"
                                 // showLineNumbers={true}
-                                customStyle={{
-                                    margin: 0,
-                                    background: '#f8f8f8',
-                                }}
+                                style={isDarkMode ? dracula : vs}
                                 {...props_}
                             >
                                 {String(children).replace(/\n$/, '')}

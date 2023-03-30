@@ -1,18 +1,18 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
-import './index.css'
 import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client'
 import App from './App'
 import reportWebVitals from './reportWebVitals'
 
-// 1
+// make sure our stylesheet is last
+import 'swagger-ui-react/swagger-ui.css'
+import 'semantic-ui-css/semantic.min.css'
+import './index.css'
 
-// 2
 const httpLink = createHttpLink({
     uri: '/graphql',
 })
 
-// 3
 const client = new ApolloClient({
     link: httpLink,
     cache: new InMemoryCache(),

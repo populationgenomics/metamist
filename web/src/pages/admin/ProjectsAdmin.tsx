@@ -3,6 +3,7 @@
 
 import * as React from 'react'
 import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 import { ProjectApi, Project, SequenceType } from '../../sm-api'
 
 interface ControlledInputProps extends InputProps {
@@ -82,7 +83,7 @@ const ProjectsAdmin = () => {
     return (
         <>
             <h1>Projects admin</h1>
-            <table className="table table-bordered">
+            <Table className="table table-bordered">
                 <thead>
                     <tr>
                         {headers.map((k) => (
@@ -137,7 +138,7 @@ const ProjectsAdmin = () => {
                         })
                         .flat()}
                 </tbody>
-            </table>
+            </Table>
         </>
     )
 }

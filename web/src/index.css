@@ -6,7 +6,40 @@
   --color-border-default: #444c56
 } */
 :root {
+    --color-bg: #f5f7f9;
+    --color-bg-card: #fff;
+    --color-bg-disabled-card: #eeeeee;
+
+    --color-border-color: #3a3a3a;
     --color-border-default: #d0d7de;
+
+    --color-divider: rgba(0, 0, 0, 0.3);
+
+    /* From: https://material.io/design/color/text-legibility.html#text-backgrounds */
+
+    --color-text-primary: rgba(0, 0, 0, 0.87);
+    --color-text-medium: rgba(0, 0, 0, 0.6);
+    --color-text-disabled: rgba(0, 0, 0, 0.38);
+
+    --color-check-green: #7ac142;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-bg: #1d1d1d;
+        --color-bg-card: #2c2c2c;
+        --color-bg-disabled-card: #353535;
+
+        --color-border-color: #3a3a3a;
+        --color-border-default: #292a2b;
+        --color-divider: rgba(255, 255, 255, 0.2);
+
+        --color-text-primary: rgba(255, 255, 255, 0.87);
+        --color-text-medium: rgba(255, 255, 255, 0.6);
+        --color-text-disabled: rgba(255, 255, 255, 0.38);
+
+        --color-check-green: #659251;
+    }
 }
 
 body {
@@ -16,6 +49,10 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: auto !important;
+
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    background: var(--color-bg);
 }
 
 code {
@@ -113,7 +150,22 @@ blockquote {
     from {
         color: rgb(199, 27, 27);
     }
+
     to {
         color: black;
     }
+}
+
+/* Turn off weird highlighting code blocks from react SyntaxHighlighter */
+[class^='language-'] {
+    border: none;
+}
+
+/* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
+.swagger-ui {
+    filter: invert(88%) hue-rotate(180deg);
+}
+
+.swagger-ui .highlight-code {
+    filter: invert(100%) hue-rotate(180deg);
 }
