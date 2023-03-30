@@ -163,6 +163,9 @@ class WebDb(DbBase):
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
 
+        # Skip 'limit' and 'after' SQL commands so we can get all samples that match the query to determine
+        # the total count, then take the selection of samples for the current page.
+        # This is more efficient than doing 2 queries separately
         sample_query = f"""
         SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
         FROM sample s
@@ -306,6 +309,10 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
+        # This retrieves all samples that match the current query
+        # This is not currently a problem as no projects are even close to 10000 rows
+        # So won't be causing any memory/resource issues
+        # Could be optimised in future by limiting to 10k if necessary
         sample_rows_all = list(await self.connection.fetch_all(sample_query, values))
         total_samples_in_query = len(sample_rows_all)
         sample_rows = sample_rows_all[token : token + limit]
