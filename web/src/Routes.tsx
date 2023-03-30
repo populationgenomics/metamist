@@ -16,7 +16,7 @@ const Routes: React.FunctionComponent = () => (
             <Route path=":id" element={<DocumentationArticle />} />
         </Route>
 
-        <Route path="/swagger" element={<SwaggerUI url="/openapi.json" />} />
+        <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
         <Route path="/project/">
             <Route
