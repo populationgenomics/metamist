@@ -222,7 +222,7 @@ class SampleSequenceLayer(BaseLayer):
         external_ids: dict[str, str] | None = None,
         status: SequenceStatus | None = None,
         technology: SequenceTechnology | None = None,
-        type: SequenceType | None = None,
+        type: SequenceType | None = None,  # pylint: disable=redefined-builtin
         meta: dict | None = None,
         author: str | None = None,
         check_project_id=True,

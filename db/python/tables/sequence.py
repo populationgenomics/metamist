@@ -355,7 +355,7 @@ class SampleSequencingTable(DbBase):
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
         technology: Optional[SequenceTechnology] = None,
-        type: Optional[SequenceType] = None,
+        type: Optional[SequenceType] = None,  # pylint: disable=redefined-builtin
         meta: Optional[Dict] = None,
         project: Optional[ProjectId] = None,
         author=None,
