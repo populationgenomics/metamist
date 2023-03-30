@@ -72,7 +72,7 @@ async def update_sequence(
     _ = await sequence_layer.update_sequence(
         sequence_id,
         external_ids=sequence.external_ids,
-        type=sequence.type,
+        sequence_type=sequence.type,
         status=sequence.status,
         meta=sequence.meta,
     )
