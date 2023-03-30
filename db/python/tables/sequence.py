@@ -355,7 +355,7 @@ class SampleSequencingTable(DbBase):
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
         technology: Optional[SequenceTechnology] = None,
-        sequence_type: Optional[SequenceType] = None,  # pylint: disable=redefined-builtin
+        sequence_type: Optional[SequenceType] = None,
         meta: Optional[Dict] = None,
         project: Optional[ProjectId] = None,
         author=None,
@@ -377,7 +377,7 @@ class SampleSequencingTable(DbBase):
             if technology:
                 updaters.append('technology = :technology')
                 fields['technology'] = technology.value
-            if type:
+            if sequence_type:
                 updaters.append('type = :sequence_type')
                 fields['type'] = sequence_type.value
 
