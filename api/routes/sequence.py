@@ -54,7 +54,7 @@ async def create_sequence(
     return await seq_table.insert_sequencing(
         external_ids=sequence.external_ids,
         sample_id=sample_id_transform_to_raw(sequence.sample_id),
-        sequence_type=sequence.type,
+        type=sequence.type,
         technology=sequence.technology,
         sequence_meta=sequence.meta,
         status=sequence.status,
@@ -72,7 +72,7 @@ async def update_sequence(
     _ = await sequence_layer.update_sequence(
         sequence_id,
         external_ids=sequence.external_ids,
-        sequence_type=sequence.type,
+        type=sequence.type,
         status=sequence.status,
         meta=sequence.meta,
     )

@@ -355,7 +355,7 @@ class SampleSequencingTable(DbBase):
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
         technology: Optional[SequenceTechnology] = None,
-        sequence_type: Optional[SequenceType] = None,
+        type: Optional[SequenceType] = None,
         meta: Optional[Dict] = None,
         project: Optional[ProjectId] = None,
         author=None,
@@ -377,9 +377,9 @@ class SampleSequencingTable(DbBase):
             if technology:
                 updaters.append('technology = :technology')
                 fields['technology'] = technology.value
-            if sequence_type:
-                updaters.append('sequence_type = :type')
-                fields['sequence_type'] = sequence_type.value
+            if type:
+                updaters.append('type = :type')
+                fields['type'] = type.value
 
             _query = f"""
                 UPDATE sample_sequencing
