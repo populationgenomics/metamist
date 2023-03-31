@@ -1,4 +1,4 @@
-# pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel
+# pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel,too-many-locals
 import asyncio
 import os
 import re
@@ -167,10 +167,12 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
         if not filtered_family_eids:
             raise ValueError('No families to sync')
 
-        # await sync_families(**params, family_eids=filtered_family_eids)
-        # await sync_pedigree(**params, family_eids=filtered_family_eids)
-        # await sync_individual_metadata(**params, participant_eids=set(participant_eids))
-        await update_es_index(**params, sequence_type=sequence_type)
+        await sync_families(**params, family_eids=filtered_family_eids)
+        await sync_pedigree(**params, family_eids=filtered_family_eids)
+        await sync_individual_metadata(**params, participant_eids=set(participant_eids))
+        await update_es_index(
+            **params, sequence_type=sequence_type, internal_sample_ids=sample_ids
+        )
 
         await sync_cram_map(
             **params, participant_eids=participant_eids, sequence_type=sequence_type
@@ -309,10 +311,26 @@ async def sync_individual_metadata(
 
         return None
 
+    def _parse_consanguity(consanguity):
+        if not consanguity:
+            return None
+
+        if isinstance(consanguity, bool):
+            return consanguity
+
+        if consanguity.lower() in ('t', 'true', 'yes', 'y', '1'):
+            return True
+
+        if consanguity.lower() in ('f', 'false', 'no', 'n', '0'):
+            return False
+
+        return None
+
     key_processor = {
         'hpo_terms_present': _process_hpo_terms,
         'hpo_terms_absent': _process_hpo_terms,
         'affected': _parse_affected,
+        'consanguinity': _parse_consanguity,
         # 'individual_notes': lambda x: x + '.'
     }
 
@@ -379,6 +397,7 @@ async def update_es_index(
     headers,
     check_metamist=True,
     allow_skip=False,
+    internal_sample_ids: set[str] = None,
 ):
     """Update seqr samples for latest elastic-search index"""
 
@@ -427,6 +446,16 @@ async def update_es_index(
             raise ValueError(f'No ES index for {dataset!r} to synchronise')
 
         es_index = es_index_analyses[-1]['output']
+
+        if internal_sample_ids:
+            sample_ids_missing_from_index = internal_sample_ids - set(
+                es_index_analyses[-1]['sample_ids']
+            )
+            if sample_ids_missing_from_index:
+                print(
+                    f'{dataset}.{sequence_type} :: Samples missing from index: ',
+                    ', '.join(sample_ids_missing_from_index),
+                )
     else:
         es_index = ES_INDICES[sequence_type][dataset]
         print(f'{dataset} :: Falling back to YAML es-index: {es_index!r}')
@@ -448,7 +477,7 @@ async def update_es_index(
     resp_2 = await session.post(req2_url, json={}, headers=headers)
     print(f'{dataset} :: Updated saved variants with status code: {resp_2.status}')
     if not resp_2.ok:
-        print(f'{dataset} :: Request failed with information: {resp_2.text}')
+        print(f'{dataset} :: Request failed with information: {resp_2.text()}')
     resp_2.raise_for_status()
 
 
@@ -525,7 +554,7 @@ async def sync_cram_map(
 
         t = await resp.text()
         if not resp.ok:
-            raise Exception(
+            raise ValueError(
                 f'{dataset} :: Failed to update {individual_guid} with response: {t!r})',
                 resp,
             )
@@ -698,8 +727,9 @@ if __name__ == '__main__':
     # datasets = ['acute-care']
     # for dataset in datasets:
     #     sync_single_dataset_from_name(dataset, 'genome')
-    # sync_dataset('acute-care', 'R0012_acute_care_testing', sequence_type='genome')
-    sync_single_dataset_from_name('ag-hidden', 'genome')
+    # sync_dataset('kidgen', 'R0001_seqr_test_project', sequence_type='exome')
+    # sync_single_dataset_from_name('ag-hidden', 'genome')
+    sync_single_dataset_from_name('acute-care', 'genome')
     # sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
     # sync_all_datasets(sequence_type='exome', ignore={'flinders-ophthal'})
     # sync_single_dataset_from_name('udn-aus', 'exome')

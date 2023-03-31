@@ -173,14 +173,29 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
 
 @router.post('/{project}/{sequence_type}/sync-dataset', operation_id='syncSeqrProject')
 async def sync_seqr_project(
-    sequence_type: SequenceType, connection=get_project_write_connection
+    sequence_type: SequenceType,
+    sync_families: bool = True,
+    sync_individual_metadata: bool = True,
+    sync_individuals: bool = True,
+    sync_es_index: bool = True,
+    sync_saved_variants: bool = True,
+    sync_cram_map: bool = True,
+    connection=get_project_write_connection,
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)
     """
     seqr = SeqrLayer(connection)
     try:
-        messages = await seqr.sync_dataset(sequence_type)
+        messages = await seqr.sync_dataset(
+            sequence_type,
+            sync_families=sync_families,
+            sync_individual_metadata=sync_individual_metadata,
+            sync_individuals=sync_individuals,
+            sync_es_index=sync_es_index,
+            sync_saved_variants=sync_saved_variants,
+            sync_cram_map=sync_cram_map,
+        )
         return {'success': True, 'messages': messages}
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e

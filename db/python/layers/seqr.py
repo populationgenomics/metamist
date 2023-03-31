@@ -21,7 +21,7 @@ from db.python.layers.sequence import SampleSequenceLayer
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import ProjectId
 from models.enums import SequenceType, AnalysisStatus, AnalysisType
-from models.models.sample import sample_id_format
+from models.models.sample import sample_id_format, sample_id_format_list
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -90,7 +90,16 @@ class SeqrLayer(BaseLayer):
         ]
         return sts
 
-    async def sync_dataset(self, sequence_type: SequenceType):
+    async def sync_dataset(
+        self,
+        sequence_type: SequenceType,
+        sync_families: bool = True,
+        sync_individual_metadata: bool = True,
+        sync_individuals: bool = True,
+        sync_es_index: bool = True,
+        sync_saved_variants: bool = True,
+        sync_cram_map: bool = True,
+    ):
         """Sync a specific dataset for seqr"""
         if not await self.is_seqr_sync_setup():
             raise ValueError('Seqr synchronisation is not configured in metamist')
@@ -111,9 +120,9 @@ class SeqrLayer(BaseLayer):
 
         seqlayer = SampleSequenceLayer(self.connection)
 
-        participant_ids = await seqlayer.get_participant_ids_for_sequence_type(
-            sequence_type
-        )
+        pid_to_sid_map = await seqlayer.get_pids_sids_for_sequence_type(sequence_type)
+        participant_ids = list(pid_to_sid_map.keys())
+        sample_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
         families = await self.flayer.get_families_by_participants(participant_ids)
         family_ids = set(f.id for fams in families.values() for f in fams)
 
@@ -131,17 +140,39 @@ class SeqrLayer(BaseLayer):
             # sync pedigree first as it creates the families and individuals
             messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
             # now that families and individuals are created, sync the rest
+            promises = []
+            if sync_families:
+                promises.append(self.sync_families(family_ids=family_ids, **params))
+
+            if sync_individuals:
+                promises.append(self.sync_pedigree(family_ids=family_ids, **params))
+            if sync_individual_metadata:
+                promises.append(
+                    self.sync_individual_metadata(
+                        participant_ids=participant_ids, **params
+                    )
+                )
+            if sync_es_index:
+                promises.append(
+                    self.update_es_index(
+                        sequence_type=sequence_type,
+                        internal_sample_ids=sample_ids,
+                        **params,
+                    )
+                )
+            if sync_saved_variants:
+                promises.append(self.update_saved_variants(**params))
+            if sync_cram_map:
+                promises.append(
+                    self.sync_cram_map(
+                        sequence_type=sequence_type,
+                        participant_ids=participant_ids,
+                        **params,
+                    )
+                )
+
             _messages = await asyncio.gather(
-                self.sync_families(family_ids=family_ids, **params),
-                self.sync_individual_metadata(
-                    participant_ids=participant_ids, **params
-                ),
-                self.update_es_index(sequence_type=sequence_type, **params),
-                self.sync_cram_map(
-                    sequence_type=sequence_type,
-                    participant_ids=participant_ids,
-                    **params,
-                ),
+                *promises,
                 return_exceptions=True,
             )
             errors = []
@@ -263,7 +294,8 @@ class SeqrLayer(BaseLayer):
         sequence_type: SequenceType,
         project_guid,
         headers,
-    ):
+        internal_sample_ids: set[int],
+    ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
         eid_to_sid_rows = (
             await self.player.get_external_participant_id_to_internal_sample_id_map(
@@ -312,6 +344,30 @@ class SeqrLayer(BaseLayer):
 
         es_index = es_index_analyses[-1]['output']
 
+        messages = []
+
+        if internal_sample_ids:
+            samples_in_new_index = set(es_index_analyses[-1]['sample_ids'])
+
+            if len(es_index_analyses) > 1:
+                samples_in_old_index = set(es_index_analyses[-2]['sample_ids'])
+                samples_diff = sample_id_format_list(
+                    samples_in_new_index - samples_in_old_index
+                )
+                if samples_diff:
+                    messages.append(
+                        'Samples added to index: ' + ', '.join(samples_diff),
+                    )
+
+            sample_ids_missing_from_index = sample_id_format_list(
+                internal_sample_ids - samples_in_new_index
+            )
+            if sample_ids_missing_from_index:
+                messages.append(
+                    'Samples missing from index: '
+                    + ', '.join(sample_ids_missing_from_index),
+                )
+
         req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
         resp_1 = await session.post(
             req1_url,
@@ -325,11 +381,24 @@ class SeqrLayer(BaseLayer):
         )
         resp_1.raise_for_status()
 
+        messages.append(f'Updated ES index {es_index}')
+
+        return messages
+
+    async def update_saved_variants(
+        self,
+        session: aiohttp.ClientSession,
+        project_guid,
+        headers,
+    ) -> list[str]:
+        """Update saved variants"""
         req2_url = SEQR_URL + _url_update_saved_variants.format(
             projectGuid=project_guid
         )
         resp_2 = await session.post(req2_url, json={}, headers=headers)
         resp_2.raise_for_status()
+
+        return ['Updated saved variants']
 
     async def sync_cram_map(
         self,
@@ -497,10 +566,26 @@ class SeqrLayer(BaseLayer):
 
             return None
 
+        def _parse_consanguity(consanguity):
+            if not consanguity:
+                return None
+
+            if isinstance(consanguity, bool):
+                return consanguity
+
+            if consanguity.lower() in ('t', 'true', 'yes', 'y', '1'):
+                return True
+
+            if consanguity.lower() in ('f', 'false', 'no', 'n', '0'):
+                return False
+
+            return None
+
         key_processor = {
             'hpo_terms_present': _process_hpo_terms,
             'hpo_terms_absent': _process_hpo_terms,
             'affected': _parse_affected,
+            'consanguinity': _parse_consanguity,
         }
 
         seqr_map = {
@@ -515,13 +600,13 @@ class SeqrLayer(BaseLayer):
             'notes': 'notes',
             'maternal_ethnicity': 'maternal_ancestry',
             'paternal_ethnicity': 'paternal_ancestry',
-            # 'assigned_analyst'
-            # 'consanguinity'
-            # 'affected_relatives'
-            # 'expected_inheritance'
-            # 'disorders'
-            # 'rejected_genes'
-            # 'candidate_genes'
+            'consanguinity': 'consanguinity',
+            'affected_relatives': 'affected_relatives',
+            'expected_inheritance': 'expected_inheritance',
+            # 'assigned_analyst',
+            # 'disorders',
+            # 'rejected_genes',
+            # 'candidate_genes',
         }
 
         def process_row(row):

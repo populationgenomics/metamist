@@ -160,18 +160,21 @@ class SampleSequenceLayer(BaseLayer):
 
         return seqs
 
-    async def get_participant_ids_for_sequence_type(
+    async def get_pids_sids_for_sequence_type(
         self, sequence_type: SequenceType, check_project_ids: bool = True
-    ) -> list[int]:
+    ) -> dict[int, list[int]]:
         """
         Get list of partiicpant IDs for a specific sequence type,
         useful for synchronisation seqr projects
         """
-        projects, pids = await self.seqt.get_participant_ids_for_sequence_type(
+        (
+            projects,
+            pids,
+        ) = await self.seqt.get_participant_ids_and_sample_ids_for_sequence_type(
             sequence_type
         )
         if not pids:
-            return []
+            return {}
 
         if check_project_ids:
             await self.ptable.check_access_to_project_ids(
