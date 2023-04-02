@@ -378,7 +378,7 @@ class SampleSequencingTable(DbBase):
                 updaters.append('technology = :technology')
                 fields['technology'] = technology.value
             if sequence_type:
-                updaters.append('sequence_type = :type')
+                updaters.append('type = :sequence_type')
                 fields['sequence_type'] = sequence_type.value
 
             _query = f"""
