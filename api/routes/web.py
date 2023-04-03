@@ -180,6 +180,7 @@ async def sync_seqr_project(
     sync_es_index: bool = True,
     sync_saved_variants: bool = True,
     sync_cram_map: bool = True,
+    post_slack_notification: bool = True,
     connection=get_project_write_connection,
 ):
     """
@@ -187,7 +188,7 @@ async def sync_seqr_project(
     """
     seqr = SeqrLayer(connection)
     try:
-        messages = await seqr.sync_dataset(
+        data = await seqr.sync_dataset(
             sequence_type,
             sync_families=sync_families,
             sync_individual_metadata=sync_individual_metadata,
@@ -195,7 +196,9 @@ async def sync_seqr_project(
             sync_es_index=sync_es_index,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
+            post_slack_notification=post_slack_notification,
         )
-        return {'success': True, 'messages': messages}
+        return {'success': 'errors' not in data, **data}
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
+        # return {'success': False, 'message': str(e)}

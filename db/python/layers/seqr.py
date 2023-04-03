@@ -1,17 +1,26 @@
-# pylint: disable=unnecessary-lambda-assignment,too-many-locals
+# pylint: disable=unnecessary-lambda-assignment,too-many-locals,broad-exception-caught
 
 import os
 import re
 import asyncio
+import traceback
 from collections import defaultdict
 from datetime import datetime
 from typing import Iterable, Iterator, TypeVar
 
 import aiohttp
+import slack_sdk
+import slack_sdk.errors
 from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_google_identity_token
 
-from api.settings import SEQR_URL, SEQR_AUDIENCE, SEQR_MAP_LOCATION
+from api.settings import (
+    SEQR_URL,
+    SEQR_AUDIENCE,
+    SEQR_MAP_LOCATION,
+    SEQR_SLACK_NOTIFICATION_CHANNEL,
+    get_slack_token,
+)
 from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.base import BaseLayer
@@ -99,7 +108,8 @@ class SeqrLayer(BaseLayer):
         sync_es_index: bool = True,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
-    ):
+        post_slack_notification: bool = True,
+    ) -> dict[str, list[str]]:
         """Sync a specific dataset for seqr"""
         if not await self.is_seqr_sync_setup():
             raise ValueError('Seqr synchronisation is not configured in metamist')
@@ -137,15 +147,33 @@ class SeqrLayer(BaseLayer):
                 'session': session,
             }
 
-            # sync pedigree first as it creates the families and individuals
-            messages.extend(await self.sync_pedigree(family_ids=family_ids, **params))
-            # now that families and individuals are created, sync the rest
             promises = []
+
+            # Sync pedigree separately AND first, and don't continue if there's an error
+            if sync_individuals:
+                try:
+                    messages.extend(
+                        await self.sync_pedigree(family_ids=family_ids, **params)
+                    )
+                except Exception as e:
+                    _errors = [
+                        ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+                    ]
+                    if post_slack_notification:
+                        _errors.extend(
+                            self.send_slack_notification(
+                                project_name=project.name,
+                                sequence_type=sequence_type,
+                                errors=_errors,
+                                messages=messages,
+                            )
+                        )
+                        messages.append('Sent a notification to slack')
+                    return {'errors': _errors, 'messages': messages}
+
             if sync_families:
                 promises.append(self.sync_families(family_ids=family_ids, **params))
 
-            if sync_individuals:
-                promises.append(self.sync_pedigree(family_ids=family_ids, **params))
             if sync_individual_metadata:
                 promises.append(
                     self.sync_individual_metadata(
@@ -177,13 +205,28 @@ class SeqrLayer(BaseLayer):
             )
             errors = []
             for m in _messages:
-                if isinstance(m, Exception):
+                if isinstance(m, BaseException):
                     errors.append(m)
                 else:
                     messages.extend(m)
 
-            if errors:
-                return {'errors': errors, 'messages': messages}
+        _errors = [
+            ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            for e in errors
+        ]
+        if post_slack_notification:
+            _errors.extend(
+                self.send_slack_notification(
+                    project_name=project.name,
+                    sequence_type=sequence_type,
+                    errors=_errors,
+                    messages=messages,
+                )
+            )
+            messages.append('Sent a notification to slack')
+
+        if _errors:
+            return {'errors': _errors, 'messages': messages}
         return {'messages': messages}
 
     def generate_seqr_auth_token(self):
@@ -619,3 +662,51 @@ class SeqrLayer(BaseLayer):
             }
 
         return list(map(process_row, json_rows))
+
+    def send_slack_notification(
+        self,
+        project_name: str,
+        sequence_type: SequenceType,
+        messages: list[str],
+        errors: list[str],
+    ):
+        """Generate and send slack notification from responses"""
+        slack_channel = SEQR_SLACK_NOTIFICATION_CHANNEL
+        if not slack_channel:
+            return ['Slack channel not setup for seqr notifications']
+
+        slack_client = slack_sdk.WebClient(token=get_slack_token())
+        try:
+            if errors:
+                text = (
+                    f':rotating_light: Error syncing *{project_name}* '
+                    f'(_{sequence_type.value}_) seqr project :rotating_light:'
+                )
+            else:
+                text = f'Synced {project_name} ({sequence_type.value}) seqr project'
+
+            blocks = []
+            if errors:
+                error_block = ['*Errors*']
+                for error in errors:
+                    error_block.append(f'> ```{error}```')
+                blocks.append('\n'.join(error_block))
+
+            if messages:
+                blocks.append('*Messages*\n\n' + '\n'.join(f'* {e}' for e in messages))
+
+            text = '\n\n'.join([text, *blocks])
+
+            slack_client.api_call(
+                'chat.postMessage',
+                json={
+                    'channel': slack_channel,
+                    'text': text,
+                },
+            )
+        except slack_sdk.errors.SlackApiError as err:
+            return [f'SlackAPI error: {err}']
+        except Exception as e:
+            return [f'Error posting to slack: {e}']
+
+        return []
