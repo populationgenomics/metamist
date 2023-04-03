@@ -51,7 +51,6 @@ def get_slack_token(allow_empty=False):
         return _SLACK_TOKEN
 
     if _SLACK_SECRET_ID and _SLACK_SECRET_PROJECT_ID:
-
         return read_secret(
             project_id=_SLACK_SECRET_PROJECT_ID,
             secret_name=_SLACK_SECRET_ID,
