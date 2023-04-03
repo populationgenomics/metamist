@@ -460,6 +460,42 @@
 
 	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+<!--		Rename sample_sequencing to assay to be more generic -->
+		<renameTable
+			oldTableName="sample_sequencing"
+			newTableName="assay"
+		/>
+
+<!--		Instead of ENUMs, make some fields FKs -->
+		<createTable tableName="sequencing_technology">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_platform">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+<!--		Create sequencing_group tables -->
 		<createTable tableName="sequencing_group">
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
@@ -470,14 +506,14 @@
 			<column name="sample_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
 			</column>
-			<column name="type" type="ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell')">
-				<constraints nullable="false" />
+			<column name="type" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_type" references="sequencing_type(id)"/>
 			</column>
-			<column name="technology" type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')">
-				<constraints nullable="false" />
+			<column name="technology" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_technology" references="sequencing_technology(id)"/>
 			</column>
 			<column name="platform" type="VARCHAR(255)">
-				<constraints nullable="true" />
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>
 			</column>
 			<column name="meta" type="JSON" />
 			<column name="archived" type="BIT" />
@@ -485,21 +521,23 @@
 				<constraints nullable="false" />
 			</column>
 		</createTable>
-		<addColumn
-			tableName="sample_sequencing">
-			<column name="platform" type="VARCHAR(255)" />
-		</addColumn>
-		<createTable tableName="sequencing_group_sequence">
+
+		<createTable tableName="sequencing_group_assay">
 			<column name="sequencing_group_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id" references="sequencing_group(id)" />
 			</column>
-			<column name="sequencing_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id" references="sample_sequencing(id)" />
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id" references="assay(id)" />
 			</column>
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
 		</createTable>
+
+<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
+			You make a combined key, with one of the fields only NOT NULL when the row should participant in the check.
+			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow multiple
+			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
 		<createTable tableName="sequencing_group_external_ids">
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
@@ -516,15 +554,19 @@
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
+			<column name="nullIfInactive" type="BIT" defaultValue="true">
+				<constraints nullable="true" />
+			</column>
 		</createTable>
 		<addUniqueConstraint
-			columnNames="project,external_id"
+			columnNames="project,external_id,nullIfInactive"
 			tableName="sequencing_group_external_ids"
 			constraintName="UK_SEQUENCING_GROUP_EXTERNALID"
 			validate="true"
 		/>
 
-		<!-- Replaces the analysis_sample table-->
+<!-- 		Replaces the analysis_sample table.
+			We cannot delete the old table, so it's around for legacy purposes. -->
 		<createTable tableName="analysis_sequence_group">
 			<column name="analysis_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_analysis" references="analysis(id)"/>
@@ -534,6 +576,21 @@
 			</column>
 		</createTable>
 
+
+<!--		Default data -->
+
+		<sql>
+			INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
+			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
+			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
+			INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
+
+			INSERT INTO sequencing_technology (name) VALUES ('illumina');
+			INSERT INTO sequencing_technology (name) VALUES ('pacbio');
+			INSERT INTO sequencing_technology (name) VALUES ('oxford-nanopore');
+
+		</sql>
 	</changeSet>
+
 
 </databaseChangeLog>
