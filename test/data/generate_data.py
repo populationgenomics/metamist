@@ -43,6 +43,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
 
     papi = ProjectApi()
     existing_projects = await papi.get_my_projects_async()
+    print(existing_projects)
     if project not in existing_projects:
         await papi.create_project_async(
             name=project, dataset=project, create_test_project=False
