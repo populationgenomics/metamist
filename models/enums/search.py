@@ -7,3 +7,4 @@ class SearchResponseType(str, Enum):
     FAMILY = 'family'
     PARTICIPANT = 'participant'
     SAMPLE = 'sample'
+    ERROR = 'error'

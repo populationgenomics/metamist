@@ -37,3 +37,8 @@ cram-map/
 graphql-types/
 openapi-generator-cli.jar
 scripts/*.json
+lcov-report/
+coverage/
+
+web/schema.graphql
+web/src/__generated__

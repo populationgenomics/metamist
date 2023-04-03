@@ -641,7 +641,6 @@ class ParticipantLayer(BaseLayer):
     ):
         """Update many participant external ids"""
         if check_project_ids:
-
             projects = await self.pttable.get_project_ids_for_participant_ids(
                 list(internal_to_external_id.keys())
             )
@@ -655,7 +654,6 @@ class ParticipantLayer(BaseLayer):
 
     @staticmethod
     def _validate_individual_metadata_headers(headers):
-
         lheader_set = set(h.lower() for h in headers)
         mandatory_keys = [SeqrMetadataKeys.INDIVIDUAL_ID.value]
         missing_keys = [h for h in mandatory_keys if h.lower() not in lheader_set]
@@ -822,7 +820,6 @@ class ParticipantLayer(BaseLayer):
         }
 
         if check_project_ids:
-
             projects = await self.pttable.get_project_ids_for_participant_ids(
                 [participant_id]
             )

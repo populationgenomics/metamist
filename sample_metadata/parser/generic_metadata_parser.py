@@ -4,6 +4,7 @@ import logging
 import re
 import shlex
 from functools import reduce
+from io import StringIO
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
@@ -20,6 +21,7 @@ from sample_metadata.parser.generic_parser import (
     ParsedSample,   # noqa
     SingleRow,
     run_as_sync,
+    group_by,
     ParsedAnalysis,
 )  # noqa
 
@@ -105,7 +107,7 @@ class GenericMetadataParser(GenericParser):
         default_sequence_type='genome',
         default_sequence_status='uploaded',
         default_sample_type='blood',
-        default_sequence_technology='long-reads',
+        default_sequence_technology='short-read',
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -116,6 +118,7 @@ class GenericMetadataParser(GenericParser):
             default_sequence_type=default_sequence_type,
             default_sequence_status=default_sequence_status,
             default_sample_type=default_sample_type,
+            default_sequence_technology=default_sequence_technology,
             **kwargs,
         )
 
@@ -181,7 +184,7 @@ class GenericMetadataParser(GenericParser):
         value = value.lower()
 
         if value == 'ont':
-            value = 'long-reads'
+            value = 'long-read'
 
         return SequenceTechnology(value)
 

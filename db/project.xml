@@ -425,11 +425,36 @@
 			/>
 		</addColumn>
 		<sql>
-			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'transcriptome', 'chip', 'mtseq', 'ont', 'single-cell');
-
+			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'ont', 'wgs', 'transcriptome', 'chip');
 			UPDATE sample_sequencing SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
 			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read', meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont';
 			UPDATE sample_sequencing SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type = 'single-cell';
+		</sql>
+	</changeSet>
+	<changeSet author="michael.franklin" id="2023-01-25_">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<renameColumn
+			columnDataType="VARCHAR(255)"
+			newColumnName="read_group_name"
+			oldColumnName="read_secret_name"
+			remarks="Migration of groups membership cache to blobs"
+			tableName="project"
+		/>
+		<renameColumn
+				columnDataType="VARCHAR(255)"
+				newColumnName="write_group_name"
+				oldColumnName="write_secret_name"
+				remarks="Migration of groups membership cache to blobs"
+				tableName="project"
+		/>
+		<dropColumn
+			tableName="project"
+			columnName="gcp_id"
+		/>
+		<sql>
+			UPDATE project SET
+			read_group_name=SUBSTRING(read_group_name, 1, LENGTH(read_group_name) - 14),
+			write_group_name=SUBSTRING(write_group_name, 1, LENGTH(write_group_name) - 14)
 		</sql>
 	</changeSet>
 

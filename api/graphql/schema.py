@@ -76,7 +76,7 @@ async def load_samples_for_ids(sample_ids: list[int], connection) -> list['Sampl
     """
     samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
     # in case it's not ordered
-    s_by_id = {s.id: s for s in samples}
+    s_by_id = {sample_id_transform_to_raw(s.id): s for s in samples}
     return [s_by_id.get(s) for s in sample_ids]
 
 
@@ -122,7 +122,7 @@ async def load_families_for_participants(
 ) -> list[list['Family']]:
     flayer = FamilyLayer(connection)
     fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
-    return [fam_map.get(p) for p in participant_ids]
+    return [fam_map.get(p, []) for p in participant_ids]
 
 
 @connected_data_loader
@@ -131,7 +131,7 @@ async def load_participants_for_families(
 ) -> list[list['Participant']]:
     player = ParticipantLayer(connection)
     pmap = await player.get_participants_by_families(family_ids)
-    return [pmap.get(fid) for fid in family_ids]
+    return [pmap.get(fid, []) for fid in family_ids]
 
 
 @connected_data_loader
@@ -214,8 +214,8 @@ class GraphQLProject:
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
-    read_secret_name: str | None = None
-    write_secret_name: str | None = None
+    read_group_name: str | None = None
+    write_group_name: str | None = None
 
     @strawberry.field()
     async def pedigree(
@@ -254,7 +254,6 @@ class GraphQLProject:
     async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
         connection = info.context['connection']
         participants = await FamilyLayer(connection).get_families(project=root.id)
-
         return participants
 
     @strawberry.field()
@@ -352,13 +351,14 @@ class GraphQLSample:
     meta: strawberry.scalars.JSON
     type: strawberry.enum(SampleType)
     author: str | None
+    participant_id: int
 
     @strawberry.field
     async def participant(
         self, info: Info, root: 'Sample'
     ) -> GraphQLParticipant | None:
         loader_participants_for_ids = info.context['loader_participants_for_ids']
-        if root.participant is None:
+        if root.participant_id is None:
             return None
         return await loader_participants_for_ids.load(root.participant_id)
 
@@ -403,7 +403,7 @@ class GraphQLSampleSequencing:
     @strawberry.field
     async def sample(self, info: Info, root) -> GraphQLSample:
         loader = info.context['loader_samples_for_ids']
-        return await loader.load(root.sample_id)
+        return await loader.load(int(root.sample_id))
 
 
 @strawberry.type

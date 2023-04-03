@@ -9,33 +9,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 
 from db.python.connect import SMConnections
-from db.python.tables.project import is_full_access
+from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 from api import routes
 from api.utils import get_openapi_schema_func
 from api.utils.exceptions import determine_code_from_error
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-
+from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.4.0'
+_VERSION = '5.5.8'
 
 logger = get_logger()
 
-SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
 static_dir_exists = os.path.exists(STATIC_DIR)
 
 app = FastAPI()
 
-if os.getenv('SM_PROFILE_REQUESTS', 'false').upper() in ('1', 'y', 't', 'true'):
+if PROFILE_REQUESTS:
     from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 
-if is_full_access():
+if is_all_access():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -124,7 +123,6 @@ async def exception_handler(_: Request, e: Exception):
 
 # graphql
 app.include_router(MetamistGraphQLRouter, prefix='/graphql')
-
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):

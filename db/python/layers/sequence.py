@@ -223,6 +223,7 @@ class SampleSequenceLayer(BaseLayer):
         external_ids: dict[str, str] | None = None,
         status: SequenceStatus | None = None,
         technology: SequenceTechnology | None = None,
+        sequence_type: SequenceType | None = None,
         meta: dict | None = None,
         author: str | None = None,
         check_project_id=True,
@@ -242,6 +243,7 @@ class SampleSequenceLayer(BaseLayer):
             status=status,
             meta=meta,
             technology=technology,
+            sequence_type=sequence_type,
             author=author,
             project=project_id,
         )

@@ -1,0 +1,14 @@
+{
+    "schema": "schema.graphql",
+    "documents": "src/**/*.tsx",
+    "emitLegacyCommonJSImports": false,
+    "generates": {
+        "./src/__generated__/": {
+            "preset": "client",
+            "presetConfig": {
+                "gqlTagName": "gql"
+            }
+        }
+    },
+    "ignoreNoDocuments": true
+}

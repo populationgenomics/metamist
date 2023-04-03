@@ -108,7 +108,7 @@ class SampleSequencingTable(DbBase):
         sample_id,
         external_ids: Optional[dict[str, str]],
         sequence_type: SequenceType,
-        technology: SequenceTechnology | None,
+        technology: SequenceTechnology,
         status: SequenceStatus,
         sequence_meta: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
@@ -118,6 +118,9 @@ class SampleSequencingTable(DbBase):
         """
         Create a new sequence for a sample, and add it to database
         """
+
+        if technology is None:
+            raise ValueError('Sequence technology cannot be null')
 
         _query = """\
             INSERT INTO sample_sequencing
@@ -129,7 +132,6 @@ class SampleSequencingTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-
             id_of_new_sequence = await self.connection.fetch_val(
                 _query,
                 {
@@ -143,7 +145,6 @@ class SampleSequencingTable(DbBase):
             )
 
             if external_ids:
-
                 _project = project or self.project
                 if not _project:
                     raise ValueError(
@@ -355,6 +356,7 @@ class SampleSequencingTable(DbBase):
         external_ids: Optional[dict[str, str]] = None,
         status: Optional[SequenceStatus] = None,
         technology: Optional[SequenceTechnology] = None,
+        sequence_type: Optional[SequenceType] = None,
         meta: Optional[Dict] = None,
         project: Optional[ProjectId] = None,
         author=None,
@@ -362,7 +364,6 @@ class SampleSequencingTable(DbBase):
         """Update a sequence"""
 
         async with self.connection.transaction():
-
             promises = []
 
             fields = {'sequencing_id': sequencing_id, 'author': author or self.author}
@@ -377,6 +378,9 @@ class SampleSequencingTable(DbBase):
             if technology:
                 updaters.append('technology = :technology')
                 fields['technology'] = technology.value
+            if sequence_type:
+                updaters.append('type = :sequence_type')
+                fields['sequence_type'] = sequence_type.value
 
             _query = f"""
                 UPDATE sample_sequencing
@@ -408,7 +412,6 @@ class SampleSequencingTable(DbBase):
                         )
                     )
                 if to_update:
-
                     # we actually need the project here, get first value from list
                     project = next(
                         iter(await self.get_projects_by_sequence_ids([sequencing_id]))

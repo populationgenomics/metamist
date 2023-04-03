@@ -81,9 +81,10 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self, mock_any_path, mock_get_sequence_ids, mock_get_sample_id
+        self, mock_filesize, mock_fileexists, mock_get_sequence_ids, mock_get_sample_id
     ):
         """
         Test importing a single row, forms objects and checks response
@@ -92,9 +93,8 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
 
-        # new magic mocks across AnyPath
-        mock_any_path.return_value.stat.return_value.st_size = 111
-        mock_any_path.return_value.exists.return_value = False
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = False
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
@@ -403,10 +403,14 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_contents')
     async def test_cram_with_no_reference(
         self,
-        mock_any_path,
+        mock_filecontents,
+        mock_filesize,
+        mock_fileexists,
         mock_get_sequence_ids,
         mock_get_sample_id,
     ):
@@ -418,8 +422,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_sequence_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
-        mock_any_path.return_value.stat.return_value.st_size = 111
-        mock_any_path.return_value.exists.return_value = False
+        mock_filecontents.return_value = 'testmd5'
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = True
 
         rows = [
             'Sample ID\tFilename',
@@ -454,10 +459,12 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
         self,
-        mock_any_path,
+        mock_filesize,
+        mock_fileexists,
         mock_get_sequence_ids,
         mock_get_sample_id,
     ):
@@ -469,8 +476,8 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_sequence_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
-        mock_any_path.return_value.stat.return_value.st_size = 111
-        mock_any_path.return_value.exists.return_value = True
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = True
 
         rows = [
             'Sample ID\tFilename',
@@ -528,10 +535,10 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
         self,
-        mock_any_path,
+        mock_fileexists,
         mock_get_sequence_ids,
         mock_get_sample_id,
     ):
@@ -543,7 +550,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_sequence_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
-        mock_any_path.return_value.exists.return_value = True
+        mock_fileexists.return_value = True
 
         rows = [
             'Sample ID\tFilename\tRef',
@@ -603,10 +610,10 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
         self,
-        mock_any_path,
+        mock_fileexists,
         mock_get_sequence_ids,
         mock_get_sample_id,
     ):
@@ -618,7 +625,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_get_sequence_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
-        mock_any_path.return_value.exists.return_value = True
+        mock_fileexists.return_value = True
 
         rows = [
             'Sample ID\tFilename\tRef',
@@ -658,3 +665,38 @@ class TestParseGenericMetadata(unittest.TestCase):
             'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
             str(ctx.exception),
         )
+
+
+class FastqPairMatcher(unittest.TestCase):
+    """Test Fastq pair matching logic explictly"""
+
+    def test_simple(self):
+        """Simple fastq pair matching case"""
+        entries = [
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
+        ]
+
+        grouped = GenericMetadataParser.parse_fastqs_structure(entries)
+
+        self.assertEqual(1, len(grouped))
+        self.assertEqual(2, len(grouped[0]))
+        self.assertListEqual(sorted(grouped[0]), grouped[0])
+
+    def test_post_r_value_matcher(self):
+        """Test entries with post R values, eg: R1_001.fastq"""
+        entries = [
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2_001.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1_001.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R1_002.fastq.gz',
+            'gs://BUCKET/FAKE/<sample-id>.filename-R2_002.fastq.gz',
+        ]
+
+        grouped = GenericMetadataParser.parse_fastqs_structure(entries)
+
+        self.assertEqual(2, len(grouped))
+        self.assertEqual(2, len(grouped[0]))
+
+        # check that the 002 got grouped together
+        self.assertIn('002', grouped[1][0])
+        self.assertIn('002', grouped[1][1])

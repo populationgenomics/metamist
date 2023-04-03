@@ -42,7 +42,7 @@ class OntParser(GenericMetadataParser):
         search_locations: List[str],
         project: str,
         default_sequence_type='genome',
-        default_sequence_technology='long-reads',
+        default_sequence_technology='long-read',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
