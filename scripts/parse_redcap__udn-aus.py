@@ -78,6 +78,50 @@ def parse_redcap(redcap_csv: str):
     return families, samples
 
 
+def recover_missing_individuals(family):
+    """
+    If the parental ID(s) are provided in the 'family_information_arm_1' row, 
+    but either parent does not have their own individual row like:
+        'redcap_event_name' == 'maternal_informati_arm_1' 
+        OR
+        'redcap_event_name' == 'paternal_informati_arm_1', 
+    then we must create the individual data for the missing parent(s) and add it
+    to the family.
+    """
+    family_metadata = family['family_metadata']
+    individual_data = family['individual_data']
+    individual_ids = individual_data.keys()
+
+    # If at least one of parents missing, use the proband metadata as a template to add the missing parent(s)
+    if ((family_metadata['maternal_id'] and family_metadata['maternal_id'] not in individual_ids) 
+            or (family_metadata['paternal_id'] and family_metadata['paternal_id'] not in individual_ids)):
+        
+        proband_data = individual_data[family_metadata['proband_id']]
+        proband_metadata = proband_data['individual_metadata']
+
+        # Copy the proband metadata keys without copying the values to create parent metadata entries
+        if family_metadata['maternal_id'] and family_metadata['maternal_id'] not in individual_ids:    
+                
+            maternal_metadata = {}.fromkeys(proband_metadata, '')
+            maternal_metadata['sex'] = 2
+            
+            print(f'Adding individual: {family_metadata["maternal_id"]} to family: {family_metadata["fam_id"]}')
+            individual_data[family_metadata['maternal_id']] = {'individual_metadata': maternal_metadata}
+        
+        if family_metadata['paternal_id'] and family_metadata['paternal_id'] not in individual_ids:
+                        
+            paternal_metadata = {}.fromkeys(proband_metadata, '')
+            paternal_metadata['sex'] = 1
+
+            print(f'Adding individual: {family_metadata["paternal_id"]} to family: {family_metadata["fam_id"]}')
+            individual_data[family_metadata['paternal_id']] = {'individual_metadata' : paternal_metadata}
+
+        # Save the added parent(s) to the family
+        family['individual_data'] = individual_data
+    
+    return family
+
+
 def prepare_ped_row(individual_id, individual_metadata, family_metadata):
     "Return populated dict for pedfile row"
     # Parental IDs
@@ -176,6 +220,9 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
 
     print("Preparing metadata files for upload")
     for fam in families:
+        # Check if any parents in family are missing their individual row
+        fam = recover_missing_individuals(fam)
+
         family_metadata = fam['family_metadata']
         for individual_id, individual_data in fam['individual_data'].items():
 
