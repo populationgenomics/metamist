@@ -124,7 +124,7 @@ async def exception_handler(request: Request, e: Exception):
     # FastAPI doesn't run middleware on exception, but if we make a non-GET/INFO
     # request, then we lose CORS and hence lose the exception in the body of the
     # response. Grab it manually, and explicitly allow origin if so.
-    middlewares = [m for m in app.user_middleware if isinstance(m, CORSMiddleware)]
+    middlewares = [m for m in app.user_middleware if isinstance(m, CORSMiddleware) or m.cls == CORSMiddleware]
     if middlewares:
         cors_middleware = middlewares[0]
 
