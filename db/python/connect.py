@@ -23,12 +23,26 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'participant',
     'sample',
     'analysis_sample',
-    'sample_sequencing',
-    'sample_sequencing_eid',
+    'assay',
+    'assay_eid',
     'family',
     'family_participant',
     'participant_phenotypes',
 ][::-1]
+
+
+class NoOpAenter:
+    """
+    Sometimes it's useful to use `async with VARIABLE()`, and have
+    either VARIABLE be a transaction, or noop (eg: when a transaction
+    is already taking place). Use this in place.
+    """
+
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
 
 
 class Connection:

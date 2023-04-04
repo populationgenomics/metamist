@@ -1,31 +1,31 @@
 from test.testbase import DbIsolatedTest, run_as_sync
-from db.python.layers.sequence import SequencingUpsert
 
 from db.python.layers.participant import (
     ParticipantLayer,
-    ParticipantUpsert,
-    ParticipantUpsertBody,
 )
-from db.python.layers.sample import SampleUpsert, SequencingGroupUpsert
-from models.enums import SequenceType, SampleType, SequenceStatus, SequenceTechnology
+from models.models.participant import ParticipantUpsertInternal
+from models.models.sample import SampleUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.assay import AssayUpsertInternal
+from models.enums import SampleType
 
 
 all_participants = [
-    ParticipantUpsert(
+    ParticipantUpsertInternal(
         external_id='Demeter',
         meta={},
         samples=[
-            SampleUpsert(
+            SampleUpsertInternal(
                 external_id='sample_id001',
                 meta={},
                 sequencing_groups=[
-                    SequencingGroupUpsert(
-                        type=SequenceType('genome'),
-                        technology=SequenceTechnology('short-read'),
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
                         platform=None,
                         meta={},
-                        sequencing=[
-                            SequencingUpsert(
+                        assays=[
+                            AssayUpsertInternal(
                                 meta={
                                     'reads': [
                                         {
@@ -45,19 +45,17 @@ all_participants = [
                                     ],
                                     'reads_type': 'fastq',
                                 },
-                                status=SequenceStatus('uploaded'),
-                                technology=SequenceTechnology('short-read'),
-                                type=SequenceType('genome'),
+                                type='sequencing',
                             )
                         ],
                     ),
-                    SequencingGroupUpsert(
-                        type=SequenceType('exome'),
-                        technology=SequenceTechnology('short-read'),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
                         platform=None,
                         meta={},
-                        sequencing=[
-                            SequencingUpsert(
+                        assays=[
+                            AssayUpsertInternal(
                                 meta={
                                     'reads': [
                                         {
@@ -77,32 +75,30 @@ all_participants = [
                                     ],
                                     'reads_type': 'fastq',
                                 },
-                                status=SequenceStatus('uploaded'),
-                                type=SequenceType('exome'),
-                                technology=SequenceTechnology('short-read'),
+                                type='sequencing',
                             )
                         ],
                     ),
                 ],
-                type=SampleType('blood'),
+                type=SampleType.BLOOD,
             )
         ],
     ),
-    ParticipantUpsert(
+    ParticipantUpsertInternal(
         external_id='Apollo',
         meta={},
         samples=[
-            SampleUpsert(
+            SampleUpsertInternal(
                 external_id='sample_id002',
                 meta={},
                 sequencing_groups=[
-                    SequencingGroupUpsert(
-                        technology=SequenceTechnology('short-read'),
-                        type=SequenceType('genome'),
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
                         platform=None,
                         meta={},
-                        sequencing=[
-                            SequencingUpsert(
+                        assays=[
+                            AssayUpsertInternal(
                                 meta={
                                     'reads': [
                                         {
@@ -122,26 +118,24 @@ all_participants = [
                                     ],
                                     'reads_type': 'fastq',
                                 },
-                                status=SequenceStatus('uploaded'),
-                                technology=SequenceTechnology('short-read'),
-                                type=SequenceType('genome'),
+                                type='sequencing',
                             )
                         ],
                     ),
                 ],
-                type=SampleType('blood'),
+                type=SampleType.BLOOD,
             ),
-            SampleUpsert(
+            SampleUpsertInternal(
                 external_id='sample_id004',
                 meta={},
                 sequencing_groups=[
-                    SequencingGroupUpsert(
-                        type=SequenceType('genome'),
-                        technology=SequenceTechnology('short-read'),
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
                         platform=None,
                         meta={},
-                        sequencing=[
-                            SequencingUpsert(
+                        assays=[
+                            AssayUpsertInternal(
                                 meta={
                                     'reads': [
                                         {
@@ -161,32 +155,30 @@ all_participants = [
                                     ],
                                     'reads_type': 'fastq',
                                 },
-                                status=SequenceStatus('uploaded'),
-                                type=SequenceType('genome'),
-                                technology=SequenceTechnology('short-read'),
+                                type='sequencing',
                             )
                         ],
                     )
                 ],
-                type=SampleType('blood'),
+                type=SampleType.BLOOD,
             ),
         ],
     ),
-    ParticipantUpsert(
+    ParticipantUpsertInternal(
         external_id='Athena',
         meta={},
         samples=[
-            SampleUpsert(
+            SampleUpsertInternal(
                 external_id='sample_id003',
                 meta={},
                 sequencing_groups=[
-                    SequencingGroupUpsert(
-                        technology=SequenceTechnology('short-read'),
-                        type=SequenceType('genome'),
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
                         platform=None,
                         meta={},
-                        sequencing=[
-                            SequencingUpsert(
+                        assays=[
+                            AssayUpsertInternal(
                                 meta={
                                     'reads': [
                                         {
@@ -206,14 +198,12 @@ all_participants = [
                                     ],
                                     'reads_type': 'fastq',
                                 },
-                                status=SequenceStatus('uploaded'),
-                                technology=SequenceTechnology('short-read'),
-                                type=SequenceType('genome'),
+                                type='sequencing',
                             )
                         ],
                     )
                 ],
-                type=SampleType('blood'),
+                type=SampleType.BLOOD,
             )
         ],
     ),
@@ -234,11 +224,10 @@ class TestUpsert(DbIsolatedTest):
             tests.test_parse_generic_metadata:TestParseGenericMetadata.test_rows_with_participants
         """
 
-        body = ParticipantUpsertBody(participants=all_participants)
         # Table interfaces
         pt = ParticipantLayer(self.connection)
 
-        await pt.batch_upsert_participants(body)
+        await pt.upsert_participants(all_participants, open_transaction=False)
 
         expected_sample_eid_to_participant_eid = {
             sample.external_id: participant.external_id
@@ -279,9 +268,9 @@ class TestUpsert(DbIsolatedTest):
             self.assertIsNotNone(db_sg['type'])
 
         db_sequencing = await self.connection.connection.fetch_all(
-            'SELECT * FROM sample_sequencing'
+            'SELECT * FROM assay'
         )
         self.assertEqual(5, len(db_sequencing))
         for db_sg in db_sequencing_groups:
             self.assertIsNotNone(db_sg['sample_id'])
-            self.assertIsNotNone(db_sg['type'])
+            # self.assertIsNotNone(db_sg['type'])

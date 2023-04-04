@@ -2,7 +2,7 @@ import io
 import csv
 from datetime import date
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
@@ -19,14 +19,14 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus, SequenceType
+from models.enums import AnalysisType, AnalysisStatus
 from models.models.analysis import (
     Analysis,
     ProjectSizeModel,
     SampleSizeModel,
     DateSizeModel,
 )
-from models.models.sample import (
+from models.utils.sample_id_format import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
     sample_id_format,
@@ -41,43 +41,43 @@ class AnalysisModel(BaseModel):
     Model for 'createNewAnalysis'
     """
 
-    sample_ids: List[str]
+    sample_ids: list[str]
     type: AnalysisType
     status: AnalysisStatus
-    meta: Optional[Dict[str, Any]] = None
-    output: Optional[str] = None
+    meta: dict[str, Any] | None = None
+    output: str | None = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
-    author: Optional[str] = None
+    author: str | None = None
 
 
 class AnalysisUpdateModel(BaseModel):
     """Update analysis model"""
 
     status: AnalysisStatus
-    output: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = None
-    active: Optional[bool] = None
+    output: str | None = None
+    meta: dict[str, Any] | None = None
+    active: bool | None = None
 
 
 class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
     # sample_ids means it contains the analysis contains at least one of the sample_ids in the list
-    sample_ids: Optional[List[str]]
+    sample_ids: list[str] | None
     # # sample_ids_all means the analysis contains ALL of the sample_ids
-    # sample_ids_all: List[str] = None
-    projects: List[str]
-    type: Optional[AnalysisType] = None
-    status: Optional[AnalysisStatus] = None
-    meta: Optional[Dict[str, Any]] = None
-    output: Optional[str] = None
-    active: Optional[bool] = None
+    # sample_ids_all: list[str] = None
+    projects: list[str]
+    type: AnalysisType | None = None
+    status: AnalysisStatus | None = None
+    meta: dict[str, Any] | None = None
+    output: str | None = None
+    active: bool | None = None
 
 
-@router.put('/{project}/', operation_id='createNewAnalysis', response_model=int)
-async def create_new_analysis(
+@router.put('/{project}/', operation_id='createAnalysis', response_model=int)
+async def create_analysis(
     analysis: AnalysisModel, connection: Connection = get_project_write_connection
 ):
     """Create a new analysis"""
@@ -175,7 +175,7 @@ async def get_latest_complete_analysis_for_type(
 )
 async def get_latest_complete_analysis_for_type_post(
     analysis_type: AnalysisType,
-    meta: Dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
+    meta: dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -200,7 +200,7 @@ async def get_latest_complete_analysis_for_type_post(
     operation_id='getLatestAnalysisForSamplesAndType',
 )
 async def get_latest_analysis_for_samples_and_type(
-    sample_ids: List[str],
+    sample_ids: list[str],
     analysis_type: AnalysisType,
     allow_missing: bool = True,
     connection: Connection = get_project_readonly_connection,
@@ -271,11 +271,11 @@ async def query_analyses(
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
-    project_names: List[str] = Query(None),  # type: ignore
+    project_names: list[str] = Query(None),  # type: ignore
     author: str = None,
     output_dir: str = None,
     connection: Connection = get_projectless_db_connection,
-) -> List[Analysis]:
+) -> list[Analysis]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
@@ -300,7 +300,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequence_types: List[SequenceType] = Query(None),  # type: ignore
+    sequence_types: list[str] = Query(None),  # type: ignore
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -345,7 +345,7 @@ async def get_sample_reads_map(
 
 @router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
 async def get_sample_file_sizes(
-    project_names: List[str] = Query(None),  # type: ignore
+    project_names: list[str] = Query(None),  # type: ignore
     start_date: str = None,
     end_date: str = None,
     connection: Connection = get_projectless_db_connection,
@@ -375,7 +375,7 @@ async def get_sample_file_sizes(
     )
 
     # Convert to the correct output type, converting internal ids to external
-    fixed_pids: List[Any] = [
+    fixed_pids: list[Any] = [
         ProjectSizeModel(
             project=prj_name_map[project_data['project']],
             samples=[

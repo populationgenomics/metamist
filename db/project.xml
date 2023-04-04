@@ -467,7 +467,38 @@
 			newTableName="assay"
 		/>
 
+		<dropForeignKeyConstraint
+			baseTableName="sample_sequencing_eid"
+			constraintName="fk_sample_sequencing_eid_sequence_id"
+		/>
+		<renameTable
+			oldTableName="sample_sequencing_eid"
+			newTableName="assay_eid"
+		/>
+		<renameColumn
+			columnDataType="INT"
+			oldColumnName="sequencing_id"
+			newColumnName="assay_id"
+			tableName="assay_eid"
+		/>
+		<addForeignKeyConstraint
+			constraintName="fk_assay_eid_assay_id"
+			baseTableName="assay_eid"
+			baseColumnNames="assay_id"
+			referencedTableName="assay"
+			referencedColumnNames="id"
+		/>
+
 <!--		Instead of ENUMs, make some fields FKs -->
+		<createTable tableName="assay_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
 		<createTable tableName="sequencing_technology">
 			<column name="id" type="VARCHAR(255)">
 				<constraints primaryKey="true" nullable="false" />
@@ -500,9 +531,9 @@
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
-			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />
-			</column>
+<!--			<column name="project" type="INT">-->
+<!--				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />-->
+<!--			</column>-->
 			<column name="sample_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
 			</column>
@@ -513,7 +544,7 @@
 				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_technology" references="sequencing_technology(id)"/>
 			</column>
 			<column name="platform" type="VARCHAR(255)">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>
+<!--				<constraints nullable="true" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>-->
 			</column>
 			<column name="meta" type="JSON" />
 			<column name="archived" type="BIT" />
@@ -567,12 +598,12 @@
 
 <!-- 		Replaces the analysis_sample table.
 			We cannot delete the old table, so it's around for legacy purposes. -->
-		<createTable tableName="analysis_sequence_group">
+		<createTable tableName="analysis_sequencing_group">
 			<column name="analysis_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_analysis" references="analysis(id)"/>
 			</column>
 			<column name="sequencing_group_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_sequence_group" references="sequencing_group(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_sequencing_group" references="sequencing_group(id)"/>
 			</column>
 		</createTable>
 
@@ -580,17 +611,41 @@
 <!--		Default data -->
 
 		<sql>
+			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
+
 			INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
 			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
 			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
 			INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
 
-			INSERT INTO sequencing_technology (name) VALUES ('illumina');
-			INSERT INTO sequencing_technology (name) VALUES ('pacbio');
-			INSERT INTO sequencing_technology (name) VALUES ('oxford-nanopore');
+			INSERT INTO sequencing_technology (id, name) VALUES ('short-read', 'short-read');
+			INSERT INTO sequencing_technology (id, name) VALUES ('long-read', 'long-read');
+			INSERT INTO sequencing_technology (id, name) VALUES ('single-cell-rna-seq', 'single-cell-rna-seq');
+			INSERT INTO sequencing_technology (id, name) VALUES ('bulk-rna-seq', 'bulk-rna-seq');
+
+			INSERT INTO sequencing_platform (id, name) VALUES ('illumina', 'illumina');
+			INSERT INTO sequencing_platform (id, name) VALUES ('pacbio', 'pacbio');
+			INSERT INTO sequencing_platform (id, name) VALUES ('oxford-nanopore', 'oxford-nanopore');
 
 		</sql>
-	</changeSet>
 
+		<renameColumn
+			columnDataType="VARCHAR(255)"
+			oldColumnName="type"
+			newColumnName="_seqtype"
+			tableName="assay"
+		/>
+		<addColumn tableName="assay">
+			<column name="type" type="VARCHAR(255)" value="sequencing">
+				<constraints nullable="false" foreignKeyName="fk_assay_type" references="assay_type(id)"/>
+			</column>
+		</addColumn>
+
+<!--		-->
+		<sql>
+			UPDATE assay SET type = 'sequencing';
+		</sql>
+
+	</changeSet>
 
 </databaseChangeLog>

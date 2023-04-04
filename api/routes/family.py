@@ -19,7 +19,7 @@ from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
 from db.python.layers.family import FamilyLayer, PedRow
 from models.models.family import Family
-from models.models.sample import sample_id_transform_to_raw_list
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
 
 router = APIRouter(prefix='/family', tags=['family'])
 

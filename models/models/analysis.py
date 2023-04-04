@@ -5,7 +5,7 @@ from typing import Optional, List, Union, Dict, Any
 from pydantic import BaseModel
 
 from models.base import SMBase
-from models.enums import AnalysisType, AnalysisStatus, SequenceType
+from models.enums import AnalysisType, AnalysisStatus
 
 
 class Analysis(SMBase):
@@ -57,7 +57,7 @@ class DateSizeModel(BaseModel):
 
     start: date
     end: date | None
-    size: dict[SequenceType, int]
+    size: dict[str, int]
 
 
 class SampleSizeModel(BaseModel):

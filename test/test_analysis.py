@@ -3,11 +3,11 @@ from datetime import date, timedelta
 
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.enums.sequencing import SequenceType
-from models.enums import AnalysisType, AnalysisStatus
-
 from db.python.layers.analysis import AnalysisLayer
-from db.python.layers.sample import SampleLayer, SampleType
+from db.python.layers.sample import SampleLayer
+
+from models.models.sample import SampleUpsertInternal
+from models.enums import AnalysisType, AnalysisStatus, SampleType
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -20,12 +20,15 @@ class TestAnalysis(DbIsolatedTest):
         self.sl = SampleLayer(self.connection)
         self.al = AnalysisLayer(self.connection)
 
-        self.sample_id = await self.sl.insert_sample(
-            'Test01',
-            SampleType.BLOOD,
-            meta={'meta': 'meta ;)'},
-            active=True,
+        sample = await self.sl.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test01',
+                type=SampleType.BLOOD,
+                meta={'meta': 'meta ;)'},
+                active=True,
+            )
         )
+        self.sample_id = sample.id
 
         await self.al.insert_analysis(
             analysis_type=AnalysisType.CRAM,
@@ -68,7 +71,7 @@ class TestAnalysis(DbIsolatedTest):
                             {
                                 'start': date.today(),
                                 'end': None,
-                                'size': {SequenceType.GENOME: 1024},
+                                'size': {'genome': 1024},
                             }
                         ],
                     }
@@ -88,7 +91,7 @@ class TestAnalysis(DbIsolatedTest):
             meta={'sequence_type': 'exome', 'size': 3141},
         )
 
-        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.EXOME] = 3141
+        expected[0]['samples'][0]['dates'][0]['size']['exome'] = 3141
 
         # Assert that the exome size was added correctly
         result = await self.al.get_sample_file_sizes(project_ids=[1])
@@ -111,31 +114,33 @@ class TestAnalysis(DbIsolatedTest):
             meta={'sequence_type': 'genome', 'size': 11111},
         )
 
-        expected[0]['samples'][0]['dates'][0]['size'][SequenceType.GENOME] = 11111
+        expected[0]['samples'][0]['dates'][0]['size']['genome'] = 11111
         result = await self.al.get_sample_file_sizes(project_ids=[1])
         self.assertDictEqual(expected[0], result[0])
 
         # Add another sample and it's analysis cram as well
-        sample_id_2 = await self.sl.insert_sample(
-            'Test02',
-            SampleType.BLOOD,
-            meta={'meta': 'meta ;)'},
-            active=True,
+        sample_2 = await self.sl.upsert_sample(
+            SampleUpsertInternal(
+                external_id='Test02',
+                type=SampleType.BLOOD,
+                meta={'meta': 'meta ;)'},
+                active=True,
+            )
         )
         await self.al.insert_analysis(
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
-            sample_ids=[sample_id_2],
+            sample_ids=[sample_2.id],
             meta={'sequence_type': 'genome', 'size': 987654321},
         )
 
         sample_2_data = {
-            'sample': sample_id_2,
+            'sample': sample_2.id,
             'dates': [
                 {
                     'start': date.today(),
                     'end': None,
-                    'size': {SequenceType.GENOME: 987654321},
+                    'size': {'genome': 987654321},
                 }
             ],
         }

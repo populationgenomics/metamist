@@ -98,11 +98,9 @@ class OntParser(GenericMetadataParser):
     async def group_sequences(
         self, sample: ParsedSample
     ) -> list[ParsedSequencingGroup]:
-
         sequence_groups = await super().group_sequences(sample)
 
         for sequence_group in sequence_groups:
-
             failed_fastqs: list[str] = []
 
             for r in sequence_group.rows:

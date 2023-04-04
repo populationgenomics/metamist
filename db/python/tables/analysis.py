@@ -6,7 +6,7 @@ from typing import List, Optional, Set, Tuple, Dict, Any
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
-from models.enums import AnalysisStatus, AnalysisType, SequenceType
+from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
 
 
@@ -409,7 +409,7 @@ WHERE a.id = :analysis_id
         return projects, list(analyses.values())
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId, sequence_types: list[SequenceType]
+        self, project: ProjectId, sequence_types: list[str]
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
 
@@ -418,10 +418,10 @@ WHERE a.id = :analysis_id
         if sequence_types:
             if len(sequence_types) == 1:
                 seq_check = '= :seq_type'
-                values['seq_type'] = sequence_types[0].value
+                values['seq_type'] = sequence_types[0]
             else:
                 seq_check = 'IN :seq_types'
-                values['seq_types'] = [s.value for s in sequence_types]
+                values['seq_types'] = sequence_types
 
             seq_filter = f'AND JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check
 

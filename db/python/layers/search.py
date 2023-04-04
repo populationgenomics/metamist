@@ -48,7 +48,7 @@ class SearchLayer(BaseLayer):
         cpg_id = sample_id_format(sample_id)
 
         try:
-            project, sample = await stable.get_single_by_id(sample_id)
+            project, sample = await stable.get_sample_by_id(sample_id)
         except NotFoundError:
             return None
 

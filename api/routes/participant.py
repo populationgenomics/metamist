@@ -1,8 +1,7 @@
-from typing import Any, List, Optional, Dict
-
-import io
 import csv
+import io
 from datetime import date
+from typing import Any, List, Optional, Dict
 
 from fastapi import APIRouter
 from fastapi.params import Query
@@ -17,11 +16,9 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.layers.participant import (
     ParticipantLayer,
-    ParticipantUpdateModel,
-    ParticipantUpsertBody,
-    # ParticipantModel,
 )
-from models.models.sample import sample_id_format, sample_id_transform_to_raw
+from models.models.participant import ParticipantUpsert
+from models.models.sample import sample_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -169,21 +166,16 @@ async def get_external_participant_id_to_internal_sample_id(
 @router.post('/{participant_id}/update-participant', operation_id='updateParticipant')
 async def update_participant(
     participant_id: int,
-    participant: ParticipantUpdateModel,
+    participant: ParticipantUpsert,
     connection: Connection = get_projectless_db_connection,
 ):
     """Update Participant Data"""
     participant_layer = ParticipantLayer(connection)
 
+    participant.id = participant_id
+
     return {
-        'success': await participant_layer.update_single_participant(
-            participant_id=participant_id,
-            external_id=participant.external_id,
-            reported_sex=participant.reported_sex,
-            reported_gender=participant.reported_gender,
-            karyotype=participant.karyotype,
-            meta=participant.meta,
-        )
+        'success': await participant_layer.upsert_participant(participant.to_internal())
     }
 
 
@@ -193,7 +185,7 @@ async def update_participant(
     operation_id='batchUpsertParticipants',
 )
 async def batch_upsert_participants(
-    participants: ParticipantUpsertBody,
+    participants: list[ParticipantUpsert],
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:
     """
@@ -201,34 +193,28 @@ async def batch_upsert_participants(
     Returns the list of internal sample IDs
     """
     # Convert id in samples to int
-    for participant in participants.participants:
-        for sample in participant.samples:
-            if sample.id:
-                sample.id = sample_id_transform_to_raw(sample.id)
 
-    external_pids = [p.external_id for p in participants.participants]
+    external_pids = [p.external_id for p in participants]
 
-    async with connection.connection.transaction():
-        # Table interfaces
-        pt = ParticipantLayer(connection)
+    pt = ParticipantLayer(connection)
 
-        results = await pt.batch_upsert_participants(participants)
-        pid_key = dict(zip(results.keys(), external_pids))
+    results = await pt.upsert_participants([p.to_internal() for p in participants])
+    pid_key = dict(zip(results.keys(), external_pids))
 
-        # Map sids back from ints to strs
-        outputs: Dict[str, Dict[str, Any]] = {}
-        for pid, samples in results.items():
-            samples_output: Dict[str, Any] = {}
-            for iid, seqs in samples.items():
-                data = {'sequences': seqs}
-                samples_output[sample_id_format(iid)] = data
-            outputs[pid_key[pid]] = {
-                'id': pid,
-                'external_id': pid_key[pid],
-                'samples': samples_output,
-            }
+    # Map sids back from ints to strs
+    outputs: Dict[str, Dict[str, Any]] = {}
+    for pid, samples in results.items():
+        samples_output: Dict[str, Any] = {}
+        for iid, seqs in samples.items():
+            data = {'sequences': seqs}
+            samples_output[sample_id_format(iid)] = data
+        outputs[pid_key[pid]] = {
+            'id': pid,
+            'external_id': pid_key[pid],
+            'samples': samples_output,
+        }
 
-        return outputs
+    return outputs
 
 
 @router.post(
@@ -243,8 +229,9 @@ async def get_participants(
 ):
     """Get participants, default ALL participants in project"""
     player = ParticipantLayer(connection)
-    return await player.get_participants(
+    participants = await player.get_participants(
         project=connection.project,
         external_participant_ids=external_participant_ids,
         internal_participant_ids=internal_participant_ids,
     )
+    return [p.to_external() for p in participants]

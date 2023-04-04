@@ -11,6 +11,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from models.models.family import Family
+from models.models.participant import ParticipantUpsertInternal
 
 
 class PedRow:
@@ -538,8 +539,11 @@ class FamilyLayer(BaseLayer):
                         continue
                     external_participant_ids_map[
                         row.individual_id
-                    ] = await participant_table.create_participant(
-                        external_id=row.individual_id, reported_sex=row.sex
+                    ] = await participant_table.upsert_participant(
+                        ParticipantUpsertInternal(
+                            external_id=row.individual_id,
+                            reported_sex=row.sex,
+                        )
                     )
 
             for external_family_id in missing_external_family_ids:
@@ -568,11 +572,13 @@ class FamilyLayer(BaseLayer):
                 for row in pedrows
             ]
 
-            await participant_table.update_participants(
-                participant_ids=[
-                    external_participant_ids_map[row.individual_id] for row in pedrows
-                ],
-                reported_sexes=[row.sex for row in pedrows],
+            await participant_table.upsert_participants(
+                [
+                    ParticipantUpsertInternal(
+                        id=row.individual_id, reported_sex=row.sex
+                    )
+                    for row in pedrows
+                ]
             )
             await self.fptable.create_rows(insertable_rows)
 

@@ -114,7 +114,6 @@ class TobWgsParser(GenericMetadataParser):
     async def get_analyses_from_sequence_group(
         self, sequence_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
-
         """
         Get Analysis entries from a row.
         cpg_id is known for previously added samples.

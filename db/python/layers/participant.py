@@ -1,50 +1,48 @@
 # pylint: disable=invalid-name
+import asyncio
 from typing import Dict, List, Tuple, Optional, Any
 
 import re
 from collections import defaultdict
 from enum import Enum
 
-from pydantic import BaseModel
 
-from db.python.connect import NotFoundError
+from db.python.connect import NotFoundError, NoOpAenter
 from db.python.layers.base import BaseLayer
-from db.python.layers.sample import (
-    SampleUpsert,
-    SampleLayer,
-)
+from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId, split_generic_terms
-from models.models.participant import Participant
+from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
 
 HPO_REGEX_MATCHER = re.compile(r'HP:\d+$')
 
 
-class ParticipantUpdateModel(BaseModel):
-    """Update participant model"""
-
-    external_id: Optional[str] = None
-    reported_sex: Optional[int] = None
-    reported_gender: Optional[str] = None
-    karyotype: Optional[str] = None
-    meta: Optional[Dict] = None
-
-
-class ParticipantUpsert(ParticipantUpdateModel):
-    """Update model for sample with sequences list"""
-
-    id: int | None
-    samples: list[SampleUpsert]
-
-
-class ParticipantUpsertBody(BaseModel):
-    """Upsert model for batch Participants"""
-
-    participants: list[ParticipantUpsert]
+# class ParticipantUpdateModel(BaseModel):
+#     """Update participant model"""
+#
+#     external_id: Optional[str] = None
+#     reported_sex: Optional[int] = None
+#     reported_gender: Optional[str] = None
+#     karyotype: Optional[str] = None
+#     meta: Optional[Dict] = None
+#
+#
+# class ParticipantUpsert(ParticipantUpdateModel):
+#     """Update model for sample with sequences list"""
+#
+#     id: int | None
+#     samples: list[SampleUpsert]
+#
+#
+# class ParticipantUpsertBody(BaseModel):
+#     """Upsert model for batch Participants"""
+#
+#     participants: list[ParticipantUpsert]
+#
 
 
 class ExtraParticipantImporterHandler(Enum):
@@ -267,7 +265,7 @@ class ParticipantLayer(BaseLayer):
         pids: list[int],
         check_project_ids: bool = True,
         allow_missing: bool = False,
-    ) -> list[Participant]:
+    ) -> list[ParticipantInternal]:
         """
         Get participants by IDs
         """
@@ -294,7 +292,7 @@ class ParticipantLayer(BaseLayer):
         project: int,
         external_participant_ids: List[str] = None,
         internal_participant_ids: List[int] = None,
-    ):
+    ) -> list[ParticipantInternal]:
         """
         Get participants for a project
         """
@@ -308,20 +306,20 @@ class ParticipantLayer(BaseLayer):
         ps = await self.pttable.get_participants(
             project=project, internal_participant_ids=list(internal_ids)
         )
-        return [Participant(**p) for p in ps]
+        return ps
 
     async def fill_in_missing_participants(self):
         """Update the sequencing status from the internal sample id"""
         sample_table = SampleTable(connection=self.connection)
 
         # { external_id: internal_id }
-        internal_sample_map_with_no_pid = dict(
-            await sample_table.get_sample_with_missing_participants_by_internal_id(
+        samples_with_no_pid = (
+            await sample_table.get_samples_with_missing_participants_by_internal_id(
                 project=self.connection.project
             )
         )
         external_sample_map_with_no_pid = {
-            v: k for k, v in internal_sample_map_with_no_pid.items()
+            sample.external_id: sample.id for sample in samples_with_no_pid
         }
         ext_sample_id_to_pid = {}
 
@@ -348,7 +346,11 @@ class ParticipantLayer(BaseLayer):
             for external_id in external_participant_ids_to_add:
                 sample_id = external_sample_map_with_no_pid[external_id]
                 participant_id = await self.pttable.create_participant(
-                    external_id=external_id
+                    external_id=external_id,
+                    reported_sex=None,
+                    reported_gender=None,
+                    karyotype=None,
+                    meta=None,
                 )
                 ext_sample_id_to_pid[external_id] = participant_id
                 sample_ids_to_update[sample_id] = participant_id
@@ -411,7 +413,12 @@ class ParticipantLayer(BaseLayer):
                 )
                 for ex_pid in missing_participant_eids:
                     external_pid_map[ex_pid] = await self.pttable.create_participant(
-                        external_id=ex_pid, project=self.connection.project
+                        external_id=ex_pid,
+                        reported_sex=None,
+                        reported_gender=None,
+                        karyotype=None,
+                        meta=None,
+                        project=self.connection.project,
                     )
             elif extra_participants_method == ExtraParticipantImporterHandler.IGNORE:
                 rows = [
@@ -473,8 +480,9 @@ class ParticipantLayer(BaseLayer):
 
             if len(incompatible_familes) > 0:
                 raise ValueError(
-                    f'Specified family IDs for participants did not match what SM already knows, '
-                    f'please update these in the SM database before proceeding: {", ".join(incompatible_familes)}'
+                    'Specified family IDs for participants did not match what SM '
+                    'already knows,please update these in the SM database before '
+                    f'proceeding: {", ".join(incompatible_familes)}'
                 )
 
             if len(missing_family_ids) > 0:
@@ -514,7 +522,7 @@ class ParticipantLayer(BaseLayer):
 
     async def get_participants_by_families(
         self, family_ids: list[int], check_project_ids: bool = True
-    ) -> dict[int, list[Participant]]:
+    ) -> dict[int, list[ParticipantInternal]]:
         """Get participants, keyed by family ID"""
         projects, family_map = await self.pttable.get_participants_by_families(
             family_ids=family_ids
@@ -528,6 +536,150 @@ class ParticipantLayer(BaseLayer):
             )
 
         return family_map
+
+    async def get_id_map_by_external_ids(
+        self,
+        external_ids: List[str],
+        project: Optional[ProjectId],
+        allow_missing=False,
+    ) -> Dict[str, int]:
+        """Get participant ID map by external_ids"""
+        id_map = await self.pttable.get_id_map_by_external_ids(
+            external_ids, project=project
+        )
+        if not allow_missing and len(id_map) != len(external_ids):
+            provided_external_ids = set(external_ids)
+            # do the check again, but use the set this time
+            # (in case we're provided a list with duplicates)
+            if len(id_map) != len(provided_external_ids):
+                # we have families missing from the map, so we'll 404 the whole thing
+                missing_participant_ids = provided_external_ids - set(id_map.keys())
+
+                raise NotFoundError(
+                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
+                )
+
+        return id_map
+
+    async def get_external_participant_id_to_internal_sample_id_map(
+        self, project: int
+    ) -> List[Tuple[str, int]]:
+        """
+        Get a map of {external_participant_id} -> {internal_sample_id}
+        useful to matching joint-called samples in the matrix table to the participant
+
+        Return a list not dictionary, because dict could lose
+        participants with multiple samples.
+        """
+        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
+            project=project
+        )
+
+    # region UPSERTS / UPDATES
+
+    async def upsert_participant(
+        self,
+        participant: ParticipantUpsertInternal,
+        author: str = None,
+        project: ProjectId = None,
+        check_project_id: bool = True,
+        open_transaction=True,
+    ) -> int:
+        """Create a single participant"""
+        # pylint: disable=unused-argument
+
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
+
+        async with with_function():
+            if participant.id:
+                if check_project_id:
+                    project_ids = (
+                        await self.pttable.get_project_ids_for_participant_ids(
+                            [participant.id]
+                        )
+                    )
+
+                    await self.ptable.check_access_to_project_ids(
+                        self.connection.author, project_ids, readonly=False
+                    )
+                await self.pttable.update_participant(
+                    participant_id=participant.id,
+                    external_id=participant.external_id,
+                    reported_sex=participant.reported_sex,
+                    reported_gender=participant.reported_gender,
+                    meta=participant.meta,
+                    karyotype=participant.karyotype,
+                    author=author,
+                )
+
+            else:
+                participant.id = await self.pttable.create_participant(
+                    external_id=participant.external_id,
+                    reported_sex=participant.reported_sex,
+                    reported_gender=participant.reported_gender,
+                    karyotype=participant.karyotype,
+                    meta=participant.meta,
+                    author=author,
+                    project=project,
+                )
+
+            if participant.samples:
+                slayer = SampleLayer(self.connection)
+                for s in participant.samples:
+                    s.participant_id = participant.id
+
+                await slayer.upsert_samples(
+                    participant.samples,
+                    author=author,
+                    project=project,
+                    check_project_id=False,
+                    open_transaction=False,
+                )
+
+            return participant.id
+
+    async def upsert_participants(
+        self,
+        participants: list[ParticipantUpsertInternal],
+        open_transaction=True,
+    ):
+        """Batch upsert a list of participants with sequences"""
+
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
+
+        async with with_function():
+            # Create or update participants
+            await asyncio.gather(
+                *[
+                    self.upsert_participant(p, open_transaction=False)
+                    for p in participants
+                ]
+            )
+
+        # Format and return response
+        return participants
+
+    async def update_many_participant_external_ids(
+        self, internal_to_external_id: Dict[int, str], check_project_ids=True
+    ):
+        """Update many participant external ids"""
+        if check_project_ids:
+            projects = await self.pttable.get_project_ids_for_participant_ids(
+                list(internal_to_external_id.keys())
+            )
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.pttable.update_many_participant_external_ids(
+            internal_to_external_id
+        )
+
+    # region PHENOTYPES / SEQR
 
     async def get_seqr_individual_template(
         self,
@@ -611,46 +763,6 @@ class ParticipantLayer(BaseLayer):
             'headers': list(set_headers),
             'header_map': json_header_map,
         }
-
-    async def get_id_map_by_external_ids(
-        self,
-        external_ids: List[str],
-        project: Optional[ProjectId],
-        allow_missing=False,
-    ) -> Dict[str, int]:
-        """Get participant ID map by external_ids"""
-        id_map = await self.pttable.get_id_map_by_external_ids(
-            external_ids, project=project
-        )
-        if not allow_missing and len(id_map) != len(external_ids):
-            provided_external_ids = set(external_ids)
-            # do the check again, but use the set this time
-            # (in case we're provided a list with duplicates)
-            if len(id_map) != len(provided_external_ids):
-                # we have families missing from the map, so we'll 404 the whole thing
-                missing_participant_ids = provided_external_ids - set(id_map.keys())
-
-                raise NotFoundError(
-                    f"Couldn't find participants with IDS: {', '.join(missing_participant_ids)}"
-                )
-
-        return id_map
-
-    async def update_many_participant_external_ids(
-        self, internal_to_external_id: Dict[int, str], check_project_ids=True
-    ):
-        """Update many participant external ids"""
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                list(internal_to_external_id.keys())
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
-
-        return await self.pttable.update_many_participant_external_ids(
-            internal_to_external_id
-        )
 
     @staticmethod
     def _validate_individual_metadata_headers(headers):
@@ -759,135 +871,4 @@ class ParticipantLayer(BaseLayer):
 
         return insertable_rows
 
-    async def get_external_participant_id_to_internal_sample_id_map(
-        self, project: int
-    ) -> List[Tuple[str, int]]:
-        """
-        Get a map of {external_participant_id} -> {internal_sample_id}
-        useful to matching joint-called samples in the matrix table to the participant
-
-        Return a list not dictionary, because dict could lose
-        participants with multiple samples.
-        """
-        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
-            project=project
-        )
-
-    async def create_participant(
-        self,
-        external_id: str,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author: str = None,
-        project: ProjectId = None,
-    ) -> int:
-        """Create a single participant"""
-        # pylint: disable=unused-argument
-        d = {k: v for k, v in locals().items() if k != 'self'}
-        return await self.pttable.create_participant(**d)
-
-    async def update_participants(
-        self,
-        participant_ids: List[int],
-        reported_sexes: List[int] = None,
-        reported_genders: List[str] = None,
-        karyotypes: List[str] = None,
-        metas: List[Dict] = None,
-        author=None,
-    ):
-        """Update many participants"""
-        # pylint: disable=unused-argument
-        d = {k: v for k, v in locals().items() if k != 'self'}
-        return await self.pttable.update_participants(**d)
-
-    async def update_single_participant(
-        self,
-        participant_id: int,
-        external_id: str = None,
-        reported_sex: int = None,
-        reported_gender: str = None,
-        karyotype: str = None,
-        meta: Dict = None,
-        author=None,
-        check_project_ids=True,
-    ):
-        """Update single participants"""
-        # pylint: disable=unused-argument
-        d = {
-            k: v for k, v in locals().items() if k not in ('self', 'check_project_ids')
-        }
-
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                [participant_id]
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
-
-        _ = await self.pttable.update_participant(**d)
-        return participant_id
-
-    async def upsert_participant(self, participant: ParticipantUpsert):
-        """Upsert a participant"""
-        if not participant.id:
-            internal_id = await self.create_participant(
-                external_id=participant.external_id,
-                reported_sex=participant.reported_sex,
-                reported_gender=participant.reported_gender,
-                karyotype=participant.karyotype,
-                meta=participant.meta,
-                author=self.connection.author,
-                project=self.connection.project,
-            )
-            return int(internal_id)
-
-        # Otherwise update
-        internal_id = await self.update_single_participant(
-            participant_id=participant.id,
-            external_id=participant.external_id,
-            reported_sex=participant.reported_sex,
-            reported_gender=participant.reported_gender,
-            karyotype=participant.karyotype,
-            meta=participant.meta,
-            author=self.connection.author,
-            check_project_ids=False,
-        )
-        return int(internal_id)
-
-    async def batch_upsert_participants(self, participants: ParticipantUpsertBody):
-        """Batch upsert a list of participants with sequences"""
-        all_participants = participants.participants
-
-        sampt: SampleLayer = SampleLayer(self.connection)
-
-        async with self.connection.connection.transaction():
-            # Create or update participants
-            pids = [await self.upsert_participant(p) for p in all_participants]
-
-            # Pull a list of external pids
-            epids = [str(participant.external_id) for participant in all_participants]
-
-            # Get map of external pids to internal pids
-            epid_ipid_map = await self.get_id_map_by_external_ids(
-                epids,
-                project=self.connection.project,
-                allow_missing=False,
-            )
-
-            for participant in all_participants:
-                epid = participant.external_id
-                ipid = epid_ipid_map[epid]
-
-                for sample in participant.samples:
-                    sample.participant_id = ipid
-
-            # Upsert all samples with sequences for each participant
-            results = [
-                await sampt.batch_upsert_samples(p.samples) for p in all_participants
-            ]
-
-        # Format and return response
-        return dict(zip(pids, results))
+    # endregion PHENOTYPES / SEQR

@@ -15,17 +15,17 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.tables.sequence import SampleSequencingTable
-from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechnology
+from db.python.tables.assay import AssayTable
+from models.enums import SampleType
 
 
 class NestedSequence(BaseModel):
     """Sequence model"""
 
     id: int
-    type: SequenceType
-    status: SequenceStatus
-    technology: SequenceTechnology
+    type: str
+    status: str
+    technology: str
     meta: Dict
 
 
@@ -140,12 +140,10 @@ class WebDb(DbBase):
         seq_models = [
             NestedSequence(
                 id=seq['id'],
-                status=SequenceStatus(seq['status']),
-                type=SequenceType(seq['type']),
+                status=seq['status'],
+                type=seq['type'],
                 meta=json.loads(seq['meta']),
-                technology=SequenceTechnology(seq['technology'])
-                if seq['technology']
-                else None,
+                technology=seq['technology'] if seq['technology'] else None,
             )
             for seq in sequence_rows
         ]
@@ -188,7 +186,7 @@ class WebDb(DbBase):
 
     async def get_total_number_of_sequences(self):
         """Get total number of sequences within a project"""
-        _query = 'SELECT COUNT(*) FROM sample_sequencing sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
+        _query = 'SELECT COUNT(*) FROM assay sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
 
     @staticmethod
@@ -226,10 +224,11 @@ class WebDb(DbBase):
             'https://seqr.populationgenomics.org.au/project/{guid}/project_page'
         )
         seqr_links = {}
-        for seqtype in SequenceType:
-            key = f'seqr-project-{seqtype.value}'
+        # TODO: get this from the database
+        for seqtype in 'genome', 'exome':
+            key = f'seqr-project-{seqtype}'
             if guid := project.meta.get(key):
-                seqr_links[seqtype.value] = seqr_format.format(guid=guid)
+                seqr_links[seqtype] = seqr_format.format(guid=guid)
 
         return seqr_links
 
@@ -280,7 +279,7 @@ class WebDb(DbBase):
 
         # sequences
 
-        seq_query = 'SELECT id, sample_id, meta, type, status, technology FROM sample_sequencing WHERE sample_id IN :sids'
+        seq_query = 'SELECT id, sample_id, meta, type, status, technology FROM assay WHERE sample_id IN :sids'
         sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
 
         # participant
@@ -297,7 +296,7 @@ WHERE fp.participant_id in :pids
         family_promise = self.connection.fetch_all(f_query, {'pids': pids})
 
         atable = AnalysisTable(self._connection)
-        seqtable = SampleSequencingTable(self._connection)
+        seqtable = AssayTable(self._connection)
 
         [
             sequence_rows,
@@ -320,10 +319,8 @@ WHERE fp.participant_id in :pids
             self.get_total_number_of_participants(),
             self.get_total_number_of_sequences(),
             atable.get_number_of_crams_by_sequence_type(project=self.project),
-            seqtable.get_sequence_type_numbers_for_project(project=self.project),
-            seqtable.get_sequence_type_numbers_by_batch_for_project(
-                project=self.project
-            ),
+            seqtable.get_assay_type_numbers_for_project(project=self.project),
+            seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
         )
 

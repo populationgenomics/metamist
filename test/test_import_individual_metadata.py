@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
+
 from db.python.layers.participant import ParticipantLayer
+from models.models.participant import ParticipantUpsertInternal
 
 
 class TestImportIndividualMetadata(DbIsolatedTest):
@@ -10,7 +12,7 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         """Test import hpo terms from many columns"""
         pl = ParticipantLayer(self.connection)
 
-        await pl.create_participant('TP01')
+        await pl.upsert_participant(ParticipantUpsertInternal(external_id='TP01'))
 
         headers = [
             'Individual ID',
@@ -40,8 +42,10 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         """Test basic data for 2 participants and 2 columns"""
         pl = ParticipantLayer(self.connection)
 
-        await pl.create_participant('TP01')
-        await pl.create_participant('TP02')
+        await pl.upsert_participants([
+            ParticipantUpsertInternal(external_id='TP01'),
+            ParticipantUpsertInternal(external_id='TP02'),
+        ])
 
         headers = ['Individual ID', 'HPO Term 20', 'Age of Onset']
         rows = [

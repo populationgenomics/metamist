@@ -19,9 +19,9 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
-from db.python.layers.sequence import SampleSequenceLayer
+from db.python.layers.assay import AssayLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import SampleType, SequenceType, AnalysisType, AnalysisStatus
+from models.enums import SampleType, AnalysisType, AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw
 
 
@@ -46,8 +46,8 @@ async def load_sequences_for_samples(
     """
     DataLoader: get_sequences_for_sample_ids
     """
-    seqlayer = SampleSequenceLayer(connection)
-    sequences = await seqlayer.get_sequences_for_sample_ids(sample_ids=sample_ids)
+    seqlayer = AssayLayer(connection)
+    sequences = await seqlayer.get_assays_for_sample_ids(sample_ids=sample_ids)
     seq_map: dict[int, list['SampleSequencing']] = group_by(
         sequences, lambda sequence: int(sequence.sample_id)
     )
@@ -396,7 +396,7 @@ class GraphQLSampleSequencing:
     """SampleSequencing GraphQL model"""
 
     id: int
-    type: strawberry.enum(SequenceType)
+    type: str
     meta: strawberry.scalars.JSON
     external_ids: strawberry.scalars.JSON
 
@@ -418,8 +418,8 @@ class Query:
     @strawberry.field
     async def sample_sequence(self, info: Info, id: int) -> GraphQLSampleSequencing:
         connection = info.context['connection']
-        slayer = SampleSequenceLayer(connection)
-        return await slayer.get_sequence_by_id(id)
+        slayer = AssayLayer(connection)
+        return await slayer.get_assay_by_id(id)
 
     @strawberry.field
     async def participant(self, info: Info, id: int) -> GraphQLParticipant:

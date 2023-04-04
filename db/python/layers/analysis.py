@@ -9,9 +9,9 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 from db.python.utils import get_logger
 
-from models.enums import AnalysisStatus, AnalysisType, SequenceType
+from models.enums import AnalysisStatus, AnalysisType
 from models.models.analysis import Analysis
-from models.models.sample import sample_id_format_list
+from models.utils.sample_id_format import sample_id_format_list
 
 
 logger = get_logger()
@@ -31,7 +31,7 @@ class AnalysisLayer(BaseLayer):
         self, project_ids: list[int], active_only: bool = True
     ) -> dict[int, int]:
         """Returns all active sample_ids with project in the set of project_ids"""
-        return await self.sampt.get_samples_from_projects(
+        return await self.sampt.get_sample_id_to_project_map(
             project_ids=project_ids, active_only=active_only
         )
 
@@ -136,7 +136,7 @@ class AnalysisLayer(BaseLayer):
         return await self.at.get_incomplete_analyses(project=project)
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId, sequence_types: list[SequenceType]
+        self, project: ProjectId, sequence_types: list[str]
     ) -> List[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
         return await self.at.get_sample_cram_path_map_for_seqr(
@@ -211,7 +211,7 @@ class AnalysisLayer(BaseLayer):
             analysis_type=AnalysisType.CRAM,
             status=AnalysisStatus.COMPLETED,
         )
-        crams_by_sid: dict[int, dict[SequenceType, list]] = defaultdict(
+        crams_by_sid: dict[int, dict[str, list]] = defaultdict(
             lambda: defaultdict(list)
         )
 
@@ -220,8 +220,8 @@ class AnalysisLayer(BaseLayer):
         affected_analyses = []
         for cram in crams:
             sids = cram.sample_ids
-            seqtype = cram.meta.get('sequence_type')
-            seqtype = seqtype if seqtype else cram.meta.get('sequencing_type')
+            # support both options
+            seqtype = cram.meta.get('sequence_type') or cram.meta.get('sequencing_type')
             size = cram.meta.get('size')
 
             if len(sids) > 1:
@@ -230,7 +230,6 @@ class AnalysisLayer(BaseLayer):
 
             if not isinstance(seqtype, list) and seqtype and size:
                 sid = int(sids[0])
-                seqtype = SequenceType(seqtype)
                 crams_by_sid[sid][seqtype].append(cram)
 
         # Log weird crams

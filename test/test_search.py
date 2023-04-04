@@ -7,7 +7,8 @@ from db.python.layers.family import FamilyLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
 from models.enums import SampleType, SearchResponseType
-from models.models.sample import sample_id_format
+from models.models.sample import sample_id_format, SampleUpsertInternal
+from models.models.participant import ParticipantUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -38,8 +39,10 @@ class TestSample(DbIsolatedTest):
         Search by CPG sample ID that you do not have access to
         Mock this in testing by limiting scope to non-existent project IDs
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
-        cpg_id = sample_id_format(sample_id)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+        )
+        cpg_id = sample_id_format(sample.id)
 
         results = await self.schlay.search(
             query=cpg_id, project_ids=[self.project_id + 1]
@@ -51,8 +54,10 @@ class TestSample(DbIsolatedTest):
         """
         Search by valid CPG sample ID (special case)
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
-        cpg_id = sample_id_format(sample_id)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+        )
+        cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
 
         self.assertEqual(1, len(results))
@@ -66,10 +71,10 @@ class TestSample(DbIsolatedTest):
         Search by External sample ID with no participant / family,
         should only return one result
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
+        sample = await self.slayer.upsert_sample(SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD))
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
-        cpg_id = sample_id_format(sample_id)
+        cpg_id = sample_id_format(sample.id)
 
         self.assertEqual(1, len(results))
         result = results[0]
@@ -85,7 +90,9 @@ class TestSample(DbIsolatedTest):
         Search participant w/ no family by External ID
         should only return one result
         """
-        p_id = await self.player.create_participant(external_id='PART01')
+        p_id = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='PART01')
+        )
         results = await self.schlay.search(
             query='PART01', project_ids=[self.project_id]
         )
@@ -120,7 +127,9 @@ class TestSample(DbIsolatedTest):
         """Create a number of resources, and search for all of them"""
         fptable = FamilyParticipantTable(self.connection)
 
-        p_id = await self.player.create_participant(external_id='X:PART01')
+        p_id = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='X:PART01')
+        )
         f_id = await self.flayer.create_family(external_id='X:FAM01')
         await fptable.create_rows(
             [
@@ -135,8 +144,12 @@ class TestSample(DbIsolatedTest):
             ]
         )
 
-        s_id = await self.slayer.insert_sample(
-            'X:SAM001', SampleType.BLOOD, participant_id=p_id
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='X:SAM001',
+                sample_type=SampleType.BLOOD,
+                participant_id=p_id,
+            )
         )
 
         all_results = await self.schlay.search(
@@ -162,7 +175,7 @@ class TestSample(DbIsolatedTest):
         self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)
 
         # linked sample matches
-        cpg_id = sample_id_format(s_id)
+        cpg_id = sample_id_format(sample.id)
         self.assertEqual(cpg_id, sample_result.data.id)
         self.assertListEqual(['X:SAM001'], sample_result.data.sample_external_ids)
         self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)

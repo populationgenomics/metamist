@@ -1,18 +1,6 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, Any
 
 from fastapi import APIRouter, Body
-from pydantic import BaseModel
-
-from models.enums import SampleType
-from models.models.sample import (
-    # Sample,
-    sample_id_transform_to_raw,
-    sample_id_format,
-    sample_id_transform_to_raw_list,
-)
-
-from db.python.layers.sample import SamplesUpsertBody, SampleLayer
-from db.python.tables.project import ProjectPermissionsTable
 
 from api.utils.db import (
     get_project_write_connection,
@@ -20,80 +8,65 @@ from api.utils.db import (
     Connection,
     get_projectless_db_connection,
 )
-
-
-class NewSample(BaseModel):
-    """Model for creating new sample"""
-
-    external_id: str
-    type: SampleType
-    meta: Dict = {}
-    participant_id: Optional[int] = None
-
-
-class SampleUpdateModel(BaseModel):
-    """Update model for Sample"""
-
-    meta: Optional[Dict] = {}
-    type: Optional[SampleType] = None
-    participant_id: Optional[int] = None
-    external_id: Optional[str] = None
-    active: Optional[bool] = None
-
+from db.python.layers.sample import SampleLayer
+from db.python.tables.project import ProjectPermissionsTable
+from models.models.sample import SampleUpsert
+from models.utils.sample_id_format import (
+    # Sample,
+    sample_id_transform_to_raw,
+    sample_id_format,
+    sample_id_transform_to_raw_list,
+)
 
 router = APIRouter(prefix='/sample', tags=['sample'])
 
+# region CREATES
 
-@router.put('/{project}/', response_model=str, operation_id='createNewSample')
-async def create_new_sample(
-    sample: NewSample, connection: Connection = get_project_write_connection
+
+@router.put('/{project}/', response_model=str, operation_id='createSample')
+async def create_sample(
+    sample: SampleUpsert, connection: Connection = get_project_write_connection
 ) -> str:
     """Creates a new sample, and returns the internal sample ID"""
     st = SampleLayer(connection)
-    async with connection.connection.transaction():
-        internal_id = await st.insert_sample(
-            external_id=sample.external_id,
-            sample_type=sample.type,
-            active=True,
-            meta=sample.meta,
-            participant_id=sample.participant_id,
-            # already checked on get_project_write_connection
-            check_project_id=False,
-        )
-        return sample_id_format(internal_id)
+    internal_sid = await st.upsert_sample(sample.to_internal())
+    return sample_id_format(internal_sid.id)
 
 
 @router.put(
-    '/{project}/batch', response_model=Dict[str, Any], operation_id='batchUpsertSamples'
+    '/{project}/batch', response_model=dict[str, Any], operation_id='batchUpsertSamples'
 )
 async def batch_upsert_samples(
-    samples: SamplesUpsertBody,
+    samples: list[SampleUpsert],
     connection: Connection = get_project_write_connection,
-) -> Dict[str, Any]:
-    """Upserts a list of samples with sequences, and returns the list of internal sample IDs"""
+) -> dict[str, Any]:
+    """
+    Upserts a list of samples with sequencing-groups,
+    and returns the list of internal sample IDs
+    """
 
-    # Convert id in samples to int
-    for sample in samples.samples:
-        if sample.id:
-            sample.id = sample_id_transform_to_raw(sample.id)
+    # Table interfaces
+    st = SampleLayer(connection)
 
-    async with connection.connection.transaction():
-        # Table interfaces
-        st = SampleLayer(connection)
+    upserted = await st.upsert_samples([sample.to_internal() for sample in samples])
 
-        results = await st.batch_upsert_samples(samples.samples)
+    # Map sids back from ints to strs
+    results = {}
+    for sample in upserted:
+        sid = sample_id_format(sample.id)
+        results[sid] = sample
 
-        # Map sids back from ints to strs
-        for iid, seqs in results.items():
-            data = {'sample_id': sample_id_format(iid), 'sequences': seqs}
-            results[iid] = data
+    return results
 
-        return results
+
+# endregion CREATES
+
+# region GETS
 
 
 @router.post('/{project}/id-map/external', operation_id='getSampleIdMapByExternal')
 async def get_sample_id_map_by_external(
-    external_ids: List[str],
+    external_ids: list[str],
     allow_missing: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
@@ -107,7 +80,7 @@ async def get_sample_id_map_by_external(
 
 @router.post('/id-map/internal', operation_id='getSampleIdMapByInternal')
 async def get_sample_id_map_by_internal(
-    internal_ids: List[str],
+    internal_ids: list[str],
     connection: Connection = get_projectless_db_connection,
 ):
     """
@@ -116,7 +89,7 @@ async def get_sample_id_map_by_internal(
     """
     st = SampleLayer(connection)
     internal_ids_raw = sample_id_transform_to_raw_list(internal_ids)
-    result = await st.get_sample_id_map_by_internal_ids(internal_ids_raw)
+    result = await st.get_internal_to_external_sample_id_map(internal_ids_raw)
     return {sample_id_format(k): v for k, v in result.items()}
 
 
@@ -146,15 +119,15 @@ async def get_sample_by_external_id(
     st = SampleLayer(connection)
     assert connection.project
     result = await st.get_single_by_external_id(external_id, project=connection.project)
-    return result
+    return result.to_external()
 
 
 @router.post('/', operation_id='getSamples')
-async def get_samples_by_criteria(
-    sample_ids: List[str] = None,
-    meta: Dict = None,
-    participant_ids: List[int] = None,
-    project_ids: List[str] = None,
+async def get_samples(
+    sample_ids: list[str] = None,
+    meta: dict = None,
+    participant_ids: list[int] = None,
+    project_ids: list[str] = None,
     active: bool = Body(default=True),
     connection: Connection = get_projectless_db_connection,
 ):
@@ -164,7 +137,7 @@ async def get_samples_by_criteria(
     st = SampleLayer(connection)
 
     pt = ProjectPermissionsTable(connection.connection)
-    pids: Optional[List[int]] = None
+    pids: Optional[list[int]] = None
     if project_ids:
         pids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_ids, readonly=True
@@ -181,29 +154,42 @@ async def get_samples_by_criteria(
         check_project_ids=True,
     )
 
-    for sample in result:
-        sample.id = sample_id_format(sample.id)
-
-    return result
+    return [r.to_external() for r in result]
 
 
 @router.patch('/{id_}', operation_id='updateSample')
 async def update_sample(
     id_: str,
-    model: SampleUpdateModel,
+    sample: SampleUpsert,
     connection: Connection = get_projectless_db_connection,
 ):
     """Update sample with id"""
     st = SampleLayer(connection)
-    result = await st.update_sample(
-        id_=sample_id_transform_to_raw(id_),
-        meta=model.meta,
-        participant_id=model.participant_id,
-        external_id=model.external_id,
-        type_=model.type,
-        active=model.active,
-    )
-    return result
+    sample.id = id_
+    await st.upsert_sample(sample.to_internal())
+    return sample
+
+
+@router.post('/samples-create-date', operation_id='getSamplesCreateDate')
+async def get_samples_create_date(
+    sample_ids: list[str],
+    connection: Connection = get_projectless_db_connection,
+):
+    """Get full history of sample from internal ID"""
+    st = SampleLayer(connection)
+
+    # Check access permissions
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
+
+    # Convert to raw ids and query the start dates for all of them
+    result = await st.get_samples_create_date(sample_ids_raw)
+
+    return {sample_id_format(k): v for k, v in result.items()}
+
+
+# endregion GETS
+
+# region OTHER
 
 
 @router.patch('/{id_keep}/{id_merge}', operation_id='mergeSamples')
@@ -238,18 +224,4 @@ async def get_history_of_sample(
     return result
 
 
-@router.post('/samples-create-date', operation_id='getSamplesCreateDate')
-async def get_samples_create_date(
-    sample_ids: List[str],
-    connection: Connection = get_projectless_db_connection,
-):
-    """Get full history of sample from internal ID"""
-    st = SampleLayer(connection)
-
-    # Check access permissions
-    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
-
-    # Convert to raw ids and query the start dates for all of them
-    result = await st.get_samples_create_date(sample_ids_raw)
-
-    return {sample_id_format(k): v for k, v in result.items()}
+# endregion OTHER
