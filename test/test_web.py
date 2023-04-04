@@ -10,7 +10,7 @@ from db.python.layers.web import (
     NestedSequence,
     WebProject,
     SearchItem,
-    MetaSearchEntityPrefix
+    MetaSearchEntityPrefix,
 )
 from db.python.layers.participant import (
     ParticipantLayer,
