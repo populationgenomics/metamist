@@ -5,8 +5,6 @@ import { Table as SUITable, Form, Popup } from 'semantic-ui-react'
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
 import CloseIcon from '@mui/icons-material/Close'
-// import FilterAltOffIcon from '@mui/icons-material/FilterAltOff'
-// import { red } from '@mui/material/colors'
 import { IconButton } from '@mui/material'
 import Table from '../../shared/components/Table'
 import SampleLink from '../../shared/components/links/SampleLink'
@@ -17,8 +15,8 @@ import { ProjectSummaryResponse } from '../../sm-api/api'
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
     projectName: string
-    filterValues: Record<string, string>
-    updateFilters: (e: { [k: string]: FormDataEntryValue }) => void
+    filterValues: Record<string, { value: string; category: string }>
+    updateFilters: (e: { [k: string]: { value: string; category: string } }) => void
 }
 
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
@@ -27,24 +25,36 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     filterValues,
     updateFilters,
 }) => {
-    const headers = [
-        'Family ID',
-        ...summary.participant_keys.map((field) => field[1]),
-        ...summary.sample_keys.map((field) => field[1]),
-        ...summary.sequence_keys.map((field) => `sequence.${field[1]}`),
+    let headers = [
+        { name: 'Family ID', title: 'Family ID', category: 'Family' },
+        ...summary.participant_keys.map((field) => ({
+            category: 'participant',
+            name: field[0],
+            title: field[1],
+        })),
+        ...summary.sample_keys.map((field) => ({
+            category: 'sample',
+            name: field[0],
+            title: field[1],
+        })),
+        ...summary.sequence_keys.map((field) => ({
+            category: 'sequence',
+            name: field[0],
+            title: `sequence.${field[1]}`,
+        })),
     ]
 
     const [tempFilterValues, setTempFilterValues] =
-        React.useState<Record<string, string>>(filterValues)
+        React.useState<Record<string, { value: string; category: string }>>(filterValues)
 
-    const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const onChange = (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
         const { name } = e.target
         const { value } = e.target
         setTempFilterValues({
             ...Object.keys(tempFilterValues)
                 .filter((key) => name !== key)
                 .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
-            ...(value && { [name]: value }),
+            ...(value && { [name]: { value, category } }),
         })
     }
 
@@ -60,29 +70,37 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         updateFilters(tempFilterValues)
     }
 
+    if (summary.participants.length === 0 && Object.keys(filterValues).length) {
+        headers = Object.entries(filterValues).map(([key, { category }]) => ({
+            name: key,
+            category,
+            title: category,
+        }))
+    }
+
     return (
         <Table celled>
             <SUITable.Header>
                 <SUITable.Row>
-                    {headers.map((k, i) => {
-                        if (k === 'Sample ID') {
+                    {headers.map(({ name, category, title }, i) => {
+                        if (title === 'Sample ID' || title === 'Created date') {
                             return (
                                 <SUITable.HeaderCell
-                                    key={`filter-${k}-${i}`}
+                                    key={`filter-${name}-${i}`}
                                     style={{ borderBottom: 'none' }}
                                 ></SUITable.HeaderCell>
                             )
                         }
                         return (
                             <SUITable.HeaderCell
-                                key={`filter-${k}-${i}`}
+                                key={`filter-${title}-${i}`}
                                 style={{ borderBottom: 'none' }}
                             >
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
                                         <Popup
                                             trigger={
-                                                k in filterValues ? (
+                                                name in filterValues ? (
                                                     <FilterAltIcon />
                                                 ) : (
                                                     <FilterAltOutlinedIcon />
@@ -99,19 +117,19 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         <Form.Input
                                                             action={{ icon: 'search' }}
                                                             placeholder="Filter..."
-                                                            name={k}
+                                                            name={name}
                                                             value={
-                                                                k in tempFilterValues
-                                                                    ? tempFilterValues[k]
+                                                                name in tempFilterValues
+                                                                    ? tempFilterValues[name].value
                                                                     : ''
                                                             }
-                                                            onChange={onChange}
+                                                            onChange={(e) => onChange(e, category)}
                                                         />
                                                     </Form.Field>
-                                                    {k in filterValues && (
+                                                    {name in filterValues && (
                                                         <Form.Field style={{ padding: 0 }}>
                                                             <IconButton
-                                                                onClick={() => onClear(k)}
+                                                                onClick={() => onClear(name)}
                                                                 style={{ padding: 0 }}
                                                             >
                                                                 <CloseIcon />
@@ -130,8 +148,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
             </SUITable.Header>
             <SUITable.Header>
                 <SUITable.Row>
-                    {headers.map((k, i) => (
-                        <SUITable.HeaderCell key={`${k}-${i}`}>{k}</SUITable.HeaderCell>
+                    {headers.map(({ name, title }, i) => (
+                        <SUITable.HeaderCell key={`${name}-${i}`}>{title}</SUITable.HeaderCell>
                     ))}
                 </SUITable.Row>
             </SUITable.Header>

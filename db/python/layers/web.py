@@ -25,16 +25,16 @@ from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechn
 class MetaSearchEntityPrefix(Enum):
     """Links prefixes to tables"""
 
-    p = 'participant'
-    s = 'sample'
-    sq = 'sequence'
-    f = 'family'
+    PARTICIPANT = 'p'
+    SAMPLE = 's'
+    SEQUENCE = 'sq'
+    FAMILY = 'f'
 
 
 class SearchItem(SMBase):
     """Summary Grid Filter Model"""
 
-    model_type: str
+    model_type: MetaSearchEntityPrefix
     query: str
     field: str
     is_meta: bool
@@ -147,7 +147,8 @@ class WebDb(DbBase):
         for query in grid_filter:
             value = query.query
             field = query.field
-            prefix = MetaSearchEntityPrefix(query.model_type).name
+            # prefix = MetaSearchEntityPrefix(query.model_type).name
+            prefix = query.model_type.value
             key = (
                 f'{query.model_type}_{field}_{value}'.replace('-', '_')
                 .replace('.', '_')

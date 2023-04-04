@@ -1,9 +1,14 @@
 import * as React from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { Dropdown, Button } from 'semantic-ui-react'
+import { Dropdown } from 'semantic-ui-react'
 import ProjectSelector from './ProjectSelector'
-import { WebApi, ProjectSummaryResponse, SearchItem } from '../../sm-api/api'
+import {
+    WebApi,
+    ProjectSummaryResponse,
+    SearchItem,
+    MetaSearchEntityPrefix,
+} from '../../sm-api/api'
 
 import PageOptions from './PageOptions'
 import SeqrLinks from './SeqrLinks'
@@ -16,6 +21,21 @@ import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
+
+/* eslint-disable consistent-return */
+const getPrefix = (model_type: string) => {
+    switch (model_type) {
+        case 'participant':
+            return MetaSearchEntityPrefix.P
+        case 'sequence':
+            return MetaSearchEntityPrefix.Sq
+        case 'family':
+            return MetaSearchEntityPrefix.F
+        case 'sample':
+            return MetaSearchEntityPrefix.S
+        // no default
+    }
+}
 
 const ProjectSummary: React.FunctionComponent = () => {
     const navigate = useNavigate()
@@ -39,7 +59,9 @@ const ProjectSummary: React.FunctionComponent = () => {
         validPages ? +pageSize : PAGE_SIZES[0]
     )
     const [filterValues, setFilterValues] = React.useState<SearchItem[]>([])
-    const [gridFilterValues, setGridFilterValues] = React.useState<Record<string, string>>({})
+    const [gridFilterValues, setGridFilterValues] = React.useState<
+        Record<string, { value: string; category: string }>
+    >({})
 
     const handleOnClick = React.useCallback(
         (p) => {
@@ -85,36 +107,25 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
 
     const updateFilters = React.useCallback(
-        (e) => {
+        (e: Record<string, { value: string; category: string }>) => {
             if (!summary) return
             /* eslint-disable no-param-reassign */
-            const processedFilter = Object.entries(e).reduce((filter, [column, v]) => {
-                if (!v) {
+            const processedFilter = Object.entries(e).reduce(
+                (filter, [column, { value, category }]) => {
+                    if (!value) {
+                        return filter
+                    }
+                    const is_meta = column.startsWith('meta.')
+                    const field = is_meta ? column.slice(5) : column
+                    const model_type = getPrefix(category)
+                    if (!model_type) {
+                        throw new TypeError('Invalid Model Type')
+                    }
+                    filter.push({ query: value, is_meta, model_type, field })
                     return filter
-                }
-                const query = v as string
-                const participantIndex = summary.participant_keys.findIndex((i) => i[1] === column)
-                const sampleIndex = summary.sample_keys.findIndex((i) => i[1] === column)
-                const sequenceIndex = summary.sequence_keys.findIndex(
-                    (i) => `sequence.${i[1]}` === column
-                )
-                const { model_type, oldField } = (participantIndex > -1 && {
-                    model_type: 'participant',
-                    oldField: summary.participant_keys[participantIndex][0],
-                }) ||
-                    (sampleIndex > -1 && {
-                        model_type: 'sample',
-                        oldField: summary.sample_keys[sampleIndex][0],
-                    }) ||
-                    (sequenceIndex > -1 && {
-                        model_type: 'sequence',
-                        oldField: summary.sequence_keys[sequenceIndex][0],
-                    }) || { model_type: 'family', oldField: 'family_ID' }
-                const is_meta = oldField.startsWith('meta.')
-                const field = is_meta ? oldField.slice(5) : oldField
-                filter.push({ query, is_meta, model_type, field })
-                return filter
-            }, [] as SearchItem[])
+                },
+                [] as SearchItem[]
+            )
             /* eslint-enable no-param-reassign */
             setFilterValues(processedFilter)
             setGridFilterValues(Object.entries(processedFilter).length ? e : {})
@@ -161,73 +172,39 @@ const ProjectSummary: React.FunctionComponent = () => {
                 !Object.keys(filterValues).length && (
                     <MuckError message={`Ah Muck, there aren't any samples in this project`} />
                 )}
-            {!isLoading &&
-                summary &&
-                summary.participants.length === 0 &&
-                Object.keys(filterValues).length && (
-                    <>
-                        <MuckError message={`Ah Muck, your filters are too restrictive!`} />
-                        <Button
-                            onClick={() => {
-                                setFilterValues([])
-                                setGridFilterValues({})
-                            }}
-                        >
-                            Clear Filters
-                        </Button>
-                    </>
-                )}
-            {projectName &&
-                !error &&
-                !isLoading &&
-                summary &&
-                summary?.participants.length !== 0 && (
-                    <>
-                        <TotalsStats summary={summary ?? {}} />
-                        <SummaryStatistics
-                            projectName={projectName}
-                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                        />
-                        <BatchStatistics
-                            projectName={projectName}
-                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
-                        />
-                        <hr />
-                        <MultiQCReports projectName={projectName} />
-                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
-                        <hr />
-                        <div
-                            style={{
-                                marginBottom: '10px',
-                                justifyContent: 'flex-end',
-                                display: 'flex',
-                                flexDirection: 'row',
-                            }}
-                        >
-                            <Dropdown
-                                selection
-                                onChange={setPageLimit}
-                                value={pageLimit}
-                                options={PAGE_SIZES.map((s) => ({
-                                    key: s,
-                                    text: `${s} samples`,
-                                    value: s,
-                                }))}
-                            />
-                            <PageOptions
-                                isLoading={isLoading}
-                                totalPageNumbers={totalPageNumbers}
-                                totalSamples={summary?.total_samples_in_query}
-                                pageNumber={pageNumber}
-                                handleOnClick={handleOnClick}
-                            />
-                        </div>
-                        <ProjectGrid
-                            summary={summary}
-                            projectName={projectName}
-                            updateFilters={updateFilters}
-                            filterValues={gridFilterValues}
+            {projectName && !error && !isLoading && summary && (
+                <>
+                    <TotalsStats summary={summary ?? {}} />
+                    <SummaryStatistics
+                        projectName={projectName}
+                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                    />
+                    <BatchStatistics
+                        projectName={projectName}
+                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                        batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                    />
+                    <hr />
+                    <MultiQCReports projectName={projectName} />
+                    <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                    <hr />
+                    <div
+                        style={{
+                            marginBottom: '10px',
+                            justifyContent: 'flex-end',
+                            display: 'flex',
+                            flexDirection: 'row',
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
                         />
                         <PageOptions
                             isLoading={isLoading}
@@ -236,8 +213,22 @@ const ProjectSummary: React.FunctionComponent = () => {
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
                         />
-                    </>
-                )}
+                    </div>
+                    <ProjectGrid
+                        summary={summary}
+                        projectName={projectName}
+                        updateFilters={updateFilters}
+                        filterValues={gridFilterValues}
+                    />
+                    <PageOptions
+                        isLoading={isLoading}
+                        totalPageNumbers={totalPageNumbers}
+                        totalSamples={summary?.total_samples_in_query}
+                        pageNumber={pageNumber}
+                        handleOnClick={handleOnClick}
+                    />
+                </>
+            )}
         </>
     )
 }
