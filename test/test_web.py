@@ -10,6 +10,7 @@ from db.python.layers.web import (
     NestedSequence,
     WebProject,
     SearchItem,
+    MetaSearchEntityPrefix
 )
 from db.python.layers.participant import (
     ParticipantLayer,
@@ -205,7 +206,7 @@ class TestWeb(DbIsolatedTest):
             grid_filter=[
                 SearchItem(
                     **{
-                        'model_type': 'sequence',
+                        'model_type': MetaSearchEntityPrefix.SEQUENCE,
                         'query': 'M001',
                         'field': 'batch',
                         'is_meta': True,
@@ -221,7 +222,7 @@ class TestWeb(DbIsolatedTest):
             grid_filter=[
                 SearchItem(
                     **{
-                        'model_type': 'sequence',
+                        'model_type': MetaSearchEntityPrefix.SEQUENCE,
                         'query': 'M002',
                         'field': 'batch',
                         'is_meta': True,
@@ -424,7 +425,7 @@ class TestWeb(DbIsolatedTest):
             grid_filter=[
                 SearchItem(
                     **{
-                        'model_type': 'sample',
+                        'model_type': MetaSearchEntityPrefix.SAMPLE,
                         'query': 'sample_id002',
                         'field': 'external_id',
                         'is_meta': False,
