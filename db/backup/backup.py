@@ -1,5 +1,5 @@
 #!/usr/bin/python3.7
-
+# pylint: disable=broad-exception-caught,broad-exception-raised
 """ Daily back up function for databases within a local
 MariaDB instance """
 
@@ -7,7 +7,6 @@ from datetime import datetime
 import subprocess
 from google.cloud import storage
 from google.cloud import logging
-import pytz
 
 
 def perform_backup():
@@ -20,8 +19,9 @@ def perform_backup():
     logger = logging_client.logger(log_name)
 
     # Get timestamp
-    utc_now = pytz.utc.localize(datetime.utcnow())
-    timestamp_str = utc_now.strftime('%d_%m_%Y_%H-%M-%S')
+    timestamp_str = (
+        datetime.utcnow().isoformat(timespec='seconds').replace(':', '-') + 'Z'
+    )
 
     # Set up tmp dir
     tmp_dir = f'backup_{timestamp_str}'
@@ -31,6 +31,8 @@ def perform_backup():
 
     # Export SQL Data
     try:
+        text = f'Performed mariabackup to pull data {timestamp_str}.'
+        logger.log_text(text, severity='INFO')
         subprocess.run(
             [
                 'mariabackup',
@@ -39,12 +41,15 @@ def perform_backup():
                 '--user=root',
             ],
             check=True,
+            stderr=subprocess.DEVNULL,
         )
-        text = f'Performed mariabackup to pull data {timestamp_str} UTC.'
-        logger.log_text(text, severity='INFO')
 
-    except subprocess.SubprocessError:
-        text = f'Failed to export backup {timestamp_str} UTC.'
+    except subprocess.CalledProcessError as e:
+        text = f'Failed to export backup {timestamp_str}: {e}\n {e.stderr}'
+        logger.log_text(text, severity='ERROR')
+        return
+    except Exception as e:
+        text = f'Failed to export backup {timestamp_str}: {e}'
         logger.log_text(text, severity='ERROR')
         return
 
@@ -52,32 +57,41 @@ def perform_backup():
     # so we'll grant appropriate permissions for tmp_dir to later remove it
     subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
 
-    # Upload file to GCS
+    # tar the archive to make it easier to upload to GCS
+    tar_archive_path = f'{tmp_dir}.tar.gz'
+    subprocess.run(['tar', '-czf', tar_archive_path, tmp_dir], check=True)
+
+    # Upload tar file to GCS
     # GCS Client Library does not support moving directories
     try:
         subprocess.run(
-            ['gsutil', '-m', 'mv', tmp_dir, 'gs://cpg-sm-backups'], check=True
+            ['gsutil', '-m', 'mv', tar_archive_path, 'gs://cpg-sm-backups'], check=True
         )
-    except subprocess.CalledProcessError:
-        text = f'Failed to upload backup to GCS. {timestamp_str} UTC. \
-        gsutil failed'
+    except subprocess.CalledProcessError as e:
+        text = (
+            f'Failed to upload backup {timestamp_str} to GCS. '
+            f'GSUtil failed to upload with error: {e.stderr}'
+        )
         logger.log_text(text, severity='ERROR')
 
     # Cleans up empty directories after the move
-    subprocess.run(['rm', '-r', tmp_dir], check=True)
+    subprocess.run(['rm', '-rf', tmp_dir, tar_archive_path], check=True)
 
     # Validates file exists and was uploaded to GCS
     client = storage.Client()
     bucket = client.get_bucket('cpg-sm-backups')
-    files_in_gcs = list(client.list_blobs(bucket, prefix=tmp_dir))
+    files_in_gcs = list(client.list_blobs(bucket, prefix=tar_archive_path))
 
     if len(files_in_gcs) > 0:
-        text = f'Successful backup {timestamp_str} UTC'
+        text = f'Successfully backed up: {timestamp_str}'
         logger.log_text(text, severity='INFO')
     else:
-        text = f'Failed to upload backup to GCS. {timestamp_str} UTC. \
-        Could not find the file within {bucket.name}'
+        text = (
+            f'Failed to upload backup to GCS: {timestamp_str}. '
+            f'Could not find the file gs://{bucket.name}/{tar_archive_path}'
+        )
         logger.log_text(text, severity='ERROR')
+        raise Exception(text)
 
 
 if __name__ == '__main__':

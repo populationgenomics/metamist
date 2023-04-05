@@ -1,5 +1,7 @@
 # pylint: disable=global-statement
 import os
+from functools import lru_cache
+from cpg_utils.cloud import read_secret
 
 TRUTH_SET = ('1', 'y', 't', 'true')
 
@@ -9,6 +11,19 @@ SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 PROFILE_REQUESTS = os.getenv('SM_PROFILE_REQUESTS', 'false').lower() in TRUTH_SET
 IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in TRUTH_SET
 MEMBERS_CACHE_LOCATION = os.getenv('SM_MEMBERS_CACHE_LOCATION')
+
+SEQR_URL = os.getenv('SM_SEQR_URL')
+SEQR_AUDIENCE = os.getenv('SM_SEQR_AUDIENCE')
+SEQR_MAP_LOCATION = os.getenv('SM_SEQR_MAP_LOCATION')
+
+# you can set one of the following for pluggin in slack notifications
+_SLACK_SECRET_PROJECT_ID = os.getenv('SM_SLACK_SECRET_PROJECT_ID')
+_SLACK_SECRET_ID = os.getenv('SM_SLACK_SECRET_ID')
+
+# or
+_SLACK_TOKEN = os.getenv('SM_SLACK_TOKEN')
+
+SEQR_SLACK_NOTIFICATION_CHANNEL = os.getenv('SM_SEQR_SLACK_NOTIFICATION_CHANNEL')
 
 
 def get_default_user() -> str | None:
@@ -27,3 +42,21 @@ def set_all_access(access: bool):
     """Set full_access for future use"""
     global _ALLOW_ALL_ACCESS
     _ALLOW_ALL_ACCESS = access
+
+
+@lru_cache
+def get_slack_token(allow_empty=False):
+    """Get slack token"""
+    if _SLACK_TOKEN:
+        return _SLACK_TOKEN
+
+    if _SLACK_SECRET_ID and _SLACK_SECRET_PROJECT_ID:
+        return read_secret(
+            project_id=_SLACK_SECRET_PROJECT_ID,
+            secret_name=_SLACK_SECRET_ID,
+            fail_gracefully=allow_empty,
+        )
+    if allow_empty:
+        return None
+
+    raise ValueError('No slack token found')

@@ -1,32 +1,183 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Table as SUITable } from 'semantic-ui-react'
-import Table from '../../shared/components/Table'
+import { Table as SUITable, Form, Popup } from 'semantic-ui-react'
 
+import FilterAltIcon from '@mui/icons-material/FilterAlt'
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined'
+import CloseIcon from '@mui/icons-material/Close'
+import { IconButton } from '@mui/material'
+import Table from '../../shared/components/Table'
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { ProjectSummaryResponse } from '../../sm-api/api'
+import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
     projectName: string
+    filterValues: Record<
+        string,
+        { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+    >
+    updateFilters: (e: {
+        [k: string]: {
+            value: string
+            category: MetaSearchEntityPrefix
+            title: string
+            field: string
+        }
+    }) => void
 }
 
-const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({ summary, projectName }) => {
-    const headers = [
-        'Family ID',
-        ...summary.participant_keys.map((field) => field[1]),
-        ...summary.sample_keys.map((field) => field[1]),
-        ...summary.sequence_keys.map((field) => `sequence.${field[1]}`),
+const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
+    summary,
+    projectName,
+    filterValues,
+    updateFilters,
+}) => {
+    let headers = [
+        { name: 'Family ID', title: 'Family ID', category: MetaSearchEntityPrefix.F },
+        ...summary.participant_keys.map((field) => ({
+            category: MetaSearchEntityPrefix.P,
+            name: field[0],
+            title: field[1],
+        })),
+        ...summary.sample_keys.map((field) => ({
+            category: MetaSearchEntityPrefix.S,
+            name: field[0],
+            title: field[1],
+        })),
+        ...summary.sequence_keys.map((field) => ({
+            category: MetaSearchEntityPrefix.Sq,
+            name: field[0],
+            title: `sequence.${field[1]}`,
+        })),
     ]
+
+    const [tempFilterValues, setTempFilterValues] =
+        React.useState<
+            Record<
+                string,
+                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+            >
+        >(filterValues)
+
+    const onFilterValueChange = (
+        e: React.ChangeEvent<HTMLInputElement>,
+        category: MetaSearchEntityPrefix,
+        title: string
+    ) => {
+        const { name } = e.target
+        const { value } = e.target
+        setTempFilterValues({
+            ...Object.keys(tempFilterValues)
+                .filter((key) => `${category}.${name}` !== key)
+                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+            ...(value && { [`${category}.${name}`]: { value, category, title, field: name } }),
+        })
+    }
+
+    const onClear = (column: string, category: MetaSearchEntityPrefix) => {
+        updateFilters({
+            ...Object.keys(tempFilterValues)
+                .filter((key) => `${category}.${column}` !== key)
+                .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
+        })
+    }
+
+    const onSubmit = () => {
+        updateFilters(tempFilterValues)
+    }
+
+    if (summary.participants.length === 0 && Object.keys(filterValues).length) {
+        headers = Object.entries(filterValues).map(([key, { category, title }]) => ({
+            name: key,
+            category,
+            title,
+        }))
+    }
 
     return (
         <Table celled>
             <SUITable.Header>
                 <SUITable.Row>
-                    {headers.map((k, i) => (
-                        <SUITable.HeaderCell key={`${k}-${i}`}>{k}</SUITable.HeaderCell>
+                    {headers.map(({ name, category, title }, i) => {
+                        if (title === 'Sample ID' || title === 'Created date') {
+                            return (
+                                <SUITable.HeaderCell
+                                    key={`filter-${name}-${i}`}
+                                    style={{ borderBottom: 'none' }}
+                                ></SUITable.HeaderCell>
+                            )
+                        }
+                        return (
+                            <SUITable.HeaderCell
+                                key={`filter-${title}-${i}`}
+                                style={{ borderBottom: 'none' }}
+                            >
+                                <div style={{ position: 'relative' }}>
+                                    <div style={{ position: 'absolute', top: 0, right: 0 }}>
+                                        <Popup
+                                            position="top center"
+                                            trigger={
+                                                `${category}.${name}` in filterValues ? (
+                                                    <FilterAltIcon />
+                                                ) : (
+                                                    <FilterAltOutlinedIcon />
+                                                )
+                                            }
+                                            hoverable
+                                        >
+                                            <Form onSubmit={onSubmit}>
+                                                <Form.Group
+                                                    inline
+                                                    style={{ padding: 0, margin: 0 }}
+                                                >
+                                                    <Form.Field style={{ padding: 0, margin: 0 }}>
+                                                        <Form.Input
+                                                            action={{ icon: 'search' }}
+                                                            placeholder="Filter..."
+                                                            name={name}
+                                                            value={
+                                                                tempFilterValues[
+                                                                    `${category}.${name}`
+                                                                ]?.value || ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                onFilterValueChange(
+                                                                    e,
+                                                                    category,
+                                                                    title
+                                                                )
+                                                            }
+                                                        />
+                                                    </Form.Field>
+                                                    {`${category}.${name}` in filterValues && (
+                                                        <Form.Field style={{ padding: 0 }}>
+                                                            <IconButton
+                                                                onClick={() =>
+                                                                    onClear(name, category)
+                                                                }
+                                                                style={{ padding: 0 }}
+                                                            >
+                                                                <CloseIcon />
+                                                            </IconButton>
+                                                        </Form.Field>
+                                                    )}
+                                                </Form.Group>
+                                            </Form>
+                                        </Popup>
+                                    </div>
+                                </div>
+                            </SUITable.HeaderCell>
+                        )
+                    })}
+                </SUITable.Row>
+            </SUITable.Header>
+            <SUITable.Header>
+                <SUITable.Row>
+                    {headers.map(({ name, title }, i) => (
+                        <SUITable.HeaderCell key={`${name}-${i}`}>{title}</SUITable.HeaderCell>
                     ))}
                 </SUITable.Row>
             </SUITable.Header>

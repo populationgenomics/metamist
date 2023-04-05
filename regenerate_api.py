@@ -299,7 +299,7 @@ def main():
 
         shutil.copy(
             './resources/muck-the-duck.svg',
-            os.path.join(STATIC_DIR, 'muck-the-duck.svg'),
+            os.path.join('web/src', 'muck-the-duck.svg'),
         )
         shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
 

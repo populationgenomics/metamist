@@ -548,6 +548,33 @@ class SampleSequencingTable(DbBase):
 
         return projs, list(sequences.values())
 
+    async def get_participant_ids_and_sample_ids_for_sequence_type(
+        self, sequence_type: SequenceType
+    ) -> tuple[set[ProjectId], dict[int, list[int]]]:
+        """
+        Get participant IDs for a specific sequence type.
+        Particularly useful for seqr like cases
+        """
+        _query = """
+    SELECT s.project as project, s.id as sid, s.participant_id as pid
+    FROM sample_sequencing sq
+    INNER JOIN sample s ON sq.sample_id = s.id
+    WHERE sq.type = :seqtype AND project = :project
+        """
+
+        rows = list(
+            await self.connection.fetch_all(
+                _query, {'seqtype': sequence_type.value, 'project': self.project}
+            )
+        )
+
+        projects = set(r['project'] for r in rows)
+        participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
+        for r in rows:
+            participant_id_to_sids[r['pid']].append(r['sid'])
+
+        return projects, participant_id_to_sids
+
     # region EIDs
 
     async def _get_sequence_eids(self, sequence_id):
