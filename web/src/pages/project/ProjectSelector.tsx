@@ -23,7 +23,7 @@ interface ProjectSelectorProps {
     setPageLimit: React.Dispatch<React.SetStateAction<number>>
     setFilterValues: React.Dispatch<React.SetStateAction<SearchItem[]>>
     setGridFilterValues: React.Dispatch<
-        React.SetStateAction<Record<string, { value: string; category: string }>>
+        React.SetStateAction<Record<string, { value: string; category: string; title: string }>>
     >
     pageLimit: number
 }

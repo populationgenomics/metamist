@@ -60,7 +60,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
     const [filterValues, setFilterValues] = React.useState<SearchItem[]>([])
     const [gridFilterValues, setGridFilterValues] = React.useState<
-        Record<string, { value: string; category: string }>
+        Record<string, { value: string; category: string; title: string }>
     >({})
 
     const handleOnClick = React.useCallback(
@@ -107,7 +107,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
 
     const updateFilters = React.useCallback(
-        (e: Record<string, { value: string; category: string }>) => {
+        (e: Record<string, { value: string; category: string; title: string }>) => {
             if (!summary) return
             /* eslint-disable no-param-reassign */
             const processedFilter = Object.entries(e).reduce(

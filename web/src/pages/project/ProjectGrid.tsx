@@ -15,8 +15,8 @@ import { ProjectSummaryResponse } from '../../sm-api/api'
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
     projectName: string
-    filterValues: Record<string, { value: string; category: string }>
-    updateFilters: (e: { [k: string]: { value: string; category: string } }) => void
+    filterValues: Record<string, { value: string; category: string; title: string }>
+    updateFilters: (e: { [k: string]: { value: string; category: string; title: string } }) => void
 }
 
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
@@ -45,16 +45,18 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     ]
 
     const [tempFilterValues, setTempFilterValues] =
-        React.useState<Record<string, { value: string; category: string }>>(filterValues)
+        React.useState<Record<string, { value: string; category: string; title: string }>>(
+            filterValues
+        )
 
-    const onChange = (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
+    const onChange = (e: React.ChangeEvent<HTMLInputElement>, category: string, title: string) => {
         const { name } = e.target
         const { value } = e.target
         setTempFilterValues({
             ...Object.keys(tempFilterValues)
                 .filter((key) => name !== key)
                 .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
-            ...(value && { [name]: { value, category } }),
+            ...(value && { [name]: { value, category, title } }),
         })
     }
 
@@ -71,10 +73,10 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     }
 
     if (summary.participants.length === 0 && Object.keys(filterValues).length) {
-        headers = Object.entries(filterValues).map(([key, { category }]) => ({
+        headers = Object.entries(filterValues).map(([key, { category, title }]) => ({
             name: key,
             category,
-            title: category,
+            title,
         }))
     }
 
@@ -123,7 +125,9 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                                     ? tempFilterValues[name].value
                                                                     : ''
                                                             }
-                                                            onChange={(e) => onChange(e, category)}
+                                                            onChange={(e) =>
+                                                                onChange(e, category, title)
+                                                            }
                                                         />
                                                     </Form.Field>
                                                     {name in filterValues && (
