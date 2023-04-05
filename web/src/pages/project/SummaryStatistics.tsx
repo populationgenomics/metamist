@@ -1,7 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
-import Table from '../../shared/components/Table'
 import { Table as SUITable } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 
 interface SummaryStatisticsProps {
     cramSeqrStats: Record<string, Record<string, string>>

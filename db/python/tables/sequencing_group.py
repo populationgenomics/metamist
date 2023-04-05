@@ -71,6 +71,34 @@ class SequencingGroupTable(DbBase):
 
         return dict(sequencing_groups)
 
+    async def get_participant_ids_and_sequence_group_ids_for_sequence_type(
+        self, sequence_type: str
+    ) -> tuple[set[ProjectId], dict[int, list[int]]]:
+        """
+        Get participant IDs for a specific sequence type.
+        Particularly useful for seqr like cases
+        """
+        _query = """
+    SELECT s.project as project, sg.id as sid, s.participant_id as pid
+    FROM sequencing_group sg
+    INNER JOIN sample s ON sq.sample_id = s.id
+    WHERE sg.type = :seqtype AND project = :project
+        """
+
+        rows = list(
+            await self.connection.fetch_all(
+                _query, {'seqtype': sequence_type, 'project': self.project}
+            )
+        )
+
+        projects = set(r['project'] for r in rows)
+        participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
+        for r in rows:
+            participant_id_to_sids[r['pid']].append(r['sid'])
+
+        return projects, participant_id_to_sids
+
+
     async def create_sequencing_group(
         self,
         sample_id: int,

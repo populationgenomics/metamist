@@ -1,5 +1,4 @@
 import * as React from 'react'
-import _ from 'lodash'
 import { ProjectSummaryResponse } from '../../sm-api/api'
 
 interface TotalStatsProps {

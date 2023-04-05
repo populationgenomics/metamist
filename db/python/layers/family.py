@@ -356,6 +356,30 @@ class FamilyLayer(BaseLayer):
             project=project, participant_ids=all_participants
         )
 
+    async def get_families_by_ids(
+        self,
+        family_ids: list[int],
+        check_missing: bool = True,
+        check_project_ids: bool = True,
+    ) -> list[Family]:
+        """Get families by internal IDs"""
+        projects, families = await self.ftable.get_families_by_ids(
+            family_ids=family_ids
+        )
+        if not families:
+            return []
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        if check_missing and len(family_ids) != len(families):
+            missing_ids = set(family_ids) - set(f.id for f in families)
+            raise ValueError(f'Missing family IDs: {missing_ids}')
+
+        return families
+
     async def get_families_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
     ) -> dict[int, list[Family]]:

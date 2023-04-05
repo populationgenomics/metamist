@@ -117,6 +117,19 @@ class FamilyTable(DbBase):
         project = row['project']
         return project, Family.from_db(row)
 
+    async def get_families_by_ids(
+        self, family_ids: list[int]
+    ) -> tuple[set[ProjectId], list[Family]]:
+        """Get family (+ project) by internal ID"""
+        _query = """
+        SELECT id, external_id, description, coded_phenotype, project
+        FROM family WHERE id IN :fids
+        """
+        rows = list(await self.connection.fetch_all(_query, {'fids': family_ids}))
+        fams = [Family.from_db(row) for row in rows]
+        project = set(f.project for f in fams)
+        return project, fams
+
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5
     ) -> list[tuple[ProjectId, int, str]]:

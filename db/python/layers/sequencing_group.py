@@ -57,6 +57,29 @@ class SequencingGroupLayer(BaseLayer):
 
         return groups
 
+    async def get_participant_ids_sequencing_group_ids_for_sequence_type(
+        self, sequence_type: str, check_project_ids: bool = True
+    ) -> dict[int, list[int]]:
+        """
+        Get list of partiicpant IDs for a specific sequence type,
+        useful for synchronisation seqr projects
+        """
+        (
+            projects,
+            pids,
+        ) = await self.seqgt.get_participant_ids_and_sample_ids_for_sequence_type(
+            sequence_type
+        )
+        if not pids:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return pids
+
     # region CREATE / MUTATE
 
     async def create_sequencing_group_from_sequences(
