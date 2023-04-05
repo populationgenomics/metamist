@@ -87,7 +87,9 @@ class SeqrLayer(BaseLayer):
         """
         return f'seqr-project-{sequence_type.value}'
 
-    async def get_synchronisable_types(self, project_id: ProjectId | None = None) -> list[SequenceType]:
+    async def get_synchronisable_types(
+        self, project_id: ProjectId | None = None
+    ) -> list[SequenceType]:
         """
         Check the project meta to find out which sequence_types are synchronisable
         """
@@ -96,6 +98,15 @@ class SeqrLayer(BaseLayer):
 
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
         project = await pptable.get_project_by_id(project_id or self.connection.project)
+
+        has_access = pptable.check_access_to_project_id(
+            user=self.author,
+            project_id=project.id,
+            readonly=False,
+            raise_exception=False,
+        )
+        if not has_access:
+            return []
 
         sts = [
             st
@@ -225,6 +236,7 @@ class SeqrLayer(BaseLayer):
                 self.send_slack_notification(
                     project_name=project.name,
                     sequence_type=sequence_type,
+                    seqr_guid=seqr_guid,
                     errors=_errors,
                     messages=messages,
                 )
