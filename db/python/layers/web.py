@@ -159,6 +159,7 @@ class WebDb(DbBase):
                 .replace(' ', '_')
             )
             if bool(re.search(r'\W', field)):
+                # protect against SQL injection attacks
                 raise ValueError('Invalid characters in field')
             if not query.is_meta:
                 q = f'{prefix}.{field} LIKE :{key}'
