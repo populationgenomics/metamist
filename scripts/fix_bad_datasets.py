@@ -57,7 +57,7 @@ def generate_updates_for_bad_analysis_tsv(filename: str, output_filename: str = 
 UPDATE analysis
     SET project = {project_id}
     WHERE
-        JSON_VALUE(meta, '$.dataset') = '{dataset}'
+        JSON_VALUE(meta, '$.dataset') = {dataset!r}
         AND id IN ({','.join(map(str, analysis_ids))});
 """
         updaters.append(updater)
@@ -77,4 +77,5 @@ if __name__ == '__main__':
         print(f'Usage: {sys.argv[0]} <bad_analysis.tsv> [<output-filename.sql>]')
         sys.exit(1)
 
+    # pylint: disable=too-many-function-args
     generate_updates_for_bad_analysis_tsv(*sys.argv[1:])
