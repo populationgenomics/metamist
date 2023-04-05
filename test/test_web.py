@@ -77,6 +77,7 @@ class TestWeb(DbIsolatedTest):
             sample_keys=[],
             sequence_keys=[],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         self.assertEqual(expected, result)
@@ -197,6 +198,7 @@ class TestWeb(DbIsolatedTest):
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         self.assertEqual(expected_data, result)
@@ -347,6 +349,7 @@ class TestWeb(DbIsolatedTest):
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         two_samples_result = await self.webl.get_project_summary(
@@ -418,6 +421,7 @@ class TestWeb(DbIsolatedTest):
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         two_samples_result_filtered = await self.webl.get_project_summary(

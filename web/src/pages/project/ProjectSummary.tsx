@@ -19,6 +19,7 @@ import ProjectGrid from './ProjectGrid'
 import TotalsStats from './TotalsStats'
 import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import SeqrSync from './SeqrSync'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -155,7 +156,9 @@ const ProjectSummary: React.FunctionComponent = () => {
                     <em>Please select a project</em>
                 </p>
             )}
-            {!isLoading &&
+            {projectName &&
+                !error &&
+                !isLoading &&
                 summary &&
                 summary.participants.length === 0 &&
                 !Object.keys(filterValues).length && (
@@ -176,6 +179,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                     <hr />
                     <MultiQCReports projectName={projectName} />
                     <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                    <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
                     <hr />
                     <div
                         style={{

@@ -7,8 +7,10 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from db.python.layers.search import SearchLayer
+from db.python.layers.seqr import SeqrLayer
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.layers.web import WebLayer, NestedParticipant, SearchItem
+from models.enums import SequenceType
 
 from models.models.sample import sample_id_format
 from models.models.search import SearchResponse
@@ -16,6 +18,7 @@ from models.models.search import SearchResponse
 from api.utils.db import (
     get_project_readonly_connection,
     get_projectless_db_connection,
+    get_project_write_connection,
     Connection,
 )
 
@@ -55,6 +58,7 @@ class ProjectSummaryResponse(BaseModel):
     sample_keys: list[list[str]]
     sequence_keys: list[list[str]]
     seqr_links: dict[str, str]
+    seqr_sync_types: list[SequenceType]
 
     links: PagingLinks | None
 
@@ -107,6 +111,7 @@ async def get_project_summary(
             cram_seqr_stats={},
             batch_sequence_stats={},
             seqr_links=summary.seqr_links,
+            seqr_sync_types=[],
         )
 
     participants = summary.participants
@@ -144,6 +149,7 @@ async def get_project_summary(
         sample_keys=summary.sample_keys,
         sequence_keys=summary.sequence_keys,
         seqr_links=summary.seqr_links,
+        seqr_sync_types=summary.seqr_sync_types,
         _links=links,
     )
 
@@ -168,3 +174,36 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
         res.data.project = projects.get(res.data.project, res.data.project)  # type: ignore
 
     return SearchResponseModel(responses=responses)
+
+
+@router.post('/{project}/{sequence_type}/sync-dataset', operation_id='syncSeqrProject')
+async def sync_seqr_project(
+    sequence_type: SequenceType,
+    sync_families: bool = True,
+    sync_individual_metadata: bool = True,
+    sync_individuals: bool = True,
+    sync_es_index: bool = True,
+    sync_saved_variants: bool = True,
+    sync_cram_map: bool = True,
+    post_slack_notification: bool = True,
+    connection=get_project_write_connection,
+):
+    """
+    Sync a metamist project with its seqr project (for a specific sequence type)
+    """
+    seqr = SeqrLayer(connection)
+    try:
+        data = await seqr.sync_dataset(
+            sequence_type,
+            sync_families=sync_families,
+            sync_individual_metadata=sync_individual_metadata,
+            sync_individuals=sync_individuals,
+            sync_es_index=sync_es_index,
+            sync_saved_variants=sync_saved_variants,
+            sync_cram_map=sync_cram_map,
+            post_slack_notification=post_slack_notification,
+        )
+        return {'success': 'errors' not in data, **data}
+    except Exception as e:
+        raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
+        # return {'success': False, 'message': str(e)}
