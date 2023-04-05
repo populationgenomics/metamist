@@ -9,7 +9,6 @@ from typing import Dict, List, Optional, Set
 from enum import Enum
 from pydantic import BaseModel
 
-from api.settings import SEQR_URL
 from api.utils import group_by
 
 from db.python.connect import DbBase
@@ -277,14 +276,11 @@ class WebDb(DbBase):
         if not project.meta.get('is_seqr', False):
             return {}
 
-        seqr_format = '{seqr_url}/project/{guid}/project_page'
         seqr_links = {}
         for seqtype in SequenceType:
             key = f'seqr-project-{seqtype.value}'
             if guid := project.meta.get(key):
-                seqr_links[seqtype.value] = seqr_format.format(
-                    seqr_url=SEQR_URL, guid=guid
-                )
+                seqr_links[seqtype.value] = SeqrLayer.get_seqr_link_from_guid(guid)
 
         return seqr_links
 
