@@ -90,8 +90,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     }
 
     if (summary.participants.length === 0 && Object.keys(filterValues).length) {
-        headers = Object.entries(filterValues).map(([key, { category, title }]) => ({
-            name: key,
+        headers = Object.entries(filterValues).map(([, { field, category, title }]) => ({
+            name: field,
             category,
             title,
         }))

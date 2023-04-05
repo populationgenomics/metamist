@@ -317,8 +317,6 @@ class WebDb(DbBase):
         # This is not currently a problem as no projects are even close to 10000 rows
         # So won't be causing any memory/resource issues
         # Could be optimised in future by limiting to 10k if necessary
-        print(sample_query)
-        print(values)
         sample_rows_all = list(await self.connection.fetch_all(sample_query, values))
         total_samples_in_query = len(sample_rows_all)
         sample_rows = sample_rows_all[token : token + limit]
