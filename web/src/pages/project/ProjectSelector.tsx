@@ -8,7 +8,7 @@ import { useQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__/gql'
 
-import { SearchItem } from '../../sm-api/api'
+import { SearchItem, MetaSearchEntityPrefix } from '../../sm-api/api'
 
 const GET_PROJECTS = gql(`
     query getProjects {
@@ -23,7 +23,12 @@ interface ProjectSelectorProps {
     setPageLimit: React.Dispatch<React.SetStateAction<number>>
     setFilterValues: React.Dispatch<React.SetStateAction<SearchItem[]>>
     setGridFilterValues: React.Dispatch<
-        React.SetStateAction<Record<string, { value: string; category: string; title: string }>>
+        React.SetStateAction<
+            Record<
+                string,
+                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+            >
+        >
     >
     pageLimit: number
 }

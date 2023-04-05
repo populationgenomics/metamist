@@ -22,21 +22,6 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
-/* eslint-disable consistent-return */
-const getPrefix = (model_type: string) => {
-    switch (model_type) {
-        case 'participant':
-            return MetaSearchEntityPrefix.P
-        case 'sequence':
-            return MetaSearchEntityPrefix.Sq
-        case 'family':
-            return MetaSearchEntityPrefix.F
-        case 'sample':
-            return MetaSearchEntityPrefix.S
-        // no default
-    }
-}
-
 const ProjectSummary: React.FunctionComponent = () => {
     const navigate = useNavigate()
 
@@ -60,7 +45,10 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
     const [filterValues, setFilterValues] = React.useState<SearchItem[]>([])
     const [gridFilterValues, setGridFilterValues] = React.useState<
-        Record<string, { value: string; category: string; title: string }>
+        Record<
+            string,
+            { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+        >
     >({})
 
     const handleOnClick = React.useCallback(
@@ -107,21 +95,22 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
 
     const updateFilters = React.useCallback(
-        (e: Record<string, { value: string; category: string; title: string }>) => {
+        (
+            e: Record<
+                string,
+                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+            >
+        ) => {
             if (!summary) return
             /* eslint-disable no-param-reassign */
             const processedFilter = Object.entries(e).reduce(
-                (filter, [column, { value, category }]) => {
+                (filter, [, { value, category, field }]) => {
                     if (!value) {
                         return filter
                     }
-                    const is_meta = column.startsWith('meta.')
-                    const field = is_meta ? column.slice(5) : column
-                    const model_type = getPrefix(category)
-                    if (!model_type) {
-                        throw new TypeError('Invalid Model Type')
-                    }
-                    filter.push({ query: value, is_meta, model_type, field })
+                    const is_meta = field.startsWith('meta.')
+                    const fieldName = is_meta ? field.slice(5) : field
+                    filter.push({ query: value, is_meta, model_type: category, field: fieldName })
                     return filter
                 },
                 [] as SearchItem[]

@@ -10,13 +10,23 @@ import Table from '../../shared/components/Table'
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { ProjectSummaryResponse } from '../../sm-api/api'
+import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
     projectName: string
-    filterValues: Record<string, { value: string; category: string; title: string }>
-    updateFilters: (e: { [k: string]: { value: string; category: string; title: string } }) => void
+    filterValues: Record<
+        string,
+        { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+    >
+    updateFilters: (e: {
+        [k: string]: {
+            value: string
+            category: MetaSearchEntityPrefix
+            title: string
+            field: string
+        }
+    }) => void
 }
 
 const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
@@ -26,44 +36,51 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     updateFilters,
 }) => {
     let headers = [
-        { name: 'Family ID', title: 'Family ID', category: 'Family' },
+        { name: 'Family ID', title: 'Family ID', category: MetaSearchEntityPrefix.F },
         ...summary.participant_keys.map((field) => ({
-            category: 'participant',
+            category: MetaSearchEntityPrefix.P,
             name: field[0],
             title: field[1],
         })),
         ...summary.sample_keys.map((field) => ({
-            category: 'sample',
+            category: MetaSearchEntityPrefix.S,
             name: field[0],
             title: field[1],
         })),
         ...summary.sequence_keys.map((field) => ({
-            category: 'sequence',
+            category: MetaSearchEntityPrefix.Sq,
             name: field[0],
             title: `sequence.${field[1]}`,
         })),
     ]
 
     const [tempFilterValues, setTempFilterValues] =
-        React.useState<Record<string, { value: string; category: string; title: string }>>(
-            filterValues
-        )
+        React.useState<
+            Record<
+                string,
+                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+            >
+        >(filterValues)
 
-    const onChange = (e: React.ChangeEvent<HTMLInputElement>, category: string, title: string) => {
+    const onFilterValueChange = (
+        e: React.ChangeEvent<HTMLInputElement>,
+        category: MetaSearchEntityPrefix,
+        title: string
+    ) => {
         const { name } = e.target
         const { value } = e.target
         setTempFilterValues({
             ...Object.keys(tempFilterValues)
-                .filter((key) => name !== key)
+                .filter((key) => `${category}.${name}` !== key)
                 .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
-            ...(value && { [name]: { value, category, title } }),
+            ...(value && { [`${category}.${name}`]: { value, category, title, field: name } }),
         })
     }
 
-    const onClear = (column: string) => {
+    const onClear = (column: string, category: MetaSearchEntityPrefix) => {
         updateFilters({
             ...Object.keys(tempFilterValues)
-                .filter((key) => column !== key)
+                .filter((key) => `${category}.${column}` !== key)
                 .reduce((res, key) => Object.assign(res, { [key]: tempFilterValues[key] }), {}),
         })
     }
@@ -101,8 +118,9 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
                                         <Popup
+                                            position="top center"
                                             trigger={
-                                                name in filterValues ? (
+                                                `${category}.${name}` in filterValues ? (
                                                     <FilterAltIcon />
                                                 ) : (
                                                     <FilterAltOutlinedIcon />
@@ -121,19 +139,25 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                             placeholder="Filter..."
                                                             name={name}
                                                             value={
-                                                                name in tempFilterValues
-                                                                    ? tempFilterValues[name].value
-                                                                    : ''
+                                                                tempFilterValues[
+                                                                    `${category}.${name}`
+                                                                ]?.value || ''
                                                             }
                                                             onChange={(e) =>
-                                                                onChange(e, category, title)
+                                                                onFilterValueChange(
+                                                                    e,
+                                                                    category,
+                                                                    title
+                                                                )
                                                             }
                                                         />
                                                     </Form.Field>
-                                                    {name in filterValues && (
+                                                    {`${category}.${name}` in filterValues && (
                                                         <Form.Field style={{ padding: 0 }}>
                                                             <IconButton
-                                                                onClick={() => onClear(name)}
+                                                                onClick={() =>
+                                                                    onClear(name, category)
+                                                                }
                                                                 style={{ padding: 0 }}
                                                             >
                                                                 <CloseIcon />
