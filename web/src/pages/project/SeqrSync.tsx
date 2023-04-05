@@ -2,12 +2,10 @@ import * as React from 'react'
 import _ from 'lodash'
 import { Button, CheckboxProps, Form, Message, Modal } from 'semantic-ui-react'
 import { SequenceType, WebApi } from '../../sm-api'
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
 interface SeqrSyncProps {
     project: string
-
     syncTypes: SequenceType[]
 }
 
@@ -39,7 +37,8 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
 
     if (!syncTypes || syncTypes.length === 0) return <></>
 
-    const syncSeqrProject = (seqType: SequenceType) => {
+    const syncSeqrProject = (seqType: SequenceType | null) => {
+        if (!seqType) return
         setIsLoading(true)
         setErrors(null)
         new WebApi()
@@ -175,7 +174,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                     </Form>
                 </Modal.Content>
                 <Modal.Actions>
-                    <Button onClick={() => syncSeqrProject(seqTypeInModal!)}>Synchronise</Button>
+                    <Button onClick={() => syncSeqrProject(seqTypeInModal)}>Synchronise</Button>
                 </Modal.Actions>
             </Modal>
         </>

@@ -75,6 +75,11 @@ class SeqrLayer(BaseLayer):
         return SEQR_URL and SEQR_AUDIENCE
 
     @staticmethod
+    def get_seqr_link_from_guid(guid: str):
+        """Get link to seqr project from guid"""
+        return f'{SEQR_URL}/project/{guid}/project_page'
+
+    @staticmethod
     def get_meta_key_from_sequence_type(sequence_type: SequenceType):
         """
         Convenience method for computing the key where the SEQR_GUID
@@ -82,7 +87,9 @@ class SeqrLayer(BaseLayer):
         """
         return f'seqr-project-{sequence_type.value}'
 
-    async def get_synchronisable_types(self, project_id: ProjectId | None = None):
+    async def get_synchronisable_types(
+        self, project_id: ProjectId | None = None
+    ) -> list[SequenceType]:
         """
         Check the project meta to find out which sequence_types are synchronisable
         """
@@ -91,6 +98,15 @@ class SeqrLayer(BaseLayer):
 
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
         project = await pptable.get_project_by_id(project_id or self.connection.project)
+
+        has_access = pptable.check_access_to_project_id(
+            user=self.author,
+            project_id=project.id,
+            readonly=False,
+            raise_exception=False,
+        )
+        if not has_access:
+            return []
 
         sts = [
             st
@@ -166,6 +182,7 @@ class SeqrLayer(BaseLayer):
                                 sequence_type=sequence_type,
                                 errors=_errors,
                                 messages=messages,
+                                seqr_guid=seqr_guid,
                             )
                         )
                         messages.append('Sent a notification to slack')
@@ -219,6 +236,7 @@ class SeqrLayer(BaseLayer):
                 self.send_slack_notification(
                     project_name=project.name,
                     sequence_type=sequence_type,
+                    seqr_guid=seqr_guid,
                     errors=_errors,
                     messages=messages,
                 )
@@ -669,6 +687,7 @@ class SeqrLayer(BaseLayer):
         sequence_type: SequenceType,
         messages: list[str],
         errors: list[str],
+        seqr_guid: str,
     ):
         """Generate and send slack notification from responses"""
         slack_channel = SEQR_SLACK_NOTIFICATION_CHANNEL
@@ -677,13 +696,15 @@ class SeqrLayer(BaseLayer):
 
         slack_client = slack_sdk.WebClient(token=get_slack_token())
         try:
+            seqr_link = self.get_seqr_link_from_guid(seqr_guid)
+            pn_link = f'<{seqr_link}|{project_name}>'
             if errors:
                 text = (
-                    f':rotating_light: Error syncing *{project_name}* '
+                    f':rotating_light: Error syncing *{pn_link}* '
                     f'(_{sequence_type.value}_) seqr project :rotating_light:'
                 )
             else:
-                text = f'Synced {project_name} ({sequence_type.value}) seqr project'
+                text = f'Synced {pn_link} ({sequence_type.value}) seqr project'
 
             blocks = []
             if errors:
