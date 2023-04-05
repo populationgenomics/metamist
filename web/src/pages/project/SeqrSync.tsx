@@ -6,7 +6,6 @@ import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
 interface SeqrSyncProps {
     project: string
-
     syncTypes: SequenceType[]
 }
 
