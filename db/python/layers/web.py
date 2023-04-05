@@ -5,6 +5,7 @@ import dataclasses
 from datetime import date
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
+import re
 
 from enum import Enum
 from pydantic import BaseModel
@@ -149,7 +150,6 @@ class WebDb(DbBase):
         for query in grid_filter:
             value = query.query
             field = query.field
-            # prefix = MetaSearchEntityPrefix(query.model_type).name
             prefix = query.model_type.value
             key = (
                 f'{query.model_type}_{field}_{value}'.replace('-', '_')
@@ -157,6 +157,9 @@ class WebDb(DbBase):
                 .replace(':', '_')
                 .replace(' ', '_')
             )
+            if bool(re.search(r'\W', field)):
+                # protect against SQL injection attacks
+                raise ValueError('Invalid characters in field')
             if not query.is_meta:
                 q = f'{prefix}.{field} LIKE :{key}'
             else:

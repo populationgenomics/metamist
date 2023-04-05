@@ -36,7 +36,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     updateFilters,
 }) => {
     let headers = [
-        { name: 'Family ID', title: 'Family ID', category: MetaSearchEntityPrefix.F },
+        { name: 'external_id', title: 'Family ID', category: MetaSearchEntityPrefix.F },
         ...summary.participant_keys.map((field) => ({
             category: MetaSearchEntityPrefix.P,
             name: field[0],
@@ -90,8 +90,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     }
 
     if (summary.participants.length === 0 && Object.keys(filterValues).length) {
-        headers = Object.entries(filterValues).map(([key, { category, title }]) => ({
-            name: key,
+        headers = Object.entries(filterValues).map(([, { field, category, title }]) => ({
+            name: field,
             category,
             title,
         }))
