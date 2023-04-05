@@ -74,6 +74,7 @@ class TestWeb(DbIsolatedTest):
             sample_keys=[],
             sequence_keys=[],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         self.assertEqual(expected, result)
@@ -193,6 +194,7 @@ class TestWeb(DbIsolatedTest):
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
+            seqr_sync_types=[],
         )
 
         self.assertEqual(expected, result)

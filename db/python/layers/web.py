@@ -8,11 +8,13 @@ from typing import Dict, List, Optional, Set
 
 from pydantic import BaseModel
 
+from api.settings import SEQR_URL
 from api.utils import group_by
 
 from db.python.connect import DbBase
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
+from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequence import SampleSequencingTable
@@ -91,6 +93,7 @@ class ProjectSummary:
 
     # seqr
     seqr_links: dict[str, str]
+    seqr_sync_types: list[SequenceType]
 
 
 class WebLayer(BaseLayer):
@@ -222,14 +225,14 @@ class WebDb(DbBase):
         if not project.meta.get('is_seqr', False):
             return {}
 
-        seqr_format = (
-            'https://seqr.populationgenomics.org.au/project/{guid}/project_page'
-        )
+        seqr_format = '{seqr_url}/project/{guid}/project_page'
         seqr_links = {}
         for seqtype in SequenceType:
             key = f'seqr-project-{seqtype.value}'
             if guid := project.meta.get(key):
-                seqr_links[seqtype.value] = seqr_format.format(guid=guid)
+                seqr_links[seqtype.value] = seqr_format.format(
+                    seqr_url=SEQR_URL, guid=guid
+                )
 
         return seqr_links
 
@@ -273,6 +276,7 @@ class WebDb(DbBase):
                 batch_sequence_stats={},
                 cram_seqr_stats={},
                 seqr_links=seqr_links,
+                seqr_sync_types=[],
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -311,6 +315,7 @@ WHERE fp.participant_id in :pids
             seq_number_by_seq_type,
             seq_number_by_seq_type_and_batch,
             seqr_stats_by_seq_type,
+            seqr_sync_types,
         ] = await asyncio.gather(
             sequence_promise,
             participant_promise,
@@ -325,6 +330,7 @@ WHERE fp.participant_id in :pids
                 project=self.project
             ),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
+            SeqrLayer(self._connection).get_synchronisable_types(self.project),
         )
 
         # post-processing
@@ -462,4 +468,5 @@ WHERE fp.participant_id in :pids
             batch_sequence_stats=sequence_stats,
             cram_seqr_stats=cram_seqr_stats,
             seqr_links=seqr_links,
+            seqr_sync_types=seqr_sync_types,
         )
