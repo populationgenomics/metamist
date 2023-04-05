@@ -1,7 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { SequenceType, WebApi } from '../../sm-api'
 import { Button, CheckboxProps, Form, Message, Modal } from 'semantic-ui-react'
+import { SequenceType, WebApi } from '../../sm-api'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
@@ -37,7 +37,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         postSlackNotification: true,
     })
 
-    if (!syncTypes || syncTypes.length == 0) return <></>
+    if (!syncTypes || syncTypes.length === 0) return <></>
 
     const syncSeqrProject = (seqType: SequenceType) => {
         setIsLoading(true)
@@ -64,9 +64,9 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                 setMessages(resp.data.messages)
             })
             .catch((er) => {
-                let message = er.message
+                let { message } = er
                 if (er?.response?.data) {
-                    message = er?.response?.data.description + '\n' + er?.response.data.stacktrace
+                    message = `${er?.response?.data.description}\n${er?.response.data.stacktrace}`
                 }
 
                 setIsLoading(false)

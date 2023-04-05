@@ -6,6 +6,7 @@ from datetime import date
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
+from enum import Enum
 from pydantic import BaseModel
 
 from api.settings import SEQR_URL
@@ -18,7 +19,27 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequence import SampleSequencingTable
+from models.base import SMBase
+
 from models.enums import SampleType, SequenceType, SequenceStatus, SequenceTechnology
+
+
+class MetaSearchEntityPrefix(Enum):
+    """Links prefixes to tables"""
+
+    PARTICIPANT = 'p'
+    SAMPLE = 's'
+    SEQUENCE = 'sq'
+    FAMILY = 'f'
+
+
+class SearchItem(SMBase):
+    """Summary Grid Filter Model"""
+
+    model_type: MetaSearchEntityPrefix
+    query: str
+    field: str
+    is_meta: bool
 
 
 class NestedSequence(BaseModel):
@@ -80,6 +101,7 @@ class ProjectSummary:
 
     # stats
     total_samples: int
+    total_samples_in_query: int
     total_participants: int
     total_sequences: int
     cram_seqr_stats: dict[str, dict[str, str]]
@@ -100,35 +122,65 @@ class WebLayer(BaseLayer):
     """Web layer"""
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int = 50
+        self,
+        grid_filter: list[SearchItem],
+        token: Optional[int],
+        limit: int = 20,
     ) -> ProjectSummary:
         """
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
         """
         webdb = WebDb(self.connection)
-        return await webdb.get_project_summary(token=token, limit=limit)
+        return await webdb.get_project_summary(
+            grid_filter=grid_filter, token=token, limit=limit
+        )
 
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, limit, after):
+    def _project_summary_sample_query(self, grid_filter: List[SearchItem]):
         """
         Get query for getting list of samples
         """
-        wheres = ['project = :project']
-        values = {'limit': limit, 'project': self.project, 'after': after}
-        # if after:
-        #     values['after'] = after
-        #     # wheres.append('id > :after')
-        #     wheres.append('offset :after')
-
+        wheres = ['s.project = :project']
+        values = {'project': self.project}
         where_str = ''
+        for query in grid_filter:
+            value = query.query
+            field = query.field
+            # prefix = MetaSearchEntityPrefix(query.model_type).name
+            prefix = query.model_type.value
+            key = (
+                f'{query.model_type}_{field}_{value}'.replace('-', '_')
+                .replace('.', '_')
+                .replace(':', '_')
+                .replace(' ', '_')
+            )
+            if not query.is_meta:
+                q = f'{prefix}.{field} LIKE :{key}'
+            else:
+                q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
+            wheres.append(q)
+            values[key] = self.escape_like_term(value) + '%'
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
-        sample_query = f'SELECT id, external_id, type, meta, participant_id FROM sample {where_str} ORDER BY id LIMIT :limit OFFSET :after'
 
+        # Skip 'limit' and 'after' SQL commands so we can get all samples that match the query to determine
+        # the total count, then take the selection of samples for the current page.
+        # This is more efficient than doing 2 queries separately
+        sample_query = f"""
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
+        FROM sample s
+        LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
+        LEFT JOIN participant p ON p.id = s.participant_id
+        LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
+        LEFT JOIN family f ON f.id = fp.family_id
+        {where_str}
+        GROUP BY id
+        ORDER BY id
+        """
         return sample_query, values
 
     @staticmethod
@@ -237,7 +289,10 @@ class WebDb(DbBase):
         return seqr_links
 
     async def get_project_summary(
-        self, token: Optional[str], limit: int
+        self,
+        grid_filter: List[SearchItem],
+        limit: int,
+        token: Optional[int] = 0,
     ) -> ProjectSummary:
         """
         Get project summary
@@ -247,9 +302,7 @@ class WebDb(DbBase):
         """
         # do initial query to get sample info
         sampl = SampleLayer(self._connection)
-        sample_query, values = self._project_summary_sample_query(
-            limit, int(token or 0)
-        )
+        sample_query, values = self._project_summary_sample_query(grid_filter)
         ptable = ProjectPermissionsTable(self.connection)
         project_db = await ptable.get_project_by_id(self.project)
         project = WebProject(
@@ -260,7 +313,13 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        sample_rows = list(await self.connection.fetch_all(sample_query, values))
+        # This retrieves all samples that match the current query
+        # This is not currently a problem as no projects are even close to 10000 rows
+        # So won't be causing any memory/resource issues
+        # Could be optimised in future by limiting to 10k if necessary
+        sample_rows_all = list(await self.connection.fetch_all(sample_query, values))
+        total_samples_in_query = len(sample_rows_all)
+        sample_rows = sample_rows_all[token : token + limit]
 
         if len(sample_rows) == 0:
             return ProjectSummary(
@@ -271,6 +330,7 @@ class WebDb(DbBase):
                 sequence_keys=[],
                 # stats
                 total_samples=0,
+                total_samples_in_query=0,
                 total_participants=0,
                 total_sequences=0,
                 batch_sequence_stats={},
@@ -463,6 +523,7 @@ WHERE fp.participant_id in :pids
             sample_keys=sample_keys,
             sequence_keys=sequence_keys,
             total_samples=total_samples,
+            total_samples_in_query=total_samples_in_query,
             total_participants=total_participants,
             total_sequences=total_sequences,
             batch_sequence_stats=sequence_stats,
