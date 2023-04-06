@@ -273,7 +273,7 @@ class TestWeb(DbIsolatedTest):
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
-                                    'field with spaces': 'some entry'
+                                    'field with spaces': 'some entry',
                                 },
                             },
                         ],
@@ -459,6 +459,4 @@ class TestWeb(DbIsolatedTest):
             ],
         )
 
-        self.assertEqual(
-            expected_data_two_samples_filtered, test_field_with_space
-        )
+        self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)
