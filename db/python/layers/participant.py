@@ -20,6 +20,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId, split_generic_terms
+from models.models.family import PedRowInternal
 from models.models.participant import Participant
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
@@ -492,12 +493,14 @@ class ParticipantLayer(BaseLayer):
 
             if len(family_persons_to_insert) > 0:
                 formed_rows = [
-                    {
-                        'family_id': fmap_by_external[external_family_id],
-                        'participant_id': pid,
-                        'sex': 0,
-                        'affected': 0,
-                    }
+                    PedRowInternal(
+                        family_id=fmap_by_external[external_family_id],
+                        participant_id=pid,
+                        affected=0,
+                        maternal_id=None,
+                        paternal_id=None,
+                        notes=None,
+                    )
                     for external_family_id, pid in family_persons_to_insert
                 ]
                 await fpttable.create_rows(formed_rows)

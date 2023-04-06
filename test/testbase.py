@@ -134,9 +134,10 @@ class DbTest(unittest.TestCase):
                 ppt = ProjectPermissionsTable(
                     connection.connection, allow_full_access=True
                 )
-                await ppt.create_project(
-                    project_name='test',
-                    dataset_name='test',
+                cls.project_name = 'test'
+                cls.project_id = await ppt.create_project(
+                    project_name=cls.project_name,
+                    dataset_name=cls.project_name,
                     create_test_project=False,
                     author='testuser',
                     read_group_name='None',
@@ -170,6 +171,7 @@ class DbTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.project_id = 1
+        self.project_name = 'test'
         self.connection = self.connections[self.__class__.__name__]
 
 
