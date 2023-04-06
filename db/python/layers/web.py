@@ -157,13 +157,13 @@ class WebDb(DbBase):
                 .replace(':', '_')
                 .replace(' ', '_')
             )
-            if bool(re.search(r'\W', field)):
+            if bool(re.search(r'\W', field)) and not query.is_meta:
                 # protect against SQL injection attacks
                 raise ValueError('Invalid characters in field')
             if not query.is_meta:
                 q = f'{prefix}.{field} LIKE :{key}'
             else:
-                q = f'JSON_VALUE({prefix}.meta, "$.{field}") LIKE :{key}'
+                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'
             wheres.append(q)
             values[key] = self.escape_like_term(value) + '%'
         if wheres:
