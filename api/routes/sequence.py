@@ -149,8 +149,8 @@ async def get_sequences_by_criteria(
         else None,
     )
 
-    for sequence_group in result:
-        sequence_group.sample_id = sample_id_format(sequence_group.sample_id)
+    for sequence in result:
+        sequence.sample_id = sample_id_format(sequence.sample_id)
 
     return result
 
