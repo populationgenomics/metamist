@@ -15,6 +15,30 @@ controlled through membership of the google groups:
 `$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
 are cached in a secret as group-membership identity checks are slow.
 
+## API
+
+There are two ways to query metamist in Python:
+
+1. Use the REST interface with the predefined requests
+2. Use the GraphQL interface.
+
+To use the GraphQL interface in Python with the sample_metadata library, you can do the following:
+
+```python
+from sample_metadata.graphql import query
+
+_query = """
+query YourQueryNameHere($sampleId: String!) {
+  sample(id: $sampleId) {
+    id
+    externalId
+  }
+}
+"""
+
+print(query(_query, {"sampleId": "CPG18"}))
+```
+
 ## Structure
 
 ![Database structure](resources/2021-10-27_db-diagram.png)

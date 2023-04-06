@@ -222,7 +222,7 @@ def copy_python_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'README.md', 'parser'}
+    files_to_ignore = {'README.md', 'parser', 'graphql'}
 
     module_dir = MODULE_NAME.replace('.', '/')
     dir_to_copy_to = module_dir  # should be relative to this script
