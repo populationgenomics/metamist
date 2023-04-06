@@ -163,6 +163,7 @@ class WebDb(DbBase):
             if not query.is_meta:
                 q = f'{prefix}.{field} LIKE :{key}'
             else:
+                # double double quote field to allow white space
                 q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'
             wheres.append(q)
             values[key] = self.escape_like_term(value) + '%'
