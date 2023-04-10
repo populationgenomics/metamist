@@ -49,35 +49,40 @@ python parse_generic_metadata.py \
     <manifest-path>
 ```
 
-## Existing Cohorts Data Ingestion 
+## Existing Cohorts Data Ingestion
 
 ### Data Format
+
 Data is commonly received in the form of CSV files. Each CSV file can include data on a Participant, Sample, Sequence Group, and other related attributes.
 
 ### Metadata Parser
+
 We have developed a generic metadata parser that takes in a CSV file. Each row corresponds to a sequencing group/sample, and each column corresponds to an attribute. While we try to ensure all input data is homogenized, some inputs may need further work before they can be ingested.
 
 ### Parsing Scripts
+
 To handle specific data formats or conditions, we have developed additional parsers that build upon our generic metadata parser. These parsers are used to parse data from external sources.
 
 ### Existing Cohorts Ingestion Workflow
+
 1. Parse Manifest CSVs
 
     Usage:
 
-    ```shell 
+    ```shell
     analysis-runner --dataset <DATASET> --access-level standard --description <DESCRIPTION> -o parser-tmp python3 -m scripts.parse_existing_cohort --project <PROJECT> --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH> --include-participant-column <PATH TO CSV>
     ```
+    
     For example:
 
-    ```shell 
+    ```shell
     analysis-runner --dataset fewgenomes --access-level standard --description "Parse Dummy Samples" -o parser-tmp python3 -m scripts.parse_existing_cohort --project fewgenomes --search-location gs://cpg-fewgenomes-main/ --batch-number "1" --include-participant-column gs://cpg-fewgenomes-main-upload/fewgenomes_manifest.csv
     ```
 
     The existing cohort parser behaves as follows:
 
     - If the input CSV does not include a participant_id column, the external_id is used by default. If a participant column does exist a user can specify the —include-participant-column flag, which is by default False.
-    - It assumes the batch-number column does not exist in the input CSV and should be specified as a parameter. Note, this means manifests should be ingested batch per batch. Often, the batch-number is found in the csv filename. The default behavior expects this parameter to be set. 
+    - It assumes the batch-number column does not exist in the input CSV and should be specified as a parameter. Note, this means manifests should be ingested batch per batch. Often, the batch-number is found in the csv filename. The default behavior expects this parameter to be set.
     - It assumes that FASTQ URLs are not provided in the CSV, so it pulls them from the input bucket. It also handles the fact that while the data in the input CSV is provided according to a sample ID, these sample IDs are not present in the file path of the FASTQs. Instead, FASTQ’s are named according to their fluidX tube id The script matches samples to FASTQ's accordingly.
     - It discards the header.
 
