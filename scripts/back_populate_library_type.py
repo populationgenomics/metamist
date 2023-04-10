@@ -12,7 +12,9 @@ from sample_metadata.apis import SequenceApi
 from sample_metadata.models import SequenceUpdateModel
 
 logger = logging.getLogger(__file__)
-logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(levelname)s (%(name)s %(lineno)s): %(message)s', level=logging.INFO
+)
 # logger.setLevel(logging.INFO)
 
 # Facility specific regular expressions
