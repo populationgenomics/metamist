@@ -19,19 +19,25 @@ logger.setLevel(logging.INFO)
 # Facility specific regular expressions
 # VCGS fastq
 # This is the current name format
-vcgs_fastq_regex = r'(?P<run_date>\d{6})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_' \
-    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_(?P<library_id>[A-Z\d-]+)_' \
+vcgs_fastq_regex = (
+    r'(?P<run_date>\d{6})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_'
+    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_(?P<library_id>[A-Z\d-]+)_'
     r'(?P<library_type>[\w\d]+)_(?P<lane>L\d+)_(?P<read>R[12])\.fastq\.gz'
+)
 # Pre mid 2018 the library id was not included:
-vcgs_fastq_pre2018_regex = r'(?P<run_date>\d{6})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_' \
-    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_' \
+vcgs_fastq_pre2018_regex = (
+    r'(?P<run_date>\d{6})_(?P<g2>[A-Z\d]+)_(?P<g3>\d{4})_'
+    r'(?P<g4>[A-Z]{2}\d+)_(?P<sample_id>[\w\d-]+)_'
     r'(?P<library_type>[\w\d]+)_(?P<lane>L\d+)_(?P<read>R[12])\.fastq\.gz'
+)
 
 # Garvan fastq
-garvan_fastq_regex = r'(?P<flowcell_id>[A-Z0-9]+_\d)_(?P<rundate>\d{6})_' \
-    r'(?P<sample_id>[A-Z]{2}\d{8})_(?P<species>[\w-]+)_' \
-    r'(?P<library_barcode>[ACGT]+-[ACGT]+)_(?P<batch_submission_id>R_\d{6}_[A-Z]{6})_' \
+garvan_fastq_regex = (
+    r'(?P<flowcell_id>[A-Z0-9]+_\d)_(?P<rundate>\d{6})_'
+    r'(?P<sample_id>[A-Z]{2}\d{8})_(?P<species>[\w-]+)_'
+    r'(?P<library_barcode>[ACGT]+-[ACGT]+)_(?P<batch_submission_id>R_\d{6}_[A-Z]{6})_'
     r'(?P<sample_type>DNA)_(?P<lane>[A-Z]\d{3})_(?P<read>R[12])\.fastq\.gz'
+)
 
 
 @click.command()
@@ -41,7 +47,8 @@ garvan_fastq_regex = r'(?P<flowcell_id>[A-Z0-9]+_\d)_(?P<rundate>\d{6})_' \
     help='The sample-metadata project ($DATASET)',
 )
 @click.option(
-    '-d', '--dummy-run',
+    '-d',
+    '--dummy-run',
     is_flag=True,
     default=False,
     help='Do not save changes to metamist',
@@ -75,7 +82,9 @@ def main(project: str, dummy_run: bool):
             fastq_filename = sequence.get('meta').get('reads')[0][0].get('basename')
         except (TypeError, KeyError):
             # Can't determine fastq_filename
-            logging.warning(f'Cant extract fastq_filename for {internal_sequence_id} skipping {sequence}')
+            logging.warning(
+                f'Cant extract fastq_filename for {internal_sequence_id} skipping {sequence}'
+            )
             continue
 
         meta_fields_to_update = {}
@@ -95,17 +104,24 @@ def main(project: str, dummy_run: bool):
             meta_fields_to_update['facility'] = 'garvan'
 
         else:
-            logging.warning(f'No file name match found for {internal_sequence_id} skipping {fastq_filename}')
-
-        # if meta_fields_to_update:
-        if meta_fields_to_update and not dummy_run:
-            seqapi.update_sequence(
-                internal_sequence_id,
-                SequenceUpdateModel(meta=meta_fields_to_update),
+            logging.warning(
+                f'No file name match found for {internal_sequence_id} skipping {fastq_filename}'
             )
-            updated_sequences.append({internal_sequence_id: meta_fields_to_update})
 
-    logging.info(f'Updated {len(updated_sequences)} sequences. {updated_sequences}')
+        if meta_fields_to_update:
+            if not dummy_run:
+                seqapi.update_sequence(
+                    internal_sequence_id,
+                    SequenceUpdateModel(meta=meta_fields_to_update),
+                )
+            updated_sequences.append({internal_sequence_id: meta_fields_to_update})
+        else:
+            f'No sequences found to update'
+
+    if dummy_run:
+        logging.info(f'Dummy run. Would have updated {len(updated_sequences)} sequences. {updated_sequences}')
+    else:
+        logging.info(f'Updated {len(updated_sequences)} sequences. {updated_sequences}')
 
 
 if __name__ == '__main__':
