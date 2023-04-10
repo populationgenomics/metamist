@@ -269,7 +269,9 @@ class SampleLayer(BaseLayer):
                 for assay in sample.non_sequencing_assays:
                     assay.sample_id = sample.id
                 if process_assays:
-                    await alayer.upsert_assays(sample.non_sequencing_assays, open_transaction=False)
+                    await alayer.upsert_assays(
+                        sample.non_sequencing_assays, open_transaction=False
+                    )
 
         return sample
 

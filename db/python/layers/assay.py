@@ -175,7 +175,10 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def upsert_assays(
-        self, assays: list[AssayUpsertInternal], check_project_ids: bool = True, open_transaction=True
+        self,
+        assays: list[AssayUpsertInternal],
+        check_project_ids: bool = True,
+        open_transaction=True,
     ) -> list[AssayUpsertInternal]:
         """Upsert multiple sequences to the given sample (sid)"""
 
@@ -187,10 +190,15 @@ class AssayLayer(BaseLayer):
                 self.author, project_ids, readonly=False
             )
 
-        with_function = self.connection.connection.transaction if open_transaction else NoOpAenter
+        with_function = (
+            self.connection.connection.transaction if open_transaction else NoOpAenter
+        )
         async with with_function():
             upserts = await asyncio.gather(
-                *[self.upsert_assay(a, check_project_id=False, open_transaction=False) for a in assays]
+                *[
+                    self.upsert_assay(a, check_project_id=False, open_transaction=False)
+                    for a in assays
+                ]
             )
 
         return upserts

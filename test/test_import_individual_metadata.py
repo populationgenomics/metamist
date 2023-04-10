@@ -42,10 +42,12 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         """Test basic data for 2 participants and 2 columns"""
         pl = ParticipantLayer(self.connection)
 
-        await pl.upsert_participants([
-            ParticipantUpsertInternal(external_id='TP01'),
-            ParticipantUpsertInternal(external_id='TP02'),
-        ])
+        await pl.upsert_participants(
+            [
+                ParticipantUpsertInternal(external_id='TP01'),
+                ParticipantUpsertInternal(external_id='TP02'),
+            ]
+        )
 
         headers = ['Individual ID', 'HPO Term 20', 'Age of Onset']
         rows = [

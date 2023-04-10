@@ -1,6 +1,7 @@
 # requirements are for running the server
 cpg-utils
 aiohttp
+async_lru
 cloudpathlib
 requests
 google-auth==1.35.0

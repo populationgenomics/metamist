@@ -98,7 +98,6 @@ class SequencingGroupTable(DbBase):
 
         return projects, participant_id_to_sids
 
-
     async def create_sequencing_group(
         self,
         sample_id: int,

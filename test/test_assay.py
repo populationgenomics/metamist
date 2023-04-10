@@ -240,20 +240,22 @@ class TestSequence(DbIsolatedTest):
 
         sample_id_for_test = sample.id
 
-        seqs = await self.assaylayer.upsert_assays([
-            AssayUpsertInternal(
-                sample_id=sample_id_for_test,
-                type='sequencing',
-                meta={'unique': 'a', 'common': 'common'},
-                external_ids={'default': 'SEQ01'},
-            ),
-            AssayUpsertInternal(
-                sample_id=sample_id_for_test,
-                type='sequencing',
-                meta={'unique': 'b', 'common': 'common'},
-                external_ids={'default': 'SEQ02'},
-            )
-        ])
+        seqs = await self.assaylayer.upsert_assays(
+            [
+                AssayUpsertInternal(
+                    sample_id=sample_id_for_test,
+                    type='sequencing',
+                    meta={'unique': 'a', 'common': 'common'},
+                    external_ids={'default': 'SEQ01'},
+                ),
+                AssayUpsertInternal(
+                    sample_id=sample_id_for_test,
+                    type='sequencing',
+                    meta={'unique': 'b', 'common': 'common'},
+                    external_ids={'default': 'SEQ02'},
+                ),
+            ]
+        )
 
         async def search_result_to_ids(**query):
             seqs = await self.assaylayer.get_assays_by(
@@ -385,7 +387,8 @@ class TestSequence(DbIsolatedTest):
 
         # cycle through all statuses, and check that works
         await self.assaylayer.upsert_assay(
-            AssayUpsertInternal(id=assay.id, type='metabolomics'), check_project_id=False
+            AssayUpsertInternal(id=assay.id, type='metabolomics'),
+            check_project_id=False,
         )
         row_to_check = await self.connection.connection.fetch_one(
             'SELECT type FROM assay WHERE id = :id',

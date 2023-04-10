@@ -26,11 +26,12 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
-from db.python.layers.sequence import SampleSequenceLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.tables.sequencing_type import SequencingTypeTable
 from db.python.utils import ProjectId
-from models.enums import SequenceType, AnalysisStatus, AnalysisType
-from models.models.sample import sample_id_format, sample_id_format_list
+from models.enums import AnalysisStatus, AnalysisType
+from models.utils.sample_id_format import sample_id_format, sample_id_format_list
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -70,7 +71,8 @@ class SeqrLayer(BaseLayer):
         self.flayer = FamilyLayer(connection)
         self.player = ParticipantLayer(connection)
 
-    async def is_seqr_sync_setup(self):
+    @staticmethod
+    async def is_seqr_sync_setup():
         """Check if metamist is configured to interact with seqr"""
         return SEQR_URL and SEQR_AUDIENCE
 
@@ -80,16 +82,16 @@ class SeqrLayer(BaseLayer):
         return f'{SEQR_URL}/project/{guid}/project_page'
 
     @staticmethod
-    def get_meta_key_from_sequence_type(sequence_type: SequenceType):
+    def get_meta_key_from_sequence_type(sequence_type: str):
         """
         Convenience method for computing the key where the SEQR_GUID
         is stored within the project.meta
         """
-        return f'seqr-project-{sequence_type.value}'
+        return f'seqr-project-{sequence_type}'
 
     async def get_synchronisable_types(
         self, project_id: ProjectId | None = None
-    ) -> list[SequenceType]:
+    ) -> list[str]:
         """
         Check the project meta to find out which sequence_types are synchronisable
         """
@@ -108,16 +110,19 @@ class SeqrLayer(BaseLayer):
         if not has_access:
             return []
 
+        sequencing_types = await SequencingTypeTable(
+            connection=self.connection
+        ).get_sequencing_types()
         sts = [
             st
-            for st in SequenceType
+            for st in sequencing_types
             if self.get_meta_key_from_sequence_type(st) in project.meta
         ]
         return sts
 
     async def sync_dataset(
         self,
-        sequence_type: SequenceType,
+        sequence_type: str,
         sync_families: bool = True,
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
@@ -141,12 +146,16 @@ class SeqrLayer(BaseLayer):
         if not seqr_guid:
             raise ValueError(
                 f'The project {project.name} does NOT have an appropriate seqr '
-                f'project attached for {sequence_type.value}'
+                f'project attached for {sequence_type}'
             )
 
-        seqlayer = SampleSequenceLayer(self.connection)
+        seqlayer = SequencingGroupLayer(self.connection)
 
-        pid_to_sid_map = await seqlayer.get_participant_ids_sequencing_group_ids_for_sequence_type(sequence_type)
+        pid_to_sid_map = (
+            await seqlayer.get_participant_ids_sequencing_group_ids_for_sequence_type(
+                sequence_type
+            )
+        )
         participant_ids = list(pid_to_sid_map.keys())
         sample_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
         families = await self.flayer.get_families_by_participants(participant_ids)
@@ -352,7 +361,7 @@ class SeqrLayer(BaseLayer):
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
-        sequence_type: SequenceType,
+        sequence_type: str,
         project_guid,
         headers,
         internal_sample_ids: set[int],
@@ -388,7 +397,7 @@ class SeqrLayer(BaseLayer):
         es_index_analyses = await alayer.query_analysis(
             project_ids=[self.connection.project],
             analysis_type=AnalysisType('es-index'),
-            meta={'sequencing_type': sequence_type.value},
+            meta={'sequencing_type': sequence_type},
             status=AnalysisStatus('completed'),
         )
 
@@ -465,7 +474,7 @@ class SeqrLayer(BaseLayer):
         self,
         session: aiohttp.ClientSession,
         participant_ids: list[int],
-        sequence_type: SequenceType,
+        sequence_type: str,
         project_guid: str,
         headers,
     ):
@@ -480,9 +489,9 @@ class SeqrLayer(BaseLayer):
         )
         output_filter = lambda row: True  # noqa
         # eventually solved by sequence groups
-        if sequence_type.value == 'genome':
+        if sequence_type == 'genome':
             output_filter = lambda output: 'exome' not in output  # noqa
-        elif sequence_type.value == 'exome':
+        elif sequence_type == 'exome':
             output_filter = lambda output: 'exome' in output  # noqa
 
         parsed_records = defaultdict(list)
@@ -514,10 +523,10 @@ class SeqrLayer(BaseLayer):
             req_igv_update_url = SEQR_URL + _url_igv_individual_update.format(
                 individualGuid=individual_guid
             )
-            resp = await session.post(req_igv_update_url, json=update, headers=headers)
+            igv_resp = await session.post(req_igv_update_url, json=update, headers=headers)
 
-            resp.raise_for_status()
-            return await resp.text()
+            igv_resp.raise_for_status()
+            return await igv_resp.text()
 
         chunk_size = 10
         all_updates = response['updates']
@@ -684,7 +693,7 @@ class SeqrLayer(BaseLayer):
     def send_slack_notification(
         self,
         project_name: str,
-        sequence_type: SequenceType,
+        sequence_type: str,
         messages: list[str],
         errors: list[str],
         seqr_guid: str,
@@ -701,10 +710,10 @@ class SeqrLayer(BaseLayer):
             if errors:
                 text = (
                     f':rotating_light: Error syncing *{pn_link}* '
-                    f'(_{sequence_type.value}_) seqr project :rotating_light:'
+                    f'(_{sequence_type}_) seqr project :rotating_light:'
                 )
             else:
-                text = f'Synced {pn_link} ({sequence_type.value}) seqr project'
+                text = f'Synced {pn_link} ({sequence_type}) seqr project'
 
             blocks = []
             if errors:

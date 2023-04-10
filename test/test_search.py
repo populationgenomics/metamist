@@ -71,7 +71,9 @@ class TestSample(DbIsolatedTest):
         Search by External sample ID with no participant / family,
         should only return one result
         """
-        sample = await self.slayer.upsert_sample(SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD))
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+        )
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
         cpg_id = sample_id_format(sample.id)

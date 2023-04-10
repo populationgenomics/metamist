@@ -40,6 +40,7 @@ class ParticipantInternal(BaseModel):
 
 class ParticipantUpsertInternal(BaseModel):
     """Internal upsert model for participant"""
+
     id: int | None = None
     external_id: str = None
     reported_sex: int | None = None
@@ -52,6 +53,7 @@ class ParticipantUpsertInternal(BaseModel):
 
 class Participant(BaseModel):
     """External participant model"""
+
     id: int
     project: ProjectId
     external_id: str = None
@@ -63,6 +65,7 @@ class Participant(BaseModel):
 
 class ParticipantUpsert(BaseModel):
     """External upsert model for participant"""
+
     id: int | None = None
     external_id: str = None
     reported_sex: int | None = None
