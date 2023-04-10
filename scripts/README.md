@@ -53,7 +53,7 @@ python parse_generic_metadata.py \
 
 Data is commonly received in the form of CSV files. Each CSV file can include data on a Participant, Sample, Sequence Group, and other related attributes.
 
-As described above, the generic metadata parser that takes in a CSV file to be ingested. Each row corresponds to a sequencing group/sample, and each column corresponds to an attribute. While we try to ensure all input data is homogenized, some inputs may need further work before they can be ingested. To handle specific data formats or conditions, we have developed additional parsers that build upon our generic metadata parser. These parsers are used to parse data from external sources.
+As described above, the generic metadata parser takes in a CSV file to be ingested. Each row corresponds to a sequencing group/sample, and each column corresponds to an attribute. While we try to ensure all input data is homogenized, some inputs may need further work before they can be ingested. To handle specific data formats or conditions, we have developed additional parsers that build upon our generic metadata parser. These parsers are used to parse data from external sources.
 
 ### Existing Cohorts Ingestion Workflow
 
