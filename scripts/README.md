@@ -72,7 +72,7 @@ To handle specific data formats or conditions, we have developed additional pars
     ```shell
     analysis-runner --dataset <DATASET> --access-level standard --description <DESCRIPTION> -o parser-tmp python3 -m scripts.parse_existing_cohort --project <PROJECT> --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH> --include-participant-column <PATH TO CSV>
     ```
-    
+
     For example:
 
     ```shell
@@ -89,5 +89,5 @@ To handle specific data formats or conditions, we have developed additional pars
 2. Update Participant IDs
 If participant IDs need to be ingested and were not handled correctly, fix_participant_ids.py can be used to update external participant IDs. It takes a map of {old_external: new_external} as input.
 
-3.  Parse Pedigrees
+3. Parse Pedigrees
 Parsing ped files is not handled by the parser. To do so, parse_ped.py should be used. Note, step 2 must be completed first.
