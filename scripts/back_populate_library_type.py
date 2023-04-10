@@ -49,12 +49,12 @@ garvan_fastq_regex = (
 )
 @click.option(
     '-d',
-    '--dummy-run',
+    '--dry-run',
     is_flag=True,
     default=False,
     help='Do not save changes to metamist',
 )
-def main(project: str, dummy_run: bool):
+def main(project: str, dry_run: bool):
     """Back populate facility and library_type meta fields for existing sequences"""
     seqapi = SequenceApi()
     # Pull all the sequences
@@ -74,7 +74,7 @@ def main(project: str, dummy_run: bool):
 
         # Quick validation
         if current_library_type:
-            logging.warning(
+            logging.info(
                 f'{internal_sequence_id} already has current_library_type set: {current_library_type}. Skipping'
             )
             continue
@@ -86,10 +86,8 @@ def main(project: str, dummy_run: bool):
 
         except (TypeError, KeyError):
             # Check if this is a bam ingested with a manifest that includes design_description
-            if 'meta' in sequence and sequence['meta'].get('design_description'):
-                meta_fields_to_update['library_type'] = sequence['meta'].get(
-                    'design_description'
-                )
+            if design_description := sequence.get('meta', {}).get('design_description'):
+                meta_fields_to_update['library_type'] = design_description
                 fastq_filename = 'dummy-file-name'
             else:
                 # Can't determine fastq_filename
@@ -119,20 +117,19 @@ def main(project: str, dummy_run: bool):
             )
 
         else:
-            print('foo', sequence['meta'].get('design_description'))
             logging.warning(
                 f'No file name match found for {internal_sequence_id} skipping {fastq_filename}'
             )
 
         if meta_fields_to_update:
-            if not dummy_run:
+            if not dry_run:
                 seqapi.update_sequence(
                     internal_sequence_id,
                     SequenceUpdateModel(meta=meta_fields_to_update),
                 )
             updated_sequences.append({internal_sequence_id: meta_fields_to_update})
 
-    if dummy_run:
+    if dry_run:
         logging.info(
             f'Dummy run. Would have updated {len(updated_sequences)} sequences. {updated_sequences}'
         )
