@@ -28,8 +28,9 @@ class MetaSearchEntityPrefix(Enum):
 
     PARTICIPANT = 'p'
     SAMPLE = 's'
-    SEQUENCE = 'sq'
+    ASSAY = 'a'
     FAMILY = 'f'
+    SEQUENCING_GROUP = 'sg'
 
 
 class SearchItem(SMBase):
@@ -114,7 +115,7 @@ class ProjectSummary:
 
     # seqr
     seqr_links: dict[str, str]
-    seqr_sync_types: list[SequenceType]
+    seqr_sync_types: list[str]
 
 
 class WebLayer(BaseLayer):
@@ -168,16 +169,17 @@ class WebDb(DbBase):
         if wheres:
             where_str = 'WHERE ' + ' AND '.join(wheres)
 
-        # Skip 'limit' and 'after' SQL commands so we can get all samples that match the query to determine
-        # the total count, then take the selection of samples for the current page.
-        # This is more efficient than doing 2 queries separately
+        # Skip 'limit' and 'after' SQL commands so we can get all samples that match
+        # the query to determine the total count, then take the selection of samples
+        # for the current page. This is more efficient than doing 2 queries separately.
         sample_query = f"""
         SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
         FROM sample s
-        LEFT JOIN sample_sequencing sq ON s.id = sq.sample_id
+        LEFT JOIN assay a ON s.id = a.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
         LEFT JOIN family_participant fp on s.participant_id = fp.participant_id
         LEFT JOIN family f ON f.id = fp.family_id
+        LEFT JOIN sequencing_group sg ON s.id = sg.sample_id
         {where_str}
         GROUP BY id
         ORDER BY id

@@ -1,5 +1,5 @@
 # pylint: disable=invalid-overridden-method
-from datetime import date, timedelta
+from datetime import timedelta, datetime
 
 from test.testbase import DbIsolatedTest, run_as_sync
 
@@ -60,6 +60,8 @@ class TestAnalysis(DbIsolatedTest):
         Test retrieval of sample file sizes over time
         """
 
+        today = datetime.utcnow().date()
+
         result = await self.al.get_sample_file_sizes(project_ids=[1])
         expected = [
             {
@@ -69,7 +71,7 @@ class TestAnalysis(DbIsolatedTest):
                         'sample': self.sample_id,
                         'dates': [
                             {
-                                'start': date.today(),
+                                'start': today,
                                 'end': None,
                                 'size': {'genome': 1024},
                             }
@@ -99,7 +101,7 @@ class TestAnalysis(DbIsolatedTest):
 
         # Assert that if we select a date range outside of sample creation date
         # that is doesn't show up in the map
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = today - timedelta(days=1)
         result = await self.al.get_sample_file_sizes(
             project_ids=[1], end_date=yesterday
         )
@@ -138,7 +140,7 @@ class TestAnalysis(DbIsolatedTest):
             'sample': sample_2.id,
             'dates': [
                 {
-                    'start': date.today(),
+                    'start': today,
                     'end': None,
                     'size': {'genome': 987654321},
                 }

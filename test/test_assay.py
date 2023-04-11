@@ -1,3 +1,4 @@
+from db.python.tables.sequencing_type import SequencingTypeTable
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from pymysql.err import IntegrityError
@@ -34,13 +35,6 @@ class TestSequence(DbIsolatedTest):
                 )
             )
         ).id
-
-        # allow a different assay type
-        self.connection.connection.execute(
-            # only insert if not exists
-            'INSERT IGNORE INTO assay_type (id, name) '
-            'VALUES ("metabolomics", "metabolomics")'
-        )
 
     @run_as_sync
     async def test_not_found_assay(self):
@@ -86,7 +80,8 @@ class TestSequence(DbIsolatedTest):
         Test inserting a assay, and check all values are inserted correctly
         """
         meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't']}
-        assay_ids = await self.assaylayer.upsert_assays(
+        sequencing_types = ['sequencing', 'metabolomics']
+        assays = await self.assaylayer.upsert_assays(
             [
                 AssayUpsertInternal(
                     external_ids={'eid': f'external_id_{_type}'},
@@ -94,16 +89,16 @@ class TestSequence(DbIsolatedTest):
                     type='sequencing',
                     meta=meta,
                 )
-                for _type in ('sequencing', 'metabolomics')
+                for _type in sequencing_types
             ]
         )
-
+        assay_ids = [a.id for a in assays]
         inserted_types_rows = await self.connection.connection.fetch_all(
             'SELECT type FROM assay WHERE id in :ids', {'ids': assay_ids}
         )
         inserted_types = set(r['type'] for r in inserted_types_rows)
 
-        self.assertEqual(9, len(assay_ids))
+        self.assertEqual(len(sequencing_types), len(assay_ids))
         self.assertEqual(1, len(inserted_types))
 
     @run_as_sync
@@ -169,7 +164,7 @@ class TestSequence(DbIsolatedTest):
         """
         Test get differences assays by multiple IDs
         """
-        seq1_id = await self.assaylayer.upsert_assay(
+        seq1 = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
@@ -177,7 +172,7 @@ class TestSequence(DbIsolatedTest):
                 external_ids={'default': 'SEQ01', 'other': 'EXT_SEQ1'},
             )
         )
-        seq2_id = await self.assaylayer.upsert_assay(
+        seq2 = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
@@ -187,18 +182,19 @@ class TestSequence(DbIsolatedTest):
         )
 
         self.assertEqual(
-            seq1_id, (await self.assaylayer.get_assay_by_external_id('SEQ01')).id
+            seq1.id, (await self.assaylayer.get_assay_by_external_id('SEQ01')).id
         )
         self.assertEqual(
-            seq1_id, (await self.assaylayer.get_assay_by_external_id('EXT_SEQ1')).id
+            seq1.id, (await self.assaylayer.get_assay_by_external_id('EXT_SEQ1')).id
         )
-        seq2 = await self.assaylayer.get_assay_by_external_id('SEQ02')
-        self.assertEqual(seq2_id, seq2.id)
+        self.assertEqual(
+            seq2.id, (await self.assaylayer.get_assay_by_external_id('SEQ02')).id
+        )
 
     @run_as_sync
     async def test_get_assays_by_sample_id(self):
         """Get many assays by sample ID"""
-        seq1_id = await self.assaylayer.upsert_assay(
+        seq1 = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
@@ -206,7 +202,7 @@ class TestSequence(DbIsolatedTest):
                 external_ids={},
             )
         )
-        seq2_id = await self.assaylayer.upsert_assay(
+        seq2 = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
@@ -222,8 +218,8 @@ class TestSequence(DbIsolatedTest):
         self.assertIn(self.sample_id_raw, by_type)
         self.assertEqual(1, len(by_type))
 
-        self.assertListEqual(
-            [seq1_id, seq2_id], by_type[self.sample_id_raw]['sequencing']
+        self.assertSetEqual(
+            {seq1.id, seq2.id}, set(by_type[self.sample_id_raw]['sequencing'])
         )
 
     @run_as_sync
@@ -284,11 +280,11 @@ class TestSequence(DbIsolatedTest):
 
         # seq_meta
         self.assertSetEqual(
-            {seq2_id}, await search_result_to_ids(seq_meta={'unique': 'b'})
+            {seq2_id}, await search_result_to_ids(assay_meta={'unique': 'b'})
         )
         self.assertSetEqual(
             {seq1_id, seq2_id},
-            await search_result_to_ids(seq_meta={'common': 'common'}),
+            await search_result_to_ids(assay_meta={'common': 'common'}),
         )
 
         # sample meta
@@ -349,6 +345,7 @@ class TestSequence(DbIsolatedTest):
         await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 id=assay.id,
+                sample_id=self.sample_id_raw,
                 external_ids={
                     'default': 'NSQ_01',
                     'ext': 'EXTSEQ01',
@@ -384,6 +381,8 @@ class TestSequence(DbIsolatedTest):
                 external_ids={},
             )
         )
+        st = SequencingTypeTable(self.connection)
+        await st.insert('metabolomics')
 
         # cycle through all statuses, and check that works
         await self.assaylayer.upsert_assay(

@@ -449,7 +449,7 @@ class AssayTable(DbBase):
                     'To search assays by external_ids, you MUST supply a list of projects.'
                 )
             where.append(
-                'aeid.external_id in :external_ids AND sqeid.project in :project_ids'
+                'aeid.external_id in :external_ids AND aeid.project in :project_ids'
             )
             replacements['external_ids'] = external_assay_ids
 

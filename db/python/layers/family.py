@@ -599,7 +599,7 @@ class FamilyLayer(BaseLayer):
             await participant_table.upsert_participants(
                 [
                     ParticipantUpsertInternal(
-                        id=row.individual_id, reported_sex=row.sex
+                        id=external_participant_ids_map[row.individual_id], reported_sex=row.sex
                     )
                     for row in pedrows
                 ]
