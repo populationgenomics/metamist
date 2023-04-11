@@ -1,11 +1,12 @@
 import os
 import requests
+from typing import Dict
 from cpg_utils.cloud import get_google_identity_token
 
 from sample_metadata.configuration import sm_url
 
-
-def query(_query, variables=None, auth_token: str = None):
+# use older style typing to broaden supported Python versions
+def query(_query: str, variables: Dict=None, auth_token: str = None):
     """Query the Metamist GraphQL API"""
     if variables is None:
         variables = {}
