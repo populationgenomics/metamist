@@ -142,7 +142,7 @@ class SampleSequencingTable(DbBase):
                     'meta': to_db_json(sequence_meta),
                     'status': status.value,
                     'author': author or self.author,
-                    'datetime_added': datetime.utcnow()
+                    'datetime_added': datetime.utcnow(),
                 },
             )
 
