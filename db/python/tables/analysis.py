@@ -429,7 +429,7 @@ WHERE a.id = :analysis_id
                 seq_check = 'IN :seq_types'
                 values['seq_types'] = sequence_types
 
-            filters.append(f'JSON_VALUE(a.meta, "$.sequence_type") ' + seq_check)
+            filters.append(f'JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
         if participant_ids:
             filters.append('p.id IN :pids')

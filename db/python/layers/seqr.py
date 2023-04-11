@@ -162,6 +162,9 @@ class SeqrLayer(BaseLayer):
         # filter to only participants with a family
         participant_ids = list(families.keys())
 
+        if not family_ids and not participant_ids:
+            raise ValueError('No families / participants to synchronize')
+
         messages = []
         async with aiohttp.ClientSession() as session:
             params = {
@@ -410,15 +413,15 @@ class SeqrLayer(BaseLayer):
         with AnyPath(fn_path).open('w+') as f:
             f.write('\n'.join(rows_to_write))
 
-        es_index = es_index_analyses[-1]['output']
+        es_index = es_index_analyses[-1].output
 
         messages = []
 
         if internal_sample_ids:
-            samples_in_new_index = set(es_index_analyses[-1]['sample_ids'])
+            samples_in_new_index = set(es_index_analyses[-1].sample_ids)
 
             if len(es_index_analyses) > 1:
-                samples_in_old_index = set(es_index_analyses[-2]['sample_ids'])
+                samples_in_old_index = set(es_index_analyses[-2].sample_ids)
                 samples_diff = sample_id_format_list(
                     samples_in_new_index - samples_in_old_index
                 )

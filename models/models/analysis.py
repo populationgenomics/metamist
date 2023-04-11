@@ -15,7 +15,7 @@ class Analysis(SMBase):
     type: str
     status: AnalysisStatus
     output: Optional[str] = None
-    sample_ids: List[Union[str, int]]
+    sample_ids: List[Union[int, str]]
     timestamp_completed: Optional[str] = None
     project: Optional[int] = None
     active: Optional[bool] = None
@@ -38,11 +38,12 @@ class Analysis(SMBase):
         if timestamp_completed is not None and not isinstance(timestamp_completed, str):
             timestamp_completed = timestamp_completed.isoformat()
 
+        sample_ids = [kwargs.pop('sample_id')] if 'sample_id' in kwargs else []
         return Analysis(
             id=kwargs.pop('id'),
             type=analysis_type,
             status=AnalysisStatus(status),
-            sample_ids=[kwargs.pop('sample_id')] if 'sample_id' in kwargs else [],
+            sample_ids=sample_ids,
             output=kwargs.pop('output', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
