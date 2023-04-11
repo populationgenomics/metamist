@@ -34,7 +34,7 @@ This information is derived from the fluidX id pulled from the filename.
 
 import logging
 import csv
-from typing import List, Optional
+from typing import List, Optional, Any
 import click
 
 from sample_metadata.parser.generic_metadata_parser import (
@@ -155,6 +155,28 @@ class ExistingCohortParser(GenericMetadataParser):
                 external_sequence_id = '_'.join(split_filename)
 
         return {'kccg_id': external_sequence_id}
+
+    def get_existing_external_sequence_ids(
+        self, participant_map: dict[str, dict[Any, list[Any]]]
+    ):
+        """
+        Overwrites get_existing_sequence function to pull
+        external sequence IDs from the filename_map as opposed to the input CSV
+        """
+        external_sequence_ids: list[str] = []
+        for participant in participant_map:
+            for sample in participant_map[participant]:
+                for sequence in participant_map[participant][sample]:
+                    external_sequence_ids.append((sequence.get('Sequence ID')))
+                    for filename, _path in self.filename_map.items():
+                        if fastq_file_name_to_sample_id(filename) == sequence.get(
+                            'Sample/Name'
+                        ):
+                            split_filename = filename.split('_')[0:4]
+                            external_sequence_id = '_'.join(split_filename)
+                    external_sequence_ids.append(external_sequence_id)
+
+        return external_sequence_ids
 
 
 @click.command(help='GCS path to manifest file')
