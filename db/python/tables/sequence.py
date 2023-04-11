@@ -3,6 +3,7 @@
 import re
 import asyncio
 from collections import defaultdict
+from datetime import datetime
 from typing import Optional, Dict, List, Tuple, Iterable, Set, Any
 from api.utils import group_by
 
@@ -54,6 +55,7 @@ class SampleSequencingTable(DbBase):
         'meta',
         'status',
         'technology',
+        'datetime_added',
     ]
 
     async def get_projects_by_sequence_ids(
@@ -123,8 +125,8 @@ class SampleSequencingTable(DbBase):
 
         _query = """\
             INSERT INTO sample_sequencing
-                (sample_id, type, technology, meta, status, author)
-            VALUES (:sample_id, :type, :technology, :meta, :status, :author)
+                (sample_id, type, technology, meta, status, author, datetime_added)
+            VALUES (:sample_id, :type, :technology, :meta, :status, :author, :datetime_added)
             RETURNING id;
         """
 
@@ -140,6 +142,7 @@ class SampleSequencingTable(DbBase):
                     'meta': to_db_json(sequence_meta),
                     'status': status.value,
                     'author': author or self.author,
+                    'datetime_added': datetime.utcnow()
                 },
             )
 
