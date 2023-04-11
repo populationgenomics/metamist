@@ -22,7 +22,7 @@ There are two ways to query metamist in Python:
 1. Use the REST interface with the predefined requests
 2. Use the GraphQL interface.
 
-To use the GraphQL interface in Python with the sample_metadata library, you can do the following:
+To use the GraphQL interface in Python with the `sample_metadata` library, you can do the following:
 
 ```python
 from sample_metadata.graphql import query
