@@ -3,14 +3,11 @@
     Outputs a csv with all analyses for each sample and
     the paths to any extra files.
     """
-
+from collections import defaultdict
+import csv
 import logging
 import click
-import csv
-import subprocess
 
-from collections import defaultdict
-from os.path import basename
 from google.cloud import storage
 
 from sample_metadata.apis import AnalysisApi
@@ -45,17 +42,13 @@ def get_analyses_for_samples(datasets, sample_ids, analysis_type) -> list[dict]:
     )
 
 
-def find_sample_files(
-    projects: list[str],
-    samples: list[str],
-    csv_path: str
-):
+def find_sample_files(projects: list[str], samples: list[str], csv_path: str):
     """Find all analyses associated with the provided samples"""
     analyses = []
     for analysis_type in ANALYSIS_TYPES:
         analyses.extend(get_analyses_for_samples(projects, samples, analysis_type))
 
-    analyses_for_samples= []
+    analyses_for_samples = []
     for analysis in analyses:
         if analysis['output']:
             analyses_for_samples.append(analysis)
@@ -70,13 +63,13 @@ def find_sample_files(
             'Status',
             'Output',
             'Timestamp',
-            'Multiple_Samples'
+            'Multiple_Samples',
         ]
 
         writer.writerow(header)
 
         for analysis in analyses_for_samples:
-            if len(analysis['sample_ids'])==1:
+            if len(analysis['sample_ids']) == 1:
                 sample_ids = analysis['sample_ids'][0]
                 multiple_samples = False
             else:
@@ -89,28 +82,28 @@ def find_sample_files(
                 analysis['status'],
                 analysis['output'],
                 analysis['timestamp_completed'],
-                multiple_samples
+                multiple_samples,
             ]
             writer.writerow(row)
 
 
 def get_extra_files(project: str, csv_path: str):
     """Reads the analysis_for_samples csv and finds extra files
-       for the cram and gvcf analysis entries"""
-    
+    for the cram and gvcf analysis entries"""
+
     sample_paths = defaultdict(list)
     with open(csv_path) as f:
-        reader=csv.DictReader(f)
+        reader = csv.DictReader(f)
         for row in reader:
             # Get the output paths for cram and gvcf analyses
             if row['Type'] == 'gvcf' or row['Type'] == 'cram':
                 sample_paths[row['Sample_ID']].append(row['Output'])
-    
+
     # Find extra file paths associated with crams and gvcfs
-    extra_filepaths = get_extra_file_paths2(project, sample_paths)
+    extra_filepaths = get_extra_file_paths(project, sample_paths)
 
     # Add these extra paths to the csv
-    with open(csv_path,'a') as f:
+    with open(csv_path, 'a') as f:
         writer = csv.writer(f)
         for sample_id, extra_paths in extra_filepaths.items():
             for extra_path in extra_paths:
@@ -122,10 +115,10 @@ def get_extra_files(project: str, csv_path: str):
                 writer.writerow([sample_id, '', filetype, '', extra_path, '', False])
 
 
-def get_extra_file_paths2(project: str, sample_paths: dict[list]):
+def get_extra_file_paths(project: str, sample_paths: dict[str, list]):
     """
-    Search the cloud buckets for files related to the analysis 
-    entries found for the samples. Return the paths to extra 
+    Search the cloud buckets for files related to the analysis
+    entries found for the samples. Return the paths to extra
     files found in the analysis output paths for the samples
     (e.g. cram.crai, cram.md5, g.vcf.gz.tbi).
     """
@@ -133,7 +126,7 @@ def get_extra_file_paths2(project: str, sample_paths: dict[list]):
     paths_to_search = []
     for paths in sample_paths.values():
         for path in paths:
-            prefix = path.rsplit('/',1)[0]
+            prefix = path.rsplit('/', 1)[0]
             if prefix not in paths_to_search:
                 paths_to_search.append(prefix)
 
@@ -151,44 +144,13 @@ def get_extra_file_paths2(project: str, sample_paths: dict[list]):
     for subdir in subdirs:
         for blob in client.list_blobs(bucket_name, prefix=f'{subdir}/', delimiter='/'):
             blob_paths.append(f'gs://{bucket_name}/{blob.name}')
-    
+
     # Identify the extra files paths by checking if the filename contains the sample ID
     extra_paths = defaultdict(list)
     for path in blob_paths:
         for sample_id in sample_paths.keys():
             if sample_id in path:
                 extra_paths[sample_id].append(path)
-
-    return extra_paths                 
-
-def get_extra_file_paths(sample_paths: dict[list]):
-    """
-    Return all paths to related files for CRAMs and GCVFs
-    found in the analysis output paths for the samples.
-    (e.g. cram.crai, cram.md5, g.vcf.gz.tbi)    
-    """
-    extra_paths = defaultdict(list)
-    for sample_id, paths in sample_paths.items():
-        for path in paths:
-            # Get the gs:// prefix for the path
-            prefix = path.rsplit('/',1)[0]
-            try:
-                result = (
-                    subprocess.run(
-                        ['gsutil', 'ls', f'{prefix}/{sample_id}*'],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    )
-                    .stdout.strip('\n')
-                    .split('\n')
-                )
-                extra_paths[sample_id].extend(result)
-                logging.info(
-                    f'{sample_id}: found {[basename(path) for path in result]} in {prefix}'
-                )
-            except:
-                logging.info(f'No files found in {prefix} for {sample_id}')
 
     return extra_paths
 
@@ -198,7 +160,7 @@ def get_extra_file_paths(sample_paths: dict[list]):
 @click.option('--csv-path', default='./')
 @click.option('--samples', default=None, multiple=True)
 def main(project, csv_path, samples):
-    """Searches for analysis objects for the samples in 
+    """Searches for analysis objects for the samples in
     the project + the seqr project, saves these to a csv"""
 
     samples = list(samples)
