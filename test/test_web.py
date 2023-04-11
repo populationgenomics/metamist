@@ -176,7 +176,7 @@ class TestWeb(DbIsolatedTest):
             grid_filter=[
                 SearchItem(
                     **{
-                        'model_type': MetaSearchEntityPrefix.SEQUENCE,
+                        'model_type': MetaSearchEntityPrefix.ASSAY,
                         'query': 'M001',
                         'field': 'batch',
                         'is_meta': True,
@@ -192,7 +192,7 @@ class TestWeb(DbIsolatedTest):
             grid_filter=[
                 SearchItem(
                     **{
-                        'model_type': MetaSearchEntityPrefix.SEQUENCE,
+                        'model_type': MetaSearchEntityPrefix.ASSAY,
                         'query': 'M002',
                         'field': 'batch',
                         'is_meta': True,

@@ -125,10 +125,7 @@ class OntProductParser(CloudHelper):
         for grp in chunk(analyses, 10):
             logging.info(f'Inserting {len(grp)} analyses')
             await asyncio.gather(
-                *[
-                    self.aapi.create_new_analysis_async(self.project, a)
-                    for a in analyses
-                ]
+                *[self.aapi.create_analysis_async(self.project, a) for a in analyses]
             )
 
         return analyses

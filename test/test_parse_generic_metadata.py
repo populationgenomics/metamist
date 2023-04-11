@@ -13,16 +13,16 @@ class TestParseGenericMetadata(unittest.TestCase):
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('os.path.getsize')
     async def test_key_map(
-        self, mock_stat_size, mock_get_sequence_ids, mock_get_sample_id
+        self, mock_stat_size, mock_get_assay_ids, mock_get_sample_id
     ):
         """
         Test the flexible key map + other options
         """
         mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_stat_size.return_value = 111
 
         rows = [
@@ -42,7 +42,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='sample',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
@@ -58,9 +58,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
         self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['sequences']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
         self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(0, summary['assays']['update'])
 
         parser.ignore_extra_keys = False
         rows = [
@@ -80,18 +80,18 @@ class TestParseGenericMetadata(unittest.TestCase):
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self, mock_filesize, mock_fileexists, mock_get_sequence_ids, mock_get_sample_id
+        self, mock_filesize, mock_fileexists, mock_get_assay_ids, mock_get_sample_id
     ):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
+        - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
         """
         mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -105,7 +105,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='SampleId',
             participant_meta_map={},
             sample_meta_map={'sample.centre': 'centre'},
-            sequence_meta_map={
+            assay_meta_map={
                 'raw_data.FREEMIX': 'qc.freemix',
                 'raw_data.PCT_CHIMERAS': 'qc.pct_chimeras',
                 'raw_data.MEDIAN_INSERT_SIZE': 'qc.median_insert_size',
@@ -134,13 +134,13 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
         self.assertEqual(1, summary['samples']['insert'])
-        self.assertEqual(1, summary['sequences']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
         self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(0, summary['assays']['update'])
         self.assertEqual(1, summary['analyses']['insert'])
 
         self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
-        expected_sequence_dict = {
+        expected_assay_dict = {
             'qc': {
                 'median_insert_size': '400',
                 'median_coverage': '30',
@@ -155,9 +155,12 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'checksum': None,
                 'size': 111,
             },
+            'sequencing_platform': None,
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'sequencing',
         }
 
-        sequence_group_dict = {
+        assay_group_dict = {
             'gvcf_types': 'gvcf',
             'gvcfs': [
                 {
@@ -169,9 +172,9 @@ class TestParseGenericMetadata(unittest.TestCase):
                 }
             ],
         }
-        self.assertDictEqual(sequence_group_dict, samples[0].sequencing_groups[0].meta)
+        self.assertDictEqual(assay_group_dict, samples[0].sequencing_groups[0].meta)
         self.assertDictEqual(
-            expected_sequence_dict, samples[0].sequencing_groups[0].sequences[0].meta
+            expected_assay_dict, samples[0].sequencing_groups[0].assays[0].meta
         )
         analysis = samples[0].sequencing_groups[0].analyses[0]
         self.assertDictEqual(
@@ -186,20 +189,20 @@ class TestParseGenericMetadata(unittest.TestCase):
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     async def test_rows_with_participants(
         self,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
     ):
         """
         Test importing a single row with a participant id, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
+        - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
         """
         mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
         rows = [
@@ -222,7 +225,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             seq_type_column='Type',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
@@ -254,11 +257,11 @@ class TestParseGenericMetadata(unittest.TestCase):
         self.assertEqual(0, summary['participants']['update'])
         self.assertEqual(4, summary['samples']['insert'])
         self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(5, summary['sequences']['insert'])
-        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(5, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
         self.assertEqual(0, summary['analyses']['insert'])
 
-        expected_sequence_dict = {
+        expected_assay_dict = {
             'reads': [
                 {
                     'basename': 'sample_id001.filename-R1.fastq.gz',
@@ -276,24 +279,28 @@ class TestParseGenericMetadata(unittest.TestCase):
                 },
             ],
             'reads_type': 'fastq',
+            'sequencing_platform': None,
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'sequencing',
         }
-        sequence = participants[0].samples[0].sequence_groups[0].sequences[0]
-        self.assertDictEqual(expected_sequence_dict, sequence.meta)
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
+        self.maxDiff = None
+        self.assertDictEqual(expected_assay_dict, assay.meta)
 
-        # Check that both of Demeter's sequences are there
+        # Check that both of Demeter's assays are there
         self.assertEqual(participants[0].external_pid, 'Demeter')
         self.assertEqual(len(participants[0].samples), 1)
-        self.assertEqual(len(participants[0].samples[0].sequence_groups), 2)
+        self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
 
         return
 
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_rows_with_valid_participant_meta(
         self,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
     ):
@@ -301,11 +308,11 @@ class TestParseGenericMetadata(unittest.TestCase):
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
         - MOCKS: get_sample_id_map_by_external,  get_participant_id_map_by_external_ids,
-        get_sequence_ids_for_sample_ids_by_type
+        get_assay_ids_for_sample_ids_by_type
         """
 
         mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
         rows = [
@@ -323,7 +330,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
             reported_gender_column='Gender',
@@ -338,28 +345,34 @@ class TestParseGenericMetadata(unittest.TestCase):
         _, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
+        p_by_name = {p.external_pid: p for p in participants}
+        demeter = p_by_name['Demeter']
+        apollo = p_by_name['Apollo']
+        athena = p_by_name['Athena']
+        dionysus = p_by_name['Dionysus']
+        # pluto = p_by_name['Pluto']
 
         # Assert that the participant meta is there.
-        self.assertEqual(participants[0].reported_gender, 'Non-binary')
-        self.assertEqual(participants[0].reported_sex, 1)
-        self.assertEqual(participants[0].karyotype, 'XY')
-        self.assertEqual(participants[1].reported_gender, 'Female')
-        self.assertEqual(participants[1].reported_sex, 2)
-        self.assertEqual(participants[1].karyotype, 'XX')
-        self.assertEqual(participants[2].reported_sex, 2)
-        self.assertIsNone(participants[2].reported_gender)
-        self.assertIsNone(participants[2].karyotype)
-        self.assertEqual(participants[3].reported_gender, 'Male')
-        self.assertEqual(participants[3].karyotype, 'XX')
+        self.assertEqual(demeter.reported_gender, 'Non-binary')
+        self.assertEqual(demeter.reported_sex, 1)
+        self.assertEqual(demeter.karyotype, 'XY')
+        self.assertEqual(apollo.reported_gender, 'Female')
+        self.assertEqual(apollo.reported_sex, 2)
+        self.assertEqual(apollo.karyotype, 'XX')
+        self.assertEqual(athena.reported_sex, 2)
+        self.assertIsNone(athena.reported_gender)
+        self.assertIsNone(athena.karyotype)
+        self.assertEqual(dionysus.reported_gender, 'Male')
+        self.assertEqual(dionysus.karyotype, 'XX')
         return
 
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_rows_with_invalid_participant_meta(
         self,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
         mock_get_participant_id_map_by_external_ids,
     ):
@@ -369,7 +382,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_sample_id.return_value = {}
         mock_get_participant_id_map_by_external_ids.return_value = {}
 
@@ -384,7 +397,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             sample_name_column='Sample ID',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
@@ -402,7 +415,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_contents')
@@ -411,7 +424,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_filecontents,
         mock_filesize,
         mock_fileexists,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
     ):
         """
@@ -419,7 +432,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
         mock_filecontents.return_value = 'testmd5'
@@ -437,7 +450,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
@@ -458,14 +471,14 @@ class TestParseGenericMetadata(unittest.TestCase):
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
         self,
         mock_filesize,
         mock_fileexists,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
     ):
         """
@@ -473,7 +486,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
         mock_filesize.return_value = 111
@@ -490,7 +503,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
@@ -529,17 +542,17 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            samples[0].sequence_groups[0].sequences[0].meta['reference_assembly'],
+            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
         )
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
         self,
         mock_fileexists,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
     ):
         """
@@ -547,7 +560,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
         mock_fileexists.return_value = True
@@ -564,7 +577,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
@@ -604,17 +617,17 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         self.assertDictEqual(
             expected,
-            samples[0].sequence_groups[0].sequences[0].meta['reference_assembly'],
+            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
         )
 
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
         self,
         mock_fileexists,
-        mock_get_sequence_ids,
+        mock_get_assay_ids,
         mock_get_sample_id,
     ):
         """
@@ -622,7 +635,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         This should throw an exception
         """
 
-        mock_get_sequence_ids.return_value = {}
+        mock_get_assay_ids.return_value = {}
         mock_get_sample_id.return_value = {}
 
         mock_fileexists.return_value = True
@@ -639,7 +652,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reads_column='Filename',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map={},
+            assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',

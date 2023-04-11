@@ -7,7 +7,7 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer
 
 from models.models.sample import SampleUpsertInternal
-from models.enums import AnalysisType, AnalysisStatus, SampleType
+from models.enums import AnalysisStatus
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -23,7 +23,7 @@ class TestAnalysis(DbIsolatedTest):
         sample = await self.sl.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test01',
-                type=SampleType.BLOOD,
+                type='blood',
                 meta={'meta': 'meta ;)'},
                 active=True,
             )
@@ -31,7 +31,7 @@ class TestAnalysis(DbIsolatedTest):
         self.sample_id = sample.id
 
         await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             status=AnalysisStatus.COMPLETED,
             sample_ids=[self.sample_id],
             meta={'sequence_type': 'genome', 'size': 1024},
@@ -87,7 +87,7 @@ class TestAnalysis(DbIsolatedTest):
 
         # Add exome cram
         await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             status=AnalysisStatus.COMPLETED,
             sample_ids=[self.sample_id],
             meta={'sequence_type': 'exome', 'size': 3141},
@@ -110,7 +110,7 @@ class TestAnalysis(DbIsolatedTest):
 
         # Add another genome cram that's newer
         await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             status=AnalysisStatus.COMPLETED,
             sample_ids=[self.sample_id],
             meta={'sequence_type': 'genome', 'size': 11111},
@@ -124,13 +124,13 @@ class TestAnalysis(DbIsolatedTest):
         sample_2 = await self.sl.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test02',
-                type=SampleType.BLOOD,
+                type='blood',
                 meta={'meta': 'meta ;)'},
                 active=True,
             )
         )
         await self.al.insert_analysis(
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             status=AnalysisStatus.COMPLETED,
             sample_ids=[sample_2.id],
             meta={'sequence_type': 'genome', 'size': 987654321},

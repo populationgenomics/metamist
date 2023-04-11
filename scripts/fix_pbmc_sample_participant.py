@@ -4,7 +4,7 @@ This script adjusts the data within the TOB-WGS project to uphold this.
 """
 
 from sample_metadata.apis import SampleApi
-from sample_metadata.models import SampleUpdateModel
+from sample_metadata.models import SampleUpsert
 
 
 def main():
@@ -30,8 +30,8 @@ def main():
         try:
             participant_id = int(non_pbmc_sample['participant_id'])
             internal_id = pbmc_sample['id']
-            sample_update = SampleUpdateModel(participant_id=participant_id)
-            sapi.update_sample(id_=internal_id, sample_update_model=sample_update)
+            sample_update = SampleUpsert(id=internal_id, participant_id=participant_id)
+            sapi.update_sample(id_=internal_id, sample_upsert=sample_update)
         except TypeError:
             print(f'Skipping {external_id}, could not find.')
 

@@ -118,7 +118,7 @@ class ExistingCohortParser(GenericMetadataParser):
             sample_meta_map={},
             qc_meta_map={},
             participant_meta_map={},
-            sequence_meta_map=Columns.sequence_meta_map(),
+            assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
         )
 

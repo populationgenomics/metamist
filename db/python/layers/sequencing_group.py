@@ -7,7 +7,11 @@ from db.python.layers.assay import AssayLayer
 from db.python.tables.sample import SampleTable
 from db.python.tables.assay import AssayTable, NoOpAenter
 from db.python.tables.sequencing_group import SequencingGroupTable
-from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.sequencing_group import (
+    SequencingGroupUpsertInternal,
+    SequencingGroupInternal,
+)
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
 class SequencingGroupLayer(BaseLayer):
@@ -20,7 +24,7 @@ class SequencingGroupLayer(BaseLayer):
 
     async def get_sequencing_group_by_id(
         self, sequencing_group_id: int, check_project_id: bool = True
-    ) -> dict:
+    ) -> SequencingGroupInternal:
         """
         Get sequence group by internal ID
         """
@@ -32,7 +36,7 @@ class SequencingGroupLayer(BaseLayer):
 
     async def get_sequencing_groups_by_ids(
         self, sequencing_group_ids: list[int], check_project_ids: bool = True
-    ):
+    ) -> list[SequencingGroupInternal]:
         """
         Get sequence groups by internal IDs
         """
@@ -49,16 +53,24 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         if len(groups) != len(sequencing_group_ids):
-            missing_ids = set(sequencing_group_ids) - set(sg['id'] for sg in groups)
+            missing_ids = set(sequencing_group_ids) - set(sg.id for sg in groups)
 
             raise NotFoundError(
-                f'Missing sequence groups with IDs: {", ".join(map(str, missing_ids))}'
+                f'Missing sequence groups with IDs: {", ".join(map(sequencing_group_id_format, missing_ids))}'
             )
 
         return groups
 
-    async def get_participant_ids_sequencing_group_ids_for_sequence_type(
-        self, sequence_type: str, check_project_ids: bool = True
+    async def get_all_sequencing_group_ids_by_sample_ids_by_type(
+        self,
+    ) -> dict[int, dict[str, list[int]]]:
+        """
+        Get all sequencing group IDs by sample IDs by type
+        """
+        return await self.seqgt.get_all_sequencing_group_ids_by_sample_ids_by_type()
+
+    async def get_participant_ids_sequencing_group_ids_for_sequencing_type(
+        self, sequencing_type: str, check_project_ids: bool = True
     ) -> dict[int, list[int]]:
         """
         Get list of partiicpant IDs for a specific sequence type,
@@ -67,8 +79,8 @@ class SequencingGroupLayer(BaseLayer):
         (
             projects,
             pids,
-        ) = await self.seqgt.get_participant_ids_and_sample_ids_for_sequence_type(
-            sequence_type
+        ) = await self.seqgt.get_participant_ids_and_sequence_group_ids_for_sequencing_type(
+            sequencing_type
         )
         if not pids:
             return {}
@@ -144,14 +156,14 @@ class SequencingGroupLayer(BaseLayer):
 
         seqgroup = await self.get_sequencing_group_by_id(sequencing_group_id)
         async with with_function:
-            await self.archive_sequencing_group(seqgroup['id'])
+            await self.archive_sequencing_group(seqgroup.id)
 
             await self.seqgt.create_sequencing_group(
-                sample_id=seqgroup['sample_id'],
-                type_=seqgroup['type_'],
-                technology=seqgroup['technology'],
-                platform=seqgroup['platform'],
-                meta={**seqgroup['meta'], **meta},
+                sample_id=seqgroup.sample_id,
+                type_=seqgroup.type,
+                technology=seqgroup.technology,
+                platform=seqgroup.platform,
+                meta={**seqgroup.meta, **meta},
                 sequence_ids=sequences,
                 author=self.author,
                 open_transaction=False,

@@ -526,6 +526,26 @@
 			</column>
 		</createTable>
 
+		<createTable tableName="sample_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="analysis_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+
+
 <!--		Create sequencing_group tables -->
 		<createTable tableName="sequencing_group">
 			<column name="id" type="INT" autoIncrement="true">
@@ -613,6 +633,9 @@
 		<sql>
 			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
 
+			INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
+			INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva');
+
 			INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
 			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
 			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
@@ -627,6 +650,15 @@
 			INSERT INTO sequencing_platform (id, name) VALUES ('pacbio', 'pacbio');
 			INSERT INTO sequencing_platform (id, name) VALUES ('oxford-nanopore', 'oxford-nanopore');
 
+			INSERT INTO analysis_type (id, name) VALUES ('qc', 'qc');
+			INSERT INTO analysis_type (id, name) VALUES ('joint-calling', 'joint-calling');
+			INSERT INTO analysis_type (id, name) VALUES ('gvcf', 'gvcf');
+			INSERT INTO analysis_type (id, name) VALUES ('cram', 'cram');
+			INSERT INTO analysis_type (id, name) VALUES ('custom', 'custom');
+			INSERT INTO analysis_type (id, name) VALUES ('es-index', 'es-index');
+			INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv');
+			INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
+			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 		</sql>
 
 		<renameColumn

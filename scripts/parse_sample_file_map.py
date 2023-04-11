@@ -84,8 +84,8 @@ async def main(
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
-        default_sequence_technology=default_sequence_technology,
+        default_sequencing_type=default_sequence_type,
+        default_sequencing_technology=default_sequence_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         default_reference_assembly_location=ref,

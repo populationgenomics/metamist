@@ -180,11 +180,11 @@ async def update_participant(
 
 
 @router.put(
-    '/{project}/batch',
+    '/{project}/upsert-many',
     response_model=Dict[str, Any],
-    operation_id='batchUpsertParticipants',
+    operation_id='upsertParticipants',
 )
-async def batch_upsert_participants(
+async def upsert_participants(
     participants: list[ParticipantUpsert],
     connection: Connection = get_project_write_connection,
 ) -> Dict[str, Any]:

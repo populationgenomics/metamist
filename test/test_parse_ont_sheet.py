@@ -13,7 +13,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids')
+    @patch('sample_metadata.apis.AssayApi.get_assays_by_sample_ids')
     async def test_simple_sheet(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_get_participant_id
     ):
@@ -104,6 +104,6 @@ class TestOntSampleSheetParser(unittest.TestCase):
                 ]
             ],
         }
-        sequence_group = participants[0].samples[0].sequence_groups[0]
+        sequence_group = participants[0].samples[0].sequencing_groups[0]
         self.assertDictEqual(seqgroup_meta, sequence_group.meta)
-        self.assertDictEqual(meta_dict, sequence_group.sequences[0].meta)
+        self.assertDictEqual(meta_dict, sequence_group.assays[0].meta)

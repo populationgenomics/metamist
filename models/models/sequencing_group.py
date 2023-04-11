@@ -1,8 +1,9 @@
 from models.base import SMBase
 from models.models.assay import AssayUpsert, AssayUpsertInternal, Assay, AssayInternal
-from models.utils.sample_id_format import sample_id_transform_to_raw
+from models.utils.sample_id_format import sample_id_transform_to_raw, sample_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
+    sequencing_group_id_format,
 )
 
 
@@ -31,18 +32,20 @@ class SequencingGroupInternal(SMBase):
     meta: dict[str, str]
     sample_id: int
 
+    project: int | None = None
+
     assays: list[AssayInternal] | None = None
 
     def to_external(self):
         """Convert to transport model"""
         return SequencingGroup(
-            id=str(self.id),
+            id=sequencing_group_id_format(self.id),
             type=self.type,
             technology=self.technology,
             platform=self.platform,
             meta=self.meta,
-            sample_id=str(self.sample_id),
-            assays=[a.to_external() for a in self.assays] if self.assays else None,
+            sample_id=sample_id_format(self.sample_id),
+            assays=[a.to_external() for a in self.assays or []],
         )
 
 

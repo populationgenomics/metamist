@@ -1,8 +1,7 @@
-from db.python.tables.sequencing_type import SequencingTypeTable
 from test.testbase import DbIsolatedTest, run_as_sync
-
 from pymysql.err import IntegrityError
 
+from db.python.enum_tables.sequencing_type import SequencingTypeTable
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.assay import AssayLayer
@@ -298,7 +297,7 @@ class TestSequence(DbIsolatedTest):
 
         # assay types
         self.assertSetEqual(
-            {seq1_id, seq2_id}, await search_result_to_ids(types=['sequencing'])
+            {seq1_id, seq2_id}, await search_result_to_ids(assay_types=['sequencing'])
         )
         # self.assertSetEqual(
         #     {seq1_id, seq2_id},

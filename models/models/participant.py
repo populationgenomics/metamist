@@ -87,6 +87,6 @@ class ParticipantUpsert(BaseModel):
         )
 
         if self.samples:
-            p.samples = [s.to_internal() for s in self.samples]
+            p.samples = [s.to_internal() for s in self.samples or []]
 
         return p

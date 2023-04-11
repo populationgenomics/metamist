@@ -78,20 +78,20 @@ class VcgsManifestParser(GenericMetadataParser):
         self,
         project: str,
         search_locations: List[str],
-        default_sequence_type='wgs',
+        default_sequencing_type='wgs',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
         super().__init__(
             project=project,
             search_locations=search_locations,
-            default_sequence_type=default_sequence_type,
+            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             sample_name_column=Columns.SAMPLE_NAME,
             reads_column=Columns.FILENAME,
             participant_meta_map=Columns.participant_meta_map(),
             sample_meta_map=Columns.sample_meta_map(),
-            sequence_meta_map=Columns.sequence_meta_map(),
+            assay_meta_map=Columns.sequence_meta_map(),
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
@@ -103,7 +103,7 @@ class VcgsManifestParser(GenericMetadataParser):
             external_id = external_id.split('-')[0]
         return external_id
 
-    def get_sequence_type(self, row: SingleRow) -> SequenceType:
+    def get_sequencing_type(self, row: SingleRow) -> SequenceType:
         """
         Parse sequencing type (wgs / single-cell, etc)
         """
@@ -114,14 +114,14 @@ class VcgsManifestParser(GenericMetadataParser):
             types = [types]
         if len(types) <= 0:
             if (
-                self.default_sequence_type is None
-                or self.default_sequence_type.lower() == 'none'
+                self.default_sequencing_type is None
+                or self.default_sequencing_type.lower() == 'none'
             ):
                 raise ValueError(
                     f"Couldn't detect sequence type for sample {sample_id}, and "
                     'no default was available.'
                 )
-            return SequenceType(self.default_sequence_type)
+            return SequenceType(self.default_sequencing_type)
         if len(types) > 1:
             raise ValueError(
                 f'Multiple library types for same sample {sample_id}, '
@@ -171,7 +171,7 @@ async def main(
     _search_locations = search_path or list(set(os.path.basename(s) for s in manifests))
     parser = VcgsManifestParser(
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_sequence_type,
         project=project,
         search_locations=_search_locations,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,

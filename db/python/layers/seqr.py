@@ -28,9 +28,9 @@ from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.tables.sequencing_type import SequencingTypeTable
+from db.python.enum_tables import SequencingTypeTable
 from db.python.utils import ProjectId
-from models.enums import AnalysisStatus, AnalysisType
+from models.enums import AnalysisStatus
 from models.utils.sample_id_format import sample_id_format, sample_id_format_list
 
 # literally the most temporary thing ever, but for complete
@@ -110,9 +110,7 @@ class SeqrLayer(BaseLayer):
         if not has_access:
             return []
 
-        sequencing_types = await SequencingTypeTable(
-            connection=self.connection
-        ).get_sequencing_types()
+        sequencing_types = await SequencingTypeTable(connection=self.connection).get()
         sts = [
             st
             for st in sequencing_types
@@ -152,7 +150,7 @@ class SeqrLayer(BaseLayer):
         seqlayer = SequencingGroupLayer(self.connection)
 
         pid_to_sid_map = (
-            await seqlayer.get_participant_ids_sequencing_group_ids_for_sequence_type(
+            await seqlayer.get_participant_ids_sequencing_group_ids_for_sequencing_type(
                 sequence_type
             )
         )
@@ -396,7 +394,7 @@ class SeqrLayer(BaseLayer):
         alayer = AnalysisLayer(connection=self.connection)
         es_index_analyses = await alayer.query_analysis(
             project_ids=[self.connection.project],
-            analysis_type=AnalysisType('es-index'),
+            analysis_type='es-index',
             meta={'sequencing_type': sequence_type},
             status=AnalysisStatus('completed'),
         )
@@ -523,7 +521,9 @@ class SeqrLayer(BaseLayer):
             req_igv_update_url = SEQR_URL + _url_igv_individual_update.format(
                 individualGuid=individual_guid
             )
-            igv_resp = await session.post(req_igv_update_url, json=update, headers=headers)
+            igv_resp = await session.post(
+                req_igv_update_url, json=update, headers=headers
+            )
 
             igv_resp.raise_for_status()
             return await igv_resp.text()

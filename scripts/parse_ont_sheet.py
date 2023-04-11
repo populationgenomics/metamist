@@ -41,8 +41,8 @@ class OntParser(GenericMetadataParser):
         self,
         search_locations: List[str],
         project: str,
-        default_sequence_type='genome',
-        default_sequence_technology='long-read',
+        default_sequencing_type='genome',
+        default_sequencing_technology='long-read',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
@@ -68,12 +68,12 @@ class OntParser(GenericMetadataParser):
             participant_column=Columns.SAMPLE_ID,
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
-            default_sequence_type=default_sequence_type,
+            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
-            default_sequence_technology=default_sequence_technology,
+            default_sequencing_technology=default_sequencing_technology,
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map=sequence_meta_map,
+            assay_meta_map=sequence_meta_map,
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
@@ -98,7 +98,7 @@ class OntParser(GenericMetadataParser):
     async def group_sequences(
         self, sample: ParsedSample
     ) -> list[ParsedSequencingGroup]:
-        sequence_groups = await super().group_sequences(sample)
+        sequence_groups = await super().group_assays(sample)
 
         for sequence_group in sequence_groups:
             failed_fastqs: list[str] = []
@@ -174,7 +174,7 @@ async def main(
     parser = OntParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_sequence_type,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )

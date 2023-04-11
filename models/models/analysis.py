@@ -5,14 +5,14 @@ from typing import Optional, List, Union, Dict, Any
 from pydantic import BaseModel
 
 from models.base import SMBase
-from models.enums import AnalysisType, AnalysisStatus
+from models.enums import AnalysisStatus
 
 
 class Analysis(SMBase):
     """Model for Analysis"""
 
     id: Optional[int]
-    type: AnalysisType
+    type: str
     status: AnalysisStatus
     output: Optional[str] = None
     sample_ids: List[Union[str, int]]
@@ -40,7 +40,7 @@ class Analysis(SMBase):
 
         return Analysis(
             id=kwargs.pop('id'),
-            type=AnalysisType(analysis_type),
+            type=analysis_type,
             status=AnalysisStatus(status),
             sample_ids=[kwargs.pop('sample_id')] if 'sample_id' in kwargs else [],
             output=kwargs.pop('output', []),

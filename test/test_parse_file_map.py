@@ -13,7 +13,7 @@ class TestSampleMapParser(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_single_row_fastq(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
     ):
@@ -33,7 +33,7 @@ class TestSampleMapParser(unittest.TestCase):
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
             project='dev',
-            default_sequence_technology='short-read',
+            default_sequencing_technology='short-read',
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -48,12 +48,12 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertEqual(0, summary['participants']['update'])
         self.assertEqual(1, summary['samples']['insert'])
         self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(1, summary['sequence_groups']['insert'])
-        self.assertEqual(0, summary['sequence_groups']['update'])
-        self.assertEqual(1, summary['sequences']['insert'])
-        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(1, summary['sequencing_groups']['insert'])
+        self.assertEqual(0, summary['sequencing_groups']['update'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
 
-        sequence = participants[0].samples[0].sequencing_groups[0].sequences[0]
+        sequence = participants[0].samples[0].sequencing_groups[0].assays[0]
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence_dict = {
@@ -122,8 +122,8 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertEqual(0, summary['participants']['update'])
         self.assertEqual(2, summary['samples']['insert'])
         self.assertEqual(0, summary['samples']['update'])
-        self.assertEqual(2, summary['sequences']['insert'])
-        self.assertEqual(0, summary['sequences']['update'])
+        self.assertEqual(2, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence1_reads = [
@@ -145,7 +145,7 @@ class TestSampleMapParser(unittest.TestCase):
 
         self.assertListEqual(
             expected_sequence1_reads,
-            participants[0].samples[0].sequencing_groups[0].sequences[0].meta['reads'],
+            participants[0].samples[0].sequencing_groups[0].assays[0].meta['reads'],
         )
 
         expected_sequence2_reads = [
@@ -166,5 +166,5 @@ class TestSampleMapParser(unittest.TestCase):
         ]
         self.assertListEqual(
             expected_sequence2_reads,
-            participants[1].samples[0].sequencing_groups[0].sequences[0].meta['reads'],
+            participants[1].samples[0].sequencing_groups[0].assays[0].meta['reads'],
         )

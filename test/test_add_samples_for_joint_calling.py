@@ -9,7 +9,7 @@ import random
 import string
 
 from sample_metadata.apis import SampleApi
-from sample_metadata.models import NewSample, SampleType
+from sample_metadata.models import SampleUpsert, SampleType
 
 INPUT_PROJECT = 'test_input_project'
 
@@ -22,7 +22,7 @@ def _add_samples(run_id: str, project: str):
     Add 3 samples: one with fastq input, one with CRAM input, one with GVCF input.
     :param run_id: to suffix sample names for uniqueness
     """
-    s1 = NewSample(
+    s1 = SampleUpsert(
         external_id=f'NA12878-from-fq-{run_id}',
         type=SampleType('blood'),
         meta={
@@ -38,12 +38,12 @@ def _add_samples(run_id: str, project: str):
             ]
         },
     )
-    s2 = NewSample(
+    s2 = SampleUpsert(
         external_id=f'NA12878-from-cram-{run_id}',
         type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio-tiny/NA12878.cram'},
     )
-    s3 = NewSample(
+    s3 = SampleUpsert(
         external_id=f'NA12878-from-gvcf-{run_id}',
         type=SampleType('blood'),
         meta={'reads': 'gs://cpg-seqr-test/batches/NA12878-trio/NA12878.g.vcf.gz'},

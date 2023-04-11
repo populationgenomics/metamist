@@ -6,7 +6,7 @@ from typing import List, Optional, Set, Tuple, Dict, Any
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
-from models.enums import AnalysisStatus, AnalysisType
+from models.enums import AnalysisStatus
 from models.models.analysis import Analysis
 
 
@@ -29,7 +29,7 @@ class AnalysisTable(DbBase):
 
     async def insert_analysis(
         self,
-        analysis_type: AnalysisType,
+        analysis_type: str,
         status: AnalysisStatus,
         sample_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
@@ -44,7 +44,7 @@ class AnalysisTable(DbBase):
 
         async with self.connection.transaction():
             kv_pairs = [
-                ('type', analysis_type.value),
+                ('type', analysis_type),
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
@@ -135,7 +135,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         sample_ids: List[int] = None,
         sample_ids_all: List[int] = None,
         project_ids: List[int] = None,
-        analysis_type: AnalysisType = None,
+        analysis_type: str = None,
         status: AnalysisStatus = None,
         meta: Dict[str, Any] = None,
         output: str = None,
@@ -162,7 +162,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         if analysis_type is not None:
             wheres.append('a.type = :type')
-            values['type'] = analysis_type.value
+            values['type'] = analysis_type
         if status is not None:
             wheres.append('a.status = :status')
             values['status'] = status.value
@@ -215,12 +215,12 @@ WHERE a.id in (
     async def get_latest_complete_analysis_for_type(
         self,
         project: ProjectId,
-        analysis_type: AnalysisType,
+        analysis_type: str,
         meta: Dict[str, Any] = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
 
-        values = {'project': project, 'type': analysis_type.value}
+        values = {'project': project, 'type': analysis_type}
 
         meta_str = ''
         if meta:
@@ -248,9 +248,7 @@ WHERE a.id = (
 """
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
-            raise NotFoundError(
-                f"Couldn't find any analysis with type {analysis_type.value}"
-            )
+            raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
         a = Analysis.from_db(**dict(rows[0]))
         # .from_db maps 'sample_id' -> sample_ids
         for row in rows[1:]:
@@ -259,7 +257,7 @@ WHERE a.id = (
         return a
 
     async def get_all_sample_ids_without_analysis_type(
-        self, analysis_type: AnalysisType, project: ProjectId
+        self, analysis_type: str, project: ProjectId
     ):
         """
         Find all the samples in the sample_id list that a
@@ -276,7 +274,7 @@ WHERE s.project = :project AND
 
         rows = await self.connection.fetch_all(
             _query,
-            {'analysis_type': analysis_type.value, 'project': project or self.project},
+            {'analysis_type': analysis_type, 'project': project or self.project},
         )
         return [row[0] for row in rows]
 
@@ -306,7 +304,7 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         return list(analysis_by_id.values())
 
     async def get_latest_complete_analysis_for_samples_by_type(
-        self, analysis_type: AnalysisType, sample_ids: List[int]
+        self, analysis_type: str, sample_ids: List[int]
     ) -> List[Analysis]:
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
@@ -322,14 +320,14 @@ WHERE
     a_s.sample_id in :sample_ids
 ORDER BY a.timestamp_completed DESC
         """
-        expected_type = (AnalysisType.GVCF, AnalysisType.CRAM, AnalysisType.QC)
+        expected_type = ('gvcf', 'cram', 'qc')
         if analysis_type not in expected_type:
-            expected_types_str = ', '.join(a.value for a in expected_type)
+            expected_types_str = ', '.join(a for a in expected_type)
             raise ValueError(
-                f'Received analysis type {analysis_type.value!r}", received {expected_types_str!r}'
+                f'Received analysis type {analysis_type!r}", expected {expected_types_str!r}'
             )
 
-        values = {'sample_ids': sample_ids, 'type': analysis_type.value}
+        values = {'sample_ids': sample_ids, 'type': analysis_type}
         rows = await self.connection.fetch_all(_query, values)
         seen_sample_ids = set()
         analyses: List[Analysis] = []
@@ -367,7 +365,7 @@ WHERE a.id = :analysis_id
     async def get_analyses_for_samples(
         self,
         sample_ids: list[int],
-        analysis_type: AnalysisType | None,
+        analysis_type: str | None,
         status: AnalysisStatus,
     ) -> tuple[set[ProjectId], list[Analysis]]:
         """
@@ -380,7 +378,7 @@ WHERE a.id = :analysis_id
 
         if analysis_type:
             wheres.append('a.type = :atype')
-            values['atype'] = analysis_type.value
+            values['atype'] = analysis_type
 
         if status:
             wheres.append('a.status = :status')

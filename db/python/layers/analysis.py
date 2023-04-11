@@ -9,7 +9,7 @@ from db.python.tables.sample import SampleTable
 from db.python.tables.analysis import AnalysisTable
 from db.python.utils import get_logger
 
-from models.enums import AnalysisStatus, AnalysisType
+from models.enums import AnalysisStatus
 from models.models.analysis import Analysis
 from models.utils.sample_id_format import sample_id_format_list
 
@@ -38,7 +38,7 @@ class AnalysisLayer(BaseLayer):
     async def get_analyses_for_samples(
         self,
         sample_ids: list[int],
-        analysis_type: AnalysisType | None,
+        analysis_type: str | None,
         status: AnalysisStatus | None,
         check_project_id=True,
     ) -> list[Analysis]:
@@ -75,7 +75,7 @@ class AnalysisLayer(BaseLayer):
     async def get_latest_complete_analysis_for_type(
         self,
         project: ProjectId,
-        analysis_type: AnalysisType,
+        analysis_type: str,
         meta: Dict[str, Any] = None,
     ) -> Analysis:
         """Get SINGLE latest complete analysis for some analysis type"""
@@ -85,7 +85,7 @@ class AnalysisLayer(BaseLayer):
 
     async def get_latest_complete_analysis_for_samples_and_type(
         self,
-        analysis_type: AnalysisType,
+        analysis_type: str,
         sample_ids: List[int],
         allow_missing=True,
         check_project_ids=True,
@@ -120,7 +120,7 @@ class AnalysisLayer(BaseLayer):
         return analyses
 
     async def get_all_sample_ids_without_analysis_type(
-        self, project: ProjectId, analysis_type: AnalysisType
+        self, project: ProjectId, analysis_type: str
     ):
         """
         Find all the samples in the sample_id list that a
@@ -153,7 +153,7 @@ class AnalysisLayer(BaseLayer):
         sample_ids: List[int] = None,
         sample_ids_all: List[int] = None,
         project_ids: List[int] = None,
-        analysis_type: AnalysisType = None,
+        analysis_type: str = None,
         status: AnalysisStatus = None,
         meta: Dict[str, Any] = None,
         output: str = None,
@@ -213,7 +213,7 @@ class AnalysisLayer(BaseLayer):
         use_samples = list(filter(keep_sample, sample_ids))
         crams = await self.at.query_analysis(
             sample_ids=use_samples,
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             status=AnalysisStatus.COMPLETED,
         )
         crams_by_sid: dict[int, dict[str, list]] = defaultdict(
@@ -269,7 +269,7 @@ class AnalysisLayer(BaseLayer):
 
     async def insert_analysis(
         self,
-        analysis_type: AnalysisType,
+        analysis_type: str,
         status: AnalysisStatus,
         sample_ids: List[int],
         meta: Optional[Dict[str, Any]],

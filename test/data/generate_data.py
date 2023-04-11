@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pylint: disable=too-many-locals
 import asyncio
 from pprint import pprint
 import random
@@ -6,18 +7,15 @@ import argparse
 import datetime
 
 from sample_metadata.api.analysis_api import AnalysisApi
+
+from sample_metadata.api.enums_api import EnumsApi
 from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
 from sample_metadata.model.analysis_model import AnalysisModel
 
 from sample_metadata.models import (
-    SampleType,
-    SequenceStatus,
-    SampleBatchUpsertBody,
-    SampleBatchUpsert,
-    SequenceUpsert,
-    SequenceType,
-    SequenceTechnology,
+    SampleUpsert,
+    AssayUpsert,
+    SequencingGroupUpsert,
 )
 
 from sample_metadata.apis import (
@@ -25,6 +23,7 @@ from sample_metadata.apis import (
     FamilyApi,
     ParticipantApi,
     SampleApi,
+    SequencingGroupApi,
 )
 
 # from sample_metadata.configuration import m
@@ -39,6 +38,15 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     sapi = SampleApi()
 
     papi = ProjectApi()
+    enum_api = EnumsApi()
+    sgapi = SequencingGroupApi()
+
+    sample_types = enum_api.get_sample_types()
+    sequencing_technologies = enum_api.get_sequencing_technologys()
+    sequencing_platforms = enum_api.get_sequencing_platforms()
+    sequencing_types = enum_api.get_sequencing_types()
+    assay_type = 'sequencing'
+
     existing_projects = await papi.get_my_projects_async()
     if project not in existing_projects:
         await papi.create_project_async(
@@ -74,9 +82,9 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
 
         nsamples = generate_random_number_within_distribution()
         for _ in range(nsamples):
-            sample = SampleBatchUpsert(
+            sample = SampleUpsert(
                 external_id=f'GRK{sample_id_index}',
-                type=SampleType('blood'),
+                type=random.choice(sample_types),
                 meta={
                     'collection_date': datetime.datetime.now()
                     - datetime.timedelta(minutes=random.randint(-100, 10000)),
@@ -88,73 +96,64 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                 sequences=[],
             )
 
-            sequences = []
             sample_id_index += random.randint(1, 4)
             for _ in range(generate_random_number_within_distribution()):
-                sequences.append(
-                    SequenceUpsert(
-                        status=SequenceStatus('uploaded'),
-                        type=SequenceType(
-                            random.choice(
-                                list(
-                                    next(
-                                        iter(SequenceType.allowed_values.values())
-                                    ).values()
-                                )
-                            )
-                        ),
-                        technology=SequenceTechnology(
-                            random.choice(
-                                list(
-                                    next(
-                                        iter(SequenceTechnology.allowed_values.values())
-                                    ).values()
-                                )
-                            )
-                        ),
-                        meta={
-                            'facility': random.choice(
-                                [
-                                    'Amazing sequence centre',
-                                    'Sequence central',
-                                    'Dept of Seq.',
-                                ]
-                            ),
-                            'emoji': random.choice(EMOJIS),
-                            'technology': random.choice(
-                                ['magnifying glass', 'guessing', 'math.random']
-                            ),
-                            'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
-                        },
-                    )
+                facility = random.choice(
+                    [
+                        'Amazing sequence centre',
+                        'Sequence central',
+                        'Dept of Seq.',
+                    ]
                 )
+                sg = SequencingGroupUpsert(
+                    type=random.choice(sequencing_types),
+                    technology=random.choice(sequencing_technologies),
+                    platform=random.choice(sequencing_platforms),
+                    meta={
+                        'facility': facility,
+                    },
+                )
+                sg.assays = []
+                for _ in range(generate_random_number_within_distribution()):
+                    sg.assays.append(
+                        AssayUpsert(
+                            type=assay_type,
+                            meta={
+                                'facility': facility,
+                                'emoji': random.choice(EMOJIS),
+                                'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
+                            },
+                        )
+                    )
 
-            sample.sequences = sequences
             samples.append(sample)
 
-    batch_samples = SampleBatchUpsertBody(samples=samples)
-    response = await sapi.batch_upsert_samples_async(project, batch_samples)
+    response = await sapi.upsert_samples_async(project, samples)
     pprint(response)
 
-    sample_id_map = await sapi.get_all_sample_id_map_by_internal_async(project=project)
-    sample_ids = list(sample_id_map.keys())
+    sample_id_map = await sgapi.get_all_sequencing_group_ids_by_sample_by_type_async(
+        project=project
+    )
+    sequencing_group_ids = [sg for sgs in sample_id_map.values() for sg in sgs]
 
     analyses_to_insert = [
         AnalysisModel(
-            sample_ids=[s],
-            type=AnalysisType('cram'),
+            sequencing_group_ids=[s],
+            type='cram',
             status=AnalysisStatus('completed'),
             output=f'FAKE://greek-myth/crams/{s}.cram',
             meta={'sequencing_type': 'genome'},
         )
-        for s in sample_ids
+        for s in sequencing_group_ids
     ]
 
     # es-index
     analyses_to_insert.append(
         AnalysisModel(
-            sample_ids=random.sample(sample_ids, len(sample_ids) // 2),
-            type=AnalysisType('es-index'),
+            sequencing_group_ids=random.sample(
+                sequencing_group_ids, len(sequencing_group_ids) // 2
+            ),
+            type='es-index',
             status=AnalysisStatus('completed'),
             output=f'FAKE::greek-myth-genome-{datetime.date.today()}',
             meta={},
@@ -165,7 +164,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
         await asyncio.gather(
-            *[aapi.create_new_analysis_async(project, analysis_model=a) for a in ans]
+            *[aapi.create_analysis_async(project, analysis_model=a) for a in ans]
         )
 
 

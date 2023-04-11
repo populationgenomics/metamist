@@ -1,10 +1,11 @@
-from db.python.tables.enums import EnumTable
+from db.python.enum_tables.enums import EnumTable
 
 
 class SequencingTypeTable(EnumTable):
     """
     Replacement for SequencingType enum
     """
+
     @classmethod
-    def get_table_name(cls):
+    def get_enum_name(cls):
         return 'sequencing_type'

@@ -15,8 +15,8 @@ from sample_metadata.models import (
     SequenceUpdateModel,
     SequenceStatus,
     SampleType,
-    NewSample,
-    NewSequence,
+    SampleUpsert,
+    AssayUpsert,
 )
 from sample_metadata.exceptions import ForbiddenException, NotFoundException
 
@@ -74,12 +74,12 @@ def update_sm(
     except NotFoundException as e:
         # Otherwise create
         logging.info(e)
-        new_sample = NewSample(
+        new_sample = SampleUpsert(
             external_id=sample,
             type=sample_type,
             meta=sample_meta,
         )
-        isid = sapi.create_new_sample(new_sample=new_sample, project=project)
+        isid = sapi.create_sample(new_sample=new_sample, project=project)
 
     except ForbiddenException as e:
         logging.error(e)

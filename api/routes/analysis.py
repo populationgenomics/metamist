@@ -19,7 +19,7 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import AnalysisType, AnalysisStatus
+from models.enums import AnalysisStatus
 from models.models.analysis import (
     Analysis,
     ProjectSizeModel,
@@ -41,8 +41,8 @@ class AnalysisModel(BaseModel):
     Model for 'createNewAnalysis'
     """
 
-    sample_ids: list[str]
-    type: AnalysisType
+    sequencing_group_ids: list[str]
+    type: str
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
     output: str | None = None
@@ -64,12 +64,12 @@ class AnalysisUpdateModel(BaseModel):
 class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
-    # sample_ids means it contains the analysis contains at least one of the sample_ids in the list
-    sample_ids: list[str] | None
+    # sequencing_group_ids means it the analysis contains at least one of in the list
+    sequencing_group_ids: list[str] | None
     # # sample_ids_all means the analysis contains ALL of the sample_ids
     # sample_ids_all: list[str] = None
     projects: list[str]
-    type: AnalysisType | None = None
+    type: str | None = None
     status: AnalysisStatus | None = None
     meta: dict[str, Any] | None = None
     output: str | None = None
@@ -115,10 +115,10 @@ async def update_analysis_status(
 
 @router.get(
     '/{project}/type/{analysis_type}/not-included-sample-ids',
-    operation_id='getAllSampleIdsWithoutAnalysisType',
+    operation_id='getAllSampleIdsWithoutstr',
 )
 async def get_all_sample_ids_without_analysis_type(
-    analysis_type: AnalysisType,
+    analysis_type: str,
     connection: Connection = get_project_readonly_connection,
 ):
     """get_all_sample_ids_without_analysis_type"""
@@ -154,7 +154,7 @@ async def get_incomplete_analyses(
     operation_id='getLatestCompleteAnalysisForType',
 )
 async def get_latest_complete_analysis_for_type(
-    analysis_type: AnalysisType,
+    analysis_type: str,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get (SINGLE) latest complete analysis for some analysis type"""
@@ -174,7 +174,7 @@ async def get_latest_complete_analysis_for_type(
     operation_id='getLatestCompleteAnalysisForTypePost',
 )
 async def get_latest_complete_analysis_for_type_post(
-    analysis_type: AnalysisType,
+    analysis_type: str,
     meta: dict[str, Any] = Body(..., embed=True),  # type: ignore[assignment]
     connection: Connection = get_project_readonly_connection,
 ):
@@ -201,7 +201,7 @@ async def get_latest_complete_analysis_for_type_post(
 )
 async def get_latest_analysis_for_samples_and_type(
     sample_ids: list[str],
-    analysis_type: AnalysisType,
+    analysis_type: str,
     allow_missing: bool = True,
     connection: Connection = get_project_readonly_connection,
 ):

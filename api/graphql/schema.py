@@ -21,7 +21,7 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.assay import AssayLayer
 from db.python.tables.project import ProjectPermissionsTable
-from models.enums import SampleType, AnalysisType, AnalysisStatus
+from models.enums import AnalysisStatus
 from models.models.sample import sample_id_transform_to_raw
 
 
@@ -277,7 +277,7 @@ class GraphQLAnalysis:
     """Analysis GraphQL model"""
 
     id: int
-    type: strawberry.enum(AnalysisType)
+    type: str
     status: strawberry.enum(AnalysisStatus)
     output: str | None
     timestamp_completed: str | None = None
@@ -349,7 +349,7 @@ class GraphQLSample:
     external_id: str
     active: bool
     meta: strawberry.scalars.JSON
-    type: strawberry.enum(SampleType)
+    type: str
     author: str | None
     participant_id: int
 
@@ -378,7 +378,7 @@ class GraphQLSample:
         self,
         info: Info,
         root: 'Sample',
-        type: strawberry.enum(AnalysisType) | None = None,
+        type: str | None = None,
         status: strawberry.enum(AnalysisStatus) | None = None,
     ) -> list[GraphQLAnalysis]:
         loader = info.context['loader_analyses_for_samples_ids']

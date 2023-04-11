@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from db.python.connect import DbBase, NoOpAenter
 from db.python.utils import ProjectId, to_db_json
+from models.models.sequencing_group import SequencingGroupInternal
 
 
 class SequencingGroupTable(DbBase):
@@ -37,7 +38,7 @@ class SequencingGroupTable(DbBase):
 
     async def get_sequencing_groups_by_ids(
         self, ids: list[int]
-    ) -> tuple[set[ProjectId], list[dict]]:
+    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """
         Get sequence groups by internal identifiers
         """
@@ -48,8 +49,8 @@ class SequencingGroupTable(DbBase):
         """
 
         rows = await self.connection.fetch_all(_query, {'sqgids': ids})
-        rows = [dict(r) for r in rows]
-        projects = set(r['project'] for r in rows)
+        rows = [SequencingGroupInternal(**dict(r)) for r in rows]
+        projects = set(r.project for r in rows)
 
         return projects, rows
 
@@ -71,8 +72,32 @@ class SequencingGroupTable(DbBase):
 
         return dict(sequencing_groups)
 
-    async def get_participant_ids_and_sequence_group_ids_for_sequence_type(
-        self, sequence_type: str
+    async def get_all_sequencing_group_ids_by_sample_ids_by_type(
+        self,
+    ) -> dict[int, dict[str, list[int]]]:
+        """
+        Get all sequencing group IDs by sample IDs by type
+        """
+        _query = """
+        SELECT s.id as sid, sqg.id as sqgid, sqg.type as sqgtype
+        FROM sample s
+        INNER JOIN sequencing_group sqg ON s.id = sqg.sample_id
+        WHERE project = :project
+        """
+        rows = await self.connection.fetch_all(_query, {'project': self.project})
+        sequencing_group_ids_by_sample_ids_by_type: dict[
+            int, dict[str, list[int]]
+        ] = defaultdict(lambda: defaultdict(list))
+        for row in rows:
+            sample_id = row['sid']
+            sg_id = row['sqgid']
+            sg_type = row['sqgtype']
+            sequencing_group_ids_by_sample_ids_by_type[sample_id][sg_type].append(sg_id)
+
+        return sequencing_group_ids_by_sample_ids_by_type
+
+    async def get_participant_ids_and_sequence_group_ids_for_sequencing_type(
+        self, sequencing_type: str
     ) -> tuple[set[ProjectId], dict[int, list[int]]]:
         """
         Get participant IDs for a specific sequence type.
@@ -87,7 +112,7 @@ class SequencingGroupTable(DbBase):
 
         rows = list(
             await self.connection.fetch_all(
-                _query, {'seqtype': sequence_type, 'project': self.project}
+                _query, {'seqtype': sequencing_type, 'project': self.project}
             )
         )
 

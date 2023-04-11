@@ -4,24 +4,18 @@ import logging
 import re
 import shlex
 from functools import reduce
-# from io import StringIO
 from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
 
-from sample_metadata.model.sample_type import SampleType
-from sample_metadata.model.sequence_status import SequenceStatus
-from sample_metadata.model.sequence_technology import SequenceTechnology
-from sample_metadata.model.sequence_type import SequenceType
 from sample_metadata.parser.generic_parser import (
     GenericParser,
     GroupedRow,
     ParsedSequencingGroup,
-    ParsedSequencing,
-    ParsedSample,   # noqa
+    ParsedAssay,
+    # noqa
     SingleRow,
     run_as_sync,
-    group_by,
     ParsedAnalysis,
 )  # noqa
 
@@ -51,7 +45,7 @@ and we want to achieve the following:
 - Import this manifest into the "$dataset" project of SM
 - Map the following to `sample.meta`:
     - "sample-collection-date" -> "collection_date"
-- Map the following to `sequence.meta`:
+- Map the following to `assay.meta`:
     - "depth" -> "depth"
     - "qc_quality" -> "qc.quality" (ie: {"qc": {"quality": 0.997}})
 - Add a qc analysis object with the following mapped `analysis.meta`:
@@ -62,8 +56,8 @@ python parse_generic_metadata.py \
     --sample-name-column "Sample ID" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \
-    --sequence-meta-field "depth" \
-    --sequence-meta-field-map "qc_quality" "qc.quality" \
+    --assay-meta-field "depth" \
+    --assay-meta-field-map "qc_quality" "qc.quality" \
     --qc-meta-field-map "qc_quality" "quality" \
     --search-path "gs://cpg-upload-bucket/collaborator" \
     <manifest-path>
@@ -85,12 +79,12 @@ class GenericMetadataParser(GenericParser):
         search_locations: List[str],
         participant_meta_map: Dict[str, str],
         sample_meta_map: Dict[str, str],
-        sequence_meta_map: Dict[str, str],
+        assay_meta_map: Dict[str, str],
         qc_meta_map: Dict[str, str],
         project: str,
         sample_name_column: str,
         participant_column: Optional[str] = None,
-        sequence_id_column: Optional[str] = None,
+        assay_id_column: Optional[str] = None,
         reported_sex_column: Optional[str] = None,
         reported_gender_column: Optional[str] = None,
         karyotype_column: Optional[str] = None,
@@ -104,10 +98,9 @@ class GenericMetadataParser(GenericParser):
         batch_number: Optional[str] = None,
         reference_assembly_location_column: Optional[str] = None,
         default_reference_assembly_location: Optional[str] = None,
-        default_sequence_type='genome',
-        default_sequence_status='uploaded',
-        default_sample_type='blood',
-        default_sequence_technology='short-read',
+        default_sequencing_type='genome',
+        default_sample_type=None,
+        default_sequencing_technology='short-read',
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -115,10 +108,9 @@ class GenericMetadataParser(GenericParser):
             path_prefix=None,
             search_paths=search_locations,
             project=project,
-            default_sequence_type=default_sequence_type,
-            default_sequence_status=default_sequence_status,
+            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
-            default_sequence_technology=default_sequence_technology,
+            default_sequencing_technology=default_sequencing_technology,
             **kwargs,
         )
 
@@ -129,7 +121,7 @@ class GenericMetadataParser(GenericParser):
 
         self.sample_name_column = sample_name_column
         self.participant_column = participant_column
-        self.sequence_id_column = sequence_id_column
+        self.assay_id_column = assay_id_column
         self.reported_sex_column = reported_sex_column
         self.reported_gender_column = reported_gender_column
         self.karyotype_column = karyotype_column
@@ -140,7 +132,7 @@ class GenericMetadataParser(GenericParser):
 
         self.participant_meta_map = participant_meta_map or {}
         self.sample_meta_map = sample_meta_map or {}
-        self.sequence_meta_map = sequence_meta_map or {}
+        self.assay_meta_map = assay_meta_map or {}
         self.qc_meta_map = qc_meta_map or {}
         self.reads_column = reads_column
         self.checksum_column = checksum_column
@@ -158,39 +150,40 @@ class GenericMetadataParser(GenericParser):
         """Get internal cpg id from a row using get_sample_id and an api call"""
         return row.get(self.cpg_id_column, None)
 
-    def get_sample_type(self, row: GroupedRow) -> SampleType:
+    def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
-        return SampleType(self.default_sample_type)
+        if self.default_sample_type:
+            return self.default_sample_type
+        return None
 
-    def get_sequence_types(self, row: GroupedRow) -> List[SequenceType]:
+    def get_sequencing_types(self, row: GroupedRow) -> list[str]:
         """
-        Get sequence types from grouped row
-        if SingleRow: return sequence type
-        if GroupedRow: return sequence types for all rows
+        Get assay types from grouped row
+        if SingleRow: return assay type
+        if GroupedRow: return assay types for all rows
         """
         if isinstance(row, dict):
-            return [self.get_sequence_type(row)]
+            return [self.get_sequencing_type(row)]
         return [
-            SequenceType(r.get(self.seq_type_column, self.default_sequence_type))
-            for r in row
+            str(r.get(self.seq_type_column, self.default_sequencing_type)) for r in row
         ]
 
-    def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
-        """Get sequence technology for single row"""
+    def get_sequencing_technology(self, row: SingleRow) -> str:
+        """Get assay technology for single row"""
         value = (
             row.get(self.seq_technology_column, None)
-            or self.default_sequence_technology
+            or self.default_sequencing_technology
         )
         value = value.lower()
 
         if value == 'ont':
             value = 'long-read'
 
-        return SequenceTechnology(value)
+        return str(value)
 
-    def get_sequence_type(self, row: SingleRow) -> SequenceType:
-        """Get sequence type from row"""
-        value = row.get(self.seq_type_column, None) or self.default_sequence_type
+    def get_sequencing_type(self, row: SingleRow) -> str:
+        """Get assay type from row"""
+        value = row.get(self.seq_type_column, None) or self.default_sequencing_type
         value = value.lower()
 
         if value == 'wgs':
@@ -200,15 +193,11 @@ class GenericMetadataParser(GenericParser):
         elif 'mt' in value:
             value = 'mtseq'
 
-        return SequenceType(value)
+        return str(value)
 
-    def get_sequence_status(self, row: GroupedRow) -> SequenceStatus:
-        """Get sequence status from row"""
-        return SequenceStatus(self.default_sequence_status)
-
-    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
-        """Get external sequence ID from row. Needs to be implemented per parser.
-        NOTE: To be re-thought after sequence group changes are applied"""
+    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        """Get external assay ID from row. Needs to be implemented per parser.
+        NOTE: To be re-thought after assay group changes are applied"""
         return None
 
     def get_participant_id(self, row: SingleRow) -> Optional[str]:
@@ -503,20 +492,20 @@ class GenericMetadataParser(GenericParser):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
-    async def get_sequence_group_meta(
-        self, sequence_group: ParsedSequencingGroup
+    async def get_sequencing_group_meta(
+        self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
 
         meta = {}
 
-        if not sequence_group.sample.external_sid:
-            sequence_group.sample.external_sid = await self.get_cpg_sample_id_from_row(
-                sequence_group.rows[0]
+        if not sequencing_group.sample.external_sid:
+            sequencing_group.sample.external_sid = await self.get_cpg_sample_id_from_row(
+                sequencing_group.rows[0]
             )
 
         gvcf_filenames: List[str] = []
 
-        for r in sequence_group.rows:
+        for r in sequencing_group.rows:
             if self.gvcf_column and self.gvcf_column in r:
                 gvcf_filenames.extend(self.process_filename_value(r[self.gvcf_column]))
 
@@ -529,7 +518,7 @@ class GenericMetadataParser(GenericParser):
             )
 
         variant_file_types: Dict[str, Dict[str, List]] = await self.parse_files(
-            sequence_group.sample.external_sid, full_gvcf_filenames, None
+            sequencing_group.sample.external_sid, full_gvcf_filenames, None
         )
         variants: Dict[str, List] = variant_file_types.get('variants')
 
@@ -544,21 +533,21 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_sequences_from_group(
-        self, sequence_group: ParsedSequencingGroup
-    ) -> list[ParsedSequencing]:
-        """Get sequences from sequence group + rows"""
-        sample = sequence_group.sample
-        rows = sequence_group.rows
+    async def get_assays_from_group(
+        self, sequencing_group: ParsedSequencingGroup
+    ) -> list[ParsedAssay]:
+        """Get assays from assay group + rows"""
+        sample = sequencing_group.sample
+        rows = sequencing_group.rows
 
         if not sample.external_sid:
             sample.external_sid = await self.get_cpg_sample_id_from_row(rows[0])
 
-        collapsed_sequence_meta = self.collapse_arbitrary_meta(
-            self.sequence_meta_map, rows
+        collapsed_assay_meta = self.collapse_arbitrary_meta(
+            self.assay_meta_map, rows
         )
 
-        sequences = []
+        assays = []
 
         read_filenames: List[str] = []
         read_checksums: List[str] = []
@@ -598,14 +587,14 @@ class GenericMetadataParser(GenericParser):
         keys = list(reads.keys())
         if len(keys) > 1:
             # 2021-12-14 mfranklin: In future we should return multiple
-            #       sequence meta, and handle that in the generic parser
+            #       assay meta, and handle that in the generic parser
             raise ValueError(
                 f'Multiple types of reads found ({", ".join(keys)}), currently not supported'
             )
 
         reads_type = keys[0]
-        collapsed_sequence_meta['reads_type'] = reads_type
-        # collapsed_sequence_meta['reads'] = reads[reads_type]
+        collapsed_assay_meta['reads_type'] = reads_type
+        # collapsed_assay_meta['reads'] = reads[reads_type]
 
         if reads_type == 'cram':
             if len(reference_assemblies) > 1:
@@ -634,49 +623,53 @@ class GenericMetadataParser(GenericParser):
             cram_reference = await self.create_file_object(
                 ref_fp, secondary_files=secondary_files
             )
-            collapsed_sequence_meta['reference_assembly'] = cram_reference
+            collapsed_assay_meta['reference_assembly'] = cram_reference
 
         if self.batch_number is not None:
-            collapsed_sequence_meta['batch'] = self.batch_number
+            collapsed_assay_meta['batch'] = self.batch_number
 
         for read in reads[reads_type]:
-            sequences.append(
-                ParsedSequencing(
-                    group=sequence_group,
-                    # we don't determine which set of rows belong to a sequence,
-                    # as we grab all reads, and then determine sequence
+            assays.append(
+                ParsedAssay(
+                    group=sequencing_group,
+                    # we don't determine which set of rows belong to a assay,
+                    # as we grab all reads, and then determine assay
                     # grouping from there.
-                    rows=sequence_group.rows,
+                    rows=sequencing_group.rows,
                     internal_seq_id=None,
                     external_seq_ids={},
                     # unfortunately hard to break them up by row in the current format
-                    sequence_status=self.get_sequence_status(rows),
-                    sequence_type=sequence_group.sequence_type,
-                    sequence_technology=sequence_group.sequence_technology,
-                    sequence_platform=sequence_group.sequence_platform,
-                    meta={**collapsed_sequence_meta, 'reads': read},
+                    # assay_status=self.get_assay_status(rows),
+                    assay_type='sequencing',
+                    meta={
+                        **collapsed_assay_meta,
+                        'reads': read,
+                        'sequencing_type': 'sequencing',
+                        'sequencing_technology': sequencing_group.sequencing_technology,
+                        'sequencing_platform': sequencing_group.sequencing_platform,
+                    },
                 )
             )
 
-        return sequences
+        return assays
 
-    async def get_analyses_from_sequence_group(
-        self, sequence_group: ParsedSequencingGroup
+    async def get_analyses_from_sequencing_group(
+        self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
         if not self.qc_meta_map:
             return []
 
-        sample_id = sequence_group.sample.external_sid
+        sample_id = sequencing_group.sample.external_sid
 
         return [
             ParsedAnalysis(
-                sequence_group=sequence_group,
-                status=self.get_analysis_status(sample_id, sequence_group.rows),
-                type_=self.get_analysis_type(sample_id, sequence_group.rows),
+                sequencing_group=sequencing_group,
+                status=self.get_analysis_status(sample_id, sequencing_group.rows),
+                type_=self.get_analysis_type(sample_id, sequencing_group.rows),
                 meta=self.collapse_arbitrary_meta(
-                    self.qc_meta_map, sequence_group.rows
+                    self.qc_meta_map, sequencing_group.rows
                 ),
-                rows=sequence_group.rows,
+                rows=sequencing_group.rows,
                 output=None,
             )
         ]
@@ -726,18 +719,18 @@ class GenericMetadataParser(GenericParser):
     help='Two arguments per listing, eg: --sample-meta-field-map "name-in-manifest" "name-in-sample.meta"',
 )
 @click.option(
-    '--sequence-meta-field',
+    '--assay-meta-field',
     multiple=True,
     help='Single argument, key to pull out of row to put in sample.meta',
 )
 @click.option(
-    '--sequence-meta-field-map',
+    '--assay-meta-field-map',
     nargs=2,
     multiple=True,
-    help='Two arguments per listing, eg: --sequence-meta-field "name-in-manifest" "name-in-sequence.meta"',
+    help='Two arguments per listing, eg: --assay-meta-field "name-in-manifest" "name-in-assay.meta"',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='wgs')
+@click.option('--default-assay-type', default='wgs')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -753,13 +746,13 @@ async def main(
     participant_meta_field_map: List[Tuple[str, str]],
     sample_meta_field: List[str],
     sample_meta_field_map: List[Tuple[str, str]],
-    sequence_meta_field: List[str],
-    sequence_meta_field_map: List[Tuple[str, str]],
+    assay_meta_field: List[str],
+    assay_meta_field_map: List[Tuple[str, str]],
     qc_meta_field_map: List[Tuple[str, str]] = None,
     reads_column: Optional[str] = None,
     gvcf_column: Optional[str] = None,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_assay_type='wgs',
     confirm=False,
 ):
     """Run script from CLI arguments"""
@@ -772,7 +765,7 @@ async def main(
 
     participant_meta_map: Dict[Any, Any] = {}
     sample_meta_map: Dict[Any, Any] = {}
-    sequence_meta_map: Dict[Any, Any] = {}
+    assay_meta_map: Dict[Any, Any] = {}
 
     qc_meta_map = dict(qc_meta_field_map or {})
     if participant_meta_field_map:
@@ -783,22 +776,22 @@ async def main(
         sample_meta_map.update(dict(sample_meta_field_map))
     if sample_meta_field:
         sample_meta_map.update({k: k for k in sample_meta_field})
-    if sequence_meta_field_map:
-        sequence_meta_map.update(dict(sequence_meta_field_map))
-    if sequence_meta_field:
-        sequence_meta_map.update({k: k for k in sequence_meta_field})
+    if assay_meta_field_map:
+        assay_meta_map.update(dict(assay_meta_field_map))
+    if assay_meta_field:
+        assay_meta_map.update({k: k for k in assay_meta_field})
 
     parser = GenericMetadataParser(
         project=project,
         sample_name_column=sample_name_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
-        sequence_meta_map=sequence_meta_map,
+        assay_meta_map=assay_meta_map,
         qc_meta_map=qc_meta_map,
         reads_column=reads_column,
         gvcf_column=gvcf_column,
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_assay_type,
         search_locations=search_path,
     )
     for manifest in manifests:

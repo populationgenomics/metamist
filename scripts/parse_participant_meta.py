@@ -15,21 +15,21 @@ import click
 
 from google.cloud import storage
 
-from sample_metadata.apis import ParticipantApi
-from sample_metadata.models import ParticipantUpdateModel
 from sample_metadata import ApiException
+from sample_metadata.apis import ParticipantApi
+from sample_metadata.model.participant_upsert import ParticipantUpsert
 
 
 def update_metadata(
     participant_id: int,
-    updated_participant: ParticipantUpdateModel,
+    updated_participant: ParticipantUpsert,
 ):
     """Update participant level metadata in SM DB"""
     paapi = ParticipantApi()
 
     try:
         paapi.update_participant(
-            participant_id=participant_id, participant_update_model=updated_participant
+            participant_id=participant_id, participant_upsert=updated_participant
         )
     except ApiException:
         traceback.print_exc()
@@ -71,7 +71,7 @@ def parse_csv(csv_string: str, project: str):
         row = {k.lower(): v for k, v in row.items()}
         sample_id = row.pop('sampleid')
 
-        updated_participant = ParticipantUpdateModel()
+        updated_participant = ParticipantUpsert()
 
         if 'reported_gender' in row:
             reported_gender = row.pop('reported_gender')

@@ -149,7 +149,7 @@ class AssayLayer(BaseLayer):
 
         if not assay.id:
             if not assay.sample_id:
-                raise ValueError("Must specify sample_id when inserting an assay")
+                raise ValueError('Must specify sample_id when inserting an assay')
 
             project_ids = await self.sampt.get_project_ids_for_sample_ids(
                 [assay.sample_id]
@@ -169,9 +169,7 @@ class AssayLayer(BaseLayer):
         else:
             if check_project_id:
                 # can check the project id of the assay we're updating
-                project_ids = await self.seqt.get_projects_by_assay_ids(
-                    [assay.id]
-                )
+                project_ids = await self.seqt.get_projects_by_assay_ids([assay.id])
                 await self.ptable.check_access_to_project_ids(
                     self.author, project_ids, readonly=False
                 )

@@ -10,7 +10,7 @@ from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     ParsedSequencingGroup,
     ParsedAnalysis,
-    ParsedSequencing,
+    ParsedAssay,
 )
 
 
@@ -44,18 +44,18 @@ class TobWgsParser(GenericMetadataParser):
         self,
         project: str,
         search_locations: List[str],
-        default_sequence_type='wgs',
+        default_sequencing_type='wgs',
         default_sample_type='blood',
     ):
         super().__init__(
             search_locations=search_locations,
             project=project,
-            default_sequence_type=default_sequence_type,
+            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             sample_name_column='sample.sample_name',
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map=SEQUENCE_MAP,
+            assay_meta_map=SEQUENCE_MAP,
             qc_meta_map={},
         )
 
@@ -111,17 +111,17 @@ class TobWgsParser(GenericMetadataParser):
 
         return None
 
-    async def get_analyses_from_sequence_group(
-        self, sequence_group: ParsedSequencingGroup
+    async def get_analyses_from_sequencing_group(
+        self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAnalysis]:
         """
         Get Analysis entries from a row.
         cpg_id is known for previously added samples.
         """
-        analyses = await super().get_analyses_from_sequence_group(sequence_group)
+        analyses = await super().get_analyses_from_sequencing_group(sequencing_group)
 
-        sample_id = sequence_group.sample.external_sid
-        cpg_id = sequence_group.sample.internal_sid
+        sample_id = sequencing_group.sample.external_sid
+        cpg_id = sequencing_group.sample.internal_sid
 
         for analysis_type in ['gvcf', 'cram']:
             if analysis_type == 'gvcf':
@@ -135,7 +135,7 @@ class TobWgsParser(GenericMetadataParser):
 
             analyses.append(
                 ParsedAnalysis(
-                    sequence_group=sequence_group,
+                    sequencing_group=sequencing_group,
                     type_=AnalysisType(analysis_type),
                     status=AnalysisStatus('completed'),
                     output=file_path,
@@ -153,17 +153,17 @@ class TobWgsParser(GenericMetadataParser):
             )
         return analyses
 
-    async def get_sequences_from_group(
-        self, sequence_group: ParsedSequencingGroup
-    ) -> list[ParsedSequencing]:
-        sequences = await super().get_sequences_from_group(sequence_group)
+    async def get_assays_from_group(
+        self, sequencing_group: ParsedSequencingGroup
+    ) -> list[ParsedAssay]:
+        assays = await super().get_assays_from_group(sequencing_group)
 
-        for sequence in sequences:
-            row = sequence.rows[0]
-            sequence.meta['batch'] = int(row['batch.batch_name'][-3:])
-            sequence.meta['batch_name'] = row['batch.batch_name'][:-5]
+        for assay in assays:
+            row = assay.rows[0]
+            assay.meta['batch'] = int(row['batch.batch_name'][-3:])
+            assay.meta['batch_name'] = row['batch.batch_name'][:-5]
 
-        return sequences
+        return assays
 
 
 @click.command(help='GCS path to manifest file')
@@ -194,7 +194,7 @@ async def main(
 
     parser = TobWgsParser(
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_sequence_type,
         project=project,
         search_locations=_search_locations,
     )

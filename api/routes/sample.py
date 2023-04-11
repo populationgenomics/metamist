@@ -34,9 +34,11 @@ async def create_sample(
 
 
 @router.put(
-    '/{project}/batch', response_model=dict[str, Any], operation_id='batchUpsertSamples'
+    '/{project}/upsert-many',
+    response_model=dict[str, Any],
+    operation_id='upsertSamples',
 )
-async def batch_upsert_samples(
+async def upsert_samples(
     samples: list[SampleUpsert],
     connection: Connection = get_project_write_connection,
 ) -> dict[str, Any]:
