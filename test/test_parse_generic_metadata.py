@@ -119,7 +119,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
-            skip_checking_gcs_objects=False,
+            skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {
@@ -446,7 +446,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
-            skip_checking_gcs_objects=False,
+            skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {'file.cram': 'gs://path/file.cram'}
