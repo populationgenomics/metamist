@@ -525,6 +525,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 }
             ],
         }
@@ -600,6 +601,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 }
             ],
         }
