@@ -34,7 +34,7 @@ This information is derived from the fluidX id pulled from the filename.
 
 import logging
 import csv
-from typing import List, Optional, Any
+from typing import List, Optional
 import click
 
 from sample_metadata.parser.generic_metadata_parser import (
@@ -161,26 +161,25 @@ class ExistingCohortParser(GenericMetadataParser):
             f'Does the corresponding FASTQ exist in the search locations?'
         )
 
-    def get_existing_external_sequence_ids(
-        self, participant_map: dict[str, dict[Any, list[Any]]]
-    ):
+    def get_existing_external_sequence_ids(self, participant_map: dict[str, dict]):
         """
         Overwrites get_existing_sequence function to pull
         external sequence IDs from the filename_map as opposed to the input CSV
         """
-        external_sequence_ids: list[str] = []
-        for participant in participant_map:
-            for sample in participant_map[participant]:
-                for sequence in participant_map[participant][sample]:
-                    external_sequence_ids.append((sequence.get('Sequence ID')))
-                    for filename, _path in self.filename_map.items():
-                        if fastq_file_name_to_sample_id(filename) == sequence.get(
-                            'Sample/Name'
-                        ):
-                            split_filename = filename.split('_')[0:4]
-                            external_sequence_id = '_'.join(split_filename)
-                    external_sequence_ids.append(external_sequence_id)
 
+        external_sequence_ids = []
+        sample_id_to_seq_id_map = {
+            fastq_file_name_to_sample_id(filename): '_'.join(filename.split('_')[:4])
+            for filename in self.filename_map
+        }
+        for participant in participant_map.values():
+            for sample in participant.values():
+                for sequence in sample:
+                    external_seq_id = sample_id_to_seq_id_map.get(
+                        sequence.get('Sample/Name')
+                    )
+                    if external_seq_id:
+                        external_sequence_ids.append(external_seq_id)
         return external_sequence_ids
 
 
