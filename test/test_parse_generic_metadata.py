@@ -168,7 +168,6 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': 111,
-                    'datetime_added': None,
                 }
             ],
             'gvcf_types': 'gvcf',
