@@ -266,6 +266,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                         'class': 'File',
                         'location': '/path/to/sample_id001.filename-R1.fastq.gz',
                         'size': None,
+                        'datetime_added': None,
                     },
                     {
                         'basename': 'sample_id001.filename-R2.fastq.gz',
@@ -273,6 +274,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                         'class': 'File',
                         'location': '/path/to/sample_id001.filename-R2.fastq.gz',
                         'size': None,
+                        'datetime_added': None,
                     },
                 ]
             ],
@@ -515,6 +517,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'class': 'File',
             'checksum': None,
             'size': None,
+            'datetime_added': None,
             'secondaryFiles': [
                 {
                     'location': 'gs://path/file.fasta.fai',
@@ -589,6 +592,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'class': 'File',
             'checksum': None,
             'size': None,
+            'datetime_added': None,
             'secondaryFiles': [
                 {
                     'location': 'gs://path/ref.fa.fai',

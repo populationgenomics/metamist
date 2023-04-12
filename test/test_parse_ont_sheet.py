@@ -81,6 +81,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
                         'class': 'File',
                         'checksum': None,
                         'size': None,
+                        'datetime_added': None,
                     }
                 ]
             ],
@@ -96,6 +97,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
                         'class': 'File',
                         'location': 'gs://BUCKET/FAKE/Sample01_pass.fastq.gz',
                         'size': None,
+                        'datetime_added': None,
                     }
                 ]
             ],
