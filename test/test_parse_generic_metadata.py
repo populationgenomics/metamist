@@ -156,7 +156,26 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'basename': '<sample-id>.bam',
                     'class': 'File',
                     'checksum': None,
-                    'size': 111,
+                    'size': None,
+                    'datetime_added': None,
+                    'secondaryFiles': [
+                        {
+                            'location': '/path/to/<sample-id>.bam.bai',
+                            'basename': '<sample-id>.bam.bai',
+                            'class': 'File',
+                            'checksum': None,
+                            'size': None,
+                            'datetime_added': None,
+                        },
+                        {
+                            'location': '/path/to/<sample-id>.bai',
+                            'basename': '<sample-id>.bai',
+                            'class': 'File',
+                            'checksum': None,
+                            'size': None,
+                            'datetime_added': None,
+                        }
+                    ],
                 }
             ],
             'reads_type': 'bam',
@@ -166,13 +185,22 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'basename': '<sample-id>.g.vcf.gz',
                     'class': 'File',
                     'checksum': None,
-                    'size': 111,
+                    'size': None,
+                    'datetime_added': None,
+                    'secondaryFiles': [
+                        {
+                            'location': '/path/to/<sample-id>.g.vcf.gz.tbi',
+                            'basename': '<sample-id>.g.vcf.gz.tbi',
+                            'class': 'File',
+                            'checksum': None,
+                            'size': None,
+                            'datetime_added': None,
+                        }
+                    ],
                 }
             ],
             'gvcf_types': 'gvcf',
         }
-        for k,v in (sequences_to_add[0].meta).items():
-            print(k,v)
         self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
         analysis = analyses_to_add['<sample-id>'][0]
         self.assertDictEqual(
