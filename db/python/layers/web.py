@@ -19,7 +19,6 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.assay import AssayTable
-from models.enums import SampleType
 from models.base import SMBase
 
 
@@ -57,7 +56,7 @@ class NestedSample(BaseModel):
 
     id: str
     external_id: str
-    type: SampleType
+    type: str
     meta: Dict
     sequences: List[NestedSequence]
     created_date: Optional[str]

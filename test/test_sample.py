@@ -1,6 +1,6 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.models.sample import SampleType, SampleUpsertInternal
+from models.models.sample import SampleUpsertInternal
 from db.python.layers.sample import SampleLayer
 
 
@@ -20,7 +20,7 @@ class TestSample(DbIsolatedTest):
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test01',
-                type=SampleType.BLOOD,
+                type='blood',
                 active=True,
                 meta={'meta': 'meta ;)'},
             )
@@ -40,7 +40,7 @@ class TestSample(DbIsolatedTest):
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test01',
-                type=SampleType.BLOOD,
+                type='blood',
                 active=True,
                 meta=meta_dict,
             )
@@ -48,7 +48,7 @@ class TestSample(DbIsolatedTest):
 
         sample = await self.slayer.get_by_id(s.id, check_project_id=False)
 
-        self.assertEqual(SampleType.BLOOD, sample.type)
+        self.assertEqual('blood', sample.type)
         self.assertDictEqual(meta_dict, sample.meta)
 
     @run_as_sync
@@ -58,7 +58,7 @@ class TestSample(DbIsolatedTest):
         s = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test01',
-                type=SampleType.BLOOD,
+                type='blood',
                 active=True,
                 meta=meta_dict,
             )

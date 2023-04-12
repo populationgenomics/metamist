@@ -53,7 +53,7 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertEqual(1, summary['assays']['insert'])
         self.assertEqual(0, summary['assays']['update'])
 
-        sequence = participants[0].samples[0].sequencing_groups[0].assays[0]
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence_dict = {
@@ -74,9 +74,12 @@ class TestSampleMapParser(unittest.TestCase):
                 },
             ],
             'reads_type': 'fastq',
+            'sequencing_type': 'genome',
+            'sequencing_technology': 'short-read',
+            'sequencing_platform': 'illumina',
         }
-        self.assertEqual('short-read', str(sequence.technology))
-        self.assertDictEqual(expected_sequence_dict, sequence.meta)
+        self.maxDiff = None
+        self.assertDictEqual(expected_sequence_dict, assay.meta)
 
     @run_as_sync
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
@@ -124,6 +127,7 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertEqual(0, summary['samples']['update'])
         self.assertEqual(2, summary['assays']['insert'])
         self.assertEqual(0, summary['assays']['update'])
+        self.maxDiff = None
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
         expected_sequence1_reads = [

@@ -60,6 +60,15 @@ class AssayUpsertInternal(BaseModel):
     sample_id: int | None = None
     meta: dict[str, Any] | None = None
 
+    def to_external(self):
+        return AssayUpsert(
+            id=self.id,
+            type=self.type,
+            external_ids=self.external_ids,
+            sample_id=sample_id_format(self.sample_id) if self.sample_id else None,
+            meta=self.meta,
+        )
+
 
 class Assay(BaseModel):
     """Asssay model for external use"""

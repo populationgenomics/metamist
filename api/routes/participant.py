@@ -1,5 +1,6 @@
 import csv
 import io
+from collections import defaultdict
 from datetime import date
 from typing import Any, List, Optional, Dict
 
@@ -19,6 +20,7 @@ from db.python.layers.participant import (
 )
 from models.models.participant import ParticipantUpsert
 from models.models.sample import sample_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -138,7 +140,7 @@ async def get_external_participant_id_to_internal_sample_id(
     player = ParticipantLayer(connection)
     # this wants project ID (connection.project)
     assert connection.project
-    m = await player.get_external_participant_id_to_internal_sample_id_map(
+    m = await player.get_external_participant_id_to_internal_sequencing_group_id_map(
         project=connection.project
     )
 
@@ -187,34 +189,14 @@ async def update_participant(
 async def upsert_participants(
     participants: list[ParticipantUpsert],
     connection: Connection = get_project_write_connection,
-) -> Dict[str, Any]:
+):
     """
     Upserts a list of participants with samples and sequences
     Returns the list of internal sample IDs
     """
-    # Convert id in samples to int
-
-    external_pids = [p.external_id for p in participants]
-
     pt = ParticipantLayer(connection)
-
     results = await pt.upsert_participants([p.to_internal() for p in participants])
-    pid_key = dict(zip(results.keys(), external_pids))
-
-    # Map sids back from ints to strs
-    outputs: Dict[str, Dict[str, Any]] = {}
-    for pid, samples in results.items():
-        samples_output: Dict[str, Any] = {}
-        for iid, seqs in samples.items():
-            data = {'sequences': seqs}
-            samples_output[sample_id_format(iid)] = data
-        outputs[pid_key[pid]] = {
-            'id': pid,
-            'external_id': pid_key[pid],
-            'samples': samples_output,
-        }
-
-    return outputs
+    return [p.to_external() for p in results]
 
 
 @router.post(

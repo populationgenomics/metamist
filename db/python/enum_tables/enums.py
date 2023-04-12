@@ -58,6 +58,7 @@ class EnumTable(DbBase):
         _query = f"""
             INSERT INTO {self._get_table_name()} (id, name)
             VALUES (:name, :name)
+            ON DUPLICATE KEY UPDATE name = :name
         """
 
         await self.connection.execute(_query, {'name': value.lower()})

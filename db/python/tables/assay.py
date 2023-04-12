@@ -102,6 +102,13 @@ class AssayTable(DbBase):
         if not sample_id:
             raise ValueError('An assay MUST be assigned to a sample ID')
 
+        # TODO: revise this based on outcome of https://centrepopgen.slack.com/archives/C03FZL2EF24/p1681274510159009
+        if assay_type == 'sequencing':
+            required_fields = ['sequencing_type', 'sequencing_platform', 'sequencing_technology']
+            missing_fields = [f for f in required_fields if f not in meta]
+            if missing_fields:
+                raise ValueError(f'Assay of type sequencing is missing required meta fields: {missing_fields}')
+
         _query = """\
             INSERT INTO assay
                 (sample_id, meta, type, author)

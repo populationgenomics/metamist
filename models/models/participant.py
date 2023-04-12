@@ -50,6 +50,17 @@ class ParticipantUpsertInternal(BaseModel):
 
     samples: list[SampleUpsertInternal] | None = None
 
+    def to_external(self):
+        return ParticipantUpsert(
+            id=self.id,
+            external_id=self.external_id,
+            reported_sex=self.reported_sex,
+            reported_gender=self.reported_gender,
+            karyotype=self.karyotype,
+            meta=self.meta,
+            samples=[s.to_external() for s in self.samples or []],
+        )
+
 
 class Participant(BaseModel):
     """External participant model"""

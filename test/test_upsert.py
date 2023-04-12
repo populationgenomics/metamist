@@ -7,8 +7,12 @@ from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.models.assay import AssayUpsertInternal
-from models.enums import SampleType
 
+default_assay_meta = {
+    'sequencing_type': 'genome',
+    'sequencing_technology': 'short-read',
+    'sequencing_platform': 'illumina',
+}
 
 all_participants = [
     ParticipantUpsertInternal(
@@ -22,7 +26,7 @@ all_participants = [
                     SequencingGroupUpsertInternal(
                         type='genome',
                         technology='short-read',
-                        platform=None,
+                        platform='illumina',
                         meta={},
                         assays=[
                             AssayUpsertInternal(
@@ -44,6 +48,7 @@ all_participants = [
                                         },
                                     ],
                                     'reads_type': 'fastq',
+                                    **default_assay_meta,
                                 },
                                 type='sequencing',
                             )
@@ -52,7 +57,7 @@ all_participants = [
                     SequencingGroupUpsertInternal(
                         type='exome',
                         technology='short-read',
-                        platform=None,
+                        platform='illumina',
                         meta={},
                         assays=[
                             AssayUpsertInternal(
@@ -73,14 +78,14 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',
+                                    'reads_type': 'fastq',**default_assay_meta,
                                 },
                                 type='sequencing',
                             )
                         ],
                     ),
                 ],
-                type=SampleType.BLOOD,
+                type='blood',
             )
         ],
     ),
@@ -95,7 +100,7 @@ all_participants = [
                     SequencingGroupUpsertInternal(
                         type='genome',
                         technology='short-read',
-                        platform=None,
+                        platform='illumina',
                         meta={},
                         assays=[
                             AssayUpsertInternal(
@@ -116,14 +121,14 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',
+                                    'reads_type': 'fastq',**default_assay_meta,
                                 },
                                 type='sequencing',
                             )
                         ],
                     ),
                 ],
-                type=SampleType.BLOOD,
+                type='blood',
             ),
             SampleUpsertInternal(
                 external_id='sample_id004',
@@ -132,7 +137,7 @@ all_participants = [
                     SequencingGroupUpsertInternal(
                         type='genome',
                         technology='short-read',
-                        platform=None,
+                        platform='illumina',
                         meta={},
                         assays=[
                             AssayUpsertInternal(
@@ -153,14 +158,14 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',
+                                    'reads_type': 'fastq',**default_assay_meta,
                                 },
                                 type='sequencing',
                             )
                         ],
                     )
                 ],
-                type=SampleType.BLOOD,
+                type='blood',
             ),
         ],
     ),
@@ -175,7 +180,7 @@ all_participants = [
                     SequencingGroupUpsertInternal(
                         type='genome',
                         technology='short-read',
-                        platform=None,
+                        platform='illumina',
                         meta={},
                         assays=[
                             AssayUpsertInternal(
@@ -196,14 +201,14 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',
+                                    'reads_type': 'fastq',**default_assay_meta,
                                 },
                                 type='sequencing',
                             )
                         ],
                     )
                 ],
-                type=SampleType.BLOOD,
+                type='blood',
             )
         ],
     ),

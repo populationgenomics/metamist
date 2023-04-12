@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import date
 
 from db.python.connect import DbBase, NoOpAenter
 from db.python.utils import ProjectId, to_db_json
@@ -49,7 +50,7 @@ class SequencingGroupTable(DbBase):
         """
 
         rows = await self.connection.fetch_all(_query, {'sqgids': ids})
-        rows = [SequencingGroupInternal(**dict(r)) for r in rows]
+        rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(r.project for r in rows)
 
         return projects, rows
@@ -71,6 +72,52 @@ class SequencingGroupTable(DbBase):
             sequencing_groups[row['sequencing_group_id']].append(row['sequencing_id'])
 
         return dict(sequencing_groups)
+
+    async def query(
+        self,
+        project_ids: list[ProjectId],
+        sample_ids: list[int],
+        sequencing_group_ids: list[int],
+        types: list[str],
+        technologies: list[str],
+        platforms: list[str],
+    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
+        """
+        Query sequencing groups
+        """
+        wheres = []
+        params = {}
+        if project_ids:
+            wheres.append('s.project IN :project_ids')
+            params['project_ids'] = project_ids
+        if sample_ids:
+            wheres.append('s.id IN :sample_ids')
+            params['sample_ids'] = sample_ids
+        if sequencing_group_ids:
+            wheres.append('sqg.id IN :sequencing_group_ids')
+            params['sequencing_group_ids'] = sequencing_group_ids
+        if types:
+            wheres.append('sqg.type IN :types')
+            params['types'] = types
+        if technologies:
+            wheres.append('sqg.technology IN :technologies')
+            params['technologies'] = technologies
+        if platforms:
+            wheres.append('sqg.platform IN :platforms')
+            params['platforms'] = platforms
+
+        where = ' AND '.join(wheres)
+        _query = f"""
+            SELECT sqg.id, s.id as sample_id, s.project, sqg.type, sqg.technology, sqg.platform, sqg.meta, sqg.author
+            FROM sequencing_group sqg
+            INNER JOIN sample s ON s.id = sqg.sample_id
+            {'WHERE ' + where if where else ''}
+        """
+
+        rows = await self.connection.fetch_all(_query, params)
+        sequencing_groups = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
+        projects = set(r.project for r in sequencing_groups)
+        return projects, sequencing_groups
 
     async def get_all_sequencing_group_ids_by_sample_ids_by_type(
         self,
@@ -106,7 +153,7 @@ class SequencingGroupTable(DbBase):
         _query = """
     SELECT s.project as project, sg.id as sid, s.participant_id as pid
     FROM sequencing_group sg
-    INNER JOIN sample s ON sq.sample_id = s.id
+    INNER JOIN sample s ON sg.sample_id = s.id
     WHERE sg.type = :seqtype AND project = :project
         """
 
@@ -123,14 +170,26 @@ class SequencingGroupTable(DbBase):
 
         return projects, participant_id_to_sids
 
+    async def get_sequencing_groups_create_date(self, sequencing_group_ids: list[int]) -> dict[int, date]:
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        if len(sequencing_group_ids) == 0:
+            return {}
+        _query = """
+        SELECT id, min(row_start)
+        FROM sequencing_group FOR SYSTEM_TIME ALL
+        WHERE id in :sgids
+        GROUP BY id"""
+        rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
+        return {r[0]: r[1].date() for r in rows}
+
     async def create_sequencing_group(
         self,
         sample_id: int,
         type_: str,
         technology: str,
         platform: str,
-        meta: dict,
         sequence_ids: list[int],
+        meta: dict = None,
         author: str = None,
         open_transaction=True,
     ):
@@ -149,19 +208,26 @@ class SequencingGroupTable(DbBase):
             (:seqgroup, :assayid, :author)
         """
 
+        values = {
+                    'sample_id': sample_id,
+                    'type': type_.lower() if type else None,
+                    'technology': technology.lower() if technology else None,
+                    'platform': platform.lower() if platform else None,
+                    'meta': to_db_json(meta or {}),
+                }
+        # check if any values are None and raise an exception if so
+        bad_keys = [k for k, v in values.items() if v is None]
+        if bad_keys:
+            raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
+
+
+
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
-                {
-                    'sample_id': sample_id,
-                    'type': type_,
-                    'technology': technology,
-                    'platform': platform.upper() if platform else None,
-                    'meta': to_db_json(meta),
-                    'author': author or self.author,
-                },
+                {**values, 'author': author or self.author},
             )
             sequence_insert_values = [
                 {

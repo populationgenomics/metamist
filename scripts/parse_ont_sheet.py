@@ -5,11 +5,10 @@ import logging
 
 import click
 
+from sample_metadata.parser.generic_parser import ParsedSample, ParsedSequencingGroup
 from sample_metadata.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
-    ParsedSequencingGroup,
-    ParsedSample,
 )
 
 logger = logging.getLogger(__file__)

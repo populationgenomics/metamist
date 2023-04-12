@@ -1,3 +1,4 @@
+from db.python.enum_tables import AssayTypeTable
 from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
@@ -5,10 +6,14 @@ from db.python.enum_tables.sequencing_type import SequencingTypeTable
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.assay import AssayLayer
-from models.enums import SampleType
 from models.models.assay import AssayUpsertInternal
 from models.models.sample import SampleUpsertInternal
 
+default_sequencing_meta = {
+'sequencing_type': 'genome',
+            'sequencing_platform': 'short-read',
+            'sequencing_technology': 'illumina',
+}
 
 class TestSequence(DbIsolatedTest):
     """Test assay class"""
@@ -28,12 +33,15 @@ class TestSequence(DbIsolatedTest):
             await self.slayer.upsert_sample(
                 SampleUpsertInternal(
                     external_id=self.external_sample_id,
-                    type=SampleType.BLOOD,
+                    type='blood',
                     active=True,
                     meta={'Testing': 'test_assay'},
                 )
             )
         ).id
+
+        at = AssayTypeTable(self.connection)
+        await at.insert('metabolomics')
 
     @run_as_sync
     async def test_not_found_assay(self):
@@ -43,7 +51,7 @@ class TestSequence(DbIsolatedTest):
 
         @run_as_sync
         async def get():
-            return await self.assaylayer.get_assay_by_id(999, check_project_id=False)
+            return await self.assaylayer.get_assay_by_id(9999, check_project_id=False)
 
         self.assertRaises(NotFoundError, get)
 
@@ -53,7 +61,12 @@ class TestSequence(DbIsolatedTest):
         Test inserting a assay, and check all values are inserted correctly
         """
         external_ids = {'default': 'SEQ01', 'collaborator2': 'CBSEQ_1'}
-        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't']}
+        meta = {
+            '1': 1,
+            'nested': {'nested': 'dict'},
+            'alpha': ['b', 'e', 't'],
+            **default_sequencing_meta
+        }
         upserted_assay = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
@@ -78,7 +91,7 @@ class TestSequence(DbIsolatedTest):
         """
         Test inserting a assay, and check all values are inserted correctly
         """
-        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't']}
+        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't'], **default_sequencing_meta}
         sequencing_types = ['sequencing', 'metabolomics']
         assays = await self.assaylayer.upsert_assays(
             [
@@ -108,7 +121,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids=external_ids,
             )
         )
@@ -119,7 +132,7 @@ class TestSequence(DbIsolatedTest):
                 AssayUpsertInternal(
                     sample_id=self.sample_id_raw,
                     type='sequencing',
-                    meta={},
+                    meta={**default_sequencing_meta},
                     external_ids=external_ids,
                 )
             )
@@ -146,7 +159,7 @@ class TestSequence(DbIsolatedTest):
                         external_ids=external_ids,
                         sample_id=self.sample_id_raw,
                         type='sequencing',
-                        meta={},
+                        meta={**default_sequencing_meta},
                     )
                     for _ in range(2)
                 ]
@@ -167,7 +180,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids={'default': 'SEQ01', 'other': 'EXT_SEQ1'},
             )
         )
@@ -175,7 +188,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids={'default': 'SEQ02'},
             )
         )
@@ -197,7 +210,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids={},
             )
         )
@@ -205,7 +218,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids={},
             )
         )
@@ -227,7 +240,7 @@ class TestSequence(DbIsolatedTest):
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='SAM_TEST_QUERY',
-                type=SampleType.BLOOD,
+                type='blood',
                 active=True,
                 meta={'collection-year': '2022'},
             )
@@ -240,13 +253,13 @@ class TestSequence(DbIsolatedTest):
                 AssayUpsertInternal(
                     sample_id=sample_id_for_test,
                     type='sequencing',
-                    meta={'unique': 'a', 'common': 'common'},
+                    meta={'unique': 'a', 'common': 'common', **default_sequencing_meta},
                     external_ids={'default': 'SEQ01'},
                 ),
                 AssayUpsertInternal(
                     sample_id=sample_id_for_test,
                     type='sequencing',
-                    meta={'unique': 'b', 'common': 'common'},
+                    meta={'unique': 'b', 'common': 'common',**default_sequencing_meta},
                     external_ids={'default': 'SEQ02'},
                 ),
             ]
@@ -314,7 +327,7 @@ class TestSequence(DbIsolatedTest):
         self.assertSetEqual(
             {seq1_id},
             await search_result_to_ids(
-                external_assay_ids=['SEQ01'], types=['sequencing']
+                external_assay_ids=['SEQ01'], assay_types=['sequencing']
             ),
         )
         # self.assertSetEqual(
@@ -332,7 +345,7 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={'a': 1, 'b': 2},
+                meta={'a': 1, 'b': 2, **default_sequencing_meta},
                 external_ids={
                     'default': 'SEQ01',
                     'untouched': 'UTC+1',
@@ -365,7 +378,7 @@ class TestSequence(DbIsolatedTest):
             {'default': 'NSQ_01', 'ext': 'EXTSEQ01', 'untouched': 'UTC+1'},
             update_assay.external_ids,
         )
-        self.assertDictEqual({'a': 2, 'b': 2, 'c': True}, update_assay.meta)
+        self.assertDictEqual({'a': 2, 'b': 2, 'c': True, **default_sequencing_meta}, update_assay.meta)
 
     @run_as_sync
     async def test_update_type(self):
@@ -376,12 +389,10 @@ class TestSequence(DbIsolatedTest):
             AssayUpsertInternal(
                 sample_id=self.sample_id_raw,
                 type='sequencing',
-                meta={},
+                meta={**default_sequencing_meta},
                 external_ids={},
             )
         )
-        st = SequencingTypeTable(self.connection)
-        await st.insert('metabolomics')
 
         # cycle through all statuses, and check that works
         await self.assaylayer.upsert_assay(

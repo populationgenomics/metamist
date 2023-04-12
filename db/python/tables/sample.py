@@ -6,7 +6,6 @@ from typing import Iterable, Any
 from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
-from models.enums import SampleType
 from models.models.sample import SampleInternal, sample_id_format
 
 
@@ -213,7 +212,7 @@ class SampleTable(DbBase):
     async def insert_sample(
         self,
         external_id: str,
-        sample_type: SampleType,
+        sample_type: str,
         active: bool,
         meta: dict | None,
         participant_id: int | None,
@@ -228,7 +227,7 @@ class SampleTable(DbBase):
             ('external_id', external_id),
             ('participant_id', participant_id),
             ('meta', to_db_json(meta or {})),
-            ('type', sample_type.value if sample_type else None),
+            ('type', sample_type),
             ('active', active),
             ('author', author or self.author),
             ('project', project or self.project),
@@ -256,7 +255,7 @@ class SampleTable(DbBase):
         meta: dict | None,
         participant_id: int | None,
         external_id: str | None,
-        type_: SampleType | None,
+        type_: str | None,
         author: str = None,
         active: bool = None,
     ):
@@ -277,7 +276,7 @@ class SampleTable(DbBase):
             fields.append('external_id = :external_id')
 
         if type_:
-            values['type'] = type_.value
+            values['type'] = type_
             fields.append('type = :type')
 
         if meta is not None and len(meta) > 0:

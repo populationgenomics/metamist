@@ -31,11 +31,13 @@ from db.python.tables.project import ProjectPermissionsTable
 from db.python.enum_tables import SequencingTypeTable
 from db.python.utils import ProjectId
 from models.enums import AnalysisStatus
-from models.utils.sample_id_format import sample_id_format, sample_id_format_list
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
-SAMPLES_TO_IGNORE = {22735, 22739}
+from models.utils.sequencing_group_id_format import sequencing_group_id_format_list, \
+    sequencing_group_id_format
+
+SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
 
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
@@ -64,7 +66,7 @@ def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
 
 
 class SeqrLayer(BaseLayer):
-    """Layer for more complex sample logic"""
+    """Layer for more complex seqr logic"""
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
@@ -155,7 +157,7 @@ class SeqrLayer(BaseLayer):
             )
         )
         participant_ids = list(pid_to_sid_map.keys())
-        sample_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
+        sequencing_group_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
         families = await self.flayer.get_families_by_participants(participant_ids)
         family_ids = set(f.id for fams in families.values() for f in fams)
 
@@ -210,8 +212,8 @@ class SeqrLayer(BaseLayer):
             if sync_es_index:
                 promises.append(
                     self.update_es_index(
-                        sequence_type=sequence_type,
-                        internal_sample_ids=sample_ids,
+                        sequencing_type=sequence_type,
+                        sequencing_group_ids=sequencing_group_ids,
                         **params,
                     )
                 )
@@ -362,32 +364,35 @@ class SeqrLayer(BaseLayer):
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
-        sequence_type: str,
+        sequencing_type: str,
         project_guid,
         headers,
-        internal_sample_ids: set[int],
+        sequencing_group_ids: set[int],
     ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
-        eid_to_sid_rows = (
-            await self.player.get_external_participant_id_to_internal_sample_id_map(
-                self.connection.project
+        eid_to_sgid_rows = (
+            await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
+                self.connection.project, sequencing_type=sequencing_type
             )
         )
 
         # format sample ID for transport
         person_sample_map_rows: list[tuple[str, str]] = [
-            (p[0], sample_id_format(p[1]))
-            for p in eid_to_sid_rows
-            if p[1] not in SAMPLES_TO_IGNORE
+            (p[0], sequencing_group_id_format(p[1]))
+            for p in eid_to_sgid_rows
+            if p[1] not in SEQUENCING_GROUPS_TO_IGNORE
         ]
 
+        # highlighting that seqr wants:
+        #   Col 1: Sample Ids (sequencing group ID in our case)
+        #   Col 2: Seqr Individual Ids (column 2).
         rows_to_write = [
             '\t'.join(s[::-1])
             for s in person_sample_map_rows
-            if not any(sid in s for sid in SAMPLES_TO_IGNORE)
+            if not any(sid in s for sid in SEQUENCING_GROUPS_TO_IGNORE)
         ]
 
-        filename = f'{project_guid}_pid_sid_map_{datetime.now().isoformat()}.tsv'
+        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
         # remove any non-filename compliant filenames
         filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
@@ -398,7 +403,7 @@ class SeqrLayer(BaseLayer):
         es_index_analyses = await alayer.query_analysis(
             project_ids=[self.connection.project],
             analysis_type='es-index',
-            meta={'sequencing_type': sequence_type},
+            meta={'sequencing_type': sequencing_type},
             status=AnalysisStatus('completed'),
         )
 
@@ -417,26 +422,26 @@ class SeqrLayer(BaseLayer):
 
         messages = []
 
-        if internal_sample_ids:
-            samples_in_new_index = set(es_index_analyses[-1].sample_ids)
+        if sequencing_group_ids:
+            sequencing_groups_in_new_index = set(es_index_analyses[-1].sequencing_group_ids)
 
             if len(es_index_analyses) > 1:
-                samples_in_old_index = set(es_index_analyses[-2].sample_ids)
-                samples_diff = sample_id_format_list(
-                    samples_in_new_index - samples_in_old_index
+                sequencing_groups_in_old_index = set(es_index_analyses[-2].sequencing_group_ids)
+                sequencing_groups_diff = sequencing_group_id_format_list(
+                    sequencing_groups_in_new_index - sequencing_groups_in_old_index
                 )
-                if samples_diff:
+                if sequencing_groups_diff:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(samples_diff),
+                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
                     )
 
-            sample_ids_missing_from_index = sample_id_format_list(
-                internal_sample_ids - samples_in_new_index
+            sg_ids_missing_from_index = sequencing_group_id_format_list(
+                sequencing_group_ids - sequencing_groups_in_new_index
             )
-            if sample_ids_missing_from_index:
+            if sg_ids_missing_from_index:
                 messages.append(
-                    'Samples missing from index: '
-                    + ', '.join(sample_ids_missing_from_index),
+                    'Sequencing groups missing from index: '
+                    + ', '.join(sg_ids_missing_from_index),
                 )
 
         req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
@@ -503,7 +508,7 @@ class SeqrLayer(BaseLayer):
                 continue
             participant_id = row['participant_id']
             parsed_records[participant_id].append(
-                {'filePath': output, 'sampleId': sample_id_format(row['sample_id'])}
+                {'filePath': output, 'sampleId': sequencing_group_id_format(row['sequencing_group_id'])}
             )
 
         if not reads_map:
@@ -537,7 +542,7 @@ class SeqrLayer(BaseLayer):
         for idx, updates in enumerate(chunk(all_updates, chunk_size=10)):
             start = idx * chunk_size + 1
             finish = start + len(updates)
-            print(f'Updating CRAMs {start} -> {finish} (/{len(all_updates)}')
+            print(f'Updating CRAMs {start} -> {finish} (/{len(all_updates)})')
 
             responses = await asyncio.gather(
                 *[_make_update_igv_call(update) for update in updates],

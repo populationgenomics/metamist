@@ -294,8 +294,8 @@ RETURNING id
         rows = await self.connection.fetch_all(_query, {'pids': participant_ids})
         return {r['id']: [r['external_id']] for r in rows}
 
-    async def get_external_participant_id_to_internal_sample_id_map(
-        self, project: ProjectId
+    async def get_external_participant_id_to_internal_sequencing_group_id_map(
+        self, project: ProjectId, sequencing_type: str | None = None
     ) -> list[tuple[str, int]]:
         """
         Get a map of {external_participant_id} -> {internal_sample_id}
@@ -304,13 +304,20 @@ RETURNING id
         Return a list not dictionary, because dict could lose
         participants with multiple samples.
         """
-        _query = """
+        wheres = ['p.project = :project']
+        values = {'project': project}
+        if sequencing_type:
+            wheres.append('sg.type = :sequencing_type')
+            values['sequencing_type'] = sequencing_type
+
+        _query = f"""
 SELECT p.external_id, s.id
 FROM participant p
 INNER JOIN sample s ON p.id = s.participant_id
-WHERE p.project = :project
+INNER JOIN sequencing_group sg ON sg.sample_id = s.id
+WHERE {' AND '.join(wheres)}
 """
-        values = await self.connection.fetch_all(_query, {'project': project})
+        values = await self.connection.fetch_all(_query, values)
         return [(r[0], r[1]) for r in values]
 
     async def search(

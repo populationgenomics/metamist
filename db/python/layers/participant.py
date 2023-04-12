@@ -564,18 +564,18 @@ class ParticipantLayer(BaseLayer):
 
         return id_map
 
-    async def get_external_participant_id_to_internal_sample_id_map(
-        self, project: int
+    async def get_external_participant_id_to_internal_sequencing_group_id_map(
+        self, project: int, sequencing_type: str=None
     ) -> List[Tuple[str, int]]:
         """
-        Get a map of {external_participant_id} -> {internal_sample_id}
+        Get a map of {external_participant_id} -> {internal_sequencing_group_id}
         useful to matching joint-called samples in the matrix table to the participant
 
         Return a list not dictionary, because dict could lose
-        participants with multiple samples.
+        participants with multiple sequencing-groups.
         """
-        return await self.pttable.get_external_participant_id_to_internal_sample_id_map(
-            project=project
+        return await self.pttable.get_external_participant_id_to_internal_sequencing_group_id_map(
+            project=project, sequencing_type=sequencing_type
         )
 
     # region UPSERTS / UPDATES
@@ -587,7 +587,7 @@ class ParticipantLayer(BaseLayer):
         project: ProjectId = None,
         check_project_id: bool = True,
         open_transaction=True,
-    ) -> int:
+    ) -> ParticipantUpsertInternal:
         """Create a single participant"""
         # pylint: disable=unused-argument
 
@@ -641,7 +641,7 @@ class ParticipantLayer(BaseLayer):
                     open_transaction=False,
                 )
 
-            return participant.id
+            return participant
 
     async def upsert_participants(
         self,

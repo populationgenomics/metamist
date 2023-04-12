@@ -21,17 +21,18 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
 from models.models.analysis import (
-    Analysis,
+    AnalysisInternal,
     ProjectSizeModel,
-    SampleSizeModel,
-    DateSizeModel,
+    SequencingGroupSizeModel,
+    DateSizeModel, Analysis,
 )
 from models.utils.sample_id_format import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
     sample_id_format,
 )
-
+from models.utils.sequencing_group_id_format import sequencing_group_id_format_list, \
+    sequencing_group_id_transform_to_raw_list, sequencing_group_id_format
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -65,6 +66,7 @@ class AnalysisQueryModel(BaseModel):
     """Used to query for many analysis"""
 
     # sequencing_group_ids means it the analysis contains at least one of in the list
+    sample_ids: list[str] | None = None
     sequencing_group_ids: list[str] | None
     # # sample_ids_all means the analysis contains ALL of the sample_ids
     # sample_ids_all: list[str] = None
@@ -78,20 +80,14 @@ class AnalysisQueryModel(BaseModel):
 
 @router.put('/{project}/', operation_id='createAnalysis', response_model=int)
 async def create_analysis(
-    analysis: AnalysisModel, connection: Connection = get_project_write_connection
-):
+    analysis: Analysis, connection: Connection = get_project_write_connection
+) -> int:
     """Create a new analysis"""
 
     atable = AnalysisLayer(connection)
 
-    sample_ids = sample_id_transform_to_raw_list(analysis.sample_ids)
-
-    analysis_id = await atable.insert_analysis(
-        analysis_type=analysis.type,
-        status=analysis.status,
-        sample_ids=sample_ids,
-        meta=analysis.meta,
-        output=analysis.output,
+    analysis_id = await atable.create_analysis(
+        analysis.to_internal(),
         # analysis-runner: usage is tracked through `on_behalf_of`
         author=analysis.author,
     )
@@ -99,12 +95,12 @@ async def create_analysis(
     return analysis_id
 
 
-@router.patch('/{analysis_id}/', operation_id='updateAnalysisStatus')
-async def update_analysis_status(
+@router.patch('/{analysis_id}/', operation_id='updateAnalysis')
+async def update_analysis(
     analysis_id: int,
     analysis: AnalysisUpdateModel,
     connection: Connection = get_projectless_db_connection,
-):
+) -> bool:
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
@@ -115,7 +111,7 @@ async def update_analysis_status(
 
 @router.get(
     '/{project}/type/{analysis_type}/not-included-sample-ids',
-    operation_id='getAllSampleIdsWithoutstr',
+    operation_id='getAllSampleIdsWithoutAnalysisType',
 )
 async def get_all_sample_ids_without_analysis_type(
     analysis_type: str,
@@ -124,10 +120,10 @@ async def get_all_sample_ids_without_analysis_type(
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
     assert connection.project
-    result = await atable.get_all_sample_ids_without_analysis_type(
+    sequencing_group_ids = await atable.get_all_sequencing_group_ids_without_analysis_type(
         connection.project, analysis_type
     )
-    return {'sample_ids': sample_id_format_list(result)}
+    return {'sequencing_group_ids': sequencing_group_id_format_list(sequencing_group_ids)}
 
 
 @router.get(
@@ -141,12 +137,7 @@ async def get_incomplete_analyses(
     atable = AnalysisLayer(connection)
     assert connection.project
     results = await atable.get_incomplete_analyses(project=connection.project)
-    if results:
-        for result in results:
-            if result.sample_ids:
-                result.sample_ids = list(sample_id_format_list(result.sample_ids))
-
-    return results
+    return [r.to_external() for r in results]
 
 
 @router.get(
@@ -163,10 +154,7 @@ async def get_latest_complete_analysis_for_type(
     analysis = await alayer.get_latest_complete_analysis_for_type(
         project=connection.project, analysis_type=analysis_type
     )
-    if analysis and analysis.sample_ids:
-        analysis.sample_ids = list(sample_id_format_list(analysis.sample_ids))
-
-    return analysis
+    return analysis.to_external()
 
 
 @router.post(
@@ -189,10 +177,8 @@ async def get_latest_complete_analysis_for_type_post(
         analysis_type=analysis_type,
         meta=meta,
     )
-    if analysis and analysis.sample_ids:
-        analysis.sample_ids = list(sample_id_format_list(analysis.sample_ids))
 
-    return analysis
+    return analysis.to_external()
 
 
 @router.post(
@@ -216,11 +202,7 @@ async def get_latest_analysis_for_samples_and_type(
         allow_missing=allow_missing,
     )
 
-    if results:
-        for result in results:
-            result.sample_ids = sample_id_format_list(result.sample_ids)
-
-    return results
+    return [r.to_external() for r in results]
 
 
 @router.get(
@@ -235,8 +217,7 @@ async def get_analysis_by_id(
     """Get analysis by ID"""
     atable = AnalysisLayer(connection)
     result = await atable.get_analysis_by_id(analysis_id)
-    result.sample_ids = sample_id_format_list(result.sample_ids)
-    return result
+    return result.to_external()
 
 
 @router.post('/query', operation_id='queryAnalyses')
@@ -256,6 +237,9 @@ async def query_analyses(
         sample_ids=sample_id_transform_to_raw_list(query.sample_ids)
         if query.sample_ids
         else None,
+        sequencing_group_ids=sequencing_group_id_transform_to_raw_list(
+            query.sequencing_group_ids
+        ),
         project_ids=project_ids,
         analysis_type=query.type,
         status=query.status,
@@ -263,10 +247,7 @@ async def query_analyses(
         output=query.output,
         active=query.active,
     )
-    for analysis in analyses:
-        analysis.sample_ids = sample_id_format_list(analysis.sample_ids)
-
-    return analyses
+    return [a.to_external() for a in analyses]
 
 
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
@@ -275,7 +256,7 @@ async def get_analysis_runner_log(
     author: str = None,
     output_dir: str = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[Analysis]:
+) -> list[AnalysisInternal]:
     """
     Get log for the analysis-runner, useful for checking this history of analysis
     """
@@ -290,7 +271,7 @@ async def get_analysis_runner_log(
     results = await atable.get_analysis_runner_log(
         project_ids=project_ids, author=author, output_dir=output_dir
     )
-    return results
+    return [a.to_external() for a in results]
 
 
 @router.get(
@@ -304,12 +285,14 @@ async def get_sample_reads_map(
     connection: Connection = get_project_readonly_connection,
 ):
     """
-    Get map of ExternalSampleId  pathToCram  InternalSampleID for seqr
+    Get map of ExternalSampleId  pathToCram  InternalSeqGroupID for seqr
+
+    Note that, in JSON the result is
 
     Description:
         Column 1: Individual ID
         Column 2: gs:// Google bucket path or server filesystem path for this Individual
-        Column 3: Sample ID for this file, if different from the Individual ID.
+        Column 3: SequencingGroup ID for this file, if different from the Individual ID.
                     Used primarily for gCNV files to identify the sample in the batch path
     """
 
@@ -320,12 +303,12 @@ async def get_sample_reads_map(
     )
 
     for r in objs:
-        r['sample_id'] = sample_id_format(r['sample_id'])
+        r['sequencing_group_id'] = sequencing_group_id_format(r['sequencing_group_id'])
 
     if export_type == ExportType.JSON:
         return objs
 
-    keys = ['participant_id', 'output', 'sample_id']
+    keys = ['participant_id', 'output', 'sequencing_group_id']
     rows = [[r[k] for k in keys] for r in objs]
 
     output = io.StringIO()
@@ -343,8 +326,8 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sample-file-sizes', operation_id='getSampleFileSizes')
-async def get_sample_file_sizes(
+@router.get('/sample-file-sizes', operation_id='getSequencingGroupFileSizes')
+async def get_sequencing_group_file_sizes(
     project_names: list[str] = Query(None),  # type: ignore
     start_date: str = None,
     end_date: str = None,
@@ -370,7 +353,7 @@ async def get_sample_file_sizes(
     end = parse_date_only_string(end_date)
 
     # Get results with internal ids as keys
-    results = await atable.get_sample_file_sizes(
+    results = await atable.get_sequencing_group_file_sizes(
         project_ids=project_ids, start_date=start, end_date=end
     )
 
@@ -379,7 +362,7 @@ async def get_sample_file_sizes(
         ProjectSizeModel(
             project=prj_name_map[project_data['project']],
             samples=[
-                SampleSizeModel(
+                SequencingGroupSizeModel(
                     sample=sample_id_format(s['sample']),
                     dates=[DateSizeModel(**d) for d in s['dates']],
                 )

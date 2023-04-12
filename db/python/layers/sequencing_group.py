@@ -1,5 +1,6 @@
 import asyncio
 from typing import Awaitable
+from datetime import date
 
 from db.python.connect import Connection, NotFoundError
 from db.python.layers.base import BaseLayer
@@ -7,6 +8,7 @@ from db.python.layers.assay import AssayLayer
 from db.python.tables.sample import SampleTable
 from db.python.tables.assay import AssayTable, NoOpAenter
 from db.python.tables.sequencing_group import SequencingGroupTable
+from db.python.utils import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupUpsertInternal,
     SequencingGroupInternal,
@@ -61,6 +63,44 @@ class SequencingGroupLayer(BaseLayer):
 
         return groups
 
+    async def query(
+        self,
+        project_ids: list[ProjectId]=None,
+        sample_ids: list[int]=None,
+        sequencing_group_ids: list[int]=None,
+        types: list[str]=None,
+        technologies: list[str]=None,
+        platforms: list[str]=None,
+        check_project_ids: bool = True,
+    ) -> list[SequencingGroupInternal]:
+        """
+        Query sequencing groups
+        """
+        projects, sequencing_groups = await self.seqgt.query(
+            project_ids=project_ids,
+            sample_ids=sample_ids,
+            sequencing_group_ids=sequencing_group_ids,
+            types=types,
+            technologies=technologies,
+            platforms=platforms,
+        )
+        if not sequencing_groups:
+            return []
+
+        if check_project_ids and not project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return sequencing_groups
+
+    async def get_sequencing_groups_create_date(self, sequencing_group_ids: list[int]) -> dict[int, date]:
+        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        if len(sequencing_group_ids) == 0:
+            return {}
+
+        return await self.seqgt.get_sequencing_groups_create_date(sequencing_group_ids)
+
     async def get_all_sequencing_group_ids_by_sample_ids_by_type(
         self,
     ) -> dict[int, dict[str, list[int]]]:
@@ -94,50 +134,77 @@ class SequencingGroupLayer(BaseLayer):
 
     # region CREATE / MUTATE
 
-    async def create_sequencing_group_from_sequences(
-        self, sequence_ids: list[int], meta: dict
-    ):
+    async def create_sequencing_group_from_assays(
+        self, assay_ids: list[int], meta: dict
+    ) -> SequencingGroupInternal:
         """
-        Create a sequence group from a list of sequences,
+        Create a sequencing group from a list of assays,
         return an exception if they're not of the same type
         """
-        if not sequence_ids:
-            raise ValueError('Requires sequences to group sequence group')
+        if not assay_ids:
+            raise ValueError('Requires assays to create SequencingGroup')
 
         # let's check the sequences first
         slayer = AssayTable(self.connection)
-        projects, sequences = await slayer.get_assays_by(assay_ids=sequence_ids)
+        projects, assays = await slayer.get_assays_by(assay_ids=assay_ids)
 
-        if len(sequence_ids) != len(sequences):
-            missing_seq_ids = set(sequence_ids) - set(s.id for s in sequences)
-            raise NotFoundError(f'Some sequences were not found: {missing_seq_ids}')
+        if len(assay_ids) != len(assays):
+            missing_seq_ids = set(assay_ids) - set(s.id for s in assays)
+            raise NotFoundError(f'Some assays were not found: {missing_seq_ids}')
 
         if not projects:
             raise ValueError('Sequences were not attached to any project')
 
-        matching_attributes = ['sample_id', 'type', 'technology', 'platform']
+        assay_types = set(a.type for a in assays)
+        if not len(assay_types) == 1 and 'sequencing' in assay_types:
+            raise ValueError(
+                f'Assays must be all of type "sequencing", got: {assay_types}'
+            )
 
-        for attribute in matching_attributes:
-            distinct_attributes = set(str(getattr(s, attribute)) for s in sequences)
-            if len(distinct_attributes) != 1:
+
+        sample_ids = set(s.sample_id for s in assays)
+        sequencing_types = set(s.meta.get('sequencing_type') for s in assays)
+        sequencing_technologies = set(
+            s.meta.get('sequencing_technology') for s in assays
+        )
+        sequencing_platforms = set(s.meta.get('sequencing_platform') for s in assays)
+
+        attributes_to_check = {
+            'type': sequencing_types,
+            'meta.technology': sequencing_technologies,
+            'meta.platform': sequencing_platforms,
+            'meta.sample_id': sample_ids,
+        }
+
+        for attribute, values in attributes_to_check.items():
+            if len(values) > 1:
                 raise ValueError(
-                    f'Incorrect number of {attribute}\'s from provided sequences - '
-                    f'expected 1, got {len(distinct_attributes)}: {distinct_attributes}'
+                    f'Cannot create sequencing group from sequences with different {attribute!r}: {values!r}'
+                )
+            first_value = next(iter(values))
+            if first_value is None:
+                raise ValueError(
+                    f'Cannot create sequencing group from sequences with missing {attribute!r}'
                 )
 
-        raise ValueError(
-            'Have another think, because we do not store the type of sequencing group on the assay anymore'
+        sequencing_group_id = await self.seqgt.create_sequencing_group(
+            sample_id=next(iter(sample_ids)),
+            type_=next(iter(sequencing_types)),
+            technology=next(iter(sequencing_technologies)),
+            platform=next(iter(sequencing_platforms)),
+            sequence_ids=assay_ids,
+            meta=meta,
         )
-        # seq0 = sequences[0]
-        # sequence = await self.seqgt.create_sequencing_group(
-        #     sample_id=int(seq0.sample_id),
-        #     type_=seq0.type,
-        #     technology=seq0.technology,
-        #     platform=seq0.platform,
-        #     sequence_ids=sequence_ids,
-        #     meta=meta,
-        # )
-        # return sequence
+        return SequencingGroupInternal(
+            id=sequencing_group_id,
+            type=next(iter(sequencing_types)),
+            technology=next(iter(sequencing_technologies)),
+            platform=next(iter(sequencing_platforms)),
+            sequence_ids=assay_ids,
+            sample_id=next(iter(sample_ids)),
+            meta=meta,
+            assays=assays,
+        )
 
     async def modify_sequences_in_group(
         self,
@@ -160,7 +227,7 @@ class SequencingGroupLayer(BaseLayer):
 
             await self.seqgt.create_sequencing_group(
                 sample_id=seqgroup.sample_id,
-                type_=seqgroup.type,
+                type_=seqgroup.type_,
                 technology=seqgroup.technology,
                 platform=seqgroup.platform,
                 meta={**seqgroup.meta, **meta},

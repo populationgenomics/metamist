@@ -631,6 +631,12 @@
 <!--		Default data -->
 
 		<sql>
+
+			ALTER TABLE sequencing_group ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group_assay ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group_external_ids ADD SYSTEM VERSIONING;
+			ALTER TABLE analysis_sequencing_group ADD SYSTEM VERSIONING;
+
 			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
 
 			INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
@@ -672,6 +678,7 @@
 				<constraints nullable="false" foreignKeyName="fk_assay_type" references="assay_type(id)"/>
 			</column>
 		</addColumn>
+
 
 <!--		-->
 		<sql>

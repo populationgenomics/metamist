@@ -561,14 +561,13 @@ class FamilyLayer(BaseLayer):
                 for row in pedrows:
                     if row.individual_id not in missing_participant_ids:
                         continue
-                    external_participant_ids_map[
-                        row.individual_id
-                    ] = await participant_table.upsert_participant(
+                    upserted_participant = await participant_table.upsert_participant(
                         ParticipantUpsertInternal(
                             external_id=row.individual_id,
                             reported_sex=row.sex,
                         )
                     )
+                    external_participant_ids_map[row.individual_id] = upserted_participant.id
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(

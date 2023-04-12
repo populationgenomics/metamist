@@ -17,14 +17,24 @@ from db.python.utils import InternalError
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+"""
+sequencing_group
+sequencing_group_assay
+sequencing_group_external_ids
+analysis_sequencing_group"""
+
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
     'analysis',
     'participant',
     'sample',
-    'analysis_sample',
+    'sequencing_group',
     'assay',
+    'sequencing_group_assay',
+    'analysis_sequencing_group',
     'assay_eid',
+    'sequencing_group_external_ids',
+    'analysis_sequencing_group',
     'family',
     'family_participant',
     'participant_phenotypes',

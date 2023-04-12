@@ -7,7 +7,7 @@ from db.python.connect import DbBase, NotFoundError
 from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
 from models.enums import AnalysisStatus
-from models.models.analysis import Analysis
+from models.models.analysis import AnalysisInternal
 
 
 class AnalysisTable(DbBase):
@@ -27,11 +27,11 @@ class AnalysisTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
         return set(r['project'] for r in rows)
 
-    async def insert_analysis(
+    async def create_analysis(
         self,
         analysis_type: str,
         status: AnalysisStatus,
-        sample_ids: List[int],
+        sequencing_group_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
         output: str = None,
         active: bool = True,
@@ -73,17 +73,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 dict(kv_pairs),
             )
 
-            await self.add_samples_to_analysis(id_of_new_analysis, sample_ids)
+            await self.add_sequencing_groups_to_analysis(id_of_new_analysis, sequencing_group_ids)
 
         return id_of_new_analysis
 
-    async def add_samples_to_analysis(self, analysis_id: int, sample_ids: List[int]):
+    async def add_sequencing_groups_to_analysis(self, analysis_id: int, sequencing_group_ids: List[int]):
         """Add samples to an analysis (through the linked table)"""
-        _query = (
-            'INSERT INTO analysis_sample (analysis_id, sample_id) VALUES (:aid, :sid)'
-        )
+        _query = """
+            INSERT INTO analysis_sequencing_group 
+                (analysis_id, sequencing_group_id) 
+            VALUES (:aid, :sid)
+        """
 
-        values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sample_ids)
+        values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sequencing_group_ids)
         await self.connection.execute_many(_query, list(values))
 
     async def update_analysis(
@@ -133,18 +135,22 @@ VALUES ({cs_id_keys}) RETURNING id;"""
     async def query_analysis(
         self,
         sample_ids: List[int] = None,
-        sample_ids_all: List[int] = None,
+        sequencing_group_ids: List[int] = None,
         project_ids: List[int] = None,
         analysis_type: str = None,
         status: AnalysisStatus = None,
         meta: Dict[str, Any] = None,
         output: str = None,
         active: bool = None,
-    ) -> List[Analysis]:
+    ) -> List[AnalysisInternal]:
         """
-        :param sample_ids: sample_ids means it contains the analysis contains at least one of the sample_ids in the list
-        :param sample_ids_all: (UNIMPLEMENTED) sample_ids_all means the analysis contains ALL of the sample_ids
+        Get analysis by various (AND'd) criteria
         """
+
+        if not sequencing_group_ids and not project_ids and not sample_ids:
+            raise ValueError(
+                'Must provide at least one of sample_ids, sequencing_group_ids, '
+                'or project_ids')
 
         wheres = []
         values: Dict[str, Any] = {}
@@ -153,12 +159,13 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
 
-        if sample_ids_all:
-            raise NotImplementedError
-
         if sample_ids:
-            wheres.append('a_s.sample_id in :sample_ids')
+            wheres.append('sg.sample_id in :sample_ids')
             values['sample_ids'] = sample_ids
+
+        if sequencing_group_ids:
+            wheres.append('a_sg.sequencing_group_id in :sequencing_group_ids')
+            values['sequencing_group_ids'] = sequencing_group_ids
 
         if analysis_type is not None:
             wheres.append('a.type = :type')
@@ -186,29 +193,30 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         where_str = ' AND '.join(wheres)
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_s.sample_id as sample_id,
+        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.timestamp_completed as timestamp_completed, a.active as active,
         a.meta as meta
-FROM analysis_sample a_s
-INNER JOIN analysis a ON a_s.analysis_id = a.id
+FROM analysis_sequencing_group a_sg
+INNER JOIN analysis a ON a_sg.analysis_id = a.id
 WHERE a.id in (
     SELECT a.id FROM analysis a
-    LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+    LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
+    INNER JOIN sequencing_group sg ON sg.id = a_sg.sequencing_group_id
     WHERE {where_str}
 )
 """
 
         rows = await self.connection.fetch_all(_query, values)
-        retvals: Dict[int, Analysis] = {}
+        retvals: Dict[int, AnalysisInternal] = {}
         for row in rows:
             key = row['id']
             if key in retvals:
                 retvals[key].sample_ids = [
                     *(retvals[key].sample_ids or []),
-                    row['sample_id'],
+                    row['sequencing_group_id'],
                 ]
             else:
-                retvals[key] = Analysis.from_db(**dict(row))
+                retvals[key] = AnalysisInternal.from_db(**dict(row))
 
         return list(retvals.values())
 
@@ -234,11 +242,11 @@ WHERE a.id in (
 
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_s.sample_id as sample_id,
+        a.output as output, a_sg.sample_id as sample_id,
         a.project as project, a.timestamp_completed as timestamp_completed,
         a.meta as meta
-FROM analysis_sample a_s
-INNER JOIN analysis a ON a_s.analysis_id = a.id
+FROM analysis_sequencing_group a_sg
+INNER JOIN analysis a ON a_sg.analysis_id = a.id
 WHERE a.id = (
     SELECT id FROM analysis
     WHERE active AND type = :type AND project = :project AND status = 'completed' AND timestamp_completed IS NOT NULL{meta_str}
@@ -249,25 +257,25 @@ WHERE a.id = (
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
-        a = Analysis.from_db(**dict(rows[0]))
+        a = AnalysisInternal.from_db(**dict(rows[0]))
         # .from_db maps 'sample_id' -> sample_ids
         for row in rows[1:]:
             a.sample_ids.append(row['sample_id'])
 
         return a
 
-    async def get_all_sample_ids_without_analysis_type(
+    async def get_all_sequencing_group_ids_without_analysis_type(
         self, analysis_type: str, project: ProjectId
-    ):
+    ) -> list[int]:
         """
         Find all the samples in the sample_id list that a
         """
         _query = """
-SELECT s.id FROM sample s
+SELECT sg.id FROM sequencing_group sg
 WHERE s.project = :project AND
       id NOT IN (
-          SELECT a_s.sample_id FROM analysis_sample a_s
-          LEFT JOIN analysis a ON a_s.analysis_id = a.id
+          SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
+          LEFT JOIN analysis a ON a_sg.analysis_id = a.id
           WHERE a.type = :analysis_type AND a.active
       )
 ;"""
@@ -278,16 +286,16 @@ WHERE s.project = :project AND
         )
         return [row[0] for row in rows]
 
-    async def get_incomplete_analyses(self, project: ProjectId) -> List[Analysis]:
+    async def get_incomplete_analyses(self, project: ProjectId) -> List[AnalysisInternal]:
         """
         Gets details of analysis with status queued or in-progress
         """
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_s.sample_id as sample_id,
+        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.meta as meta
-FROM analysis_sample a_s
-INNER JOIN analysis a ON a_s.analysis_id = a.id
+FROM analysis_sequencing_group a_sg
+INNER JOIN analysis a ON a_sg.analysis_id = a.id
 WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-progress')
 """
         rows = await self.connection.fetch_all(
@@ -297,27 +305,28 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = Analysis.from_db(**dict(row))
+                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
             else:
-                analysis_by_id[aid].sample_ids.append(row['sample_id'])
+                analysis_by_id[aid].sample_ids.append(row['sequencing_group_id'])
 
         return list(analysis_by_id.values())
 
-    async def get_latest_complete_analysis_for_samples_by_type(
-        self, analysis_type: str, sample_ids: List[int]
-    ) -> List[Analysis]:
+    async def get_latest_complete_analysis_for_sequencing_group_ids_by_type(
+        self, analysis_type: str, sequencing_group_ids: List[int]
+    ) -> List[AnalysisInternal]:
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
-SELECT a.id AS id, a.type as type, a.status as status, a.output as output,
-a.project as project, a_s.sample_id as sample_id, a.timestamp_completed as timestamp_completed,
-a.meta as meta
+SELECT 
+    a.id AS id, a.type as type, a.status as status, a.output as output,
+    a.project as project, a_sg.sequencing_group_id as sample_id, 
+    a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
-LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 WHERE
     a.active AND
     a.type = :type AND
     a.timestamp_completed IS NOT NULL AND
-    a_s.sample_id in :sample_ids
+    a_sg.sequencing_group_id in :sequencing_group_ids
 ORDER BY a.timestamp_completed DESC
         """
         expected_type = ('gvcf', 'cram', 'qc')
@@ -327,27 +336,29 @@ ORDER BY a.timestamp_completed DESC
                 f'Received analysis type {analysis_type!r}", expected {expected_types_str!r}'
             )
 
-        values = {'sample_ids': sample_ids, 'type': analysis_type}
+        values = {'sequencing_group_ids': sequencing_group_ids, 'type': analysis_type}
         rows = await self.connection.fetch_all(_query, values)
-        seen_sample_ids = set()
-        analyses: List[Analysis] = []
+        seen_sequencing_group_ids = set()
+        analyses: List[AnalysisInternal] = []
         for row in rows:
-            if row['sample_id'] in seen_sample_ids:
+            if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
-            seen_sample_ids.add(row['sample_id'])
-            analyses.append(Analysis.from_db(**row))
+            seen_sequencing_group_ids.add(row['sequencing_group_id'])
+            analyses.append(AnalysisInternal.from_db(**row))
 
         # reverse after timestamp_completed
         return analyses[::-1]
 
-    async def get_analysis_by_id(self, analysis_id: int) -> Tuple[ProjectId, Analysis]:
+    async def get_analysis_by_id(self, analysis_id: int) -> Tuple[ProjectId, AnalysisInternal]:
         """Get analysis object by analysis_id"""
         _query = """
-SELECT a.id as id, a.type as type, a.status as status,
-a.output as output, a.project as project, a_s.sample_id as sample_id,
-a.timestamp_completed as timestamp_completed, a.meta as meta
+SELECT 
+    a.id as id, a.type as type, a.status as status,
+    a.output as output, a.project as project, 
+    a_sg.sequencing_group_id as sequencing_group_id,
+    a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
-LEFT JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+LEFT JOIN analysis_sequencing_group a_s ON a_sg.analysis_id = a.id
 WHERE a.id = :analysis_id
 """
         rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
@@ -356,9 +367,9 @@ WHERE a.id = :analysis_id
 
         project = rows[0]['project']
 
-        a = Analysis.from_db(**dict(rows[0]))
+        a = AnalysisInternal.from_db(**dict(rows[0]))
         for row in rows[1:]:
-            a.sample_ids.append(row['sample_id'])
+            a.sample_ids.append(row['sequencing_group_id'])
 
         return project, a
 
@@ -367,14 +378,14 @@ WHERE a.id = :analysis_id
         sample_ids: list[int],
         analysis_type: str | None,
         status: AnalysisStatus,
-    ) -> tuple[set[ProjectId], list[Analysis]]:
+    ) -> tuple[set[ProjectId], list[AnalysisInternal]]:
         """
         Get relevant analyses for a sample, optional type / status filters
         map_sample_ids will map the Analysis.sample_ids component,
         not required for GraphQL sources.
         """
         values: dict[str, Any] = {'sample_ids': sample_ids}
-        wheres = ['a_s.sample_id IN :sample_ids']
+        wheres = ['a_sg.sequencing_group_id IN :sequencing_group_ids']
 
         if analysis_type:
             wheres.append('a.type = :atype')
@@ -385,11 +396,13 @@ WHERE a.id = :analysis_id
             values['status'] = status.value
 
         _query = f"""
-    SELECT a.id as id, a.type as type, a.status as status,
-    a.output as output, a.project as project, a_s.sample_id as sample_id,
-    a.timestamp_completed as timestamp_completed, a.meta as meta
+    SELECT 
+        a.id as id, a.type as type, a.status as status,
+        a.output as output, a.project as project, 
+        a_sg.sequencing_group_id as sequencing_group_id,
+        a.timestamp_completed as timestamp_completed, a.meta as meta
     FROM analysis a
-    INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
+    INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
     WHERE {' AND '.join(wheres)}
         """
 
@@ -399,7 +412,7 @@ WHERE a.id = :analysis_id
         for a in rows:
             a_id = a['id']
             if a_id not in analyses:
-                analyses[a_id] = Analysis.from_db(**dict(a))
+                analyses[a_id] = AnalysisInternal.from_db(**dict(a))
                 projects.add(a['project'])
 
             analyses[a_id].sample_ids.append(a['sample_id'])
@@ -419,7 +432,7 @@ WHERE a.id = :analysis_id
             'a.active',
             'a.type = "cram"',
             'a.status = "completed"',
-            's.project = :project',
+            'p.project = :project',
         ]
         if sequence_types:
             if len(sequence_types) == 1:
@@ -436,10 +449,11 @@ WHERE a.id = :analysis_id
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT p.external_id as participant_id, a.output as output, s.id as sample_id
+SELECT p.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
 FROM analysis a
-INNER JOIN analysis_sample a_s ON a_s.analysis_id = a.id
-INNER JOIN sample s ON a_s.sample_id = s.id
+INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
+INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
+INNER JOIN sample s ON sg.sample_id = s.id
 INNER JOIN participant p ON s.participant_id = p.id
 WHERE
     {' AND '.join(filters)}
@@ -455,7 +469,7 @@ ORDER BY a.timestamp_completed DESC;
         project_ids: List[int] = None,
         author: str = None,
         output_dir: str = None,
-    ) -> List[Analysis]:
+    ) -> List[AnalysisInternal]:
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
@@ -480,7 +494,7 @@ ORDER BY a.timestamp_completed DESC;
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
         rows = await self.connection.fetch_all(_query, values)
-        return [Analysis.from_db(**dict(r)) for r in rows]
+        return [AnalysisInternal.from_db(**dict(r)) for r in rows]
 
     # region STATS
 

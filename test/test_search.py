@@ -6,7 +6,7 @@ from db.python.layers.search import SearchLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
-from models.enums import SampleType, SearchResponseType
+from models.enums import SearchResponseType
 from models.models.family import PedRowInternal
 from models.models.sample import sample_id_format, SampleUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
@@ -41,7 +41,7 @@ class TestSample(DbIsolatedTest):
         Mock this in testing by limiting scope to non-existent project IDs
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+            SampleUpsertInternal(external_id='EX001', type='blood')
         )
         cpg_id = sample_id_format(sample.id)
 
@@ -56,7 +56,7 @@ class TestSample(DbIsolatedTest):
         Search by valid CPG sample ID (special case)
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+            SampleUpsertInternal(external_id='EX001', type='blood')
         )
         cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
@@ -73,7 +73,7 @@ class TestSample(DbIsolatedTest):
         should only return one result
         """
         sample = await self.slayer.upsert_sample(
-            SampleUpsertInternal(external_id='EX001', type=SampleType.BLOOD)
+            SampleUpsertInternal(external_id='EX001', type='blood')
         )
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
@@ -93,7 +93,7 @@ class TestSample(DbIsolatedTest):
         Search participant w/ no family by External ID
         should only return one result
         """
-        p_id = await self.player.upsert_participant(
+        p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_id='PART01')
         )
         results = await self.schlay.search(
@@ -101,7 +101,7 @@ class TestSample(DbIsolatedTest):
         )
         self.assertEqual(1, len(results))
         result = results[0]
-        self.assertEqual(p_id, result.data.id)
+        self.assertEqual(p.id, result.data.id)
         self.assertEqual('PART01', result.title)
         self.assertListEqual(['PART01'], result.data.participant_external_ids)
         self.assertListEqual([], result.data.family_external_ids)
@@ -130,7 +130,7 @@ class TestSample(DbIsolatedTest):
         """Create a number of resources, and search for all of them"""
         fptable = FamilyParticipantTable(self.connection)
 
-        p_id = await self.player.upsert_participant(
+        p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_id='X:PART01')
         )
         f_id = await self.flayer.create_family(external_id='X:FAM01')
@@ -138,7 +138,7 @@ class TestSample(DbIsolatedTest):
             [
                 PedRowInternal(
                     family_id=f_id,
-                    participant_id=p_id,
+                    participant_id=p.id,
                     paternal_id=None,
                     maternal_id=None,
                     affected=0,
@@ -150,8 +150,8 @@ class TestSample(DbIsolatedTest):
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='X:SAM001',
-                sample_type=SampleType.BLOOD,
-                participant_id=p_id,
+                sample_type='blood',
+                participant_id=p.id,
             )
         )
 

@@ -41,7 +41,7 @@ async def create_sample(
 async def upsert_samples(
     samples: list[SampleUpsert],
     connection: Connection = get_project_write_connection,
-) -> dict[str, Any]:
+):
     """
     Upserts a list of samples with sequencing-groups,
     and returns the list of internal sample IDs
@@ -52,13 +52,7 @@ async def upsert_samples(
 
     upserted = await st.upsert_samples([sample.to_internal() for sample in samples])
 
-    # Map sids back from ints to strs
-    results = {}
-    for sample in upserted:
-        sid = sample_id_format(sample.id)
-        results[sid] = sample
-
-    return results
+    return [s.to_external() for s in upserted]
 
 
 # endregion CREATES

@@ -1,3 +1,5 @@
+import json
+
 from models.base import SMBase
 from models.models.assay import AssayUpsert, AssayUpsertInternal, Assay, AssayInternal
 from models.utils.sample_id_format import sample_id_transform_to_raw, sample_id_format
@@ -25,16 +27,23 @@ class SequencingGroupInternal(SMBase):
 
     # similar to a sample ID, this is stored internally as an integer,
     # but displayed as a string
-    id: int
-    type: str
-    technology: str
-    platform: str  # uppercase
-    meta: dict[str, str]
-    sample_id: int
+    id: int | None = None
+    type: str | None = None
+    technology: str | None = None
+    platform: str | None = None
+    meta: dict[str, str] | None = None
+    sample_id: int | None = None
 
     project: int | None = None
 
     assays: list[AssayInternal] | None = None
+
+    @classmethod
+    def from_db(cls, **kwargs):
+        meta = kwargs.pop('meta')
+        if meta and isinstance(meta, str):
+            meta = json.loads(meta)
+        return SequencingGroupInternal(**kwargs, meta=meta)
 
     def to_external(self):
         """Convert to transport model"""
@@ -62,6 +71,28 @@ class SequencingGroupUpsertInternal(SMBase):
     sample_id: int | None = None
 
     assays: list[AssayUpsertInternal] | None = None
+
+    def to_external(self):
+        """
+        Convert to external model
+        """
+        _id = None
+        if self.id is not None:
+            _id = sequencing_group_id_format(self.id)
+
+        _sample_id = None
+        if self.sample_id is not None:
+            _sample_id = sample_id_format(self.sample_id)
+
+        return SequencingGroupUpsert(
+            id=_id,
+            type=self.type,
+            technology=self.technology,
+            platform=self.platform,
+            meta=self.meta,
+            sample_id=_sample_id,
+            assays=[a.to_external() for a in self.assays or []],
+        )
 
 
 class SequencingGroup(SMBase):
@@ -107,7 +138,7 @@ class SequencingGroupUpsert(SMBase):
             id=_id,
             type=self.type,
             technology=self.technology,
-            platform=self.platform,
+            platform=self.platform.lower() if self.platform else None,
             meta=self.meta,
             sample_id=_sample_id,
         )

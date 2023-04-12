@@ -84,6 +84,7 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sequencing_type='genome',
         default_sample_type='blood',
         default_sequencing_technology='short-read',
+            default_sequencing_platform='illumina',
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
     ):

@@ -1,7 +1,6 @@
 import json
 
 from models.base import SMBase
-from models.enums.sample import SampleType
 from models.models.assay import AssayUpsertInternal, AssayUpsert
 from models.models.sequencing_group import (
     SequencingGroupUpsert,
@@ -20,7 +19,7 @@ class SampleInternal(SMBase):
     external_id: str
     meta: dict
     project: int
-    type: SampleType | None
+    type: str | None
     participant_id: int | None
     active: bool | None
     author: str | None
@@ -43,7 +42,7 @@ class SampleInternal(SMBase):
                 meta = json.loads(meta)
 
         return SampleInternal(
-            id=_id, type=SampleType(type_), meta=meta, active=active, **d
+            id=_id, type=str(type_), meta=meta, active=active, **d
         )
 
     def to_external(self):
@@ -66,12 +65,30 @@ class SampleUpsertInternal(SMBase):
     external_id: str | None = None
     meta: dict | None = None
     project: int | None = None
-    type: SampleType | None = None
+    type: str | None = None
     participant_id: int | None = None
     active: bool | None = None
 
     sequencing_groups: list[SequencingGroupUpsertInternal] | None = None
     non_sequencing_assays: list[AssayUpsertInternal] | None = None
+
+    def to_external(self):
+        """Convert to transport model"""
+        _id = None
+        if self.id:
+            _id = sample_id_format(self.id)
+
+        return SampleUpsert(
+            id=_id,
+            external_id=self.external_id,
+            meta=self.meta,
+            project=self.project,
+            type=self.type,
+            participant_id=self.participant_id,
+            active=self.active,
+            sequencing_groups=[sg.to_external() for sg in self.sequencing_groups or []],
+            non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays],
+        )
 
 
 class Sample(SMBase):
@@ -81,7 +98,7 @@ class Sample(SMBase):
     external_id: str
     meta: dict
     project: int
-    type: SampleType | None
+    type: str | None
     participant_id: int | None
     active: bool | None
 
@@ -105,7 +122,7 @@ class SampleUpsert(SMBase):
     external_id: str | None = None
     meta: dict | None = None
     project: int | None = None
-    type: SampleType | None = None
+    type: str | None = None
     participant_id: int | None = None
     active: bool | None = None
 
