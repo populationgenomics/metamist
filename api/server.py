@@ -19,7 +19,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '5.5.8'
+_VERSION = '5.6.1'
 
 logger = get_logger()
 
@@ -97,7 +97,7 @@ async def not_found(request, exc):
 
 
 @app.exception_handler(Exception)
-async def exception_handler(_: Request, e: Exception):
+async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
     add_stacktrace = True
 
@@ -115,10 +115,33 @@ async def exception_handler(_: Request, e: Exception):
         st = traceback.format_exc()
         base_params['stacktrace'] = st
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=code,
         content=base_params,
     )
+
+    # https://github.com/tiangolo/fastapi/issues/457#issuecomment-851547205
+    # FastAPI doesn't run middleware on exception, but if we make a non-GET/INFO
+    # request, then we lose CORS and hence lose the exception in the body of the
+    # response. Grab it manually, and explicitly allow origin if so.
+    middlewares = [
+        m
+        for m in app.user_middleware
+        if isinstance(m, CORSMiddleware) or m.cls == CORSMiddleware
+    ]
+    if middlewares:
+        cors_middleware = middlewares[0]
+
+        request_origin = request.headers.get('origin', '')
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        elif (
+            cors_middleware
+            and request_origin in cors_middleware.options['allow_origins']
+        ):
+            response.headers['Access-Control-Allow-Origin'] = request_origin
+
+    return response
 
 
 # graphql

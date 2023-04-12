@@ -20,6 +20,7 @@ from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
 from db.python.utils import ProjectId, split_generic_terms
+from models.models.family import PedRowInternal
 from models.models.participant import Participant
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
@@ -492,12 +493,14 @@ class ParticipantLayer(BaseLayer):
 
             if len(family_persons_to_insert) > 0:
                 formed_rows = [
-                    {
-                        'family_id': fmap_by_external[external_family_id],
-                        'participant_id': pid,
-                        'sex': 0,
-                        'affected': 0,
-                    }
+                    PedRowInternal(
+                        family_id=fmap_by_external[external_family_id],
+                        participant_id=pid,
+                        affected=0,
+                        maternal_id=None,
+                        paternal_id=None,
+                        notes=None,
+                    )
                     for external_family_id, pid in family_persons_to_insert
                 ]
                 await fpttable.create_rows(formed_rows)
@@ -534,6 +537,8 @@ class ParticipantLayer(BaseLayer):
     async def get_seqr_individual_template(
         self,
         project: int,
+        *,
+        internal_participant_ids: Optional[list[int]] = None,
         external_participant_ids: Optional[List[str]] = None,
         # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
@@ -549,28 +554,30 @@ class ParticipantLayer(BaseLayer):
         internal_to_external_pid_map = {}
         internal_to_external_fid_map = {}
 
-        if external_participant_ids:
+        if external_participant_ids or internal_participant_ids:
             assert self.connection.project
-            pids = await self.get_id_map_by_external_ids(
-                external_participant_ids,
-                project=self.connection.project,
-                allow_missing=False,
-            )
+            pids = set(internal_participant_ids or [])
+            if external_participant_ids:
+                pid_map = await self.get_id_map_by_external_ids(
+                    external_participant_ids,
+                    project=self.connection.project,
+                    allow_missing=False,
+                )
+                pids |= set(pid_map.values())
+
             pid_to_features = await ppttable.get_key_value_rows_for_participant_ids(
-                participant_ids=list(pids.values())
+                participant_ids=list(pids)
             )
-            if replace_with_participant_external_ids:
-                internal_to_external_pid_map = {v: k for k, v in pids.items()}
         else:
             pid_to_features = await ppttable.get_key_value_rows_for_all_participants(
                 project=project
             )
-            if replace_with_participant_external_ids:
-                internal_to_external_pid_map = (
-                    await self.pttable.get_id_map_by_internal_ids(
-                        list(pid_to_features.keys())
-                    )
+        if replace_with_participant_external_ids:
+            internal_to_external_pid_map = (
+                await self.pttable.get_id_map_by_internal_ids(
+                    list(pid_to_features.keys())
                 )
+            )
 
         flayer = FamilyLayer(self.connection)
         pid_to_fid = await flayer.get_participant_family_map(
@@ -602,7 +609,8 @@ class ParticipantLayer(BaseLayer):
             ld = {k.lower(): v for k, v in d.items()}
             rows.append({lheader_to_json[h]: ld.get(h) for h in lheaders if ld.get(h)})
 
-        set_headers = set()
+        # these two columns must ALWAYS be present
+        set_headers = {'individual_id', 'family_id'}
         for row in rows:
             set_headers.update(set(row.keys()))
 
@@ -610,7 +618,10 @@ class ParticipantLayer(BaseLayer):
 
         return {
             'rows': rows,
-            'headers': list(set_headers),
+            # get ordered headers if we have data for it
+            'headers': [
+                h for h in SeqrMetadataKeys.get_ordered_headers() if h in set_headers
+            ],
             'header_map': json_header_map,
         }
 

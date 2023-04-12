@@ -7,6 +7,7 @@ from db.python.layers.family import FamilyLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
 from models.enums import SampleType, SearchResponseType
+from models.models.family import PedRowInternal
 from models.models.sample import sample_id_format
 
 
@@ -124,14 +125,14 @@ class TestSample(DbIsolatedTest):
         f_id = await self.flayer.create_family(external_id='X:FAM01')
         await fptable.create_rows(
             [
-                {
-                    'family_id': f_id,
-                    'participant_id': p_id,
-                    'paternal_participant_id': None,
-                    'maternal_participant_id': None,
-                    'affected': 0,
-                    'notes': None,
-                }
+                PedRowInternal(
+                    family_id=f_id,
+                    participant_id=p_id,
+                    paternal_id=None,
+                    maternal_id=None,
+                    affected=0,
+                    notes=None,
+                )
             ]
         )
 

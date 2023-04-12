@@ -178,10 +178,7 @@ class GenericMetadataParser(GenericParser):
         """Get list of sequence technologies for rows"""
         if isinstance(row, dict):
             return [self.get_sequence_technology(row)]
-        return [
-            self.get_sequence_technology(r)
-            for r in row
-        ]
+        return [self.get_sequence_technology(r) for r in row]
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
         """Get sequence technology for single row"""
@@ -253,11 +250,16 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
-        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        first_line = next(reader)
-        has_participants = self.participant_column in first_line
-        file_pointer.seek(0)
-        return has_participants
+        try:
+            reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
+            first_line = next(reader)
+            has_participants = self.participant_column in first_line
+            file_pointer.seek(0)
+            return has_participants
+        except StopIteration as e:
+            raise ValueError(
+                f'The manifest file appears empty. Check that header metadata is enclosed by double quotes. {e}'
+            ) from e
 
     async def validate_participant_map(
         self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
@@ -577,7 +579,7 @@ class GenericMetadataParser(GenericParser):
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
                 sequence_type=SequenceType(stype),
-                sequence_technology=SequenceTechnology(stech)
+                sequence_technology=SequenceTechnology(stech),
             )
             sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta

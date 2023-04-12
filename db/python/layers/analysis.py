@@ -136,11 +136,16 @@ class AnalysisLayer(BaseLayer):
         return await self.at.get_incomplete_analyses(project=project)
 
     async def get_sample_cram_path_map_for_seqr(
-        self, project: ProjectId, sequence_types: list[SequenceType]
+        self,
+        project: ProjectId,
+        sequence_types: list[SequenceType],
+        participant_ids: list[int] = None,
     ) -> List[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
         return await self.at.get_sample_cram_path_map_for_seqr(
-            project=project, sequence_types=sequence_types
+            project=project,
+            sequence_types=sequence_types,
+            participant_ids=participant_ids,
         )
 
     async def query_analysis(

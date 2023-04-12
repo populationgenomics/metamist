@@ -3,6 +3,7 @@ from typing import Tuple, List, Dict, Optional, Set, Any
 
 from db.python.connect import DbBase
 from db.python.tables.project import ProjectId
+from models.models.family import PedRowInternal
 
 
 class FamilyParticipantTable(DbBase):
@@ -50,7 +51,7 @@ VALUES
 
     async def create_rows(
         self,
-        dictionaries: List[Dict[str, Any]],
+        rows: list[PedRowInternal],
         author=None,
     ):
         """
@@ -63,22 +64,20 @@ VALUES
         - notes
         - author
         """
-        keys = {
-            'family_id',
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-            'affected',
-            'notes',
-            'author',
-        }
         ignore_keys_during_update = {'participant_id'}
 
         remapped_ds_by_keys: Dict[Tuple, List[Dict]] = defaultdict(list)
         # this now works when only a portion of the keys are specified
-        for row in dictionaries:
-            d: Dict[str, Any] = {k: row.get(k) for k in keys if k in row}
-            d['author'] = author or self.author
+        for row in rows:
+            d: dict[str, Any] = {
+                'family_id': row.family_id,
+                'participant_id': row.participant_id,
+                'paternal_participant_id': row.paternal_id,
+                'maternal_participant_id': row.maternal_id,
+                'affected': row.affected,
+                'notes': row.notes,
+                'author': author or self.author,
+            }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
 
