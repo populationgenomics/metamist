@@ -757,7 +757,7 @@ class GenericMetadataParser(GenericParser):
     help='Column where the reported gender is held',
 )
 @click.option(
-    '--karyotype_column',
+    '--karyotype-column',
     help='Column where the karyotype is held',
 )
 @click.option(
