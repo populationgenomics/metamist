@@ -1221,6 +1221,8 @@ class GenericParser(
         """Takes filename, returns formed CWL dictionary"""
         _checksum = checksum
         file_size = None
+        datetime_added = None
+        file_location = self.file_path(filename)
 
         if not self.skip_checking_gcs_objects:
             if not _checksum:
@@ -1231,13 +1233,15 @@ class GenericParser(
                         _checksum = f'md5:{contents.strip()}'
 
             file_size = await self.file_size(filename)
+            datetime_added = await self.get_gcs_blob(file_location).time_created
 
         d = {
-            'location': self.file_path(filename),
+            'location': file_location,
             'basename': os.path.basename(filename),
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
+            'datetime_added': datetime_added
         }
 
         if secondary_files:
