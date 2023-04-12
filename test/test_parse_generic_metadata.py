@@ -174,7 +174,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                             'checksum': None,
                             'size': None,
                             'datetime_added': None,
-                        }
+                        },
                     ],
                 }
             ],
