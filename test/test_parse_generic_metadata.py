@@ -171,6 +171,8 @@ class TestParseGenericMetadata(unittest.TestCase):
             ],
             'gvcf_types': 'gvcf',
         }
+        for k,v in (sequences_to_add[0].meta).items():
+            print(k,v)
         self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
         analysis = analyses_to_add['<sample-id>'][0]
         self.assertDictEqual(
