@@ -1222,7 +1222,6 @@ class GenericParser(
         _checksum = checksum
         file_size = None
         datetime_added = None
-        file_location = self.file_path(filename)
 
         if not self.skip_checking_gcs_objects:
             if not _checksum:
@@ -1232,11 +1231,10 @@ class GenericParser(
                     if contents:
                         _checksum = f'md5:{contents.strip()}'
 
-            file_size, file_blob = await asyncio.gather(self.file_size(filename), self.get_gcs_blob(file_location))
-            datetime_added = file_blob.time_created
+            file_size, datetime_added = await asyncio.gather(self.file_size(filename), self.datetime_added(filename))
 
         d = {
-            'location': file_location,
+            'location': self.file_path(filename),
             'basename': os.path.basename(filename),
             'class': 'File',
             'checksum': _checksum,

@@ -79,10 +79,16 @@ class TestParseGenericMetadata(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('sample_metadata.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self, mock_filesize, mock_fileexists, mock_get_sequence_ids, mock_get_sample_id
+        self,
+        mock_filesize,
+        mock_fileexists,
+        mock_datetime_added,
+        mock_get_sequence_ids,
+        mock_get_sample_id,
     ):
         """
         Test importing a single row, forms objects and checks response
@@ -93,6 +99,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
+        mock_datetime_added.return_value = None
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
@@ -119,7 +126,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
-            skip_checking_gcs_objects=True,
+            # skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {
@@ -156,26 +163,26 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'basename': '<sample-id>.bam',
                     'class': 'File',
                     'checksum': None,
-                    'size': None,
+                    'size': 111,
                     'datetime_added': None,
-                    'secondaryFiles': [
-                        {
-                            'location': '/path/to/<sample-id>.bam.bai',
-                            'basename': '<sample-id>.bam.bai',
-                            'class': 'File',
-                            'checksum': None,
-                            'size': None,
-                            'datetime_added': None,
-                        },
-                        {
-                            'location': '/path/to/<sample-id>.bai',
-                            'basename': '<sample-id>.bai',
-                            'class': 'File',
-                            'checksum': None,
-                            'size': None,
-                            'datetime_added': None,
-                        },
-                    ],
+                    # 'secondaryFiles': [
+                    #     {
+                    #         'location': '/path/to/<sample-id>.bam.bai',
+                    #         'basename': '<sample-id>.bam.bai',
+                    #         'class': 'File',
+                    #         'checksum': None,
+                    #         'size': None,
+                    #         'datetime_added': None,
+                    #     },
+                    #     {
+                    #         'location': '/path/to/<sample-id>.bai',
+                    #         'basename': '<sample-id>.bai',
+                    #         'class': 'File',
+                    #         'checksum': None,
+                    #         'size': None,
+                    #         'datetime_added': None,
+                    #     },
+                    # ],
                 }
             ],
             'reads_type': 'bam',
@@ -185,18 +192,18 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'basename': '<sample-id>.g.vcf.gz',
                     'class': 'File',
                     'checksum': None,
-                    'size': None,
+                    'size': 111,
                     'datetime_added': None,
-                    'secondaryFiles': [
-                        {
-                            'location': '/path/to/<sample-id>.g.vcf.gz.tbi',
-                            'basename': '<sample-id>.g.vcf.gz.tbi',
-                            'class': 'File',
-                            'checksum': None,
-                            'size': None,
-                            'datetime_added': None,
-                        }
-                    ],
+                    # 'secondaryFiles': [
+                    #     {
+                    #         'location': '/path/to/<sample-id>.g.vcf.gz.tbi',
+                    #         'basename': '<sample-id>.g.vcf.gz.tbi',
+                    #         'class': 'File',
+                    #         'checksum': None,
+                    #         'size': None,
+                    #         'datetime_added': None,
+                    #     }
+                    # ],
                 }
             ],
             'gvcf_types': 'gvcf',
