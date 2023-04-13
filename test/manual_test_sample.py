@@ -1,5 +1,5 @@
-from sample_metadata.apis import SampleApi, AnalysisApi
-from sample_metadata.models import NewSample, AnalysisModel
+from metamist.apis import SampleApi, AnalysisApi
+from metamist.models import NewSample, AnalysisModel
 
 
 PROJ = 'test_project'

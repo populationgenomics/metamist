@@ -19,11 +19,11 @@ from typing import Any
 
 import click
 from google.cloud import storage
-from sample_metadata.apis import SampleApi, SequenceApi, ProjectApi, AnalysisApi
+from metamist.apis import SampleApi, SequenceApi, ProjectApi, AnalysisApi
 
-from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
+from metamist.model.analysis_query_model import AnalysisQueryModel
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.model.analysis_type import AnalysisType
 
 # Global vars
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
@@ -211,7 +211,7 @@ async def find_files_to_delete(
     sequence_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
 ):
     """
-    Get all the sequences across all the projects from sample_metadata
+    Get all the sequences across all the projects from metamist
     """
 
     _projects_to_ignore = set(projects_to_ignore or [])

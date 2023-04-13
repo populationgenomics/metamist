@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 
 import click
 
-from sample_metadata.parser.generic_parser import (
+from metamist.parser.generic_parser import (
     GenericParser,
     GroupedRow,
     ParsedSequencingGroup,

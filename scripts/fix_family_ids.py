@@ -3,8 +3,8 @@ Small script to update external family IDs
 """
 import json
 import click
-from sample_metadata.apis import FamilyApi
-from sample_metadata.model.family_update_model import FamilyUpdateModel
+from metamist.apis import FamilyApi
+from metamist.model.family_update_model import FamilyUpdateModel
 
 
 @click.command()

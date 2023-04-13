@@ -5,8 +5,8 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import run_as_sync
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
+from metamist.parser.generic_metadata_parser import run_as_sync
+from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:

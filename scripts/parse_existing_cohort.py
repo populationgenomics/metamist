@@ -37,7 +37,7 @@ import csv
 from typing import List, Optional
 import click
 
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     SingleRow,
     GroupedRow,

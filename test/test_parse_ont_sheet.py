@@ -3,7 +3,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from test.testbase import run_as_sync
-from sample_metadata.parser.generic_parser import ParsedParticipant
+from metamist.parser.generic_parser import ParsedParticipant
 from scripts.parse_ont_sheet import OntParser
 
 
@@ -11,9 +11,9 @@ class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
     @run_as_sync
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.AssayApi.get_assays_by_sample_ids')
+    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('from metamist.apis.AssayApi.get_assays_by_sample_ids')
     async def test_simple_sheet(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_get_participant_id
     ):

@@ -6,16 +6,16 @@ from collections import namedtuple
 
 import click
 
-from sample_metadata.api.sequencing_group_api import SequencingGroupApi
-from sample_metadata.apis import SampleApi, AnalysisApi
-from sample_metadata.model.analysis_model import AnalysisModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.parser.cloudhelper import CloudHelper
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.api.sequencing_group_api import SequencingGroupApi
+from metamist.apis import SampleApi, AnalysisApi
+from metamist.model.analysis_model import AnalysisModel
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.parser.cloudhelper import CloudHelper
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
-from sample_metadata.parser.generic_parser import chunk, CustomDictReader
+from metamist.parser.generic_parser import chunk, CustomDictReader
 
 OntAnalysesPreparer = namedtuple(
     'OntAnalysesPreparer',

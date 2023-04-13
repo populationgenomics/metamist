@@ -4,8 +4,8 @@ from typing import Optional, List
 
 import click
 
-from sample_metadata.models import AnalysisType, AnalysisStatus
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.models import AnalysisType, AnalysisStatus
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
     ParsedSequencingGroup,

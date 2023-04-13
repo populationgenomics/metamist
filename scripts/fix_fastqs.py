@@ -1,9 +1,9 @@
 import asyncio
 from typing import Any, Dict
 
-from sample_metadata.apis import SampleApi, SequenceApi, ProjectApi
-from sample_metadata.model.sequence_update_model import SequenceUpdateModel
-from sample_metadata.parser.generic_parser import chunk, GenericParser
+from metamist.apis import SampleApi, SequenceApi, ProjectApi
+from metamist.model.sequence_update_model import SequenceUpdateModel
+from metamist.parser.generic_parser import chunk, GenericParser
 
 sapi = SampleApi()
 seqapi = SequenceApi()

@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from cpg_utils.hail_batch import remote_tmpdir
 from cpg_utils.config import get_config
 
-from sample_metadata.apis import SampleApi, AssayApi
+from metamist.apis import SampleApi, AssayApi
 
 LocationTuple = namedtuple(
     'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']

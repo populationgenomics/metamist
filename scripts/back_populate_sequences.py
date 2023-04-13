@@ -12,8 +12,8 @@ The sequence ID would be HTJMHDSX3_4_220817_FD123456
 import logging
 import click
 
-from sample_metadata.apis import SequenceApi
-from sample_metadata.models import SequenceUpdateModel
+from metamist.apis import SequenceApi
+from metamist.models import SequenceUpdateModel
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')

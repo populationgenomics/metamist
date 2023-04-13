@@ -15,9 +15,9 @@ import click
 
 from google.cloud import storage
 
-from sample_metadata import ApiException
-from sample_metadata.apis import ParticipantApi
-from sample_metadata.model.participant_upsert import ParticipantUpsert
+from metamist import ApiException
+from metamist.apis import ParticipantApi
+from metamist.model.participant_upsert import ParticipantUpsert
 
 
 def update_metadata(

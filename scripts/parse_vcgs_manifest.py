@@ -5,9 +5,9 @@ import re
 from typing import Dict, List, Any
 
 import click
-from sample_metadata.model.sequence_type import SequenceType
+from metamist.model.sequence_type import SequenceType
 
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
     SingleRow,

@@ -6,9 +6,9 @@ from typing import Any
 from cloudpathlib import GSPath
 from google.cloud import storage
 
-from sample_metadata.api.project_api import ProjectApi
-from sample_metadata.api.sample_api import SampleApi
-from sample_metadata.api.sequence_api import SequenceApi
+from metamist.api.project_api import ProjectApi
+from metamist.api.sample_api import SampleApi
+from metamist.api.sequence_api import SequenceApi
 
 loggers_to_silence = [
     'urllib3.connectionpool',

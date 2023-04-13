@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Set, Dict, Any, List
 
 from google.cloud import storage
-from sample_metadata.apis import WebApi, SampleApi, SequenceApi, ProjectApi
+from metamist.apis import WebApi, SampleApi, SequenceApi, ProjectApi
 
 # Global vars
 logger = logging.getLogger(__file__)
@@ -87,7 +87,7 @@ async def get_all_sequence_files(cpg_project):
 
 async def get_sm_sequences():
     """
-    Get all the sequences across all the projects from sample_metadata
+    Get all the sequences across all the projects from metamist
     """
     my_projects_raw, all_projects_raw = await asyncio.gather(
         projapi.get_my_projects_async(), projapi.get_all_projects_async()

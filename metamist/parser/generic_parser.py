@@ -28,10 +28,10 @@ from functools import wraps
 
 from cloudpathlib import AnyPath
 
-from sample_metadata.parser.cloudhelper import CloudHelper, group_by
+from metamist.parser.cloudhelper import CloudHelper, group_by
 
-from sample_metadata.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
-from sample_metadata.models import (
+from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
+from metamist.models import (
     AnalysisModel,
     AnalysisStatus,
     ParticipantUpsert,

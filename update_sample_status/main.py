@@ -9,8 +9,8 @@ from flask import abort
 from google.cloud import secretmanager
 from requests.exceptions import HTTPError
 
-from sample_metadata.apis import SequenceApi, SampleApi
-from sample_metadata.models import (
+from metamist.apis import SequenceApi, SampleApi
+from metamist.models import (
     SequenceType,
     SequenceUpdateModel,
     SequenceStatus,
@@ -18,7 +18,7 @@ from sample_metadata.models import (
     SampleUpsert,
     AssayUpsert,
 )
-from sample_metadata.exceptions import ForbiddenException, NotFoundException
+from metamist.exceptions import ForbiddenException, NotFoundException
 
 secret_manager = secretmanager.SecretManagerServiceClient()
 

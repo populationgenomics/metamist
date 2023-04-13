@@ -7,8 +7,8 @@ import click
 from cloudpathlib import CloudPath
 from google.cloud import storage
 
-from sample_metadata.apis import SampleApi, SequenceApi, AnalysisApi
-from sample_metadata.models import SequenceUpdateModel, AnalysisType
+from metamist.apis import SampleApi, SequenceApi, AnalysisApi
+from metamist.models import SequenceUpdateModel, AnalysisType
 
 
 client = storage.Client()

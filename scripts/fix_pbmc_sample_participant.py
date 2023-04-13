@@ -3,8 +3,8 @@ PBMC samples should have the same participant as their WGS counterparts.
 This script adjusts the data within the TOB-WGS project to uphold this.
 """
 
-from sample_metadata.apis import SampleApi
-from sample_metadata.models import SampleUpsert
+from metamist.apis import SampleApi
+from metamist.models import SampleUpsert
 
 
 def main():

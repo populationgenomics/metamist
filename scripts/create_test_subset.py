@@ -24,15 +24,15 @@ import csv
 import click
 from google.cloud import storage
 
-from sample_metadata import exceptions
-from sample_metadata.apis import (
+from metamist import exceptions
+from metamist.apis import (
     AnalysisApi,
     AssayApi,
     SampleApi,
     FamilyApi,
     ParticipantApi,
 )
-from sample_metadata.models import (
+from metamist.models import (
     BodyGetAssaysByCriteria,
     AssayUpsert,
     SampleUpsert,

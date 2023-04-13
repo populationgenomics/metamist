@@ -8,8 +8,8 @@ import logging
 import re
 import click
 
-from sample_metadata.apis import SequenceApi
-from sample_metadata.models import SequenceUpdateModel
+from metamist.apis import SequenceApi
+from metamist.models import SequenceUpdateModel
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(

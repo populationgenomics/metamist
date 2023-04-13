@@ -13,14 +13,14 @@ from io import StringIO
 import aiohttp
 import yaml
 from cloudpathlib import AnyPath
-from sample_metadata.model.analysis_type import AnalysisType
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.sequence_type import SequenceType
-from sample_metadata.model.export_type import ExportType
-from sample_metadata.model.body_get_samples import BodyGetSamples
-from sample_metadata.model.body_get_participants import BodyGetParticipants
-from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.apis import (
+from metamist.model.analysis_type import AnalysisType
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.model.sequence_type import SequenceType
+from metamist.model.export_type import ExportType
+from metamist.model.body_get_samples import BodyGetSamples
+from metamist.model.body_get_participants import BodyGetParticipants
+from metamist.model.analysis_query_model import AnalysisQueryModel
+from metamist.apis import (
     SeqrApi,
     ProjectApi,
     AnalysisApi,
@@ -28,7 +28,7 @@ from sample_metadata.apis import (
     SampleApi,
     ParticipantApi,
 )
-from sample_metadata.parser.generic_parser import chunk
+from metamist.parser.generic_parser import chunk
 
 loggers_to_silence = [
     'google.auth.transport.requests',

@@ -6,19 +6,19 @@ import random
 import argparse
 import datetime
 
-from sample_metadata.api.analysis_api import AnalysisApi
+from metamist.api.analysis_api import AnalysisApi
 
-from sample_metadata.api.enums_api import EnumsApi
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_model import AnalysisModel
+from metamist.api.enums_api import EnumsApi
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.model.analysis_model import AnalysisModel
 
-from sample_metadata.models import (
+from metamist.models import (
     SampleUpsert,
     AssayUpsert,
     SequencingGroupUpsert,
 )
 
-from sample_metadata.apis import (
+from metamist.apis import (
     ProjectApi,
     FamilyApi,
     ParticipantApi,
@@ -26,8 +26,8 @@ from sample_metadata.apis import (
     SequencingGroupApi,
 )
 
-# from sample_metadata.configuration import m
-from sample_metadata.parser.generic_parser import chunk
+# from metamist.configuration import m
+from metamist.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
 

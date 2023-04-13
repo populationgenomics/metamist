@@ -5,11 +5,11 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
-from sample_metadata.parser.generic_parser import SingleRow
+from metamist.parser.generic_parser import SingleRow
 
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'

@@ -4,16 +4,16 @@ from unittest.mock import patch
 
 from test.testbase import run_as_sync
 
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
+from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 
 class TestSampleMapParser(unittest.TestCase):
     """Test the TestSampleMapParser"""
 
     @run_as_sync
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_single_row_fastq(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
     ):
@@ -82,9 +82,9 @@ class TestSampleMapParser(unittest.TestCase):
         self.assertDictEqual(expected_sequence_dict, assay.meta)
 
     @run_as_sync
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('from metamist.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     async def test_two_rows_with_provided_checksums(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
     ):
