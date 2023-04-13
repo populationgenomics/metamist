@@ -3,6 +3,7 @@ import os
 import logging
 from typing import Iterable, Callable, TypeVar
 from collections import defaultdict
+from datetime import datetime
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
@@ -125,6 +126,21 @@ class CloudHelper:
     async def file_size(self, filename) -> int:
         """Get size of file in bytes"""
         return AnyPath(self.file_path(filename)).stat().st_size
+
+    async def datetime_added(self, filename) -> datetime | None:
+        """Get the date and time the file was created"""
+        path = self.file_path(filename)
+        if path.startswith('gs://'):
+            # add a specific case for GCS as the AnyPath implementation calls
+            # bucket.get_blob which triggers a read (which humans are not permitted)
+            blob = await self.get_gcs_blob(path)
+            return blob.time_created
+
+        ctime = AnyPath(path).stat().st_ctime
+        if not ctime:
+            return None
+
+        return datetime.utcfromtimestamp(ctime)
 
     def populate_filename_map(self, search_locations: list[str]) -> dict[str, str]:
         """
