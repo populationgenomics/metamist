@@ -12,10 +12,13 @@ db/mariadb-java-client-*.jar
 # see next comment for why
 !sample_metadata/
 sample_metadata/*
+!metamist/
+metamist/*
 
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated
 !sample_metadata/parser/
+!metamist/parser
 
 *.egg-info/
 db/liquibase.jar

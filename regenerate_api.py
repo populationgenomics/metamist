@@ -17,7 +17,7 @@ DOCKER_IMAGE = os.getenv('SM_DOCKER')
 PORT = os.getenv('PORT', '8000')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', f'http://localhost:{PORT}/openapi.json')
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
-MODULE_NAME = 'sample_metadata'
+MODULE_NAME = 'metamist'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -216,10 +216,10 @@ def copy_python_files_from(tmpdir):
     """
     Copy a selection of API files generated from openapi-generator:
 
-        FROM:   $tmpdir/sample_metadata
-        TO:     ./sample_metadata
+        FROM:   $tmpdir/metamist
+        TO:     ./metamist
 
-    This clears the ./sample_metadata folder except for 'files_to_ignore'.
+    This clears the ./metamist folder except for 'files_to_ignore'.
     """
 
     files_to_ignore = {'README.md', 'parser'}
@@ -277,8 +277,8 @@ def main():
     Generates installable python API using:
         - Start API server (if applicable);
         - Call openapi-generator to generate python API to temp folder;
-        - Empty the 'sample_metadata' folder (except for some files);
-        - Copy relevant files to 'sample_metadata' in CWD;
+        - Empty the 'metamist' folder (except for some files);
+        - Copy relevant files to 'metamist' in CWD;
         - Stop the server (if applicable)
 
     """

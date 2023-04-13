@@ -7,11 +7,11 @@ in requirements.txt, dev dependencies are listed in requirements-dev.txt.
 
 from setuptools import setup, find_packages
 
-PKG = 'sample_metadata'
+PKG = 'metamist'
 
-all_packages = ['sample_metadata']
+all_packages = ['metamist']
 all_packages.extend(
-    'sample_metadata.' + p for p in sorted(find_packages(f'./sample_metadata'))
+    'metamist.' + p for p in sorted(find_packages(f'./metamist'))
 )
 
 with open('README.md', encoding='utf-8') as f:
