@@ -10,7 +10,7 @@ from metamist.api.analysis_api import AnalysisApi
 
 from metamist.api.enums_api import EnumsApi
 from metamist.model.analysis_status import AnalysisStatus
-from metamist.model.analysis_model import AnalysisModel
+from metamist.model.analysis import Analysis
 
 from metamist.models import (
     SampleUpsert,
@@ -137,7 +137,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     sequencing_group_ids = [sg for sgs in sample_id_map.values() for sg in sgs]
 
     analyses_to_insert = [
-        AnalysisModel(
+        Analysis(
             sequencing_group_ids=[s],
             type='cram',
             status=AnalysisStatus('completed'),
@@ -149,7 +149,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
 
     # es-index
     analyses_to_insert.append(
-        AnalysisModel(
+        Analysis(
             sequencing_group_ids=random.sample(
                 sequencing_group_ids, len(sequencing_group_ids) // 2
             ),

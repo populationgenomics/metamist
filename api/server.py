@@ -162,11 +162,17 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 if __name__ == '__main__':
     import uvicorn
+    import logging
+
+#     'testcontainers.core.waiting_utils',
+# ):
+    logging.getLogger('watchfiles').setLevel(logging.WARNING)
+    logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
     uvicorn.run(
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        debug=True,
+        # debug=True,
         reload=True,
     )

@@ -32,7 +32,7 @@ from metamist.parser.cloudhelper import CloudHelper, group_by
 
 from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
 from metamist.models import (
-    AnalysisModel,
+    Analysis,
     AnalysisStatus,
     ParticipantUpsert,
     SampleUpsert,
@@ -286,7 +286,7 @@ class ParsedAnalysis:
         """To SM model"""
         if not self.sequencing_group.internal_seqgroup_id:
             raise ValueError('Sequence group ID must be filled in by now')
-        return AnalysisModel(
+        return Analysis(
             status=AnalysisStatus(self.status),
             type=str(self.type),
             meta=self.meta,

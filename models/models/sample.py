@@ -87,7 +87,7 @@ class SampleUpsertInternal(SMBase):
             participant_id=self.participant_id,
             active=self.active,
             sequencing_groups=[sg.to_external() for sg in self.sequencing_groups or []],
-            non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays],
+            non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays or []],
         )
 
 

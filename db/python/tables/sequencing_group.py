@@ -12,15 +12,19 @@ class SequencingGroupTable(DbBase):
     """
 
     table_name = 'sequencing_group'
+    common_get_keys = [
+        's.project', 'sg.sample_id', 'sg.type', 'sg.technology', 'sg.platform', 'sg.meta', 'sg.author'
+    ]
+    common_get_keys_str = ', '.join(common_get_keys)
 
     async def get_projects_by_sequencing_group_ids(
         self, sequencing_group_ids: list[int]
     ) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
         _query = """
-            SELECT s.project FROM sequencing_group sqg
-            INNER JOIN sample s ON s.id = sqg.sample_id
-            WHERE sqg.id in :sequencing_group_ids
+            SELECT s.project FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE sg.id in :sequencing_group_ids
             GROUP BY s.project
         """
         if len(sequencing_group_ids) == 0:
@@ -43,33 +47,35 @@ class SequencingGroupTable(DbBase):
         """
         Get sequence groups by internal identifiers
         """
-        _query = """
-            SELECT project, sample_id, type, technology, platform, meta, author
-            FROM sequencing_group
-            WHERE id IN :sqgids
+        
+        _query = f"""
+            SELECT {SequencingGroupTable.common_get_keys_str}
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE id IN :sgids
         """
 
-        rows = await self.connection.fetch_all(_query, {'sqgids': ids})
+        rows = await self.connection.fetch_all(_query, {'sgids': ids})
         rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(r.project for r in rows)
 
         return projects, rows
 
-    async def get_sequence_ids_by_sequencing_group_ids(
+    async def get_assay_ids_by_sequencing_group_ids(
         self, ids: list[int]
     ) -> dict[int, list[int]]:
         """
         Get sequence IDs in a sequencing_group
         """
         _query = """
-            SELECT sequencing_group_id, sequencing_id
-            FROM sequencing_group_sequence
-            WHERE sequencing_group_id IN :sqgids
+            SELECT sgs.sequencing_group_id, sgs.assay_id
+            FROM sequencing_group_sequence sgs
+            WHERE sequencing_group_id IN :sgids
         """
-        rows = await self.connection.fetch_all(_query, {'sqgids': ids})
+        rows = await self.connection.fetch_all(_query, {'sgids': ids})
         sequencing_groups: dict[int, list[int]] = defaultdict(list)
         for row in rows:
-            sequencing_groups[row['sequencing_group_id']].append(row['sequencing_id'])
+            sequencing_groups[row['sequencing_group_id']].append(row['assay_id'])
 
         return dict(sequencing_groups)
 
@@ -94,23 +100,23 @@ class SequencingGroupTable(DbBase):
             wheres.append('s.id IN :sample_ids')
             params['sample_ids'] = sample_ids
         if sequencing_group_ids:
-            wheres.append('sqg.id IN :sequencing_group_ids')
+            wheres.append('sg.id IN :sequencing_group_ids')
             params['sequencing_group_ids'] = sequencing_group_ids
         if types:
-            wheres.append('sqg.type IN :types')
+            wheres.append('sg.type IN :types')
             params['types'] = types
         if technologies:
-            wheres.append('sqg.technology IN :technologies')
+            wheres.append('sg.technology IN :technologies')
             params['technologies'] = technologies
         if platforms:
-            wheres.append('sqg.platform IN :platforms')
+            wheres.append('sg.platform IN :platforms')
             params['platforms'] = platforms
 
         where = ' AND '.join(wheres)
         _query = f"""
-            SELECT sqg.id, s.id as sample_id, s.project, sqg.type, sqg.technology, sqg.platform, sqg.meta, sqg.author
-            FROM sequencing_group sqg
-            INNER JOIN sample s ON s.id = sqg.sample_id
+            SELECT {SequencingGroupTable.common_get_keys_str}
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
             {'WHERE ' + where if where else ''}
         """
 
@@ -126,9 +132,9 @@ class SequencingGroupTable(DbBase):
         Get all sequencing group IDs by sample IDs by type
         """
         _query = """
-        SELECT s.id as sid, sqg.id as sqgid, sqg.type as sqgtype
+        SELECT s.id as sid, sg.id as sgid, sg.type as sgtype
         FROM sample s
-        INNER JOIN sequencing_group sqg ON s.id = sqg.sample_id
+        INNER JOIN sequencing_group sg ON s.id = sg.sample_id
         WHERE project = :project
         """
         rows = await self.connection.fetch_all(_query, {'project': self.project})
@@ -137,8 +143,8 @@ class SequencingGroupTable(DbBase):
         ] = defaultdict(lambda: defaultdict(list))
         for row in rows:
             sample_id = row['sid']
-            sg_id = row['sqgid']
-            sg_type = row['sqgtype']
+            sg_id = row['sgid']
+            sg_type = row['sgtype']
             sequencing_group_ids_by_sample_ids_by_type[sample_id][sg_type].append(sg_id)
 
         return sequencing_group_ids_by_sample_ids_by_type
@@ -181,6 +187,39 @@ class SequencingGroupTable(DbBase):
         GROUP BY id"""
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
+    
+    async def get_sequencing_groups_by_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
+        """Get map of samples by analysis_ids"""
+        _query = f"""
+        SELECT {SequencingGroupTable.common_get_keys_str}, asg.analysis_id
+        FROM analysis_sequencing_group asg
+        INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+        INNER JOIN sample s ON s.id = sg.sample_id
+        WHERE asg.analysis_id IN :aids
+        """
+        rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
+
+        mapped_analysis_to_sequencing_group_id: dict[int, list[int]] = defaultdict(list)
+        sg_map: dict[int, SequencingGroupInternal] = {}
+        projects: set[int] = set()
+        for rrow in rows:
+            drow = dict(rrow)
+            sid = drow['id']
+            analysis_id = drow.pop('analysis_id')
+            mapped_analysis_to_sequencing_group_id[analysis_id].append(sid)
+            projects.add(drow['project'])
+
+            if sid not in sg_map:
+                sg_map[sid] = SequencingGroupInternal.from_db(**drow)
+
+        analysis_map: dict[int, list[SequencingGroupInternal]] = {
+            analysis_id: [sg_map.get(sgid) for sgid in sgids]
+            for analysis_id, sgids in mapped_analysis_to_sequencing_group_id.items()
+        }
+
+        return projects, analysis_map
 
     async def create_sequencing_group(
         self,

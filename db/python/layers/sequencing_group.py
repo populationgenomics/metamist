@@ -63,6 +63,29 @@ class SequencingGroupLayer(BaseLayer):
 
         return groups
 
+    async def get_sequencing_groups_by_analysis_ids(
+        self, analysis_ids: list[int], check_project_ids: bool = True
+    ) -> dict[int, list[SequencingGroupInternal]]:
+        """
+        Get sequencing groups by analysis IDs
+        """
+        if not analysis_ids:
+            return {}
+
+        projects, groups = await self.seqgt.get_sequencing_groups_by_analysis_ids(
+            analysis_ids
+        )
+
+        if not groups:
+            return groups
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return groups
+
     async def query(
         self,
         project_ids: list[ProjectId]=None,
@@ -271,7 +294,7 @@ class SequencingGroupLayer(BaseLayer):
             # TODO: Fix the cast from sequencing_group_id to integers correctly
             seq_group_ids = list(map(int, seq_group_ids))
             sequence_to_group = (
-                await self.seqgt.get_sequence_ids_by_sequencing_group_ids(seq_group_ids)
+                await self.seqgt.get_assay_ids_by_sequencing_group_ids(seq_group_ids)
             )
 
             for sg in sequencing_groups_that_exist:

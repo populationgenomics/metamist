@@ -164,9 +164,10 @@ class SampleTable(DbBase):
         ]
         _query = f"""
         SELECT {", ".join("s." + k for k in keys)}, a_s.analysis_id
-        FROM analysis_sample a_s ON s.id = a_s.sample_id
-        INNER JOIN sample s
-        WHERE a_s.analysis_id IN :aids
+        FROM analysis_sequencing_group asg
+        INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+        INNER JOIN sample s ON s.id = sg.sample_id
+        WHERE asg.analysis_id IN :aids
         """
         rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
 

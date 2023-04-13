@@ -63,12 +63,15 @@ class AssayLayer(BaseLayer):
     async def get_assays_for_sample_ids(
         self,
         sample_ids: list[int],
+            assay_type: str | None = None,
         check_project_ids=True,
     ) -> list[AssayInternal]:
         """
-        Get ALL active sequence objects for a list of internal sample IDs
+        Get ALL active assays for a list of internal sample IDs
         """
-        projects, assays = await self.seqt.get_assays_by(sample_ids=sample_ids)
+        projects, assays = await self.seqt.get_assays_by(
+            sample_ids=sample_ids, assay_types=[assay_type]
+        )
 
         if (
             check_project_ids and assays

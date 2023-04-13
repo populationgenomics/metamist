@@ -50,7 +50,8 @@ async def upsert_samples(
     # Table interfaces
     st = SampleLayer(connection)
 
-    upserted = await st.upsert_samples([sample.to_internal() for sample in samples])
+    internal_samples = [sample.to_internal() for sample in samples]
+    upserted = await st.upsert_samples(internal_samples)
 
     return [s.to_external() for s in upserted]
 

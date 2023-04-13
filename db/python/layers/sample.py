@@ -300,19 +300,17 @@ class SampleLayer(BaseLayer):
 
         async with with_function():
             # Create or update samples
-            await asyncio.gather(
-                *[
-                    self.upsert_sample(
-                        s,
+            for sample in samples:
+                await     self.upsert_sample(
+                        sample,
                         author=author,
                         project=project,
                         process_sequencing_groups=False,
                         process_assays=False,
                         open_transaction=False,
                     )
-                    for s in samples
-                ]
-            )
+
+
 
             # Upsert all sequencing_groups (in turn relevant assays)
             sequencing_groups = [
