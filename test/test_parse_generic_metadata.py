@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 from test.testbase import run_as_sync
@@ -99,7 +100,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
-        mock_datetime_added.return_value = None
+        mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
@@ -126,7 +127,6 @@ class TestParseGenericMetadata(unittest.TestCase):
             project='devdev',
             reads_column='CRAM',
             gvcf_column='GVCF',
-            # skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {
@@ -164,25 +164,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': 111,
-                    'datetime_added': None,
-                    # 'secondaryFiles': [
-                    #     {
-                    #         'location': '/path/to/<sample-id>.bam.bai',
-                    #         'basename': '<sample-id>.bam.bai',
-                    #         'class': 'File',
-                    #         'checksum': None,
-                    #         'size': None,
-                    #         'datetime_added': None,
-                    #     },
-                    #     {
-                    #         'location': '/path/to/<sample-id>.bai',
-                    #         'basename': '<sample-id>.bai',
-                    #         'class': 'File',
-                    #         'checksum': None,
-                    #         'size': None,
-                    #         'datetime_added': None,
-                    #     },
-                    # ],
+                    'datetime_added': '2022-02-02T22:22:22',
                 }
             ],
             'reads_type': 'bam',
@@ -193,17 +175,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': 111,
-                    'datetime_added': None,
-                    # 'secondaryFiles': [
-                    #     {
-                    #         'location': '/path/to/<sample-id>.g.vcf.gz.tbi',
-                    #         'basename': '<sample-id>.g.vcf.gz.tbi',
-                    #         'class': 'File',
-                    #         'checksum': None,
-                    #         'size': None,
-                    #         'datetime_added': None,
-                    #     }
-                    # ],
+                    'datetime_added': '2022-02-02T22:22:22',
                 }
             ],
             'gvcf_types': 'gvcf',

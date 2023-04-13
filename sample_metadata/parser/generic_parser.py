@@ -1239,7 +1239,7 @@ class GenericParser(
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
-            'datetime_added': datetime_added
+            'datetime_added': datetime_added.isoformat() if datetime_added else None
         }
 
         if secondary_files:
