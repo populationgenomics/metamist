@@ -1,33 +1,26 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-locals
-import asyncio
-from pprint import pprint
-import random
 import argparse
+import asyncio
 import datetime
+import random
+from pprint import pprint
 
-# from metamist.graphql import query
 from metamist.api.analysis_api import AnalysisApi
-
-from metamist.api.enums_api import EnumsApi
-from metamist.model.analysis_status import AnalysisStatus
+from metamist.apis import (
+    ProjectApi,
+    ParticipantApi,
+    FamilyApi,
+    SampleApi,
+)
+from metamist.graphql import query
 from metamist.model.analysis import Analysis
-
+from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import (
     SampleUpsert,
     AssayUpsert,
     SequencingGroupUpsert,
 )
-
-from metamist.apis import (
-    ProjectApi,
-    FamilyApi,
-    ParticipantApi,
-    SampleApi,
-    SequencingGroupApi,
-)
-
-# from metamist.configuration import m
 from metamist.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
@@ -36,16 +29,28 @@ EMOJIS = [':)', ':(', ':/', ':\'(']
 async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     """Doing the generation for you"""
 
+    papi = ProjectApi()
     sapi = SampleApi()
 
-    papi = ProjectApi()
-    enum_api = EnumsApi()
-    sgapi = SequencingGroupApi()
+    enums_query = """
+    query EnumsQuery {
+      enum {
+        analysisType
+        assayType
+        sampleType
+        sequencingPlatform
+        sequencingTechnology
+        sequencingType
+      }
+    }
+    """
+    enum_resp = query(enums_query)
+    # analysis_types = enum_resp['enum']['analysisType']
+    sample_types = enum_resp['enum']['sampleType']
+    sequencing_technologies = enum_resp['enum']['sequencingTechnology']
+    sequencing_platforms = enum_resp['enum']['sequencingPlatform']
+    sequencing_types = enum_resp['enum']['sequencingType']
 
-    sample_types = enum_api.get_sample_types()
-    sequencing_technologies = enum_api.get_sequencing_technologys()
-    sequencing_platforms = enum_api.get_sequencing_platforms()
-    sequencing_types = enum_api.get_sequencing_types()
     assay_type = 'sequencing'
 
     existing_projects = await papi.get_my_projects_async()
@@ -136,24 +141,21 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                         )
                     )
 
-    # response = await sapi.upsert_samples_async(project, samples)
-    # pprint(response)
+    response = await sapi.upsert_samples_async(project, samples)
+    pprint(response)
 
     # practice what you preach I guess
     _sgid_qquery = """
-query MyQuery {
-  project(name: "greek-myth") {
+query MyQuery($project: String!) {
+  project(name: $project) {
     sequencingGroups {
       id
     }
   }
 }
     """
-
-    sample_id_map = await sgapi.get_all_sequencing_group_ids_by_sample_by_type_async(
-        project=project
-    )
-    sequencing_group_ids = [sg for sgs in sample_id_map.values() for sg in sgs.values()]
+    sgid_response = query(_sgid_qquery, {'project': project})
+    sequencing_group_ids = [sg['id'] for sg in sgid_response['project']['sequencingGroups']]
 
     analyses_to_insert = [
         Analysis(
@@ -183,7 +185,7 @@ query MyQuery {
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
         await asyncio.gather(
-            *[aapi.create_analysis_async(project, analysis_model=a) for a in ans]
+            *[aapi.create_analysis_async(project, a) for a in ans]
         )
 
 

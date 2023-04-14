@@ -12,6 +12,7 @@ from db.python.layers import (
     FamilyLayer,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from models.enums import AnalysisStatus
 from models.models import (
     AssayInternal,
     SampleInternal,
@@ -226,10 +227,27 @@ async def load_participants_for_families(
     return [pmap.get(fid, []) for fid in family_ids]
 
 @connected_data_loader
-def load_analyses_for_sequencing_groups(seq_group_ids: list[int], connection):
+def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisStatus | None], str | None], connection):
+    """
+    Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str) -> list[AnalysisInternal]
+    """
     alayer = AnalysisLayer(connection)
-    return [[] for _ in seq_group_ids]
+    by_key: dict[tuple[int, AnalysisStatus | None, str | None], list[AnalysisInternal]] = defaultdict(list)
+    for chunk in group_by(query, lambda x: x[1:]).values():
+        sequencing_group_ids = [x[0] for x in chunk]
+        status = chunk[0][1]
+        analysis_type = chunk[0][2]
 
+        analyses = alayer.query_analysis(
+            sequencing_group_ids=sequencing_group_ids,
+            status=status,
+            analysis_type=analysis_type,
+        )
+        for analysis in analyses:
+            for sequencing_group_id in analysis.sequencing_group_ids:
+                by_key[(sequencing_group_id, status, analysis_type)].append(analysis)
+
+    return [by_key.get(q, []) for q in query]
 
 class LoaderKeys(enum.Enum):
     PROJECTS_FOR_IDS = 'projects_for_id'

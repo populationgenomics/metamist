@@ -3,7 +3,7 @@ from typing import Dict
 
 import requests
 from cpg_utils.cloud import get_google_identity_token
-from sample_metadata.configuration import sm_url
+from metamist.configuration import sm_url
 
 
 # use older style typing to broaden supported Python versions

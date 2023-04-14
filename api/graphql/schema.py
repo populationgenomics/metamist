@@ -366,10 +366,12 @@ class GraphQLSequencingGroup:
 
     @strawberry.field
     async def analyses(
-        self, info: Info, root: 'GraphQLSequencingGroup'
+        self, info: Info, root: 'GraphQLSequencingGroup',
+            analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
+            analysis_type: str | None = None,
     ) -> list[GraphQLAnalysis]:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
-        analyses = await loader.load(root.internal_id)
+        analyses = await loader.load((root.internal_id, analysis_status, analysis_type))
         return [GraphQLAnalysis.from_internal(a) for a in analyses]
 
     @strawberry.field
