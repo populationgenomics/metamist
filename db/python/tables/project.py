@@ -456,7 +456,7 @@ DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
             """
             if delete_project:
-                _query += 'DELETE FROM project WHERE id = :project;'
+                _query += 'DELETE FROM project WHERE id = :project;\n'
 
             await self.connection.execute(_query, {'project': project_id})
 
