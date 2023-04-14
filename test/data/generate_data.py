@@ -6,6 +6,7 @@ import random
 import argparse
 import datetime
 
+# from metamist.graphql import query
 from metamist.api.analysis_api import AnalysisApi
 
 from metamist.api.enums_api import EnumsApi
@@ -136,16 +137,26 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                         )
                     )
 
-                sample.sequencing_groups.append(sg)
 
 
-    response = await sapi.upsert_samples_async(project, samples)
-    pprint(response)
+    # response = await sapi.upsert_samples_async(project, samples)
+    # pprint(response)
+
+    # practice what you preach I guess
+    _sgid_qquery = """
+query MyQuery {
+  project(name: "greek-myth") {
+    sequencingGroups {
+      id
+    }
+  }
+}
+    """
 
     sample_id_map = await sgapi.get_all_sequencing_group_ids_by_sample_by_type_async(
         project=project
     )
-    sequencing_group_ids = [sg for sgs in sample_id_map.values() for sg in sgs]
+    sequencing_group_ids = [sg for sgs in sample_id_map.values() for sg in sgs.values()]
 
     analyses_to_insert = [
         Analysis(

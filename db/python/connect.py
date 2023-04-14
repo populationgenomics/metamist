@@ -17,12 +17,6 @@ from db.python.utils import InternalError
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-"""
-sequencing_group
-sequencing_group_assay
-sequencing_group_external_ids
-analysis_sequencing_group"""
-
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
     'analysis',
@@ -176,7 +170,7 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(config.get_connection_string())
+        return databases.Database(config.get_connection_string(), echo=True)
 
     @staticmethod
     async def connect():
@@ -203,6 +197,7 @@ class SMConnections:
 
         conn = SMConnections.make_connection(credentials)
         await conn.connect()
+
         return conn
 
     @staticmethod

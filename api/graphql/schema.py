@@ -7,11 +7,13 @@ Schema for GraphQL.
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+from inspect import isclass
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
+from db.python import enum_tables as enum_tables
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.assay import AssayLayer
@@ -29,6 +31,27 @@ LoaderKeys,
 )
 
 
+# @strawberry.type
+# class GraphQLEnum:
+#     @strawberry.field()
+#     async def sequencing_types(self, info: Info) -> list[str]:
+#         return await SequencingTypeTable(info.context['connection']).get()
+enum_methods = {}
+for enum in enum_tables.__dict__.values():
+    if not isclass(enum):
+        continue
+    def create_function(_enum):
+        async def m(info: Info) -> list[str]:
+            return await _enum(info.context['connection']).get()
+        m.__name__ = _enum.get_enum_name()
+        # m.__annotations__ = {'return': list[str]}
+        return m
+
+    enum_methods[enum.get_enum_name()] = strawberry.field(create_function(enum), )
+
+
+
+GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 @strawberry.type
 class GraphQLProject:
@@ -105,7 +128,8 @@ class GraphQLProject:
     @strawberry.field()
     async def sequencing_groups(self, info: Info, root: 'GraphQLProject') -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS]
-        return await loader.load(root.id)
+        sequencing_groups = await loader.load(root.id)
+        return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
     # @strawberry.field()
     # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
@@ -279,9 +303,9 @@ class GraphQLSample:
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
-    async def sequencing_groups(self, info: Info, root: 'GraphQLSample') -> list['GraphQLSequencingGroup']:
+    async def sequencing_groups(self, info: Info, root: 'GraphQLSample', sequencing_type: str | None = None) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
-        sequencing_groups =  await loader.load(root.internal_id)
+        sequencing_groups = await loader.load((root.internal_id, sequencing_type))
 
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
@@ -330,7 +354,7 @@ class GraphQLSequencingGroup:
     @strawberry.field
     async def assays(self, info: Info, root: 'GraphQLSequencingGroup') -> list['GraphQLAssay']:
         loader = info.context[LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS]
-        return await loader.load(int(root.internal_id))
+        return await loader.load(root.internal_id)
 
 
 @strawberry.type
@@ -365,6 +389,10 @@ class GraphQLAssay:
 @strawberry.type
 class Query:
     """GraphQL Queries"""
+
+    @strawberry.field()
+    def enum(self, info: Info) -> GraphQLEnum:
+        return GraphQLEnum()
 
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:

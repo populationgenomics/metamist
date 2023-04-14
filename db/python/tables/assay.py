@@ -493,6 +493,43 @@ class AssayTable(DbBase):
 
         return projs, list(assays.values())
 
+    async def get_assays_for_sequencing_group_ids(
+        self, sequencing_group_ids: list[int]
+    ) -> tuple[set[ProjectId], dict[int, list[AssayInternal]]]:
+        """Get all assays for sequencing group ids"""
+        keys = [
+            'a.id',
+            'a.sample_id',
+            'a.type',
+            'a.meta',
+            's.project',
+        ]
+        wheres = [
+            'sga.sequencing_group_id IN :sequencing_group_ids',
+        ]
+
+        _query = f"""
+            SELECT {', '.join(keys)}, sga.sequencing_group_id
+            FROM sequencing_group_assay sga
+            INNER JOIN assay a ON sga.assay_id = a.id
+            INNER JOIN sample s ON a.sample_id = s.id
+            WHERE {' AND '.join(wheres)}
+        """
+
+        rows = await self.connection.fetch_all(
+            _query, {'sequencing_group_ids': sequencing_group_ids}
+        )
+        by_sequencing_group_id: dict[int, list[AssayInternal]] = defaultdict(list)
+        projects: set[ProjectId] = set()
+        for row in rows:
+            drow = dict(row)
+            sequencing_group_id = drow.pop('sequencing_group_id')
+            projects.add(drow.pop('project'))
+            assay = AssayInternal.from_db(drow)
+            by_sequencing_group_id[sequencing_group_id].append(assay)
+
+        return projects, by_sequencing_group_id
+
     # region EIDs
 
     async def _get_assay_external_ids(self, assay_id):

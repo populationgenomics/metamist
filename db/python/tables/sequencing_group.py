@@ -235,8 +235,8 @@ class SequencingGroupTable(DbBase):
         """Create sequence group"""
         _query = """
         INSERT INTO sequencing_group
-            (sample_id, type, technology, platform, meta, author)
-        VALUES (:sample_id, :type, :technology, :platform, :meta, :author)
+            (sample_id, type, technology, platform, meta, author, archived)
+        VALUES (:sample_id, :type, :technology, :platform, :meta, :author, 'false')
         RETURNING id;
         """
 

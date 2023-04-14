@@ -106,6 +106,24 @@ class AssayLayer(BaseLayer):
 
         return sample_assay_map
 
+    async def get_assays_for_sequencing_group_ids(
+            self, sequencing_group_ids: list[int],
+            check_project_ids=True) -> dict[int, list[AssayInternal]]:
+        projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
+            sequencing_group_ids=sequencing_group_ids,
+        )
+
+        if not assays:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return assays
+
+
     async def get_assays_by(
         self,
         sample_ids: list[int] = None,

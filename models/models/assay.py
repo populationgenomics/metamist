@@ -14,11 +14,11 @@ from models.utils.sample_id_format import (
 class AssayInternal(BaseModel):
     """Internal model for Assay"""
 
-    id: Optional[int] = None
-    external_ids: Optional[dict[str, str]] = None
-    sample_id: Union[str, int]
-    meta: Optional[Dict[str, Any]] = None
+    id: int | None
+    sample_id: int
+    meta: dict[str, Any] | None
     type: str
+    external_ids: dict[str, str] | None = None
 
     def __repr__(self):
         return ', '.join(f'{k}={v}' for k, v in vars(self).items())
