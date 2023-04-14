@@ -78,19 +78,23 @@ async def update_project(
     )
 
 
-@router.delete('/{project}', operation_id='deleteProject')
-async def delete_project(
+@router.delete('/{project}', operation_id='deleteProjectData')
+async def delete_project_data(
     project: str,
+    delete_project: bool = False,
     connection: Connection = get_projectless_db_connection,
 ):
     """
-    Delete a project by project name.
+    Delete all data in a project by project name.
+    Can optionally delete the project itself.
     Requires READ access + project-creator permissions
     """
     ptable = ProjectPermissionsTable(connection.connection)
     pid = await ptable.get_project_id_from_name_and_user(
         connection.author, project, readonly=False
     )
-    success = await ptable.delete_project(project_id=pid, author=connection.author)
+    success = await ptable.delete_project_data(
+        project_id=pid, delete_project=delete_project, author=connection.author
+    )
 
     return {'success': success}
