@@ -439,13 +439,29 @@ RETURNING ID"""
 
         async with self.connection.transaction():
             _query = """
-DELETE FROM participant_phenotypes where participant_id IN (SELECT id FROM participant WHERE project = :project);
-DELETE FROM family_participant WHERE family_id IN (SELECT id FROM family where project = :project);
+DELETE FROM participant_phenotypes where participant_id IN (
+    SELECT id FROM participant WHERE project = :project
+);
+DELETE FROM family_participant WHERE family_id IN (
+    SELECT id FROM family where project = :project
+);
 DELETE FROM family WHERE project = :project;
-DELETE FROM sample_sequencing_eid WHERE project = :project;
-DELETE FROM sample_sequencing WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE project = :project);
+DELETE FROM sequencing_group_external_id WHERE project = :project;
+DELETE FROM assay_external_id WHERE project = :project;
+DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM sequencing_group WHERE sample_id IN (
+    SELECT id FROM sample WHERE project = :project
+);
 DELETE FROM sample WHERE project = :project;
 DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;

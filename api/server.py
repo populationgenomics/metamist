@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 from starlette.responses import FileResponse
 
 from db.python.connect import SMConnections
@@ -104,7 +105,11 @@ async def exception_handler(request: Request, e: Exception):
     if isinstance(e, HTTPException):
         code = e.status_code
         name = e.detail
-
+    elif isinstance(e, ValidationError):
+        # for whatever reason, calling str(e) here fails
+        code = 500
+        name = 'ValidationError'
+        e = str(e.args)
     else:
         code = determine_code_from_error(e)
         name = str(type(e).__name__)

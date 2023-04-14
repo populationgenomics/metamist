@@ -33,6 +33,7 @@ class SequencingGroupInternal(SMBase):
     platform: str | None = None
     meta: dict[str, str] | None = None
     sample_id: int | None = None
+    external_ids: dict[str, str] | None = None
 
     project: int | None = None
 
@@ -69,6 +70,7 @@ class SequencingGroupUpsertInternal(SMBase):
     platform: str | None  # fk
     meta: dict[str, str] | None = None
     sample_id: int | None = None
+    external_ids: dict[str, str] | None = None
 
     assays: list[AssayUpsertInternal] | None = None
 
@@ -104,6 +106,7 @@ class SequencingGroup(SMBase):
     platform: str  # uppercase
     meta: dict[str, str]
     sample_id: str
+    external_ids: dict[str, str]
 
     assays: list[Assay] | None = None
 
@@ -119,6 +122,7 @@ class SequencingGroupUpsert(SMBase):
     platform: str  # uppercase
     meta: dict[str, str] | None = None
     sample_id: str | None = None
+    external_ids: dict[str, str] | None = None
 
     assays: list[AssayUpsert] | None = None
 
@@ -141,6 +145,7 @@ class SequencingGroupUpsert(SMBase):
             platform=self.platform.lower() if self.platform else None,
             meta=self.meta,
             sample_id=_sample_id,
+            external_ids=self.external_ids or {},
         )
 
         if self.assays is not None:

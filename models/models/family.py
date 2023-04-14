@@ -2,8 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-
-class Family(BaseModel):
+class FamilyInternal(BaseModel):
     """Family model"""
 
     id: int
@@ -15,7 +14,41 @@ class Family(BaseModel):
     @staticmethod
     def from_db(d):
         """From DB fields"""
+        return FamilyInternal(**d)
+
+    def to_external(self):
+        """Convert to external model"""
+        return Family(
+            id=self.id,
+            external_id=self.external_id,
+            project=self.project,
+            description=self.description,
+            coded_phenotype=self.coded_phenotype,
+        )
+
+class Family(BaseModel):
+    """Family model"""
+
+    id: int | None
+    external_id: str
+    project: int
+    description: Optional[str] = None
+    coded_phenotype: Optional[str] = None
+
+    @staticmethod
+    def from_db(d):
+        """From DB fields"""
         return Family(**d)
+
+    def to_internal(self):
+        """Convert to internal model"""
+        return FamilyInternal(
+            id=self.id,
+            external_id=self.external_id,
+            project=self.project,
+            description=self.description,
+            coded_phenotype=self.coded_phenotype,
+        )
 
 
 class PedRowInternal:

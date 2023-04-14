@@ -93,8 +93,10 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                     ),
                 },
                 participant_id=pid,
-                sequences=[],
+                assays=[],
+                sequencing_groups=[]
             )
+            samples.append(sample)
 
             sample_id_index += random.randint(1, 4)
             for _ in range(generate_random_number_within_distribution()):
@@ -105,15 +107,19 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                         'Dept of Seq.',
                     ]
                 )
+                stype = random.choice(sequencing_types)
+                stechnology = random.choice(sequencing_technologies)
+                splatform = random.choice(sequencing_platforms)
                 sg = SequencingGroupUpsert(
-                    type=random.choice(sequencing_types),
-                    technology=random.choice(sequencing_technologies),
-                    platform=random.choice(sequencing_platforms),
+                    type=stype,
+                    technology=stechnology,
+                    platform=splatform,
                     meta={
                         'facility': facility,
                     },
+                    assays=[]
                 )
-                sg.assays = []
+                sample.sequencing_groups.append(sg)
                 for _ in range(generate_random_number_within_distribution()):
                     sg.assays.append(
                         AssayUpsert(
@@ -122,11 +128,16 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                                 'facility': facility,
                                 'emoji': random.choice(EMOJIS),
                                 'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
+                                'sequencing_type': stype,
+                                'sequencing_technology': stechnology,
+                                'sequencing_platform': splatform,
+
                             },
                         )
                     )
 
-            samples.append(sample)
+                sample.sequencing_groups.append(sg)
+
 
     response = await sapi.upsert_samples_async(project, samples)
     pprint(response)

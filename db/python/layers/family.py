@@ -10,7 +10,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from models.models.family import Family, PedRowInternal
+from models.models.family import PedRowInternal, FamilyInternal
 from models.models.participant import ParticipantUpsertInternal
 
 
@@ -313,7 +313,7 @@ class FamilyLayer(BaseLayer):
 
     async def get_family_by_internal_id(
         self, family_id: int, check_project_id: bool = True
-    ) -> Family:
+    ) -> FamilyInternal:
         """Get family by internal ID"""
         project, family = await self.ftable.get_family_by_internal_id(family_id)
         if check_project_id:
@@ -361,7 +361,7 @@ class FamilyLayer(BaseLayer):
         family_ids: list[int],
         check_missing: bool = True,
         check_project_ids: bool = True,
-    ) -> list[Family]:
+    ) -> list[FamilyInternal]:
         """Get families by internal IDs"""
         projects, families = await self.ftable.get_families_by_ids(
             family_ids=family_ids
@@ -382,7 +382,7 @@ class FamilyLayer(BaseLayer):
 
     async def get_families_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
-    ) -> dict[int, list[Family]]:
+    ) -> dict[int, list[FamilyInternal]]:
         """
         Get families keyed by participant_ids, this will duplicate families
         """

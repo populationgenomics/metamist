@@ -101,6 +101,7 @@ class Sample(SMBase):
     type: str | None
     participant_id: int | None
     active: bool | None
+    author: str | None = None
 
     def to_internal(self):
         """Convert to internal model"""

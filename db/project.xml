@@ -473,17 +473,17 @@
 		/>
 		<renameTable
 			oldTableName="sample_sequencing_eid"
-			newTableName="assay_eid"
+			newTableName="assay_external_id"
 		/>
 		<renameColumn
 			columnDataType="INT"
 			oldColumnName="sequencing_id"
 			newColumnName="assay_id"
-			tableName="assay_eid"
+			tableName="assay_external_id"
 		/>
 		<addForeignKeyConstraint
-			constraintName="fk_assay_eid_assay_id"
-			baseTableName="assay_eid"
+			constraintName="fk_assay_external_id_assay_id"
+			baseTableName="assay_external_id"
 			baseColumnNames="assay_id"
 			referencedTableName="assay"
 			referencedColumnNames="id"
@@ -589,7 +589,7 @@
 			You make a combined key, with one of the fields only NOT NULL when the row should participant in the check.
 			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow multiple
 			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
-		<createTable tableName="sequencing_group_external_ids">
+		<createTable tableName="sequencing_group_external_id">
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
 			</column>
@@ -611,7 +611,7 @@
 		</createTable>
 		<addUniqueConstraint
 			columnNames="project,external_id,nullIfInactive"
-			tableName="sequencing_group_external_ids"
+			tableName="sequencing_group_external_id"
 			constraintName="UK_SEQUENCING_GROUP_EXTERNALID"
 			validate="true"
 		/>
@@ -634,7 +634,7 @@
 
 			ALTER TABLE sequencing_group ADD SYSTEM VERSIONING;
 			ALTER TABLE sequencing_group_assay ADD SYSTEM VERSIONING;
-			ALTER TABLE sequencing_group_external_ids ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group_external_id ADD SYSTEM VERSIONING;
 			ALTER TABLE analysis_sequencing_group ADD SYSTEM VERSIONING;
 
 			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');

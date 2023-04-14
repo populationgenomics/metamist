@@ -13,7 +13,7 @@ class SequencingGroupTable(DbBase):
 
     table_name = 'sequencing_group'
     common_get_keys = [
-        's.project', 'sg.sample_id', 'sg.type', 'sg.technology', 'sg.platform', 'sg.meta', 'sg.author'
+        'sg.id', 's.project', 'sg.sample_id', 'sg.type', 'sg.technology', 'sg.platform', 'sg.meta', 'sg.author'
     ]
     common_get_keys_str = ', '.join(common_get_keys)
 
@@ -258,8 +258,6 @@ class SequencingGroupTable(DbBase):
         bad_keys = [k for k, v in values.items() if v is None]
         if bad_keys:
             raise ValueError(f'Must provide values for {", ".join(bad_keys)}')
-
-
 
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 

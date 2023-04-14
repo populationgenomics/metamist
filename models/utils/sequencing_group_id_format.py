@@ -62,7 +62,7 @@ def sequencing_group_id_format_list(sample_ids: Iterable[int | str]) -> list[str
     return [sequencing_group_id_format(s) for s in sample_ids]
 
 
-def sequencing_group_id_format(sample_id: int | str) -> str:
+def sequencing_group_id_format(sequencing_group_id: int | str) -> str:
     """
     Transform raw (int) sequencing-group identifier to format (CPGXXXH) where:
         - CPG is the prefix
@@ -75,14 +75,16 @@ def sequencing_group_id_format(sample_id: int | str) -> str:
     >>> sequencing_group_id_format(12345)
     'CPG123455'
     """
+    if not sequencing_group_id:
+        raise ValueError('Cannot format empty sequencing group ID')
 
-    if isinstance(sample_id, str) and not sample_id.isdigit():
-        if sample_id.startswith(SEQUENCING_GROUP_PREFIX):
-            return sample_id
-        raise ValueError(f'Unexpected format for sample identifier {sample_id!r}')
+    if isinstance(sequencing_group_id, str) and not sequencing_group_id.isdigit():
+        if sequencing_group_id.startswith(SEQUENCING_GROUP_PREFIX):
+            return sequencing_group_id
+        raise ValueError(f'Unexpected format for sample identifier {sequencing_group_id!r}')
 
-    sample_id = int(sample_id)
+    sequencing_group_id = int(sequencing_group_id)
 
-    checksum = luhn_compute(sample_id, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET)
+    checksum = luhn_compute(sequencing_group_id, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET)
 
-    return f'{SEQUENCING_GROUP_PREFIX}{sample_id}{checksum}'
+    return f'{SEQUENCING_GROUP_PREFIX}{sequencing_group_id}{checksum}'

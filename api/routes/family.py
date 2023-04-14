@@ -146,9 +146,11 @@ async def get_families(
     family_layer = FamilyLayer(connection)
     sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
 
-    return await family_layer.get_families(
+    families = await family_layer.get_families(
         participant_ids=participant_ids, sample_ids=sample_ids_raw
     )
+
+    return [f.to_external() for f in families]
 
 
 @router.post('/', operation_id='updateFamily')
@@ -187,7 +189,8 @@ async def import_families(
     rows = [r for r in reader if not r[0].startswith('#')]
     if len(rows[0]) == 1:
         raise ValueError(
-            'Only one column was detected in the pedigree, ensure the file is TAB separated (\\t)'
+            'Only one column was detected in the pedigree, ensure the '
+            'file is TAB separated (\\t)'
         )
     success = await family_layer.import_families(headers, rows)
     return {'success': success}

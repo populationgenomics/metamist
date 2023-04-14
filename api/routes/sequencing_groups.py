@@ -18,7 +18,7 @@ router = APIRouter(prefix='/sequencing-group', tags=['sequencing-group'])
 # region CREATES
 
 
-@router.get('/{sequencing_group_id}', operation_id='getSequencingGroup')
+@router.get('{sequencing_group_id}', operation_id='getSequencingGroup')
 async def get_sequencing_group(
     sequencing_group_id: str, connection: Connection = get_projectless_db_connection
 ) -> str:
@@ -30,7 +30,7 @@ async def get_sequencing_group(
     return sg.to_external()
 
 
-@router.get('/{project}', operation_id='getAllSequencingGroupIdsBySampleByType')
+@router.get('/project/{project}', operation_id='getAllSequencingGroupIdsBySampleByType')
 async def get_all_sequencing_group_ids_by_sample_by_type(
     connection: Connection = get_project_readonly_connection,
 ) -> dict[str, dict[str, list[str]]]:

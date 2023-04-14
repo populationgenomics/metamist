@@ -59,19 +59,18 @@ class AssayTable(DbBase):
         return projects
 
     async def insert_many_assays(
-        self,
-        assays: list[AssayInternal],
-        author=None,
+        self, assays: list[AssayInternal], author=None, open_transaction: bool = True
     ):
         """Insert many sequencing, returning no IDs"""
+        with_function = self.connection.transaction if open_transaction else NoOpAenter
 
-        async with self.connection.transaction():
-            promises = []
+        async with with_function():
+            assay_ids = []
             for assay in assays:
                 # need to do it one by one to insert into relevant tables
                 # at least do it in a transaction
-                promises.append(
-                    self.insert_assay(
+                assay_ids.append(
+                    await self.insert_assay(
                         sample_id=assay.sample_id,
                         external_ids=assay.external_ids,
                         meta=assay.meta,
@@ -80,7 +79,7 @@ class AssayTable(DbBase):
                         open_transaction=False,
                     )
                 )
-            return await asyncio.gather(*promises)
+            return assay_ids
 
     async def insert_assay(
         self,
@@ -104,10 +103,16 @@ class AssayTable(DbBase):
 
         # TODO: revise this based on outcome of https://centrepopgen.slack.com/archives/C03FZL2EF24/p1681274510159009
         if assay_type == 'sequencing':
-            required_fields = ['sequencing_type', 'sequencing_platform', 'sequencing_technology']
+            required_fields = [
+                'sequencing_type',
+                'sequencing_platform',
+                'sequencing_technology',
+            ]
             missing_fields = [f for f in required_fields if f not in meta]
             if missing_fields:
-                raise ValueError(f'Assay of type sequencing is missing required meta fields: {missing_fields}')
+                raise ValueError(
+                    f'Assay of type sequencing is missing required meta fields: {missing_fields}'
+                )
 
         _query = """\
             INSERT INTO assay
@@ -138,7 +143,7 @@ class AssayTable(DbBase):
                     )
 
                 _eid_query = """
-                INSERT INTO assay_eid
+                INSERT INTO assay_external_id
                     (project, assay_id, external_id, name, author)
                 VALUES (:project, :assay_id, :external_id, :name, :author);
                 """
@@ -175,7 +180,7 @@ class AssayTable(DbBase):
             raise NotFoundError(f'sequence with id = {sequence_id}')
 
         d = dict(d)
-        d['external_ids'] = await self._get_assay_eids(sequence_id)
+        d['external_ids'] = await self._get_assay_external_ids(sequence_id)
         return d.pop('project'), AssayInternal.from_db(d)
 
     async def get_assay_by_external_id(
@@ -189,7 +194,7 @@ class AssayTable(DbBase):
         _query = f"""
             SELECT {keys_str}
             FROM assay a
-            INNER JOIN assay_eid aeid ON aeid.assay_id = a.id
+            INNER JOIN assay_external_id aeid ON aeid.assay_id = a.id
             WHERE aeid.external_id = :external_id AND project = :project
         """
         d = await self.connection.fetch_one(
@@ -199,7 +204,7 @@ class AssayTable(DbBase):
         if not d:
             raise NotFoundError(f'assay with external id = {external_sequence_id}')
         d = dict(d)
-        d['external_ids'] = await self._get_assay_eids(d['id'])
+        d['external_ids'] = await self._get_assay_external_ids(d['id'])
 
         return AssayInternal.from_db(d)
 
@@ -320,13 +325,13 @@ class AssayTable(DbBase):
         assay_type: str | None = None,
         sample_id: int | None = None,
         project: ProjectId | None = None,
+        open_transaction: bool = True,
         author=None,
     ):
         """Update an assay"""
+        with_function = self.connection.transaction if open_transaction else NoOpAenter
 
-        async with self.connection.transaction():
-            promises = []
-
+        async with with_function():
             fields = {'assay_id': assay_id, 'author': author or self.author}
 
             updaters = ['author = :author']
@@ -347,7 +352,7 @@ class AssayTable(DbBase):
                 SET {", ".join(updaters)}
                 WHERE id = :assay_id
             """
-            promises.append(self.connection.execute(_query, fields))
+            await self.connection.execute(_query, fields)
 
             if external_ids:
                 _project = project or self.project
@@ -364,12 +369,10 @@ class AssayTable(DbBase):
                 }
 
                 if to_delete:
-                    _delete_query = 'DELETE FROM assay_eid WHERE assay_id = :assay_id AND name in :names'
-                    promises.append(
-                        self.connection.execute(
-                            _delete_query,
-                            {'assay_id': assay_id, 'names': list(to_delete)},
-                        )
+                    _delete_query = 'DELETE FROM assay_external_id WHERE assay_id = :assay_id AND name in :names'
+                    await self.connection.execute(
+                        _delete_query,
+                        {'assay_id': assay_id, 'names': list(to_delete)},
                     )
                 if to_update:
                     # we actually need the project here, get first value from list
@@ -378,7 +381,7 @@ class AssayTable(DbBase):
                     )
 
                     _update_query = """\
-                        INSERT INTO assay_eid (project, assay_id, external_id, name, author)
+                        INSERT INTO assay_external_id (project, assay_id, external_id, name, author)
                             VALUES (:project, :assay_id, :external_id, :name, :author)
                             ON DUPLICATE KEY UPDATE external_id = :external_id, author = :author
                     """
@@ -392,9 +395,7 @@ class AssayTable(DbBase):
                         }
                         for name, eid in to_update.items()
                     ]
-                    promises.append(self.connection.execute_many(_update_query, values))
-
-            await asyncio.gather(*promises)
+                    await self.connection.execute_many(_update_query, values)
 
             return True
 
@@ -473,7 +474,7 @@ class AssayTable(DbBase):
             SELECT {keys_str}
             FROM assay a
             INNER JOIN sample s ON a.sample_id = s.id
-            LEFT OUTER JOIN assay_eid aeid ON a.id = aeid.assay_id
+            LEFT OUTER JOIN assay_external_id aeid ON a.id = aeid.assay_id
         """
         if where:
             _query += f' WHERE {" AND ".join(where)};'
@@ -494,7 +495,7 @@ class AssayTable(DbBase):
 
     # region EIDs
 
-    async def _get_assay_eids(self, assay_id):
+    async def _get_assay_external_ids(self, assay_id):
         return (await self._get_assays_eids([assay_id])).get(assay_id, {})
 
     async def _get_assays_eids(self, assay_ids: list[int]) -> dict[int, dict[str, str]]:
@@ -503,7 +504,7 @@ class AssayTable(DbBase):
 
         _query = """\
             SELECT assay_id, name, external_id
-            FROM assay_eid
+            FROM assay_external_id
             WHERE assay_id IN :assay_ids
         """
 

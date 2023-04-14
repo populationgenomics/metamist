@@ -183,6 +183,7 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 sample_id=assay.sample_id,
                 external_ids=assay.external_ids,
+                open_transaction=open_transaction
             )
         return assay
 
@@ -206,14 +207,10 @@ class AssayLayer(BaseLayer):
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
         async with with_function():
-            upserts = await asyncio.gather(
-                *[
-                    self.upsert_assay(a, check_project_id=False, open_transaction=False)
-                    for a in assays
-                ]
-            )
+            for a in assays:
+                await self.upsert_assay(a, check_project_id=False, open_transaction=False)
 
-        return upserts
+        return assays
 
     # async def insert_many_assays(
     #     self, assays: list[AssayInternal], author=None, check_project_ids=True

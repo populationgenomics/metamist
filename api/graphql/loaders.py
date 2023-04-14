@@ -142,7 +142,7 @@ async def load_samples_for_analysis_ids(
 @connected_data_loader
 async def load_sequencing_groups_for_analysis_ids(
     analysis_ids: list[int], connection
-) -> list['Sample']:
+) -> list['SequencingGroupInternal']:
     """
     DataLoader: get_samples_for_analysis_ids
     """
@@ -234,7 +234,7 @@ async def load_analyses_for_samples(queries: list[dict], connection):
 
 class LoaderKeys(enum.Enum):
     ASSAYS_FOR_SAMPLES = 'sequences_for_samples'
-    SAMPLES_FOR_PARTICIPANT = 'samples_for_participants'
+    SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
     SAMPLES_FOR_IDS = 'samples_for_ids'
     PARTICIPANTS_FOR_IDS = 'participants_for_ids'
     SAMPLES_FOR_ANALYSIS = 'samples_for_analysis'
@@ -245,12 +245,13 @@ class LoaderKeys(enum.Enum):
     SEQUENCING_GROUPS_FOR_IDS = 'sequencing_groups_for_ids'
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
     SEQUENCING_GROUPS_FOR_PROJECTS = 'sequencing_groups_for_projects'
+    SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
 
 
 async def get_context(connection=get_projectless_db_connection):
     return {
         'connection': connection,
-        LoaderKeys.SAMPLES_FOR_PARTICIPANT: DataLoader(
+        LoaderKeys.SAMPLES_FOR_PARTICIPANTS: DataLoader(
             load_samples_for_participant_ids(connection)
         ),
         LoaderKeys.SAMPLES_FOR_IDS: DataLoader(load_samples_for_ids(connection)),
@@ -277,5 +278,8 @@ async def get_context(connection=get_projectless_db_connection):
         ),
         LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS: DataLoader(
             load_sequencing_groups_for_project_ids(connection)
+        ),
+        LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS : DataLoader(
+            load_sequencing_groups_for_analysis_ids(connection)
         )
     }

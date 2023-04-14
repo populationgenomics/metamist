@@ -656,12 +656,8 @@ class ParticipantLayer(BaseLayer):
 
         async with with_function():
             # Create or update participants
-            await asyncio.gather(
-                *[
-                    self.upsert_participant(p, open_transaction=False)
-                    for p in participants
-                ]
-            )
+            for p in participants:
+                await self.upsert_participant(p, open_transaction=False)
 
         # Format and return response
         return participants

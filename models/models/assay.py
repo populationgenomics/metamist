@@ -58,7 +58,7 @@ class AssayUpsertInternal(BaseModel):
     type: str | None = None
     external_ids: dict[str, str | None] | None = None
     sample_id: int | None = None
-    meta: dict[str, Any] | None = None
+    meta: dict | None = None
 
     def to_external(self):
         return AssayUpsert(

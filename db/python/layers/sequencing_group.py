@@ -312,7 +312,10 @@ class SequencingGroupLayer(BaseLayer):
 
         promises: list[Awaitable] = []
 
-        async def insert(sg: SequencingGroupUpsertInternal):
+        # You can't reuse connections, but we're inside a transaction
+        # so it's not actually committing anything so should be quick
+
+        for sg in to_insert:
             assay_ids = [a.id for a in sg.assays]
             sg.id = await self.seqgt.create_sequencing_group(
                 sample_id=sg.sample_id,
@@ -324,24 +327,18 @@ class SequencingGroupLayer(BaseLayer):
                 open_transaction=False,
             )
 
-        promises.extend(map(insert, to_insert))
-
         for sg in to_update:
-            promises.append(
-                self.seqgt.update_sequencing_group(int(sg.id), sg.meta, sg.platform)
-            )
+            await self.seqgt.update_sequencing_group(int(sg.id), sg.meta, sg.platform)
+
 
         for sg in to_replace:
-            promises.append(
-                self.modify_sequences_in_group(
+            await self.modify_sequences_in_group(
                     sequencing_group_id=int(sg.id),
                     sequences=[s.id for s in sg.assays],
                     open_transaction=False,
                     meta=sg.meta,
                 )
-            )
 
-        await asyncio.gather(*promises)
 
         return sequencing_groups
 
