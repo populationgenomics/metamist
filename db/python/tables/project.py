@@ -433,8 +433,13 @@ RETURNING ID"""
 
         return projects
 
-    async def delete_project(self, project_id: int, author: str) -> bool:
-        """Delete metamist project, reuqires project_creator_permissions"""
+    async def delete_project_data(
+        self, project_id: int, delete_project: bool, author: str
+    ) -> bool:
+        """
+        Delete data in metamist project, requires project_creator_permissions
+        Can optionally delete the project also.
+        """
         await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
@@ -449,8 +454,9 @@ DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE 
 DELETE FROM sample WHERE project = :project;
 DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
-DELETE FROM project WHERE id = :project;
             """
+            if delete_project:
+                _query += 'DELETE FROM project WHERE id = :project;'
 
             await self.connection.execute(_query, {'project': project_id})
 
