@@ -1092,6 +1092,7 @@ class GenericParser(
         """Takes filename, returns formed CWL dictionary"""
         _checksum = checksum
         file_size = None
+        datetime_added = None
 
         if not self.skip_checking_gcs_objects:
             if not _checksum:
@@ -1101,7 +1102,7 @@ class GenericParser(
                     if contents:
                         _checksum = f'md5:{contents.strip()}'
 
-            file_size = await self.file_size(filename)
+            file_size, datetime_added = await asyncio.gather(self.file_size(filename), self.datetime_added(filename))
 
         d = {
             'location': self.file_path(filename),
@@ -1109,6 +1110,7 @@ class GenericParser(
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
+            'datetime_added': datetime_added.isoformat() if datetime_added else None
         }
 
         if secondary_files:

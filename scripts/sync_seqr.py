@@ -607,12 +607,12 @@ async def _get_pedigree_from_sm(
         if not isinstance(value, int):
             return value
         if value == 0:
-            return ''
+            return 'U'
         if value == 1:
             return 'M'
         if value == 2:
             return 'F'
-        return ''
+        return 'U'
 
     def process_affected(value):
         if not isinstance(value, int):

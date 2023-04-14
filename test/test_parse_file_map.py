@@ -64,6 +64,7 @@ class TestSampleMapParser(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 },
                 {
                     'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
@@ -71,6 +72,7 @@ class TestSampleMapParser(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 },
             ],
             'reads_type': 'fastq',
@@ -137,6 +139,7 @@ class TestSampleMapParser(unittest.TestCase):
                 'class': 'File',
                 'checksum': '<checksum>',
                 'size': None,
+                'datetime_added': None,
             },
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R2.fastq.gz',
@@ -144,6 +147,7 @@ class TestSampleMapParser(unittest.TestCase):
                 'class': 'File',
                 'checksum': '<checksum2>',
                 'size': None,
+                'datetime_added': None,
             },
         ]
 
@@ -159,6 +163,7 @@ class TestSampleMapParser(unittest.TestCase):
                 'class': 'File',
                 'checksum': '<checksum3>',
                 'size': None,
+                'datetime_added': None,
             },
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id2>.filename-R2.fastq.gz',
@@ -166,6 +171,7 @@ class TestSampleMapParser(unittest.TestCase):
                 'class': 'File',
                 'checksum': '<checksum4>',
                 'size': None,
+                'datetime_added': None,
             },
         ]
         self.assertListEqual(

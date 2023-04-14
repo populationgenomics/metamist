@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
@@ -79,12 +80,18 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self, mock_filesize, mock_fileexists, mock_get_assay_ids, mock_get_sample_id
+        self,
+        mock_filesize,
+        mock_fileexists,
+        mock_datetime_added,
+        mock_get_assay_ids,
+        mock_get_sample_id,
     ):
         """
         Test importing a single row, forms objects and checks response
@@ -95,6 +102,7 @@ class TestParseGenericMetadata(unittest.TestCase):
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
+        mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
 
         rows = [
             'GVCF\tCRAM\tSampleId\tsample.flowcell_lane\tsample.platform\tsample.centre\tsample.reference_genome\traw_data.FREEMIX\traw_data.PCT_CHIMERAS\traw_data.MEDIAN_INSERT_SIZE\traw_data.MEDIAN_COVERAGE',
@@ -154,6 +162,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'class': 'File',
                 'checksum': None,
                 'size': 111,
+                'datetime_added': '2022-02-02T22:22:22',
             },
             'sequencing_platform': None,
             'sequencing_technology': 'short-read',
@@ -169,6 +178,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': 111,
+                    'datetime_added': '2022-02-02T22:22:22',
                 }
             ],
         }
@@ -269,6 +279,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'location': '/path/to/sample_id001.filename-R1.fastq.gz',
                     'size': None,
+                    'datetime_added': None,
                 },
                 {
                     'basename': 'sample_id001.filename-R2.fastq.gz',
@@ -276,6 +287,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'location': '/path/to/sample_id001.filename-R2.fastq.gz',
                     'size': None,
+                    'datetime_added': None,
                 },
             ],
             'reads_type': 'fastq',
@@ -454,6 +466,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
             project='devdev',
+            skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {'file.cram': 'gs://path/file.cram'}
@@ -529,6 +542,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'class': 'File',
             'checksum': None,
             'size': None,
+            'datetime_added': None,
             'secondaryFiles': [
                 {
                     'location': 'gs://path/file.fasta.fai',
@@ -536,6 +550,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 }
             ],
         }
@@ -604,6 +619,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             'class': 'File',
             'checksum': None,
             'size': None,
+            'datetime_added': None,
             'secondaryFiles': [
                 {
                     'location': 'gs://path/ref.fa.fai',
@@ -611,6 +627,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                     'class': 'File',
                     'checksum': None,
                     'size': None,
+                    'datetime_added': None,
                 }
             ],
         }
