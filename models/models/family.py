@@ -2,6 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+
 class FamilyInternal(BaseModel):
     """Family model"""
 
@@ -25,6 +26,7 @@ class FamilyInternal(BaseModel):
             description=self.description,
             coded_phenotype=self.coded_phenotype,
         )
+
 
 class Family(BaseModel):
     """Family model"""

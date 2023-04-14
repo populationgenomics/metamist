@@ -24,15 +24,19 @@ from models.models.analysis import (
     AnalysisInternal,
     ProjectSizeModel,
     SequencingGroupSizeModel,
-    DateSizeModel, Analysis,
+    DateSizeModel,
+    Analysis,
 )
 from models.utils.sample_id_format import (
     sample_id_transform_to_raw_list,
     sample_id_format_list,
     sample_id_format,
 )
-from models.utils.sequencing_group_id_format import sequencing_group_id_format_list, \
-    sequencing_group_id_transform_to_raw_list, sequencing_group_id_format
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
+    sequencing_group_id_transform_to_raw_list,
+    sequencing_group_id_format,
+)
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
 
@@ -120,10 +124,14 @@ async def get_all_sample_ids_without_analysis_type(
     """get_all_sample_ids_without_analysis_type"""
     atable = AnalysisLayer(connection)
     assert connection.project
-    sequencing_group_ids = await atable.get_all_sequencing_group_ids_without_analysis_type(
-        connection.project, analysis_type
+    sequencing_group_ids = (
+        await atable.get_all_sequencing_group_ids_without_analysis_type(
+            connection.project, analysis_type
+        )
     )
-    return {'sequencing_group_ids': sequencing_group_id_format_list(sequencing_group_ids)}
+    return {
+        'sequencing_group_ids': sequencing_group_id_format_list(sequencing_group_ids)
+    }
 
 
 @router.get(

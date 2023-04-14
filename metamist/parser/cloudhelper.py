@@ -177,7 +177,6 @@ class CloudHelper:
         return blob
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:
-
         path = GSPath(gcs_path)
         if path.parts[2:]:
             remaining_path = '/'.join(path.parts[2:]) + '/'  # has to end with "/"

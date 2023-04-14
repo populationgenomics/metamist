@@ -488,19 +488,17 @@ class GenericMetadataParser(GenericParser):
         return self.collapse_arbitrary_meta(self.sample_meta_map, rows)
 
     async def get_participant_meta_from_group(self, rows: GroupedRow):
-
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
     async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
-
         meta = {}
 
         if not sequencing_group.sample.external_sid:
-            sequencing_group.sample.external_sid = await self.get_cpg_sample_id_from_row(
-                sequencing_group.rows[0]
+            sequencing_group.sample.external_sid = (
+                await self.get_cpg_sample_id_from_row(sequencing_group.rows[0])
             )
 
         gvcf_filenames: List[str] = []
@@ -543,9 +541,7 @@ class GenericMetadataParser(GenericParser):
         if not sample.external_sid:
             sample.external_sid = await self.get_cpg_sample_id_from_row(rows[0])
 
-        collapsed_assay_meta = self.collapse_arbitrary_meta(
-            self.assay_meta_map, rows
-        )
+        collapsed_assay_meta = self.collapse_arbitrary_meta(self.assay_meta_map, rows)
 
         assays = []
 

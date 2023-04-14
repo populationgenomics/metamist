@@ -81,10 +81,14 @@ def sequencing_group_id_format(sequencing_group_id: int | str) -> str:
     if isinstance(sequencing_group_id, str) and not sequencing_group_id.isdigit():
         if sequencing_group_id.startswith(SEQUENCING_GROUP_PREFIX):
             return sequencing_group_id
-        raise ValueError(f'Unexpected format for sample identifier {sequencing_group_id!r}')
+        raise ValueError(
+            f'Unexpected format for sample identifier {sequencing_group_id!r}'
+        )
 
     sequencing_group_id = int(sequencing_group_id)
 
-    checksum = luhn_compute(sequencing_group_id, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET)
+    checksum = luhn_compute(
+        sequencing_group_id, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET
+    )
 
     return f'{SEQUENCING_GROUP_PREFIX}{sequencing_group_id}{checksum}'

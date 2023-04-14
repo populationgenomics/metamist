@@ -13,13 +13,13 @@ from db.python.layers import (
 )
 from db.python.tables.project import ProjectPermissionsTable
 from models.models import (
-    Participant,
-    Sample,
     AssayInternal,
     SampleInternal,
     SequencingGroupInternal,
     AnalysisInternal,
     ParticipantInternal,
+    FamilyInternal,
+    Project,
 )
 
 
@@ -147,7 +147,7 @@ async def load_samples_for_ids(
 @connected_data_loader
 async def load_participants_for_ids(
     participant_ids: list[int], connection
-) -> list['ParticipantInternal']:
+) -> list[ParticipantInternal]:
     """
     DataLoader: get_participants_by_ids
     """
@@ -162,7 +162,7 @@ async def load_participants_for_ids(
 @connected_data_loader
 async def load_samples_for_analysis_ids(
     analysis_ids: list[int], connection
-) -> list['Sample']:
+) -> list[SampleInternal]:
     """
     DataLoader: get_samples_for_analysis_ids
     """
@@ -175,7 +175,7 @@ async def load_samples_for_analysis_ids(
 @connected_data_loader
 async def load_sequencing_groups_for_analysis_ids(
     analysis_ids: list[int], connection
-) -> list['SequencingGroupInternal']:
+) -> list[list[SequencingGroupInternal]]:
     """
     DataLoader: get_samples_for_analysis_ids
     """
@@ -188,7 +188,7 @@ async def load_sequencing_groups_for_analysis_ids(
 @connected_data_loader
 async def load_sequencing_groups_for_project_ids(
     project_ids: list[int], connection
-) -> list['SequencingGroupInternal']:
+) -> list[SequencingGroupInternal]:
     """
     DataLoader: get_sequencing_groups_for_project_ids
     """
@@ -199,8 +199,9 @@ async def load_sequencing_groups_for_project_ids(
     return [seq_group_map.get(p, []) for p in project_ids]
 
 
+
 @connected_data_loader
-async def load_projects_for_ids(project_ids: list[int], connection) -> list['Project']:
+async def load_projects_for_ids(project_ids: list[int], connection) -> list[Project]:
     pttable = ProjectPermissionsTable(connection.connection)
     projects = await pttable.get_projects_by_ids(project_ids)
     p_by_id = {p.id: p for p in projects}
@@ -210,7 +211,7 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list['Pro
 @connected_data_loader
 async def load_families_for_participants(
     participant_ids: list[int], connection
-) -> list[list['Family']]:
+) -> list[list[FamilyInternal]]:
     flayer = FamilyLayer(connection)
     fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
     return [fam_map.get(p, []) for p in participant_ids]
@@ -224,50 +225,6 @@ async def load_participants_for_families(
     pmap = await player.get_participants_by_families(family_ids)
     return [pmap.get(fid, []) for fid in family_ids]
 
-
-@connected_data_loader
-async def load_analyses_for_samples(queries: list[dict], connection):
-    """
-    It's a little awkward, but we want extra parameter,
-    """
-    # supported params
-    supported_params = ['type', 'status']
-    ordered_lookup = ['sample', *supported_params]
-
-    grouped_by_params = group_by(
-        queries, lambda q: tuple((k, q.get(k)) for k in supported_params)
-    )
-    alayer = AnalysisLayer(connection)
-    cached_for_return = defaultdict(list)
-    for group in grouped_by_params.values():
-        analysis_type = group[0].get('type')
-        status = group[0].get('status')
-        sample_ids = [r['sample'] for r in group]
-
-        by_sample = defaultdict(list)
-
-        analyses = await alayer.get_analyses_for_samples(
-            sample_ids,
-            analysis_type=analysis_type,
-            status=status,
-        )
-
-        for a in analyses:
-            for sample_id in a.sample_ids:
-                by_sample[sample_id].append(a)
-
-        for row in group:
-            # use tuple
-            if result_for_sample := by_sample.get(row['sample']):
-                key = tuple(row.get(k) for k in ordered_lookup)
-                cached_for_return[key] = result_for_sample
-
-    return [
-        cached_for_return.get(tuple(row.get(k) for k in ordered_lookup), [])
-        for row in queries
-    ]
-
-
 @connected_data_loader
 def load_analyses_for_sequencing_groups(seq_group_ids: list[int], connection):
     alayer = AnalysisLayer(connection)
@@ -277,7 +234,6 @@ def load_analyses_for_sequencing_groups(seq_group_ids: list[int], connection):
 class LoaderKeys(enum.Enum):
     PROJECTS_FOR_IDS = 'projects_for_id'
 
-    ANALYSES_FOR_SAMPLES = 'analyses_for_samples'
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
     ASSAYS_FOR_SAMPLES = 'sequences_for_samples'
@@ -316,9 +272,6 @@ async def get_context(connection=get_projectless_db_connection):
             load_participants_for_ids(connection)
         ),
         LoaderKeys.PROJECTS_FOR_IDS: DataLoader(load_projects_for_ids(connection)),
-        LoaderKeys.ANALYSES_FOR_SAMPLES: DataLoader(
-            load_analyses_for_samples(connection), cache=False
-        ),
         LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS: DataLoader(
             load_analyses_for_sequencing_groups(connection), cache=False
         ),

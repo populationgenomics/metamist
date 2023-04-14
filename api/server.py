@@ -101,20 +101,23 @@ async def not_found(request, exc):
 async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
     add_stacktrace = True
+    description: str
 
     if isinstance(e, HTTPException):
         code = e.status_code
         name = e.detail
+        description = str(e)
     elif isinstance(e, ValidationError):
         # for whatever reason, calling str(e) here fails
         code = 500
         name = 'ValidationError'
-        e = str(e.args)
+        description = str(e.args)
     else:
         code = determine_code_from_error(e)
         name = str(type(e).__name__)
+        description = str(e)
 
-    base_params = {'name': name, 'description': str(e)}
+    base_params = {'name': name, 'description': description}
 
     if add_stacktrace:
         st = traceback.format_exc()
@@ -169,8 +172,8 @@ if __name__ == '__main__':
     import uvicorn
     import logging
 
-#     'testcontainers.core.waiting_utils',
-# ):
+    #     'testcontainers.core.waiting_utils',
+    # ):
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 

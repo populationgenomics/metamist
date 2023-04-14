@@ -34,8 +34,10 @@ from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
-from models.utils.sequencing_group_id_format import sequencing_group_id_format_list, \
-    sequencing_group_id_format
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
+    sequencing_group_id_format,
+)
 
 SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
 
@@ -157,7 +159,9 @@ class SeqrLayer(BaseLayer):
             )
         )
         participant_ids = list(pid_to_sid_map.keys())
-        sequencing_group_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
+        sequencing_group_ids = set(
+            sid for sids in pid_to_sid_map.values() for sid in sids
+        )
         families = await self.flayer.get_families_by_participants(participant_ids)
         family_ids = set(f.id for fams in families.values() for f in fams)
 
@@ -370,10 +374,8 @@ class SeqrLayer(BaseLayer):
         sequencing_group_ids: set[int],
     ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
-        eid_to_sgid_rows = (
-            await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
-                self.connection.project, sequencing_type=sequencing_type
-            )
+        eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
+            self.connection.project, sequencing_type=sequencing_type
         )
 
         # format sample ID for transport
@@ -423,10 +425,14 @@ class SeqrLayer(BaseLayer):
         messages = []
 
         if sequencing_group_ids:
-            sequencing_groups_in_new_index = set(es_index_analyses[-1].sequencing_group_ids)
+            sequencing_groups_in_new_index = set(
+                es_index_analyses[-1].sequencing_group_ids
+            )
 
             if len(es_index_analyses) > 1:
-                sequencing_groups_in_old_index = set(es_index_analyses[-2].sequencing_group_ids)
+                sequencing_groups_in_old_index = set(
+                    es_index_analyses[-2].sequencing_group_ids
+                )
                 sequencing_groups_diff = sequencing_group_id_format_list(
                     sequencing_groups_in_new_index - sequencing_groups_in_old_index
                 )
@@ -508,7 +514,10 @@ class SeqrLayer(BaseLayer):
                 continue
             participant_id = row['participant_id']
             parsed_records[participant_id].append(
-                {'filePath': output, 'sampleId': sequencing_group_id_format(row['sequencing_group_id'])}
+                {
+                    'filePath': output,
+                    'sampleId': sequencing_group_id_format(row['sequencing_group_id']),
+                }
             )
 
         if not reads_map:

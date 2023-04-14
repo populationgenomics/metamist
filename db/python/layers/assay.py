@@ -63,7 +63,7 @@ class AssayLayer(BaseLayer):
     async def get_assays_for_sample_ids(
         self,
         sample_ids: list[int],
-            assay_type: str | None = None,
+        assay_type: str | None = None,
         check_project_ids=True,
     ) -> list[AssayInternal]:
         """
@@ -107,8 +107,8 @@ class AssayLayer(BaseLayer):
         return sample_assay_map
 
     async def get_assays_for_sequencing_group_ids(
-            self, sequencing_group_ids: list[int],
-            check_project_ids=True) -> dict[int, list[AssayInternal]]:
+        self, sequencing_group_ids: list[int], check_project_ids=True
+    ) -> dict[int, list[AssayInternal]]:
         projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
             sequencing_group_ids=sequencing_group_ids,
         )
@@ -122,7 +122,6 @@ class AssayLayer(BaseLayer):
             )
 
         return assays
-
 
     async def get_assays_by(
         self,
@@ -201,7 +200,7 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 sample_id=assay.sample_id,
                 external_ids=assay.external_ids,
-                open_transaction=open_transaction
+                open_transaction=open_transaction,
             )
         return assay
 
@@ -226,7 +225,9 @@ class AssayLayer(BaseLayer):
         )
         async with with_function():
             for a in assays:
-                await self.upsert_assay(a, check_project_id=False, open_transaction=False)
+                await self.upsert_assay(
+                    a, check_project_id=False, open_transaction=False
+                )
 
         return assays
 

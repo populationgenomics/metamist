@@ -565,7 +565,7 @@ class ParticipantLayer(BaseLayer):
         return id_map
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
-        self, project: int, sequencing_type: str=None
+        self, project: int, sequencing_type: str = None
     ) -> List[Tuple[str, int]]:
         """
         Get a map of {external_participant_id} -> {internal_sequencing_group_id}

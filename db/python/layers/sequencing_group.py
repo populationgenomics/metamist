@@ -88,12 +88,12 @@ class SequencingGroupLayer(BaseLayer):
 
     async def query(
         self,
-        project_ids: list[ProjectId]=None,
-        sample_ids: list[int]=None,
-        sequencing_group_ids: list[int]=None,
-        types: list[str]=None,
-        technologies: list[str]=None,
-        platforms: list[str]=None,
+        project_ids: list[ProjectId] = None,
+        sample_ids: list[int] = None,
+        sequencing_group_ids: list[int] = None,
+        types: list[str] = None,
+        technologies: list[str] = None,
+        platforms: list[str] = None,
         check_project_ids: bool = True,
     ) -> list[SequencingGroupInternal]:
         """
@@ -117,7 +117,9 @@ class SequencingGroupLayer(BaseLayer):
 
         return sequencing_groups
 
-    async def get_sequencing_groups_create_date(self, sequencing_group_ids: list[int]) -> dict[int, date]:
+    async def get_sequencing_groups_create_date(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[int, date]:
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         if len(sequencing_group_ids) == 0:
             return {}
@@ -184,7 +186,6 @@ class SequencingGroupLayer(BaseLayer):
                 f'Assays must be all of type "sequencing", got: {assay_types}'
             )
 
-
         sample_ids = set(s.sample_id for s in assays)
         sequencing_types = set(s.meta.get('sequencing_type') for s in assays)
         sequencing_technologies = set(
@@ -250,7 +251,7 @@ class SequencingGroupLayer(BaseLayer):
 
             await self.seqgt.create_sequencing_group(
                 sample_id=seqgroup.sample_id,
-                type_=seqgroup.type_,
+                type_=seqgroup.type,
                 technology=seqgroup.technology,
                 platform=seqgroup.platform,
                 meta={**seqgroup.meta, **meta},
@@ -293,8 +294,8 @@ class SequencingGroupLayer(BaseLayer):
             seq_group_ids = [sg.id for sg in sequencing_groups_that_exist if sg.id]
             # TODO: Fix the cast from sequencing_group_id to integers correctly
             seq_group_ids = list(map(int, seq_group_ids))
-            sequence_to_group = (
-                await self.seqgt.get_assay_ids_by_sequencing_group_ids(seq_group_ids)
+            sequence_to_group = await self.seqgt.get_assay_ids_by_sequencing_group_ids(
+                seq_group_ids
             )
 
             for sg in sequencing_groups_that_exist:
@@ -330,15 +331,13 @@ class SequencingGroupLayer(BaseLayer):
         for sg in to_update:
             await self.seqgt.update_sequencing_group(int(sg.id), sg.meta, sg.platform)
 
-
         for sg in to_replace:
             await self.modify_sequences_in_group(
-                    sequencing_group_id=int(sg.id),
-                    sequences=[s.id for s in sg.assays],
-                    open_transaction=False,
-                    meta=sg.meta,
-                )
-
+                sequencing_group_id=int(sg.id),
+                sequences=[s.id for s in sg.assays],
+                open_transaction=False,
+                meta=sg.meta,
+            )
 
         return sequencing_groups
 

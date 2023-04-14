@@ -59,7 +59,6 @@ jobs:
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
-          ls -lGh sample_metadata
           pip install .
 
       - name: "Run unit tests"

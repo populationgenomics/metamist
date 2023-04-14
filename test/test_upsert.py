@@ -78,7 +78,8 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',**default_assay_meta,
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
                                 },
                                 type='sequencing',
                             )
@@ -121,7 +122,8 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',**default_assay_meta,
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
                                 },
                                 type='sequencing',
                             )
@@ -158,7 +160,8 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',**default_assay_meta,
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
                                 },
                                 type='sequencing',
                             )
@@ -201,7 +204,8 @@ all_participants = [
                                             'size': 111,
                                         },
                                     ],
-                                    'reads_type': 'fastq',**default_assay_meta,
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
                                 },
                                 type='sequencing',
                             )

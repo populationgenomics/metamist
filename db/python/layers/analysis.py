@@ -235,11 +235,13 @@ class AnalysisLayer(BaseLayer):
 
                 # Allow for multiple crams per sample in the future
                 # even though for now we only support 1
-                crams_by_project[sg.project][sgid] = [{
-                    'start': history[sgid],
-                    'end': None,  # TODO: add functionality for deleted samples
-                    'size': size,
-                }]
+                crams_by_project[sg.project][sgid] = [
+                    {
+                        'start': history[sgid],
+                        'end': None,  # TODO: add functionality for deleted samples
+                        'size': size,
+                    }
+                ]
 
         formated = [
             {'project': p, 'sequencing_groups': crams_by_project[p]}

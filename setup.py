@@ -10,9 +10,7 @@ from setuptools import setup, find_packages
 PKG = 'metamist'
 
 all_packages = ['metamist']
-all_packages.extend(
-    'metamist.' + p for p in sorted(find_packages(f'./metamist'))
-)
+all_packages.extend('metamist.' + p for p in sorted(find_packages(f'./metamist')))
 
 with open('README.md', encoding='utf-8') as f:
     readme = f.read()

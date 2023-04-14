@@ -13,7 +13,14 @@ class SequencingGroupTable(DbBase):
 
     table_name = 'sequencing_group'
     common_get_keys = [
-        'sg.id', 's.project', 'sg.sample_id', 'sg.type', 'sg.technology', 'sg.platform', 'sg.meta', 'sg.author'
+        'sg.id',
+        's.project',
+        'sg.sample_id',
+        'sg.type',
+        'sg.technology',
+        'sg.platform',
+        'sg.meta',
+        'sg.author',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
 
@@ -47,7 +54,7 @@ class SequencingGroupTable(DbBase):
         """
         Get sequence groups by internal identifiers
         """
-        
+
         _query = f"""
             SELECT {SequencingGroupTable.common_get_keys_str}
             FROM sequencing_group sg
@@ -176,7 +183,9 @@ class SequencingGroupTable(DbBase):
 
         return projects, participant_id_to_sids
 
-    async def get_sequencing_groups_create_date(self, sequencing_group_ids: list[int]) -> dict[int, date]:
+    async def get_sequencing_groups_create_date(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[int, date]:
         """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
         if len(sequencing_group_ids) == 0:
             return {}
@@ -187,7 +196,7 @@ class SequencingGroupTable(DbBase):
         GROUP BY id"""
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
-    
+
     async def get_sequencing_groups_by_analysis_ids(
         self, analysis_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
@@ -248,12 +257,12 @@ class SequencingGroupTable(DbBase):
         """
 
         values = {
-                    'sample_id': sample_id,
-                    'type': type_.lower() if type else None,
-                    'technology': technology.lower() if technology else None,
-                    'platform': platform.lower() if platform else None,
-                    'meta': to_db_json(meta or {}),
-                }
+            'sample_id': sample_id,
+            'type': type_.lower() if type else None,
+            'technology': technology.lower() if technology else None,
+            'platform': platform.lower() if platform else None,
+            'meta': to_db_json(meta or {}),
+        }
         # check if any values are None and raise an exception if so
         bad_keys = [k for k, v in values.items() if v is None]
         if bad_keys:

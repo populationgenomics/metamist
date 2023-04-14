@@ -95,7 +95,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                 },
                 participant_id=pid,
                 assays=[],
-                sequencing_groups=[]
+                sequencing_groups=[],
             )
             samples.append(sample)
 
@@ -118,7 +118,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                     meta={
                         'facility': facility,
                     },
-                    assays=[]
+                    assays=[],
                 )
                 sample.sequencing_groups.append(sg)
                 for _ in range(generate_random_number_within_distribution()):
@@ -132,12 +132,9 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                                 'sequencing_type': stype,
                                 'sequencing_technology': stechnology,
                                 'sequencing_platform': splatform,
-
                             },
                         )
                     )
-
-
 
     # response = await sapi.upsert_samples_async(project, samples)
     # pprint(response)

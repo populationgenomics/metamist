@@ -10,10 +10,11 @@ from models.models.assay import AssayUpsertInternal
 from models.models.sample import SampleUpsertInternal
 
 default_sequencing_meta = {
-'sequencing_type': 'genome',
-            'sequencing_platform': 'short-read',
-            'sequencing_technology': 'illumina',
+    'sequencing_type': 'genome',
+    'sequencing_platform': 'short-read',
+    'sequencing_technology': 'illumina',
 }
+
 
 class TestSequence(DbIsolatedTest):
     """Test assay class"""
@@ -65,7 +66,7 @@ class TestSequence(DbIsolatedTest):
             '1': 1,
             'nested': {'nested': 'dict'},
             'alpha': ['b', 'e', 't'],
-            **default_sequencing_meta
+            **default_sequencing_meta,
         }
         upserted_assay = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
@@ -91,7 +92,12 @@ class TestSequence(DbIsolatedTest):
         """
         Test inserting a assay, and check all values are inserted correctly
         """
-        meta = {'1': 1, 'nested': {'nested': 'dict'}, 'alpha': ['b', 'e', 't'], **default_sequencing_meta}
+        meta = {
+            '1': 1,
+            'nested': {'nested': 'dict'},
+            'alpha': ['b', 'e', 't'],
+            **default_sequencing_meta,
+        }
         sequencing_types = ['sequencing', 'metabolomics']
         assays = await self.assaylayer.upsert_assays(
             [
@@ -259,7 +265,7 @@ class TestSequence(DbIsolatedTest):
                 AssayUpsertInternal(
                     sample_id=sample_id_for_test,
                     type='sequencing',
-                    meta={'unique': 'b', 'common': 'common',**default_sequencing_meta},
+                    meta={'unique': 'b', 'common': 'common', **default_sequencing_meta},
                     external_ids={'default': 'SEQ02'},
                 ),
             ]
@@ -378,7 +384,9 @@ class TestSequence(DbIsolatedTest):
             {'default': 'NSQ_01', 'ext': 'EXTSEQ01', 'untouched': 'UTC+1'},
             update_assay.external_ids,
         )
-        self.assertDictEqual({'a': 2, 'b': 2, 'c': True, **default_sequencing_meta}, update_assay.meta)
+        self.assertDictEqual(
+            {'a': 2, 'b': 2, 'c': True, **default_sequencing_meta}, update_assay.meta
+        )
 
     @run_as_sync
     async def test_update_type(self):

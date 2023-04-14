@@ -352,7 +352,6 @@ class GenericParser(
         required_keys: Set[str] = None,
         verbose=True,
     ):
-
         self.path_prefix = path_prefix
         self.skip_checking_gcs_objects = skip_checking_gcs_objects
         self.verbose = verbose
@@ -702,7 +701,6 @@ class GenericParser(
     async def group_participants(
         self, rows: list[SingleRow]
     ) -> list[ParsedParticipant]:
-
         participant_groups: list[ParsedParticipant] = []
         pgroups = group_by(rows, self.get_participant_id)
         for pid, prows in pgroups.items():
@@ -755,7 +753,6 @@ class GenericParser(
         )
 
     async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
-
         sequencing_groups = []
         for seq_rows in group_by(sample.rows, self.get_sequencing_group_key).values():
             seq_type = self.get_sequencing_type(seq_rows[0])

@@ -301,16 +301,14 @@ class SampleLayer(BaseLayer):
         async with with_function():
             # Create or update samples
             for sample in samples:
-                await     self.upsert_sample(
-                        sample,
-                        author=author,
-                        project=project,
-                        process_sequencing_groups=False,
-                        process_assays=False,
-                        open_transaction=False,
-                    )
-
-
+                await self.upsert_sample(
+                    sample,
+                    author=author,
+                    project=project,
+                    process_sequencing_groups=False,
+                    process_assays=False,
+                    open_transaction=False,
+                )
 
             # Upsert all sequencing_groups (in turn relevant assays)
             sequencing_groups = [

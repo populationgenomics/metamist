@@ -73,15 +73,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 dict(kv_pairs),
             )
 
-            await self.add_sequencing_groups_to_analysis(id_of_new_analysis, sequencing_group_ids)
+            await self.add_sequencing_groups_to_analysis(
+                id_of_new_analysis, sequencing_group_ids
+            )
 
         return id_of_new_analysis
 
-    async def add_sequencing_groups_to_analysis(self, analysis_id: int, sequencing_group_ids: List[int]):
+    async def add_sequencing_groups_to_analysis(
+        self, analysis_id: int, sequencing_group_ids: List[int]
+    ):
         """Add samples to an analysis (through the linked table)"""
         _query = """
-            INSERT INTO analysis_sequencing_group 
-                (analysis_id, sequencing_group_id) 
+            INSERT INTO analysis_sequencing_group
+                (analysis_id, sequencing_group_id)
             VALUES (:aid, :sid)
         """
 
@@ -150,7 +154,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         if not sequencing_group_ids and not project_ids and not sample_ids:
             raise ValueError(
                 'Must provide at least one of sample_ids, sequencing_group_ids, '
-                'or project_ids')
+                'or project_ids'
+            )
 
         wheres = []
         values: Dict[str, Any] = {}
@@ -286,7 +291,9 @@ WHERE s.project = :project AND
         )
         return [row[0] for row in rows]
 
-    async def get_incomplete_analyses(self, project: ProjectId) -> List[AnalysisInternal]:
+    async def get_incomplete_analyses(
+        self, project: ProjectId
+    ) -> List[AnalysisInternal]:
         """
         Gets details of analysis with status queued or in-progress
         """
@@ -316,9 +323,9 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
     ) -> List[AnalysisInternal]:
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
-SELECT 
+SELECT
     a.id AS id, a.type as type, a.status as status, a.output as output,
-    a.project as project, a_sg.sequencing_group_id as sample_id, 
+    a.project as project, a_sg.sequencing_group_id as sample_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
 LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
@@ -349,12 +356,14 @@ ORDER BY a.timestamp_completed DESC
         # reverse after timestamp_completed
         return analyses[::-1]
 
-    async def get_analysis_by_id(self, analysis_id: int) -> Tuple[ProjectId, AnalysisInternal]:
+    async def get_analysis_by_id(
+        self, analysis_id: int
+    ) -> Tuple[ProjectId, AnalysisInternal]:
         """Get analysis object by analysis_id"""
         _query = """
-SELECT 
+SELECT
     a.id as id, a.type as type, a.status as status,
-    a.output as output, a.project as project, 
+    a.output as output, a.project as project,
     a_sg.sequencing_group_id as sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
@@ -396,9 +405,9 @@ WHERE a.id = :analysis_id
             values['status'] = status.value
 
         _query = f"""
-    SELECT 
+    SELECT
         a.id as id, a.type as type, a.status as status,
-        a.output as output, a.project as project, 
+        a.output as output, a.project as project,
         a_sg.sequencing_group_id as sequencing_group_id,
         a.timestamp_completed as timestamp_completed, a.meta as meta
     FROM analysis a

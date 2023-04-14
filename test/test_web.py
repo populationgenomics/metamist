@@ -15,10 +15,11 @@ from db.python.layers.web import (
 from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
-                    'sequencing_type': 'genome',
-                    'sequencing_technology': 'short-read',
-                    'sequencing_platform': 'illumina',
-                }
+    'sequencing_type': 'genome',
+    'sequencing_technology': 'short-read',
+    'sequencing_platform': 'illumina',
+}
+
 
 def data_to_class(data: dict | list) -> dict | list:
     """Convert the data into it's class using the _class field"""
@@ -173,10 +174,10 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                        model_type=MetaSearchEntityPrefix.ASSAY,
-                        query='M001',
-                        field='batch',
-                        is_meta=True,
+                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    query='M001',
+                    field='batch',
+                    is_meta=True,
                 )
             ],
         )
@@ -187,10 +188,10 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                        model_type=MetaSearchEntityPrefix.ASSAY,
-                        query='M002',
-                        field='batch',
-                        is_meta=True,
+                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    query='M002',
+                    field='batch',
+                    is_meta=True,
                 )
             ],
         )
@@ -198,7 +199,7 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(expected, filtered_result_empty)
 
         new_participants = [
-                ParticipantUpsertInternal(
+            ParticipantUpsertInternal(
                 external_id='Meter',
                 meta={},
                 samples=[
@@ -213,35 +214,35 @@ class TestWeb(DbIsolatedTest):
                                 platform='Illumina',
                                 assays=[
                                     AssayUpsertInternal(
-
                                         meta={
                                             'reads': [
-                                                    {
-                                                        'basename': 'sample_id002.filename-R1.fastq.gz',
-                                                        'checksum': None,
-                                                        'class': 'File',
-                                                        'location': '/path/to/sample_id002.filename-R1.fastq.gz',
-                                                        'size': 112,
-                                                    },
-                                                    {
-                                                        'basename': 'sample_id002.filename-R2.fastq.gz',
-                                                        'checksum': None,
-                                                        'class': 'File',
-                                                        'location': '/path/to/sample_id002.filename-R2.fastq.gz',
-                                                        'size': 112,
-                                                    },
+                                                {
+                                                    'basename': 'sample_id002.filename-R1.fastq.gz',
+                                                    'checksum': None,
+                                                    'class': 'File',
+                                                    'location': '/path/to/sample_id002.filename-R1.fastq.gz',
+                                                    'size': 112,
+                                                },
+                                                {
+                                                    'basename': 'sample_id002.filename-R2.fastq.gz',
+                                                    'checksum': None,
+                                                    'class': 'File',
+                                                    'location': '/path/to/sample_id002.filename-R2.fastq.gz',
+                                                    'size': 112,
+                                                },
                                             ],
                                             'reads_type': 'fastq',
                                             'batch': 'M001',
                                             **default_assay_meta,
                                         }
                                     ),
-                                ]
+                                ],
                             ),
+                        ],
+                    )
                 ],
             )
         ]
-                )]
 
         await self.partl.upsert_participants(participants=new_participants)
 
@@ -261,7 +262,7 @@ class TestWeb(DbIsolatedTest):
                 }
             },
             batch_sequence_stats={'M001': {'genome': '2'}},
-            participants=[], # data_to_class(expected_data_list),
+            participants=[],  # data_to_class(expected_data_list),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
@@ -337,7 +338,7 @@ class TestWeb(DbIsolatedTest):
                 }
             },
             batch_sequence_stats={'M001': {'genome': '2'}},
-            participants=[], #data_to_class(expected_data_list_filtered),
+            participants=[],  # data_to_class(expected_data_list_filtered),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
                 ('id', 'Sample ID'),
@@ -358,10 +359,10 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                        model_type=MetaSearchEntityPrefix.SAMPLE,
-                        query='sample_id002',
-                        field='external_id',
-                        is_meta=False,
+                    model_type=MetaSearchEntityPrefix.SAMPLE,
+                    query='sample_id002',
+                    field='external_id',
+                    is_meta=False,
                 )
             ],
         )

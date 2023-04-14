@@ -41,9 +41,7 @@ class SampleInternal(SMBase):
             if isinstance(meta, str):
                 meta = json.loads(meta)
 
-        return SampleInternal(
-            id=_id, type=str(type_), meta=meta, active=active, **d
-        )
+        return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
 
     def to_external(self):
         """Convert to transport model"""
@@ -87,7 +85,9 @@ class SampleUpsertInternal(SMBase):
             participant_id=self.participant_id,
             active=self.active,
             sequencing_groups=[sg.to_external() for sg in self.sequencing_groups or []],
-            non_sequencing_assays=[a.to_external() for a in self.non_sequencing_assays or []],
+            non_sequencing_assays=[
+                a.to_external() for a in self.non_sequencing_assays or []
+            ],
         )
 
 

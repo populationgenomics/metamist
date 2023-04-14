@@ -1,13 +1,15 @@
 import json
 from datetime import date
-from typing import Optional, List, Union, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel
 
 from models.base import SMBase
 from models.enums import AnalysisStatus
-from models.utils.sequencing_group_id_format import sequencing_group_id_format_list, \
-    sequencing_group_id_transform_to_raw_list
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
+    sequencing_group_id_transform_to_raw_list,
+)
 
 
 class AnalysisInternal(SMBase):

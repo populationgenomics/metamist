@@ -567,7 +567,9 @@ class FamilyLayer(BaseLayer):
                             reported_sex=row.sex,
                         )
                     )
-                    external_participant_ids_map[row.individual_id] = upserted_participant.id
+                    external_participant_ids_map[
+                        row.individual_id
+                    ] = upserted_participant.id
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
