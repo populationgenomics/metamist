@@ -15,7 +15,6 @@ from strawberry.types import Info
 
 from db.python import enum_tables as enum_tables
 from db.python.layers.family import FamilyLayer
-from db.python.layers.participant import ParticipantLayer
 from db.python.layers.assay import AssayLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
@@ -131,12 +130,9 @@ class GraphQLProject:
     async def participants(
         self, info: Info, root: 'Project'
     ) -> list['GraphQLParticipant']:
-        connection = info.context['connection']
-        participants = await ParticipantLayer(connection).get_participants(
-            project=root.id
-        )
-
-        return [p.to_external() for p in participants]
+        loader = info.context[LoaderKeys.PARTICIPANTS_FOR_PROJECTS]
+        participants = await loader.load(root.id)
+        return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()
     async def sequencing_groups(
@@ -450,10 +446,8 @@ class Query:
 
     @strawberry.field
     async def participant(self, info: Info, id: int) -> GraphQLParticipant:
-        connection = info.context['connection']
-        player = ParticipantLayer(connection)
-        ps = await player.get_participants_by_ids([id])
-        return GraphQLParticipant.from_internal(ps[0])
+        loader = info.context[LoaderKeys.PARTICIPANTS_FOR_IDS]
+        return GraphQLParticipant.from_internal(await loader.load(id))
 
     @strawberry.field()
     async def family(self, info: Info, family_id: int) -> GraphQLFamily:

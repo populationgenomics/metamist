@@ -11,6 +11,7 @@ from typing import Optional
 
 import databases
 
+from api.settings import LOG_DATABASE_QUERIES
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import InternalError
 
@@ -170,7 +171,9 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(config.get_connection_string(), echo=True)
+        return databases.Database(
+            config.get_connection_string(), echo=LOG_DATABASE_QUERIES
+        )
 
     @staticmethod
     async def connect():

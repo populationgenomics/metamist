@@ -20,7 +20,7 @@ class SampleTable(DbBase):
 
     async def get_project_ids_for_sample_ids(self, sample_ids: list[int]) -> set[int]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
-        _query = 'SELECT project FROM sample WHERE id in :sample_ids GROUP BY project'
+        _query = 'SELECT DISTINCT project FROM sample WHERE id in :sample_ids'
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 

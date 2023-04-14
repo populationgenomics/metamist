@@ -216,10 +216,7 @@ WHERE a.id in (
         for row in rows:
             key = row['id']
             if key in retvals:
-                retvals[key].sample_ids = [
-                    *(retvals[key].sample_ids or []),
-                    row['sequencing_group_id'],
-                ]
+                retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
             else:
                 retvals[key] = AnalysisInternal.from_db(**dict(row))
 

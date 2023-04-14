@@ -12,6 +12,7 @@ from db.python.layers import (
     FamilyLayer,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import ProjectId
 from models.enums import AnalysisStatus
 from models.models import (
     AssayInternal,
@@ -227,7 +228,16 @@ async def load_participants_for_families(
     return [pmap.get(fid, []) for fid in family_ids]
 
 @connected_data_loader
-def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisStatus | None], str | None], connection):
+async def load_participants_for_projects(project_ids: list[ProjectId], connection) -> list[ParticipantInternal]:
+    retval: list[list[ParticipantInternal]] = []
+
+    for project in project_ids:
+        retval.append(await ParticipantLayer(connection).get_participants(project=project))
+
+    return retval
+
+@connected_data_loader
+async def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisStatus | None], str | None], connection):
     """
     Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str) -> list[AnalysisInternal]
     """
@@ -238,7 +248,7 @@ def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisStatus | 
         status = chunk[0][1]
         analysis_type = chunk[0][2]
 
-        analyses = alayer.query_analysis(
+        analyses = await alayer.query_analysis(
             sequencing_group_ids=sequencing_group_ids,
             status=status,
             analysis_type=analysis_type,
@@ -263,6 +273,7 @@ class LoaderKeys(enum.Enum):
 
     PARTICIPANTS_FOR_IDS = 'participants_for_ids'
     PARTICIPANTS_FOR_FAMILIES = 'participants_for_families'
+    PARTICIPANTS_FOR_PROJECTS = 'participants_for_projects'
 
     FAMILIES_FOR_PARTICIPANTS = 'families_for_participants'
 
@@ -295,6 +306,9 @@ async def get_context(connection=get_projectless_db_connection):
         ),
         LoaderKeys.FAMILIES_FOR_PARTICIPANTS: DataLoader(
             load_families_for_participants(connection)
+        ),
+        LoaderKeys.PARTICIPANTS_FOR_PROJECTS: DataLoader(
+            load_participants_for_projects(connection)
         ),
         LoaderKeys.PARTICIPANTS_FOR_FAMILIES: DataLoader(
             load_participants_for_families(connection)
