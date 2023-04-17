@@ -115,7 +115,7 @@ jobs:
 #            --platform managed
 
       - name: Publish package
-        if: github.ref == 'refs/heads/main'
+#        if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
