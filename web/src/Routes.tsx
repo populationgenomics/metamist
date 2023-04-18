@@ -8,6 +8,7 @@ import FamilyView from './pages/family/FamilyView'
 import ProjectSummary from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
+import AnalysisRunnerSummary from './pages/project/AnalysisRunnerSummary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -17,6 +18,25 @@ const Routes: React.FunctionComponent = () => (
         </Route>
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
+
+        <Route path="/analysis-runner/">
+            <Route
+                path=""
+                element={
+                    <ErrorBoundary>
+                        <AnalysisRunnerSummary />
+                    </ErrorBoundary>
+                }
+            />
+            <Route
+                path=":projectName"
+                element={
+                    <ErrorBoundary>
+                        <AnalysisRunnerSummary />
+                    </ErrorBoundary>
+                }
+            />
+        </Route>
 
         <Route path="/project/">
             <Route
