@@ -502,6 +502,7 @@ class GenericParser(
             'sequences': sequences_to_upsert,
         }
         if cpg_sample_id:
+            # If we have a CPG ID, we can update
             sample_args['id'] = cpg_sample_id
 
         sample_to_upsert = SampleBatchUpsert(**sample_args)
@@ -1230,7 +1231,9 @@ class GenericParser(
                     if contents:
                         _checksum = f'md5:{contents.strip()}'
 
-            file_size, datetime_added = await asyncio.gather(self.file_size(filename), self.datetime_added(filename))
+            file_size, datetime_added = await asyncio.gather(
+                self.file_size(filename), self.datetime_added(filename)
+            )
 
         d = {
             'location': self.file_path(filename),
@@ -1238,7 +1241,7 @@ class GenericParser(
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
-            'datetime_added': datetime_added.isoformat() if datetime_added else None
+            'datetime_added': datetime_added.isoformat() if datetime_added else None,
         }
 
         if secondary_files:
