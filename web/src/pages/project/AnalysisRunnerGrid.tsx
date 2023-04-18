@@ -31,7 +31,6 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
 
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
-    console.log(data)
     if (!data?.project.analyses.length)
         return (
             <MuckError
