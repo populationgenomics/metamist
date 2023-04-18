@@ -299,12 +299,13 @@ class AssayTable(DbBase):
         _query = """
             SELECT
                 IFNULL(JSON_EXTRACT(a.meta, '$.batch'), 'null') as batch,
-                a.type,
+                sg.type,
                 COUNT(*) AS n
             FROM assay a
             INNER JOIN sample s ON s.id = a.sample_id
+            LEFT JOIN sequencing_group sg ON sg.sample_id = s.id
             WHERE s.project = :project
-            GROUP BY batch, type
+            GROUP BY batch, sg.type
         """
         rows = await self.connection.fetch_all(_query, {'project': project})
         batch_result: dict[str, dict[str, str]] = defaultdict(dict)

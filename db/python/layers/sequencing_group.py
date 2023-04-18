@@ -157,6 +157,9 @@ class SequencingGroupLayer(BaseLayer):
 
         return pids
 
+    async def get_type_numbers_for_project(self, project) -> dict[str, int]:
+        return await self.seqgt.get_type_numbers_for_project(project)
+
     # region CREATE / MUTATE
 
     async def create_sequencing_group_from_assays(

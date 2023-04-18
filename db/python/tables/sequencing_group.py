@@ -245,7 +245,7 @@ class SequencingGroupTable(DbBase):
         _query = """
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, author, archived)
-        VALUES (:sample_id, :type, :technology, :platform, :meta, :author, 'false')
+        VALUES (:sample_id, :type, :technology, :platform, :meta, :author, false)
         RETURNING id;
         """
 
@@ -321,3 +321,14 @@ class SequencingGroupTable(DbBase):
         return await self.connection.execute(
             _query, {'sequencing_group_id': sequencing_group_id, 'author': self.author}
         )
+
+    async def get_type_numbers_for_project(self, project) -> dict[str, int]:
+        _query = """
+SELECT sg.type, COUNT(*) as n
+FROM sequencing_group sg
+INNER JOIN sample s ON s.id = sg.sample_id
+WHERE s.project = :project AND NOT sg.archived
+GROUP BY sg.type
+        """
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        return {r['type']: r['n'] for r in rows}

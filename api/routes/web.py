@@ -146,7 +146,7 @@ async def get_project_summary(
         participants=participants,
         participant_keys=summary.participant_keys,
         sample_keys=summary.sample_keys,
-        sequence_keys=summary.sequence_keys,
+        sequence_keys=summary.assay_keys,
         seqr_links=summary.seqr_links,
         seqr_sync_types=summary.seqr_sync_types,
         _links=links,

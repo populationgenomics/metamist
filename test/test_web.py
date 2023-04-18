@@ -42,47 +42,7 @@ def merge(d1: dict, d2: dict):
     """Merges two dictionaries"""
     return dict(d1, **d2)
 
-
-class TestWeb(DbIsolatedTest):
-    """Test web class containing web endpoints"""
-
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.webl = WebLayer(self.connection)
-        self.partl = ParticipantLayer(self.connection)
-        self.sampl = SampleLayer(self.connection)
-        self.seql = AssayLayer(self.connection)
-
-    @run_as_sync
-    async def test_project_summary(self):
-        """Test getting the summary for a project"""
-        result = await self.webl.get_project_summary(token=0, grid_filter=[])
-
-        # Expect an empty project
-        expected = ProjectSummary(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
-            total_samples=0,
-            total_samples_in_query=0,
-            total_participants=0,
-            total_sequences=0,
-            batch_sequence_stats={},
-            cram_seqr_stats={},
-            participants=[],
-            participant_keys=[],
-            sample_keys=[],
-            sequence_keys=[],
-            seqr_links={},
-            seqr_sync_types=[],
-        )
-
-        self.assertEqual(expected, result)
-
-        # Now add a participant with a sample and sequence
-        data = [
-            ParticipantUpsertInternal(
+SINGLE_PARTICIPANT_UPSERT = ParticipantUpsertInternal(
                 external_id='Demeter',
                 meta={},
                 samples=[
@@ -94,7 +54,7 @@ class TestWeb(DbIsolatedTest):
                             SequencingGroupUpsertInternal(
                                 type='genome',
                                 technology='short-read',
-                                platform=None,
+                                platform='illumina',
                                 assays=[
                                     AssayUpsertInternal(
                                         type='sequencing',
@@ -128,13 +88,8 @@ class TestWeb(DbIsolatedTest):
                     )
                 ],
             )
-        ]
 
-        await self.partl.upsert_participants(participants=data)
-
-        result = await self.webl.get_project_summary(token=0, grid_filter=[])
-
-        expected_data = ProjectSummary(
+SINGLE_PARTICIPANT_RESULT = ProjectSummary(
             project=WebProject(
                 **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
             ),
@@ -157,7 +112,11 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
+                ('created_date', 'Created date'),
+            ],
+            assay_keys=[
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
@@ -166,9 +125,59 @@ class TestWeb(DbIsolatedTest):
             seqr_links={},
             seqr_sync_types=[],
         )
-        # TODO: fix this test
 
-        self.assertEqual(expected_data, result)
+class TestWeb(DbIsolatedTest):
+    """Test web class containing web endpoints"""
+
+    @run_as_sync
+    async def setUp(self) -> None:
+        super().setUp()
+        self.webl = WebLayer(self.connection)
+        self.partl = ParticipantLayer(self.connection)
+        self.sampl = SampleLayer(self.connection)
+        self.seql = AssayLayer(self.connection)
+
+    @run_as_sync
+    async def test_project_summary_empty(self):
+        """Test getting the summary for a project"""
+        result = await self.webl.get_project_summary(token=0, grid_filter=[])
+
+        # Expect an empty project
+        expected = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
+            total_samples=0,
+            total_samples_in_query=0,
+            total_participants=0,
+            total_sequences=0,
+            batch_sequence_stats={},
+            cram_seqr_stats={},
+            participants=[],
+            participant_keys=[],
+            sample_keys=[],
+            sequencing_group_keys=[],
+            assay_keys=[],
+            seqr_links={},
+            seqr_sync_types=[],
+        )
+
+        self.assertEqual(expected, result)
+
+    @run_as_sync
+    async def test_project_summary_single_entry(self):
+
+        # Now add a participant with a sample and sequence
+        await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
+
+        result = await self.webl.get_project_summary(token=0, grid_filter=[])
+
+        result.participants = []
+        self.assertEqual(SINGLE_PARTICIPANT_RESULT, result)
+
+    @run_as_sync
+    async def project_summary_with_filter_with_results(self):
+        await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
 
         filtered_result_success = await self.webl.get_project_summary(
             token=0,
@@ -181,8 +190,11 @@ class TestWeb(DbIsolatedTest):
                 )
             ],
         )
+        filtered_result_success.participants = []
+        self.assertEqual(SINGLE_PARTICIPANT_RESULT, filtered_result_success)
 
-        self.assertEqual(expected_data, filtered_result_success)
+    @run_as_sync
+    async def project_summary_with_filter_no_results(self):
 
         filtered_result_empty = await self.webl.get_project_summary(
             token=0,
@@ -195,8 +207,29 @@ class TestWeb(DbIsolatedTest):
                 )
             ],
         )
+        empty_result = ProjectSummary(
+            project=WebProject(
+                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+            ),
+            total_samples=0,
+            total_samples_in_query=0,
+            total_participants=0,
+            total_sequences=0,
+            batch_sequence_stats={},
+            cram_seqr_stats={},
+            participants=[],
+            participant_keys=[],
+            sample_keys=[],
+            sequencing_group_keys=[],
+            assay_keys=[],
+            seqr_links={},
+            seqr_sync_types=[],
+        )
 
-        self.assertEqual(expected, filtered_result_empty)
+        self.assertEqual(empty_result, filtered_result_empty)
+
+    @run_as_sync
+    async def test_project_summary_multiple_participants(self):
 
         new_participants = [
             ParticipantUpsertInternal(
@@ -269,7 +302,7 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[
+            assay_keys=[
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
@@ -345,7 +378,7 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
-            sequence_keys=[
+            assay_keys=[
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),

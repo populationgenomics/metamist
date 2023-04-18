@@ -567,7 +567,7 @@
 <!--				<constraints nullable="true" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>-->
 			</column>
 			<column name="meta" type="JSON" />
-			<column name="archived" type="BIT" />
+			<column name="archived" type="BOOLEAN" />
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
@@ -593,7 +593,7 @@
 			<column name="project" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
 			</column>
-			<column name="sequencing_group" type="INT">
+			<column name="sequencing_group_id" type="INT">
 				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_sequencing_group_id" references="sequencing_group(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">

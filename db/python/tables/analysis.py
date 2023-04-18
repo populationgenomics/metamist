@@ -504,23 +504,25 @@ ORDER BY a.timestamp_completed DESC;
 
     # region STATS
 
-    async def get_number_of_crams_by_sequence_type(
+    async def get_number_of_crams_by_sequencing_type(
         self, project: ProjectId
     ) -> dict[str, int]:
         """
         Get number of crams, grouped by sequence type (one per sample per sequence type)
         """
 
-        # Only count one cram per sample, do this in a double query.
-        # First select, then aggregate
+        # Only count crams for ACTIVE sequencing groups
         _query = """
-        SELECT seq_type, COUNT(*) as number_of_crams FROM (
-            SELECT JSON_EXTRACT(meta, "$.sequencing_type") as seq_type
-            FROM analysis a
-            INNER JOIN analysis_sample asam ON a.id = asam.analysis_id
-            WHERE project = :project AND status = 'completed' AND type = 'cram'
-            GROUP BY seq_type, asam.sample_id
-        ) as iq GROUP BY seq_type
+SELECT sg.type as seq_type, COUNT(*) as number_of_crams
+FROM analysis a
+INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
+INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
+WHERE 
+    a.project = :project 
+    AND a.status = 'completed' 
+    AND a.type = 'cram'
+    AND NOT sg.archived
+GROUP BY seq_type
         """
 
         rows = await self.connection.fetch_all(_query, {'project': project})
@@ -529,18 +531,7 @@ ORDER BY a.timestamp_completed DESC;
         n_counts: dict[str, int] = defaultdict(int)
         for r in rows:
             if seq_type := r['seq_type']:
-                try:
-                    seq_type = json.loads(seq_type)
-                finally:
-                    if isinstance(seq_type, str):
-                        n_counts[seq_type.lower()] += r['number_of_crams']
-                    elif isinstance(seq_type, dict) and isinstance(
-                        seq_type.get('value'), str
-                    ):
-                        # if API inserts it as meta: {'sequencing_type': SequenceType('genome')}
-                        n_counts[seq_type.get('value').lower()] += r['number_of_crams']
-                    else:
-                        n_counts['unknown'] += r['number_of_crams']
+                n_counts[str(seq_type).lower()] += r['number_of_crams']
 
         return n_counts
 
@@ -551,15 +542,17 @@ ORDER BY a.timestamp_completed DESC;
         Get number of samples in seqr (in latest es-index), grouped by sequence type
         """
         _query = """
-SELECT a.seq_type, COUNT(*) as n
-FROM (
-    SELECT MAX(id) as analysis_id, JSON_EXTRACT(meta, "$.sequencing_type") as seq_type
-    FROM analysis
-    WHERE project = :project AND status = 'completed' AND type = 'es-index'
-    GROUP BY seq_type
-) a
-INNER JOIN analysis_sample asample ON asample.analysis_id = a.analysis_id
-GROUP BY a.seq_type
+SELECT sg.type as seq_type, COUNT(*) as n
+FROM analysis a
+INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
+INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
+INNER JOIN sample s on sg.sample_id = s.id
+WHERE 
+    s.project = :project 
+    AND a.status = 'completed' 
+    AND a.type = 'es-index'
+    AND NOT sg.archived
+GROUP BY seq_type
         """
 
         rows = await self.connection.fetch_all(_query, {'project': project})

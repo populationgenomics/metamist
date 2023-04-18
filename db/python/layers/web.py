@@ -1,24 +1,26 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
+import itertools
+import re
 import json
 import asyncio
 import dataclasses
+from enum import Enum
 from datetime import date
 from collections import defaultdict
-from typing import Dict, List, Optional, Set
-import re
 
-from enum import Enum
 from pydantic import BaseModel
 
 from api.utils import group_by
 
 from db.python.connect import DbBase
+from db.python.layers import SequencingGroupLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.assay import AssayTable
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.base import SMBase
 
 
@@ -41,14 +43,24 @@ class SearchItem(SMBase):
     is_meta: bool
 
 
-class NestedSequence(BaseModel):
-    """Sequence model"""
+class NestedAssay(BaseModel):
+    """Assay model"""
 
     id: int
     type: str
-    status: str
+    meta: dict
+
+
+class NestedSequencingGroup(BaseModel):
+    """Sequencing group model"""
+
+    id: int
+    external_ids: dict[str, str]
+    type: str
     technology: str
-    meta: Dict
+    platform: str
+    meta: dict
+    assays: list[NestedAssay]
 
 
 class NestedSample(BaseModel):
@@ -57,9 +69,10 @@ class NestedSample(BaseModel):
     id: str
     external_id: str
     type: str
-    meta: Dict
-    sequences: List[NestedSequence]
-    created_date: Optional[str]
+    meta: dict
+    sequencing_groups: list[NestedSequencingGroup]
+    non_sequencing_assays: list[NestedAssay]
+    created_date: str | None
 
 
 class NestedFamily(BaseModel):
@@ -72,14 +85,14 @@ class NestedFamily(BaseModel):
 class NestedParticipant(BaseModel):
     """Participant with nested family and sampels"""
 
-    id: Optional[int]
-    external_id: Optional[str]
-    meta: Optional[Dict]
-    families: List[NestedFamily]
-    samples: List[NestedSample]
-    reported_sex: Optional[int]
-    reported_gender: Optional[str]
-    karyotype: Optional[str]
+    id: int | None
+    external_id: str | None
+    meta: dict | None
+    families: list[NestedFamily]
+    samples: list[NestedSample]
+    reported_sex: int | None
+    reported_gender: str | None
+    karyotype: str | None
 
 
 @dataclasses.dataclass
@@ -107,10 +120,11 @@ class ProjectSummary:
     batch_sequence_stats: dict[str, dict[str, str]]
 
     # grid
-    participants: List[NestedParticipant]
+    participants: list[NestedParticipant]
     participant_keys: list[tuple[str, str]]
     sample_keys: list[tuple[str, str]]
-    sequence_keys: list[tuple[str, str]]
+    sequencing_group_keys: list[tuple[str, str]]
+    assay_keys: list[tuple[str, str]]
 
     # seqr
     seqr_links: dict[str, str]
@@ -123,7 +137,7 @@ class WebLayer(BaseLayer):
     async def get_project_summary(
         self,
         grid_filter: list[SearchItem],
-        token: Optional[int],
+        token: int | None,
         limit: int = 20,
     ) -> ProjectSummary:
         """
@@ -139,7 +153,7 @@ class WebLayer(BaseLayer):
 class WebDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _project_summary_sample_query(self, grid_filter: List[SearchItem]):
+    def _project_summary_sample_query(self, grid_filter: list[SearchItem]):
         """
         Get query for getting list of samples
         """
@@ -186,21 +200,19 @@ class WebDb(DbBase):
         return sample_query, values
 
     @staticmethod
-    def _project_summary_process_sequence_rows_by_sample_id(
+    def _project_summary_process_assay_rows_by_sample_id(
         sequence_rows,
-    ) -> Dict[int, List[NestedSequence]]:
+    ) -> dict[int, list[NestedAssay]]:
         """
         Get sequences for samples for project summary
         """
 
         seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in sequence_rows}
         seq_models = [
-            NestedSequence(
+            NestedAssay(
                 id=seq['id'],
-                status=seq['status'],
                 type=seq['type'],
                 meta=json.loads(seq['meta']),
-                technology=seq['technology'] if seq['technology'] else None,
             )
             for seq in sequence_rows
         ]
@@ -211,12 +223,64 @@ class WebDb(DbBase):
         return seq_models_by_sample_id
 
     @staticmethod
+    def _project_summary_process_sequencing_group_rows_by_sample_id(
+            sequencing_group_rows,
+            sequencing_eid_rows: list,
+            seq_models_by_sample_id: dict[int, list[NestedAssay]],
+        ) -> dict[int, list[NestedSequencingGroup]]:
+        assay_models_by_id = {
+            assay.id: assay for assay in itertools.chain(*seq_models_by_sample_id.values())
+        }
+
+        sequencing_group_eid_map = defaultdict(dict)
+        for row in sequencing_eid_rows:
+            sgid = row['sequencing_group_id']
+            sequencing_group_eid_map[sgid][row['name']] = row['name']
+
+        sg_by_id: dict[int, NestedSequencingGroup] = {}
+        sg_id_to_sample_id: dict[int, int] = {}
+        for row in sequencing_group_rows:
+            sg_id = row['id']
+            assay = assay_models_by_id.get(row['assay_id'])
+            if sg_id in sg_by_id:
+                if assay:
+                    sg_by_id[sg_id].assays.append(assay)
+                continue
+            sg_id_to_sample_id[sg_id] = row['sample_id']
+            sg_by_id[sg_id] = NestedSequencingGroup(
+                id=sg_id,
+                meta=json.loads(row['meta']),
+                type=row['type'],
+                technology=row['technology'],
+                platform=row['platform'],
+                assays=[assay] if assay else [],
+                external_ids=sequencing_group_eid_map.get(sg_id, {}),
+            )
+
+        return group_by(sg_by_id.values(), lambda sg: sg_id_to_sample_id[sg.id])
+
+    @staticmethod
     def _project_summary_process_sample_rows(
-        sample_rows, seq_models_by_sample_id, sample_id_start_times: Dict[int, date]
-    ) -> List[NestedSample]:
+        sample_rows,
+        assay_models_by_sample_id: dict[int, list[NestedAssay]],
+        sg_models_by_sample_id: dict[int, list[NestedSequencingGroup]],
+        sample_id_start_times: dict[int, date],
+    ) -> list[NestedSample]:
         """
         Process the returned sample rows into nested samples + sequences
         """
+        assays_in_sgs = set(
+            assay.id
+            for sgs in sg_models_by_sample_id.values()
+            for sg in sgs
+            for assay in sg.assays
+        )
+        # filter assays to only those not in sequencing groups
+        filtered_assay_models_by_sid = {}
+        for sample_id, assays in assay_models_by_sample_id.items():
+            filtered_assays = [a for a in assays if a.id not in assays_in_sgs]
+            if len(filtered_assays) > 0:
+                filtered_assay_models_by_sid[sample_id] = filtered_assays
 
         smodels = [
             NestedSample(
@@ -225,7 +289,8 @@ class WebDb(DbBase):
                 type=s['type'],
                 meta=json.loads(s['meta']) or {},
                 created_date=str(sample_id_start_times.get(s['id'], '')),
-                sequences=seq_models_by_sample_id.get(s['id'], []) or [],
+                sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
+                non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
             )
             for s in sample_rows
         ]
@@ -249,7 +314,7 @@ class WebDb(DbBase):
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
         family_rows,
-    ) -> Dict[int, List[NestedFamily]]:
+    ) -> dict[int, list[NestedFamily]]:
         """
         Process the family rows into NestedFamily objects
         """
@@ -288,9 +353,9 @@ class WebDb(DbBase):
 
     async def get_project_summary(
         self,
-        grid_filter: List[SearchItem],
+        grid_filter: list[SearchItem],
         limit: int,
-        token: Optional[int] = 0,
+        token: int | None = 0,
     ) -> ProjectSummary:
         """
         Get project summary
@@ -325,7 +390,8 @@ class WebDb(DbBase):
                 participants=[],
                 participant_keys=[],
                 sample_keys=[],
-                sequence_keys=[],
+                assay_keys=[],
+                sequencing_group_keys=[],
                 # stats
                 total_samples=0,
                 total_samples_in_query=0,
@@ -340,13 +406,41 @@ class WebDb(DbBase):
         pids = list(set(s['participant_id'] for s in sample_rows))
         sids = list(s['id'] for s in sample_rows)
 
-        # sequences
+        # assays
+        assay_query = """
+            SELECT id, sample_id, meta, type
+            FROM assay 
+            WHERE sample_id IN :sids
+        """
+        assay_promise = self.connection.fetch_all(assay_query, {'sids': sids})
 
-        seq_query = 'SELECT id, sample_id, meta, type, status, technology FROM assay WHERE sample_id IN :sids'
-        sequence_promise = self.connection.fetch_all(seq_query, {'sids': sids})
+        # sequencing_groups
+        sg_query = """
+            SELECT 
+                sg.id, sg.meta, sg.type, sg.sample_id,
+                sg.technology, sg.platform, sga.assay_id
+            FROM sequencing_group sg 
+            INNER JOIN sequencing_group_assay sga ON sga.sequencing_group_id = sg.id
+            WHERE sg.sample_id IN :sids
+        """
+        sequencing_group_promise = self.connection.fetch_all(sg_query, {'sids': sids})
+
+        sg_eid_query = """
+            SELECT sgeid.sequencing_group_id, sgeid.name, sgeid.external_id
+            FROM sequencing_group_external_id sgeid
+            INNER JOIN sequencing_group sg ON sg.id = sgeid.sequencing_group_id
+            WHERE sg.sample_id IN :sids
+        """
+        sequencing_group_eid_promise = self.connection.fetch_all(
+            sg_eid_query, {'sids': sids}
+        )
 
         # participant
-        p_query = 'SELECT id, external_id, meta, reported_sex, reported_gender, karyotype FROM participant WHERE id in :pids'
+        p_query = """
+            SELECT id, external_id, meta, reported_sex, reported_gender, karyotype
+            FROM participant 
+            WHERE id in :pids
+        """
         participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
 
         # family
@@ -360,9 +454,12 @@ WHERE fp.participant_id in :pids
 
         atable = AnalysisTable(self._connection)
         seqtable = AssayTable(self._connection)
+        sgtable = SequencingGroupTable(self._connection)
 
         [
-            sequence_rows,
+            assay_rows,
+            sequencing_group_rows,
+            sequencing_group_eids,
             participant_rows,
             family_rows,
             sample_id_start_times,
@@ -375,26 +472,36 @@ WHERE fp.participant_id in :pids
             seqr_stats_by_seq_type,
             seqr_sync_types,
         ] = await asyncio.gather(
-            sequence_promise,
+            assay_promise,
+            sequencing_group_promise,
+            sequencing_group_eid_promise,
             participant_promise,
             family_promise,
             sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
             self.get_total_number_of_participants(),
             self.get_total_number_of_sequences(),
-            atable.get_number_of_crams_by_sequence_type(project=self.project),
-            seqtable.get_assay_type_numbers_for_project(project=self.project),
+            atable.get_number_of_crams_by_sequencing_type(project=self.project),
+            sgtable.get_type_numbers_for_project(project=self.project),
             seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
             atable.get_seqr_stats_by_sequence_type(project=self.project),
             SeqrLayer(self._connection).get_synchronisable_types(self.project),
         )
 
         # post-processing
-        seq_models_by_sample_id = (
-            self._project_summary_process_sequence_rows_by_sample_id(sequence_rows)
+        assay_models_by_sample_id = (
+            self._project_summary_process_assay_rows_by_sample_id(assay_rows)
+        )
+        seq_group_models_by_sample_id = self._project_summary_process_sequencing_group_rows_by_sample_id(
+            sequencing_group_rows=sequencing_group_rows,
+            sequencing_eid_rows=sequencing_group_eids,
+            seq_models_by_sample_id=assay_models_by_sample_id,
         )
         smodels = self._project_summary_process_sample_rows(
-            sample_rows, seq_models_by_sample_id, sample_id_start_times
+            sample_rows,
+            assay_models_by_sample_id=assay_models_by_sample_id,
+            sg_models_by_sample_id=seq_group_models_by_sample_id,
+            sample_id_start_times=sample_id_start_times,
         )
         # the pydantic model is casting to the id to a str, as that makes sense on the front end
         # but cast back here to do the lookup
@@ -441,9 +548,15 @@ WHERE fp.participant_id in :pids
                     )
                 )
 
-        ignore_participant_keys: Set[str] = set()
+        ignore_participant_keys: set[str] = set()
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
-        ignore_sequence_meta_keys = {'reads', 'vcfs', 'gvcf'}
+        ignore_assay_meta_keys = {'reads', 'vcfs', 'gvcf',
+
+                                     'sequencing_platform',
+                                     'sequencing_technology',
+                                     'sequencing_type',
+                                     }
+        ignore_sg_meta_keys: set[str] = set()
 
         participant_meta_keys = set(
             pk
@@ -454,18 +567,23 @@ WHERE fp.participant_id in :pids
         )
         sample_meta_keys = set(
             sk
-            for p in pmodels
-            for s in p.samples
+            for s in smodels
             for sk in s.meta.keys()
             if (sk not in ignore_sample_meta_keys)
         )
-        sequence_meta_keys = set(
+        sg_meta_keys = set(
             sk
-            for p in pmodels
-            for s in p.samples
-            for seq in s.sequences
-            for sk in seq.meta
-            if (sk not in ignore_sequence_meta_keys)
+            for sgs in seq_group_models_by_sample_id.values()
+            for sg in sgs
+            for sk in sg.meta
+            if (sk not in ignore_sg_meta_keys)
+        )
+        assay_meta_keys = set(
+            sk
+            for assays in assay_models_by_sample_id.values()
+            for assay in assays
+            for sk in assay.meta
+            if (sk not in ignore_assay_meta_keys)
         )
 
         has_reported_sex = any(p.reported_sex for p in pmodels)
@@ -487,16 +605,21 @@ WHERE fp.participant_id in :pids
             ('external_id', 'External Sample ID'),
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
-        sequence_keys = [('type', 'type'), ('technology', 'technology')] + sorted(
-            [('meta.' + k, k) for k in sequence_meta_keys]
+
+        assay_keys = [('type', 'type'), ('technology', 'technology')] + sorted(
+            [('meta.' + k, k) for k in assay_meta_keys]
         )
+        sequencing_group_keys = [
+            ('id', 'Sequencing Group ID'),
+            ('created_date', 'Created date')
+        ] + sorted([('meta.' + k, k) for k in sg_meta_keys])
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
             set(seq_number_by_seq_type.keys())
         )
         seen_batches = set(seq_number_by_seq_type_and_batch.keys())
 
-        sequence_stats: Dict[str, Dict[str, str]] = {}
+        sequence_stats: dict[str, dict[str, str]] = {}
         cram_seqr_stats = {}
 
         for seq in seen_seq_types:
@@ -517,7 +640,8 @@ WHERE fp.participant_id in :pids
             participants=pmodels,
             participant_keys=participant_keys,
             sample_keys=sample_keys,
-            sequence_keys=sequence_keys,
+            sequencing_group_keys=sequencing_group_keys,
+            assay_keys=assay_keys,
             total_samples=total_samples,
             total_samples_in_query=total_samples_in_query,
             total_participants=total_participants,
