@@ -14,6 +14,8 @@ from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
 import nest_asyncio
 
+from api.graphql.loaders import get_context
+from api.graphql.schema import schema
 from api.settings import set_all_access
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
@@ -173,6 +175,20 @@ class DbTest(unittest.TestCase):
         self.project_id = 1
         self.project_name = 'test'
         self.connection = self.connections[self.__class__.__name__]
+
+    @run_as_sync
+    async def run_graphql_query(self, query, variables=None):
+        return await self.run_graphql_query_async(query, variables=variables)
+
+    async def run_graphql_query_async(self, query, variables=None):
+        value = await schema.execute(
+            query,
+            variable_values=variables,
+            context_value=await get_context(connection=self.connection),
+        )
+        if value.errors:
+            raise value.errors[0]
+        return value.data
 
 
 class DbIsolatedTest(DbTest):

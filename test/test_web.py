@@ -247,6 +247,7 @@ class TestWeb(DbIsolatedTest):
                                 platform='Illumina',
                                 assays=[
                                     AssayUpsertInternal(
+                                        type='sequencing',
                                         meta={
                                             'reads': [
                                                 {

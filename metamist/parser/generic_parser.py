@@ -28,6 +28,7 @@ from functools import wraps
 
 from cloudpathlib import AnyPath
 
+from metamist.graphql import query_async
 from metamist.parser.cloudhelper import CloudHelper, group_by
 
 from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
@@ -248,16 +249,16 @@ class ParsedAssay:
         self.sequencing_group = group
         self.rows = rows
 
-        self.internal_seq_id = internal_seq_id
-        self.external_seq_ids = external_seq_ids
+        self.internal_id = internal_seq_id
+        self.external_ids = external_seq_ids
         self.assay_type = assay_type
         self.meta = meta
 
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
         return AssayUpsert(
-            id=self.internal_seq_id,
-            external_ids=self.external_seq_ids,
+            id=self.internal_id,
+            external_ids=self.external_ids,
             # sample_id=self.s,
             meta=self.meta,
         )
@@ -473,8 +474,6 @@ class GenericParser(
                 sample.sequencing_groups = seqgroups
                 sequencing_groups.extend(seqgroups)
 
-        await self.match_sequencing_group_ids(sequencing_groups)
-
         assays: list[ParsedAssay] = []
         for sgchunk in chunk(sequencing_groups):
             assays_for_chunk = await asyncio.gather(
@@ -491,7 +490,9 @@ class GenericParser(
                 assays.extend(chunked_assays)
                 sequencing_group.analyses = analyses
 
-        await self.match_sequence_ids(assays)
+        await self.match_assay_ids(assays)
+        # match sequencing group ids after assays
+        await self.match_sequencing_group_ids(sequencing_groups)
 
         summary = self.prepare_summary(participants, samples, sequencing_groups, assays)
         message = self.prepare_message(
@@ -553,7 +554,7 @@ class GenericParser(
         sgs_to_insert = sum(
             1 for sg in sequencing_groups if not sg.internal_seqgroup_id
         )
-        assays_to_insert = sum(1 for sq in assays if not sq.internal_seq_id)
+        assays_to_insert = sum(1 for sq in assays if not sq.internal_id)
         analyses_to_insert = sum(len(sg.analyses or []) for sg in sequencing_groups)
         summary = {
             'participants': {
@@ -628,22 +629,43 @@ class GenericParser(
     # region MATCHING
 
     async def match_participant_ids(self, participants: list[ParsedParticipant]):
-        external_pids = {p.external_pid for p in participants}
+        _query = """
+query GetParticipantEidMapQuery($project: String!) {
+  project(name: $project) {
+    participants {
+      externalId
+      id
+    }
+  }
+}
+        """
 
-        papi = ParticipantApi()
-        pid_map = await papi.get_participant_id_map_by_external_ids_async(
-            list(external_pids), allow_missing=True
-        )
+        values = await query_async(_query, variables={'project': self.project})
+        pid_map = {
+            p['externalId']: p['id']
+            for p in values['project']['participants']
+        }
 
         for participant in participants:
             participant.internal_pid = pid_map.get(participant.external_pid)
 
     async def match_sample_ids(self, samples: list[ParsedSample]):
-        external_sids = {s.external_sid for s in samples}
-        sapi = SampleApi()
-        sid_map = await sapi.get_sample_id_map_by_external_async(
-            list(external_sids), allow_missing=True
-        )
+        _query = """
+query GetSampleEidMapQuery($project: String!) {
+  project(name: $project) {
+    samples {
+      externalId
+      id
+    }
+  }
+}
+"""
+
+        values = await query_async(_query, variables={'project': self.project})
+        sid_map = {
+            p['externalId']: p['id']
+            for p in values['project']['samples']
+        }
 
         for sample in samples:
             sample.internal_sid = sid_map.get(sample.external_sid)
@@ -651,10 +673,96 @@ class GenericParser(
     async def match_sequencing_group_ids(
         self, sequencing_groups: list[ParsedSequencingGroup]
     ):
-        pass
+        """
+        sequencing_groups MUST have assays already attached.
 
-    async def match_sequence_ids(self, assays: list[ParsedAssay]):
-        pass
+        This one is a little more tricky, because we won't have a direct mapping.
+        We're only allowed to bind the ID if:
+         - All the assays already exist
+         - The group members match
+        Otherwise we should leave the ID blank (forcing a create).
+        """
+
+        if not all(sg.assays for sg in sequencing_groups):
+            raise ValueError('sequencing_groups must have assays attached')
+
+        _query = """
+query MyQuery($project:String!) {
+  project(name: $project) {
+    sequencingGroups {
+      id
+      assays {
+        id
+      }
+    }
+  }
+}
+"""
+
+        values = await query_async(_query, variables={'project': self.project})
+        sg_map = {
+            tuple(sorted(a['id'] for a in sg['assays'])): sg['id']
+            for sg in values['project']['sequencingGroups']
+        }
+        for sg in sequencing_groups:
+            sg_ids = tuple(sorted(a.internal_id for a in sg.assays))
+            # don't match if any of the assays are missing
+            if any(asid is None for asid in sg_ids):
+                continue
+            # matches only if they all exist!
+            sg.internal_seqg_id = sg_map.get(sg_ids)
+
+    async def match_assay_ids(self, assays: list[ParsedAssay]):
+        _query = """
+query GetSampleEidMapQuery($project: String!) {
+  project(name: $project) {
+    samples {
+      assays {
+        externalIds
+        id
+      }
+    }
+  }
+}
+        """
+
+        values = await query_async(_query, variables={'project': self.project})
+
+        assay_eid_map = {
+            external_id: assay['id']
+            for sample in values['project']['samples']
+            for assay in sample['assays']
+            for external_id in assay['externalIds'].values()
+        }
+
+        # map filenames of reads to assay IDs as that's the most likely way we'll map
+        reads_to_key = lambda reads: tuple(sorted(r['location'] for r in reads)) if reads else None
+        filename_meta_map = {
+            reads_to_key(assay['meta']['reads']): assay['id']
+            for sample in values['project']['samples']
+            for assay in sample['assays']
+            if assay.get('meta', {}).get('reads')
+        }
+        def _map_assay(assay: ParsedAssay):
+            # put it in a function so we can return early
+
+            # external IDs match
+            for exid in (assay.external_ids or {}).values():
+                if exid in assay_eid_map:
+                    return assay_eid_map.get(exid)
+
+            # reads match
+            if assay.meta.get('reads'):
+                key = reads_to_key(assay.meta['reads'])
+                if key in filename_meta_map:
+                    return filename_meta_map.get(key)
+
+            return None
+
+        for assay in assays:
+            assay.internal_id = _map_assay(assay)
+
+        return assays
 
     # endregion MATCHING
 

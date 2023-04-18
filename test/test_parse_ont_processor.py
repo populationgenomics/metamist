@@ -11,9 +11,9 @@ class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row_all_files_exist(
         self, mock_filesize, mock_fileexists, mock_get_sample_id
     ):

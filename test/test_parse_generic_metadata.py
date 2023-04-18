@@ -13,8 +13,8 @@ class TestParseGenericMetadata(unittest.TestCase):
     """Test the GenericMetadataParser"""
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     @patch('os.path.getsize')
     async def test_key_map(
         self, mock_stat_size, mock_get_assay_ids, mock_get_sample_id
@@ -198,9 +198,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
     async def test_rows_with_participants(
         self,
         mock_get_assay_ids,
@@ -307,9 +307,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_rows_with_valid_participant_meta(
         self,
         mock_get_assay_ids,
@@ -379,9 +379,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
     async def test_rows_with_invalid_participant_meta(
         self,
         mock_get_assay_ids,
@@ -426,11 +426,11 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_size')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_contents')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_contents')
     async def test_cram_with_no_reference(
         self,
         mock_filecontents,
@@ -483,10 +483,10 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
         self,
         mock_filesize,
@@ -561,9 +561,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
         self,
         mock_fileexists,
@@ -638,9 +638,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('from metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
         self,
         mock_fileexists,

@@ -11,9 +11,9 @@ class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
     @run_as_sync
-    @patch('from metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('from metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('from metamist.apis.AssayApi.get_assays_by_sample_ids')
+    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.apis.AssayApi.get_assays_by_sample_ids')
     async def test_simple_sheet(
         self, mock_get_sequence_ids, mock_get_sample_id, mock_get_participant_id
     ):

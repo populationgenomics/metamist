@@ -135,6 +135,14 @@ class GraphQLProject:
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()
+    async def samples(
+            self, info: Info, root: 'Project'
+    ) -> list['GraphQLSample']:
+        loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
+        samples = await loader.load(root.id)
+        return [GraphQLSample.from_internal(p) for p in samples]
+
+    @strawberry.field()
     async def sequencing_groups(
         self, info: Info, root: 'GraphQLProject'
     ) -> list['GraphQLSequencingGroup']:
@@ -306,9 +314,9 @@ class GraphQLSample:
         return GraphQLParticipant.from_internal(participant)
 
     @strawberry.field
-    async def assays(self, info: Info, root: 'GraphQLSample') -> list['GraphQLAssay']:
+    async def assays(self, info: Info, root: 'GraphQLSample', type: str = None) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
-        assays = await loader_assays_for_sample_ids.load(root.internal_id)
+        assays = await loader_assays_for_sample_ids.load((root.internal_id, type))
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
     @strawberry.field

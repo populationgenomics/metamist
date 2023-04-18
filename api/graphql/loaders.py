@@ -41,20 +41,33 @@ def connected_data_loader(fn):
 
 @connected_data_loader
 async def load_assays_by_samples(
-    sample_ids: list[int], assay_type: str | None, connection
+    query: list[tuple[int, str | None]], connection
 ) -> list[list[AssayInternal]]:
     """
     DataLoader: get_sequences_for_sample_ids
     """
+
     assaylayer = AssayLayer(connection)
-    assays = await assaylayer.get_assays_for_sample_ids(
-        sample_ids=sample_ids, assay_type=assay_type
-    )
-    seq_map: dict[int, list[AssayInternal]] = group_by(
-        assays, lambda assay: int(assay.sample_id)
+
+    by_key: dict[tuple[int, str | None], list[AssayInternal]] = defaultdict(
+        list
     )
 
-    return [seq_map.get(sid, []) for sid in sample_ids]
+    # group by all last fields, in case we add more
+    for chunk in group_by(query, lambda x: x[1:]).values():
+        assay_type = chunk[0][1]
+        sample_ids = [x[0] for x in chunk]
+
+        assays = await assaylayer.get_assays_for_sample_ids(
+        sample_ids=sample_ids, assay_type=assay_type
+    )
+        assay_map = group_by(assays, lambda a: a.sample_id)
+        for key in chunk:
+            sample_id = key[0]
+            if sample_id in assay_map:
+                by_key[key].extend(assay_map[sample_id])
+
+    return [by_key.get(q, []) for q in query]
 
 
 @connected_data_loader
@@ -145,6 +158,14 @@ async def load_samples_for_ids(
     samples_map = {s.id: s for s in samples}
     return [samples_map.get(s) for s in sample_ids]
 
+@connected_data_loader
+async def load_samples_for_projects(project_ids: list[ProjectId], connection):
+    """
+    DataLoader: get_samples_for_project_ids
+    """
+    samples = await SampleLayer(connection).get_samples_by(project_ids=project_ids)
+    samples_by_project = group_by(samples, lambda s: s.project)
+    return [samples_by_project.get(pid, []) for pid in project_ids]
 
 @connected_data_loader
 async def load_participants_for_ids(
@@ -270,6 +291,7 @@ class LoaderKeys(enum.Enum):
     SAMPLES_FOR_IDS = 'samples_for_ids'
     SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
     SAMPLES_FOR_ANALYSIS = 'samples_for_analysis'
+    SAMPLES_FOR_PROJECTS = 'samples_for_projects'
 
     PARTICIPANTS_FOR_IDS = 'participants_for_ids'
     PARTICIPANTS_FOR_FAMILIES = 'participants_for_families'
@@ -286,26 +308,12 @@ class LoaderKeys(enum.Enum):
 async def get_context(connection=get_projectless_db_connection):
     return {
         'connection': connection,
-        LoaderKeys.SAMPLES_FOR_PARTICIPANTS: DataLoader(
-            load_samples_for_participant_ids(connection)
-        ),
-        LoaderKeys.SAMPLES_FOR_IDS: DataLoader(load_samples_for_ids(connection)),
-        LoaderKeys.ASSAYS_FOR_SAMPLES: DataLoader(load_assays_by_samples(connection)),
-        LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS: DataLoader(
-            load_assays_by_sequencing_groups(connection)
-        ),
-        LoaderKeys.SAMPLES_FOR_ANALYSIS: DataLoader(
-            load_samples_for_analysis_ids(connection)
-        ),
+        # projects
+        LoaderKeys.PROJECTS_FOR_IDS: DataLoader(load_projects_for_ids(connection)),
+
+        # participants
         LoaderKeys.PARTICIPANTS_FOR_IDS: DataLoader(
             load_participants_for_ids(connection)
-        ),
-        LoaderKeys.PROJECTS_FOR_IDS: DataLoader(load_projects_for_ids(connection)),
-        LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS: DataLoader(
-            load_analyses_for_sequencing_groups(connection), cache=False
-        ),
-        LoaderKeys.FAMILIES_FOR_PARTICIPANTS: DataLoader(
-            load_families_for_participants(connection)
         ),
         LoaderKeys.PARTICIPANTS_FOR_PROJECTS: DataLoader(
             load_participants_for_projects(connection)
@@ -313,6 +321,18 @@ async def get_context(connection=get_projectless_db_connection):
         LoaderKeys.PARTICIPANTS_FOR_FAMILIES: DataLoader(
             load_participants_for_families(connection)
         ),
+
+        # samples
+        LoaderKeys.SAMPLES_FOR_IDS: DataLoader(load_samples_for_ids(connection)),
+        LoaderKeys.SAMPLES_FOR_PROJECTS: DataLoader(load_samples_for_projects(connection)),
+        LoaderKeys.SAMPLES_FOR_PARTICIPANTS: DataLoader(
+            load_samples_for_participant_ids(connection)
+        ),
+        LoaderKeys.SAMPLES_FOR_ANALYSIS: DataLoader(
+            load_samples_for_analysis_ids(connection)
+        ),
+
+        # sequencing groups
         LoaderKeys.SEQUENCING_GROUPS_FOR_IDS: DataLoader(
             load_sequencing_groups_for_ids(connection)
         ),
@@ -325,4 +345,21 @@ async def get_context(connection=get_projectless_db_connection):
         LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS: DataLoader(
             load_sequencing_groups_for_analysis_ids(connection)
         ),
+
+        # assays
+        LoaderKeys.ASSAYS_FOR_SAMPLES: DataLoader(load_assays_by_samples(connection)),
+        LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS: DataLoader(
+            load_assays_by_sequencing_groups(connection)
+        ),
+
+        # analyses
+        LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS: DataLoader(
+            load_analyses_for_sequencing_groups(connection), cache=False
+        ),
+        # families
+        LoaderKeys.FAMILIES_FOR_PARTICIPANTS: DataLoader(
+            load_families_for_participants(connection)
+        ),
+
+
     }

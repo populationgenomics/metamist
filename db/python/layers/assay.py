@@ -70,7 +70,7 @@ class AssayLayer(BaseLayer):
         Get ALL active assays for a list of internal sample IDs
         """
         projects, assays = await self.seqt.get_assays_by(
-            sample_ids=sample_ids, assay_types=[assay_type]
+            sample_ids=sample_ids, assay_types=[assay_type] if assay_type else None
         )
 
         if (
