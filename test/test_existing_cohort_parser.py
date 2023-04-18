@@ -51,8 +51,8 @@ class TestExistingCohortParser(unittest.TestCase):
         )
 
         parser.filename_map = {
-            'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq',
-            'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq',
+            'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+            'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
         }
 
         file_contents = '\n'.join(rows)
@@ -79,16 +79,16 @@ class TestExistingCohortParser(unittest.TestCase):
             'reads': [
                 [
                     {
-                        'location': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq',
-                        'basename': 'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq',
+                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
                         'class': 'File',
                         'checksum': None,
                         'size': 111,
                         'datetime_added': '2022-02-02T22:22:22',
                     },
                     {
-                        'location': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq',
-                        'basename': 'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq',
+                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
                         'class': 'File',
                         'checksum': None,
                         'size': 111,
@@ -121,8 +121,8 @@ class TestExistingCohortParser(unittest.TestCase):
         )
 
         parser.filename_map = {
-            'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq',
-            'HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDX1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq',
+            'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+            'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
         }
 
         file_contents = '\n'.join(rows)
@@ -164,8 +164,8 @@ class TestExistingCohortParser(unittest.TestCase):
         )
 
         parser.filename_map = {
-            'HG3FMDSX3_2_220405_FLUIDXMISTMATCH1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R1.fastq',
-            'HG3FMDSX3_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3FMDSX3_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_VB_BLAH_M002_R2.fastq',
+            'HG3F_2_220405_FLUIDXMISTMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+            'HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
         }
 
         file_contents = '\n'.join(rows)
