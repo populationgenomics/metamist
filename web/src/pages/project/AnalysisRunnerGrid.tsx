@@ -2,7 +2,6 @@ import * as React from 'react'
 import { useQuery } from '@apollo/client'
 import { Table as SUITable } from 'semantic-ui-react'
 import _ from 'lodash'
-import LaunchIcon from '@mui/icons-material/Launch'
 import { gql } from '../../__generated__/gql'
 import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -67,21 +66,20 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
                 {data.project.analyses.map((log) => (
                     <SUITable.Row key={`${log.id}`}>
                         <SUITable.Cell>
-                            <LaunchIcon
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => window.open(`${log.meta.batch_url}`, '_blank')}
-                            />
+                            <a href={`${log.meta.batch_url}`} rel="noreferrer">
+                                {log.meta.batch_url.replace(
+                                    'https://batch.hail.populationgenomics.org.au/',
+                                    ''
+                                )}
+                            </a>
                         </SUITable.Cell>
                         <SUITable.Cell>
-                            <LaunchIcon
-                                style={{ cursor: 'pointer' }}
-                                onClick={() =>
-                                    window.open(
-                                        `https://www.github.com/populationgenonics/${log.meta.repo}/tree/${log.meta.commit}`,
-                                        '_blank'
-                                    )
-                                }
-                            />
+                            <a
+                                href={`${`https://www.github.com/populationgenomics/${log.meta.repo}/tree/${log.meta.commit}`}`}
+                                rel="noreferrer"
+                            >
+                                {log.meta.commit}
+                            </a>
                         </SUITable.Cell>
                         {mainHeaders.map((category) => (
                             <SUITable.Cell key={`${category}`}>
