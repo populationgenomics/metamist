@@ -1,3 +1,5 @@
+from test.testbase import DbIsolatedTest, run_as_sync
+
 from api.graphql.loaders import get_context
 from api.graphql.schema import schema
 from db.python.layers import ParticipantLayer
@@ -7,7 +9,6 @@ from models.models import (
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',

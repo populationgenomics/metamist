@@ -226,6 +226,9 @@ async def load_sequencing_groups_for_project_ids(
 
 @connected_data_loader
 async def load_projects_for_ids(project_ids: list[int], connection) -> list[Project]:
+    """
+    Get projects by IDs
+    """
     pttable = ProjectPermissionsTable(connection.connection)
     projects = await pttable.get_projects_by_ids(project_ids)
     p_by_id = {p.id: p for p in projects}
@@ -236,6 +239,9 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list[Proj
 async def load_families_for_participants(
     participant_ids: list[int], connection
 ) -> list[list[FamilyInternal]]:
+    """
+    Get families of participants, noting a participant can be in multiple families
+    """
     flayer = FamilyLayer(connection)
     fam_map = await flayer.get_families_by_participants(participant_ids=participant_ids)
     return [fam_map.get(p, []) for p in participant_ids]
@@ -245,6 +251,7 @@ async def load_families_for_participants(
 async def load_participants_for_families(
     family_ids: list[int], connection
 ) -> list[list[ParticipantInternal]]:
+    """Get all participants in a family, doesn't include affected statuses"""
     player = ParticipantLayer(connection)
     pmap = await player.get_participants_by_families(family_ids)
     return [pmap.get(fid, []) for fid in family_ids]
@@ -254,6 +261,10 @@ async def load_participants_for_families(
 async def load_participants_for_projects(
     project_ids: list[ProjectId], connection
 ) -> list[list[ParticipantInternal]]:
+    """
+    Get all participants in a project
+    """
+
     retval: list[list[ParticipantInternal]] = []
 
     for project in project_ids:
@@ -294,6 +305,10 @@ async def load_analyses_for_sequencing_groups(
 
 
 class LoaderKeys(enum.Enum):
+    """
+    Keys for the data loaders, define them to it's clearer when we add / remove
+    them, and reduces the chance of typos
+    """
     PROJECTS_FOR_IDS = 'projects_for_id'
 
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'

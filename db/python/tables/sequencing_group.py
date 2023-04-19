@@ -324,6 +324,10 @@ class SequencingGroupTable(DbBase):
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:
+        """
+        Get number of sequencing groups for each type for a project
+        Useful for the web layer
+        """
         _query = """
 SELECT sg.type, COUNT(*) as n
 FROM sequencing_group sg

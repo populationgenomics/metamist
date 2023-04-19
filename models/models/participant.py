@@ -51,6 +51,7 @@ class ParticipantUpsertInternal(BaseModel):
     samples: list[SampleUpsertInternal] | None = None
 
     def to_external(self):
+        """Convert to transport model"""
         return ParticipantUpsert(
             id=self.id,
             external_id=self.external_id,

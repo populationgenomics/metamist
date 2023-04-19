@@ -178,9 +178,11 @@ class DbTest(unittest.TestCase):
 
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
+        """Run SYNC graphql query on internal database"""
         return await self.run_graphql_query_async(query, variables=variables)
 
     async def run_graphql_query_async(self, query, variables=None):
+        """Run ASYNC graphql query on internal database"""
         value = await schema.execute(
             query,
             variable_values=variables,

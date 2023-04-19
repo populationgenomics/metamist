@@ -4,17 +4,16 @@ from datetime import timedelta, datetime
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.assay import AssayLayer
+from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.models import (
     AnalysisInternal,
     AssayUpsertInternal,
     SequencingGroupUpsertInternal,
+    SampleUpsertInternal,
 )
 
-from db.python.layers.analysis import AnalysisLayer
-from db.python.layers.sample import SampleLayer
-
-from models.models.sample import SampleUpsertInternal
 from models.enums import AnalysisStatus
 
 

@@ -1,8 +1,8 @@
 from io import StringIO
 from unittest.mock import patch
+from test.testbase import DbIsolatedTest, run_as_sync
 
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestSampleMapParser(DbIsolatedTest):

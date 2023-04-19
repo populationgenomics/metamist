@@ -108,6 +108,7 @@ class AssayLayer(BaseLayer):
     async def get_assays_for_sequencing_group_ids(
         self, sequencing_group_ids: list[int], check_project_ids=True
     ) -> dict[int, list[AssayInternal]]:
+        """Get assays for a list of sequencing group IDs"""
         projects, assays = await self.seqt.get_assays_for_sequencing_group_ids(
             sequencing_group_ids=sequencing_group_ids,
         )

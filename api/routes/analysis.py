@@ -186,31 +186,6 @@ async def get_latest_complete_analysis_for_type_post(
 
     return analysis.to_external()
 
-
-@router.post(
-    '/{project}/{analysis_type}/latest-complete/for-samples',
-    operation_id='getLatestAnalysisForSamplesAndType',
-)
-async def get_latest_analysis_for_samples_and_type(
-    sample_ids: list[str],
-    analysis_type: str,
-    allow_missing: bool = True,
-    connection: Connection = get_project_readonly_connection,
-):
-    """
-    Get latest complete analysis for samples and type.
-    Should return one per sample.
-    """
-    atable = AnalysisLayer(connection)
-    results = await atable.get_latest_complete_analysis_for_samples_and_type(
-        analysis_type=analysis_type,
-        sample_ids=sample_id_transform_to_raw_list(sample_ids),
-        allow_missing=allow_missing,
-    )
-
-    return [r.to_external() for r in results]
-
-
 @router.get(
     '/{analysis_id}/details',
     operation_id='getAnalysisById',

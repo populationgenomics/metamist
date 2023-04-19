@@ -166,6 +166,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def test_project_summary_single_entry(self):
+        """Test project summary with a single participant with all fields"""
         # Now add a participant with a sample and sequence
         await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
 
