@@ -179,6 +179,7 @@ class TestExistingCohortParser(unittest.TestCase):
     @run_as_sync
     @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
     @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids')
     @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
@@ -188,15 +189,17 @@ class TestExistingCohortParser(unittest.TestCase):
         mock_filesize,
         mock_fileexists,
         mock_datetime_added,
-        mock_get_sample_id,
-        mock_get_participant_id,
         mock_get_sequence_ids,
+        mock_get_sequences_by_sample_ids,
+        mock_get_participant_id,
+        mock_get_sample_id,
     ):
         """
         Test importing a single row, forms objects and checks response
         """
         mock_get_sample_id.return_value = {'EXTID1234': 'CPG123'}
         mock_get_sequence_ids.return_value = {}
+        mock_get_sequences_by_sample_ids.return_value = {}
         mock_get_participant_id.return_value = {'EXTID1234': 1234}
 
         mock_filesize.return_value = 111
