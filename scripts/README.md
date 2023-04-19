@@ -115,3 +115,6 @@ Parameters
 | --skip-ped    | Flag to be used when there isn't available pedigree/family information       |
 | --add-family  | Additional families to include. All samples from these fams will be included |
 | --add-sample  | Additional samples to include.                                               |
+
+In some cases, a random subset of samples or families is sufficient. In this case the `--families` or `--samples` parameters should be used.  
+In other cases, a specific subset of samples or families is more useful (for example, in the case of a pipeline failing on a specific sample in production). In this instance you can use the `--add-family` or `--add-sample` parameters any number of times. 
