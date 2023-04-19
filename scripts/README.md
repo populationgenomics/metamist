@@ -62,20 +62,20 @@ As described above, the generic metadata parser takes in a CSV file to be ingest
     Usage:
 
     ```shell
-    analysis-runner --dataset <DATASET> --access-level standard  
-    --description <DESCRIPTION> -o parser-tmp  
-    python3 -m scripts.parse_existing_cohort --project <PROJECT>  
-    --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH>  
+    analysis-runner --dataset <DATASET> --access-level standard
+    --description <DESCRIPTION> -o parser-tmp
+    python3 -m scripts.parse_existing_cohort --project <PROJECT>
+    --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH>
     --include-participant-column <PATH TO CSV>
     ```
 
     For example:
 
     ```shell
-    analysis-runner --dataset fewgenomes --access-level standard  
-    --description "Parse Dummy Samples" -o parser-tmp  
-    python3 -m scripts.parse_existing_cohort --project fewgenomes  
-    --search-location gs://cpg-fewgenomes-main/ --batch-number "1"  
+    analysis-runner --dataset fewgenomes --access-level standard
+    --description "Parse Dummy Samples" -o parser-tmp
+    python3 -m scripts.parse_existing_cohort --project fewgenomes
+    --search-location gs://cpg-fewgenomes-main/ --batch-number "1"
     --include-participant-column gs://cpg-fewgenomes-main-upload/fewgenomes_manifest.csv
     ```
 
@@ -102,8 +102,8 @@ Prior to running an existing workflow on a new dataset, a -test project should f
 Usage:
 
 ```shell
-analysis-runner --dataset <DATASET> --access-level standard --description  
-<DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project  
+analysis-runner --dataset <DATASET> --access-level standard --description
+<DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project
 <PROJECT> --samples <N_SAMPLES> --skip-ped
 ```
 
@@ -117,5 +117,5 @@ Parameters
 | --add-family  | Additional families to include. All samples from these fams will be included |
 | --add-sample  | Additional samples to include.                                               |
 
-In some cases, a random subset of samples or families is sufficient. In this case the `--families` or `--samples` parameters should be used.  
-In other cases, a specific subset of samples or families is more useful (for example, in the case of a pipeline failing on a specific sample in production). In this instance you can use the `--add-family` or `--add-sample` parameters any number of times. 
+In some cases, a random subset of samples or families is sufficient. In this case the `--families` or `--samples` parameters should be used.
+In other cases, a specific subset of samples or families is more useful (for example, in the case of a pipeline failing on a specific sample in production). In this instance you can use the `--add-family` or `--add-sample` parameters any number of times.
