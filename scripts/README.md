@@ -68,7 +68,11 @@ As described above, the generic metadata parser takes in a CSV file to be ingest
     For example:
 
     ```shell
-    analysis-runner --dataset fewgenomes --access-level standard --description "Parse Dummy Samples" -o parser-tmp python3 -m scripts.parse_existing_cohort --project fewgenomes --search-location gs://cpg-fewgenomes-main/ --batch-number "1" --include-participant-column gs://cpg-fewgenomes-main-upload/fewgenomes_manifest.csv
+    analysis-runner --dataset fewgenomes --access-level standard  
+    --description "Parse Dummy Samples" -o parser-tmp  
+    python3 -m scripts.parse_existing_cohort --project fewgenomes  
+    --search-location gs://cpg-fewgenomes-main/ --batch-number "1"  
+    --include-participant-column gs://cpg-fewgenomes-main-upload/fewgenomes_manifest.csv
     ```
 
     The existing cohort parser behaves as follows:
@@ -78,26 +82,26 @@ As described above, the generic metadata parser takes in a CSV file to be ingest
     - It assumes that FASTQ URLs are not provided in the CSV, so it pulls them from the input bucket. It also handles the fact that while the data in the input CSV is provided according to a sample ID, these sample IDs are not present in the file path of the FASTQs. Instead, FASTQ’s are named according to their fluidX tube id The script matches samples to FASTQ's accordingly.
     - It discards the header.
 
-2. Update Participant IDs with `fix_participant_ids.py` 
+2. Update Participant IDs with `fix_participant_ids.py`
 If participant IDs need to be ingested and were not handled correctly, `fix_participant_ids.py` can be used to update external participant IDs. It takes a map of {old_external: new_external} as input.
 
-3. Parse Pedigrees with `parse_ped.py` 
+3. Parse Pedigrees with `parse_ped.py`
 Parsing ped files is not handled by the parser. To do so, `parse_ped.py` should be used. Note, step 2 must be completed first.
 
 ### Post-Ingestion
 
-In order to test new and existing workflows, `-test` projects should be used. 
-For development work, you can use fewgenomes-test, thousandgenomes-test or hgdp-test. 
+In order to test new and existing workflows, `-test` projects should be used.
+For development work, you can use fewgenomes-test, thousandgenomes-test or hgdp-test.
 
-Prior to running an existing workflow on a new dataset, a -test project should first be populated. The `create_test_subset.py` script handles this. 
+Prior to running an existing workflow on a new dataset, a -test project should first be populated. The `create_test_subset.py` script handles this.
 
     Usage:
 
     ```shell
-    analysis-runner --dataset <DATASET> --access-level standard --description <DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project <PROJECT> --samples <N_SAMPLES> --skip-ped
+    analysis-runner --dataset <DATASET> --access-level standard --description   <DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project  <PROJECT> --samples <N_SAMPLES> --skip-ped
     ```
 
-Parameters 
+Parameters
 | Option        | Description                                                                  |
 |---------------|------------------------------------------------------------------------------|
 | --project     | The sample-metadata project ($DATASET)                                       |
@@ -106,4 +110,3 @@ Parameters
 | --skip-ped    | Flag to be used when there isn't available pedigree/family information       |
 | --add-family  | Additional families to include. All samples from these fams will be included |
 | --add-sample  | Additional samples to include.                                               |
-
