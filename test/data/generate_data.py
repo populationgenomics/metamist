@@ -43,7 +43,6 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
 
     papi = ProjectApi()
     existing_projects = await papi.get_my_projects_async()
-    print(existing_projects)
     if project not in existing_projects:
         await papi.create_project_async(
             name=project, dataset=project, create_test_project=False
@@ -170,6 +169,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                     'hailVersion': '1.0',
                     'source': 'analysis-runner',
                     'cwd': 'scripts',
+                    'repo': 'some-repo',
                     'driverImage': 'fake-australia-southeast1-fake-docker.pkg',
                     'batch_url': f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
                 },

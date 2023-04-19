@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useQuery } from '@apollo/client'
 import { Table as SUITable } from 'semantic-ui-react'
 import _ from 'lodash'
+import LaunchIcon from '@mui/icons-material/Launch'
 import { gql } from '../../__generated__/gql'
 import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -11,14 +12,11 @@ import sanitiseValue from '../../shared/utilities/sanitiseValue'
 const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
-        id
         analyses(type: "analysis-runner") {
-          active
-          type
-          meta
+          author
           id
+          meta
           output
-          status
         }
       }
   }
@@ -39,7 +37,6 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
         )
 
     const mainHeaders = [
-        'id',
         ...new Set(
             data.project.analyses
                 .flatMap(Object.keys)
@@ -47,10 +44,15 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
         ),
     ]
     const metaHeaders = [
-        ...new Set(data.project.analyses.map((item) => Object.keys(item.meta)).flat()),
+        ...new Set(
+            data.project.analyses
+                .map((item) => Object.keys(item.meta))
+                .flat()
+                .filter((header) => !['batch_url', 'commit', 'repo'].includes(header))
+        ),
     ]
 
-    const allHeaders = mainHeaders.concat(metaHeaders)
+    const allHeaders = ['Hail Batch', 'GitHub', ...mainHeaders, ...metaHeaders]
 
     return (
         <Table celled>
@@ -64,6 +66,23 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
             <SUITable.Body>
                 {data.project.analyses.map((log) => (
                     <SUITable.Row key={`${log.id}`}>
+                        <SUITable.Cell>
+                            <LaunchIcon
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => window.open(`${log.meta.batch_url}`, '_blank')}
+                            />
+                        </SUITable.Cell>
+                        <SUITable.Cell>
+                            <LaunchIcon
+                                style={{ cursor: 'pointer' }}
+                                onClick={() =>
+                                    window.open(
+                                        `https://www.github.com/populationgenonics/${log.meta.repo}/tree/${log.meta.commit}`,
+                                        '_blank'
+                                    )
+                                }
+                            />
+                        </SUITable.Cell>
                         {mainHeaders.map((category) => (
                             <SUITable.Cell key={`${category}`}>
                                 {sanitiseValue(_.get(log, category))}
