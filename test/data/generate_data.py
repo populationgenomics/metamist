@@ -74,6 +74,17 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     )
 
     how_many_samples = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
+    how_many_sequencing_groups = {1: 0.78, 2: 0.16, 3: 0.05}
+
+    def get_sequencing_types():
+        """Return a random length of random sequencing types"""
+        k = random.choices(
+            list(how_many_sequencing_groups.keys()),
+            list(how_many_sequencing_groups.values()),
+        )[0]
+        return random.choices(
+            sequencing_types, k=k
+        )
 
     def generate_random_number_within_distribution():
         return random.choices(
@@ -105,7 +116,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
             samples.append(sample)
 
             sample_id_index += random.randint(1, 4)
-            for _ in range(generate_random_number_within_distribution()):
+            for stype in get_sequencing_types():
                 facility = random.choice(
                     [
                         'Amazing sequence centre',
@@ -113,7 +124,6 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
                         'Dept of Seq.',
                     ]
                 )
-                stype = random.choice(sequencing_types)
                 stechnology = random.choice(sequencing_technologies)
                 splatform = random.choice(sequencing_platforms)
                 sg = SequencingGroupUpsert(
