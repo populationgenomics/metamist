@@ -1,7 +1,5 @@
-from typing import Optional, Dict, Any, Union
-
-
 import json
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -29,7 +27,7 @@ class AssayInternal(BaseModel):
         return False
 
     @staticmethod
-    def from_db(d: Dict):
+    def from_db(d: dict):
         """Take DB mapping object, and return SampleSequencing"""
         meta = d.pop('meta', None)
 

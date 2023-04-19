@@ -82,9 +82,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
             list(how_many_sequencing_groups.keys()),
             list(how_many_sequencing_groups.values()),
         )[0]
-        return random.choices(
-            sequencing_types, k=k
-        )
+        return random.choices(sequencing_types, k=k)
 
     def generate_random_number_within_distribution():
         return random.choices(
@@ -165,7 +163,9 @@ query MyQuery($project: String!) {
 }
     """
     sgid_response = query(_sgid_qquery, {'project': project})
-    sequencing_group_ids = [sg['id'] for sg in sgid_response['project']['sequencingGroups']]
+    sequencing_group_ids = [
+        sg['id'] for sg in sgid_response['project']['sequencingGroups']
+    ]
 
     analyses_to_insert = [
         Analysis(
@@ -194,9 +194,7 @@ query MyQuery($project: String!) {
     aapi = AnalysisApi()
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
-        await asyncio.gather(
-            *[aapi.create_analysis_async(project, a) for a in ans]
-        )
+        await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
 
 
 if __name__ == '__main__':

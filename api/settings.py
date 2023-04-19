@@ -5,7 +5,9 @@ from cpg_utils.cloud import read_secret
 
 TRUTH_SET = ('1', 'y', 't', 'true')
 
-LOG_DATABASE_QUERIES = os.getenv('SM_LOG_DATABASE_QUERIES', 'false').lower() in TRUTH_SET
+LOG_DATABASE_QUERIES = (
+    os.getenv('SM_LOG_DATABASE_QUERIES', 'false').lower() in TRUTH_SET
+)
 _ALLOW_ALL_ACCESS: bool = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in TRUTH_SET
 _DEFAULT_USER = os.getenv('SM_LOCALONLY_DEFAULTUSER')
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))

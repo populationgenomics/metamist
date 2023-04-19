@@ -1,3 +1,5 @@
+# pylint: disable=no-value-for-parameter
+# ^ Do this because of the loader decorator
 import enum
 from collections import defaultdict
 from strawberry.dataloader import DataLoader
@@ -49,9 +51,7 @@ async def load_assays_by_samples(
 
     assaylayer = AssayLayer(connection)
 
-    by_key: dict[tuple[int, str | None], list[AssayInternal]] = defaultdict(
-        list
-    )
+    by_key: dict[tuple[int, str | None], list[AssayInternal]] = defaultdict(list)
 
     # group by all last fields, in case we add more
     for chunk in group_by(query, lambda x: x[1:]).values():
@@ -59,8 +59,8 @@ async def load_assays_by_samples(
         sample_ids = [x[0] for x in chunk]
 
         assays = await assaylayer.get_assays_for_sample_ids(
-        sample_ids=sample_ids, assay_type=assay_type
-    )
+            sample_ids=sample_ids, assay_type=assay_type
+        )
         assay_map = group_by(assays, lambda a: a.sample_id)
         for key in chunk:
             sample_id = key[0]
@@ -158,6 +158,7 @@ async def load_samples_for_ids(
     samples_map = {s.id: s for s in samples}
     return [samples_map.get(s) for s in sample_ids]
 
+
 @connected_data_loader
 async def load_samples_for_projects(project_ids: list[ProjectId], connection):
     """
@@ -167,10 +168,11 @@ async def load_samples_for_projects(project_ids: list[ProjectId], connection):
     samples_by_project = group_by(samples, lambda s: s.project)
     return [samples_by_project.get(pid, []) for pid in project_ids]
 
+
 @connected_data_loader
 async def load_participants_for_ids(
     participant_ids: list[int], connection
-) -> list[ParticipantInternal]:
+) -> list[list[ParticipantInternal]]:
     """
     DataLoader: get_participants_by_ids
     """
@@ -185,7 +187,7 @@ async def load_participants_for_ids(
 @connected_data_loader
 async def load_samples_for_analysis_ids(
     analysis_ids: list[int], connection
-) -> list[SampleInternal]:
+) -> list[list[SampleInternal]]:
     """
     DataLoader: get_samples_for_analysis_ids
     """
@@ -211,7 +213,7 @@ async def load_sequencing_groups_for_analysis_ids(
 @connected_data_loader
 async def load_sequencing_groups_for_project_ids(
     project_ids: list[int], connection
-) -> list[SequencingGroupInternal]:
+) -> list[list[SequencingGroupInternal]]:
     """
     DataLoader: get_sequencing_groups_for_project_ids
     """
@@ -220,7 +222,6 @@ async def load_sequencing_groups_for_project_ids(
     seq_group_map = group_by(sequencing_groups, lambda sg: sg.project)
 
     return [seq_group_map.get(p, []) for p in project_ids]
-
 
 
 @connected_data_loader
@@ -248,22 +249,33 @@ async def load_participants_for_families(
     pmap = await player.get_participants_by_families(family_ids)
     return [pmap.get(fid, []) for fid in family_ids]
 
+
 @connected_data_loader
-async def load_participants_for_projects(project_ids: list[ProjectId], connection) -> list[ParticipantInternal]:
+async def load_participants_for_projects(
+    project_ids: list[ProjectId], connection
+) -> list[list[ParticipantInternal]]:
     retval: list[list[ParticipantInternal]] = []
 
     for project in project_ids:
-        retval.append(await ParticipantLayer(connection).get_participants(project=project))
+        retval.append(
+            await ParticipantLayer(connection).get_participants(project=project)
+        )
 
     return retval
 
+
 @connected_data_loader
-async def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisStatus | None], str | None], connection):
+async def load_analyses_for_sequencing_groups(
+    query: list[tuple[int, AnalysisStatus | None, str | None]], connection
+) -> list[list[AnalysisInternal]]:
     """
-    Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str) -> list[AnalysisInternal]
+    Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str)
+        -> list[list[AnalysisInternal]]
     """
     alayer = AnalysisLayer(connection)
-    by_key: dict[tuple[int, AnalysisStatus | None, str | None], list[AnalysisInternal]] = defaultdict(list)
+    by_key: dict[
+        tuple[int, AnalysisStatus | None, str | None], list[AnalysisInternal]
+    ] = defaultdict(list)
     for chunk in group_by(query, lambda x: x[1:]).values():
         sequencing_group_ids = [x[0] for x in chunk]
         status = chunk[0][1]
@@ -279,6 +291,7 @@ async def load_analyses_for_sequencing_groups(query: list[tuple[int, AnalysisSta
                 by_key[(sequencing_group_id, status, analysis_type)].append(analysis)
 
     return [by_key.get(q, []) for q in query]
+
 
 class LoaderKeys(enum.Enum):
     PROJECTS_FOR_IDS = 'projects_for_id'
@@ -310,7 +323,6 @@ async def get_context(connection=get_projectless_db_connection):
         'connection': connection,
         # projects
         LoaderKeys.PROJECTS_FOR_IDS: DataLoader(load_projects_for_ids(connection)),
-
         # participants
         LoaderKeys.PARTICIPANTS_FOR_IDS: DataLoader(
             load_participants_for_ids(connection)
@@ -321,17 +333,17 @@ async def get_context(connection=get_projectless_db_connection):
         LoaderKeys.PARTICIPANTS_FOR_FAMILIES: DataLoader(
             load_participants_for_families(connection)
         ),
-
         # samples
         LoaderKeys.SAMPLES_FOR_IDS: DataLoader(load_samples_for_ids(connection)),
-        LoaderKeys.SAMPLES_FOR_PROJECTS: DataLoader(load_samples_for_projects(connection)),
+        LoaderKeys.SAMPLES_FOR_PROJECTS: DataLoader(
+            load_samples_for_projects(connection)
+        ),
         LoaderKeys.SAMPLES_FOR_PARTICIPANTS: DataLoader(
             load_samples_for_participant_ids(connection)
         ),
         LoaderKeys.SAMPLES_FOR_ANALYSIS: DataLoader(
             load_samples_for_analysis_ids(connection)
         ),
-
         # sequencing groups
         LoaderKeys.SEQUENCING_GROUPS_FOR_IDS: DataLoader(
             load_sequencing_groups_for_ids(connection)
@@ -345,13 +357,11 @@ async def get_context(connection=get_projectless_db_connection):
         LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS: DataLoader(
             load_sequencing_groups_for_analysis_ids(connection)
         ),
-
         # assays
         LoaderKeys.ASSAYS_FOR_SAMPLES: DataLoader(load_assays_by_samples(connection)),
         LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS: DataLoader(
             load_assays_by_sequencing_groups(connection)
         ),
-
         # analyses
         LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS: DataLoader(
             load_analyses_for_sequencing_groups(connection), cache=False
@@ -360,6 +370,4 @@ async def get_context(connection=get_projectless_db_connection):
         LoaderKeys.FAMILIES_FOR_PARTICIPANTS: DataLoader(
             load_families_for_participants(connection)
         ),
-
-
     }

@@ -1,6 +1,5 @@
 import csv
 import io
-from collections import defaultdict
 from datetime import date
 from typing import Any, List, Optional, Dict
 
@@ -20,7 +19,6 @@ from db.python.layers.participant import (
 )
 from models.models.participant import ParticipantUpsert
 from models.models.sample import sample_id_format
-from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 

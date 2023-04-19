@@ -9,12 +9,16 @@ from metamist.configuration import sm_url
 
 # use older style typing to broaden supported Python versions
 def query(_query: str, variables: Dict = None, auth_token: str = None):
+    """Query the metamist GraphQL API"""
     loop = asyncio.get_event_loop()
-    return loop.run_until_complete(query_async(
-        _query=_query,
-    variables=variables,
-    auth_token=auth_token,
-    ))
+    return loop.run_until_complete(
+        query_async(
+            _query=_query,
+            variables=variables,
+            auth_token=auth_token,
+        )
+    )
+
 
 async def query_async(_query: str, variables: Dict = None, auth_token: str = None):
     """Query the Metamist GraphQL API"""
@@ -40,4 +44,3 @@ async def query_async(_query: str, variables: Dict = None, auth_token: str = Non
     if 'errors' in data:
         raise ValueError(f'Metamist GraphQL query failed: {data["errors"]}')
     return data['data']
-

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from typing import Any
 
 from db.python.connect import DbBase, NoOpAenter
 from db.python.utils import ProjectId, to_db_json
@@ -99,7 +100,7 @@ class SequencingGroupTable(DbBase):
         Query sequencing groups
         """
         wheres = []
-        params = {}
+        params: dict[str, Any] = {}
         if project_ids:
             wheres.append('s.project IN :project_ids')
             params['project_ids'] = project_ids
@@ -258,7 +259,7 @@ class SequencingGroupTable(DbBase):
 
         values = {
             'sample_id': sample_id,
-            'type': type_.lower() if type else None,
+            'type': type_.lower() if type_ else None,
             'technology': technology.lower() if technology else None,
             'platform': platform.lower() if platform else None,
             'meta': to_db_json(meta or {}),

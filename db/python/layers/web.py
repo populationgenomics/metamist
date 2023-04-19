@@ -1,25 +1,23 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
-import itertools
-import re
-import json
 import asyncio
 import dataclasses
-from enum import Enum
-from datetime import date
+import itertools
+import json
+import re
 from collections import defaultdict
+from datetime import date
+from enum import Enum
 
 from pydantic import BaseModel
 
 from api.utils import group_by
-
 from db.python.connect import DbBase
-from db.python.layers import SequencingGroupLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer
 from db.python.tables.analysis import AnalysisTable
-from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.assay import AssayTable
+from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from models.base import SMBase
 
@@ -224,12 +222,13 @@ class WebDb(DbBase):
 
     @staticmethod
     def _project_summary_process_sequencing_group_rows_by_sample_id(
-            sequencing_group_rows,
-            sequencing_eid_rows: list,
-            seq_models_by_sample_id: dict[int, list[NestedAssay]],
-        ) -> dict[int, list[NestedSequencingGroup]]:
+        sequencing_group_rows,
+        sequencing_eid_rows: list,
+        seq_models_by_sample_id: dict[int, list[NestedAssay]],
+    ) -> dict[int, list[NestedSequencingGroup]]:
         assay_models_by_id = {
-            assay.id: assay for assay in itertools.chain(*seq_models_by_sample_id.values())
+            assay.id: assay
+            for assay in itertools.chain(*seq_models_by_sample_id.values())
         }
 
         sequencing_group_eid_map = defaultdict(dict)
@@ -409,17 +408,17 @@ class WebDb(DbBase):
         # assays
         assay_query = """
             SELECT id, sample_id, meta, type
-            FROM assay 
+            FROM assay
             WHERE sample_id IN :sids
         """
         assay_promise = self.connection.fetch_all(assay_query, {'sids': sids})
 
         # sequencing_groups
         sg_query = """
-            SELECT 
+            SELECT
                 sg.id, sg.meta, sg.type, sg.sample_id,
                 sg.technology, sg.platform, sga.assay_id
-            FROM sequencing_group sg 
+            FROM sequencing_group sg
             INNER JOIN sequencing_group_assay sga ON sga.sequencing_group_id = sg.id
             WHERE sg.sample_id IN :sids
         """
@@ -438,7 +437,7 @@ class WebDb(DbBase):
         # participant
         p_query = """
             SELECT id, external_id, meta, reported_sex, reported_gender, karyotype
-            FROM participant 
+            FROM participant
             WHERE id in :pids
         """
         participant_promise = self.connection.fetch_all(p_query, {'pids': pids})
@@ -492,10 +491,12 @@ WHERE fp.participant_id in :pids
         assay_models_by_sample_id = (
             self._project_summary_process_assay_rows_by_sample_id(assay_rows)
         )
-        seq_group_models_by_sample_id = self._project_summary_process_sequencing_group_rows_by_sample_id(
-            sequencing_group_rows=sequencing_group_rows,
-            sequencing_eid_rows=sequencing_group_eids,
-            seq_models_by_sample_id=assay_models_by_sample_id,
+        seq_group_models_by_sample_id = (
+            self._project_summary_process_sequencing_group_rows_by_sample_id(
+                sequencing_group_rows=sequencing_group_rows,
+                sequencing_eid_rows=sequencing_group_eids,
+                seq_models_by_sample_id=assay_models_by_sample_id,
+            )
         )
         smodels = self._project_summary_process_sample_rows(
             sample_rows,
@@ -550,12 +551,14 @@ WHERE fp.participant_id in :pids
 
         ignore_participant_keys: set[str] = set()
         ignore_sample_meta_keys = {'reads', 'vcfs', 'gvcf'}
-        ignore_assay_meta_keys = {'reads', 'vcfs', 'gvcf',
-
-                                     'sequencing_platform',
-                                     'sequencing_technology',
-                                     'sequencing_type',
-                                     }
+        ignore_assay_meta_keys = {
+            'reads',
+            'vcfs',
+            'gvcf',
+            'sequencing_platform',
+            'sequencing_technology',
+            'sequencing_type',
+        }
         ignore_sg_meta_keys: set[str] = set()
 
         participant_meta_keys = set(
@@ -611,7 +614,7 @@ WHERE fp.participant_id in :pids
         )
         sequencing_group_keys = [
             ('id', 'Sequencing Group ID'),
-            ('created_date', 'Created date')
+            ('created_date', 'Created date'),
         ] + sorted([('meta.' + k, k) for k in sg_meta_keys])
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(

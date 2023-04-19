@@ -1,11 +1,10 @@
-import json
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
-from db.python.utils import to_db_json
 from db.python.tables.project import ProjectId
+from db.python.utils import to_db_json
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
 
@@ -517,9 +516,9 @@ SELECT sg.type as seq_type, COUNT(*) as number_of_crams
 FROM analysis a
 INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
 INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
-WHERE 
-    a.project = :project 
-    AND a.status = 'completed' 
+WHERE
+    a.project = :project
+    AND a.status = 'completed'
     AND a.type = 'cram'
     AND NOT sg.archived
 GROUP BY seq_type
@@ -547,9 +546,9 @@ FROM analysis a
 INNER JOIN analysis_sequencing_group asga ON a.id = asga.analysis_id
 INNER JOIN sequencing_group sg ON asga.sequencing_group_id = sg.id
 INNER JOIN sample s on sg.sample_id = s.id
-WHERE 
-    s.project = :project 
-    AND a.status = 'completed' 
+WHERE
+    s.project = :project
+    AND a.status = 'completed'
     AND a.type = 'es-index'
     AND NOT sg.archived
 GROUP BY seq_type

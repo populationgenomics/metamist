@@ -305,7 +305,7 @@ RETURNING id
         participants with multiple samples.
         """
         wheres = ['p.project = :project']
-        values = {'project': project}
+        values: dict[str, Any] = {'project': project}
         if sequencing_type:
             wheres.append('sg.type = :sequencing_type')
             values['sequencing_type'] = sequencing_type
@@ -317,8 +317,8 @@ INNER JOIN sample s ON p.id = s.participant_id
 INNER JOIN sequencing_group sg ON sg.sample_id = s.id
 WHERE {' AND '.join(wheres)}
 """
-        values = await self.connection.fetch_all(_query, values)
-        return [(r[0], r[1]) for r in values]
+        rows = await self.connection.fetch_all(_query, values)
+        return [(r[0], int(r[1])) for r in rows]
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5

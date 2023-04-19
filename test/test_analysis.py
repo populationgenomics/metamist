@@ -1,15 +1,15 @@
 # pylint: disable=invalid-overridden-method
 from datetime import timedelta, datetime
 
+from test.testbase import DbIsolatedTest, run_as_sync
+
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from models.models.analysis import AnalysisInternal
-from models.models.assay import AssayUpsertInternal
-from models.models.sequencing_group import (
-    SequencingGroupInternal,
+from models.models import (
+    AnalysisInternal,
+    AssayUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer

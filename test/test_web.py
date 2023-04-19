@@ -42,89 +42,89 @@ def merge(d1: dict, d2: dict):
     """Merges two dictionaries"""
     return dict(d1, **d2)
 
+
 SINGLE_PARTICIPANT_UPSERT = ParticipantUpsertInternal(
-                external_id='Demeter',
-                meta={},
-                samples=[
-                    SampleUpsertInternal(
-                        external_id='sample_id001',
-                        meta={},
-                        type='blood',
-                        sequencing_groups=[
-                            SequencingGroupUpsertInternal(
-                                type='genome',
-                                technology='short-read',
-                                platform='illumina',
-                                assays=[
-                                    AssayUpsertInternal(
-                                        type='sequencing',
-                                        meta={
-                                            'reads': [
-                                                [
-                                                    {
-                                                        'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                        'checksum': None,
-                                                        'class': 'File',
-                                                        'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                        'size': 111,
-                                                    },
-                                                    {
-                                                        'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                        'checksum': None,
-                                                        'class': 'File',
-                                                        'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                        'size': 111,
-                                                    },
-                                                ]
-                                            ],
-                                            'reads_type': 'fastq',
-                                            'batch': 'M001',
-                                            **default_assay_meta,
+    external_id='Demeter',
+    meta={},
+    samples=[
+        SampleUpsertInternal(
+            external_id='sample_id001',
+            meta={},
+            type='blood',
+            sequencing_groups=[
+                SequencingGroupUpsertInternal(
+                    type='genome',
+                    technology='short-read',
+                    platform='illumina',
+                    assays=[
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            meta={
+                                'reads': [
+                                    [
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
                                         },
-                                    ),
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ]
                                 ],
-                            )
-                        ],
-                    )
-                ],
-            )
+                                'reads_type': 'fastq',
+                                'batch': 'M001',
+                                **default_assay_meta,
+                            },
+                        ),
+                    ],
+                )
+            ],
+        )
+    ],
+)
 
 SINGLE_PARTICIPANT_RESULT = ProjectSummary(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
-            total_samples=1,
-            total_samples_in_query=1,
-            total_participants=1,
-            total_sequences=1,
-            cram_seqr_stats={
-                'genome': {
-                    'Sequences': '1',
-                    'Crams': '0',
-                    'Seqr': '0',
-                }
-            },
-            batch_sequence_stats={'M001': {'genome': '1'}},
-            participants=[],
-            participant_keys=[('external_id', 'Participant ID')],
-            sample_keys=[
-                ('id', 'Sample ID'),
-                ('external_id', 'External Sample ID'),
-                ('created_date', 'Created date'),
-            ],
-            sequencing_group_keys=[
-                ('id', 'Sequencing Group ID'),
-                ('created_date', 'Created date'),
-            ],
-            assay_keys=[
-                ('type', 'type'),
-                ('technology', 'technology'),
-                ('meta.batch', 'batch'),
-                ('meta.reads_type', 'reads_type'),
-            ],
-            seqr_links={},
-            seqr_sync_types=[],
-        )
+    project=WebProject(id=1, name='test', meta={}, dataset='test'),
+    total_samples=1,
+    total_samples_in_query=1,
+    total_participants=1,
+    total_sequences=1,
+    cram_seqr_stats={
+        'genome': {
+            'Sequences': '1',
+            'Crams': '0',
+            'Seqr': '0',
+        }
+    },
+    batch_sequence_stats={'M001': {'genome': '1'}},
+    participants=[],
+    participant_keys=[('external_id', 'Participant ID')],
+    sample_keys=[
+        ('id', 'Sample ID'),
+        ('external_id', 'External Sample ID'),
+        ('created_date', 'Created date'),
+    ],
+    sequencing_group_keys=[
+        ('id', 'Sequencing Group ID'),
+        ('created_date', 'Created date'),
+    ],
+    assay_keys=[
+        ('type', 'type'),
+        ('technology', 'technology'),
+        ('meta.batch', 'batch'),
+        ('meta.reads_type', 'reads_type'),
+    ],
+    seqr_links={},
+    seqr_sync_types=[],
+)
+
 
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
@@ -166,7 +166,6 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def test_project_summary_single_entry(self):
-
         # Now add a participant with a sample and sequence
         await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
 
@@ -195,7 +194,6 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def project_summary_with_filter_no_results(self):
-
         filtered_result_empty = await self.webl.get_project_summary(
             token=0,
             grid_filter=[
@@ -230,7 +228,6 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def test_project_summary_multiple_participants(self):
-
         new_participants = [
             ParticipantUpsertInternal(
                 external_id='Meter',
@@ -268,7 +265,7 @@ class TestWeb(DbIsolatedTest):
                                             'reads_type': 'fastq',
                                             'batch': 'M001',
                                             **default_assay_meta,
-                                        }
+                                        },
                                     ),
                                 ],
                             ),
@@ -282,7 +279,7 @@ class TestWeb(DbIsolatedTest):
 
         expected_data_two_samples = ProjectSummary(
             project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
+                id=1, name='test', meta={}, dataset='test'
             ),
             total_samples=2,
             total_samples_in_query=2,

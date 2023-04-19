@@ -13,7 +13,7 @@ import strawberry
 from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
-from db.python import enum_tables as enum_tables
+from db.python import enum_tables
 from db.python.layers.family import FamilyLayer
 from db.python.layers.assay import AssayLayer
 from db.python.tables.project import ProjectPermissionsTable
@@ -135,9 +135,7 @@ class GraphQLProject:
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()
-    async def samples(
-            self, info: Info, root: 'Project'
-    ) -> list['GraphQLSample']:
+    async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
         samples = await loader.load(root.id)
         return [GraphQLSample.from_internal(p) for p in samples]
@@ -314,7 +312,9 @@ class GraphQLSample:
         return GraphQLParticipant.from_internal(participant)
 
     @strawberry.field
-    async def assays(self, info: Info, root: 'GraphQLSample', type: str = None) -> list['GraphQLAssay']:
+    async def assays(
+        self, info: Info, root: 'GraphQLSample', type: str = None
+    ) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
         assays = await loader_assays_for_sample_ids.load((root.internal_id, type))
         return [GraphQLAssay.from_internal(assay) for assay in assays]
@@ -370,9 +370,11 @@ class GraphQLSequencingGroup:
 
     @strawberry.field
     async def analyses(
-        self, info: Info, root: 'GraphQLSequencingGroup',
-            analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
-            analysis_type: str | None = None,
+        self,
+        info: Info,
+        root: 'GraphQLSequencingGroup',
+        analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
+        analysis_type: str | None = None,
     ) -> list[GraphQLAnalysis]:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
         analyses = await loader.load((root.internal_id, analysis_status, analysis_type))

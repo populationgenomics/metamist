@@ -1,15 +1,14 @@
-import io
 import csv
+import io
 from datetime import date
-
 from typing import Any
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from api.utils.dates import parse_date_only_string
 
+from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     get_projectless_db_connection,
     get_project_readonly_connection,
@@ -29,7 +28,6 @@ from models.models.analysis import (
 )
 from models.utils.sample_id_format import (
     sample_id_transform_to_raw_list,
-    sample_id_format_list,
     sample_id_format,
 )
 from models.utils.sequencing_group_id_format import (

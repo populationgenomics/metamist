@@ -1,12 +1,10 @@
-import asyncio
-from typing import Awaitable
 from datetime import date
 
 from db.python.connect import Connection, NotFoundError
-from db.python.layers.base import BaseLayer
 from db.python.layers.assay import AssayLayer
-from db.python.tables.sample import SampleTable
+from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
+from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import ProjectId
 from models.models.sequencing_group import (
@@ -314,11 +312,9 @@ class SequencingGroupLayer(BaseLayer):
                 else:
                     to_replace.append(sg)
 
-        promises: list[Awaitable] = []
-
-        # You can't reuse connections, but we're inside a transaction
-        # so it's not actually committing anything so should be quick
-
+        # You can't write to the same connections multiple times in parallel,
+        # but we're inside a transaction so it's not actually committing anything
+        # so should be quick to "write" in serial
         for sg in to_insert:
             assay_ids = [a.id for a in sg.assays]
             sg.id = await self.seqgt.create_sequencing_group(

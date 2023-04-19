@@ -1,11 +1,10 @@
-from db.python.enum_tables import AssayTypeTable
 from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
-from db.python.enum_tables.sequencing_type import SequencingTypeTable
 from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.assay import AssayLayer
+from db.python.enum_tables import AssayTypeTable
 from models.models.assay import AssayUpsertInternal
 from models.models.sample import SampleUpsertInternal
 

@@ -63,4 +63,4 @@ class EnumTable(DbBase):
 
         await self.connection.execute(_query, {'name': value.lower()})
         # clear the cache so results are up-to-date
-        self.get.cache_clear()  # pylint: disable
+        self.get.cache_clear()  # pylint: disable=no-member

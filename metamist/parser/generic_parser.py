@@ -641,10 +641,7 @@ query GetParticipantEidMapQuery($project: String!) {
         """
 
         values = await query_async(_query, variables={'project': self.project})
-        pid_map = {
-            p['externalId']: p['id']
-            for p in values['project']['participants']
-        }
+        pid_map = {p['externalId']: p['id'] for p in values['project']['participants']}
 
         for participant in participants:
             participant.internal_pid = pid_map.get(participant.external_pid)
@@ -662,10 +659,7 @@ query GetSampleEidMapQuery($project: String!) {
 """
 
         values = await query_async(_query, variables={'project': self.project})
-        sid_map = {
-            p['externalId']: p['id']
-            for p in values['project']['samples']
-        }
+        sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
 
         for sample in samples:
             sample.internal_sid = sid_map.get(sample.external_sid)
@@ -736,13 +730,16 @@ query GetSampleEidMapQuery($project: String!) {
         }
 
         # map filenames of reads to assay IDs as that's the most likely way we'll map
-        reads_to_key = lambda reads: tuple(sorted(r['location'] for r in reads)) if reads else None
+        def reads_to_key(reads):
+            return tuple(sorted(r['location'] for r in reads)) if reads else None
+
         filename_meta_map = {
             reads_to_key(assay['meta']['reads']): assay['id']
             for sample in values['project']['samples']
             for assay in sample['assays']
             if assay.get('meta', {}).get('reads')
         }
+
         def _map_assay(assay: ParsedAssay):
             # put it in a function so we can return early
 
@@ -1210,7 +1207,9 @@ query GetSampleEidMapQuery($project: String!) {
                     if contents:
                         _checksum = f'md5:{contents.strip()}'
 
-            file_size, datetime_added = await asyncio.gather(self.file_size(filename), self.datetime_added(filename))
+            file_size, datetime_added = await asyncio.gather(
+                self.file_size(filename), self.datetime_added(filename)
+            )
 
         d = {
             'location': self.file_path(filename),
@@ -1218,7 +1217,7 @@ query GetSampleEidMapQuery($project: String!) {
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
-            'datetime_added': datetime_added.isoformat() if datetime_added else None
+            'datetime_added': datetime_added.isoformat() if datetime_added else None,
         }
 
         if secondary_files:

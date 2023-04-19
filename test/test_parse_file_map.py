@@ -1,10 +1,8 @@
-import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestSampleMapParser(DbIsolatedTest):
@@ -12,9 +10,7 @@ class TestSampleMapParser(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_single_row_fastq(
-        self, mock_graphql_query
-    ):
+    async def test_single_row_fastq(self, mock_graphql_query):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type

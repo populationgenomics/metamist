@@ -148,12 +148,12 @@ class SampleUpsert(SMBase):
 
         if self.sequencing_groups:
             sample_upsert.sequencing_groups = [
-                sg.to_internal() for sg in self.sequencing_groups
+                sg.to_internal() for sg in (self.sequencing_groups or [])
             ]
 
         if self.non_sequencing_assays:
             sample_upsert.non_sequencing_assays = [
-                a.to_internal() for a in self.non_sequencing_assays
+                a.to_internal() for a in (self.non_sequencing_assays or [])
             ]
 
         return sample_upsert

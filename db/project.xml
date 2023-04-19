@@ -461,34 +461,6 @@
 	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 
-<!--		Rename sample_sequencing to assay to be more generic -->
-		<renameTable
-			oldTableName="sample_sequencing"
-			newTableName="assay"
-		/>
-
-		<dropForeignKeyConstraint
-			baseTableName="sample_sequencing_eid"
-			constraintName="fk_sample_sequencing_eid_sequence_id"
-		/>
-		<renameTable
-			oldTableName="sample_sequencing_eid"
-			newTableName="assay_external_id"
-		/>
-		<renameColumn
-			columnDataType="INT"
-			oldColumnName="sequencing_id"
-			newColumnName="assay_id"
-			tableName="assay_external_id"
-		/>
-		<addForeignKeyConstraint
-			constraintName="fk_assay_external_id_assay_id"
-			baseTableName="assay_external_id"
-			baseColumnNames="assay_id"
-			referencedTableName="assay"
-			referencedColumnNames="id"
-		/>
-
 <!--		Instead of ENUMs, make some fields FKs -->
 		<createTable tableName="assay_type">
 			<column name="id" type="VARCHAR(255)">
@@ -544,7 +516,53 @@
 			</column>
 		</createTable>
 
+<!--		Create assay table linking to assay_type FK-->
+		<createTable tableName="assay">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_ASSAY" references="sample(id)"/>
+			</column>
+			<column name="type" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_TYPE" references="assay_type(id)"/>
+			</column>
+			<column name="meta" type="json" />
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
 
+		<createTable tableName="assay_external_id">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_PROJECT" references="project(id)" />
+			</column>
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY" references="sample_sequencing(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints unique="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+
+		</createTable>
+		<addPrimaryKey
+				columnNames="assay_id,name"
+				constraintName="PK_ASSAY_EXTERNAL_ID"
+				tableName="assay_external_id"
+				validate="true"
+		/>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="assay_external_id"
+			constraintName="UK_PROJECT_ASSAY_EXTERNAL_ID"
+			validate="true"
+		/>
 
 <!--		Create sequencing_group tables -->
 		<createTable tableName="sequencing_group">
@@ -620,10 +638,17 @@
 			We cannot delete the old table, so it's around for legacy purposes. -->
 		<createTable tableName="analysis_sequencing_group">
 			<column name="analysis_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_analysis" references="analysis(id)"/>
+				<constraints
+						nullable="false"
+						foreignKeyName="FK_ANALYSIS_SQG_ANALYSIS"
+						references="analysis(id)"/>
 			</column>
 			<column name="sequencing_group_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_analysis_sqg_sequencing_group" references="sequencing_group(id)"/>
+				<constraints
+						nullable="false"
+						foreignKeyName="FK_ANALYSIS_SQG_SEQUENCING_GROUP"
+						references="sequencing_group(id)"
+				/>
 			</column>
 		</createTable>
 
@@ -632,6 +657,8 @@
 
 		<sql>
 
+			ALTER TABLE assay ADD SYSTEM VERSIONING;
+			ALTER TABLE assay_external_id ADD SYSTEM VERSIONING;
 			ALTER TABLE sequencing_group ADD SYSTEM VERSIONING;
 			ALTER TABLE sequencing_group_assay ADD SYSTEM VERSIONING;
 			ALTER TABLE sequencing_group_external_id ADD SYSTEM VERSIONING;
@@ -646,6 +673,7 @@
 			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
 			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
 			INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
+			INSERT INTO sequencing_type (id, name) VALUES ('chip', 'chip');
 
 			INSERT INTO sequencing_technology (id, name) VALUES ('short-read', 'short-read');
 			INSERT INTO sequencing_technology (id, name) VALUES ('long-read', 'long-read');
@@ -666,25 +694,6 @@
 			INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
 			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 		</sql>
-
-		<renameColumn
-			columnDataType="VARCHAR(255)"
-			oldColumnName="type"
-			newColumnName="_seqtype"
-			tableName="assay"
-		/>
-		<addColumn tableName="assay">
-			<column name="type" type="VARCHAR(255)" value="sequencing">
-				<constraints nullable="false" foreignKeyName="fk_assay_type" references="assay_type(id)"/>
-			</column>
-		</addColumn>
-
-
-<!--		-->
-		<sql>
-			UPDATE assay SET type = 'sequencing';
-		</sql>
-
 	</changeSet>
 
 </databaseChangeLog>

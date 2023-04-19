@@ -1,7 +1,6 @@
 # pylint: disable=too-many-locals,too-many-arguments
 
 import re
-import asyncio
 from collections import defaultdict
 from typing import Iterable, Any
 from api.utils import group_by
