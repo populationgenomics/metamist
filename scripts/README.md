@@ -62,7 +62,11 @@ As described above, the generic metadata parser takes in a CSV file to be ingest
     Usage:
 
     ```shell
-    analysis-runner --dataset <DATASET> --access-level standard --description <DESCRIPTION> -o parser-tmp python3 -m scripts.parse_existing_cohort --project <PROJECT> --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH> --include-participant-column <PATH TO CSV>
+    analysis-runner --dataset <DATASET> --access-level standard  
+    --description <DESCRIPTION> -o parser-tmp  
+    python3 -m scripts.parse_existing_cohort --project <PROJECT>  
+    --search-location <BUCKET CONTAINING FASTQS> --batch-number <BATCH>  
+    --include-participant-column <PATH TO CSV>
     ```
 
     For example:
@@ -95,11 +99,12 @@ For development work, you can use fewgenomes-test, thousandgenomes-test or hgdp-
 
 Prior to running an existing workflow on a new dataset, a -test project should first be populated. The `create_test_subset.py` script handles this.
 
-    Usage:
-
-    ```shell
-    analysis-runner --dataset <DATASET> --access-level standard --description   <DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project  <PROJECT> --samples <N_SAMPLES> --skip-ped
-    ```
+Usage:
+```shell
+analysis-runner --dataset <DATASET> --access-level standard --description  
+<DESCRIPTION> -o test-subset-tmp python3 -m scripts.create_test_subset --project  
+<PROJECT> --samples <N_SAMPLES> --skip-ped
+```
 
 Parameters
 | Option        | Description                                                                  |
