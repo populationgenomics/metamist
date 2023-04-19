@@ -144,7 +144,7 @@ class TestExistingCohortParser(unittest.TestCase):
         mock_get_participant_id,
     ):
         """
-        Test importing a single row, forms objects and checks response
+        Tests case where the fastq's in the storage do not match the ingested samples.
         """
         mock_get_sample_id.return_value = {}
         mock_get_sequence_ids.return_value = {}
@@ -195,7 +195,7 @@ class TestExistingCohortParser(unittest.TestCase):
         mock_get_sample_id,
     ):
         """
-        Test importing a single row, forms objects and checks response
+        Tests ingestion for an existing sample.
         """
         mock_get_sample_id.return_value = {'EXTID1234': 'CPG123'}
         mock_get_sequence_ids.return_value = {}
