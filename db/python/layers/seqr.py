@@ -340,8 +340,8 @@ class SeqrLayer(BaseLayer):
         resp = await session.post(
             req_url, json={'individuals': processed_records}, headers=headers
         )
-
-        if resp.status == 400 and 'Unable to find individuals to update' in resp.text:
+        text_response = await resp.text()
+        if resp.status == 400 and 'Unable to find individuals to update' in text_response
             return [
                 f'No individual metadata needed updating (from {len(processed_records)} rows)'
             ]
