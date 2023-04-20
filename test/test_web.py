@@ -43,7 +43,9 @@ def merge(d1: dict, d2: dict):
     return dict(d1, **d2)
 
 
-SINGLE_PARTICIPANT_UPSERT = ParticipantUpsertInternal(
+def get_test_participant():
+    """Do it like this to avoid an upsert writing the test value"""
+    return ParticipantUpsertInternal(
     external_id='Demeter',
     meta={},
     samples=[
@@ -168,7 +170,7 @@ class TestWeb(DbIsolatedTest):
     async def test_project_summary_single_entry(self):
         """Test project summary with a single participant with all fields"""
         # Now add a participant with a sample and sequence
-        await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
+        await self.partl.upsert_participants(participants=[get_test_participant()])
 
         result = await self.webl.get_project_summary(token=0, grid_filter=[])
 
@@ -177,7 +179,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def project_summary_with_filter_with_results(self):
-        await self.partl.upsert_participants(participants=[SINGLE_PARTICIPANT_UPSERT])
+        await self.partl.upsert_participants(participants=[get_test_participant()])
 
         filtered_result_success = await self.webl.get_project_summary(
             token=0,
@@ -276,7 +278,7 @@ class TestWeb(DbIsolatedTest):
 
 
         await self.partl.upsert_participants(
-            participants=[SINGLE_PARTICIPANT_UPSERT, p2]
+            participants=[get_test_participant(), p2]
         )
 
         expected_data_two_samples = ProjectSummary(
