@@ -13,11 +13,13 @@ If there are discrepencies, check if the file name and size is the same in the b
 
 Check if a sample has a completed cram - if so, its sequence data can be removed
     - Remove this data from the bucket
-    - TODO: Remove the sequence reads URI from the Metamist sequence entry
 
+TODO: Remove the sequence reads URI from the Metamist sequence entry
 TODO: find other files to delete, not just fastqs
 TODO: make sure sequences are grabbed with the appropriate fields, e.g. read_type, project
 TODO: add filtering for exome vs genome
+TODO: add test and dry-run functionality
+TODO: make compatible with analysis-runner
 """
 
 from collections import defaultdict
