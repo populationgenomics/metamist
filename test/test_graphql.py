@@ -1,3 +1,4 @@
+from models.utils.sample_id_format import sample_id_format
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from api.graphql.loaders import get_context
@@ -98,6 +99,7 @@ query MyQuery($project: String!) {
       samples {
         id
         sequencingGroups {
+          id
           assays {
             id
           }
@@ -112,11 +114,12 @@ query MyQuery($project: String!) {
         self.assertEqual(p.id, participants[0]['id'])
         samples = participants[0]['samples']
         self.assertEqual(1, len(samples))
-        self.assertEqual(p.samples[0].id, samples[0]['id'])
+
+        self.assertEqual(p.samples[0].to_external().id, samples[0]['id'])
         sequencing_groups = samples[0]['sequencingGroups']
         self.assertEqual(1, len(sequencing_groups))
         self.assertEqual(
-            p.samples[0].sequencing_groups[0].id, sequencing_groups[0]['id']
+            p.samples[0].sequencing_groups[0].to_external().id, sequencing_groups[0]['id']
         )
         assays = sequencing_groups[0]['assays']
         self.assertEqual(

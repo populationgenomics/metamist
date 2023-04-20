@@ -13,7 +13,7 @@ class TestSampleMapParser(DbIsolatedTest):
     async def test_single_row_fastq(self, mock_graphql_query):
         """
         Test importing a single row, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
+        - MOCKS: query_async
         """
         mock_graphql_query.side_effect = self.run_graphql_query_async
 
@@ -75,19 +75,15 @@ class TestSampleMapParser(DbIsolatedTest):
         self.assertDictEqual(expected_sequence_dict, assay.meta)
 
     @run_as_sync
-    @patch('metamist.graphql')
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     async def test_two_rows_with_provided_checksums(
-        self, mock_get_sequence_ids, mock_get_sample_id, mock_participant_ids
+        self, mock_graphql_query
     ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
-        mock_participant_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tFilenames\tChecksum',
@@ -98,7 +94,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project='dev',
+            project=self.project_name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',

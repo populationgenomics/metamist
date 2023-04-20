@@ -3,27 +3,25 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
-from test.testbase import run_as_sync
+from test.testbase import run_as_sync, DbIsolatedTest
 
 from metamist.parser.generic_parser import ParsedParticipant, ParsedSample
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
 
-class TestParseGenericMetadata(unittest.TestCase):
+class TestParseGenericMetadata(DbIsolatedTest):
     """Test the GenericMetadataParser"""
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('os.path.getsize')
     async def test_key_map(
-        self, mock_stat_size, mock_get_assay_ids, mock_get_sample_id
+        self, mock_stat_size, mock_graphql_query
     ):
         """
         Test the flexible key map + other options
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_assay_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
         mock_stat_size.return_value = 111
 
         rows = [
@@ -46,7 +44,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
@@ -80,8 +78,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             )
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
@@ -90,15 +87,13 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_filesize,
         mock_fileexists,
         mock_datetime_added,
-        mock_get_assay_ids,
-        mock_get_sample_id,
+        mock_graphql_query
     ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_assay_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -126,7 +121,7 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
@@ -164,9 +159,9 @@ class TestParseGenericMetadata(unittest.TestCase):
                 'size': 111,
                 'datetime_added': '2022-02-02T22:22:22',
             },
-            'sequencing_platform': None,
+            'sequencing_platform': 'illumina',
             'sequencing_technology': 'short-read',
-            'sequencing_type': 'sequencing',
+            'sequencing_type': 'genome',
         }
 
         assay_group_dict = {
@@ -198,22 +193,16 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
-    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
+    @patch('metamist.parser.generic_parser.query_async')
     async def test_rows_with_participants(
         self,
-        mock_get_assay_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
+        mock_graphql_query
     ):
         """
         Test importing a single row with a participant id, forms objects and checks response
-        - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
+        - MOCKS: query_async
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_assay_ids.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tSample ID\tFilenames\tType',
@@ -238,7 +227,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         parser.skip_checking_gcs_objects = True
@@ -291,9 +280,9 @@ class TestParseGenericMetadata(unittest.TestCase):
                 },
             ],
             'reads_type': 'fastq',
-            'sequencing_platform': None,
+            'sequencing_platform': 'illumina',
             'sequencing_technology': 'short-read',
-            'sequencing_type': 'sequencing',
+            'sequencing_type': 'genome',
         }
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
         self.maxDiff = None
@@ -307,14 +296,10 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     async def test_rows_with_valid_participant_meta(
         self,
-        mock_get_assay_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
+        mock_graphql_query
     ):
         """
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
@@ -323,9 +308,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         get_assay_ids_for_sample_ids_by_type
         """
 
-        mock_get_sample_id.return_value = {}
-        mock_get_assay_ids.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'Individual ID\tSample ID\tSex\tGender\tKaryotype',
@@ -348,7 +331,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         # Call generic parser
@@ -379,14 +362,9 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('metamist.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     async def test_rows_with_invalid_participant_meta(
-        self,
-        mock_get_assay_ids,
-        mock_get_sample_id,
-        mock_get_participant_id_map_by_external_ids,
+        self, mock_graphql_query
     ):
         """
         Test importing a single rows with invalid participant metadata,
@@ -394,9 +372,8 @@ class TestParseGenericMetadata(unittest.TestCase):
         - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
-        mock_get_assay_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
-        mock_get_participant_id_map_by_external_ids.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
 
         rows = [
             'Individual ID\tSample ID\tSex\tKaryotype',
@@ -414,7 +391,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
         )
 
         # Call generic parser
@@ -426,8 +403,7 @@ class TestParseGenericMetadata(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_contents')
@@ -436,16 +412,14 @@ class TestParseGenericMetadata(unittest.TestCase):
         mock_filecontents,
         mock_filesize,
         mock_fileexists,
-        mock_get_assay_ids,
-        mock_get_sample_id,
+        mock_graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_assay_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filecontents.return_value = 'testmd5'
         mock_filesize.return_value = 111
@@ -465,7 +439,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             skip_checking_gcs_objects=True,
         )
 
@@ -483,24 +457,21 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
         self,
         mock_filesize,
         mock_fileexists,
-        mock_get_assay_ids,
-        mock_get_sample_id,
+        mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_assay_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = True
@@ -519,7 +490,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             default_reference_assembly_location='gs://path/file.fasta',
         )
         parser.skip_checking_gcs_objects = True
@@ -561,22 +532,19 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
         self,
         mock_fileexists,
-        mock_get_assay_ids,
-        mock_get_sample_id,
+        mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_assay_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_fileexists.return_value = True
 
@@ -595,7 +563,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reference_assembly_location_column='Ref'
             # default_reference_assembly_location='gs://path/file.fasta',
         )
@@ -638,22 +606,17 @@ class TestParseGenericMetadata(unittest.TestCase):
         )
 
     @run_as_sync
-    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('metamist.apis.AssayApi.get_assay_ids_for_sample_ids_by_type')
+    @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
-        self,
-        mock_fileexists,
-        mock_get_assay_ids,
-        mock_get_sample_id,
+        self, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_get_assay_ids.return_value = {}
-        mock_get_sample_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_fileexists.return_value = True
 
@@ -672,7 +635,7 @@ class TestParseGenericMetadata(unittest.TestCase):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project='devdev',
+            project=self.project_name,
             reference_assembly_location_column='Ref'
             # default_reference_assembly_location='gs://path/file.fasta',
         )

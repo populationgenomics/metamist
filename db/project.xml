@@ -538,7 +538,7 @@
 				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_PROJECT" references="project(id)" />
 			</column>
 			<column name="assay_id" type="INT">
-				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY" references="sample_sequencing(id)" />
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY" references="assay(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">
 				<constraints unique="true" nullable="false" />

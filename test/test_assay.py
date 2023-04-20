@@ -15,7 +15,7 @@ default_sequencing_meta = {
 }
 
 
-class TestSequence(DbIsolatedTest):
+class TestAssay(DbIsolatedTest):
     """Test assay class"""
 
     # pylint: disable=too-many-instance-attributes

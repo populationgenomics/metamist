@@ -42,6 +42,7 @@ class OntParser(GenericMetadataParser):
         project: str,
         default_sequencing_type='genome',
         default_sequencing_technology='long-read',
+        default_sequencing_platform='oxford-nanopore',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
@@ -67,9 +68,10 @@ class OntParser(GenericMetadataParser):
             participant_column=Columns.SAMPLE_ID,
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
-            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
+            default_sequencing_type=default_sequencing_type,
             default_sequencing_technology=default_sequencing_technology,
+            default_sequencing_platform=default_sequencing_platform,
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map=sequence_meta_map,
@@ -94,9 +96,7 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
-    async def group_sequences(
-        self, sample: ParsedSample
-    ) -> list[ParsedSequencingGroup]:
+    async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
         sequence_groups = await super().group_assays(sample)
 
         for sequence_group in sequence_groups:
@@ -131,7 +131,9 @@ class OntParser(GenericMetadataParser):
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='ont')
+@click.option('--default-sequence-type', default='genome')
+@click.option('--default-sequencing-technology', default='long-read')
+@click.option('--default-sequencing-platform', default='oxford-nanopore')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -157,7 +159,9 @@ async def main(
     search_path: List[str],
     project: str,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='genome',
+    default_sequencing_technology='long-read',
+    default_sequencing_platform='oxford-nanopore',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
@@ -173,7 +177,9 @@ async def main(
     parser = OntParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
+        default_sequencing_platform=default_sequencing_platform,
+        default_sequencing_technology=default_sequencing_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )

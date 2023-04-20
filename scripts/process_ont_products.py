@@ -8,7 +8,7 @@ import click
 
 from metamist.api.sequencing_group_api import SequencingGroupApi
 from metamist.apis import SampleApi, AnalysisApi
-from metamist.model.analysis_model import AnalysisModel
+from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.parser.cloudhelper import CloudHelper
 from metamist.parser.generic_metadata_parser import (
@@ -207,7 +207,7 @@ class OntProductParser(CloudHelper):
             }
 
             analyses.append(
-                AnalysisModel(
+                Analysis(
                     type=preparer.atype,
                     meta=meta,
                     status=AnalysisStatus('completed'),

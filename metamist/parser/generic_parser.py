@@ -486,10 +486,17 @@ class GenericParser(
             for sequencing_group, chunked_assays, analyses in zip(
                 sgchunk, assays_for_chunk, analyses_for_chunk
             ):
-                sequencing_group.assays = assays
+                if not chunked_assays:
+                    # mark for removal
+                    sequencing_group.assays = None
+                    continue
+                sequencing_group.assays = chunked_assays
                 assays.extend(chunked_assays)
                 sequencing_group.analyses = analyses
 
+        # remove sequencing groups with no assays
+        sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
+        # match assay ids after sequencing groups
         await self.match_assay_ids(assays)
         # match sequencing group ids after assays
         await self.match_sequencing_group_ids(sequencing_groups)
@@ -699,12 +706,13 @@ query MyQuery($project:String!) {
             for sg in values['project']['sequencingGroups']
         }
         for sg in sequencing_groups:
-            sg_ids = tuple(sorted(a.internal_id for a in sg.assays))
+            sg_ids = [a.internal_id for a in sg.assays]
             # don't match if any of the assays are missing
             if any(asid is None for asid in sg_ids):
                 continue
             # matches only if they all exist!
-            sg.internal_seqg_id = sg_map.get(sg_ids)
+            sorted_sg_ids = tuple(sorted(sg_ids))
+            sg.internal_seqg_id = sg_map.get(sorted_sg_ids)
 
     async def match_assay_ids(self, assays: list[ParsedAssay]):
         _query = """
@@ -731,7 +739,13 @@ query GetSampleEidMapQuery($project: String!) {
 
         # map filenames of reads to assay IDs as that's the most likely way we'll map
         def reads_to_key(reads):
-            return tuple(sorted(r['location'] for r in reads)) if reads else None
+            if isinstance(reads, list):
+                return tuple(sorted(map(reads_to_key, reads)))
+            if isinstance(reads, dict):
+                return reads['location']
+            if isinstance(reads, str):
+                raise TypeError(f'Unformmatted reads (expected file object): {reads}')
+            raise ValueError(f'Unknown type {reads}')
 
         filename_meta_map = {
             reads_to_key(assay['meta']['reads']): assay['id']
@@ -911,7 +925,7 @@ query GetSampleEidMapQuery($project: String!) {
         return self.default_sequencing_technology
 
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
-        return None
+        return self.default_sequencing_platform
 
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
         """Get analysis type from row"""
@@ -1016,7 +1030,7 @@ query GetSampleEidMapQuery($project: String!) {
         )
 
         fastqs = [
-            r for r in reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+            r for r in _reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)
@@ -1032,7 +1046,7 @@ query GetSampleEidMapQuery($project: String!) {
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
         crams = [
-            r for r in reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
+            r for r in _reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]
         file_promises: List[Coroutine]
 
@@ -1051,7 +1065,7 @@ query GetSampleEidMapQuery($project: String!) {
             file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)  # type: ignore
 
         bams = [
-            r for r in reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
+            r for r in _reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
         ]
         if bams:
             file_promises = []
@@ -1069,11 +1083,11 @@ query GetSampleEidMapQuery($project: String!) {
             file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)  # type: ignore
 
         gvcfs = [
-            r for r in reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
+            r for r in _reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
         ]
         vcfs = [
             r
-            for r in reads
+            for r in _reads
             if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs
         ]
 
@@ -1101,7 +1115,7 @@ query GetSampleEidMapQuery($project: String!) {
 
         unhandled_files = [
             r
-            for r in reads
+            for r in _reads
             if not any(r.lower().endswith(ext) for ext in ALL_EXTENSIONS)
         ]
         if unhandled_files:

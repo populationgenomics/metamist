@@ -229,8 +229,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def test_project_summary_multiple_participants(self):
-        new_participants = [
-            ParticipantUpsertInternal(
+        p2 = ParticipantUpsertInternal(
                 external_id='Meter',
                 meta={},
                 samples=[
@@ -274,9 +273,11 @@ class TestWeb(DbIsolatedTest):
                     )
                 ],
             )
-        ]
 
-        await self.partl.upsert_participants(participants=new_participants)
+
+        await self.partl.upsert_participants(
+            participants=[SINGLE_PARTICIPANT_UPSERT, p2]
+        )
 
         expected_data_two_samples = ProjectSummary(
             project=WebProject(
@@ -301,6 +302,10 @@ class TestWeb(DbIsolatedTest):
                 ('external_id', 'External Sample ID'),
                 ('created_date', 'Created date'),
             ],
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
+                ('created_date', 'Created date'),
+            ],
             assay_keys=[
                 ('type', 'type'),
                 ('technology', 'technology'),
@@ -314,12 +319,9 @@ class TestWeb(DbIsolatedTest):
         two_samples_result = await self.webl.get_project_summary(
             token=0, grid_filter=[]
         )
-        for k, v in two_samples_result.__dict__.items():
-            if k == 'participants':
-                continue
+        two_samples_result.participants = []
 
-            self.assertEqual(v, expected_data_two_samples.__dict__[k])
-        # self.assertEqual(expected_data_two_samples, two_samples_result)
+        self.assertEqual(expected_data_two_samples, two_samples_result)
 
         # expected_data_list_filtered: list = [
         #     merge(
@@ -375,6 +377,10 @@ class TestWeb(DbIsolatedTest):
             sample_keys=[
                 ('id', 'Sample ID'),
                 ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
                 ('created_date', 'Created date'),
             ],
             assay_keys=[

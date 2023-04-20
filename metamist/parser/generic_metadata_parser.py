@@ -92,6 +92,7 @@ class GenericMetadataParser(GenericParser):
         checksum_column: Optional[str] = None,
         seq_type_column: Optional[str] = None,
         seq_technology_column: Optional[str] = None,
+        seq_platform_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
@@ -101,6 +102,7 @@ class GenericMetadataParser(GenericParser):
         default_sequencing_type='genome',
         default_sample_type=None,
         default_sequencing_technology='short-read',
+        default_sequencing_platform='illumina',
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -111,6 +113,7 @@ class GenericMetadataParser(GenericParser):
             default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             default_sequencing_technology=default_sequencing_technology,
+            default_sequencing_platform=default_sequencing_platform,
             **kwargs,
         )
 
@@ -127,6 +130,7 @@ class GenericMetadataParser(GenericParser):
         self.karyotype_column = karyotype_column
         self.seq_type_column = seq_type_column
         self.seq_technology_column = seq_technology_column
+        self.seq_platform_column = seq_platform_column
         self.reference_assembly_location_column = reference_assembly_location_column
         self.default_reference_assembly_location = default_reference_assembly_location
 
@@ -178,6 +182,16 @@ class GenericMetadataParser(GenericParser):
 
         if value == 'ont':
             value = 'long-read'
+
+        return str(value)
+
+    def get_sequencing_platform(self, row: SingleRow) -> str:
+        """Get sequencing platform for single row"""
+        value = (
+            row.get(self.seq_platform_column, None)
+            or self.default_sequencing_platform
+        )
+        value = value.lower()
 
         return str(value)
 
@@ -640,7 +654,7 @@ class GenericMetadataParser(GenericParser):
                     meta={
                         **collapsed_assay_meta,
                         'reads': read,
-                        'sequencing_type': 'sequencing',
+                        'sequencing_type': self.get_sequencing_type(rows[0]),
                         'sequencing_technology': sequencing_group.sequencing_technology,
                         'sequencing_platform': sequencing_group.sequencing_platform,
                     },
