@@ -15,9 +15,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
     @patch('os.path.getsize')
-    async def test_key_map(
-        self, mock_stat_size, mock_graphql_query
-    ):
+    async def test_key_map(self, mock_stat_size, mock_graphql_query):
         """
         Test the flexible key map + other options
         """
@@ -83,11 +81,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self,
-        mock_filesize,
-        mock_fileexists,
-        mock_datetime_added,
-        mock_graphql_query
+        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
     ):
         """
         Test importing a single row, forms objects and checks response
@@ -194,10 +188,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_participants(
-        self,
-        mock_graphql_query
-    ):
+    async def test_rows_with_participants(self, mock_graphql_query):
         """
         Test importing a single row with a participant id, forms objects and checks response
         - MOCKS: query_async
@@ -297,10 +288,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_valid_participant_meta(
-        self,
-        mock_graphql_query
-    ):
+    async def test_rows_with_valid_participant_meta(self, mock_graphql_query):
         """
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
@@ -363,9 +351,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_invalid_participant_meta(
-        self, mock_graphql_query
-    ):
+    async def test_rows_with_invalid_participant_meta(self, mock_graphql_query):
         """
         Test importing a single rows with invalid participant metadata,
         forms objects and checks response
@@ -373,7 +359,6 @@ class TestParseGenericMetadata(DbIsolatedTest):
         """
 
         mock_graphql_query.side_effect = self.run_graphql_query_async
-
 
         rows = [
             'Individual ID\tSample ID\tSex\tKaryotype',
@@ -461,10 +446,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
-        self,
-        mock_filesize,
-        mock_fileexists,
-        mock_graphql_query
+        self, mock_filesize, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference
@@ -535,9 +517,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
-        self,
-        mock_fileexists,
-        mock_graphql_query
+        self, mock_fileexists, mock_graphql_query
     ):
         """
         Test importing a single row with a cram with no reference

@@ -326,10 +326,16 @@ class GraphQLSample:
 
     @strawberry.field
     async def sequencing_groups(
-        self, info: Info, root: 'GraphQLSample', sequencing_type: str | None = None
+        self,
+        info: Info,
+        root: 'GraphQLSample',
+        sequencing_type: str | None = None,
+        active_only: bool = True,
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
-        sequencing_groups = await loader.load((root.internal_id, sequencing_type))
+        sequencing_groups = await loader.load(
+            (root.internal_id, sequencing_type, active_only)
+        )
 
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 

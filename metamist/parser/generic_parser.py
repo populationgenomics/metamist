@@ -23,6 +23,7 @@ from typing import (
     Coroutine,
     Set,
     Iterable,
+    Hashable,
 )
 from functools import wraps
 
@@ -368,8 +369,8 @@ class GenericParser(
 
         self.default_sequencing_type: str = default_sequencing_type
         self.default_sequencing_technology: str = default_sequencing_technology
-        self.default_sequencing_platform: str | None = default_sequencing_platform
-        self.default_sample_type: str = default_sample_type
+        self.default_sequencing_platform: Optional[str] = default_sequencing_platform
+        self.default_sample_type: Optional[str] = default_sample_type
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
 
@@ -546,6 +547,7 @@ class GenericParser(
         return reader
 
     async def file_pointer_to_rows(self, file_pointer, delimiter) -> list[SingleRow]:
+        """Given some file pointer + a delimiter, get a list of rows (dictionary)"""
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         return list(reader)
 
@@ -555,7 +557,10 @@ class GenericParser(
         samples: list[ParsedSample],
         sequencing_groups: list[ParsedSequencingGroup],
         assays: list[ParsedAssay],
-    ):
+    ) -> dict[str, dict[Literal['insert', 'update'], int]]:
+        """
+        From the parsed objects, prepare a summary of what will be inserted / updated
+        """
         participants_to_insert = sum(1 for p in participants if not p.internal_pid)
         samples_to_insert = sum(1 for s in samples if not s.internal_sid)
         sgs_to_insert = sum(
@@ -563,7 +568,7 @@ class GenericParser(
         )
         assays_to_insert = sum(1 for sq in assays if not sq.internal_id)
         analyses_to_insert = sum(len(sg.analyses or []) for sg in sequencing_groups)
-        summary = {
+        summary: dict[str, dict[Literal['insert', 'update'], int]] = {
             'participants': {
                 'insert': participants_to_insert,
                 'update': len(participants) - participants_to_insert,
@@ -592,7 +597,8 @@ class GenericParser(
         samples: list[ParsedSample],
         sequencing_groups: list[ParsedSequencingGroup],
         assays: list[ParsedAssay],
-    ):
+    ) -> str:
+        """From summary, prepare a string to log to the console"""
         if participants:
             external_participant_ids = ', '.join(
                 set(p.external_pid for p in participants)
@@ -636,6 +642,10 @@ class GenericParser(
     # region MATCHING
 
     async def match_participant_ids(self, participants: list[ParsedParticipant]):
+        """
+        Determine if a participant is NEW or UPDATE, and match the ID if so.
+        Participants only match on external_id
+        """
         _query = """
 query GetParticipantEidMapQuery($project: String!) {
   project(name: $project) {
@@ -654,6 +664,10 @@ query GetParticipantEidMapQuery($project: String!) {
             participant.internal_pid = pid_map.get(participant.external_pid)
 
     async def match_sample_ids(self, samples: list[ParsedSample]):
+        """
+        Determine if a sample is NEW or UPDATE, and match the ID if so.
+        Only matches based on the external ID
+        """
         _query = """
 query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
@@ -675,7 +689,8 @@ query GetSampleEidMapQuery($project: String!) {
         self, sequencing_groups: list[ParsedSequencingGroup]
     ):
         """
-        sequencing_groups MUST have assays already attached.
+        Determine if sequencing groups are NEW, or UPDATE, and match the ID if so.
+        **sequencing_groups MUST have assays already attached.**
 
         This one is a little more tricky, because we won't have a direct mapping.
         We're only allowed to bind the ID if:
@@ -715,6 +730,10 @@ query MyQuery($project:String!) {
             sg.internal_seqg_id = sg_map.get(sorted_sg_ids)
 
     async def match_assay_ids(self, assays: list[ParsedAssay]):
+        """
+        Determine if assays are NEW, or UPDATE, and match the ID if so.
+        This works based on the filenames of the reads.
+        """
         _query = """
 query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
@@ -820,6 +839,11 @@ query GetSampleEidMapQuery($project: String!) {
     async def group_participants(
         self, rows: list[SingleRow]
     ) -> list[ParsedParticipant]:
+        """
+        From a set of rows, group (by calling self.get_participant_meta)
+        and parse participant other participant values.
+        """
+
         participant_groups: list[ParsedParticipant] = []
         pgroups = group_by(rows, self.get_participant_id)
         for pid, prows in pgroups.items():
@@ -838,11 +862,16 @@ query GetSampleEidMapQuery($project: String!) {
         return participant_groups
 
     async def get_participant_meta_from_group(self, rows: GroupedRow) -> dict:
+        """From a list of rows, get any relevant participant meta"""
         return {}
 
     async def group_samples(
         self, participant: ParsedParticipant | None, rows
     ) -> list[ParsedSample]:
+        """
+        From a set of rows, group (by calling self.get_sample_id)
+        and parse sample other sample values.
+        """
         samples = []
         for sid, sample_rows in group_by(rows, self.get_sample_id).items():
             samples.append(
@@ -859,19 +888,33 @@ query GetSampleEidMapQuery($project: String!) {
         return samples
 
     async def get_sample_meta_from_group(self, rows: GroupedRow) -> dict:
+        """From a list of rows, get any relevant sample meta"""
         return {}
 
-    def get_sequencing_group_key(self, row):
+    def get_sequencing_group_key(self, row: SingleRow) -> Hashable:
+        """
+        Get a key to group sequencing rows by.
+        """
         if seq_group_id := self.get_sequencing_group_id(row):
             return seq_group_id
 
-        return (
-            str(self.get_sequencing_type(row)),
-            str(self.get_sequencing_technology(row)),
-            str(self.get_sequencing_platform(row)),
-        )
+        keys = [
+            ('sequencing_type', str(self.get_sequencing_type(row))),
+            ('sequencing_technology', str(self.get_sequencing_technology(row))),
+            ('sequencing_platform', str(self.get_sequencing_platform(row))),
+        ]
+
+        invalid_keys = [k for k, v in keys if v is None]
+        if invalid_keys:
+            raise ValueError(f'Invalid sequencing group key: {invalid_keys}')
+
+        return tuple(v for _, v in keys)
 
     async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+        """
+        From a set of rows, group (by calling self.get_sequencing_group_key)
+        and parse sequencing group other sequencing group values.
+        """
         sequencing_groups = []
         for seq_rows in group_by(sample.rows, self.get_sequencing_group_key).values():
             seq_type = self.get_sequencing_type(seq_rows[0])
@@ -894,27 +937,44 @@ query GetSampleEidMapQuery($project: String!) {
 
         return sequencing_groups
 
-    async def get_analyses_from_sequencing_group(
-        self, sequencing_group: ParsedSequencingGroup
-    ) -> list[ParsedAnalysis]:
-        return []
-
     async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
+        """
+        From a list of rows, get any relevant sequencing group meta
+        """
         return {}
+
+    async def get_analyses_from_sequencing_group(
+        self, sequencing_group: ParsedSequencingGroup
+    ) -> list[ParsedAnalysis]:
+        """
+        An override that allows a subclass to return a list of analyses
+        for a sequencing group.
+        """
+        return []
 
     @abstractmethod
     async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
-        pass
+        """
+        From a sequencing_group (list of rows with some common seq fields),
+        return list[ParsedAssay] (does not have to equal number of rows).
+        """
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
         return self.default_sample_type
 
     def get_sequencing_group_id(self, row: SingleRow) -> str | None:
+        """
+        External sequencing_group identifier. Odds are you don't want this.
+            Unless you have a "library ID" or something similar"
+
+        There are few cases where the collaborator actually generates a sequencing
+        group identifier (more of a CPG concept), but you can probably proxy it.
+        """
         return None
 
     def get_sequencing_type(self, row: SingleRow) -> str:
@@ -922,9 +982,11 @@ query GetSampleEidMapQuery($project: String!) {
         return self.default_sequencing_type
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
+        """Get sequencing technology from row"""
         return self.default_sequencing_technology
 
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
+        """Get sequencing platform from row"""
         return self.default_sequencing_platform
 
     def get_analysis_type(self, sample_id: str, row: GroupedRow) -> str:
@@ -1030,7 +1092,9 @@ query GetSampleEidMapQuery($project: String!) {
         )
 
         fastqs = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
+            r
+            for r in _reads
+            if any(r.lower().endswith(ext) for ext in FASTQ_EXTENSIONS)
         ]
         if fastqs:
             structured_fastqs = self.parse_fastqs_structure(fastqs)

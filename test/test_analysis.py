@@ -131,6 +131,10 @@ class TestAnalysis(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_single_sample_double_sg(self):
+        """
+        Test getting file sizes for sequencing groups
+            1 sample, w/ 2 sequencing groups
+        """
         today = datetime.utcnow().date()
 
         # Add exome cram
@@ -168,6 +172,9 @@ class TestAnalysis(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_exclusive_date_range(self):
+        """
+        Exclusive date range returning no data
+        """
         today = datetime.utcnow().date()
 
         # Assert that if we select a date range outside of sample creation date
@@ -181,6 +188,9 @@ class TestAnalysis(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_newer_sample(self):
+        """
+        Update analysis for sequencing group, making sure we only return the later one
+        """
         today = datetime.utcnow().date()
 
         # Add another genome cram that's newer
@@ -210,6 +220,7 @@ class TestAnalysis(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_two_samples(self):
+        """Test that it works for two samples"""
         today = datetime.utcnow().date()
 
         # Add another sample and it's analysis cram as well

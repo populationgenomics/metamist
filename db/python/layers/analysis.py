@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from db.python.connect import Connection, NotFoundError
+from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
@@ -11,7 +11,6 @@ from db.python.tables.sample import SampleTable
 from db.python.utils import get_logger
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
-from models.utils.sample_id_format import sample_id_format_list
 
 logger = get_logger()
 
@@ -75,42 +74,6 @@ class AnalysisLayer(BaseLayer):
             project=project, analysis_type=analysis_type, meta=meta
         )
 
-    async def get_latest_complete_analysis_for_samples_and_type(
-        self,
-        analysis_type: str,
-        sample_ids: list[int],
-        allow_missing=True,
-        check_project_ids=True,
-    ):
-        """Get the latest complete analysis for samples (one per sample)"""
-        if check_project_ids:
-            project_ids = await SampleTable(
-                self.connection
-            ).get_project_ids_for_sample_ids(sample_ids)
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=True
-            )
-
-        analyses = await self.at.get_latest_complete_analysis_for_samples_by_type(
-            analysis_type=analysis_type, sample_ids=sample_ids
-        )
-
-        if not allow_missing and len(sample_ids) != len(analyses):
-            seen_sample_ids = set(
-                s
-                for a in analyses
-                for s in (a.sample_ids or [])
-                if a.sample_ids is not None
-            )
-            missing_sample_ids = set(sample_ids).difference(seen_sample_ids)
-            sample_ids_str = ', '.join(sample_id_format_list(list(missing_sample_ids)))
-
-            raise NotFoundError(
-                f'Missing gvcfs for the following sample IDs: {sample_ids_str}'
-            )
-
-        return analyses
-
     async def get_all_sequencing_group_ids_without_analysis_type(
         self, project: ProjectId, analysis_type: str
     ):
@@ -152,7 +115,7 @@ class AnalysisLayer(BaseLayer):
         meta: dict[str, Any] = None,
         output: str = None,
         active: bool = None,
-    ):
+    ) -> list[AnalysisInternal]:
         """
         :param sample_ids: sample_ids means it contains the analysis contains at least one of the sample_ids in the list
         """

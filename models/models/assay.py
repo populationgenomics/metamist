@@ -59,6 +59,7 @@ class AssayUpsertInternal(BaseModel):
     meta: dict | None = None
 
     def to_external(self):
+        """Convert to external model"""
         return AssayUpsert(
             id=self.id,
             type=self.type,

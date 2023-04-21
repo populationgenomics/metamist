@@ -95,6 +95,7 @@ class SequencingGroupTable(DbBase):
         types: list[str],
         technologies: list[str],
         platforms: list[str],
+        active_only: bool = True,
     ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """
         Query sequencing groups
@@ -119,6 +120,9 @@ class SequencingGroupTable(DbBase):
         if platforms:
             wheres.append('sg.platform IN :platforms')
             params['platforms'] = platforms
+
+        if active_only:
+            wheres.append('NOT sg.archived')
 
         where = ' AND '.join(wheres)
         _query = f"""

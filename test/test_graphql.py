@@ -1,8 +1,5 @@
-from models.utils.sample_id_format import sample_id_format
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from api.graphql.loaders import get_context
-from api.graphql.schema import schema
 from db.python.layers import ParticipantLayer
 from models.models import (
     SampleUpsertInternal,
@@ -73,19 +70,6 @@ class TestWeb(DbIsolatedTest):
         super().setUp()
         self.player = ParticipantLayer(self.connection)
 
-    async def _run_query(self, query, variables=None):
-        return await schema.execute(
-            query,
-            variable_values=variables,
-            context_value=await get_context(connection=self.connection),
-        )
-
-    async def _get_data(self, query, variables=None, assert_no_errors: bool = True):
-        response = await self._run_query(query, variables)
-        if assert_no_errors:
-            self.assertIsNone(response.errors)
-        return response.data
-
     @run_as_sync
     async def test_basic_graphql_query(self):
         """Test getting the summary for a project"""
@@ -108,7 +92,9 @@ query MyQuery($project: String!) {
     }
   }
 }"""
-        data = await self._get_data(query, variables={'project': self.project_name})
+        data = await self.run_graphql_query_async(
+            query, variables={'project': self.project_name}
+        )
         participants = data['project']['participants']
         self.assertEqual(1, len(participants))
         self.assertEqual(p.id, participants[0]['id'])
@@ -119,7 +105,8 @@ query MyQuery($project: String!) {
         sequencing_groups = samples[0]['sequencingGroups']
         self.assertEqual(1, len(sequencing_groups))
         self.assertEqual(
-            p.samples[0].sequencing_groups[0].to_external().id, sequencing_groups[0]['id']
+            p.samples[0].sequencing_groups[0].to_external().id,
+            sequencing_groups[0]['id'],
         )
         assays = sequencing_groups[0]['assays']
         self.assertEqual(

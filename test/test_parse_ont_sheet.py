@@ -1,10 +1,10 @@
-import unittest
 from io import StringIO
 from unittest.mock import patch
 
+from test.testbase import run_as_sync, DbIsolatedTest
+
 from db.python.layers import ParticipantLayer
 from models.models import ParticipantUpsertInternal, SampleUpsertInternal
-from test.testbase import run_as_sync, DbIsolatedTest
 from metamist.parser.generic_parser import ParsedParticipant
 from scripts.parse_ont_sheet import OntParser
 
@@ -24,16 +24,18 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         """
 
         player = ParticipantLayer(self.connection)
-        await player.upsert_participants([
-            ParticipantUpsertInternal(
-                external_id='Sample01',
-                samples=[
-                    SampleUpsertInternal(
-                        external_id='Sample01',
-                    )
-                ]
-            )
-        ])
+        await player.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_id='Sample01',
+                    samples=[
+                        SampleUpsertInternal(
+                            external_id='Sample01',
+                        )
+                    ],
+                )
+            ]
+        )
 
         mock_graphql_query.side_effect = self.run_graphql_query_async
 

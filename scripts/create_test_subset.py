@@ -36,7 +36,7 @@ from metamist.models import (
     BodyGetAssaysByCriteria,
     AssayUpsert,
     SampleUpsert,
-    AnalysisModel,
+    Analysis,
     AnalysisStatus,
 )
 
@@ -299,7 +299,7 @@ def main(
             analysis = analysis_by_sid_by_type[a_type].get(s['id'])
             if analysis:
                 logger.info(f'Processing {a_type} analysis entry')
-                am = AnalysisModel(
+                am = Analysis(
                     type=str(a_type),
                     output=_copy_files_in_dict(
                         analysis['output'],
@@ -311,7 +311,7 @@ def main(
                     meta=analysis['meta'],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
-                aapi.create_analysis(project=target_project, analysis_model=am)
+                aapi.create_analysis(project=target_project, analysis=am)
         logger.info(f'-')
 
 

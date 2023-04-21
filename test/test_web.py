@@ -1,10 +1,14 @@
-from db.python.layers.assay import AssayLayer, AssayUpsertInternal
-from db.python.layers.participant import (
-    ParticipantLayer,
+from test.testbase import DbIsolatedTest, run_as_sync
+
+from models.models import (
     ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+    AssayUpsertInternal,
 )
-from db.python.layers.sample import SampleLayer, SampleUpsertInternal
-from db.python.layers.sequencing_group import SequencingGroupUpsertInternal
+from db.python.layers.assay import AssayLayer
+from db.python.layers.sample import SampleLayer
+from db.python.layers.participant import ParticipantLayer
 from db.python.layers.web import (
     WebLayer,
     ProjectSummary,
@@ -12,7 +16,6 @@ from db.python.layers.web import (
     SearchItem,
     MetaSearchEntityPrefix,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -46,51 +49,100 @@ def merge(d1: dict, d2: dict):
 def get_test_participant():
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
-    external_id='Demeter',
-    meta={},
-    samples=[
-        SampleUpsertInternal(
-            external_id='sample_id001',
-            meta={},
-            type='blood',
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    assays=[
-                        AssayUpsertInternal(
-                            type='sequencing',
-                            meta={
-                                'reads': [
-                                    [
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                        [
+                                            {
+                                                'basename': 'sample_id001.filename-R1.fastq.gz',
+                                                'checksum': None,
+                                                'class': 'File',
+                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                                'size': 111,
+                                            },
+                                            {
+                                                'basename': 'sample_id001.filename-R2.fastq.gz',
+                                                'checksum': None,
+                                                'class': 'File',
+                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                                'size': 111,
+                                            },
+                                        ]
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+
+
+def get_test_participant_2():
+    """Do it like this to avoid an upsert writing the test value"""
+    return ParticipantUpsertInternal(
+        external_id='Meter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id002',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='Illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
                                         {
-                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'basename': 'sample_id002.filename-R1.fastq.gz',
                                             'checksum': None,
                                             'class': 'File',
-                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                            'size': 111,
+                                            'location': '/path/to/sample_id002.filename-R1.fastq.gz',
+                                            'size': 112,
                                         },
                                         {
-                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'basename': 'sample_id002.filename-R2.fastq.gz',
                                             'checksum': None,
                                             'class': 'File',
-                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                            'size': 111,
+                                            'location': '/path/to/sample_id002.filename-R2.fastq.gz',
+                                            'size': 112,
                                         },
-                                    ]
-                                ],
-                                'reads_type': 'fastq',
-                                'batch': 'M001',
-                                **default_assay_meta,
-                            },
-                        ),
-                    ],
-                )
-            ],
-        )
-    ],
-)
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        ],
+    )
+
 
 SINGLE_PARTICIPANT_RESULT = ProjectSummary(
     project=WebProject(id=1, name='test', meta={}, dataset='test'),
@@ -179,6 +231,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def project_summary_with_filter_with_results(self):
+        """Project grid but with test filter, that shows results"""
         await self.partl.upsert_participants(participants=[get_test_participant()])
 
         filtered_result_success = await self.webl.get_project_summary(
@@ -197,6 +250,7 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def project_summary_with_filter_no_results(self):
+        """Project grid but with test filter, that doesn't have results"""
         filtered_result_empty = await self.webl.get_project_summary(
             token=0,
             grid_filter=[
@@ -231,60 +285,13 @@ class TestWeb(DbIsolatedTest):
 
     @run_as_sync
     async def test_project_summary_multiple_participants(self):
-        p2 = ParticipantUpsertInternal(
-                external_id='Meter',
-                meta={},
-                samples=[
-                    SampleUpsertInternal(
-                        external_id='sample_id002',
-                        meta={},
-                        type='blood',
-                        sequencing_groups=[
-                            SequencingGroupUpsertInternal(
-                                type='genome',
-                                technology='short-read',
-                                platform='Illumina',
-                                assays=[
-                                    AssayUpsertInternal(
-                                        type='sequencing',
-                                        meta={
-                                            'reads': [
-                                                {
-                                                    'basename': 'sample_id002.filename-R1.fastq.gz',
-                                                    'checksum': None,
-                                                    'class': 'File',
-                                                    'location': '/path/to/sample_id002.filename-R1.fastq.gz',
-                                                    'size': 112,
-                                                },
-                                                {
-                                                    'basename': 'sample_id002.filename-R2.fastq.gz',
-                                                    'checksum': None,
-                                                    'class': 'File',
-                                                    'location': '/path/to/sample_id002.filename-R2.fastq.gz',
-                                                    'size': 112,
-                                                },
-                                            ],
-                                            'reads_type': 'fastq',
-                                            'batch': 'M001',
-                                            **default_assay_meta,
-                                        },
-                                    ),
-                                ],
-                            ),
-                        ],
-                    )
-                ],
-            )
-
-
+        """Try with multiple participants as some extra security"""
         await self.partl.upsert_participants(
-            participants=[get_test_participant(), p2]
+            participants=[get_test_participant(), get_test_participant_2()]
         )
 
         expected_data_two_samples = ProjectSummary(
-            project=WebProject(
-                id=1, name='test', meta={}, dataset='test'
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=2,
             total_samples_in_query=2,
             total_participants=2,
@@ -325,43 +332,15 @@ class TestWeb(DbIsolatedTest):
 
         self.assertEqual(expected_data_two_samples, two_samples_result)
 
-        # expected_data_list_filtered: list = [
-        #     merge(
-        #         participant,
-        #         {
-        #             '_class': NestedParticipant,
-        #             'id': 2,
-        #             'families': [],
-        #             'samples': [
-        #                 merge(
-        #                     sample,
-        #                     {
-        #                         '_class': NestedSample,
-        #                         'id': 2,
-        #                         'created_date': str(date.today()),
-        #                         'sequences': [
-        #                             merge(
-        #                                 sequence,
-        #                                 {
-        #                                     '_class': NestedSequence,
-        #                                     'id': 2,
-        #                                 },
-        #                             )
-        #                             for sequence in sample.get('sequences')
-        #                         ],
-        #                     },
-        #                 )
-        #                 for sample in participant.get('samples')
-        #             ],
-        #         },
-        #     )
-        #     for participant in new_data
-        # ]
+    @run_as_sync
+    async def test_project_summary_multiple_participants_and_filter(self):
+        """Try with multiple participants as some extra security"""
+        await self.partl.upsert_participants(
+            participants=[get_test_participant(), get_test_participant_2()]
+        )
 
         expected_data_two_samples_filtered = ProjectSummary(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=2,
             total_samples_in_query=1,
             total_participants=2,
@@ -406,12 +385,8 @@ class TestWeb(DbIsolatedTest):
                 )
             ],
         )
+        two_samples_result_filtered.participants = []
 
-        # self.assertEqual(
-        #     expected_data_two_samples_filtered, two_samples_result_filtered
-        # )
-        for k, v in two_samples_result_filtered.__dict__.items():
-            if k == 'participants':
-                continue
-
-            self.assertEqual(v, expected_data_two_samples_filtered.__dict__[k])
+        self.assertEqual(
+            expected_data_two_samples_filtered, two_samples_result_filtered
+        )

@@ -2,9 +2,11 @@
 # ^ Do this because of the loader decorator
 import enum
 from collections import defaultdict
-from strawberry.dataloader import DataLoader
-from api.utils import get_projectless_db_connection, group_by
+from typing import Any
 
+from strawberry.dataloader import DataLoader
+
+from api.utils import get_projectless_db_connection, group_by
 from db.python.layers import (
     AnalysisLayer,
     SampleLayer,
@@ -28,9 +30,7 @@ from models.models import (
 
 
 def connected_data_loader(fn):
-    """
-    DataLoader Decorator for allowing DB connection to be bound to a loader
-    """
+    """Provide connection to a data loader"""
 
     def inner(connection):
         async def wrapped(*args, **kwargs):
@@ -41,33 +41,51 @@ def connected_data_loader(fn):
     return inner
 
 
-@connected_data_loader
+def connected_data_loader_with_params(default_factory=None):
+    """
+    DataLoader Decorator for allowing DB connection to be bound to a loader
+    """
+
+    def connected_data_loader_caller(fn):
+        def inner(connection):
+            async def wrapped(query: list[tuple]) -> list[Any]:
+                by_key: dict[tuple, Any] = {}
+
+                # group by all last fields (except the first which is always ID
+                for chunk in group_by(query, lambda x: x[1:]).values():
+                    # ie: matrix transform
+                    ids = [row[0] for row in chunk]
+                    args = chunk[0][1:]
+                    value_map = await fn(ids, *args, connection=connection)
+                    for returned_id, value in value_map.items():
+                        by_key[(returned_id, *args)] = value
+
+                return [
+                    by_key.get(q, default_factory() if default_factory else None)
+                    for q in query
+                ]
+
+            return wrapped
+
+        return inner
+
+    return connected_data_loader_caller
+
+
+@connected_data_loader_with_params(default_factory=list)
 async def load_assays_by_samples(
-    query: list[tuple[int, str | None]], connection
-) -> list[list[AssayInternal]]:
+    sample_ids, assay_type: str, connection
+) -> dict[int, list[AssayInternal]]:
     """
     DataLoader: get_sequences_for_sample_ids
     """
 
     assaylayer = AssayLayer(connection)
-
-    by_key: dict[tuple[int, str | None], list[AssayInternal]] = defaultdict(list)
-
-    # group by all last fields, in case we add more
-    for chunk in group_by(query, lambda x: x[1:]).values():
-        assay_type = chunk[0][1]
-        sample_ids = [x[0] for x in chunk]
-
-        assays = await assaylayer.get_assays_for_sample_ids(
-            sample_ids=sample_ids, assay_type=assay_type
-        )
-        assay_map = group_by(assays, lambda a: a.sample_id)
-        for key in chunk:
-            sample_id = key[0]
-            if sample_id in assay_map:
-                by_key[key].extend(assay_map[sample_id])
-
-    return [by_key.get(q, []) for q in query]
+    assays = await assaylayer.get_assays_for_sample_ids(
+        sample_ids=sample_ids, assay_type=assay_type
+    )
+    assay_map = group_by(assays, lambda a: a.sample_id)
+    return assay_map
 
 
 @connected_data_loader
@@ -75,7 +93,7 @@ async def load_assays_by_sequencing_groups(
     sequencing_group_ids: list[int], connection
 ) -> list[list[AssayInternal]]:
     """
-    Has format (sequencing_group_id: int, sequencing_type?: string)
+    Get all assays belong to the sequencing groups
     """
     assaylayer = AssayLayer(connection)
 
@@ -95,7 +113,7 @@ async def load_samples_for_participant_ids(
     DataLoader: get_samples_for_participant_ids
     """
     sample_map = await SampleLayer(connection).get_samples_by_participants(
-        participant_ids
+        participant_ids,
     )
 
     return [sample_map.get(pid, []) for pid in participant_ids]
@@ -116,34 +134,22 @@ async def load_sequencing_groups_for_ids(
     return [sequencing_groups_map.get(sg) for sg in sequencing_group_ids]
 
 
-@connected_data_loader
+@connected_data_loader_with_params(default_factory=list)
 async def load_sequencing_groups_for_samples(
-    query: list[tuple[int, str | None]], connection
-) -> list[list[SequencingGroupInternal]]:
+    sample_ids: list[int], sequencing_type: str, active_only: bool, connection
+) -> dict[int, list[SequencingGroupInternal]]:
     """
     Has format [(sample_id: int, sequencing_type?: string)]
     """
     sglayer = SequencingGroupLayer(connection)
 
-    # group by all last fields, in case we add more
-    by_key: dict[tuple[int, str | None], list[SequencingGroupInternal]] = defaultdict(
-        list
+    sequencing_groups = await sglayer.query(
+        sample_ids=sample_ids,
+        types=[sequencing_type] if sequencing_type else None,
+        active_only=active_only,
     )
-    for chunk in group_by(query, lambda x: x[1:]).values():
-        sequencing_type = chunk[0][1]
-        sample_ids = [x[0] for x in chunk]
-
-        sequencing_groups = await sglayer.query(
-            sample_ids=sample_ids,
-            types=[sequencing_type] if sequencing_type else None,
-        )
-        sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
-        for key in chunk:
-            sample_id = key[0]
-            if sample_id in sg_map:
-                by_key[key].extend(sg_map[sample_id])
-
-    return [by_key.get(q, []) for q in query]
+    sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
+    return sg_map
 
 
 @connected_data_loader
@@ -172,7 +178,7 @@ async def load_samples_for_projects(project_ids: list[ProjectId], connection):
 @connected_data_loader
 async def load_participants_for_ids(
     participant_ids: list[int], connection
-) -> list[list[ParticipantInternal]]:
+) -> list[ParticipantInternal]:
     """
     DataLoader: get_participants_by_ids
     """
@@ -275,33 +281,29 @@ async def load_participants_for_projects(
     return retval
 
 
-@connected_data_loader
+@connected_data_loader_with_params(default_factory=list)
 async def load_analyses_for_sequencing_groups(
-    query: list[tuple[int, AnalysisStatus | None, str | None]], connection
-) -> list[list[AnalysisInternal]]:
+    sequencing_group_ids: list[int],
+    status: AnalysisStatus | None,
+    analysis_type: str | None,
+    connection,
+) -> dict[int, list[AnalysisInternal]]:
     """
     Type: (sequencing_group_id: int, status?: AnalysisStatus, type?: str)
         -> list[list[AnalysisInternal]]
     """
     alayer = AnalysisLayer(connection)
-    by_key: dict[
-        tuple[int, AnalysisStatus | None, str | None], list[AnalysisInternal]
-    ] = defaultdict(list)
-    for chunk in group_by(query, lambda x: x[1:]).values():
-        sequencing_group_ids = [x[0] for x in chunk]
-        status = chunk[0][1]
-        analysis_type = chunk[0][2]
 
-        analyses = await alayer.query_analysis(
-            sequencing_group_ids=sequencing_group_ids,
-            status=status,
-            analysis_type=analysis_type,
-        )
-        for analysis in analyses:
-            for sequencing_group_id in analysis.sequencing_group_ids:
-                by_key[(sequencing_group_id, status, analysis_type)].append(analysis)
-
-    return [by_key.get(q, []) for q in query]
+    analyses = await alayer.query_analysis(
+        sequencing_group_ids=sequencing_group_ids,
+        status=status,
+        analysis_type=analysis_type,
+    )
+    by_sg_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
+    for a in analyses:
+        for sg in a.sequencing_group_ids:
+            by_sg_id[sg].append(a)
+    return by_sg_id
 
 
 class LoaderKeys(enum.Enum):
@@ -309,6 +311,7 @@ class LoaderKeys(enum.Enum):
     Keys for the data loaders, define them to it's clearer when we add / remove
     them, and reduces the chance of typos
     """
+
     PROJECTS_FOR_IDS = 'projects_for_id'
 
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
@@ -334,6 +337,7 @@ class LoaderKeys(enum.Enum):
 
 
 async def get_context(connection=get_projectless_db_connection):
+    """Get loaders / cache context for strawberyy GraphQL"""
     return {
         'connection': connection,
         # projects

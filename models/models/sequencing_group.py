@@ -41,6 +41,7 @@ class SequencingGroupInternal(SMBase):
 
     @classmethod
     def from_db(cls, **kwargs):
+        """From database model"""
         meta = kwargs.pop('meta')
         if meta and isinstance(meta, str):
             meta = json.loads(meta)

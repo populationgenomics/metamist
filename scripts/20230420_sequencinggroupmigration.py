@@ -1,3 +1,4 @@
+# pylint: disable=missing-function-docstring
 """
 This script performs the major migration to using sequencing groups!
 Importantly, this upgrade changes the regular sample "CPG" IDs to be
@@ -80,6 +81,7 @@ def get_platform_from_technology(technology: str) -> str:
         return 'illumina'
     raise ValueError(f'Unknown technology: {technology}')
 
+
 async def check_assay_types_before_starting(connection: Database):
     query = 'SELECT DISTINCT(type) FROM sample_sequencing'
     rows = await connection.fetch_all(query)
@@ -150,10 +152,12 @@ async def migrate_sequences_to_assays(connection: Database, dry_run=True):
             inserts.append(
                 {
                     'sample_id': row['sample_id'],
-                    'meta': json.dumps({
-                        **meta,
-                        **seq_meta_values,
-                    }),
+                    'meta': json.dumps(
+                        {
+                            **meta,
+                            **seq_meta_values,
+                        }
+                    ),
                     'type': 'sequencing',
                     'author': row['author'],
                 }
@@ -292,7 +296,9 @@ ORDER BY sg.sample_id DESC;
     sequence_group_ids_of_duplicate_samples = await connection.fetch_all(
         sequence_group_ids_of_duplicate_samples_query
     )
-    duplicate_sg_id_map: dict[SampleId, dict[SequenceType, SequenceGroupId]] = defaultdict(dict)
+    duplicate_sg_id_map: dict[
+        SampleId, dict[SequenceType, SequenceGroupId]
+    ] = defaultdict(dict)
     for row in sequence_group_ids_of_duplicate_samples:
         duplicate_sg_id_map[row['sample_id']][row['type']] = row['id']
 
@@ -353,14 +359,12 @@ VALUES (:analysis_id, :sequencing_group_id)
 @click.argument('author', default='sequencing-group-migration')
 def main_sync(author, dry_run: bool = True):
     """Run synchronisation"""
-    asyncio.get_event_loop().run_until_complete(
-        main(author, dry_run=dry_run)
-    )
+    asyncio.get_event_loop().run_until_complete(main(author, dry_run=dry_run))
 
 
 async def main(author, dry_run: bool = True):
     """Run synchronisation"""
-    dry_run=False
+    dry_run = False
     connection = Database(_get_connection_string(), echo=True)
     await connection.connect()
     async with connection.transaction():

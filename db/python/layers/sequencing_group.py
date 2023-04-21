@@ -92,6 +92,7 @@ class SequencingGroupLayer(BaseLayer):
         types: list[str] = None,
         technologies: list[str] = None,
         platforms: list[str] = None,
+        active_only: bool = True,
         check_project_ids: bool = True,
     ) -> list[SequencingGroupInternal]:
         """
@@ -104,6 +105,7 @@ class SequencingGroupLayer(BaseLayer):
             types=types,
             technologies=technologies,
             platforms=platforms,
+            active_only=active_only,
         )
         if not sequencing_groups:
             return []
@@ -155,7 +157,8 @@ class SequencingGroupLayer(BaseLayer):
 
         return pids
 
-    async def get_type_numbers_for_project(self, project) -> dict[str, int]:
+    async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
+        """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
 
     # region CREATE / MUTATE

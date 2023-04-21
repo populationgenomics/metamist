@@ -10,12 +10,12 @@ from functools import wraps
 
 from typing import Dict
 
+import nest_asyncio
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
-import nest_asyncio
 
-from api.graphql.loaders import get_context
-from api.graphql.schema import schema
+from api.graphql.loaders import get_context  # type: ignore
+from api.graphql.schema import schema  # type: ignore
 from api.settings import set_all_access
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,

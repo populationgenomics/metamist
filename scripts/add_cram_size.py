@@ -142,7 +142,7 @@ async def process_project(project: str):
     for updates in chunk(list(updaters.items())):
         promises = []
         for aid, aupdate in updates:
-            promises.append(aapi.update_analysis_status_async(aid, aupdate))
+            promises.append(aapi.update_analysis(aid, aupdate))
         await asyncio.gather(*promises)
 
     if missing_files:

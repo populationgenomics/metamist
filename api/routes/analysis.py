@@ -186,6 +186,7 @@ async def get_latest_complete_analysis_for_type_post(
 
     return analysis.to_external()
 
+
 @router.get(
     '/{analysis_id}/details',
     operation_id='getAnalysisById',

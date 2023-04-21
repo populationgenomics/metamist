@@ -188,8 +188,7 @@ class GenericMetadataParser(GenericParser):
     def get_sequencing_platform(self, row: SingleRow) -> str:
         """Get sequencing platform for single row"""
         value = (
-            row.get(self.seq_platform_column, None)
-            or self.default_sequencing_platform
+            row.get(self.seq_platform_column, None) or self.default_sequencing_platform
         )
         value = value.lower()
 
@@ -761,7 +760,7 @@ async def main(
     qc_meta_field_map: List[Tuple[str, str]] = None,
     reads_column: Optional[str] = None,
     gvcf_column: Optional[str] = None,
-    default_sample_type='blood',
+    default_sample_type: Optional[str] = None,
     default_assay_type='wgs',
     confirm=False,
 ):

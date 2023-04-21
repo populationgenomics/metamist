@@ -231,7 +231,7 @@ class WebDb(DbBase):
             for assay in itertools.chain(*seq_models_by_sample_id.values())
         }
 
-        sequencing_group_eid_map = defaultdict(dict)
+        sequencing_group_eid_map: dict[int, dict[str, str]] = defaultdict(dict)
         for row in sequencing_eid_rows:
             sgid = row['sequencing_group_id']
             sequencing_group_eid_map[sgid][row['name']] = row['name']

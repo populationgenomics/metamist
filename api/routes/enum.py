@@ -9,7 +9,7 @@ from db.python.enum_tables.enums import EnumTable
 router = APIRouter(prefix='/enums', tags=['enums'])
 
 
-def create_route(e: Type[EnumTable]):
+def _create_route(e: Type[EnumTable]):
     hyphenated_name = e.get_enum_name().replace('_', '-')
     camel_case_name = ''.join([x.capitalize() for x in hyphenated_name.split('-')])
 
@@ -24,4 +24,4 @@ def create_route(e: Type[EnumTable]):
 for enum in enum_tables.__dict__.values():
     if not isclass(enum):
         continue
-    create_route(enum)
+    _create_route(enum)

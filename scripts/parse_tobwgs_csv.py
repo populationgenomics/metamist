@@ -4,7 +4,7 @@ from typing import Optional, List
 
 import click
 
-from metamist.models import AnalysisType, AnalysisStatus
+from metamist.models import AnalysisStatus
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
@@ -136,7 +136,7 @@ class TobWgsParser(GenericMetadataParser):
             analyses.append(
                 ParsedAnalysis(
                     sequencing_group=sequencing_group,
-                    type_=AnalysisType(analysis_type),
+                    type_=analysis_type,
                     status=AnalysisStatus('completed'),
                     output=file_path,
                     meta={
