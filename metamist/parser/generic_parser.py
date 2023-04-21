@@ -997,9 +997,8 @@ query GetSampleEidMapQuery($project: String!) {
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
-    @staticmethod
     def get_existing_external_sequence_ids(
-        participant_map: Dict[str, Dict[Any, List[Any]]]
+        self, participant_map: Dict[str, Dict[Any, List[Any]]]
     ):
         """Pulls external sequence IDs from participant map"""
         external_sequence_ids: list[str] = []

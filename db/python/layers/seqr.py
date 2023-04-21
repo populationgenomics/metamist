@@ -353,8 +353,11 @@ class SeqrLayer(BaseLayer):
         resp = await session.post(
             req_url, json={'individuals': processed_records}, headers=headers
         )
-
-        if resp.status == 400 and 'Unable to find individuals to update' in resp.text:
+        text_response = await resp.text()
+        if (
+            resp.status == 400
+            and 'Unable to find individuals to update' in text_response
+        ):
             return [
                 f'No individual metadata needed updating (from {len(processed_records)} rows)'
             ]
@@ -684,7 +687,7 @@ class SeqrLayer(BaseLayer):
             'birth_year': 'birth_year',
             'death_year': 'death_year',
             'onset_age': 'age_of_onset',
-            'notes': 'notes',
+            'notes': 'individual_notes',
             'maternal_ethnicity': 'maternal_ancestry',
             'paternal_ethnicity': 'paternal_ancestry',
             'consanguinity': 'consanguinity',

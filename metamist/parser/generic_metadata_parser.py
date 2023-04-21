@@ -692,12 +692,28 @@ class GenericMetadataParser(GenericParser):
 )
 @click.option('--sample-name-column', required=True)
 @click.option(
+    '--participant-column',
+    help='Column where the external participant id is held',
+)
+@click.option(
     '--reads-column',
     help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--gvcf-column',
     help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--reported-sex-column',
+    help='Column where the reported sex is held',
+)
+@click.option(
+    '--reported-gender-column',
+    help='Column where the reported gender is held',
+)
+@click.option(
+    '--karyotype-column',
+    help='Column where the karyotype is held',
 )
 @click.option(
     '--qc-meta-field-map',
@@ -748,7 +764,7 @@ class GenericMetadataParser(GenericParser):
 @run_as_sync
 async def main(
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project,
     sample_name_column: str,
     participant_meta_field: List[str],
@@ -760,8 +776,12 @@ async def main(
     qc_meta_field_map: List[Tuple[str, str]] = None,
     reads_column: Optional[str] = None,
     gvcf_column: Optional[str] = None,
+    participant_column: Optional[str] = None,
+    reported_sex_column: Optional[str] = None,
+    reported_gender_column: Optional[str] = None,
+    karyotype_column: Optional[str] = None,
     default_sample_type: Optional[str] = None,
-    default_assay_type='wgs',
+    default_assay_type='sequencing',
     confirm=False,
 ):
     """Run script from CLI arguments"""
@@ -793,12 +813,16 @@ async def main(
     parser = GenericMetadataParser(
         project=project,
         sample_name_column=sample_name_column,
+        participant_column=participant_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
         assay_meta_map=assay_meta_map,
         qc_meta_map=qc_meta_map,
         reads_column=reads_column,
         gvcf_column=gvcf_column,
+        reported_sex_column=reported_sex_column,
+        reported_gender_column=reported_gender_column,
+        karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
         default_sequencing_type=default_assay_type,
         search_locations=search_path,
