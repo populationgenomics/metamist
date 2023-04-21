@@ -664,7 +664,7 @@ class SeqrLayer(BaseLayer):
             'birth_year': 'birth_year',
             'death_year': 'death_year',
             'onset_age': 'age_of_onset',
-            'notes': 'notes',
+            'notes': 'individual_notes',
             'maternal_ethnicity': 'maternal_ancestry',
             'paternal_ethnicity': 'paternal_ancestry',
             'consanguinity': 'consanguinity',
