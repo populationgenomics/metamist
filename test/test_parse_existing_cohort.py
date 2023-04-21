@@ -2,36 +2,33 @@ import unittest
 from io import StringIO
 from datetime import datetime
 from unittest.mock import patch
-from test.testbase import run_as_sync
+
+from db.python.layers import ParticipantLayer
+from metamist.parser.generic_parser import ParsedParticipant
+from test.testbase import run_as_sync, DbIsolatedTest
 
 from scripts.parse_existing_cohort import ExistingCohortParser
 
 
-class TestExistingCohortParser(unittest.TestCase):
+class TestExistingCohortParser(DbIsolatedTest):
     """Test the ExistingCohortParser"""
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.datetime_added')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
         self,
         mock_filesize,
         mock_fileexists,
         mock_datetime_added,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
-        mock_get_participant_id,
+        mock_graphql_query,
     ):
         """
         Test importing a single row, forms objects and checks response
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
-        mock_get_participant_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -47,7 +44,7 @@ class TestExistingCohortParser(unittest.TestCase):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project='to-be-mocked-dev',
+            project=self.project_name,
         )
 
         parser.filename_map = {
@@ -56,19 +53,18 @@ class TestExistingCohortParser(unittest.TestCase):
         }
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        participants: list[ParsedParticipant]
+        summary, participants = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(0, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(0, summary['assays']['update'])
 
-        samples_to_add = resp['samples']['insert']
-        sequences_to_add = resp['sequences']['insert']
-
-        self.assertEqual('EXTID1234', samples_to_add[0].external_id)
+        sample_to_add = participants[0].samples[0]
+        self.assertEqual('EXTID1234', sample_to_add.external_sid)
         expected_sequence_dict = {
             'reference_genome': 'hg38',
             'platform': 'App',
@@ -77,34 +73,35 @@ class TestExistingCohortParser(unittest.TestCase):
             'fluid_x_tube_id': '220405_FLUIDX1234',
             'reads_type': 'fastq',
             'reads': [
-                [
-                    {
-                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
-                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
-                        'class': 'File',
-                        'checksum': None,
-                        'size': 111,
-                        'datetime_added': '2022-02-02T22:22:22',
-                    },
-                    {
-                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
-                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
-                        'class': 'File',
-                        'checksum': None,
-                        'size': 111,
-                        'datetime_added': '2022-02-02T22:22:22',
-                    },
-                ]
+                {
+                    'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                    'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': 111,
+                    'datetime_added': '2022-02-02T22:22:22',
+                },
+                {
+                    'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+                    'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+                    'class': 'File',
+                    'checksum': None,
+                    'size': 111,
+                    'datetime_added': '2022-02-02T22:22:22',
+                },
             ],
+            'sequencing_platform': 'illumina',
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'genome',
             'batch': 'M01',
         }
-        self.assertDictEqual(expected_sequence_dict, sequences_to_add[0].meta)
+        assay = sample_to_add.sequencing_groups[0].assays[0]
+        self.maxDiff = None
+        self.assertDictEqual(expected_sequence_dict, assay.meta)
         return
 
     @run_as_sync
-    async def test_no_header(
-        self,
-    ):
+    async def test_no_header(self):
         """
         Test input without a header
         """
@@ -117,7 +114,7 @@ class TestExistingCohortParser(unittest.TestCase):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project='to-be-mocked-dev',
+            project=self.project_name,
         )
 
         parser.filename_map = {
@@ -134,21 +131,12 @@ class TestExistingCohortParser(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    async def test_missing_fastqs(
-        self,
-        mock_get_sequence_ids,
-        mock_get_sample_id,
-        mock_get_participant_id,
-    ):
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_missing_fastqs(self, mock_graphql_query):
         """
         Tests case where the fastq's in the storage do not match the ingested samples.
         """
-        mock_get_sample_id.return_value = {}
-        mock_get_sequence_ids.return_value = {}
-        mock_get_participant_id.return_value = {}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
 
         rows = [
             'HEADER',
@@ -160,7 +148,7 @@ class TestExistingCohortParser(unittest.TestCase):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project='to-be-mocked-dev',
+            project=self.project_name,
         )
 
         parser.filename_map = {
@@ -177,30 +165,36 @@ class TestExistingCohortParser(unittest.TestCase):
         return
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.apis.ParticipantApi.get_participant_id_map_by_external_ids')
-    @patch('sample_metadata.apis.SequenceApi.get_sequences_by_sample_ids')
-    @patch('sample_metadata.apis.SequenceApi.get_sequence_ids_for_sample_ids_by_type')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.datetime_added')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_exists')
-    @patch('sample_metadata.parser.cloudhelper.CloudHelper.file_size')
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_existing_row(
         self,
         mock_filesize,
         mock_fileexists,
         mock_datetime_added,
-        mock_get_sequence_ids,
-        mock_get_sequences_by_sample_ids,
-        mock_get_participant_id,
-        mock_get_sample_id,
+        mock_graphql_query,
     ):
         """
         Tests ingestion for an existing sample.
         """
-        mock_get_sample_id.return_value = {'EXTID1234': 'CPG123'}
-        mock_get_sequence_ids.return_value = {}
-        mock_get_sequences_by_sample_ids.return_value = {}
-        mock_get_participant_id.return_value = {'EXTID1234': 1234}
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+
+        player = ParticipantLayer(self.connection)
+        await player.upsert_participants(
+            [
+                ParticipantUpsertInternal(
+                    external_id='EXTID1234',
+                    samples=[
+                        SampleUpsertInternal(
+                            external_id='EXTID1234',
+                        )
+                    ],
+                )
+            ]
+        )
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -216,7 +210,7 @@ class TestExistingCohortParser(unittest.TestCase):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project='to-be-mocked-dev',
+            project=self.project_name,
         )
 
         parser.filename_map = {
@@ -225,13 +219,13 @@ class TestExistingCohortParser(unittest.TestCase):
         }
 
         file_contents = '\n'.join(rows)
-        resp = await parser.parse_manifest(
+        summary, _ = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, len(resp['samples']['insert']))
-        self.assertEqual(1, len(resp['sequences']['insert']))
-        self.assertEqual(1, len(resp['samples']['update']))
-        self.assertEqual(0, len(resp['sequences']['update']))
+        self.assertEqual(0, summary['samples']['insert'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(1, summary['samples']['update'])
+        self.assertEqual(0, summary['assays']['update'])
 
         return

@@ -302,6 +302,15 @@ class GenericMetadataParser(GenericParser):
         filenames_from_rows = set(f.strip() for f in files_from_rows if f and f.strip())
         relevant_extensions = ('.cram', '.fastq.gz', '.bam')
 
+        # we need to explicitly filter filenames from rows not to include absolute
+        # paths, otherwise the below check will flag it as missing
+        absolute_path_starts = ('/', 'gs://', 'https://')
+        filenames_from_rows = set(
+            f
+            for f in filenames_from_rows
+            if not (any(f.startswith(p) for p in absolute_path_starts))
+        )
+
         def filename_filter(f):
             return any(f.endswith(ext) for ext in relevant_extensions)
 
@@ -466,7 +475,7 @@ class GenericMetadataParser(GenericParser):
         """Get paths to reads from a row"""
         if not self.reads_column or self.reads_column not in row:
             return []
-        # more post processing
+        # more post-processing
         return self.process_filename_value(row[self.reads_column])
 
     async def get_checksums_from_row(

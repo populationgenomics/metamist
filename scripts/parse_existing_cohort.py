@@ -144,7 +144,7 @@ class ExistingCohortParser(GenericMetadataParser):
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
         ]
 
-    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from sequence file name"""
 
         for filename, _path in self.filename_map.items():

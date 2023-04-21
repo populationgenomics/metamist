@@ -812,7 +812,7 @@ query GetSampleEidMapQuery($project: String!) {
         """Get external sample ID from row"""
 
     # @abstractmethod
-    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from row"""
         return None
 
