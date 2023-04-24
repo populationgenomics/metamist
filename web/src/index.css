@@ -5,6 +5,8 @@
 
   --color-border-default: #444c56
 } */
+/* :root { */
+/* .light-mode { */
 :root {
     --color-bg: #f5f7f9;
     --color-bg-card: #fff;
@@ -24,31 +26,69 @@
     --color-check-green: #7ac142;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root {
-        --color-bg: #1d1d1d;
-        --color-bg-card: #2c2c2c;
-        --color-bg-disabled-card: #353535;
+html[data-theme='dark-mode'] {
+    /* .dark-mode { */
+    --color-bg: #1d1d1d;
+    --color-bg-card: #2c2c2c;
+    --color-bg-disabled-card: #353535;
 
-        --color-border-color: #3a3a3a;
-        --color-border-default: #292a2b;
-        --color-divider: rgba(255, 255, 255, 0.2);
+    --color-border-color: #3a3a3a;
+    --color-border-default: #292a2b;
+    --color-divider: rgba(255, 255, 255, 0.2);
 
-        --color-text-primary: rgba(255, 255, 255, 0.87);
-        --color-text-medium: rgba(255, 255, 255, 0.6);
-        --color-text-disabled: rgba(255, 255, 255, 0.38);
+    --color-text-primary: rgba(255, 255, 255, 0.87);
+    --color-text-medium: rgba(255, 255, 255, 0.6);
+    --color-text-disabled: rgba(255, 255, 255, 0.38);
 
-        --color-check-green: #659251;
-    }
+    --color-check-green: #659251;
+}
+/* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
+html[data-theme='dark-mode'] .swagger-ui {
+    filter: invert(88%) hue-rotate(180deg);
+}
 
-    /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
-    .swagger-ui {
-        filter: invert(88%) hue-rotate(180deg);
-    }
+html[data-theme='dark-mode'] .swagger-ui .highlight-code {
+    filter: invert(100%) hue-rotate(180deg);
+}
 
-    .swagger-ui .highlight-code {
-        filter: invert(100%) hue-rotate(180deg);
-    }
+html[data-theme='dark-mode'] .ui.selection.dropdown {
+    background-color: #353535;
+    color: rgba(255, 255, 255, 0.87);
+    z-index: 10;
+}
+
+html[data-theme='dark-mode'] .ui.selection.visible.dropdown > .text:not(.default) {
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
+    background-color: #353535;
+    color: rgba(255, 255, 255, 0.87);
+    border: none;
+    z-index: 10;
+}
+
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item:hover {
+    background-color: #2c2c2c;
+    z-index: 10;
+}
+
+html[data-theme='dark-mode'] .ui.button {
+    background-color: #353535;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.input > input {
+    background-color: #304f85;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.input > input:focus {
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.input > input:focus::placeholder {
+    color: rgba(255, 255, 255, 0.4);
 }
 
 body {
@@ -103,8 +143,6 @@ blockquote {
 
 .header {
     background-color: #24344f;
-    /* overflow: hidden; */
-    padding: 80px;
     display: flex;
     align-items: center;
     padding: 0px 80px 0px 80px;

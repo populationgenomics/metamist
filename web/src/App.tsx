@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Link } from 'react-router-dom'
 import Routes from './Routes'
 import Searchbar from './shared/components/Search'
 import MuckTheDuck from './shared/components/MuckTheDuck'
+import ToggleDarkMode from './shared/components/ToggleDarkMode'
 
 const App: React.FunctionComponent = () => (
     <Router>
@@ -30,6 +31,9 @@ const App: React.FunctionComponent = () => (
                     <Link className="navbarLink" to="/documentation">
                         Docs
                     </Link>
+                    <div style={{ marginLeft: 'auto' }}>
+                        <ToggleDarkMode />
+                    </div>
                     <Searchbar />
                 </div>
             </header>

@@ -256,7 +256,7 @@ const Searchbar: React.FunctionComponent = () => {
             onSearchChange={handleSearchChange}
             results={results}
             value={value}
-            style={{ marginLeft: 'auto', width: '400px' }}
+            style={{ width: '400px' }}
         />
     )
 }
