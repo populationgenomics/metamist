@@ -564,12 +564,19 @@ def main(
         project, sequence_reads
     )
 
+    # Any moved data from a sample with a completed CRAM can be added to the delete list
+    moved_sequence_reads_to_delete = {}
+    for sequence_id, paths in moved_sequence_paths.items():
+        sample_id = seq_id_sample_id[sequence_id]
+        if sample_id in sample_completion.get('complete'):
+            moved_sequence_reads_to_delete[sequence_id]= paths
+
     logging.info(f'Found len{uningested_paths} possible uningested files in bucket')
 
     if not dry_run:
         # Combine the obvious reads to delete with the moved reads to delete into a flat list
         reads_to_delete = list(sequence_reads_to_delete.values()) + list(
-            moved_sequence_paths.values()
+            moved_sequence_reads_to_delete.values()
         )
         reads_to_delete = [read for readlist in reads_to_delete for read in readlist]
         # Convert the paths to delete to CloudPath objects and delete them
