@@ -1,15 +1,15 @@
 """
 What's happening here?
 1. Input a Metamist project
-2. Get all the samples for this project from Metamist
-3. Get all the sequences for this project from Metamist
-4. Check the bucket for all sequence data, and compare to the data in the metamist sequences
+2. Get all the samples and sequences for this project from Metamist
+3. Check the bucket for all sequence data, and compare to the data in the metamist sequences
     - If there are discrepencies, check if the file name and size is the same in the bucket as it is in metamist
       - If they are both the same, assume this file has just been moved to a different location in the bucket
       - Note the link between the Metamist sequence ID and this new bucket location
       - Note the link between the Metamist sequence ID and the Sample ID
 
-5. Check if a sample has a completed cram - if so, its sequence data can be removed
+4. Check if a sample has a completed cram - if so, its sequence data can be removed
+5. Remove the sequence data for samples with completed crams, including those whose data has been moved
 
 TODO: find other files to delete, not just fastqs
 TODO: make sure sequences are grabbed with the appropriate fields, e.g. read_type, project
