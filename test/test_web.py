@@ -273,6 +273,7 @@ class TestWeb(DbIsolatedTest):
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
+                                    'field with spaces': 'some entry',
                                 },
                             },
                         ],
@@ -346,6 +347,7 @@ class TestWeb(DbIsolatedTest):
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
@@ -418,6 +420,7 @@ class TestWeb(DbIsolatedTest):
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
@@ -441,3 +444,19 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(
             expected_data_two_samples_filtered, two_samples_result_filtered
         )
+
+        test_field_with_space = await self.webl.get_project_summary(
+            token=0,
+            grid_filter=[
+                SearchItem(
+                    **{
+                        'model_type': MetaSearchEntityPrefix.SEQUENCE,
+                        'query': 'some',
+                        'field': 'field with spaces',
+                        'is_meta': True,
+                    }
+                )
+            ],
+        )
+
+        self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)
