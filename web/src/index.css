@@ -78,19 +78,6 @@ html[data-theme='dark-mode'] .ui.button {
     color: rgba(255, 255, 255, 0.87);
 }
 
-html[data-theme='dark-mode'] .ui.input > input {
-    background-color: #304f85;
-    color: rgba(255, 255, 255, 0.87);
-}
-
-html[data-theme='dark-mode'] .ui.input > input:focus {
-    color: rgba(255, 255, 255, 0.87);
-}
-
-html[data-theme='dark-mode'] .ui.input > input:focus::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-}
-
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
