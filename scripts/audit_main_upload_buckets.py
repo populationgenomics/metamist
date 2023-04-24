@@ -131,7 +131,7 @@ def get_paths_for_subdir(bucket_name, subdirectory, file_extension):
     return files_in_bucket_subdir
 
 
-def get_files_in_buckets_subdirs(
+def find_files_in_buckets_subdirs(
     buckets_subdirs: defaultdict[str, list], file_types: list[str]
 ):
     """
@@ -150,7 +150,7 @@ def get_files_in_buckets_subdirs(
     return files_in_bucket
 
 
-def get_sequence_files_in_bucket(bucket_name: str) -> list[str]:
+def find_sequence_files_in_bucket(bucket_name: str) -> list[str]:
     """Gets all the gs paths to fastq files in the projects main-upload bucket"""
     sequence_paths = []
     for blob in CLIENT.list_blobs(bucket_name, prefix=''):
@@ -359,7 +359,7 @@ def get_complete_and_incomplete_samples(
     # Check the analysis paths actually point to crams that exist in the bucket
     cram_paths = [path for paths in sample_cram_paths.values() for path in paths]
     buckets_subdirs = get_bucket_subdirs_to_search(cram_paths)
-    crams_in_bucket = get_files_in_buckets_subdirs(
+    crams_in_bucket = find_files_in_buckets_subdirs(
         buckets_subdirs,
         [
             'cram',
@@ -391,12 +391,12 @@ def check_for_uningested_or_moved_sequences(
              2. A dict mapping sequence IDs to GS filepaths that have been ingested,
                 but where the path in the bucket is different to the path for this
                 sequence in Metamist. If the filenames and file sizes match,
-                These are identified as sequence files that have been moved from
+                these are identified as sequence files that have been moved from
                 their original location to a new location.
     """
     # Get all the paths to sequence data anywhere in the main-upload bucket
     bucket_name = f'cpg-{project}-main-upload'
-    sequence_paths_in_bucket = get_sequence_files_in_bucket(bucket_name)
+    sequence_paths_in_bucket = find_sequence_files_in_bucket(bucket_name)
 
     # Flatten all the sequence file paths and file sizes in metamist for this project into a single list
     sequence_paths_sizes_in_metamist = []
