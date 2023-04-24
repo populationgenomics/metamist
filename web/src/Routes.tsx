@@ -12,58 +12,27 @@ import AnalysisRunnerSummary from './pages/project/AnalysisRunnerSummary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
-        <Route path="/documentation">
-            <Route path="" element={<DocumentationArticle />} />
-            <Route path=":id" element={<DocumentationArticle />} />
-        </Route>
+        <Route path="/documentation/:id?" element={<DocumentationArticle />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
-        <Route path="/analysis-runner/">
-            <Route
-                path=""
-                element={
-                    <ErrorBoundary>
-                        <AnalysisRunnerSummary />
-                    </ErrorBoundary>
-                }
-            />
-            <Route
-                path=":projectName"
-                element={
-                    <ErrorBoundary>
-                        <AnalysisRunnerSummary />
-                    </ErrorBoundary>
-                }
-            />
-        </Route>
+        <Route
+            path="/analysis-runner/:projectName?"
+            element={
+                <ErrorBoundary>
+                    <AnalysisRunnerSummary />
+                </ErrorBoundary>
+            }
+        />
 
-        <Route path="/project/">
-            <Route
-                path=""
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-            <Route
-                path=":projectName"
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-            <Route
-                path=":projectName/:page"
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-        </Route>
+        <Route
+            path="/project/:projectName?/:page?"
+            element={
+                <ErrorBoundary>
+                    <ProjectSummary />
+                </ErrorBoundary>
+            }
+        />
 
         <Route path="admin" element={<ProjectsAdmin />} />
 
