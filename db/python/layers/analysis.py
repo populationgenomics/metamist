@@ -176,7 +176,7 @@ class AnalysisLayer(BaseLayer):
             output=output,
             active=active,
         )
-
+        # print(analyses)
         return analyses
 
     async def get_sample_file_sizes(

@@ -97,6 +97,18 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         }))
     }
 
+    // return (
+    //     <Table celled>
+    //         <SUITable.Header>
+    //             <SUITable.Row>
+    //                 <SUITable.HeaderCell>
+    //                     <FilterAltIcon />
+    //                 </SUITable.HeaderCell>
+    //             </SUITable.Row>
+    //         </SUITable.Header>
+    //     </Table>
+    // )
+
     return (
         <Table celled>
             <SUITable.Header>
