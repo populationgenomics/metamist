@@ -137,15 +137,20 @@ const ProjectSummary: React.FunctionComponent = () => {
 
     const totalPageNumbers = Math.ceil((summary?.total_samples_in_query || 0) / pageLimit)
 
+    const projectSelectorOnClick = React.useCallback(
+        (_, { value }) => {
+            navigate(`/project/${value}`)
+            setPageNumber(1)
+            _setPageLimit(pageLimit)
+            setFilterValues([])
+            setGridFilterValues({})
+        },
+        [navigate, _setPageLimit, setPageNumber, pageLimit, setFilterValues, setGridFilterValues]
+    )
+
     return (
         <>
-            <ProjectSelector
-                setPageLimit={_setPageLimit}
-                setPageNumber={setPageNumber}
-                setFilterValues={setFilterValues}
-                setGridFilterValues={setGridFilterValues}
-                pageLimit={PAGE_SIZES[0]}
-            />
+            <ProjectSelector onClickFunction={projectSelectorOnClick} />
             <hr />
             {error && (
                 <MuckError message={`Ah Muck, An error occurred when fetching samples: ${error}`} />

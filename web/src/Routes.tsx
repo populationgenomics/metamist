@@ -8,42 +8,31 @@ import FamilyView from './pages/family/FamilyView'
 import ProjectSummary from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
+import AnalysisRunnerSummary from './pages/project/AnalysisRunnerSummary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
-        <Route path="/documentation">
-            <Route path="" element={<DocumentationArticle />} />
-            <Route path=":id" element={<DocumentationArticle />} />
-        </Route>
+        <Route path="/documentation/:id?" element={<DocumentationArticle />} />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
-        <Route path="/project/">
-            <Route
-                path=""
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-            <Route
-                path=":projectName"
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-            <Route
-                path=":projectName/:page"
-                element={
-                    <ErrorBoundary>
-                        <ProjectSummary />
-                    </ErrorBoundary>
-                }
-            />
-        </Route>
+        <Route
+            path="/analysis-runner/:projectName?"
+            element={
+                <ErrorBoundary>
+                    <AnalysisRunnerSummary />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/project/:projectName?/:page?"
+            element={
+                <ErrorBoundary>
+                    <ProjectSummary />
+                </ErrorBoundary>
+            }
+        />
 
         <Route path="admin" element={<ProjectsAdmin />} />
 

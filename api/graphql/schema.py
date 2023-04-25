@@ -253,8 +253,8 @@ class GraphQLProject:
     @strawberry.field()
     async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
         connection = info.context['connection']
-        participants = await FamilyLayer(connection).get_families(project=root.id)
-        return participants
+        families = await FamilyLayer(connection).get_families(project=root.id)
+        return families
 
     @strawberry.field()
     async def participants(
@@ -267,9 +267,20 @@ class GraphQLProject:
 
         return participants
 
-    # @strawberry.field()
-    # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
-    #     return []
+    @strawberry.field()
+    async def analyses(
+        self,
+        info: Info,
+        root: 'Project',
+        type: str | None = None,
+        active: bool | None = None,
+    ) -> list['GraphQLAnalysis']:
+        connection = info.context['connection']
+        connection.project = root.id
+        analysis_type = AnalysisType(type) if type else None
+        return await AnalysisLayer(connection).query_analysis(
+            project_ids=[root.id], analysis_type=analysis_type, active=active
+        )
 
 
 @strawberry.type
