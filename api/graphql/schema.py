@@ -201,11 +201,11 @@ class GraphQLFamily:
     id: int
     external_id: str
 
-    description: str | None = None
-    coded_phenotype: str | None = None
+    description: str | None
+    coded_phenotype: str | None
 
     # internal
-    project: strawberry.Private[int]
+    project_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: FamilyInternal) -> 'GraphQLFamily':
@@ -214,13 +214,13 @@ class GraphQLFamily:
             external_id=internal.external_id,
             description=internal.description,
             coded_phenotype=internal.coded_phenotype,
-            project=internal.project,
+            project_id=internal.project,
         )
 
     @strawberry.field
     async def project(self, info: Info, root: 'GraphQLFamily') -> GraphQLProject:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
-        project = await loader.load(root.project)
+        project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
     @strawberry.field
@@ -313,7 +313,7 @@ class GraphQLSample:
 
     @strawberry.field
     async def assays(
-        self, info: Info, root: 'GraphQLSample', type: str = None
+        self, info: Info, root: 'GraphQLSample', type: str | None = None
     ) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
         assays = await loader_assays_for_sample_ids.load((root.internal_id, type))

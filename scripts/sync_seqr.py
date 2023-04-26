@@ -13,20 +13,14 @@ from io import StringIO
 import aiohttp
 import yaml
 from cloudpathlib import AnyPath
-from metamist.model.analysis_type import AnalysisType
+from metamist.graphql import query_async
 from metamist.model.analysis_status import AnalysisStatus
-from metamist.model.sequence_type import SequenceType
 from metamist.model.export_type import ExportType
-from metamist.model.body_get_samples import BodyGetSamples
-from metamist.model.body_get_participants import BodyGetParticipants
 from metamist.model.analysis_query_model import AnalysisQueryModel
 from metamist.apis import (
     SeqrApi,
     ProjectApi,
     AnalysisApi,
-    SequenceApi,
-    SampleApi,
-    ParticipantApi,
 )
 from metamist.parser.generic_parser import chunk
 
@@ -64,7 +58,7 @@ ENVS = {
     ),
 }
 
-SAMPLES_TO_IGNORE = {'CPG227355', 'CPG227397'}
+SGS_TO_IGNORE = {'CPG227355', 'CPG227397'}
 BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
 
 url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
@@ -103,8 +97,6 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
     Synchronisation driver for a single dataset
     """
     print(f'{dataset} ({sequence_type}) :: Syncing to {seqr_guid}')
-    seqapi = SequenceApi()
-    samapi = SampleApi()
 
     # sync people first
     token = get_token()
@@ -117,50 +109,49 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
             'session': client,
         }
 
-        # check sequence type is valid
-        _ = SequenceType(sequence_type)
+        mm_query = """
+query MyQuery($project: String!, $seqType: String!) {
+  project(name: $project) {
+    participants {
+      id
+      externalId
+      samples {
+        sequencingGroups(sequencingType: $seqType) {
+          id
+        }
+      }
+      families {
+        externalId
+        id
+      }
+    }
+  }
+}"""
+        data = await query_async(mm_query, {'project': dataset, 'seqType': sequence_type})
 
-        samples = samapi.get_samples(
-            body_get_samples=BodyGetSamples(project_ids=[dataset])
-        )
-        sequences_all = seqapi.get_sequence_ids_for_sample_ids_by_type(
-            [s['id'] for s in samples if s['id'] not in SAMPLES_TO_IGNORE]
-        )
-        sample_ids = set(
-            [
-                sid
-                for sid, types in sequences_all.items()
-                if sequence_type in types and sid not in SAMPLES_TO_IGNORE
-            ]
-        )
-        participant_ids = set(
-            int(sample['participant_id'])
-            for sample in samples
-            if sample['id'] in sample_ids
-        )
-        participants = ParticipantApi().get_participants(
-            project=dataset,
-            body_get_participants=BodyGetParticipants(
-                internal_participant_ids=list(participant_ids)
-            ),
-        )
-        participant_eids = [p['external_id'] for p in participants]
+        family_eids: set[str] = set()
+        participant_eids: set[str] = set()
+        external_pid_to_internal_sgid_map: dict[str, list[str]] = {}
+        for participant in data['project']['participants']:
+            sg_ids = {
+                sg['id']
+                for s in participant['samples']
+                for sg in s['sequencingGroups']
+            }
+            if not sg_ids:
+                # nothing more required for this participant
+                continue
 
-        ped_rows = seqrapi.get_pedigree(project=dataset)
-        filtered_family_eids = set(
-            row['family_id']
-            for row in ped_rows
-            if 'family_id' in row and row['individual_id'] in participant_eids
-        )
-        participants_with_families = set(
-            row['individual_id']
-            for row in ped_rows
-            if 'family_id' in row and row['family_id'] in filtered_family_eids
-        )
+            external_pid_to_internal_sgid_map[participant['externalId']] = list(sg_ids)
+            participant_eids.add(participant['externalId'])
+            family_eids |= {f['externalId'] for f in participant['families']}
 
-        participant_eids = list(
-            set(participant_eids).intersection(participants_with_families)
-        )
+        participant_eids = {p['externalId'] for p in data['project']['participants']}
+        filtered_family_eids = {
+            f['externalId']
+            for p in data['project']['participants']
+            for f in p['families']
+        }
 
         if not participant_eids:
             raise ValueError('No participants to sync?')
@@ -171,7 +162,7 @@ async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
         await sync_pedigree(**params, family_eids=filtered_family_eids)
         await sync_individual_metadata(**params, participant_eids=set(participant_eids))
         await update_es_index(
-            **params, sequence_type=sequence_type, internal_sample_ids=sample_ids
+            **params, sequence_type=sequence_type, external_pid_to_internal_sgid_map=external_pid_to_internal_sgid_map,
         )
 
         await sync_cram_map(
@@ -397,20 +388,21 @@ async def update_es_index(
     headers,
     check_metamist=True,
     allow_skip=False,
-    internal_sample_ids: set[str] = None,
+    external_pid_to_internal_sgid_map: dict[str, list[str]] = None,
 ):
     """Update seqr samples for latest elastic-search index"""
-
-    person_sample_map_rows = (
-        await seqrapi.get_external_participant_id_to_internal_sample_id_async(
-            project=dataset
-        )
-    )
+    internal_sg_ids = {
+        sg
+        for sgids in external_pid_to_internal_sgid_map.values()
+        for sg in sgids
+    }
 
     rows_to_write = [
-        '\t'.join(s[::-1])
-        for s in person_sample_map_rows
-        if not any(sid in s for sid in SAMPLES_TO_IGNORE)
+        # (ID in ES-Index, External PID in seqr)
+        '\t'.join([sg, pid])
+        for pid, p_sgids in external_pid_to_internal_sgid_map.items()
+        for sg in p_sgids
+        if sg not in SGS_TO_IGNORE
     ]
 
     filename = f'{dataset}_pid_sid_map_{datetime.datetime.now().isoformat()}.tsv'
@@ -425,7 +417,7 @@ async def update_es_index(
         es_index_analyses = await aapi.query_analyses_async(
             AnalysisQueryModel(
                 projects=[dataset, 'seqr'],
-                type=AnalysisType('es-index'),
+                type='es-index',
                 meta={'sequencing_type': sequence_type, 'dataset': dataset},
                 status=AnalysisStatus('completed'),
             )
@@ -447,8 +439,8 @@ async def update_es_index(
 
         es_index = es_index_analyses[-1]['output']
 
-        if internal_sample_ids:
-            sample_ids_missing_from_index = internal_sample_ids - set(
+        if internal_sg_ids:
+            sample_ids_missing_from_index = internal_sg_ids - set(
                 es_index_analyses[-1]['sample_ids']
             )
             if sample_ids_missing_from_index:
@@ -484,7 +476,7 @@ async def update_es_index(
 async def sync_cram_map(
     session: aiohttp.ClientSession,
     dataset,
-    participant_eids: list[str],
+    participant_eids: set[str],
     sequence_type,
     project_guid,
     headers,

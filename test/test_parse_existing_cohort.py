@@ -1,13 +1,13 @@
-import unittest
-from io import StringIO
 from datetime import datetime
+from io import StringIO
 from unittest.mock import patch
 
-from db.python.layers import ParticipantLayer
-from metamist.parser.generic_parser import ParsedParticipant
 from test.testbase import run_as_sync, DbIsolatedTest
 
+from db.python.layers import ParticipantLayer
 from scripts.parse_existing_cohort import ExistingCohortParser
+from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from metamist.parser.generic_parser import ParsedParticipant
 
 
 class TestExistingCohortParser(DbIsolatedTest):
@@ -180,7 +180,6 @@ class TestExistingCohortParser(DbIsolatedTest):
         Tests ingestion for an existing sample.
         """
         mock_graphql_query.side_effect = self.run_graphql_query_async
-        from models.models import ParticipantUpsertInternal, SampleUpsertInternal
 
         player = ParticipantLayer(self.connection)
         await player.upsert_participants(

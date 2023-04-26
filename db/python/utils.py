@@ -46,7 +46,7 @@ class NoProjectAccess(Forbidden):
         *args,
         readonly: bool = None,
     ):
-        project_names_str = ', '.join(str(p) for p in project_names)
+        project_names_str = ', '.join(repr(p) for p in project_names)
         access_type = ''
         if readonly is False:
             access_type = 'write '
