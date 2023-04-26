@@ -171,6 +171,34 @@ blockquote {
     width: 100% !important;
 }
 
+html[data-theme='dark-mode'] .ui.styled.accordion {
+    box-shadow: 0 1px 2px 0 rgba(84, 84, 84, 0.87), 0 0 0 1px rgba(84, 84, 84, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.styled.accordion .content {
+    background-color: #353535;
+    border-color: rgba(255, 255, 255, 0.87);
+}
+html[data-theme='dark-mode'] .ui.styled.accordion .title {
+    background-color: #242424;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.styled.accordion .active.title {
+    background-color: #242424;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.styled.accordion .title:hover {
+    background-color: #1d1d1d;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+html[data-theme='dark-mode'] .ui.table {
+    /* background-color: red; */
+    border: 1px solid rgba(84, 84, 84, 0.87);
+}
+
 .selectedParticipant {
     animation-name: tempHighlight;
     animation-duration: 4s;
