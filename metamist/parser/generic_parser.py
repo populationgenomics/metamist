@@ -727,7 +727,7 @@ query MyQuery($project:String!) {
                 continue
             # matches only if they all exist!
             sorted_sg_ids = tuple(sorted(sg_ids))
-            sg.internal_seqg_id = sg_map.get(sorted_sg_ids)
+            sg.internal_seqgroup_id = sg_map.get(sorted_sg_ids)
 
     async def match_assay_ids(self, assays: list[ParsedAssay]):
         """

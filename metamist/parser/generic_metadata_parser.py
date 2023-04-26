@@ -516,7 +516,7 @@ class GenericMetadataParser(GenericParser):
     async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
-        meta = {}
+        meta: dict[str, Any] = {}
 
         if not sequencing_group.sample.external_sid:
             sequencing_group.sample.external_sid = (
