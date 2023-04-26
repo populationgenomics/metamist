@@ -21,6 +21,9 @@ const App: React.FunctionComponent = () => (
                     <Link className="navbarLink" to="/project">
                         Explore
                     </Link>
+                    <Link className="navbarLink" to="/analysis-runner">
+                        Analysis Runner
+                    </Link>
                     <Link className="navbarLink" to="/swagger">
                         Swagger
                     </Link>

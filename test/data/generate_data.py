@@ -178,6 +178,31 @@ query MyQuery($project: String!) {
         for s in sequencing_group_ids
     ]
 
+    analyses_to_insert.extend(
+        [
+            Analysis(
+                sample_ids=[],
+                type='analysis-runner',
+                status=AnalysisStatus('completed'),
+                output=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
+                active=True,
+                meta={
+                    'accessLevel': 'full',
+                    'commit': 'some-hash',
+                    'script': 'myFakeScript.py',
+                    'description': 'just analysis things',
+                    'hailVersion': '1.0',
+                    'source': 'analysis-runner',
+                    'cwd': 'scripts',
+                    'repo': 'some-repo',
+                    'driverImage': 'fake-australia-southeast1-fake-docker.pkg',
+                    'batch_url': f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
+                },
+            )
+            for s in random.choices(sequencing_group_ids, k=10)
+        ]
+    )
+
     # es-index
     analyses_to_insert.append(
         Analysis(

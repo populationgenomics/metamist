@@ -133,6 +133,7 @@ def get_test_participant_2():
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
+                                    'field with spaces': 'field with spaces',
                                     **default_assay_meta,
                                 },
                             ),
@@ -319,6 +320,7 @@ class TestWeb(DbIsolatedTest):
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
@@ -328,6 +330,7 @@ class TestWeb(DbIsolatedTest):
         two_samples_result = await self.webl.get_project_summary(
             token=0, grid_filter=[]
         )
+
         two_samples_result.participants = []
 
         self.assertEqual(expected_data_two_samples, two_samples_result)
@@ -368,6 +371,7 @@ class TestWeb(DbIsolatedTest):
                 ('type', 'type'),
                 ('technology', 'technology'),
                 ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
             ],
             seqr_links={},
@@ -390,3 +394,64 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(
             expected_data_two_samples_filtered, two_samples_result_filtered
         )
+
+    @run_as_sync
+    async def test_field_with_space(self):
+        """Test filtering on a meta field with spaces"""
+        await self.partl.upsert_participants(
+            participants=[get_test_participant(), get_test_participant_2()]
+        )
+        print(await self.connection.connection.fetch_all('SELECT * FROM assay'))
+        test_field_with_space = await self.webl.get_project_summary(
+            token=0,
+            grid_filter=[
+                SearchItem(
+                    **{
+                        'model_type': MetaSearchEntityPrefix.ASSAY,
+                        'query': 'field wi',
+                        'field': 'field with spaces',
+                        'is_meta': True,
+                    }
+                )
+            ],
+        )
+        self.assertEqual(1, len(test_field_with_space.participants))
+        test_field_with_space.participants = []
+
+        expected_data_two_samples_filtered = ProjectSummary(
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
+            total_samples=2,
+            total_samples_in_query=1,
+            total_participants=2,
+            total_sequences=2,
+            cram_seqr_stats={
+                'genome': {
+                    'Sequences': '2',
+                    'Crams': '0',
+                    'Seqr': '0',
+                }
+            },
+            batch_sequence_stats={'M001': {'genome': '2'}},
+            participants=[],
+            participant_keys=[('external_id', 'Participant ID')],
+            sample_keys=[
+                ('id', 'Sample ID'),
+                ('external_id', 'External Sample ID'),
+                ('created_date', 'Created date'),
+            ],
+            sequencing_group_keys=[
+                ('id', 'Sequencing Group ID'),
+                ('created_date', 'Created date'),
+            ],
+            assay_keys=[
+                ('type', 'type'),
+                ('technology', 'technology'),
+                ('meta.batch', 'batch'),
+                ('meta.field with spaces', 'field with spaces'),
+                ('meta.reads_type', 'reads_type'),
+            ],
+            seqr_links={},
+            seqr_sync_types=[],
+        )
+
+        self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)

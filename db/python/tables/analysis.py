@@ -199,7 +199,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 SELECT a.id as id, a.type as type, a.status as status,
         a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.timestamp_completed as timestamp_completed, a.active as active,
-        a.meta as meta
+        a.meta as meta, a.author as author
 FROM analysis_sequencing_group a_sg
 INNER JOIN analysis a ON a_sg.analysis_id = a.id
 WHERE a.id in (

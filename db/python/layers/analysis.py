@@ -129,7 +129,7 @@ class AnalysisLayer(BaseLayer):
             output=output,
             active=active,
         )
-
+        # print(analyses)
         return analyses
 
     async def get_sequencing_group_file_sizes(

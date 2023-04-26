@@ -14,6 +14,7 @@ from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
 from db.python import enum_tables
+from db.python.layers import AnalysisLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.assay import AssayLayer
 from db.python.tables.project import ProjectPermissionsTable
@@ -123,8 +124,8 @@ class GraphQLProject:
     @strawberry.field()
     async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
         connection = info.context['connection']
-        participants = await FamilyLayer(connection).get_families(project=root.id)
-        return participants
+        families = await FamilyLayer(connection).get_families(project=root.id)
+        return families
 
     @strawberry.field()
     async def participants(
@@ -148,9 +149,20 @@ class GraphQLProject:
         sequencing_groups = await loader.load(root.id)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
 
-    # @strawberry.field()
-    # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
-    #     return []
+    @strawberry.field()
+    async def analyses(
+        self,
+        info: Info,
+        root: 'Project',
+        type: str | None = None,
+        active: bool | None = None,
+    ) -> list['GraphQLAnalysis']:
+        connection = info.context['connection']
+        connection.project = root.id
+        internal_analysis = await AnalysisLayer(connection).query_analysis(
+            project_ids=[root.id], analysis_type=type, active=active
+        )
+        return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
 
 
 @strawberry.type
