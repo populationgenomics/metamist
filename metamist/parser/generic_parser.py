@@ -29,7 +29,7 @@ from functools import wraps
 
 from cloudpathlib import AnyPath
 
-from metamist.graphql import query_async
+from metamist.graphql import query_async, gql
 from metamist.parser.cloudhelper import CloudHelper, group_by
 
 from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
@@ -84,6 +84,50 @@ SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
+QUERY_MATCH_PARTICIPANTS = gql("""
+query GetParticipantEidMapQuery($project: String!) {
+  project(name: $project) {
+    participants {
+      externalId
+      id
+    }
+  }
+}""")
+
+QUERY_MATCH_SAMPLES = gql("""
+query GetSampleEidMapQuery($project: String!) {
+  project(name: $project) {
+    samples {
+      externalId
+      id
+    }
+  }
+}
+        """)
+QUERY_MATCH_SEQUENCING_GROUPS = gql("""
+query MyQuery($project:String!) {
+  project(name: $project) {
+    sequencingGroups {
+      id
+      assays {
+        id
+      }
+    }
+  }
+}
+""")
+QUERY_MATCH_ASSAYS = gql("""
+query GetSampleEidMapQuery($project: String!) {
+  project(name: $project) {
+    samples {
+      assays {
+        externalIds
+        id
+      }
+    }
+  }
+}
+""")
 
 class CustomDictReader(csv.DictReader):
     """csv.DictReader that strips whitespace off headers"""
@@ -646,18 +690,8 @@ class GenericParser(
         Determine if a participant is NEW or UPDATE, and match the ID if so.
         Participants only match on external_id
         """
-        _query = """
-query GetParticipantEidMapQuery($project: String!) {
-  project(name: $project) {
-    participants {
-      externalId
-      id
-    }
-  }
-}
-        """
 
-        values = await query_async(_query, variables={'project': self.project})
+        values = await query_async(QUERY_MATCH_PARTICIPANTS, variables={'project': self.project})
         pid_map = {p['externalId']: p['id'] for p in values['project']['participants']}
 
         for participant in participants:
@@ -668,18 +702,9 @@ query GetParticipantEidMapQuery($project: String!) {
         Determine if a sample is NEW or UPDATE, and match the ID if so.
         Only matches based on the external ID
         """
-        _query = """
-query GetSampleEidMapQuery($project: String!) {
-  project(name: $project) {
-    samples {
-      externalId
-      id
-    }
-  }
-}
-"""
 
-        values = await query_async(_query, variables={'project': self.project})
+
+        values = await query_async(QUERY_MATCH_SAMPLES, variables={'project': self.project})
         sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
 
         for sample in samples:
@@ -702,20 +727,8 @@ query GetSampleEidMapQuery($project: String!) {
         if not all(sg.assays for sg in sequencing_groups):
             raise ValueError('sequencing_groups must have assays attached')
 
-        _query = """
-query MyQuery($project:String!) {
-  project(name: $project) {
-    sequencingGroups {
-      id
-      assays {
-        id
-      }
-    }
-  }
-}
-"""
 
-        values = await query_async(_query, variables={'project': self.project})
+        values = await query_async(QUERY_MATCH_SEQUENCING_GROUPS, variables={'project': self.project})
         sg_map = {
             tuple(sorted(a['id'] for a in sg['assays'])): sg['id']
             for sg in values['project']['sequencingGroups']
@@ -734,20 +747,8 @@ query MyQuery($project:String!) {
         Determine if assays are NEW, or UPDATE, and match the ID if so.
         This works based on the filenames of the reads.
         """
-        _query = """
-query GetSampleEidMapQuery($project: String!) {
-  project(name: $project) {
-    samples {
-      assays {
-        externalIds
-        id
-      }
-    }
-  }
-}
-        """
 
-        values = await query_async(_query, variables={'project': self.project})
+        values = await query_async(QUERY_MATCH_ASSAYS, variables={'project': self.project})
 
         assay_eid_map = {
             external_id: assay['id']
