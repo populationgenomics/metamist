@@ -19,8 +19,9 @@ TODO: make compatible with analysis-runner
 """
 
 from collections import defaultdict
-import csv
-from datetime import datetime
+
+# import csv
+# from datetime import datetime
 import logging
 import os
 import click
@@ -208,6 +209,11 @@ def get_datasets() -> list[dict]:
 
 
 def get_project_participant_data(project_name: str):
+    """
+    Uses a graphQL query to return all participants in a Metamist project.
+    Nested in the return are all samples associated with the participants,
+    and then all the sequences associated with those samples.
+    """
     _query = """
     query ProjectData($projectName: String!) {
         project(name: $projectName) {
@@ -230,11 +236,11 @@ def get_project_participant_data(project_name: str):
     """
 
     return (
-        query(_query, {"projectName": project_name}).get('project').get('participants')
+        query(_query, {'projectName': project_name}).get('project').get('participants')
     )
 
 
-def get_participant_sample_ids_for_project(participants: list[dict]) -> dict[str, list]:
+def map_participants_to_samples(participants: list[dict]) -> dict[str, list]:
     """
     Returns the {external_participant_id : sample_id} mapping for a Metamist project
      - Also reports if any participants have more than one sample
@@ -267,23 +273,26 @@ def get_participant_sample_ids_for_project(participants: list[dict]) -> dict[str
 
 def get_samples_for_participants(participants: list[dict]) -> dict[str, str]:
     """
-    Returns the {internal sample ID : external sample ID} mapping for all samples in a Metamist project
+    Returns the {internal sample ID : external sample ID} mapping for all participants in a Metamist project
     Also removes any samples that are part of the exclusions list
     """
-
-    samples = [
+    # Create a list of dictionaries, each mapping a sample ID to its external ID
+    samples_all = [
         {
             sample.get('id'): sample.get('externalId')
             for sample in participant.get('samples')
         }
         for participant in participants
     ]
+
+    # Squish them into a single dictionary not a list of dictionaries
     samples = {
         sample_id: sample_external_id
-        for sample_map in samples
+        for sample_map in samples_all
         for sample_id, sample_external_id in sample_map.items()
     }
 
+    # Remove exclusions
     for exclusion in EXCLUDED_SAMPLES:
         if samples.get(exclusion):
             del samples[exclusion]
@@ -347,10 +356,6 @@ def get_sequences_from_participants(
         for participant in participants
     ]
 
-    for sample in EXCLUDED_SAMPLES:
-        if sample in all_sequences:
-            del all_sequences[sample]
-
     return get_sequence_mapping(all_sequences, sequence_type)
 
 
@@ -364,8 +369,12 @@ def get_sequence_mapping(
     seq_id_sample_id = {}
     # multiple reads per sequence is possible so use defaultdict(list)
     sequence_reads = defaultdict(list)
-    for samplesequence in all_sequences:
+    for samplesequence in all_sequences:  # pylint: disable=R1702
+        # Extract the sample ID, skip the sequence if its an exclusion
         sample_id = list(samplesequence.keys())[0]
+        if sample_id in EXCLUDED_SAMPLES:
+            continue
+
         for sequences in samplesequence.values():
             for sequence in sequences:
                 if not sequence.get('type').lower() in sequence_type:
@@ -463,7 +472,9 @@ def get_complete_and_incomplete_samples(
      - the incomplete samples where the alignment hasn't completed and no cram exists
     """
     # Check the analysis paths actually point to crams that exist in the bucket
-    cram_paths = list(sample_cram_paths.values())
+    cram_paths = [
+        path for pathlist in list(sample_cram_paths.values()) for path in pathlist
+    ]
     buckets_subdirs = get_bucket_subdirs_to_search(cram_paths)
     crams_in_bucket = find_files_in_buckets_subdirs(
         buckets_subdirs,
@@ -482,6 +493,10 @@ def get_complete_and_incomplete_samples(
             completed_samples.append(sample)
             continue
         incomplete_samples.update(sample)
+
+    if incomplete_samples:
+        logging.info(f'Samples without CRAMs found: {list(incomplete_samples)}')
+
     return {'complete': completed_samples, 'incomplete': list(incomplete_samples)}
 
 
@@ -632,6 +647,8 @@ def main(
            Add any "moved" files to the sequence files to delete list.
         6. Execute the delete on the full list.
     """
+    logging.basicConfig(level=logging.INFO)
+
     # Get all the participants and all the samples mapped to participants
     participant_data = get_project_participant_data(project)
 
