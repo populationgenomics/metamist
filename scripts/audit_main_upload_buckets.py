@@ -19,7 +19,10 @@ TODO: make compatible with analysis-runner
 """
 
 from collections import defaultdict
+import csv
+from datetime import datetime
 import logging
+import os
 import click
 from cloudpathlib import CloudPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
@@ -50,12 +53,27 @@ ALL_EXTENSIONS = (
     + VCF_EXTENSIONS
 )
 
-FILE_TYPES_MAP = {'fastq': FASTQ_EXTENSIONS,
-                  'bam': BAM_EXTENSIONS,
-                  'cram': CRAM_EXTENSIONS,
-                  'gvcf': GVCF_EXTENSIONS,
-                  'vcf': VCF_EXTENSIONS,
-                  'all': ALL_EXTENSIONS}
+FILE_TYPES_MAP = {
+    'fastq': FASTQ_EXTENSIONS,
+    'bam': BAM_EXTENSIONS,
+    'cram': CRAM_EXTENSIONS,
+    'gvcf': GVCF_EXTENSIONS,
+    'vcf': VCF_EXTENSIONS,
+    'all': ALL_EXTENSIONS,
+}
+
+SEQUENCE_TYPES_MAP = {
+    'genome': [
+        'genome',
+    ],
+    'exome': [
+        'exome',
+    ],
+    'both': [
+        'genome',
+        'exome',
+    ],
+}
 
 ANALYSIS_TYPES = [
     'qc',
@@ -125,6 +143,8 @@ def get_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
 
 def get_paths_for_subdir(bucket_name, subdirectory, file_extension):
     """Iterate through a gcp bucket/subdir and get all the blobs with the specified file extension(s)"""
+    if isinstance(file_extension, list) and len(file_extension) == 1:
+        file_extension = file_extension[0]
     files_in_bucket_subdir = []
     for blob in CLIENT.list_blobs(bucket_name, prefix=subdirectory, delimiter='/'):
         # Check if file ends with specified analysis type
@@ -154,7 +174,9 @@ def find_files_in_buckets_subdirs(
     return files_in_bucket
 
 
-def find_sequence_files_in_bucket(bucket_name: str, file_extensions: tuple[str]) -> list[str]:
+def find_sequence_files_in_bucket(
+    bucket_name: str, file_extensions: tuple[str]
+) -> list[str]:
     """Gets all the gs paths to fastq files in the projects main-upload bucket"""
     sequence_paths = []
     for blob in CLIENT.list_blobs(bucket_name, prefix=''):
@@ -168,13 +190,13 @@ def find_sequence_files_in_bucket(bucket_name: str, file_extensions: tuple[str])
 def get_filename_from_path(path: str) -> str:
     """Extracts filename from file path. e.g. 'subdir/file.ext' -> 'file.ext'"""
 
-    return path.rsplit('/', 1)[1]
+    return os.path.basename(path)
 
 
 def get_filesize_from_path(bucket_name: str, path: str) -> int:
     """Extracts filesize from gs path"""
     bucket = CLIENT.get_bucket(bucket_name)
-    blob_path = path.split(f'gs://{bucket_name}/')[1]
+    blob_path = path.removeprefix(f'gs://{bucket_name}/')
     blob = bucket.get_blob(blob_path)
 
     return blob.size
@@ -183,6 +205,7 @@ def get_filesize_from_path(bucket_name: str, path: str) -> int:
 def get_datasets() -> list[dict]:
     """API call to get project list"""
     return ProjectApi().get_seqr_projects()
+
 
 def get_project_participant_data(project_name: str):
     _query = """
@@ -206,19 +229,30 @@ def get_project_participant_data(project_name: str):
     }
     """
 
-    return query(_query, {"projectName": project_name}).get('project').get('participants')
+    return (
+        query(_query, {"projectName": project_name}).get('project').get('participants')
+    )
+
 
 def get_participant_sample_ids_for_project(participants: list[dict]) -> dict[str, list]:
     """
-    Gets all the participants from a Metamist project + the external_participant_id : sample_id mapping
-    Also report if any participants have more than one sample
+    Returns the {external_participant_id : sample_id} mapping for a Metamist project
+     - Also reports if any participants have more than one sample
     """
 
     # Create mapping of participant external ID to sample ID
-    participant_sample_ids = {participant.get('externalId'): [sample.get('id') for sample in participant.get('samples')]  for participant in participants}
+    participant_sample_ids = {
+        participant.get('externalId'): [
+            sample.get('id') for sample in participant.get('samples')
+        ]
+        for participant in participants
+    }
 
     # Create mapping of participant external ID to internal ID
-    participant_eid_to_iid = {participant.get('externalId'): participant.get('id')  for participant in participants}
+    participant_eid_to_iid = {
+        participant.get('externalId'): participant.get('id')
+        for participant in participants
+    }
 
     # Report if any participants have more than one sample ID
     for participant_eid, sample_ids in participant_sample_ids.items():
@@ -227,18 +261,28 @@ def get_participant_sample_ids_for_project(participants: list[dict]) -> dict[str
                 f'Participant {participant_eid_to_iid[participant_eid]} (external ID: {participant_eid})'
                 + f' associated with more than one sample id: {sample_ids}'
             )
-    
+
     return participant_sample_ids
 
 
-def get_samples_for_participants(participants: list[dict]) -> dict[str,str]:
+def get_samples_for_participants(participants: list[dict]) -> dict[str, str]:
     """
-    Gets all the sample IDs for a Metamist project mapped to their external sample IDs
-    Removes any samples that are part of the exclusions list
+    Returns the {internal sample ID : external sample ID} mapping for all samples in a Metamist project
+    Also removes any samples that are part of the exclusions list
     """
-    
-    samples = [{sample.get('id'): sample.get('externalId') for sample in participant.get('samples')} for participant in participants]
-    samples = {sample_id:sample_external_id for sample_id, sample_external_id in samples.items()}
+
+    samples = [
+        {
+            sample.get('id'): sample.get('externalId')
+            for sample in participant.get('samples')
+        }
+        for participant in participants
+    ]
+    samples = {
+        sample_id: sample_external_id
+        for sample_map in samples
+        for sample_id, sample_external_id in sample_map.items()
+    }
 
     for exclusion in EXCLUDED_SAMPLES:
         if samples.get(exclusion):
@@ -290,9 +334,18 @@ def get_samples_for_participants(participants: list[dict]) -> dict[str,str]:
 #         f'Samples with no participants: {sample_id_set.difference(sample_id_from_papi_set)}'
 #     )
 
-def get_sequences_from_participants(participants: list[dict], sequence_type) -> tuple[dict[int, str], defaultdict[int, list]]:
+
+def get_sequences_from_participants(
+    participants: list[dict], sequence_type
+) -> tuple[dict[int, str], defaultdict[int, list]]:
     """Return latest sequence ids for sample ids"""
-    all_sequences = [{sample.get('id') : sample.get('sequences') for sample in participant.get('samples')} for participant in participants]
+    all_sequences = [
+        {
+            sample.get('id'): sample.get('sequences')
+            for sample in participant.get('samples')
+        }
+        for participant in participants
+    ]
 
     for sample in EXCLUDED_SAMPLES:
         if sample in all_sequences:
@@ -302,28 +355,24 @@ def get_sequences_from_participants(participants: list[dict], sequence_type) -> 
 
 
 def get_sequence_mapping(
-    all_sequences: list[dict], sequence_type: str
+    all_sequences: list[dict], sequence_type: list[str]
 ) -> tuple[dict[int, str], defaultdict[int, list]]:
     """
     Input: A list of Metamist sequences
-    Returns dict mappings of {sequence_id: sample_id}, and {sequence_id: read_locations}
+    Returns dict mappings of {sequence_id : sample_id}, and {sequence_id : read_locations}
     """
     seq_id_sample_id = {}
-    sequence_reads = defaultdict(
-            list
-    )  # multiple reads per sequence is possible so use defaultdict(list)
+    # multiple reads per sequence is possible so use defaultdict(list)
+    sequence_reads = defaultdict(list)
     for samplesequence in all_sequences:
+        sample_id = list(samplesequence.keys())[0]
         for sequences in samplesequence.values():
             for sequence in sequences:
-                if not sequence.get('type').lower() == sequence_type:
+                if not sequence.get('type').lower() in sequence_type:
                     continue
-                
-                seq_id = sequence.get('id')
-                seq_type = sequence.get('type').lower()
                 meta = sequence.get('meta')
-                reads_type = meta.get('reads_type')
-
                 reads = meta.get('reads')
+                seq_id_sample_id[sequence.get('id')] = sample_id
                 if not reads:
                     continue
                 # support up to three levels of nesting, because:
@@ -336,7 +385,9 @@ def get_sequence_mapping(
                 #   - reads: [cram1, cram2]
                 #   - reads: [[fq1_forward, fq1_back], [fq2_forward, fq2_back]]
                 if isinstance(reads, dict):
-                    sequence_reads[sequence.get('id')].append((reads.get('location'), reads.get('size')))
+                    sequence_reads[sequence.get('id')].append(
+                        (reads.get('location'), reads.get('size'))
+                    )
                     continue
                 if not isinstance(reads, list):
                     logging.error(f'Invalid read type: {type(reads)}: {reads}')
@@ -358,7 +409,9 @@ def get_sequence_mapping(
                                 f'Got {type(inner_read)} read, expected dict: {inner_read}'
                             )
                             continue
-                        sequence_reads[sequence.get('id')].append((read.get('location'), read.get('size')))   
+                        sequence_reads[sequence.get('id')].append(
+                            (read.get('location'), read.get('size'))
+                        )
 
     return seq_id_sample_id, sequence_reads
 
@@ -373,8 +426,8 @@ def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str,
         AnalysisQueryModel(
             projects=[
                 project,
-                'seqr',
-            ],  # Many analysis objects hiding out in seqr project
+                'seqr',  # Many analysis objects hiding out in seqr project
+            ],
             type=AnalysisType('cram'),
             status=AnalysisStatus('completed'),  # Only interested in aligned crams
             sample_ids=sample_ids,
@@ -383,8 +436,10 @@ def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str,
 
     sample_cram_paths = {}
     for analysis in analyses:
-        # First check the analysis output path is valid
-        if not validate_analysis_output(analysis['output'], 'cram'):
+        # Check the analysis output path is a valid gs path to a .cram file
+        if not analysis['output'].startswith('gs://') and analysis['output'].endswith(
+            'cram'
+        ):
             logging.info(
                 f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
             )
@@ -396,13 +451,7 @@ def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str,
             # Try getting the sample ID from the 'sample_ids' field
             for sample_id in analysis['sample_ids']:
                 sample_cram_paths[sample_id] = analysis['output']
-
     return sample_cram_paths
-
-
-def validate_analysis_output(output_path: str, file_extension: str):
-    """Check that the analysis output path begins with gs:// and ends in 'cram'"""
-    return output_path.startswith('gs://') and output_path.endswith(file_extension)
 
 
 def get_complete_and_incomplete_samples(
@@ -411,10 +460,10 @@ def get_complete_and_incomplete_samples(
     """
     Returns a dictionary containing two lists of samples:
      - the completed samples which have finished aligning and have a cram
-     - the incomplete samples where the alignment hasn't completed and no cram exists.
+     - the incomplete samples where the alignment hasn't completed and no cram exists
     """
     # Check the analysis paths actually point to crams that exist in the bucket
-    cram_paths = [path for paths in sample_cram_paths.values() for path in paths]
+    cram_paths = list(sample_cram_paths.values())
     buckets_subdirs = get_bucket_subdirs_to_search(cram_paths)
     crams_in_bucket = find_files_in_buckets_subdirs(
         buckets_subdirs,
@@ -433,7 +482,6 @@ def get_complete_and_incomplete_samples(
             completed_samples.append(sample)
             continue
         incomplete_samples.update(sample)
-
     return {'complete': completed_samples, 'incomplete': list(incomplete_samples)}
 
 
@@ -443,7 +491,7 @@ def check_for_uningested_or_moved_sequences(
     """
     Compares the sequences in a Metamist project to the sequences in the main-upload bucket
 
-    Input: The project name, and the sequence dictionaries for the project from Metamist
+    Input: The project name, the {sequence_id : read_paths} mapping, and the sequence file types
     Returns: 1. Paths to sequences that have not yet been ingested.
              2. A dict mapping sequence IDs to GS filepaths that have been ingested,
                 but where the path in the bucket is different to the path for this
@@ -453,7 +501,9 @@ def check_for_uningested_or_moved_sequences(
     """
     # Get all the paths to sequence data anywhere in the main-upload bucket
     bucket_name = f'cpg-{project}-main-upload'
-    sequence_paths_in_bucket = find_sequence_files_in_bucket(bucket_name, file_extensions)
+    sequence_paths_in_bucket = find_sequence_files_in_bucket(
+        bucket_name, file_extensions
+    )
 
     # Flatten all the sequence file paths and file sizes in metamist for this project into a single list
     sequence_paths_sizes_in_metamist = []
@@ -543,8 +593,20 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
     '--project',
     help='Metamist project, used to filter samples',
 )
-@click.option('--sequence-type', '-s', type=click.Choice(['genome', 'exome']), required='True', help='genome or exome')
-@click.option('--file-types', '-f', type=click.Choice(['fastq', 'bam', 'cram', 'gvcf', 'vcf', 'all']), required='True', help='Find fastq, bam, cram, gvcf, vcf, or all sequence file types')
+@click.option(
+    '--sequence-type',
+    '-s',
+    type=click.Choice(['genome', 'exome', 'both']),
+    required='True',
+    help='genome, exome, or both',
+)
+@click.option(
+    '--file-types',
+    '-f',
+    type=click.Choice(['fastq', 'bam', 'cram', 'gvcf', 'vcf', 'all']),
+    required='True',
+    help='Find fastq, bam, cram, gvcf, vcf, or all sequence file types',
+)
 # @click.option('--test', '-t', is_flag=True, default=False, help='uses test datasets')
 @click.option(
     '--dry-run',
@@ -572,14 +634,19 @@ def main(
     """
     # Get all the participants and all the samples mapped to participants
     participant_data = get_project_participant_data(project)
-    #participants_all = PAPI.get_participants(project)
-    #participant_sample_ids = get_participant_sample_ids_for_project(participant_data)
+
+    # Filter out any participants with no samples
+    participant_data = [
+        participant for participant in participant_data if participant.get('samples')
+    ]
 
     # Get all the samples
     samples_all = get_samples_for_participants(participant_data)
 
     # Get all the sequences for the samples in the project and map them to their samples and reads
-    seq_id_sample_id, sequence_reads = get_sequences_from_participants(participant_data, sequence_type)
+    seq_id_sample_id, sequence_reads = get_sequences_from_participants(
+        participant_data, SEQUENCE_TYPES_MAP.get(sequence_type)
+    )
 
     # Also create a mapping of sample ID: sequence ID - use defaultdict in case a sample has several sequences
     sample_id_seq_id = defaultdict(list)
@@ -616,9 +683,9 @@ def main(
     for sequence_id, paths in moved_sequence_paths.items():
         sample_id = seq_id_sample_id.get(sequence_id)
         if sample_id in sample_completion.get('complete'):
-            moved_sequence_reads_to_delete[sequence_id]= paths
+            moved_sequence_reads_to_delete[sequence_id] = paths
 
-    logging.info(f'Found len{uningested_paths} possible uningested files in bucket')
+    logging.info(f'Found {len(uningested_paths)} possible uningested files in bucket')
 
     if not dry_run:
         # Combine the obvious reads to delete with the moved reads to delete into a flat list
@@ -633,7 +700,8 @@ def main(
         logging.info(f'Dry-run - no files deleted')
 
     # Writing the output to files - not really completed
-    # sequences_to_delete_file = f'./seq_del_{project}.csv'
+    # today = datetime.today().strftime('%Y-%m-%d')
+    # sequences_to_delete_file = f'/Users/edwfor/Code/sample-metadata/data_management_scripts/audit_results/seq_del_{project}_{today}_{sequence_type}_{file_types}.csv'
     # with open(sequences_to_delete_file, 'w') as f:
     #     writer = csv.writer(f)
     #     i = 0
@@ -651,7 +719,7 @@ def main(
 
     # logging.info(f'Wrote sequences to delete: {sequences_to_delete_file}')
 
-    # sequences_to_ingest_file = f'./seq_ingest_{project}.csv'
+    # sequences_to_ingest_file = f'/Users/edwfor/Code/sample-metadata/data_management_scripts/audit_results/seq_ingest_{project}_{today}_{sequence_type}_{file_types}.csv'
     # with open(sequences_to_ingest_file, 'w') as f:
     #     writer = csv.writer(f)
     #     i = 0
