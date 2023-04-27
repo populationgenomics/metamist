@@ -7,6 +7,7 @@ import Routes from './Routes'
 import Searchbar from './shared/components/Search'
 import MuckTheDuck from './shared/components/MuckTheDuck'
 import ToggleDarkMode from './shared/components/ToggleDarkMode'
+import TriButton from './shared/components/DarkModeTriButton/DarkModeTriButton'
 
 const App: React.FunctionComponent = () => (
     <Router>
@@ -32,7 +33,8 @@ const App: React.FunctionComponent = () => (
                         Docs
                     </Link>
                     <div style={{ marginLeft: 'auto' }}>
-                        <ToggleDarkMode />
+                        {/* <ToggleDarkMode /> */}
+                        <TriButton />
                     </div>
                     <Searchbar />
                 </div>
