@@ -150,6 +150,11 @@ blockquote {
     display: inline-block;
 }
 
+.navbarIcon {
+    padding: 0 8px;
+    display: inline-block;
+}
+
 .body {
     /* padding: 10px 20px;
   max-width: 768px;

@@ -3,9 +3,10 @@ import './DarkModeTriButton.css'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import ComputerIcon from '@mui/icons-material/Computer'
+import { Popup } from 'semantic-ui-react'
 import { ThemeContext } from '../ThemeProvider'
 
-const TriButton: React.FunctionComponent = () => {
+const DarkModeTriButton: React.FunctionComponent = () => {
     const { toggleTheme } = React.useContext(ThemeContext)
     const [selection, updateSelection] = React.useState(
         localStorage.getItem('theme') || 'system-mode'
@@ -23,7 +24,9 @@ const TriButton: React.FunctionComponent = () => {
                 checked={selection === 'light-mode'}
             />
             <label htmlFor="on">
-                <LightModeIcon />
+                <Popup trigger={<LightModeIcon />} hoverable position="bottom center">
+                    <h5>Light Theme</h5>
+                </Popup>
             </label>
 
             <input
@@ -37,7 +40,9 @@ const TriButton: React.FunctionComponent = () => {
                 checked={selection === 'system-mode'}
             />
             <label htmlFor="na">
-                <ComputerIcon />
+                <Popup trigger={<ComputerIcon />} hoverable position="bottom center">
+                    <h5>Follow System</h5>
+                </Popup>
             </label>
 
             <input
@@ -51,10 +56,12 @@ const TriButton: React.FunctionComponent = () => {
                 checked={selection === 'dark-mode'}
             />
             <label htmlFor="off">
-                <DarkModeIcon />
+                <Popup trigger={<DarkModeIcon />} hoverable position="bottom center">
+                    <h5>Dark Theme</h5>
+                </Popup>
             </label>
         </div>
     )
 }
 
-export default TriButton
+export default DarkModeTriButton
