@@ -32,7 +32,9 @@ class TestValidateParserQueries(unittest.TestCase):
         """
         # only need to apply schema to the first client to create, then it gets cached
 
-        client = configure_sync_client(schema=api.graphql.schema.schema.as_str())
+        client = configure_sync_client(
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+        )
         validate(QUERY_MATCH_PARTICIPANTS, client=client)
         validate(QUERY_MATCH_SAMPLES, client=client)
         validate(QUERY_MATCH_SEQUENCING_GROUPS, client=client)

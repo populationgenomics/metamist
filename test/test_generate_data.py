@@ -8,6 +8,6 @@ class ValidateGenerateDataQueries(unittest.TestCase):
     """Validate generate data queries"""
     def test_validate_queries(self):
         """Validate queries"""
-        client = configure_sync_client(schema=schema.as_str())
+        client = configure_sync_client(schema=schema.as_str(), auth_token='FAKE')
         validate(QUERY_ENUMS, client=client)
         validate(QUERY_SG_ID, client=client)

@@ -37,7 +37,7 @@ setup(
         'typing-extensions',
         # for get id-token
         'cpg-utils >= 4.9.4',
-        "gql[aiohttp,requests]",
+        'gql[aiohttp,requests]',
     ],
     include_package_data=True,
     zip_safe=False,
