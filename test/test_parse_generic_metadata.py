@@ -5,8 +5,38 @@ from unittest.mock import patch
 
 from test.testbase import run_as_sync, DbIsolatedTest
 
-from metamist.parser.generic_parser import ParsedParticipant, ParsedSample
+from metamist.graphql import validate, configure_sync_client
+from metamist.parser.generic_parser import (
+    ParsedParticipant,
+    ParsedSample,
+    QUERY_MATCH_PARTICIPANTS,
+    QUERY_MATCH_SAMPLES,
+    QUERY_MATCH_SEQUENCING_GROUPS,
+    QUERY_MATCH_ASSAYS,
+)
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
+
+import api.graphql.schema
+
+
+class TestValidateParserQueries(unittest.TestCase):
+    """
+    Validate queries used by the GenericParser
+    """
+
+    def test_queries(self):
+        """
+        We have the luxury of getting the schema directly, so we can validate
+        the current development version! Oustide metamist, you'd just leave the
+        schema option blank, and it would fetch the schema from the server.
+        """
+        # only need to apply schema to the first client to create, then it gets cached
+
+        client = configure_sync_client(schema=api.graphql.schema.schema.as_str())
+        validate(QUERY_MATCH_PARTICIPANTS, client=client)
+        validate(QUERY_MATCH_SAMPLES, client=client)
+        validate(QUERY_MATCH_SEQUENCING_GROUPS, client=client)
+        validate(QUERY_MATCH_ASSAYS, client=client)
 
 
 class TestParseGenericMetadata(DbIsolatedTest):

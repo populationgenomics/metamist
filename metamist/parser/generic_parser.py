@@ -84,7 +84,8 @@ SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
-QUERY_MATCH_PARTICIPANTS = gql("""
+QUERY_MATCH_PARTICIPANTS = gql(
+    """
 query GetParticipantEidMapQuery($project: String!) {
   project(name: $project) {
     participants {
@@ -92,9 +93,11 @@ query GetParticipantEidMapQuery($project: String!) {
       id
     }
   }
-}""")
+}"""
+)
 
-QUERY_MATCH_SAMPLES = gql("""
+QUERY_MATCH_SAMPLES = gql(
+    """
 query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
     samples {
@@ -103,8 +106,10 @@ query GetSampleEidMapQuery($project: String!) {
     }
   }
 }
-        """)
-QUERY_MATCH_SEQUENCING_GROUPS = gql("""
+        """
+)
+QUERY_MATCH_SEQUENCING_GROUPS = gql(
+    """
 query MyQuery($project:String!) {
   project(name: $project) {
     sequencingGroups {
@@ -115,8 +120,10 @@ query MyQuery($project:String!) {
     }
   }
 }
-""")
-QUERY_MATCH_ASSAYS = gql("""
+"""
+)
+QUERY_MATCH_ASSAYS = gql(
+    """
 query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
     samples {
@@ -127,7 +134,9 @@ query GetSampleEidMapQuery($project: String!) {
     }
   }
 }
-""")
+"""
+)
+
 
 class CustomDictReader(csv.DictReader):
     """csv.DictReader that strips whitespace off headers"""
@@ -691,7 +700,9 @@ class GenericParser(
         Participants only match on external_id
         """
 
-        values = await query_async(QUERY_MATCH_PARTICIPANTS, variables={'project': self.project})
+        values = await query_async(
+            QUERY_MATCH_PARTICIPANTS, variables={'project': self.project}
+        )
         pid_map = {p['externalId']: p['id'] for p in values['project']['participants']}
 
         for participant in participants:
@@ -703,8 +714,9 @@ class GenericParser(
         Only matches based on the external ID
         """
 
-
-        values = await query_async(QUERY_MATCH_SAMPLES, variables={'project': self.project})
+        values = await query_async(
+            QUERY_MATCH_SAMPLES, variables={'project': self.project}
+        )
         sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
 
         for sample in samples:
@@ -727,8 +739,9 @@ class GenericParser(
         if not all(sg.assays for sg in sequencing_groups):
             raise ValueError('sequencing_groups must have assays attached')
 
-
-        values = await query_async(QUERY_MATCH_SEQUENCING_GROUPS, variables={'project': self.project})
+        values = await query_async(
+            QUERY_MATCH_SEQUENCING_GROUPS, variables={'project': self.project}
+        )
         sg_map = {
             tuple(sorted(a['id'] for a in sg['assays'])): sg['id']
             for sg in values['project']['sequencingGroups']
@@ -748,7 +761,9 @@ class GenericParser(
         This works based on the filenames of the reads.
         """
 
-        values = await query_async(QUERY_MATCH_ASSAYS, variables={'project': self.project})
+        values = await query_async(
+            QUERY_MATCH_ASSAYS, variables={'project': self.project}
+        )
 
         assay_eid_map = {
             external_id: assay['id']

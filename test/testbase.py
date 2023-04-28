@@ -183,6 +183,16 @@ class DbTest(unittest.TestCase):
 
     async def run_graphql_query_async(self, query, variables=None):
         """Run ASYNC graphql query on internal database"""
+        if not isinstance(query, str):
+            # if the query was wrapped in a gql() call, unwrap it
+            try:
+                query = query.loc.source.body
+            except KeyError as exc:
+                # it obviously wasn't of type document
+                raise ValueError(
+                    f'Invalid test query (type: {type(query)}): {query}'
+                ) from exc
+
         value = await schema.execute(
             query,
             variable_values=variables,

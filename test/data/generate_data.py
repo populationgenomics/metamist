@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,unsubscriptable-object
 import argparse
 import asyncio
 import datetime
@@ -13,7 +13,7 @@ from metamist.apis import (
     FamilyApi,
     SampleApi,
 )
-from metamist.graphql import query
+from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.models import (
@@ -25,6 +25,27 @@ from metamist.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
 
+QUERY_SG_ID = gql("""
+query MyQuery($project: String!) {
+  project(name: $project) {
+    sequencingGroups {
+      id
+    }
+  }
+}""")
+
+QUERY_ENUMS = gql("""
+query EnumsQuery {
+  enum {
+    analysisType
+    assayType
+    sampleType
+    sequencingPlatform
+    sequencingTechnology
+    sequencingType
+  }
+}""")
+
 
 async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     """Doing the generation for you"""
@@ -32,19 +53,7 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     papi = ProjectApi()
     sapi = SampleApi()
 
-    enums_query = """
-    query EnumsQuery {
-      enum {
-        analysisType
-        assayType
-        sampleType
-        sequencingPlatform
-        sequencingTechnology
-        sequencingType
-      }
-    }
-    """
-    enum_resp = query(enums_query)
+    enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
     # analysis_types = enum_resp['enum']['analysisType']
     sample_types = enum_resp['enum']['sampleType']
     sequencing_technologies = enum_resp['enum']['sequencingTechnology']
@@ -153,16 +162,8 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
     pprint(response)
 
     # practice what you preach I guess
-    _sgid_qquery = """
-query MyQuery($project: String!) {
-  project(name: $project) {
-    sequencingGroups {
-      id
-    }
-  }
-}
-    """
-    sgid_response = query(_sgid_qquery, {'project': project})
+
+    sgid_response = await query_async(QUERY_SG_ID, {'project': project})
     sequencing_group_ids = [
         sg['id'] for sg in sgid_response['project']['sequencingGroups']
     ]
