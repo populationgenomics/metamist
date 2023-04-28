@@ -19,14 +19,15 @@ TODO: make compatible with analysis-runner
 """
 
 from collections import defaultdict
-
-# import csv
-# from datetime import datetime
+import csv
+from datetime import datetime
+import sys
 import logging
 import os
 from typing import Type, TypeVar
 import click
-from cloudpathlib import CloudPath
+
+# from cloudpathlib import CloudPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from google.cloud import storage
 from google.cloud.storage.bucket import Bucket
@@ -71,7 +72,7 @@ SEQUENCE_TYPES_MAP = {
     'exome': [
         'exome',
     ],
-    'both': [
+    'all': [
         'genome',
         'exome',
     ],
@@ -125,7 +126,7 @@ TBucket = TypeVar('TBucket', bound=Bucket)
 
 
 def get_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
-    """ "
+    """
     Takes a list of paths and extracts the bucket name and subdirectory, returning all unique pairs
     of buckets/subdirectories
     """
@@ -319,8 +320,8 @@ def get_sequence_mapping(
     for samplesequence in all_sequences:  # pylint: disable=R1702
         # Extract the sample ID, skip the sequence if its an exclusion
         sample_id = list(samplesequence.keys())[0]
-        if sample_id in EXCLUDED_SAMPLES:
-            continue
+        # if sample_id in EXCLUDED_SAMPLES:
+        #    continue
 
         for sequences in samplesequence.values():
             for sequence in sequences:
@@ -372,10 +373,12 @@ def get_sequence_mapping(
     return seq_id_sample_id, sequence_reads
 
 
-def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str, str]):
+def get_analysis_cram_paths_for_project_samples(
+    project: str, samples: dict[str, str], sequence_type: list[str]
+) -> defaultdict[str, dict[int, str]]:
     """
     Queries all analyses for the list of samples in the given project AND the seqr project.
-    Returns a dict mapping {sample_id : cram_path}
+    Returns a dict mapping {sample_id : (analysis_id, cram_path) }
     """
     sample_ids = list(samples.keys())
     analyses = AAPI.query_analyses(
@@ -390,7 +393,40 @@ def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str,
         )
     )
 
-    sample_cram_paths = {}
+    # Report any crams missing the sequence type
+    crams_with_missing_seq_type = [
+        analysis.get('id')
+        for analysis in analyses
+        if 'sequencing_type' not in analysis['meta']
+    ]
+    if crams_with_missing_seq_type:
+        logging.warning(
+            f'CRAMs from dataset {project} did not have sequencing_type: {crams_with_missing_seq_type}'
+        )
+        logging.info(
+            'Assuming CRAM sequencing type based on output path containing /exome/ or not...'
+        )
+        # Assign sequencing types to the crams based on the output path
+        for i, analysis in enumerate(analyses):
+            if analysis.get('id') in crams_with_missing_seq_type:
+                exome = 'exome' in analysis.get('output')
+                if not exome:
+                    analysis['meta']['sequencing_type'] = 'genome'
+                    analyses[i] = analysis
+                    continue
+                analysis['meta']['sequencing_type'] = 'exome'
+                analyses[i] = analysis
+
+    # Filter the analyses based on input sequence type
+
+    analyses = [
+        analysis
+        for analysis in analyses
+        if analysis.get('meta')['sequencing_type'] in sequence_type
+    ]
+
+    # For each sample ID, collect the analysis IDs and cram paths
+    sample_cram_paths: defaultdict[str, dict[int, str]] = defaultdict(dict)
     for analysis in analyses:
         # Check the analysis output path is a valid gs path to a .cram file
         if not analysis['output'].startswith('gs://') and analysis['output'].endswith(
@@ -402,27 +438,35 @@ def get_analysis_cram_paths_for_project_samples(project: str, samples: dict[str,
             continue
         try:
             # Try getting the sample ID from the 'meta' field's 'sample' field
-            sample_cram_paths[analysis['meta']['sample']] = analysis['output']
+            sample_id = analysis.get('meta')['sample']
         except KeyError:
             # Try getting the sample ID from the 'sample_ids' field
-            for sample_id in analysis['sample_ids']:
-                sample_cram_paths[sample_id] = analysis['output']
+            for sample in analysis.get('sample_ids'):
+                sample_id = sample
+
+        sample_cram_paths[sample_id].update(
+            [(analysis.get('id'), analysis.get('output'))]
+        )
+
     return sample_cram_paths
 
 
 def get_complete_and_incomplete_samples(
-    samples: list[str], sample_cram_paths: dict[str, list[str]]
+    samples: list[str], sample_cram_paths: dict[str, dict[int, str]]
 ):
     """
-    Returns a dictionary containing two lists of samples:
-     - the completed samples which have finished aligning and have a cram
-     - the incomplete samples where the alignment hasn't completed and no cram exists
+    Returns a dictionary containing two categories of samples:
+     - the completed samples which have finished aligning and have a cram, as a dict mapping
+        the sample_id to the analysis IDs
+     - the incomplete samples where the alignment hasn't completed and no cram exists, as a list
     """
+    # Get all the unique cram paths to check
+    cram_paths = set()
+    for analyses in sample_cram_paths.values():
+        cram_paths.update(list(analyses.values()))
+
     # Check the analysis paths actually point to crams that exist in the bucket
-    cram_paths = [
-        path for pathlist in list(sample_cram_paths.values()) for path in pathlist
-    ]
-    buckets_subdirs = get_bucket_subdirs_to_search(cram_paths)
+    buckets_subdirs = get_bucket_subdirs_to_search(list(cram_paths))
     crams_in_bucket = find_files_in_buckets_subdirs(
         buckets_subdirs,
         [
@@ -434,12 +478,13 @@ def get_complete_and_incomplete_samples(
     incomplete_samples = set(samples).difference(set(sample_cram_paths.keys()))
 
     # Completed samples are those whose completed cram output path exists in the bucket at the same path
-    completed_samples = []
-    for sample, cram_path in sample_cram_paths.items():
-        if cram_path in crams_in_bucket:
-            completed_samples.append(sample)
-            continue
-        incomplete_samples.update(sample)
+    completed_samples = defaultdict(list)
+    for sample, analyses in sample_cram_paths.items():
+        for analysis_id, cram_path in analyses.items():
+            if cram_path in crams_in_bucket:
+                completed_samples[sample].append(analysis_id)
+                continue
+            incomplete_samples.update(sample)
 
     if incomplete_samples:
         logging.info(f'Samples without CRAMs found: {list(incomplete_samples)}')
@@ -447,8 +492,60 @@ def get_complete_and_incomplete_samples(
     return {'complete': completed_samples, 'incomplete': list(incomplete_samples)}
 
 
-def check_for_uningested_or_moved_sequences(
-    project: str, sequence_reads: defaultdict[int, list], file_extensions: tuple[str]
+def get_reads_to_delete_or_ingest(
+    project: str,
+    completed_samples: defaultdict[str, list[int]],
+    sequence_reads: defaultdict[int, list],
+    sample_id_seq_id_map: dict[str, list[int]],
+    seq_id_sample_id_map: dict[int, str],
+    file_types: tuple[str],
+) -> tuple[list, list]:
+    """
+    Inputs: 1. Metamist project name
+            2. List of samples which have completed CRAMs
+            3. Dictionary mapping of sequence IDs to read paths and read file sizes
+            4. Dictionary mapping sample IDs to sequence IDs
+            5. Dictionary mapping sequence_ids to sample_ids
+            6. The sequence file types to search for in the bucket
+    Returns a tuple of two lists, each containing sequences IDs and sequence file paths.
+    The first containins reads which can be deleted, the second containing reads to ingest.
+    Include the sample ID and analysis ID in the reads to delete list.
+    """
+
+    # Check for uningested sequence data that may be hiding or sequence data that has been moved
+    (
+        reads_to_ingest,
+        moved_sequences_to_delete,
+    ) = check_for_uningested_or_moved_sequences(
+        project,
+        sequence_reads,
+        completed_samples,
+        seq_id_sample_id_map,
+        file_types,
+    )
+
+    sequence_reads_to_delete = []
+    for sample_id, analysis_ids in completed_samples.items():
+        seq_ids = sample_id_seq_id_map[sample_id]
+        for seq_id in seq_ids:
+            seq_read_paths = [reads_sizes[0] for reads_sizes in sequence_reads[seq_id]]
+            for path in seq_read_paths:
+                if sample_id not in EXCLUDED_SAMPLES:
+                    sequence_reads_to_delete.append(
+                        (sample_id, seq_id, path, analysis_ids)
+                    )
+
+    reads_to_delete = sequence_reads_to_delete + moved_sequences_to_delete
+
+    return reads_to_delete, reads_to_ingest
+
+
+def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
+    project: str,
+    sequence_reads: defaultdict[int, list],
+    completed_samples: defaultdict[str, list[int]],
+    seq_id_sample_id_map: dict[int, str],
+    file_extensions: tuple[str],
 ):
     """
     Compares the sequences in a Metamist project to the sequences in the main-upload bucket
@@ -478,7 +575,7 @@ def check_for_uningested_or_moved_sequences(
     sequence_paths_in_metamist = [
         path_size[0] for path_size in sequence_paths_sizes_in_metamist
     ]
-    uningested_paths = list(
+    uningested_sequence_paths = list(
         set(sequence_paths_in_bucket).difference(set(sequence_paths_in_metamist))
     )
 
@@ -493,7 +590,7 @@ def check_for_uningested_or_moved_sequences(
 
     # Identify if any paths are to files that have actually just been moved by checking if they are in the bucket but not metamist
     ingested_and_moved_filepaths = []
-    for path in uningested_paths:
+    for path in uningested_sequence_paths:
         filename = os.path.basename(path)
         # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
         if filename in sequence_files_sizes_in_metamist.keys():
@@ -502,10 +599,13 @@ def check_for_uningested_or_moved_sequences(
                 ingested_and_moved_filepaths.append(
                     (path, sequence_files_paths_in_metamist.get(filename))
                 )
+    logging.info(
+        f'Found {len(ingested_and_moved_filepaths)} ingested files that have been moved'
+    )
 
     # If the file has just been moved, we consider it ingested
     for bucket_path, _ in ingested_and_moved_filepaths:
-        uningested_paths.remove(bucket_path)
+        uningested_sequence_paths.remove(bucket_path)
 
     # flip the sequence id : reads mapping to identify sequence IDs by their read paths
     reads_sequences = {}
@@ -514,40 +614,64 @@ def check_for_uningested_or_moved_sequences(
             reads_sequences[read_size[0]] = sequence_id
 
     # Collect the sequences for files that have been ingested and moved to a different bucket location
-    sequences_moved_paths = defaultdict(list)
+    sequences_moved_paths = []
     for bucket_path, metamist_path in ingested_and_moved_filepaths:
-        seq_id = reads_sequences[metamist_path]
-        sequences_moved_paths[seq_id].append(bucket_path)
+        seq_id = reads_sequences.get(metamist_path)
+        sample_id = seq_id_sample_id_map.get(seq_id)
+        analysis_ids = completed_samples.get(sample_id)
+        if sample_id not in EXCLUDED_SAMPLES:
+            sequences_moved_paths.append((sample_id, seq_id, bucket_path, analysis_ids))
 
-    return uningested_paths, sequences_moved_paths
-
-
-def get_reads_to_delete(
-    completed_samples: list[str],
-    sequence_reads: dict[int, list[tuple[str, int]]],
-    sample_id_seq_id_map: dict[str, list[int]],
-) -> dict[int, list[str]]:
-    """
-    Inputs: 1. List of samples which have completed CRAMs
-            2. Dictionary mapping of sequence IDs to read paths and read file sizes
-            3. Dictionary mapping sample IDs to sequence IDs
-    Returns a dictionary mapping sequences IDs to sequence read file paths which can be safely deleted.
-    """
-    sequence_reads_to_delete = defaultdict(list)
-    for sample in completed_samples:
-        seq_ids = sample_id_seq_id_map[sample]
-        for seq_id in seq_ids:
-            seq_read_paths = [reads_sizes[0] for reads_sizes in sequence_reads[seq_id]]
-            sequence_reads_to_delete[seq_id].extend(seq_read_paths)
-
-    return sequence_reads_to_delete
+    return uningested_sequence_paths, sequences_moved_paths
 
 
-def clean_up_cloud_storage(locations: list[CloudPath]):
-    """Given a list of locations of files to be deleted"""
-    for location in locations:
-        location.unlink()
-        logging.info(f'{location.name} was deleted from cloud storage.')
+def write_sequencing_reports(
+    project,
+    file_types,
+    sequence_type,
+    sequence_reads_to_delete,
+    sequence_reads_to_ingest,
+):
+    """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
+    # Writing the output to files
+    today = datetime.today().strftime('%Y-%m-%d')
+    sequences_to_delete_file = (
+        f'./{project}_{file_types}_{sequence_type}_sequences_to_delete_{today}.csv'
+    )
+    with open(sequences_to_delete_file, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs'])
+        for row in sequence_reads_to_delete:
+            writer.writerow(row)
+        logging.info(f'Wrote {len(sequence_reads_to_delete)} reads to delete')
+
+    logging.info(f'Wrote sequences to delete report: {sequences_to_delete_file}')
+
+    sequences_to_ingest_file = (
+        f'./{project}_{file_types}_{sequence_type}_sequences_to_ingest_{today}.csv'
+    )
+    with open(sequences_to_ingest_file, 'w') as f:
+        writer = csv.writer(f)
+        for path in sequence_reads_to_ingest:
+            writer.writerow([path])
+        logging.info(
+            f'Wrote {len(sequence_reads_to_ingest)} possible sequences to ingest'
+        )
+
+    logging.info(f'Wrote sequences to ingest report: {sequences_to_ingest_file}')
+
+    for sequence_report in [sequences_to_delete_file, sequences_to_ingest_file]:
+        file = os.path.basename(sequence_report)
+        bucket = CLIENT.get_bucket(f'cpg-{project}-main-upload')
+
+        upload_report = bucket.blob(os.path.join('audit_results', today, file))
+        upload_report.upload_from_filename(sequence_report)
+
+        logging.info(
+            f'Uploaded {file} to gs://cpg-{project}-main-upload/audit_results/{today}/'
+        )
+
+    logging.info('Sequences to delete and ingest reports uploaded. Finishing...')
 
 
 @click.command()
@@ -558,9 +682,9 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
 @click.option(
     '--sequence-type',
     '-s',
-    type=click.Choice(['genome', 'exome', 'both']),
+    type=click.Choice(['genome', 'exome', 'all']),
     required='True',
-    help='genome, exome, or both',
+    help='genome, exome, or all',
 )
 @click.option(
     '--file-types',
@@ -569,15 +693,10 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
     required='True',
     help='Find fastq, bam, cram, gvcf, vcf, or all sequence file types',
 )
-@click.option(
-    '--dry-run',
-    is_flag=True,
-)
 def main(
     project,
     sequence_type,
     file_types,
-    dry_run,
 ):
     """
     Finds sequence files which can be deleted and does so if the dry-run flag is absent.
@@ -593,8 +712,6 @@ def main(
            Add any "moved" files to the sequence files to delete list.
         6. Execute the delete on the full list.
     """
-    logging.basicConfig(level=logging.INFO)
-
     # Get all the participants and all the samples mapped to participants
     participant_data = get_project_participant_data(project)
 
@@ -618,7 +735,7 @@ def main(
 
     # Get all completed cram output paths for the samples in the project and validate them
     sample_cram_paths = get_analysis_cram_paths_for_project_samples(
-        project, samples_all
+        project, samples_all, SEQUENCE_TYPES_MAP.get(sequence_type)
     )
 
     # Identify samples with and without completed crams
@@ -626,73 +743,31 @@ def main(
         samples_all, sample_cram_paths
     )
 
-    if sample_completion.get('incomplete'):
-        logging.info(
-            f'Samples without CRAMs found: {sample_completion.get("incomplete")}'
-        )
-
     # Samples with completed crams can have their sequences deleted - these are the obvious ones
-    sequence_reads_to_delete = get_reads_to_delete(
-        sample_completion.get('complete'), sequence_reads, sample_id_seq_id
+    sequence_reads_to_delete, sequence_reads_to_ingest = get_reads_to_delete_or_ingest(
+        project,
+        sample_completion.get('complete'),
+        sequence_reads,
+        sample_id_seq_id,
+        seq_id_sample_id,
+        FILE_TYPES_MAP.get(file_types),
     )
 
-    # Check for uningested sequence data that may be hiding or sequence data that has been moved
-    uningested_paths, moved_sequence_paths = check_for_uningested_or_moved_sequences(
-        project, sequence_reads, FILE_TYPES_MAP.get(file_types)
+    write_sequencing_reports(
+        project,
+        file_types,
+        sequence_type,
+        sequence_reads_to_delete,
+        sequence_reads_to_ingest,
     )
-
-    # Any moved data from a sample with a completed CRAM can be added to the delete list
-    moved_sequence_reads_to_delete = {}
-    for sequence_id, paths in moved_sequence_paths.items():
-        sample_id = seq_id_sample_id.get(sequence_id)
-        if sample_id in sample_completion.get('complete'):
-            moved_sequence_reads_to_delete[sequence_id] = paths
-
-    logging.info(f'Found {len(uningested_paths)} possible uningested files in bucket')
-
-    if not dry_run:
-        # Combine the obvious reads to delete with the moved reads to delete into a flat list
-        reads_to_delete = list(sequence_reads_to_delete.values()) + list(
-            moved_sequence_reads_to_delete.values()
-        )
-        reads_to_delete = [read for readlist in reads_to_delete for read in readlist]
-        # Convert the paths to delete to CloudPath objects and delete them
-        reads_to_delete = [CloudPath(read) for read in reads_to_delete]
-        clean_up_cloud_storage(reads_to_delete)
-    else:
-        logging.info(f'Dry-run - no files deleted')
-
-    # Writing the output to files - not really completed
-    # today = datetime.today().strftime('%Y-%m-%d')
-    # sequences_to_delete_file = f'/Users/edwfor/Code/sample-metadata/data_management_scripts/audit_results/seq_del_{project}_{today}_{sequence_type}_{file_types}.csv'
-    # with open(sequences_to_delete_file, 'w') as f:
-    #     writer = csv.writer(f)
-    #     i = 0
-    #     for seq, reads in sequence_reads_to_delete.items():
-    #         for read in reads:
-    #             i += 1
-    #             writer.writerow([seq, read])
-    #     logging.info(f'Wrote {i} reads to delete')
-    #     i = 0
-    #     for seq, reads in moved_sequence_paths.items():
-    #         for read in reads:
-    #             i += 1
-    #             writer.writerow([seq, read])
-    #     logging.info(f'Wrote {i} reads to delete which were ingested and moved')
-
-    # logging.info(f'Wrote sequences to delete: {sequences_to_delete_file}')
-
-    # sequences_to_ingest_file = f'/Users/edwfor/Code/sample-metadata/data_management_scripts/audit_results/seq_ingest_{project}_{today}_{sequence_type}_{file_types}.csv'
-    # with open(sequences_to_ingest_file, 'w') as f:
-    #     writer = csv.writer(f)
-    #     i = 0
-    #     for path in uningested_paths:
-    #         writer.writerow([path])
-    #         i += 1
-    #     logging.info(f'Wrote {i} uningested sequences')
-
-    # logging.info(f'Wrote sequences to ingest: {sequences_to_ingest_file}')
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(module)s:%(lineno)d - %(message)s',
+        datefmt='%Y-%M-%d %H:%M:%S',
+        stream=sys.stderr,
+    )
+
     main()  # pylint: disable=E1120
