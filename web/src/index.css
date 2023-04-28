@@ -119,13 +119,16 @@ blockquote {
     top: 0;
     width: 100%;
     z-index: 999;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    /* height: 50px; */
 }
 
 .metamist {
     font-family: 'Raleway', sans-serif;
     color: white;
     font-size: 28px;
-    display: inline-block;
+    /* display: inline-block; */
 }
 
 .header {
@@ -135,13 +138,13 @@ blockquote {
     padding: 0px 80px 0px 80px;
 }
 
-.header img {
+.metamist-img {
     vertical-align: bottom;
 }
 
 .navbarLink {
     color: #f2f2f2;
-    padding: 14px 16px;
+    padding: 0 16px;
     text-decoration: none;
     font-size: 17px;
     display: inline-block;
