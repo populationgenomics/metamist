@@ -97,18 +97,6 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
         }))
     }
 
-    // return (
-    //     <Table celled>
-    //         <SUITable.Header>
-    //             <SUITable.Row>
-    //                 <SUITable.HeaderCell>
-    //                     <FilterAltIcon />
-    //                 </SUITable.HeaderCell>
-    //             </SUITable.Row>
-    //         </SUITable.Header>
-    //     </Table>
-    // )
-
     return (
         <Table celled>
             <SUITable.Header>
@@ -130,7 +118,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
                                         <Popup
-                                            position="top center"
+                                            position={
+                                                summary.participants.length === 0
+                                                    ? 'top right'
+                                                    : 'top center'
+                                            }
                                             trigger={
                                                 `${category}.${name}` in filterValues ? (
                                                     <FilterAltIcon />

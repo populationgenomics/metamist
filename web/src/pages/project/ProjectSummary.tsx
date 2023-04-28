@@ -169,40 +169,58 @@ const ProjectSummary: React.FunctionComponent = () => {
                 !Object.keys(filterValues).length && (
                     <MuckError message={`Ah Muck, there aren't any samples in this project`} />
                 )}
-            {projectName && !error && !isLoading && summary && (
-                <>
-                    <TotalsStats summary={summary ?? {}} />
-                    <SummaryStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                    />
-                    <BatchStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                        batchSequenceStats={summary?.batch_sequence_stats ?? {}}
-                    />
-                    <hr />
-                    <MultiQCReports projectName={projectName} />
-                    <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
-                    <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
-                    <hr />
-                    <div
-                        style={{
-                            marginBottom: '10px',
-                            justifyContent: 'flex-end',
-                            display: 'flex',
-                            flexDirection: 'row',
-                        }}
-                    >
-                        <Dropdown
-                            selection
-                            onChange={setPageLimit}
-                            value={pageLimit}
-                            options={PAGE_SIZES.map((s) => ({
-                                key: s,
-                                text: `${s} samples`,
-                                value: s,
-                            }))}
+            {projectName &&
+                !error &&
+                !isLoading &&
+                summary &&
+                !!(summary.participants.length !== 0 || Object.keys(filterValues).length) && (
+                    <>
+                        <TotalsStats summary={summary ?? {}} />
+                        <SummaryStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                        />
+                        <BatchStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                        />
+                        <hr />
+                        <MultiQCReports projectName={projectName} />
+                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                        <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
+                        <hr />
+                        <div
+                            style={{
+                                marginBottom: '10px',
+                                justifyContent: 'flex-end',
+                                display: 'flex',
+                                flexDirection: 'row',
+                            }}
+                        >
+                            <Dropdown
+                                selection
+                                onChange={setPageLimit}
+                                value={pageLimit}
+                                options={PAGE_SIZES.map((s) => ({
+                                    key: s,
+                                    text: `${s} samples`,
+                                    value: s,
+                                }))}
+                            />
+                            <PageOptions
+                                isLoading={isLoading}
+                                totalPageNumbers={totalPageNumbers}
+                                totalSamples={summary?.total_samples_in_query}
+                                pageNumber={pageNumber}
+                                handleOnClick={handleOnClick}
+                            />
+                        </div>
+                        <ProjectGrid
+                            summary={summary}
+                            projectName={projectName}
+                            updateFilters={updateFilters}
+                            filterValues={gridFilterValues}
                         />
                         <PageOptions
                             isLoading={isLoading}
@@ -211,22 +229,8 @@ const ProjectSummary: React.FunctionComponent = () => {
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
                         />
-                    </div>
-                    <ProjectGrid
-                        summary={summary}
-                        projectName={projectName}
-                        updateFilters={updateFilters}
-                        filterValues={gridFilterValues}
-                    />
-                    <PageOptions
-                        isLoading={isLoading}
-                        totalPageNumbers={totalPageNumbers}
-                        totalSamples={summary?.total_samples_in_query}
-                        pageNumber={pageNumber}
-                        handleOnClick={handleOnClick}
-                    />
-                </>
-            )}
+                    </>
+                )}
         </>
     )
 }

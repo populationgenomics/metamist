@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 import remarkToc from 'remark-toc'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vs, dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { useMediaQuery } from 'react-responsive'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 interface IDocumentationArticleProps {
     articleid?: string
@@ -30,7 +30,9 @@ const DocumentationArticle: React.FunctionComponent<IDocumentationArticleProps> 
     props: IDocumentationArticleProps
 ) => {
     const [text, setText] = React.useState<string | null>(null)
-    const isDarkMode = useMediaQuery({ query: '(prefers-color-scheme: dark)' })
+    const theme = React.useContext(ThemeContext)
+
+    const isDarkMode = theme.theme === 'dark-mode'
 
     const match = useParams()
 

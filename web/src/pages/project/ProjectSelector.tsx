@@ -8,8 +8,6 @@ import { useQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__/gql'
 
-// import { SearchItem, MetaSearchEntityPrefix } from '../../sm-api/api'
-
 const GET_PROJECTS = gql(`
     query getProjects {
         myProjects {
