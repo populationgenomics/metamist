@@ -13,7 +13,7 @@ from gql.transport.requests import RequestsHTTPTransport
 
 from cpg_utils.cloud import get_google_identity_token
 # this does not import itself, it imports the module
-from graphql import DocumentNode
+from graphql import DocumentNode    # type: ignore
 
 import metamist.configuration
 
