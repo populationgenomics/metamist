@@ -60,7 +60,7 @@ class SequencingGroupTable(DbBase):
             SELECT {SequencingGroupTable.common_get_keys_str}
             FROM sequencing_group sg
             INNER JOIN sample s ON s.id = sg.sample_id
-            WHERE id IN :sgids
+            WHERE sg.id IN :sgids
         """
 
         rows = await self.connection.fetch_all(_query, {'sgids': ids})
@@ -323,8 +323,18 @@ class SequencingGroupTable(DbBase):
         SET archive = 1, author = :author
         WHERE id = :sequencing_group_id;
         """
-        return await self.connection.execute(
+        # do this so we can reuse the sequencing_group_ids
+        _external_id_query = """
+        UPDATE sequencing_group_external_id
+        SET nullIfInactive = NULL
+        WHERE sequencing_group_id = :sequencing_group_id;
+        """
+        await self.connection.execute(
             _query, {'sequencing_group_id': sequencing_group_id, 'author': self.author}
+        )
+        await self.connection.execute(
+            _external_id_query,
+            {'sequencing_group_id': sequencing_group_id, 'author': self.author},
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:

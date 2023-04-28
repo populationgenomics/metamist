@@ -1,4 +1,4 @@
-# pylint: disable=global-statement
+# pylint: disable=global-statement,import-self
 """
 GraphQL utilities for Metamist, allows you to:
     - construct queries using the `gql` function (which validates graphql syntax)
@@ -12,7 +12,9 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 
 from cpg_utils.cloud import get_google_identity_token
+# this does not import itself, it imports the module
 from graphql import DocumentNode
+
 import metamist.configuration
 
 

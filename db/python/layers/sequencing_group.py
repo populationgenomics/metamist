@@ -271,7 +271,7 @@ class SequencingGroupLayer(BaseLayer):
         - should all relevant single-sample analysis entries be archived
         - why are they being archived?
         """
-        return await self.archive_sequencing_group(sequencing_group_id)
+        return await self.seqgt.archive_sequencing_groups([sequencing_group_id])
 
     async def upsert_sequencing_groups(
         self, sequencing_groups: list[SequencingGroupUpsertInternal]

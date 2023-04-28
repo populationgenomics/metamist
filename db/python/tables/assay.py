@@ -99,7 +99,7 @@ class AssayTable(DbBase):
 
         if not sample_id:
             raise ValueError('An assay MUST be assigned to a sample ID')
-
+        meta = meta or {}
         # TODO: revise this based on outcome of https://centrepopgen.slack.com/archives/C03FZL2EF24/p1681274510159009
         if assay_type == 'sequencing':
             required_fields = [
