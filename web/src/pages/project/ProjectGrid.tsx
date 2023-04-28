@@ -118,7 +118,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
                                         <Popup
-                                            position="top center"
+                                            position={
+                                                summary.participants.length === 0
+                                                    ? 'top right'
+                                                    : 'top center'
+                                            }
                                             trigger={
                                                 `${category}.${name}` in filterValues ? (
                                                     <FilterAltIcon />

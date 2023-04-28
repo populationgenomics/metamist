@@ -7,8 +7,10 @@ import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
+import SearchIcon from '@mui/icons-material/Search'
 
-import { SearchResponse, WebApi } from '../../sm-api/api'
+import { SearchResponse, WebApi } from '../../../sm-api/api'
+import './Search.css'
 
 type State = {
     loading: boolean
@@ -236,28 +238,34 @@ const Searchbar: React.FunctionComponent = () => {
     )
 
     return (
-        <Search
-            showNoResults={false}
-            selectFirstResult
-            fluid
-            input={{ fluid: true }}
-            loading={loading}
-            placeholder="Search..."
-            onResultSelect={(e, data) => {
-                dispatch({
-                    type: ActionKind.Update,
-                    selection: data.result.title,
-                    query: '',
-                    results: {},
-                } as Action)
-                searchResultToRoute(data.result.type, data.result.data.id)
-            }}
-            resultRenderer={resultRenderer}
-            onSearchChange={handleSearchChange}
-            results={results}
-            value={value}
-            style={{ marginLeft: 'auto', width: '400px' }}
-        />
+        <div className="search-container">
+            <Search
+                showNoResults={false}
+                selectFirstResult
+                fluid
+                input={{ fluid: true }}
+                loading={loading}
+                placeholder="Search..."
+                onResultSelect={(e, data) => {
+                    dispatch({
+                        type: ActionKind.Update,
+                        selection: data.result.title,
+                        query: '',
+                        results: {},
+                    } as Action)
+                    searchResultToRoute(data.result.type, data.result.data.id)
+                }}
+                resultRenderer={resultRenderer}
+                onSearchChange={handleSearchChange}
+                results={results}
+                value={value}
+                className="nav-searchbar"
+                id="navsearch"
+            />
+            <label className="searchbutton" htmlFor="navsearch">
+                <SearchIcon />
+            </label>
+        </div>
     )
 }
 

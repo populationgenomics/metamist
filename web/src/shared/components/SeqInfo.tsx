@@ -1,10 +1,11 @@
 import * as React from 'react'
-import { Table } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
 
 import _ from 'lodash'
 import { GraphQlSampleSequencing } from '../../__generated__/graphql'
 import formatBytes from '../utilities/formatBytes'
 import safeValue from '../utilities/safeValue'
+import Table from './Table'
 
 interface File {
     location: string
@@ -27,14 +28,14 @@ const SeqInfo: React.FunctionComponent<{
 }> = ({ data }) => {
     const renderReadsMetadata = (readsMetadata: File[], key: number | string) => (
         <Table celled key={key}>
-            <Table.Body>
+            <SUITable.Body>
                 {readsMetadata.map((item: File) => (
-                    <Table.Row key={item.location}>
-                        <Table.Cell collapsing>{item.location}</Table.Cell>
-                        <Table.Cell collapsing>{formatBytes(item.size)}</Table.Cell>
-                    </Table.Row>
+                    <SUITable.Row key={item.location}>
+                        <SUITable.Cell collapsing>{item.location}</SUITable.Cell>
+                        <SUITable.Cell collapsing>{formatBytes(item.size)}</SUITable.Cell>
+                    </SUITable.Row>
                 ))}
-            </Table.Body>
+            </SUITable.Body>
         </Table>
     )
 
@@ -42,24 +43,24 @@ const SeqInfo: React.FunctionComponent<{
         if (!metadata.reads) return <></>
         if (!Array.isArray(metadata.reads))
             return (
-                <Table.Row>
-                    <Table.Cell>
+                <SUITable.Row>
+                    <SUITable.Cell>
                         <b>Reads</b>
-                    </Table.Cell>
-                    <Table.Cell>{renderReadsMetadata([metadata.reads], 1)}</Table.Cell>
-                </Table.Row>
+                    </SUITable.Cell>
+                    <SUITable.Cell>{renderReadsMetadata([metadata.reads], 1)}</SUITable.Cell>
+                </SUITable.Row>
             )
         return (
-            <Table.Row>
-                <Table.Cell>
+            <SUITable.Row>
+                <SUITable.Cell>
                     <b>Reads</b>
-                </Table.Cell>
-                <Table.Cell>
+                </SUITable.Cell>
+                <SUITable.Cell>
                     {metadata.reads.map((v, i) =>
                         renderReadsMetadata(Array.isArray(v) ? v : [v], i)
                     )}
-                </Table.Cell>
-            </Table.Row>
+                </SUITable.Cell>
+            </SUITable.Row>
         )
     }
 
@@ -70,16 +71,16 @@ const SeqInfo: React.FunctionComponent<{
                 if (key === 'externalIds') {
                     if (Object.keys(seqInfo.externalIds ?? {}).length) {
                         return (
-                            <Table.Row key={key}>
-                                <Table.Cell>
+                            <SUITable.Row key={key}>
+                                <SUITable.Cell>
                                     <b>External Ids</b>
-                                </Table.Cell>
-                                <Table.Cell>
+                                </SUITable.Cell>
+                                <SUITable.Cell>
                                     {Object.entries(seqInfo.externalIds ?? {})
                                         .map(([k1, v1]) => `${v1} (${k1})`)
                                         .join(', ')}
-                                </Table.Cell>
-                            </Table.Row>
+                                </SUITable.Cell>
+                            </SUITable.Row>
                         )
                     }
                     return <React.Fragment key="ExternalID"></React.Fragment>
@@ -94,59 +95,61 @@ const SeqInfo: React.FunctionComponent<{
                             ) {
                                 // all are files coincidentally
                                 return (
-                                    <Table.Row key={`${k1}`}>
-                                        <Table.Cell>
+                                    <SUITable.Row key={`${k1}`}>
+                                        <SUITable.Cell>
                                             <b>{_.capitalize(k1)}</b>
-                                        </Table.Cell>
-                                        <Table.Cell>
+                                        </SUITable.Cell>
+                                        <SUITable.Cell>
                                             {renderReadsMetadata(v1 as File[], key)}
-                                        </Table.Cell>
-                                    </Table.Row>
+                                        </SUITable.Cell>
+                                    </SUITable.Row>
                                 )
                             }
                             if (v1 && typeof v1 === 'object' && !Array.isArray(v1)) {
                                 if (!!v1.location && !!v1.size) {
                                     return (
-                                        <Table.Row key={`${k1}`}>
-                                            <Table.Cell>
+                                        <SUITable.Row key={`${k1}`}>
+                                            <SUITable.Cell>
                                                 <b>{_.capitalize(k1)}:</b>
-                                            </Table.Cell>
-                                            <Table.Cell>
+                                            </SUITable.Cell>
+                                            <SUITable.Cell>
                                                 {renderReadsMetadata([v1] as File[], k1)}
-                                            </Table.Cell>
-                                        </Table.Row>
+                                            </SUITable.Cell>
+                                        </SUITable.Row>
                                     )
                                 }
                             }
                             const stringifiedValue = safeValue(v1)
                             return (
-                                <Table.Row key={`${k1}-${stringifiedValue}`}>
-                                    <Table.Cell>
+                                <SUITable.Row key={`${k1}-${stringifiedValue}`}>
+                                    <SUITable.Cell>
                                         <b>{_.capitalize(k1)}</b>
-                                    </Table.Cell>
-                                    <Table.Cell>{stringifiedValue ?? <em>no-value</em>}</Table.Cell>
-                                </Table.Row>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {stringifiedValue ?? <em>no-value</em>}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
                             )
                         })
                 }
 
                 const stringifiedValue = safeValue(value)
                 return (
-                    <Table.Row key={`${key}-${stringifiedValue}`}>
-                        <Table.Cell>
+                    <SUITable.Row key={`${key}-${stringifiedValue}`}>
+                        <SUITable.Cell>
                             <b>{_.capitalize(key)}</b>
-                        </Table.Cell>
-                        <Table.Cell>{stringifiedValue ?? <em>no-value</em>}</Table.Cell>
-                    </Table.Row>
+                        </SUITable.Cell>
+                        <SUITable.Cell>{stringifiedValue ?? <em>no-value</em>}</SUITable.Cell>
+                    </SUITable.Row>
                 )
             })
 
     return (
         <Table celled collapsing>
-            <Table.Body>
+            <SUITable.Body>
                 {renderSeqInfo(data)}
                 {prepReadMetadata(data.meta || {})}
-            </Table.Body>
+            </SUITable.Body>
         </Table>
     )
 }
