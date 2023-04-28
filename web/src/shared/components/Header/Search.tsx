@@ -9,7 +9,7 @@ import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
 import SearchIcon from '@mui/icons-material/Search'
 
-import { SearchResponse, WebApi } from '../../sm-api/api'
+import { SearchResponse, WebApi } from '../../../sm-api/api'
 import './Search.css'
 
 type State = {
