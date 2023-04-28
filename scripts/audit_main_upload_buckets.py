@@ -24,12 +24,13 @@ from collections import defaultdict
 # from datetime import datetime
 import logging
 import os
+from typing import Type, TypeVar
 import click
 from cloudpathlib import CloudPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from google.cloud import storage
+from google.cloud.storage.bucket import Bucket
 from sample_metadata.apis import (
-    ProjectApi,
     ParticipantApi,
     AnalysisApi,
     SampleApi,
@@ -120,6 +121,7 @@ PAPI = ParticipantApi()
 SAPI = SampleApi()
 SEQAPI = SequenceApi()
 CLIENT = storage.Client()
+TBucket = TypeVar('TBucket', bound=Bucket)
 
 
 def get_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
@@ -188,24 +190,12 @@ def find_sequence_files_in_bucket(
     return sequence_paths
 
 
-def get_filename_from_path(path: str) -> str:
-    """Extracts filename from file path. e.g. 'subdir/file.ext' -> 'file.ext'"""
-
-    return os.path.basename(path)
-
-
-def get_filesize_from_path(bucket_name: str, path: str) -> int:
-    """Extracts filesize from gs path"""
-    bucket = CLIENT.get_bucket(bucket_name)
+def get_filesize_from_path(bucket_name: str, bucket: Type[TBucket], path: str) -> int:
+    """Extracts file size from gs path"""
     blob_path = path.removeprefix(f'gs://{bucket_name}/')
     blob = bucket.get_blob(blob_path)
 
     return blob.size
-
-
-def get_datasets() -> list[dict]:
-    """API call to get project list"""
-    return ProjectApi().get_seqr_projects()
 
 
 def get_project_participant_data(project_name: str):
@@ -214,6 +204,7 @@ def get_project_participant_data(project_name: str):
     Nested in the return are all samples associated with the participants,
     and then all the sequences associated with those samples.
     """
+
     _query = """
     query ProjectData($projectName: String!) {
         project(name: $projectName) {
@@ -298,50 +289,6 @@ def get_samples_for_participants(participants: list[dict]) -> dict[str, str]:
             del samples[exclusion]
 
     return samples
-
-
-# def validate_participant_samples(
-#     participants: list[dict],
-#     participant_sample_ids: defaultdict[str, list],
-#     samples: dict[str, str],
-# ):
-#     """
-#     Input: Metamist list of participants, mapping of participant external ID : Internal Sample ID,
-#     and the Metamist list of samples for the project.
-
-#     No returns, just report if any participants have multiple samples or no samples,
-#     or if any samples have no participants.
-#     """
-#     # Get the external_participant_id : internal_participant_id mapping for all participants
-#     participant_eid_to_iid = {
-#         participant['external_id']: participant['id'] for participant in participants
-#     }
-
-#     # Report if any participants have more than one sample ID
-#     for participant_eid, sample_ids in participant_sample_ids.items():
-#         if len(sample_ids) > 1:
-#             logging.info(
-#                 f'Participant {participant_eid_to_iid[participant_eid]} (external ID: {participant_eid})'
-#                 + f' associated with more than one sample id: {[(sample_id, samples[sample_id]) for sample_id in sample_ids]}'
-#             )
-
-#     # Compare the participants in the full list to the participants from the sample:participant_eid mapping
-#     participant_eid_set = set(
-#         participant['external_id'] for participant in participants
-#     )
-#     participant_eid_from_samples_set = set(participant_sample_ids.keys())
-#     logging.info(
-#         f'Participants with no samples: {len(participant_eid_set.difference(participant_eid_from_samples_set))}'
-#     )
-
-#     # Compare the samples obtained from SampleApi vs ParticipantApi (papi)
-#     sample_id_set = set(samples.keys())
-#     sample_id_from_papi_set = set(
-#         [item for sublist in participant_sample_ids.values() for item in sublist]
-#     )
-#     logging.info(
-#         f'Samples with no participants: {sample_id_set.difference(sample_id_from_papi_set)}'
-#     )
 
 
 def get_sequences_from_participants(
@@ -514,13 +461,15 @@ def check_for_uningested_or_moved_sequences(
                 these are identified as sequence files that have been moved from
                 their original location to a new location.
     """
-    # Get all the paths to sequence data anywhere in the main-upload bucket
     bucket_name = f'cpg-{project}-main-upload'
+    bucket = CLIENT.get_bucket(bucket_name)
+
+    # Get all the paths to sequence data anywhere in the main-upload bucket
     sequence_paths_in_bucket = find_sequence_files_in_bucket(
         bucket_name, file_extensions
     )
 
-    # Flatten all the sequence file paths and file sizes in metamist for this project into a single list
+    # Flatten all the Metamist sequence file paths and sizes into a single list
     sequence_paths_sizes_in_metamist = []
     for sequence in sequence_reads.values():
         sequence_paths_sizes_in_metamist.extend(sequence)
@@ -534,23 +483,21 @@ def check_for_uningested_or_moved_sequences(
     )
 
     # Strip the metamist paths into just filenames
+    # Map each file name to its file size and path
     sequence_files_sizes_in_metamist = {
-        get_filename_from_path(path[0]): path[1]
-        for path in sequence_paths_sizes_in_metamist
+        os.path.basename(path[0]): path[1] for path in sequence_paths_sizes_in_metamist
     }
     sequence_files_paths_in_metamist = {
-        get_filename_from_path(path[0]): path[0]
-        for path in sequence_paths_sizes_in_metamist
+        os.path.basename(path[0]): path[0] for path in sequence_paths_sizes_in_metamist
     }
 
     # Identify if any paths are to files that have actually just been moved by checking if they are in the bucket but not metamist
     ingested_and_moved_filepaths = []
     for path in uningested_paths:
-        filename = get_filename_from_path(path)
-
+        filename = os.path.basename(path)
         # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
         if filename in sequence_files_sizes_in_metamist.keys():
-            filesize = get_filesize_from_path(bucket_name, path)
+            filesize = get_filesize_from_path(bucket_name, bucket, path)
             if filesize == sequence_files_sizes_in_metamist.get(filename):
                 ingested_and_moved_filepaths.append(
                     (path, sequence_files_paths_in_metamist.get(filename))
@@ -622,7 +569,6 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
     required='True',
     help='Find fastq, bam, cram, gvcf, vcf, or all sequence file types',
 )
-# @click.option('--test', '-t', is_flag=True, default=False, help='uses test datasets')
 @click.option(
     '--dry-run',
     is_flag=True,
