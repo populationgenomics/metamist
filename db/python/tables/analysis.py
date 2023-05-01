@@ -477,7 +477,6 @@ ORDER BY a.timestamp_completed DESC;
 
         wheres_str = ' AND '.join(wheres)
         _query = f'SELECT * FROM analysis WHERE {wheres_str}'
-        print(_query)
         rows = await self.connection.fetch_all(_query, values)
         return [Analysis.from_db(**dict(r)) for r in rows]
 

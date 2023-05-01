@@ -60,7 +60,8 @@ class TestAnalysis(DbIsolatedTest):
 
         await self.al.insert_analysis(
             analysis_type=AnalysisType.ANALYSIS_RUNNER,
-            status=AnalysisStatus.IN_PROGRESS,
+            status=AnalysisStatus.UNKNOWN,
+            # no sample IDs to check join
             sample_ids=[],
             meta={},
         )
@@ -72,7 +73,7 @@ class TestAnalysis(DbIsolatedTest):
             Analysis(
                 id=3,
                 type=AnalysisType.ANALYSIS_RUNNER,
-                status=AnalysisStatus.IN_PROGRESS,
+                status=AnalysisStatus.UNKNOWN,
                 sample_ids=[],
                 output=None,
                 timestamp_completed=None,
