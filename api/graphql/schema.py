@@ -29,7 +29,8 @@ from models.models import (
     AssayInternal,
 )
 from models.models.sample import sample_id_transform_to_raw
-from models.utils.sample_id_format import sample_id_format
+from models.utils.sample_id_format import sample_id_format, \
+    sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
     sequencing_group_id_format,
@@ -136,9 +137,21 @@ class GraphQLProject:
         return [GraphQLParticipant.from_internal(p) for p in participants]
 
     @strawberry.field()
-    async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
+    async def samples(
+        self,
+        info: Info,
+        root: 'Project',
+        internal_ids: list[str] | None = None,
+        # external_ids: list[str] | None = None,
+    ) -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
-        samples = await loader.load(root.id)
+        samples = await loader.load(
+            {
+                'id': root.id,
+                'internal_sample_ids': sample_id_transform_to_raw_list(internal_ids) if internal_ids else None,
+                # 'external_sample_ids': external_ids,
+            }
+        )
         return [GraphQLSample.from_internal(p) for p in samples]
 
     @strawberry.field()
@@ -253,12 +266,15 @@ class GraphQLParticipant:
     external_id: str
     meta: strawberry.scalars.JSON
 
+    project_id: strawberry.Private[int]
+
     @staticmethod
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
         return GraphQLParticipant(
             id=internal.id,
             external_id=internal.external_id,
             meta=internal.meta,
+            project_id=internal.project,
         )
 
     @strawberry.field
@@ -278,7 +294,7 @@ class GraphQLParticipant:
     @strawberry.field
     async def project(self, info: Info, root: 'GraphQLParticipant') -> GraphQLProject:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
-        project = await loader.load(root.project)
+        project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
 
@@ -328,7 +344,9 @@ class GraphQLSample:
         self, info: Info, root: 'GraphQLSample', type: str | None = None
     ) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
-        assays = await loader_assays_for_sample_ids.load((root.internal_id, type))
+        assays = await loader_assays_for_sample_ids.load(
+            {'id': root.internal_id, 'assay_type': type}
+        )
         return [GraphQLAssay.from_internal(assay) for assay in assays]
 
     @strawberry.field
@@ -346,7 +364,11 @@ class GraphQLSample:
     ) -> list['GraphQLSequencingGroup']:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
         sequencing_groups = await loader.load(
-            (root.internal_id, sequencing_type, active_only)
+            {
+                'id': root.internal_id,
+                'sequencing_type': sequencing_type,
+                'active_only': active_only,
+            }
         )
 
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
@@ -395,7 +417,13 @@ class GraphQLSequencingGroup:
         analysis_type: str | None = None,
     ) -> list[GraphQLAnalysis]:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
-        analyses = await loader.load((root.internal_id, analysis_status, analysis_type))
+        analyses = await loader.load(
+            {
+                'id': root.internal_id,
+                'status': analysis_status,
+                'analysis_type': analysis_type,
+            }
+        )
         return [GraphQLAnalysis.from_internal(a) for a in analyses]
 
     @strawberry.field
@@ -429,7 +457,7 @@ class GraphQLAssay:
         )
 
     @strawberry.field
-    async def sample(self, info: Info, root) -> GraphQLSample:
+    async def sample(self, info: Info, root: 'GraphQLAssay') -> GraphQLSample:
         loader = info.context[LoaderKeys.SAMPLES_FOR_IDS]
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
