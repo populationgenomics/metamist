@@ -12,10 +12,6 @@ What's happening here?
 5. Remove the sequence data for samples with completed crams, including those whose data has been moved
 
 TODO: find other files to delete, not just fastqs
-TODO: make sure sequences are grabbed with the appropriate fields, e.g. read_type, project
-TODO: add filtering for exome vs genome
-TODO: add test and dry-run functionality
-TODO: make compatible with analysis-runner
 """
 
 from collections import defaultdict
@@ -29,6 +25,7 @@ import click
 
 # from cloudpathlib import CloudPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
+from cpg_utils.config import get_config
 from google.cloud import storage
 from google.cloud.storage.bucket import Bucket
 from sample_metadata.apis import (
@@ -318,11 +315,7 @@ def get_sequence_mapping(
     # multiple reads per sequence is possible so use defaultdict(list)
     sequence_reads = defaultdict(list)
     for samplesequence in all_sequences:  # pylint: disable=R1702
-        # Extract the sample ID, skip the sequence if its an exclusion
-        sample_id = list(samplesequence.keys())[0]
-        # if sample_id in EXCLUDED_SAMPLES:
-        #    continue
-
+        sample_id = list(samplesequence.keys())[0] # Extract the sample ID
         for sequences in samplesequence.values():
             for sequence in sequences:
                 if not sequence.get('type').lower() in sequence_type:
@@ -331,6 +324,7 @@ def get_sequence_mapping(
                 reads = meta.get('reads')
                 seq_id_sample_id[sequence.get('id')] = sample_id
                 if not reads:
+                    logging.info(f'Sample {sample_id} has no sequence reads')
                     continue
                 # support up to three levels of nesting, because:
                 #
@@ -418,7 +412,6 @@ def get_analysis_cram_paths_for_project_samples(
                 analyses[i] = analysis
 
     # Filter the analyses based on input sequence type
-
     analyses = [
         analysis
         for analysis in analyses
@@ -452,7 +445,7 @@ def get_analysis_cram_paths_for_project_samples(
 
 
 def get_complete_and_incomplete_samples(
-    samples: list[str], sample_cram_paths: dict[str, dict[int, str]]
+    samples: dict[str, str], sample_cram_paths: dict[str, dict[int, str]]
 ):
     """
     Returns a dictionary containing two categories of samples:
@@ -475,7 +468,7 @@ def get_complete_and_incomplete_samples(
     )
 
     # Incomplete samples initialised as the list of samples without a valid analysis cram output path
-    incomplete_samples = set(samples).difference(set(sample_cram_paths.keys()))
+    incomplete_samples = set(samples.keys()).difference(set(sample_cram_paths.keys()))
 
     # Completed samples are those whose completed cram output path exists in the bucket at the same path
     completed_samples = defaultdict(list)
@@ -626,52 +619,75 @@ def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
 
 
 def write_sequencing_reports(
-    project,
-    file_types,
-    sequence_type,
-    sequence_reads_to_delete,
-    sequence_reads_to_ingest,
+    project: str,
+    access_level: str,
+    file_types: str,
+    sequence_type: str,
+    sequence_reads_to_delete: list[tuple[str, int, str, list[int]]],
+    sequence_reads_to_ingest: list[str],
+    incomplete_samples: list[tuple[str,str]] | None
 ):
     """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
-    # Writing the output to files
+    # Writing the output to files with the file type, sequence type, and date specified
     today = datetime.today().strftime('%Y-%m-%d')
-    sequences_to_delete_file = (
-        f'./{project}_{file_types}_{sequence_type}_sequences_to_delete_{today}.csv'
-    )
-    with open(sequences_to_delete_file, 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs'])
-        for row in sequence_reads_to_delete:
-            writer.writerow(row)
-        logging.info(f'Wrote {len(sequence_reads_to_delete)} reads to delete')
+    reports_to_write = []
+    # Sequences to delete report has several data points for validation
+    if sequence_reads_to_delete:
+        sequences_to_delete_file = (
+            f'./{project}_{file_types}_{sequence_type}_sequences_to_delete_{today}.csv'
+        )
+        reports_to_write.append(sequences_to_delete_file)
 
-    logging.info(f'Wrote sequences to delete report: {sequences_to_delete_file}')
+        with open(sequences_to_delete_file, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs'])
 
-    sequences_to_ingest_file = (
-        f'./{project}_{file_types}_{sequence_type}_sequences_to_ingest_{today}.csv'
-    )
-    with open(sequences_to_ingest_file, 'w') as f:
-        writer = csv.writer(f)
-        for path in sequence_reads_to_ingest:
-            writer.writerow([path])
+            for row in sequence_reads_to_delete:
+                writer.writerow(row)
+
+        logging.info(f'Wrote {len(sequence_reads_to_delete)} reads to delete to report: {sequences_to_delete_file}')
+
+    # Sequences to ingest file only contains paths to the (possibly) uningested files
+    if sequence_reads_to_ingest:
+        sequences_to_ingest_file = (
+            f'./{project}_{file_types}_{sequence_type}_sequences_to_ingest_{today}.csv'
+        )
+        reports_to_write.append(sequences_to_ingest_file)
+
+        with open(sequences_to_ingest_file, 'w') as f:
+            writer = csv.writer(f)
+            for path in sequence_reads_to_ingest:
+                writer.writerow([path])
+
         logging.info(
-            f'Wrote {len(sequence_reads_to_ingest)} possible sequences to ingest'
+            f'Wrote {len(sequence_reads_to_ingest)} possible sequences to ingest to report: {sequences_to_ingest_file}'
+        )
+    
+    if incomplete_samples:
+        incomplete_samples_file = f'./{project}_{file_types}_{sequence_type}_samples_without_crams_{today}.csv'
+        reports_to_write.append(incomplete_samples_file)
+
+        with open(incomplete_samples_file, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Sample_ID', 'External_Sample_ID'])
+            for row in incomplete_samples:
+                writer.writerow(row)
+
+        logging.info(
+            f'Wrote {len(incomplete_samples)} samples missing crams: {incomplete_samples_file}'
         )
 
-    logging.info(f'Wrote sequences to ingest report: {sequences_to_ingest_file}')
-
-    for sequence_report in [sequences_to_delete_file, sequences_to_ingest_file]:
+    # Upload the reports to the upload bucket, in the audit_results/today directory
+    for sequence_report in reports_to_write:
         file = os.path.basename(sequence_report)
-        bucket = CLIENT.get_bucket(f'cpg-{project}-main-upload')
+        bucket = CLIENT.get_bucket(f'cpg-{project}-{access_level}-upload')
 
         upload_report = bucket.blob(os.path.join('audit_results', today, file))
         upload_report.upload_from_filename(sequence_report)
 
         logging.info(
-            f'Uploaded {file} to gs://cpg-{project}-main-upload/audit_results/{today}/'
+            f'Uploaded {file} to gs://cpg-{project}-{access_level}-upload/audit_results/{today}/'
         )
-
-    logging.info('Sequences to delete and ingest reports uploaded. Finishing...')
 
 
 @click.command()
@@ -699,7 +715,8 @@ def main(
     file_types,
 ):
     """
-    Finds sequence files which can be deleted and does so if the dry-run flag is absent.
+    Finds sequence files for samples with completed CRAMs and adds these to a csv for deletion.
+    Also finds any extra files in the upload bucket which may be uningested sequence data.
     Works in a few simple steps:
         1. Get all participants in a project, their samples, and the sequences for the samples
         2. Get all the sequence file paths that exist in the project's main-upload bucket
@@ -707,11 +724,15 @@ def main(
            For samples with a completed CRAM - add their sequence files to the delete list
         4. Any files found in the bucket but NOT found in metamist are checked to see if they ARE
            a file from metamist, but in a different location. We match the file names and sizes
-           for this check and consider these as "moved" sequence files.
-        5. Report any uningested files with the logger (TODO: report these in an output file).
-           Add any "moved" files to the sequence files to delete list.
-        6. Execute the delete on the full list.
+           for this check and consider these as "moved" sequence files. Add these to the list
+           of sequence files to delete.
+        5. Report any uningested files a csv
     """
+    config = get_config()
+    if not project:
+        project = config['workflow']['dataset']
+    access_level = config['workflow']['access_level']
+
     # Get all the participants and all the samples mapped to participants
     participant_data = get_project_participant_data(project)
 
@@ -742,6 +763,8 @@ def main(
     sample_completion = get_complete_and_incomplete_samples(
         samples_all, sample_cram_paths
     )
+    if sample_completion.get('incomplete'):
+        incomplete_samples = [(sample_id, samples_all.get(sample_id)) for sample_id in sample_completion.get('incomplete')]
 
     # Samples with completed crams can have their sequences deleted - these are the obvious ones
     sequence_reads_to_delete, sequence_reads_to_ingest = get_reads_to_delete_or_ingest(
@@ -755,11 +778,15 @@ def main(
 
     write_sequencing_reports(
         project,
+        access_level,
         file_types,
         sequence_type,
         sequence_reads_to_delete,
         sequence_reads_to_ingest,
+        incomplete_samples,
     )
+
+    logging.info('Sequences to delete and ingest reports uploaded. Finishing...')
 
 
 if __name__ == '__main__':
