@@ -272,14 +272,13 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        type: str | None = None,
+        type: strawberry.enum(AnalysisType) | None = None,
         active: bool | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
-        analysis_type = AnalysisType(type) if type else None
         return await AnalysisLayer(connection).query_analysis(
-            project_ids=[root.id], analysis_type=analysis_type, active=active
+            project_ids=[root.id], analysis_type=type, active=active
         )
 
 

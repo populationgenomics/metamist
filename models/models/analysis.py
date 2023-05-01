@@ -38,7 +38,11 @@ class Analysis(SMBase):
         if timestamp_completed is not None and not isinstance(timestamp_completed, str):
             timestamp_completed = timestamp_completed.isoformat()
 
-        sample_ids = [kwargs.pop('sample_id')] if 'sample_id' in kwargs else []
+        sample_ids = (
+            [kwargs.pop('sample_id')]
+            if ('sample_id' in kwargs and kwargs.get('sample_id') is not None)
+            else []
+        )
         return Analysis(
             id=kwargs.pop('id'),
             type=AnalysisType(analysis_type),
