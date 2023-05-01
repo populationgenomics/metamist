@@ -20,7 +20,7 @@ from datetime import datetime
 import sys
 import logging
 import os
-from typing import Type, TypeVar
+from typing import Any, Type, TypeVar
 import click
 
 # from cloudpathlib import CloudPath
@@ -315,7 +315,7 @@ def get_sequence_mapping(
     # multiple reads per sequence is possible so use defaultdict(list)
     sequence_reads = defaultdict(list)
     for samplesequence in all_sequences:  # pylint: disable=R1702
-        sample_id = list(samplesequence.keys())[0] # Extract the sample ID
+        sample_id = list(samplesequence.keys())[0]  # Extract the sample ID
         for sequences in samplesequence.values():
             for sequence in sequences:
                 if not sequence.get('type').lower() in sequence_type:
@@ -446,7 +446,7 @@ def get_analysis_cram_paths_for_project_samples(
 
 def get_complete_and_incomplete_samples(
     samples: dict[str, str], sample_cram_paths: dict[str, dict[int, str]]
-):
+) -> dict[str, Any]:
     """
     Returns a dictionary containing two categories of samples:
      - the completed samples which have finished aligning and have a cram, as a dict mapping
@@ -625,7 +625,7 @@ def write_sequencing_reports(
     sequence_type: str,
     sequence_reads_to_delete: list[tuple[str, int, str, list[int]]],
     sequence_reads_to_ingest: list[str],
-    incomplete_samples: list[tuple[str,str]] | None
+    incomplete_samples: list[tuple[str, str]],
 ):
     """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
     # Writing the output to files with the file type, sequence type, and date specified
@@ -640,12 +640,16 @@ def write_sequencing_reports(
 
         with open(sequences_to_delete_file, 'w') as f:
             writer = csv.writer(f)
-            writer.writerow(['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs'])
+            writer.writerow(
+                ['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs']
+            )
 
             for row in sequence_reads_to_delete:
                 writer.writerow(row)
 
-        logging.info(f'Wrote {len(sequence_reads_to_delete)} reads to delete to report: {sequences_to_delete_file}')
+        logging.info(
+            f'Wrote {len(sequence_reads_to_delete)} reads to delete to report: {sequences_to_delete_file}'
+        )
 
     # Sequences to ingest file only contains paths to the (possibly) uningested files
     if sequence_reads_to_ingest:
@@ -662,7 +666,8 @@ def write_sequencing_reports(
         logging.info(
             f'Wrote {len(sequence_reads_to_ingest)} possible sequences to ingest to report: {sequences_to_ingest_file}'
         )
-    
+
+    # Write the samples without any completed cram to a csv
     if incomplete_samples:
         incomplete_samples_file = f'./{project}_{file_types}_{sequence_type}_samples_without_crams_{today}.csv'
         reports_to_write.append(incomplete_samples_file)
@@ -670,8 +675,8 @@ def write_sequencing_reports(
         with open(incomplete_samples_file, 'w') as f:
             writer = csv.writer(f)
             writer.writerow(['Sample_ID', 'External_Sample_ID'])
-            for row in incomplete_samples:
-                writer.writerow(row)
+            for samples in incomplete_samples:
+                writer.writerow(samples)
 
         logging.info(
             f'Wrote {len(incomplete_samples)} samples missing crams: {incomplete_samples_file}'
@@ -763,8 +768,10 @@ def main(
     sample_completion = get_complete_and_incomplete_samples(
         samples_all, sample_cram_paths
     )
-    if sample_completion.get('incomplete'):
-        incomplete_samples = [(sample_id, samples_all.get(sample_id)) for sample_id in sample_completion.get('incomplete')]
+    incomplete_samples = [
+        (sample_id, samples_all.get(sample_id))
+        for sample_id in sample_completion.get('incomplete')
+    ]
 
     # Samples with completed crams can have their sequences deleted - these are the obvious ones
     sequence_reads_to_delete, sequence_reads_to_ingest = get_reads_to_delete_or_ingest(

@@ -1,8 +1,8 @@
 import csv
+from datetime import datetime
+import logging
 import sys
 import click
-import logging
-from datetime import datetime
 from google.cloud import storage
 from cloudpathlib import CloudPath
 from cpg_utils.config import get_config
@@ -57,10 +57,10 @@ def main(date, sequence_type, file_types):
     blob.download_to_filename('./sequences_to_delete.csv', CLIENT)
     logging.info(f'Downloaded audit results: {blob.name}')
 
-    paths = set() # Read the delete paths as a set to prevent duplicates
+    paths = set()  # Read the delete paths as a set to prevent duplicates
     with open('./sequences_to_delete.csv', 'r') as f:
         reader = csv.DictReader(f)
-        next(reader) # Skip header
+        next(reader)  # Skip header
         for row in reader:
             paths.add(CloudPath(row['Sequence_Path']))
 
