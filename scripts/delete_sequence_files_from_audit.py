@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import csv
 from datetime import datetime
 import logging

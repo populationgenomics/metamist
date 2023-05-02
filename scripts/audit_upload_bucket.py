@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 What's happening here?
 1. Input a Metamist project
