@@ -46,14 +46,13 @@ def main(date, sequence_type, file_types):
     config = get_config()
     project = config['workflow']['dataset']
     access_level = config['workflow']['access_level']
+    subdir = f'audit_results/{date}/'
     if access_level == 'full':
         bucket_name = f'cpg-{project}-main-upload'
+        file = f'{subdir}/{project}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
     else:
         bucket_name = f'cpg-{project}-test-upload'
-
-    subdir = f'audit_results/{date}/'
-
-    file = f'{subdir}/{project}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
+        file = f'{subdir}/{project}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
 
     bucket = CLIENT.get_bucket(bucket_name)
     blob = bucket.get_blob(file)
