@@ -22,10 +22,16 @@ async def get_all_projects(connection=get_projectless_db_connection):
 async def get_my_projects(connection=get_projectless_db_connection):
     """Get projects I have access to"""
     ptable = ProjectPermissionsTable(connection.connection)
-    pmap = await ptable.get_projects_accessible_by_user(
-        author=connection.author, readonly=True
+    # 2023-05-02 mfranklin: Show all projects, regardless of permissions
+    #       We're protected by read / write checks later
+    projects = await ptable.get_project_rows(
+        author=connection.author, check_permissions=False
     )
-    return list(pmap.values())
+    return sorted(p.name for p in projects)
+    # pmap = await ptable.get_projects_accessible_by_user(
+    #     author=connection.author, readonly=True
+    # )
+    # return list(pmap.values())
 
 
 @router.put('/', operation_id='createProject')
