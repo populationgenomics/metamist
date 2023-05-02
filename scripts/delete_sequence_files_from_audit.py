@@ -45,9 +45,12 @@ def main(date, sequence_type, file_types):
     """
     config = get_config()
     project = config['workflow']['dataset']
-    access = config['workflow']['access_level']
+    access_level = config['workflow']['access_level']
+    if access_level == 'full':
+        bucket_name = f'cpg-{project}-{main}-upload'
+    else:
+        bucket_name = f'cpg-{project}-upload'
 
-    bucket_name = f'cpg-{project}-{access}-upload'
     subdir = f'audit_results/{date}/'
 
     file = f'{subdir}/{project}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
