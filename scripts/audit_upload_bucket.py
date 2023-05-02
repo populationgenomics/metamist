@@ -791,9 +791,9 @@ def write_sequencing_reports(
 @click.option(
     '--file-types',
     '-f',
-    type=click.Choice(['fastq', 'bam', 'cram', 'gvcf', 'vcf', 'all']),
+    type=click.Choice(['fastq', 'bam', 'cram', 'all_reads', 'gvcf', 'vcf', 'all']),
     required='True',
-    help='Find fastq, bam, cram, gvcf, vcf, or all sequence file types',
+    help='Find fastq, bam, cram, gvcf, vcf, all_reads (fastq + bam + cram), or all sequence file types',
 )
 def main(
     project,
