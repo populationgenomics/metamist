@@ -104,6 +104,40 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
 
     @run_as_sync
+    async def test_get_analysis(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        """
+
+        a_id = await self.al.insert_analysis(
+            analysis_type='analysis-runner',
+            status=AnalysisStatus.UNKNOWN,
+            # no sample IDs to check join
+            sequence_group_ids=[],
+            meta={},
+        )
+
+        analyses = await self.al.query_analysis(
+            project_ids=[1], analysis_type=AnalysisType.ANALYSIS_RUNNER
+        )
+        expected = [
+            Analysis(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequence_group_ids=[],
+                output=None,
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author='testuser',
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
     async def test_get_sequencing_group_file_sizes_single(self):
         """
         Test retrieval of sample file sizes over time

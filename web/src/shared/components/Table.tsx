@@ -3,10 +3,13 @@
 import * as React from 'react'
 
 import { Table as SUITable, TableProps } from 'semantic-ui-react'
-import { useMediaQuery } from 'react-responsive'
+import { ThemeContext } from './ThemeProvider'
 
 const Table: React.FunctionComponent<TableProps> = ({ className, ...props }) => {
-    const isDarkMode = useMediaQuery({ query: '(prefers-color-scheme: dark)' })
+    const theme = React.useContext(ThemeContext)
+
+    const isDarkMode = theme.theme === 'dark-mode'
+
     let classNames = className || ''
     if (isDarkMode) {
         classNames += ' inverted'
