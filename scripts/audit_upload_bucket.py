@@ -376,12 +376,14 @@ def get_analysis_cram_paths_for_project_samples(
     Returns a dict mapping {sample_id : (analysis_id, cram_path) }
     """
     sample_ids = list(samples.keys())
+    if 'test' not in project:
+        projects = [
+            f'{project}',
+            'seqr',  # Many analysis objects hiding out in seqr project
+        ]
     analyses = AAPI.query_analyses(
         AnalysisQueryModel(
-            projects=[
-                project,
-                'seqr',  # Many analysis objects hiding out in seqr project
-            ],
+            projects=projects,
             type=AnalysisType('cram'),
             status=AnalysisStatus('completed'),  # Only interested in aligned crams
             sample_ids=sample_ids,
