@@ -640,7 +640,9 @@ def write_sequencing_reports(
     today = datetime.today().strftime('%Y-%m-%d')
     reports_to_write = []
     # Sequences to delete report has several data points for validation
-    if sequence_reads_to_delete:
+    if not sequence_reads_to_delete:
+        logging.info('No sequence reads to delete found.')
+    else:
         sequences_to_delete_file = (
             f'./{project}_{file_types}_{sequence_type}_sequences_to_delete_{today}.csv'
         )
@@ -660,7 +662,9 @@ def write_sequencing_reports(
         )
 
     # Sequences to ingest file only contains paths to the (possibly) uningested files
-    if sequence_reads_to_ingest:
+    if not sequence_reads_to_ingest:
+        logging.info('No sequence reads to ingest found.')
+    else:
         sequences_to_ingest_file = (
             f'./{project}_{file_types}_{sequence_type}_sequences_to_ingest_{today}.csv'
         )
@@ -676,7 +680,9 @@ def write_sequencing_reports(
         )
 
     # Write the samples without any completed cram to a csv
-    if incomplete_samples:
+    if not incomplete_samples:
+        logging.info(f'No samples without crams found.')
+    else:
         incomplete_samples_file = f'./{project}_{file_types}_{sequence_type}_samples_without_crams_{today}.csv'
         reports_to_write.append(incomplete_samples_file)
 
@@ -691,19 +697,28 @@ def write_sequencing_reports(
         )
 
     # Upload the reports to the upload bucket, in the audit_results/today directory
-    for sequence_report in reports_to_write:
-        file = os.path.basename(sequence_report)
-        if access_level == 'test':
-            bucket_name = f'cpg-{project}-upload'
-        else:
-            bucket_name = f'cpg-{project}-main-upload'
+    if not reports_to_write:
+        logging.info(
+            'No sequence files to delete, ingest, or samples without CRAMs. No reports written.'
+        )
+    else:
+        for sequence_report in reports_to_write:
+            file = os.path.basename(sequence_report)
+            if access_level == 'test':
+                bucket_name = f'cpg-{project}-upload'
+            else:
+                bucket_name = f'cpg-{project}-main-upload'
 
-        bucket = CLIENT.get_bucket(bucket_name)
+            bucket = CLIENT.get_bucket(bucket_name)
 
-        upload_report = bucket.blob(os.path.join('audit_results', today, file))
-        upload_report.upload_from_filename(sequence_report)
+            upload_report = bucket.blob(os.path.join('audit_results', today, file))
+            upload_report.upload_from_filename(sequence_report)
 
-        logging.info(f'Uploaded {file} to gs://{bucket_name}/audit_results/{today}/')
+            logging.info(
+                f'Uploaded {file} to gs://{bucket_name}/audit_results/{today}/'
+            )
+
+        logging.info(f'Reports: {reports_to_write} uploaded. Finishing...')
 
 
 @click.command()
@@ -803,8 +818,6 @@ def main(
         sequence_reads_to_ingest,
         incomplete_samples,
     )
-
-    logging.info('Sequences to delete and ingest reports uploaded. Finishing...')
 
 
 if __name__ == '__main__':
