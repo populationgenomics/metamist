@@ -693,13 +693,18 @@ def write_sequencing_reports(
     # Upload the reports to the upload bucket, in the audit_results/today directory
     for sequence_report in reports_to_write:
         file = os.path.basename(sequence_report)
-        bucket = CLIENT.get_bucket(f'cpg-{project}-{access_level}-upload')
+        if access_level == 'test':
+            bucket_name = f'cpg-{project}-upload'
+        else:
+            bucket_name = f'cpg-{project}-main-upload'
+        
+        bucket = CLIENT.get_bucket(bucket_name)
 
         upload_report = bucket.blob(os.path.join('audit_results', today, file))
         upload_report.upload_from_filename(sequence_report)
 
         logging.info(
-            f'Uploaded {file} to gs://cpg-{project}-{access_level}-upload/audit_results/{today}/'
+            f'Uploaded {file} to gs://{bucket_name}/audit_results/{today}/'
         )
 
 
