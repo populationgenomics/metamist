@@ -376,6 +376,9 @@ def get_analysis_cram_paths_for_project_samples(
     Returns a dict mapping {sample_id : (analysis_id, cram_path) }
     """
     sample_ids = list(samples.keys())
+    projects = [
+        project,
+    ]
     if 'test' not in project:
         projects = [
             f'{project}',
