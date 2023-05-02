@@ -47,9 +47,9 @@ def main(date, sequence_type, file_types):
     project = config['workflow']['dataset']
     access_level = config['workflow']['access_level']
     if access_level == 'full':
-        bucket_name = f'cpg-{project}-{main}-upload'
+        bucket_name = f'cpg-{project}-main-upload'
     else:
-        bucket_name = f'cpg-{project}-upload'
+        bucket_name = f'cpg-{project}-test-upload'
 
     subdir = f'audit_results/{date}/'
 
