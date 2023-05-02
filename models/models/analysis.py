@@ -42,16 +42,15 @@ class AnalysisInternal(SMBase):
         if timestamp_completed is not None and not isinstance(timestamp_completed, str):
             timestamp_completed = timestamp_completed.isoformat()
 
-        sequencing_group_ids = (
-            [kwargs.pop('sequencing_group_id')]
-            if 'sequencing_group_id' in kwargs
-            else []
-        )
+        sequencing_group_ids = []
+        if sg := kwargs.pop('sequencing_group_id', None):
+            sequencing_group_ids.append(sg)
+
         return AnalysisInternal(
             id=kwargs.pop('id'),
             type=analysis_type,
             status=AnalysisStatus(status),
-            sequencing_group_ids=sequencing_group_ids,
+            sequencing_group_ids=sequencing_group_ids or [],
             output=kwargs.pop('output', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),

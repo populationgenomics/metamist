@@ -167,7 +167,7 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        type: strawberry.enum(AnalysisType) | None = None,
+        type: str | None = None,
         active: bool | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']

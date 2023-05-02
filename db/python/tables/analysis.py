@@ -197,9 +197,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         where_str = ' AND '.join(wheres)
         _query = f"""
         SELECT a.id as id, a.type as type, a.status as status,
-                a.output as output, a_s.sequencing_group_id as sequencing_group_id,
-                a.project as project, a.timestamp_completed as timestamp_completed, a.active as active,
-                a.meta as meta, a.author as author
+                a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+                a.project as project, a.timestamp_completed as timestamp_completed,
+                a.active as active, a.meta as meta, a.author as author
         FROM analysis a
         LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
         WHERE {where_str}

@@ -109,19 +109,20 @@ class TestAnalysis(DbIsolatedTest):
         Test adding an analysis of type ANALYSIS_RUNNER
         """
 
-        a_id = await self.al.insert_analysis(
-            analysis_type='analysis-runner',
-            status=AnalysisStatus.UNKNOWN,
-            # no sample IDs to check join
-            sequence_group_ids=[],
-            meta={},
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequence_group_ids=[],
+                meta={},
+            )
         )
 
         analyses = await self.al.query_analysis(
-            project_ids=[1], analysis_type=AnalysisType.ANALYSIS_RUNNER
+            project_ids=[1], analysis_type='analysis-runner'
         )
         expected = [
-            Analysis(
+            AnalysisInternal(
                 id=a_id,
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
