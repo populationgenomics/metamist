@@ -711,6 +711,9 @@ def write_csv_report_to_cloud(
         if header_row:
             writer.writerow(header_row)
         for row in data_to_write:
+            if isinstance(row, str):
+                writer.writerow([row])
+                continue
             writer.writerow(row)
 
     logging.info(f'Wrote {len(data_to_write)} lines to report: {report_path}')
