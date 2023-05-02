@@ -65,7 +65,6 @@ def main(date, sequence_type, file_types):
     paths = set()  # Read the delete paths as a set to prevent duplicates
     with open('./sequences_to_delete.csv', 'r') as f:
         reader = csv.DictReader(f)
-        next(reader)  # Skip header
         for row in reader:
             paths.add(CloudPath(row['Sequence_Path']))
 
