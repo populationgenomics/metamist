@@ -713,7 +713,7 @@ def write_csv_report_to_cloud(
         for row in data_to_write:
             writer.writerow(row)
 
-    logging.info('Wrote {len(data_to_write)} lines to report: {report_path}')
+    logging.info(f'Wrote {len(data_to_write)} lines to report: {report_path}')
 
 
 def write_sequencing_reports(
@@ -757,7 +757,7 @@ def write_sequencing_reports(
             f'{project}_{file_types}_{sequence_type}_sequences_to_ingest_{today}.csv'
         )
         write_csv_report_to_cloud(
-            data_to_write=sequence_reads_to_delete,
+            data_to_write=sequence_reads_to_ingest,
             report_path=os.path.join(report_path, sequences_to_ingest_file),
             header_row=None,
         )
@@ -770,9 +770,9 @@ def write_sequencing_reports(
             f'{project}_{file_types}_{sequence_type}_samples_without_crams_{today}.csv'
         )
         write_csv_report_to_cloud(
-            data_to_write=sequence_reads_to_delete,
+            data_to_write=incomplete_samples,
             report_path=os.path.join(report_path, incomplete_samples_file),
-            header_row=['Sample_ID', 'Sequence_ID', 'Sequence_Path', 'Analysis_IDs'],
+            header_row=['Internal_Sample_ID', 'External_Sample_ID'],
         )
 
 
