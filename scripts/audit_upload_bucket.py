@@ -557,7 +557,9 @@ def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
                 these are identified as sequence files that have been moved from
                 their original location to a new location.
     """
-    bucket_name = f'cpg-{project}-main-upload'
+    bucket_name = f'cpg-{project}-upload'
+    if 'test' not in project:
+        bucket_name = f'cpg-{project}-main-upload'
     bucket = CLIENT.get_bucket(bucket_name)
 
     # Get all the paths to sequence data anywhere in the main-upload bucket
