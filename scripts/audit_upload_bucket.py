@@ -697,15 +697,13 @@ def write_sequencing_reports(
             bucket_name = f'cpg-{project}-upload'
         else:
             bucket_name = f'cpg-{project}-main-upload'
-        
+
         bucket = CLIENT.get_bucket(bucket_name)
 
         upload_report = bucket.blob(os.path.join('audit_results', today, file))
         upload_report.upload_from_filename(sequence_report)
 
-        logging.info(
-            f'Uploaded {file} to gs://{bucket_name}/audit_results/{today}/'
-        )
+        logging.info(f'Uploaded {file} to gs://{bucket_name}/audit_results/{today}/')
 
 
 @click.command()
