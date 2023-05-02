@@ -30,12 +30,12 @@ class TestValidateParserQueries(unittest.TestCase):
         the current development version! Oustide metamist, you'd just leave the
         schema option blank, and it would fetch the schema from the server.
         """
-        # only need to apply schema to the first client to create, then it gets cached
 
+        # only need to apply schema to the first client to create, then it gets cached
         client = configure_sync_client(
             schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
         )
-        validate(QUERY_MATCH_PARTICIPANTS, client=client)
+        validate(QUERY_MATCH_PARTICIPANTS)
         validate(QUERY_MATCH_SAMPLES, client=client)
         validate(QUERY_MATCH_SEQUENCING_GROUPS, client=client)
         validate(QUERY_MATCH_ASSAYS, client=client)

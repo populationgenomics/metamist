@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = 'web/src/static'
 OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
+MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_NAME)
 
 
 def check_if_server_is_accessible() -> bool:
@@ -166,6 +167,17 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
     shutil.rmtree(tmpdir)
 
 
+def generate_schema_file():
+    """
+    Generate schema file and place int he metamist/graphql/ directory
+    """
+    command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
+    schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
+
+    with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
+        f.write(schema)
+
+
 def copy_typescript_files_from(tmpdir):
     """Copy typescript files to web/src/sm-api/"""
     files_to_ignore = {
@@ -224,9 +236,8 @@ def copy_python_files_from(tmpdir):
 
     files_to_ignore = {'README.md', 'parser', 'graphql'}
 
-    module_dir = MODULE_NAME.replace('.', '/')
-    dir_to_copy_to = module_dir  # should be relative to this script
-    dir_to_copy_from = os.path.join(tmpdir, module_dir)
+    dir_to_copy_to = MODULE_DIR  # should be relative to this script
+    dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)
 
     if not os.path.exists(dir_to_copy_to):
         raise FileNotFoundError(
@@ -297,6 +308,7 @@ def main():
         )
         generate_api_and_copy('typescript-axios', copy_typescript_files_from)
 
+        generate_schema_file()
         shutil.copy(
             './resources/muck-the-duck.svg',
             os.path.join('web/src', 'muck-the-duck.svg'),

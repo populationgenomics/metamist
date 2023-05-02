@@ -1,4 +1,5 @@
 from test.testbase import DbIsolatedTest, run_as_sync
+from graphql.error import GraphQLError, GraphQLSyntaxError
 
 from db.python.layers import ParticipantLayer
 from models.models import (
@@ -7,6 +8,9 @@ from models.models import (
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
 )
+import api.graphql.schema
+from metamist.graphql import gql, validate, configure_sync_client
+
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -61,14 +65,78 @@ SINGLE_PARTICIPANT_UPSERT = ParticipantUpsertInternal(
     ],
 )
 
+TEST_QUERY = gql(
+    """
+query MyQuery($project: String!) {
+  project(name: $project) {
+    participants {
+      id
+      samples {
+        id
+        sequencingGroups {
+          id
+          assays {
+            id
+          }
+        }
+      }
+    }
+  }
+}"""
+)
 
-class TestWeb(DbIsolatedTest):
-    """Test web class containing web endpoints"""
+
+class TestGraphQL(DbIsolatedTest):
+    """Test graphql functionality"""
 
     @run_as_sync
     async def setUp(self) -> None:
+        """Setup the tests"""
         super().setUp()
         self.player = ParticipantLayer(self.connection)
+
+    def test_validate_local_schema(self):
+        """
+        test using the bundled schema file (from regenerateapi.py)
+         to make sure people can validate with authentication
+        """
+        validate(TEST_QUERY, use_local_schema=True)
+
+    def test_validate_provided_schema(self):
+        """
+        Validate using schema directly from api.graphql.schema
+        (strawberry has an as_str() method)
+        """
+        client = configure_sync_client(
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+        )
+        validate(TEST_QUERY, client=client)
+
+    def test_bad_syntax_query(self):
+        """Fail on bad syntax"""
+        with self.assertRaises(GraphQLSyntaxError):
+            gql(
+                """
+            query MyQuery(badtoken $project: String!) {
+                project(name: $project) {
+                    name
+                }
+            }"""
+            )
+
+    def test_bad_field_query(self):
+        """Fail because the field doesn't exist"""
+        # query syntactically validates
+        query = gql(
+            """
+            query MyQuery($project: String!) {
+                project(name: $project) {
+                    thisFieldDoesntExist
+                }
+        }"""
+        )
+        with self.assertRaises(GraphQLError):
+            validate(query, use_local_schema=True)
 
     @run_as_sync
     async def test_basic_graphql_query(self):
