@@ -5,7 +5,7 @@ import logging
 import sys
 import click
 from google.cloud import storage
-from cloudpathlib import CloudPath
+from cloudpathlib import CloudPath, AnyPath
 from cpg_utils.config import get_config
 
 
@@ -54,22 +54,17 @@ def main(date, sequence_type, file_types):
         bucket_name = f'cpg-{project}-test-upload'
         file = f'{subdir}/{project}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
 
-    bucket = CLIENT.get_bucket(bucket_name)
+    report_path = f'gs://{bucket_name}/{file}'
 
-    logging.info(f'Getting file {file}...')
-    blob = bucket.get_blob(file)
-
-    blob.download_to_filename('./sequences_to_delete.csv', CLIENT)
-    logging.info(f'Downloaded audit results: {blob.name}')
-
-    paths = set()  # Read the delete paths as a set to prevent duplicates
-    with open('./sequences_to_delete.csv', 'r') as f:
+    paths = set()
+    with AnyPath(report_path).open('r') as f:  # pylint: disable=E1101
+        logging.info(f'Getting file {report_path}...')
         reader = csv.DictReader(f)
         for row in reader:
             paths.add(CloudPath(row['Sequence_Path']))
 
     clean_up_cloud_storage(list(paths))
-    logging.info(f'{len(paths)} deleted')
+    logging.info(f'{len(paths)} sequence files deleted.')
 
 
 if __name__ == '__main__':
