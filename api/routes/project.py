@@ -28,10 +28,6 @@ async def get_my_projects(connection=get_projectless_db_connection):
         author=connection.author, check_permissions=False
     )
     return sorted(p.name for p in projects)
-    # pmap = await ptable.get_projects_accessible_by_user(
-    #     author=connection.author, readonly=True
-    # )
-    # return list(pmap.values())
 
 
 @router.put('/', operation_id='createProject')
