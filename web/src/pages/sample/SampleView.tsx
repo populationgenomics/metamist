@@ -29,7 +29,7 @@ query SampleInfo($sample_id: String!) {
   }
 `)
 
-const sampleFieldsToDisplay = ['active', 'type', /*'participantId'*/]
+const sampleFieldsToDisplay = ['active', 'type' /*'participantId'*/]
 
 const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
     const theme = React.useContext(ThemeContext)

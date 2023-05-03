@@ -150,7 +150,8 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummary(
     total_samples=1,
     total_samples_in_query=1,
     total_participants=1,
-    total_sequences=1,
+    total_sequencing_groups=1,
+    total_assays=1,
     cram_seqr_stats={
         'genome': {
             'Sequences': '1',
@@ -158,7 +159,7 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummary(
             'Seqr': '0',
         }
     },
-    batch_sequence_stats={'M001': {'genome': '1'}},
+    batch_sequencing_group_stats={'M001': {'genome': '1'}},
     participants=[],
     participant_keys=[('external_id', 'Participant ID')],
     sample_keys=[
@@ -205,8 +206,9 @@ class TestWeb(DbIsolatedTest):
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
-            total_sequences=0,
-            batch_sequence_stats={},
+            total_sequencing_groups=0,
+            total_assays=0,
+            batch_sequencing_group_stats={},
             cram_seqr_stats={},
             participants=[],
             participant_keys=[],
@@ -270,8 +272,9 @@ class TestWeb(DbIsolatedTest):
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
-            total_sequences=0,
-            batch_sequence_stats={},
+            total_sequencing_groups=0,
+            total_assays=0,
+            batch_sequencing_group_stats={},
             cram_seqr_stats={},
             participants=[],
             participant_keys=[],
@@ -296,7 +299,8 @@ class TestWeb(DbIsolatedTest):
             total_samples=2,
             total_samples_in_query=2,
             total_participants=2,
-            total_sequences=2,
+            total_sequencing_groups=2,
+            total_assays=2,
             cram_seqr_stats={
                 'genome': {
                     'Sequences': '2',
@@ -304,7 +308,7 @@ class TestWeb(DbIsolatedTest):
                     'Seqr': '0',
                 }
             },
-            batch_sequence_stats={'M001': {'genome': '2'}},
+            batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
@@ -347,7 +351,8 @@ class TestWeb(DbIsolatedTest):
             total_samples=2,
             total_samples_in_query=1,
             total_participants=2,
-            total_sequences=2,
+            total_sequencing_groups=2,
+            total_assays=2,
             cram_seqr_stats={
                 'genome': {
                     'Sequences': '2',
@@ -355,7 +360,7 @@ class TestWeb(DbIsolatedTest):
                     'Seqr': '0',
                 }
             },
-            batch_sequence_stats={'M001': {'genome': '2'}},
+            batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],  # data_to_class(expected_data_list_filtered),
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[
@@ -423,7 +428,8 @@ class TestWeb(DbIsolatedTest):
             total_samples=2,
             total_samples_in_query=1,
             total_participants=2,
-            total_sequences=2,
+            total_sequencing_groups=2,
+            total_assays=2,
             cram_seqr_stats={
                 'genome': {
                     'Sequences': '2',
@@ -431,7 +437,7 @@ class TestWeb(DbIsolatedTest):
                     'Seqr': '0',
                 }
             },
-            batch_sequence_stats={'M001': {'genome': '2'}},
+            batch_sequencing_group_stats={'M001': {'genome': '2'}},
             participants=[],
             participant_keys=[('external_id', 'Participant ID')],
             sample_keys=[

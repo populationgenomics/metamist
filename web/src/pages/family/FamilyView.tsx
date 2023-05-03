@@ -17,7 +17,7 @@ import iconStyle from '../../shared/iconStyle'
 import SeqPanel from '../../shared/components/SeqPanel'
 import SampleInfo from '../../shared/components/SampleInfo'
 
-const sampleFieldsToDisplay = ['active', 'type', /*'participantId'*/]
+const sampleFieldsToDisplay = ['active', 'type' /*'participantId'*/]
 
 // TODO: Fix this query
 const GET_FAMILY_INFO = gql(`

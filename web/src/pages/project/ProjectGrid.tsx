@@ -194,71 +194,75 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                         // .map((s_) => s_.sequences.length)
                         // .reduce((a, b) => a + b, 0)
                         const fakeSeq = [{}]
-                        return fakeSeq/*s.sequences*/.map((seq, seqidx) => {
-                            const isFirstOfGroup = sidx === 0 && seqidx === 0
-                            return (
-                                <SUITable.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
-                                    {isFirstOfGroup && (
-                                        <SUITable.Cell
-                                            style={{ backgroundColor }}
-                                            rowSpan={lengthOfParticipant}
-                                        >
-                                            {
-                                                <FamilyLink
-                                                    id={p.families.map((f) => f.id).join(', ')}
-                                                    projectName={projectName}
-                                                >
-                                                    {p.families
-                                                        .map((f) => f.external_id)
-                                                        .join(', ')}
-                                                </FamilyLink>
-                                            }
-                                        </SUITable.Cell>
-                                    )}
-                                    {isFirstOfGroup &&
-                                        summary.participant_keys.map(([k]) => (
+                        return fakeSeq /*s.sequences*/
+                            .map((seq, seqidx) => {
+                                const isFirstOfGroup = sidx === 0 && seqidx === 0
+                                return (
+                                    <SUITable.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
+                                        {isFirstOfGroup && (
                                             <SUITable.Cell
-                                                style={{
-                                                    backgroundColor,
-                                                }}
-                                                key={`${p.id}participant.${k}`}
+                                                style={{ backgroundColor }}
                                                 rowSpan={lengthOfParticipant}
                                             >
-                                                {sanitiseValue(_.get(p, k))}
+                                                {
+                                                    <FamilyLink
+                                                        id={p.families.map((f) => f.id).join(', ')}
+                                                        projectName={projectName}
+                                                    >
+                                                        {p.families
+                                                            .map((f) => f.external_id)
+                                                            .join(', ')}
+                                                    </FamilyLink>
+                                                }
                                             </SUITable.Cell>
-                                        ))}
-                                    {seqidx === 0 &&
-                                        summary.sample_keys.map(([k]) => (
-                                            <SUITable.Cell
-                                                style={{
-                                                    backgroundColor,
-                                                }}
-                                                key={`${s.id}sample.${k}`}
-                                            // rowSpan={s.sequences.length}
-                                            >
-                                                {k === 'external_id' || k === 'id' ? (
-                                                    <SampleLink id={s.id} projectName={projectName}>
-                                                        {sanitiseValue(_.get(s, k))}
-                                                    </SampleLink>
-                                                ) : (
-                                                    sanitiseValue(_.get(s, k))
-                                                )}
-                                            </SUITable.Cell>
-                                        ))}
-                                    {seq &&
-                                        /*summary.sequence_keys*/[].map(([k]) => (
-                                        <SUITable.Cell
-                                            style={{
-                                                backgroundColor,
-                                            }}
-                                            key={`${s.id}sequence.${k}`}
-                                        >
-                                            {sanitiseValue(_.get(seq, k))}
-                                        </SUITable.Cell>
-                                    ))}
-                                </SUITable.Row>
-                            )
-                        })
+                                        )}
+                                        {isFirstOfGroup &&
+                                            summary.participant_keys.map(([k]) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${p.id}participant.${k}`}
+                                                    rowSpan={lengthOfParticipant}
+                                                >
+                                                    {sanitiseValue(_.get(p, k))}
+                                                </SUITable.Cell>
+                                            ))}
+                                        {seqidx === 0 &&
+                                            summary.sample_keys.map(([k]) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${s.id}sample.${k}`}
+                                                    // rowSpan={s.sequences.length}
+                                                >
+                                                    {k === 'external_id' || k === 'id' ? (
+                                                        <SampleLink
+                                                            id={s.id}
+                                                            projectName={projectName}
+                                                        >
+                                                            {sanitiseValue(_.get(s, k))}
+                                                        </SampleLink>
+                                                    ) : (
+                                                        sanitiseValue(_.get(s, k))
+                                                    )}
+                                                </SUITable.Cell>
+                                            ))}
+                                        {seq &&
+                                            /*summary.sequence_keys*/ [].map(([k]) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${s.id}sequence.${k}`}
+                                                >
+                                                    {sanitiseValue(_.get(seq, k))}
+                                                </SUITable.Cell>
+                                            ))}
+                                    </SUITable.Row>
+                                )
+                            })
                     })
                 )}
             </SUITable.Body>

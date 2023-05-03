@@ -308,10 +308,11 @@ class WebDb(DbBase):
         return await self.connection.fetch_val(_query, {'project': self.project})
 
     async def get_total_number_of_sequencing_groups(self):
+        """Get total number of sequencing groups within a project"""
         _query = """
-        SELECT COUNT(*) 
-        FROM sequencing_group sg 
-        INNER JOIN sample s ON s.id = sg.sample_id 
+        SELECT COUNT(*)
+        FROM sequencing_group sg
+        INNER JOIN sample s ON s.id = sg.sample_id
         WHERE project = :project"""
         return await self.connection.fetch_val(_query, {'project': self.project})
 
