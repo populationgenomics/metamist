@@ -15,19 +15,13 @@ const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {
     sample(id: $sample_id) {
       id
-      participantId
       externalId
       participant {
+        id
         externalId
         families {
             id
         }
-      }
-      sequences {
-        id
-        externalIds
-        type
-        meta
       }
       type
       active
@@ -35,7 +29,7 @@ query SampleInfo($sample_id: String!) {
   }
 `)
 
-const sampleFieldsToDisplay = ['active', 'type', 'participantId']
+const sampleFieldsToDisplay = ['active', 'type', /*'participantId'*/]
 
 const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
     const theme = React.useContext(ThemeContext)
@@ -98,7 +92,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                         )}
                     />
                 </div>
-                <SeqPanel isOpen sequences={data.sample.sequences} />
+                {/*}<SeqPanel isOpen sequences={data.sample.sequences} />*/}
             </div>
         </>
     ) : (

@@ -47,11 +47,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
             name: field[0],
             title: field[1],
         })),
-        ...summary.sequence_keys.map((field) => ({
-            category: MetaSearchEntityPrefix.Sq,
-            name: field[0],
-            title: `sequence.${field[1]}`,
-        })),
+        // ...summary.sequence_keys.map((field) => ({
+        //     category: MetaSearchEntityPrefix.Sq,
+        //     name: field[0],
+        //     title: `sequence.${field[1]}`,
+        // })),
     ]
 
     const [tempFilterValues, setTempFilterValues] =
@@ -190,10 +190,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                     p.samples.map((s, sidx) => {
                         const backgroundColor =
                             pidx % 2 === 0 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
-                        const lengthOfParticipant = p.samples
-                            .map((s_) => s_.sequences.length)
-                            .reduce((a, b) => a + b, 0)
-                        return s.sequences.map((seq, seqidx) => {
+                        const lengthOfParticipant = p.samples.length
+                        // .map((s_) => s_.sequences.length)
+                        // .reduce((a, b) => a + b, 0)
+                        const fakeSeq = [{}]
+                        return fakeSeq/*s.sequences*/.map((seq, seqidx) => {
                             const isFirstOfGroup = sidx === 0 && seqidx === 0
                             return (
                                 <SUITable.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
@@ -233,7 +234,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     backgroundColor,
                                                 }}
                                                 key={`${s.id}sample.${k}`}
-                                                rowSpan={s.sequences.length}
+                                            // rowSpan={s.sequences.length}
                                             >
                                                 {k === 'external_id' || k === 'id' ? (
                                                     <SampleLink id={s.id} projectName={projectName}>
@@ -245,16 +246,16 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                             </SUITable.Cell>
                                         ))}
                                     {seq &&
-                                        summary.sequence_keys.map(([k]) => (
-                                            <SUITable.Cell
-                                                style={{
-                                                    backgroundColor,
-                                                }}
-                                                key={`${s.id}sequence.${k}`}
-                                            >
-                                                {sanitiseValue(_.get(seq, k))}
-                                            </SUITable.Cell>
-                                        ))}
+                                        /*summary.sequence_keys*/[].map(([k]) => (
+                                        <SUITable.Cell
+                                            style={{
+                                                backgroundColor,
+                                            }}
+                                            key={`${s.id}sequence.${k}`}
+                                        >
+                                            {sanitiseValue(_.get(seq, k))}
+                                        </SUITable.Cell>
+                                    ))}
                                 </SUITable.Row>
                             )
                         })

@@ -113,9 +113,10 @@ class ProjectSummary:
     total_samples: int
     total_samples_in_query: int
     total_participants: int
-    total_sequences: int
+    total_sequencing_groups: int
+    total_assays: int
     cram_seqr_stats: dict[str, dict[str, str]]
-    batch_sequence_stats: dict[str, dict[str, str]]
+    batch_sequencing_group_stats: dict[str, dict[str, str]]
 
     # grid
     participants: list[NestedParticipant]
@@ -306,7 +307,15 @@ class WebDb(DbBase):
         _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
 
-    async def get_total_number_of_sequences(self):
+    async def get_total_number_of_sequencing_groups(self):
+        _query = """
+        SELECT COUNT(*) 
+        FROM sequencing_group sg 
+        INNER JOIN sample s ON s.id = sg.sample_id 
+        WHERE project = :project"""
+        return await self.connection.fetch_val(_query, {'project': self.project})
+
+    async def get_total_number_of_assays(self):
         """Get total number of sequences within a project"""
         _query = 'SELECT COUNT(*) FROM assay sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
         return await self.connection.fetch_val(_query, {'project': self.project})
@@ -390,17 +399,18 @@ class WebDb(DbBase):
                 participants=[],
                 participant_keys=[],
                 sample_keys=[],
-                assay_keys=[],
                 sequencing_group_keys=[],
+                assay_keys=[],
                 # stats
                 total_samples=0,
                 total_samples_in_query=0,
                 total_participants=0,
-                total_sequences=0,
-                batch_sequence_stats={},
+                total_assays=0,
+                total_sequencing_groups=0,
                 cram_seqr_stats={},
                 seqr_links=seqr_links,
                 seqr_sync_types=[],
+                batch_sequencing_group_stats={}
             )
 
         pids = list(set(s['participant_id'] for s in sample_rows))
@@ -465,7 +475,8 @@ WHERE fp.participant_id in :pids
             sample_id_start_times,
             total_samples,
             total_participants,
-            total_sequences,
+            total_sequencing_groups,
+            total_assays,
             cram_number_by_seq_type,
             seq_number_by_seq_type,
             seq_number_by_seq_type_and_batch,
@@ -480,7 +491,8 @@ WHERE fp.participant_id in :pids
             sampl.get_samples_create_date(sids),
             self.get_total_number_of_samples(),
             self.get_total_number_of_participants(),
-            self.get_total_number_of_sequences(),
+            self.get_total_number_of_sequencing_groups(),
+            self.get_total_number_of_assays(),
             atable.get_number_of_crams_by_sequencing_type(project=self.project),
             sgtable.get_type_numbers_for_project(project=self.project),
             seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
@@ -649,8 +661,9 @@ WHERE fp.participant_id in :pids
             total_samples=total_samples,
             total_samples_in_query=total_samples_in_query,
             total_participants=total_participants,
-            total_sequences=total_sequences,
-            batch_sequence_stats=sequence_stats,
+            total_assays=total_assays,
+            total_sequencing_groups=total_sequencing_groups,
+            batch_sequencing_group_stats=sequence_stats,
             cram_seqr_stats=cram_seqr_stats,
             seqr_links=seqr_links,
             seqr_sync_types=seqr_sync_types,

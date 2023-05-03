@@ -47,15 +47,17 @@ class ProjectSummaryResponse(BaseModel):
     total_participants: int
     total_samples: int
     total_samples_in_query: int
-    total_sequences: int
+    total_sequencing_groups: int
+    total_assays: int
     cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
-    batch_sequence_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
+    batch_sequencing_group_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
 
     # for display
     participants: list[NestedParticipant]
     participant_keys: list[list[str]]
     sample_keys: list[list[str]]
-    sequence_keys: list[list[str]]
+    sequencing_group_keys: list[list[str]]
+    assay_keys: list[list[str]]
     seqr_links: dict[str, str]
     seqr_sync_types: list[str]
 
@@ -101,14 +103,16 @@ async def get_project_summary(
             participants=[],
             participant_keys=[],
             sample_keys=[],
-            sequence_keys=[],
+            sequencing_group_keys=[],
+            assay_keys=[],
             _links=None,
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
-            total_sequences=0,
+            total_sequencing_groups=0,
+            total_assays=0,
             cram_seqr_stats={},
-            batch_sequence_stats={},
+            batch_sequencing_group_stats={},
             seqr_links=summary.seqr_links,
             seqr_sync_types=[],
         )
@@ -139,14 +143,16 @@ async def get_project_summary(
         total_samples=summary.total_samples,
         total_samples_in_query=summary.total_samples_in_query,
         total_participants=summary.total_participants,
-        total_sequences=summary.total_sequences,
+        total_sequencing_groups=summary.total_sequencing_groups,
+        total_assays=summary.total_assays,
         cram_seqr_stats=summary.cram_seqr_stats,
-        batch_sequence_stats=summary.batch_sequence_stats,
+        batch_sequencing_group_stats=summary.batch_sequencing_group_stats,
         # other stuff
         participants=participants,
         participant_keys=summary.participant_keys,
         sample_keys=summary.sample_keys,
-        sequence_keys=summary.assay_keys,
+        assay_keys=summary.assay_keys,
+        sequencing_group_keys=summary.sequencing_group_keys,
         seqr_links=summary.seqr_links,
         seqr_sync_types=summary.seqr_sync_types,
         _links=links,
