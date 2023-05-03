@@ -15,15 +15,13 @@ Procedure:
    ingest, and any samples without completed crams.
 """
 
-import csv
+
 from datetime import datetime
 import sys
 import logging
 import os
-from typing import Any
 import click
 
-from cloudpathlib import AnyPath
 from cpg_utils.config import get_config
 
 from audit.generic_auditor import GenericAuditor
@@ -85,26 +83,6 @@ class UploadBucketAuditor(GenericAuditor):
             default_analysis_status=default_analysis_status,
         )
 
-    @staticmethod
-    def write_csv_report_to_cloud(
-        data_to_write: list[Any], report_path: AnyPath, header_row: list[str] | None
-    ):
-        """
-        Writes a csv report to the cloud bucket containing the data to write
-        at the report path, with an optional header row
-        """
-        with AnyPath(report_path).open('w+') as f:  # pylint: disable=E1101
-            writer = csv.writer(f)
-            if header_row:
-                writer.writerow(header_row)
-            for row in data_to_write:
-                if isinstance(row, str):
-                    writer.writerow([row])
-                    continue
-                writer.writerow(row)
-
-        logging.info(f'Wrote {len(data_to_write)} lines to report: {report_path}')
-
     def write_upload_bucket_audit_reports(
         self,
         access_level: str,
@@ -126,7 +104,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_delete:
             logging.info('No sequence read files to delete found. Skipping report...')
         else:
-            sequences_to_delete_file = f'{self.project}_{self.file_types}_{self.sequence_type}_sequences_to_delete_{today}.csv'
+            sequences_to_delete_file = f'{self.project}_{self.file_types}_{self.sequence_type}_sequences_to_delete_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_delete,
                 report_path=os.path.join(report_path, sequences_to_delete_file),
@@ -142,7 +120,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_ingest:
             logging.info('No sequence reads to ingest found. Skipping report...')
         else:
-            sequences_to_ingest_file = f'{self.project}_{self.file_types}_{self.sequence_type}_sequences_to_ingest_{today}.csv'
+            sequences_to_ingest_file = f'{self.project}_{self.file_types}_{self.sequence_type}_sequences_to_ingest_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_ingest,
                 report_path=os.path.join(report_path, sequences_to_ingest_file),
@@ -153,7 +131,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not incomplete_samples:
             logging.info(f'No samples without crams found. Skipping report...')
         else:
-            incomplete_samples_file = f'{self.project}_{self.file_types}_{self.sequence_type}_samples_without_crams_{today}.csv'
+            incomplete_samples_file = f'{self.project}_{self.file_types}_{self.sequence_type}_samples_without_crams_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=incomplete_samples,
                 report_path=os.path.join(report_path, incomplete_samples_file),

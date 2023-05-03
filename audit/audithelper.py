@@ -1,7 +1,9 @@
 # pylint: disable=no-member
 import logging
 from collections import defaultdict
+import csv
 from datetime import datetime
+from typing import Any
 
 from cloudpathlib import AnyPath, GSPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
@@ -186,3 +188,23 @@ class AuditHelper:
             continue
 
         return sequence_paths
+
+    @staticmethod
+    def write_csv_report_to_cloud(
+        data_to_write: list[Any], report_path: AnyPath, header_row: list[str] | None
+    ):
+        """
+        Writes a csv report to the cloud bucket containing the data to write
+        at the report path, with an optional header row
+        """
+        with AnyPath(report_path).open('w+') as f:  # pylint: disable=E1101
+            writer = csv.writer(f)
+            if header_row:
+                writer.writerow(header_row)
+            for row in data_to_write:
+                if isinstance(row, str):
+                    writer.writerow([row])
+                    continue
+                writer.writerow(row)
+
+        logging.info(f'Wrote {len(data_to_write)} lines to report: {report_path}')
