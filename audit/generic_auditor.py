@@ -11,44 +11,6 @@ from sample_metadata.model.analysis_status import AnalysisStatus
 from sample_metadata.graphql import query
 
 
-FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
-BAM_EXTENSIONS = ('.bam',)
-CRAM_EXTENSIONS = ('.cram',)
-GVCF_EXTENSIONS = ('.g.vcf.gz',)
-VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
-READ_EXTENSIONS = FASTQ_EXTENSIONS + BAM_EXTENSIONS + CRAM_EXTENSIONS
-ALL_EXTENSIONS = (
-    FASTQ_EXTENSIONS
-    + BAM_EXTENSIONS
-    + CRAM_EXTENSIONS
-    + GVCF_EXTENSIONS
-    + VCF_EXTENSIONS
-)
-
-FILE_TYPES_MAP = {
-    'fastq': FASTQ_EXTENSIONS,
-    'bam': BAM_EXTENSIONS,
-    'cram': CRAM_EXTENSIONS,
-    'gvcf': GVCF_EXTENSIONS,
-    'vcf': VCF_EXTENSIONS,
-    'all_reads': READ_EXTENSIONS,
-    'all': ALL_EXTENSIONS,
-}
-
-SEQUENCE_TYPES_MAP = {
-    'genome': [
-        'genome',
-    ],
-    'exome': [
-        'exome',
-    ],
-    'all': [
-        'genome',
-        'exome',
-    ],
-}
-
-
 ANALYSIS_TYPES = [
     'qc',
     'joint-calling',
@@ -59,13 +21,6 @@ ANALYSIS_TYPES = [
     'sv',
     'web',
     'analysis-runner',
-]
-
-BUCKET_TYPES = [
-    'main',
-    'test',
-    'archive',
-    'release',
 ]
 
 EXCLUDED_SAMPLES = [
@@ -150,11 +105,25 @@ class GenericAuditor(AuditHelper):
         and then all the sequences associated with those samples.
         """
 
-        return (
+        participant_data = (
             query(self.query, {'projectName': self.project})
             .get('project')
             .get('participants')
         )
+
+        # Filter out any participants with no samples and log any found
+        for participant in participant_data:
+            if not participant.get('samples'):
+                logging.info(
+                    f'Participant {participant.get("id")} / {participant.get("externalId")} from {self.project} has no samples. Filtering this participant out.'
+                )
+        participant_data = [
+            participant
+            for participant in participant_data
+            if participant.get('samples')
+        ]
+
+        return participant_data
 
     def map_participants_to_samples(self, participants: list[dict]) -> dict[str, list]:
         """
@@ -208,7 +177,7 @@ class GenericAuditor(AuditHelper):
             sample_id: sample_external_id
             for sample_map in samples_all
             for sample_id, sample_external_id in sample_map.items()
-            if sample_id not in self.EXCLUDED_SAMPLES
+            if sample_id not in EXCLUDED_SAMPLES
         }
 
         return sample_internal_external_id_map
@@ -218,7 +187,8 @@ class GenericAuditor(AuditHelper):
     ) -> tuple[dict[int, str], defaultdict[int, list]]:
         """
         Input: A list of Metamist sequences
-        Returns dict mappings of {sequence_id : sample_internal_id}, and {sequence_id : (sequence_filepath, sequence_filesize)}
+        Returns dict mappings of:
+        {sequence_id : sample_internal_id}, and {sequence_id : (sequence_filepath, sequence_filesize)}
         """
         seq_id_sample_id_map = {}
         # multiple reads per sequence is possible so use defaultdict(list)
@@ -429,7 +399,7 @@ class GenericAuditor(AuditHelper):
 
         # Check the analysis paths actually point to crams that exist in the bucket
         buckets_subdirs = self.get_gcs_bucket_subdirs_to_search(list(cram_paths))
-        crams_in_bucket = self.find_files_in_buckets_subdirs(
+        crams_in_bucket = self.find_files_in_gcs_buckets_subdirs(
             buckets_subdirs,
             ('cram',),
         )
@@ -458,7 +428,7 @@ class GenericAuditor(AuditHelper):
 
     def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
         self,
-        sequence_reads: defaultdict[int, list],
+        sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         completed_samples: defaultdict[str, list[int]],
         seq_id_sample_id_map_map: dict[int, str],
     ):
@@ -478,13 +448,13 @@ class GenericAuditor(AuditHelper):
             bucket_name = f'cpg-{self.project}-main-upload'
 
         # Get all the paths to sequence data anywhere in the main-upload bucket
-        sequence_paths_in_bucket = self.find_sequence_files_in_bucket(
+        sequence_paths_in_bucket = self.find_sequence_files_in_gcs_bucket(
             bucket_name, self.file_types
         )
 
         # Flatten all the Metamist sequence file paths and sizes into a single list
         sequence_paths_sizes_in_metamist: list[tuple[str, int]] = []
-        for sequence in sequence_reads.values():
+        for sequence in sequence_filepaths_filesizes.values():
             sequence_paths_sizes_in_metamist.extend(sequence)
 
         # Find the paths that exist in the bucket and not in metamist
@@ -528,7 +498,7 @@ class GenericAuditor(AuditHelper):
 
         # flip the sequence id : reads mapping to identify sequence IDs by their read paths
         reads_sequences = {}
-        for sequence_id, reads_sizes in sequence_reads.items():
+        for sequence_id, reads_sizes in sequence_filepaths_filesizes.items():
             for read_size in reads_sizes:
                 reads_sequences[read_size[0]] = sequence_id
 
@@ -553,8 +523,7 @@ class GenericAuditor(AuditHelper):
     def get_reads_to_delete_or_ingest(
         self,
         completed_samples: defaultdict[str, list[int]],
-        sequence_reads: defaultdict[int, list],
-        sample_id_seq_id_map: dict[str, list[int]],
+        sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         seq_id_sample_id_map: dict[int, str],
     ) -> tuple[list, list]:
         """
@@ -566,16 +535,20 @@ class GenericAuditor(AuditHelper):
         The first containins reads which can be deleted, the second containing reads to ingest.
         The sample ID, sequence ID, and analysis ID (of completed cram) are included in the delete list.
         """
-
         # Check for uningested sequence data that may be hiding or sequence data that has been moved
         (
             reads_to_ingest,
             moved_sequences_to_delete,
         ) = self.check_for_uningested_or_moved_sequences(
-            sequence_reads,
+            sequence_filepaths_filesizes,
             completed_samples,
             seq_id_sample_id_map,
         )
+
+        # Create a mapping of sample ID: sequence ID - use defaultdict in case a sample has several sequences
+        sample_id_seq_id_map: defaultdict[str, list[int]] = defaultdict(list)
+        for sequence, sample in seq_id_sample_id_map.items():
+            sample_id_seq_id_map[sample].append(sequence)
 
         sequence_reads_to_delete = []
         for sample_id, analysis_ids in completed_samples.items():
@@ -584,7 +557,8 @@ class GenericAuditor(AuditHelper):
             seq_ids = sample_id_seq_id_map[sample_id]
             for seq_id in seq_ids:
                 seq_read_paths = [
-                    reads_sizes[0] for reads_sizes in sequence_reads[seq_id]
+                    reads_sizes[0]
+                    for reads_sizes in sequence_filepaths_filesizes[seq_id]
                 ]
                 for path in seq_read_paths:
                     sequence_reads_to_delete.append(

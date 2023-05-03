@@ -14,62 +14,6 @@ class AuditHelper:
     LOCAL_PREFIX = '/'
     GCS_PREFIX = 'gs://'
     AZ_PREFIX = 'az://'
-    FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
-    BAM_EXTENSIONS = ('.bam',)
-    CRAM_EXTENSIONS = ('.cram',)
-    GVCF_EXTENSIONS = ('.g.vcf.gz',)
-    VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
-    READ_EXTENSIONS = FASTQ_EXTENSIONS + BAM_EXTENSIONS + CRAM_EXTENSIONS
-    ALL_EXTENSIONS = (
-        FASTQ_EXTENSIONS
-        + BAM_EXTENSIONS
-        + CRAM_EXTENSIONS
-        + GVCF_EXTENSIONS
-        + VCF_EXTENSIONS
-    )
-
-    FILE_TYPES_MAP = {
-        'fastq': FASTQ_EXTENSIONS,
-        'bam': BAM_EXTENSIONS,
-        'cram': CRAM_EXTENSIONS,
-        'gvcf': GVCF_EXTENSIONS,
-        'vcf': VCF_EXTENSIONS,
-        'all_reads': READ_EXTENSIONS,
-        'all': ALL_EXTENSIONS,
-    }
-
-    SEQUENCE_TYPES_MAP = {
-        'genome': [
-            'genome',
-        ],
-        'exome': [
-            'exome',
-        ],
-        'all': [
-            'genome',
-            'exome',
-        ],
-    }
-
-    EXCLUDED_SAMPLES = [
-        'CPG11783',  # acute-care, no FASTQ data
-        'CPG13409',  # perth-neuro, coverage ~0x
-        'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
-        'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
-        'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
-        'CPG261792',  # rdp-kidney misformated fastq - https://batch.hail.populationgenomics.org.au/batches/378736/jobs/43
-        # acute care fasq parsing errors https://batch.hail.populationgenomics.org.au/batches/379303/jobs/24
-        'CPG259150',
-        'CPG258814',
-        'CPG258137',
-        'CPG258111',
-        'CPG258012',
-        # ohmr4 cram parsing in align issues
-        'CPG261339',
-        'CPG261347',
-        # IBMDX truncated sample? https://batch.hail.populationgenomics.org.au/batches/422181/jobs/99
-        'CPG265876',
-    ]
 
     def __init__(self):
         # gs specific
@@ -189,7 +133,7 @@ class AuditHelper:
 
         return buckets_subdirs_to_search
 
-    def get_paths_for_subdir(
+    def get_gcs_paths_for_subdir(
         self, bucket_name: str, subdirectory: str, file_extension: tuple[str]
     ):
         """Iterate through a gcp bucket/subdir and get all the blobs with the specified file extension(s)"""
@@ -204,7 +148,7 @@ class AuditHelper:
 
         return files_in_bucket_subdir
 
-    def find_files_in_buckets_subdirs(
+    def find_files_in_gcs_buckets_subdirs(
         self, buckets_subdirs: defaultdict[str, list], file_types: tuple[str]
     ):
         """
@@ -219,12 +163,12 @@ class AuditHelper:
                 if '.mt' in subdir or '.ht' in subdir:
                     continue
                 files_in_bucket.extend(
-                    self.get_paths_for_subdir(bucket, subdir, file_types)
+                    self.get_gcs_paths_for_subdir(bucket, subdir, file_types)
                 )
 
         return files_in_bucket
 
-    def find_sequence_files_in_bucket(
+    def find_sequence_files_in_gcs_bucket(
         self, bucket_name: str, file_extensions: tuple[str]
     ) -> list[str]:
         """Gets all the gs paths to fastq files in the projects upload bucket"""
