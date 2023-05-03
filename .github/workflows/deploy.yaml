@@ -24,15 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@main
 
-#      - name: "gcloud setup"
-#        uses: google-github-actions/setup-gcloud@v0
-#        with:
-#          project_id: sample-metadata
-#          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
-#
-#      - name: "gcloud docker auth"
-#        run: |
-#          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+      - name: "gcloud setup"
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: sample-metadata
+          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+
+      - name: "gcloud docker auth"
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
       - uses: actions/setup-python@v2
         with:
@@ -49,20 +49,23 @@ jobs:
           pip install -r requirements.txt
           wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
 
-#      - name: prepare-deployment
-#        run: |
-#          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-#            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
-#            echo SM_ENVIRONMENT=production >> $GITHUB_ENV
-#          else
-#            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
-#            echo SM_ENVIRONMENT=development >> $GITHUB_ENV
-#            pip install bump2version
-#            # add
-#            bump2version patch \
-#              --no-commit --allow-dirty \
-#              --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
-#          fi
+      - name: prepare-deployment
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
+            echo SM_ENVIRONMENT=production >> $GITHUB_ENV
+          elif [[ $GITHUB_REF == 'refs/heads/sequence-groups' ]]; then
+            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
+            echo SM_ENVIRONMENT=development >> $GITHUB_ENV
+          else
+            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
+            echo SM_ENVIRONMENT=development >> $GITHUB_ENV
+            pip install bump2version
+            # add
+            bump2version patch \
+              --no-commit --allow-dirty \
+              --new-version $(cat deploy/python/version.txt)dev$(echo $(git rev-parse HEAD) | cut -c1-7)
+          fi
 
       # we have to build the image first without the web files to
       # generate the openapi file to then generate the documentation
@@ -79,40 +82,40 @@ jobs:
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
           ls -lGh metamist
-#
-#        # also copies build artifacts to api/public
-#      - name: "build web front-end"
-#        run: |
-#          set -eo pipefail
-#          pushd web
-#          # installs package-lock, not what it thinks it should be
-#          npm ci
-#          npm run build
-#          popd
-#
-#      # rebuild docker image now that front-end files are in the right place
-#      - name: "build image II"
-#        run: |
-#          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
+
+        # also copies build artifacts to api/public
+      - name: "build web front-end"
+        run: |
+          set -eo pipefail
+          pushd web
+          # installs package-lock, not what it thinks it should be
+          npm ci
+          npm run build
+          popd
+
+      # rebuild docker image now that front-end files are in the right place
+      - name: "build image II"
+        run: |
+          docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
       - name: Build python package
         run: python setup.py sdist
 
-#      - name: "push server image"
-#        run: |
-#          docker push $SM_DOCKER
-#
-#      - name: "deploy to Cloud Run"
-#        run: |
-#          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-#            gcloud_deploy_name=sample-metadata-api
-#          else
-#            gcloud_deploy_name=sample-metadata-api-dev
-#          fi
-#          gcloud run deploy \
-#            $gcloud_deploy_name --image $SM_DOCKER \
-#            --region australia-southeast1 --no-allow-unauthenticated \
-#            --platform managed
+      - name: "push server image"
+        run: |
+          docker push $SM_DOCKER
+
+      - name: "deploy to Cloud Run"
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            gcloud_deploy_name=sample-metadata-api
+          else
+            gcloud_deploy_name=sample-metadata-api-dev
+          fi
+          gcloud run deploy \
+            $gcloud_deploy_name --image $SM_DOCKER \
+            --region australia-southeast1 --no-allow-unauthenticated \
+            --platform managed
 
       - name: Publish package
 #        if: github.ref == 'refs/heads/main'
