@@ -176,7 +176,7 @@ class WebDb(DbBase):
                 q = f'{prefix}.{field} LIKE :{key}'
             else:
                 # double double quote field to allow white space
-                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'
+                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'   # noqa: B028
             wheres.append(q)
             values[key] = self.escape_like_term(value) + '%'
         if wheres:
@@ -318,7 +318,11 @@ class WebDb(DbBase):
 
     async def get_total_number_of_assays(self):
         """Get total number of sequences within a project"""
-        _query = 'SELECT COUNT(*) FROM assay sq INNER JOIN sample s ON s.id = sq.sample_id WHERE s.project = :project'
+        _query = """
+        SELECT COUNT(*)
+        FROM assay sq
+        INNER JOIN sample s ON s.id = sq.sample_id
+        WHERE s.project = :project"""
         return await self.connection.fetch_val(_query, {'project': self.project})
 
     @staticmethod
