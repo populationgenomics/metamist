@@ -29,8 +29,10 @@ from models.models import (
     AssayInternal,
 )
 from models.models.sample import sample_id_transform_to_raw
-from models.utils.sample_id_format import sample_id_format, \
-    sample_id_transform_to_raw_list
+from models.utils.sample_id_format import (
+    sample_id_format,
+    sample_id_transform_to_raw_list,
+)
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
     sequencing_group_id_format,
@@ -148,7 +150,9 @@ class GraphQLProject:
         samples = await loader.load(
             {
                 'id': root.id,
-                'internal_sample_ids': sample_id_transform_to_raw_list(internal_ids) if internal_ids else None,
+                'internal_sample_ids': sample_id_transform_to_raw_list(internal_ids)
+                if internal_ids
+                else None,
                 # 'external_sample_ids': external_ids,
             }
         )

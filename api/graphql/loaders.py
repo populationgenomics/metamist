@@ -44,7 +44,6 @@ class LoaderKeys(enum.Enum):
 
     SAMPLES_FOR_IDS = 'samples_for_ids'
     SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
-    SAMPLES_FOR_ANALYSIS = 'samples_for_analysis'
     SAMPLES_FOR_PROJECTS = 'samples_for_projects'
 
     PARTICIPANTS_FOR_IDS = 'participants_for_ids'
@@ -282,19 +281,6 @@ async def load_participants_for_ids(
     )
     p_by_id = {p.id: p for p in persons}
     return [p_by_id.get(p) for p in participant_ids]
-
-
-@connected_data_loader(LoaderKeys.SAMPLES_FOR_ANALYSIS)
-async def load_samples_for_analysis_ids(
-    analysis_ids: list[int], connection
-) -> list[list[SampleInternal]]:
-    """
-    DataLoader: get_samples_for_analysis_ids
-    """
-    slayer = SampleLayer(connection)
-    analysis_sample_map = await slayer.get_samples_by_analysis_ids(analysis_ids)
-
-    return [analysis_sample_map.get(aid, []) for aid in analysis_ids]
 
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS)

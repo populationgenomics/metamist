@@ -1,5 +1,3 @@
-from typing import Optional, Any
-
 from fastapi import APIRouter, Body
 
 from api.utils.db import (
@@ -35,7 +33,6 @@ async def create_sample(
 
 @router.put(
     '/{project}/upsert-many',
-    response_model=dict[str, Any],
     operation_id='upsertSamples',
 )
 async def upsert_samples(
@@ -134,7 +131,7 @@ async def get_samples(
     st = SampleLayer(connection)
 
     pt = ProjectPermissionsTable(connection.connection)
-    pids: Optional[list[int]] = None
+    pids: list[int] | None = None
     if project_ids:
         pids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_ids, readonly=True

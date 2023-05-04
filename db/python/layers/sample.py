@@ -35,28 +35,6 @@ class SampleLayer(BaseLayer):
 
         return sample
 
-    async def get_samples_by_analysis_ids(
-        self, analysis_ids: list[int], check_project_ids: bool = True
-    ) -> dict[int, list[SampleInternal]]:
-        """
-        Get samples by analysis_ids (map).
-        Note: It's not guaranteed that analysis has samples, so some
-        analysis_ids may NOT be present in the final map
-        """
-        projects, analysis_sample_map = await self.st.get_samples_by_analysis_ids(
-            analysis_ids
-        )
-
-        if not analysis_sample_map:
-            return {}
-
-        if check_project_ids:
-            await self.pt.check_access_to_project_ids(
-                self.connection.author, projects, readonly=True
-            )
-
-        return analysis_sample_map
-
     async def get_samples_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
     ) -> dict[int, list[SampleInternal]]:

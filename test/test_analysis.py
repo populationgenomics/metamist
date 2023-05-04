@@ -93,15 +93,14 @@ class TestAnalysis(DbIsolatedTest):
         """
 
         analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
-        analysis_samples = await self.connection.connection.fetch_all(
+        analysis_sgs = await self.connection.connection.fetch_all(
             'SELECT * FROM analysis_sequencing_group'
         )
-        # print(analyses, analysis_samples)
 
         self.assertEqual(1, len(analyses))
 
-        self.assertEqual(1, analysis_samples[0]['sequencing_group_id'])
-        self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
+        self.assertEqual(1, analysis_sgs[0]['sequencing_group_id'])
+        self.assertEqual(analyses[0]['id'], analysis_sgs[0]['analysis_id'])
 
     @run_as_sync
     async def test_get_analysis(self):

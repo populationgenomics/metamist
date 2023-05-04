@@ -25,16 +25,19 @@ from metamist.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
 
-QUERY_SG_ID = gql("""
+QUERY_SG_ID = gql(
+    """
 query MyQuery($project: String!) {
   project(name: $project) {
     sequencingGroups {
       id
     }
   }
-}""")
+}"""
+)
 
-QUERY_ENUMS = gql("""
+QUERY_ENUMS = gql(
+    """
 query EnumsQuery {
   enum {
     analysisType
@@ -44,7 +47,8 @@ query EnumsQuery {
     sequencingTechnology
     sequencingType
   }
-}""")
+}"""
+)
 
 
 async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):

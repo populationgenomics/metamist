@@ -64,10 +64,12 @@ def main(project: str):
         external_assay_id = '_'.join(split_filename)
 
         # Add assay id to existing assay object
-        assayapi.update_assay(AssayUpsert(
-            id=internal_assay_id,
-            external_ids={'kccg_id': external_assay_id},
-        ))
+        assayapi.update_assay(
+            AssayUpsert(
+                id=internal_assay_id,
+                external_ids={'kccg_id': external_assay_id},
+            )
+        )
         updated_assays.append({internal_assay_id: external_assay_id})
 
     logging.info(f'Updated {len(updated_assays)} assays. {updated_assays}')

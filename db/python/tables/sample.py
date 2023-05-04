@@ -1,5 +1,4 @@
 import asyncio
-from collections import defaultdict
 from datetime import date
 from typing import Iterable, Any
 
@@ -148,48 +147,6 @@ class SampleTable(DbBase):
         )
         samples = list(map(SampleInternal.from_db, sample_dicts))
         return projects, samples
-
-    async def get_samples_by_analysis_ids(
-        self, analysis_ids: list[int]
-    ) -> tuple[set[ProjectId], dict[int, list[SampleInternal]]]:
-        """Get map of samples by analysis_ids"""
-        keys = [
-            'id',
-            'external_id',
-            'participant_id',
-            'meta',
-            'active',
-            'type',
-            'project',
-        ]
-        _query = f"""
-        SELECT {", ".join("s." + k for k in keys)}, a_s.analysis_id
-        FROM analysis_sequencing_group asg
-        INNER JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
-        INNER JOIN sample s ON s.id = sg.sample_id
-        WHERE asg.analysis_id IN :aids
-        """
-        rows = await self.connection.fetch_all(_query, {'aids': analysis_ids})
-
-        ds = [dict(d) for d in rows]
-
-        mapped_analysis_to_sample_id: dict[int, list[int]] = defaultdict(list)
-        sample_map: dict[int, SampleInternal] = {}
-        projects: set[int] = set()
-        for row in ds:
-            sid = row['id']
-            mapped_analysis_to_sample_id[row['analysis_id']].append(sid)
-            projects.add(row['project'])
-
-            if sid not in ds:
-                sample_map[sid] = SampleInternal.from_db({k: row.get(k) for k in keys})
-
-        analysis_map: dict[int, list[SampleInternal]] = {
-            analysis_id: [sample_map.get(sid) for sid in sids]
-            for analysis_id, sids in mapped_analysis_to_sample_id.items()
-        }
-
-        return projects, analysis_map
 
     async def get_sample_id_to_project_map(
         self, project_ids: list[int], active_only: bool = True
@@ -360,6 +317,7 @@ class SampleTable(DbBase):
             SET sample_id = :id_keep
             WHERE sample_id = :id_merge
         """
+        # TODO: merge sequencing groups I guess?
         _query_analyses = f"""
             UPDATE analysis_sample
             SET sample_id = :id_keep

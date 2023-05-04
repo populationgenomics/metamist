@@ -127,16 +127,16 @@ query MyQuery($project: String!, $seqType: String!) {
     }
   }
 }"""
-        data = await query_async(mm_query, {'project': dataset, 'seqType': sequence_type})
+        data = await query_async(
+            mm_query, {'project': dataset, 'seqType': sequence_type}
+        )
 
         family_eids: set[str] = set()
         participant_eids: set[str] = set()
         external_pid_to_internal_sgid_map: dict[str, list[str]] = {}
         for participant in data['project']['participants']:
             sg_ids = {
-                sg['id']
-                for s in participant['samples']
-                for sg in s['sequencingGroups']
+                sg['id'] for s in participant['samples'] for sg in s['sequencingGroups']
             }
             if not sg_ids:
                 # nothing more required for this participant
@@ -162,7 +162,9 @@ query MyQuery($project: String!, $seqType: String!) {
         await sync_pedigree(**params, family_eids=filtered_family_eids)
         await sync_individual_metadata(**params, participant_eids=set(participant_eids))
         await update_es_index(
-            **params, sequence_type=sequence_type, external_pid_to_internal_sgid_map=external_pid_to_internal_sgid_map,
+            **params,
+            sequence_type=sequence_type,
+            external_pid_to_internal_sgid_map=external_pid_to_internal_sgid_map,
         )
 
         await sync_cram_map(
@@ -392,9 +394,7 @@ async def update_es_index(
 ):
     """Update seqr samples for latest elastic-search index"""
     internal_sg_ids = {
-        sg
-        for sgids in external_pid_to_internal_sgid_map.values()
-        for sg in sgids
+        sg for sgids in external_pid_to_internal_sgid_map.values() for sg in sgids
     }
 
     rows_to_write = [
