@@ -577,7 +577,7 @@ WHERE fp.participant_id in :pids
             'sequencing_technology',
             'sequencing_type',
         }
-        ignore_sg_meta_keys: set[str] = set()
+        ignore_sg_meta_keys: set[str] = {'facility'}
 
         participant_meta_keys = set(
             pk
@@ -599,6 +599,7 @@ WHERE fp.participant_id in :pids
             for sk in sg.meta
             if (sk not in ignore_sg_meta_keys)
         )
+
         assay_meta_keys = set(
             sk
             for assays in assay_models_by_sample_id.values()
@@ -627,12 +628,14 @@ WHERE fp.participant_id in :pids
             ('created_date', 'Created date'),
         ] + [('meta.' + k, k) for k in sample_meta_keys]
 
-        assay_keys = [('type', 'type'), ('technology', 'technology')] + sorted(
+        assay_keys = [('type', 'type')] + sorted(
             [('meta.' + k, k) for k in assay_meta_keys]
         )
         sequencing_group_keys = [
             ('id', 'Sequencing Group ID'),
-            ('created_date', 'Created date'),
+            ('platform', 'Platform'),
+            ('technology', 'Technology'),
+            ('type', 'Type'),
         ] + sorted([('meta.' + k, k) for k in sg_meta_keys])
 
         seen_seq_types = set(cram_number_by_seq_type.keys()).union(
