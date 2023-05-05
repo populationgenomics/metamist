@@ -77,7 +77,6 @@ const ProjectSummary: React.FunctionComponent = () => {
                     sanitisedToken
                 )
                 setSummary(response.data)
-                console.log(response.data)
             } catch (er: any) {
                 setError(er.message)
             } finally {

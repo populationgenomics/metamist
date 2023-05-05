@@ -17,7 +17,7 @@ import iconStyle from '../../shared/iconStyle'
 import SeqPanel from '../../shared/components/SeqPanel'
 import SampleInfo from '../../shared/components/SampleInfo'
 
-const sampleFieldsToDisplay = ['active', 'type' /*'participantId'*/]
+const sampleFieldsToDisplay = ['active', 'type']
 
 // TODO: Fix this query
 const GET_FAMILY_INFO = gql(`
@@ -34,6 +34,17 @@ query FamilyInfo($family_id: Int!) {
         id
         meta
         type
+        sequencingGroups {
+            id
+            platform
+            technology
+            type
+            assays {
+                id
+                meta
+                type
+            }
+        }
       }
       externalId
     }
@@ -194,7 +205,11 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
                                                                 )}
                                                             />
 
-                                                            {/*}<SeqPanel sequences={s.sequences} />*/}
+                                                            <SeqPanel
+                                                                sequencingGroups={
+                                                                    s.sequencingGroups
+                                                                }
+                                                            />
                                                         </div>
                                                     </>
                                                 ),

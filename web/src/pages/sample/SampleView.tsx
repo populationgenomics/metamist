@@ -14,22 +14,32 @@ import { ThemeContext } from '../../shared/components/ThemeProvider'
 const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {
     sample(id: $sample_id) {
-      id
-      externalId
-      participant {
         id
         externalId
-        families {
+        participant {
             id
+            externalId
+            families {
+                id
+            }
         }
-      }
-      type
-      active
+        type
+        active
+        sequencingGroups {
+            id
+            platform
+            technology
+            type
+            assays {
+                id
+                meta
+                type
+            }
+        }
     }
-  }
-`)
+}`)
 
-const sampleFieldsToDisplay = ['active', 'type' /*'participantId'*/]
+const sampleFieldsToDisplay = ['active', 'type']
 
 const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
     const theme = React.useContext(ThemeContext)
@@ -92,7 +102,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                         )}
                     />
                 </div>
-                {/*}<SeqPanel isOpen sequences={data.sample.sequences} />*/}
+                <SeqPanel isOpen sequencingGroups={data.sample.sequencingGroups} />
             </div>
         </>
     ) : (

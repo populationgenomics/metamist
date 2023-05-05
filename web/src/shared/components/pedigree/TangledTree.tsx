@@ -20,7 +20,7 @@ const TangledTree: React.FunctionComponent<RenderPedigreeProps> = ({ data, click
     <>
         Temporary Pedigree component
         <br />
-        {JSON.stringify(data)}
+        {`Truncated Pedigree: ' ${JSON.stringify(data.slice(0, 10))}`}
         <br />
         {JSON.stringify(click)}
     </>
