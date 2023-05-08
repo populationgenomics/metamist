@@ -45,7 +45,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'
 
-    const { sampleName } = useParams()
+    const { sampleName, sequenceGroupName } = useParams()
     const sampleID = sampleName || ''
 
     const { loading, error, data } = useQuery(GET_SAMPLE_INFO, {
@@ -102,7 +102,11 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                         )}
                     />
                 </div>
-                <SeqPanel isOpen sequencingGroups={data.sample.sequencingGroups} />
+                <SeqPanel
+                    isOpen
+                    highlighted={sequenceGroupName ?? ''}
+                    sequencingGroups={data.sample.sequencingGroups}
+                />
             </div>
         </>
     ) : (

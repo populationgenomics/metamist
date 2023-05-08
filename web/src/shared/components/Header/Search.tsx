@@ -7,6 +7,7 @@ import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
+import VaccinesRoundedIcon from '@mui/icons-material/VaccinesRounded'
 import SearchIcon from '@mui/icons-material/Search'
 
 import { SearchResponse, WebApi } from '../../../sm-api/api'
@@ -102,8 +103,9 @@ const resultRenderer = ({ ...props }) => {
             icon = <Diversity3RoundedIcon sx={style} />
             break
         }
-        case 'seqGroup': {
+        case 'sequencing-group': {
             components.push(...(props.data.sample_external_ids || []))
+            icon = <VaccinesRoundedIcon sx={style} />
             break
         }
         case 'error': {
@@ -173,7 +175,7 @@ const Searchbar: React.FunctionComponent = () => {
                 // alert("Family page not implemented yet");
                 navigate(`/family/${id}`)
                 break
-            case 'seqGroup':
+            case 'sequencing-group':
                 navigate(`/sample/${id}/${seqID}`)
             // no default
         }
@@ -261,8 +263,8 @@ const Searchbar: React.FunctionComponent = () => {
                     } as Action)
                     searchResultToRoute(
                         data.result.type,
-                        data.result.data.id,
-                        data.result.data?.seqID
+                        data.result.data.sample_external_id,
+                        data.result.data?.sg_external_id
                     )
                 }}
                 resultRenderer={resultRenderer}

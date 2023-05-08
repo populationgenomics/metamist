@@ -11,6 +11,7 @@ import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
+import SequenceGroupLink from '../../shared/components/links/SequenceGroupLink'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -152,7 +153,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
             <SUITable.Header>
                 <SUITable.Row>
                     {headers.map(({ name, category, title, first }, i) => {
-                        if (title === 'Sample ID' || title === 'Created date') {
+                        if (
+                            title === 'Sample ID' ||
+                            title === 'Created date' ||
+                            title === 'Sequencing Group ID'
+                        ) {
                             return (
                                 <SUITable.HeaderCell
                                     key={`filter-${name}-${i}`}
@@ -368,7 +373,17 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     key={`${s.id}sequence_group.${k}`}
                                                     rowSpan={seq.assays.length}
                                                 >
-                                                    {sanitiseValue(_.get(seq, k))}
+                                                    {k === 'id' ? (
+                                                        <SequenceGroupLink
+                                                            projectName={projectName}
+                                                            id={s.id}
+                                                            sg_id={_.get(seq, 'id').toString()}
+                                                        >
+                                                            {sanitiseValue(_.get(seq, k))}
+                                                        </SequenceGroupLink>
+                                                    ) : (
+                                                        sanitiseValue(_.get(seq, k))
+                                                    )}
                                                 </SUITable.Cell>
                                             ))}
                                         {assay &&

@@ -13,11 +13,17 @@ from models.models.sample import (
     sample_id_format,
     sample_id_transform_to_raw,
 )
+
+from models.models.sequencing_group import (
+    sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw
+)
 from models.models.search import (
     SearchResponse,
     SampleSearchResponseData,
     ParticipantSearchResponseData,
     FamilySearchResponseData,
+    SequencingGroupSearchResponseData
 )
 
 
@@ -36,6 +42,17 @@ class SearchLayer(BaseLayer):
         otherwise return None (helper to catch exception)"""
         try:
             return sample_id_transform_to_raw(query, strict=False)
+        except ValueError:
+            return None
+    
+    @staticmethod
+    def try_get_sg_id_from_query(query: str) -> Optional[int]:
+        """
+        Try to get internal CPG SG Identifier from string,
+        otherwise return None (helper to catch exception)"""
+        try:
+            print(sequencing_group_id_transform_to_raw(query, strict=False))
+            return sequencing_group_id_transform_to_raw(query, strict=False)
         except ValueError:
             return None
 
@@ -86,6 +103,42 @@ class SearchLayer(BaseLayer):
                 participant_external_ids=participant_eids,
             ),
         )
+    
+    async def _get_search_result_for_sequencing_group(
+        self, sg_id: int, project_ids: list[int]
+    ) -> SearchResponse | None:
+        sgtable = SequencingGroupTable(self.connection)
+
+        cpg_sg_id = sequencing_group_id_format(sg_id)
+
+        try:
+            _, rows = await sgtable.get_sequencing_groups_by_ids(ids=[sg_id])
+        except NotFoundError:
+            return None
+        result = rows[0]
+        
+        sample_id= result.sample_id
+        sg_id = result.id
+        project = result.project
+        
+        title = cpg_sg_id
+        id_field = cpg_sg_id
+        if project not in project_ids:
+            # or should it maybe say "no-access" or something
+            title = f'{cpg_sg_id} (no access to project)'
+            id_field = None
+
+        return SearchResponse(
+            title=title,
+            type=SearchResponseType.SEQGROUP,
+            data=SequencingGroupSearchResponseData(
+                project=project,
+                id=id_field,
+                sample_external_id=sample_id_format(sample_id),
+                sg_external_id=sequencing_group_id_format(sg_id)
+            ),
+        )
+
 
     async def search(self, query: str, project_ids: list[int]) -> List[SearchResponse]:
         """
@@ -104,29 +157,61 @@ class SearchLayer(BaseLayer):
             )
 
             return [response] if response else []
+    
+        if cpg_sg_id := self.try_get_sg_id_from_query(query):
+            # just get the sg
+            response = await self._get_search_result_for_sequencing_group(
+                cpg_sg_id, project_ids=project_ids
+            )
+            print(response)
+
+            return [response] if response else []
 
         ftable = FamilyTable(self.connection)
         ptable = ParticipantTable(self.connection)
         stable = SampleTable(self.connection)
         sgtable = SequencingGroupTable(self.connection)
 
-        sample_rows, participant_rows, family_rows, sg_rows = await asyncio.gather(
+        sample_rows, participant_rows, family_rows = await asyncio.gather(
             stable.search(query, project_ids=project_ids, limit=5),
             ptable.search(query, project_ids=project_ids, limit=5),
             ftable.search(query, project_ids=project_ids, limit=5),
-            sgtable.search(query, project_ids=project_ids, limit=5),
+            # sgtable.search(query, project_ids=project_ids, limit=5),
         )
-        print(sg_rows)
+        # print(sg_rows)
 
         sample_participant_ids = [s[2] for s in sample_rows]
         all_participant_ids = list(
             set(sample_participant_ids + [p[1] for p in participant_rows])
         )
+        # seq_group_participant_ids = [sg[3] for sg in sg_rows]
 
         sample_participant_eids, participant_family_eids = await asyncio.gather(
             ptable.get_external_ids_by_participant(sample_participant_ids),
             ftable.get_family_external_ids_by_participant_ids(all_participant_ids),
+            # ptable.get_external_ids_by_participant(seq_group_participant_ids),
         )
+
+        # sequencing_groups = [
+        #     SearchResponse(
+        #         title=sample_id_format(s_id),
+        #         type=SearchResponseType.SEQGROUP,
+        #         data=SequencingGroupSearchResponseData(
+        #             project=project,
+        #             id=sample_id_format(s_id),
+        #             family_external_ids=participant_family_eids.get(p_id) or []
+        #             if p_id
+        #             else [],
+        #             participant_external_ids=sg_participant_eids.get(p_id) or []
+        #             if p_id
+        #             else [],
+        #             sample_external_ids=[s_id],
+        #             sg_external_ids=[sg_id],
+        #         ),
+        #     )
+        #     for project, sg_id, s_id, p_id in sg_rows
+        # ]
+        # print(sequencing_groups)
 
         samples = [
             SearchResponse(

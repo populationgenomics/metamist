@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from db.python.connect import DbBase, NoOpAenter
+from db.python.connect import DbBase, NoOpAenter, NotFoundError
 from db.python.utils import ProjectId, to_db_json
 from models.models.sequencing_group import SequencingGroupInternal
 
@@ -64,6 +64,11 @@ class SequencingGroupTable(DbBase):
         """
 
         rows = await self.connection.fetch_all(_query, {'sgids': ids})
+        if not rows:
+            raise NotFoundError(
+                f'Couldn\'t find sequencing groups with internal id {ids})'
+            )
+
         rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(r.project for r in rows)
 
@@ -94,8 +99,9 @@ class SequencingGroupTable(DbBase):
         """
         Search by some term, return [ProjectId, SampleID, SequencingGroupID]
         """
+        # SELECT s.project, sg.sample_id, sg.id, s.participant_id
         _query = """
-        SELECT s.project, sg.sample_id, sg.id
+        SELECT *
         FROM sequencing_group sg
         INNER JOIN sample s ON s.id = sg.sample_id
         LIMIT :limit
@@ -109,9 +115,10 @@ class SequencingGroupTable(DbBase):
                 'limit': limit,
             },
         )
+        print('test')
         print(rows)
-        return 'test'
-        return [(r['project'], r['id'], r['external_id']) for r in rows]
+        print('test2')
+        return [(r['project'], r['sample_id'], r['id'], r['participant_id']) for r in rows]
 
     async def query(
         self,

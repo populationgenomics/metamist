@@ -9,8 +9,9 @@ import SeqGroupInfo from './SeqGroupInfo'
 
 const SeqPanel: React.FunctionComponent<{
     sequencingGroups: DeepPartial<GraphQlSequencingGroup>[]
+    highlighted?: string
     isOpen?: boolean
-}> = ({ sequencingGroups, isOpen = false }) => (
+}> = ({ sequencingGroups, isOpen = false, highlighted }) => (
     <Accordion
         styled
         className="accordionStyle"
@@ -21,6 +22,7 @@ const SeqPanel: React.FunctionComponent<{
                     <h3
                         style={{
                             display: 'inline',
+                            color: seq.id === highlighted ? 'red' : 'black',
                         }}
                     >
                         Sequencing Group ID: {seq.id}
