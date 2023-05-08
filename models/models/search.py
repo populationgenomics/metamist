@@ -1,6 +1,7 @@
 from db.python.utils import ProjectId
 from models.base import SMBase
 from models.enums.search import SearchResponseType
+from models.enums.web import MetaSearchEntityPrefix
 
 
 class SearchResponseData(SMBase):
@@ -46,3 +47,12 @@ class SearchResponse(SMBase):
     title: str
     data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
     error: ErrorResponse | None = None
+
+
+class SearchItem(SMBase):
+    """Summary Grid Filter Model"""
+
+    model_type: MetaSearchEntityPrefix
+    query: str
+    field: str
+    is_meta: bool

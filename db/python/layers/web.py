@@ -1,14 +1,10 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
-import dataclasses
 import itertools
 import json
 import re
 from collections import defaultdict
 from datetime import date
-from enum import Enum
-
-from pydantic import BaseModel
 
 from api.utils import group_by
 from db.python.connect import DbBase
@@ -19,115 +15,15 @@ from db.python.tables.analysis import AnalysisTable
 from db.python.tables.assay import AssayTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from models.base import SMBase
-
-
-class MetaSearchEntityPrefix(Enum):
-    """Links prefixes to tables"""
-
-    PARTICIPANT = 'p'
-    SAMPLE = 's'
-    ASSAY = 'a'
-    FAMILY = 'f'
-    SEQUENCING_GROUP = 'sg'
-
-
-class SearchItem(SMBase):
-    """Summary Grid Filter Model"""
-
-    model_type: MetaSearchEntityPrefix
-    query: str
-    field: str
-    is_meta: bool
-
-
-class NestedAssay(BaseModel):
-    """Assay model"""
-
-    id: int
-    type: str
-    meta: dict
-
-
-class NestedSequencingGroup(BaseModel):
-    """Sequencing group model"""
-
-    id: int
-    external_ids: dict[str, str]
-    type: str
-    technology: str
-    platform: str
-    meta: dict
-    assays: list[NestedAssay]
-
-
-class NestedSample(BaseModel):
-    """Sample with nested sequences"""
-
-    id: str
-    external_id: str
-    type: str
-    meta: dict
-    sequencing_groups: list[NestedSequencingGroup]
-    non_sequencing_assays: list[NestedAssay]
-    created_date: str | None
-
-
-class NestedFamily(BaseModel):
-    """Simplified family model"""
-
-    id: int
-    external_id: str
-
-
-class NestedParticipant(BaseModel):
-    """Participant with nested family and sampels"""
-
-    id: int | None
-    external_id: str | None
-    meta: dict | None
-    families: list[NestedFamily]
-    samples: list[NestedSample]
-    reported_sex: int | None
-    reported_gender: str | None
-    karyotype: str | None
-
-
-@dataclasses.dataclass
-class WebProject:
-    """Return class for Project, minimal fields"""
-
-    id: int
-    name: str
-    dataset: str
-    meta: dict
-
-
-@dataclasses.dataclass
-class ProjectSummary:
-    """Return class for the project summary endpoint"""
-
-    project: WebProject
-
-    # stats
-    total_samples: int
-    total_samples_in_query: int
-    total_participants: int
-    total_sequencing_groups: int
-    total_assays: int
-    cram_seqr_stats: dict[str, dict[str, str]]
-    batch_sequencing_group_stats: dict[str, dict[str, str]]
-
-    # grid
-    participants: list[NestedParticipant]
-    participant_keys: list[tuple[str, str]]
-    sample_keys: list[tuple[str, str]]
-    sequencing_group_keys: list[tuple[str, str]]
-    assay_keys: list[tuple[str, str]]
-
-    # seqr
-    seqr_links: dict[str, str]
-    seqr_sync_types: list[str]
+from models.models import (
+    NestedParticipantInternal,
+    NestedSampleInternal,
+    NestedSequencingGroupInternal,
+    AssayInternal,
+    SearchItem,
+    FamilySimpleInternal,
+)
+from models.models.web import ProjectSummaryInternal, WebProject
 
 
 class WebLayer(BaseLayer):
@@ -138,7 +34,7 @@ class WebLayer(BaseLayer):
         grid_filter: list[SearchItem],
         token: int | None,
         limit: int = 20,
-    ) -> ProjectSummary:
+    ) -> ProjectSummaryInternal:
         """
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
@@ -176,7 +72,7 @@ class WebDb(DbBase):
                 q = f'{prefix}.{field} LIKE :{key}'
             else:
                 # double double quote field to allow white space
-                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'   # noqa: B028
+                q = f'JSON_VALUE({prefix}.meta, "$.""{field}""") LIKE :{key}'  # noqa: B028
             wheres.append(q)
             values[key] = self.escape_like_term(value) + '%'
         if wheres:
@@ -202,17 +98,18 @@ class WebDb(DbBase):
     @staticmethod
     def _project_summary_process_assay_rows_by_sample_id(
         sequence_rows,
-    ) -> dict[int, list[NestedAssay]]:
+    ) -> dict[int, list[AssayInternal]]:
         """
         Get sequences for samples for project summary
         """
 
         seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in sequence_rows}
         seq_models = [
-            NestedAssay(
+            AssayInternal(
                 id=seq['id'],
                 type=seq['type'],
                 meta=json.loads(seq['meta']),
+                sample_id=seq['sample_id'],
             )
             for seq in sequence_rows
         ]
@@ -226,8 +123,8 @@ class WebDb(DbBase):
     def _project_summary_process_sequencing_group_rows_by_sample_id(
         sequencing_group_rows,
         sequencing_eid_rows: list,
-        seq_models_by_sample_id: dict[int, list[NestedAssay]],
-    ) -> dict[int, list[NestedSequencingGroup]]:
+        seq_models_by_sample_id: dict[int, list[AssayInternal]],
+    ) -> dict[int, list[NestedSequencingGroupInternal]]:
         assay_models_by_id = {
             assay.id: assay
             for assay in itertools.chain(*seq_models_by_sample_id.values())
@@ -238,7 +135,7 @@ class WebDb(DbBase):
             sgid = row['sequencing_group_id']
             sequencing_group_eid_map[sgid][row['name']] = row['name']
 
-        sg_by_id: dict[int, NestedSequencingGroup] = {}
+        sg_by_id: dict[int, NestedSequencingGroupInternal] = {}
         sg_id_to_sample_id: dict[int, int] = {}
         for row in sequencing_group_rows:
             sg_id = row['id']
@@ -248,7 +145,7 @@ class WebDb(DbBase):
                     sg_by_id[sg_id].assays.append(assay)
                 continue
             sg_id_to_sample_id[sg_id] = row['sample_id']
-            sg_by_id[sg_id] = NestedSequencingGroup(
+            sg_by_id[sg_id] = NestedSequencingGroupInternal(
                 id=sg_id,
                 meta=json.loads(row['meta']),
                 type=row['type'],
@@ -263,10 +160,10 @@ class WebDb(DbBase):
     @staticmethod
     def _project_summary_process_sample_rows(
         sample_rows,
-        assay_models_by_sample_id: dict[int, list[NestedAssay]],
-        sg_models_by_sample_id: dict[int, list[NestedSequencingGroup]],
+        assay_models_by_sample_id: dict[int, list[AssayInternal]],
+        sg_models_by_sample_id: dict[int, list[NestedSequencingGroupInternal]],
         sample_id_start_times: dict[int, date],
-    ) -> list[NestedSample]:
+    ) -> list[NestedSampleInternal]:
         """
         Process the returned sample rows into nested samples + sequences
         """
@@ -284,7 +181,7 @@ class WebDb(DbBase):
                 filtered_assay_models_by_sid[sample_id] = filtered_assays
 
         smodels = [
-            NestedSample(
+            NestedSampleInternal(
                 id=s['id'],
                 external_id=s['external_id'],
                 type=s['type'],
@@ -328,7 +225,7 @@ class WebDb(DbBase):
     @staticmethod
     def _project_summary_process_family_rows_by_pid(
         family_rows,
-    ) -> dict[int, list[NestedFamily]]:
+    ) -> dict[int, list[FamilySimpleInternal]]:
         """
         Process the family rows into NestedFamily objects
         """
@@ -340,7 +237,7 @@ class WebDb(DbBase):
         for f in family_rows:
             if f['family_id'] in family_rows:
                 continue
-            res_families[f['family_id']] = NestedFamily(
+            res_families[f['family_id']] = FamilySimpleInternal(
                 id=f['family_id'], external_id=f['external_family_id']
             )
         pid_to_families = {
@@ -370,7 +267,7 @@ class WebDb(DbBase):
         grid_filter: list[SearchItem],
         limit: int,
         token: int | None = 0,
-    ) -> ProjectSummary:
+    ) -> ProjectSummaryInternal:
         """
         Get project summary
 
@@ -399,24 +296,7 @@ class WebDb(DbBase):
         sample_rows = sample_rows_all[token : token + limit]
 
         if len(sample_rows) == 0:
-            return ProjectSummary(
-                project=project,
-                participants=[],
-                participant_keys=[],
-                sample_keys=[],
-                sequencing_group_keys=[],
-                assay_keys=[],
-                # stats
-                total_samples=0,
-                total_samples_in_query=0,
-                total_participants=0,
-                total_assays=0,
-                total_sequencing_groups=0,
-                cram_seqr_stats={},
-                seqr_links=seqr_links,
-                seqr_sync_types=[],
-                batch_sequencing_group_stats={}
-            )
+            return ProjectSummaryInternal.empty(project)
 
         pids = list(set(s['participant_id'] for s in sample_rows))
         sids = list(s['id'] for s in sample_rows)
@@ -540,7 +420,7 @@ WHERE fp.participant_id in :pids
             pid = srow['participant_id']
             if pid is None:
                 pmodels.append(
-                    NestedParticipant(
+                    NestedParticipantInternal(
                         id=None,
                         external_id=None,
                         meta=None,
@@ -549,13 +429,14 @@ WHERE fp.participant_id in :pids
                         reported_sex=None,
                         reported_gender=None,
                         karyotype=None,
+                        project=self.project,
                     )
                 )
             elif pid not in pid_seen:
                 pid_seen.add(pid)
                 p = participant_map[pid]
                 pmodels.append(
-                    NestedParticipant(
+                    NestedParticipantInternal(
                         id=p['id'],
                         external_id=p['external_id'],
                         meta=json.loads(p['meta']),
@@ -564,6 +445,7 @@ WHERE fp.participant_id in :pids
                         reported_sex=p['reported_sex'],
                         reported_gender=p['reported_gender'],
                         karyotype=p['karyotype'],
+                        project=self.project,
                     )
                 )
 
@@ -659,7 +541,7 @@ WHERE fp.participant_id in :pids
                 for seq in seen_seq_types
             }
 
-        return ProjectSummary(
+        return ProjectSummaryInternal(
             project=project,
             participants=pmodels,
             participant_keys=participant_keys,

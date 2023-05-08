@@ -12,21 +12,27 @@ from models.models.assay import (
     AssayUpsert,
 )
 from models.models.family import (
+    FamilySimpleInternal,
     FamilyInternal,
+    FamilySimple,
     Family,
     PedRowInternal,
 )
 from models.models.participant import (
     ParticipantInternal,
+    NestedParticipantInternal,
     ParticipantUpsertInternal,
     Participant,
+    NestedParticipant,
     ParticipantUpsert,
 )
 from models.models.project import Project
 from models.models.sample import (
     SampleInternal,
+    NestedSampleInternal,
     SampleUpsertInternal,
     Sample,
+    NestedSample,
     SampleUpsert,
 )
 from models.models.search import (
@@ -36,10 +42,19 @@ from models.models.search import (
     SampleSearchResponseData,
     ErrorResponse,
     SearchResponse,
+    SearchItem,
 )
 from models.models.sequencing_group import (
     SequencingGroupInternal,
+    NestedSequencingGroupInternal,
     SequencingGroupUpsertInternal,
     SequencingGroup,
+    NestedSequencingGroup,
     SequencingGroupUpsert,
+)
+from models.models.web import (
+    ProjectSummaryInternal,
+    WebProject,
+    ProjectSummary,
+    PagingLinks,
 )

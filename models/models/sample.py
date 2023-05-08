@@ -1,10 +1,12 @@
 import json
 
 from models.base import SMBase
-from models.models.assay import AssayUpsertInternal, AssayUpsert
+from models.models.assay import AssayUpsertInternal, AssayUpsert, AssayInternal, Assay
 from models.models.sequencing_group import (
     SequencingGroupUpsert,
+    NestedSequencingGroup,
     SequencingGroupUpsertInternal,
+    NestedSequencingGroupInternal,
 )
 from models.utils.sample_id_format import (
     sample_id_format,
@@ -53,6 +55,33 @@ class SampleInternal(SMBase):
             type=self.type,
             participant_id=self.participant_id,
             active=self.active,
+        )
+
+
+class NestedSampleInternal(SMBase):
+    """SampleInternal with nested sequencing groups and assays"""
+    id: int
+    external_id: str
+    meta: dict
+    type: str | None
+    active: bool | None
+    created_date: str | None
+
+    sequencing_groups: list[NestedSequencingGroupInternal] | None = None
+    non_sequencing_assays: list[AssayInternal]
+
+    def to_external(self):
+        """Convert to transport model"""
+        return NestedSample(
+            id=sample_id_format(self.id),
+            external_id=self.external_id,
+            meta=self.meta,
+            type=self.type,
+            created_date=self.created_date,
+            sequencing_groups=[sg.to_external() for sg in self.sequencing_groups or []],
+            non_sequencing_assays=[
+                a.to_external() for a in self.non_sequencing_assays or []
+            ],
         )
 
 
@@ -114,6 +143,17 @@ class Sample(SMBase):
             participant_id=self.participant_id,
             active=self.active,
         )
+
+
+class NestedSample(SMBase):
+    """External sample model with nested sequencing groups and assays"""
+    id: str
+    external_id: str
+    meta: dict
+    type: str | None
+    created_date: str | None
+    sequencing_groups: list[NestedSequencingGroup] | None = None
+    non_sequencing_assays: list[Assay]
 
 
 class SampleUpsert(SMBase):

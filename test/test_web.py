@@ -1,20 +1,25 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from models.enums import MetaSearchEntityPrefix
 from models.models import (
     ParticipantUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
+    ProjectSummaryInternal,
+    AssayInternal,
+    Assay,
 )
+from models.utils.sample_id_format import sample_id_transform_to_raw
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
+
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.web import (
     WebLayer,
-    ProjectSummary,
     WebProject,
     SearchItem,
-    MetaSearchEntityPrefix,
 )
 
 default_assay_meta = {
@@ -145,7 +150,7 @@ def get_test_participant_2():
     )
 
 
-SINGLE_PARTICIPANT_RESULT = ProjectSummary(
+SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
     project=WebProject(id=1, name='test', meta={}, dataset='test'),
     total_samples=1,
     total_samples_in_query=1,
@@ -199,7 +204,7 @@ class TestWeb(DbIsolatedTest):
         result = await self.webl.get_project_summary(token=0, grid_filter=[])
 
         # Expect an empty project
-        expected = ProjectSummary(
+        expected = ProjectSummaryInternal(
             project=WebProject(
                 **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
             ),
@@ -231,6 +236,44 @@ class TestWeb(DbIsolatedTest):
 
         result.participants = []
         self.assertEqual(SINGLE_PARTICIPANT_RESULT, result)
+
+    @run_as_sync
+    async def test_project_summary_to_external(self):
+        """Test project summary to_external function"""
+        # Now add a participant with a sample and sequence
+        await self.partl.upsert_participants(participants=[get_test_participant()])
+
+        result = await self.webl.get_project_summary(token=0, grid_filter=[])
+
+        ex_result = result.to_external(links=None)
+
+        self.assertIsInstance(result.participants[0].samples[0].id, int)
+        self.assertIsInstance(ex_result.participants[0].samples[0].id, str)
+        self.assertEqual(
+            result.participants[0].samples[0].id,
+            sample_id_transform_to_raw(ex_result.participants[0].samples[0].id),
+        )
+
+        self.assertIsInstance(
+            result.participants[0].samples[0].sequencing_groups[0].id, int
+        )
+        self.assertIsInstance(
+            ex_result.participants[0].samples[0].sequencing_groups[0].id, str
+        )
+        self.assertEqual(
+            result.participants[0].samples[0].sequencing_groups[0].id,
+            sequencing_group_id_transform_to_raw(
+                ex_result.participants[0].samples[0].sequencing_groups[0].id
+            ),
+        )
+
+        self.assertIsInstance(
+            result.participants[0].samples[0].sequencing_groups[0].assays[0],
+            AssayInternal,
+        )
+        self.assertIsInstance(
+            ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
+        )
 
     @run_as_sync
     async def project_summary_with_filter_with_results(self):
@@ -265,7 +308,7 @@ class TestWeb(DbIsolatedTest):
                 )
             ],
         )
-        empty_result = ProjectSummary(
+        empty_result = ProjectSummaryInternal(
             project=WebProject(
                 **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
             ),
@@ -294,7 +337,7 @@ class TestWeb(DbIsolatedTest):
             participants=[get_test_participant(), get_test_participant_2()]
         )
 
-        expected_data_two_samples = ProjectSummary(
+        expected_data_two_samples = ProjectSummaryInternal(
             project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=2,
             total_samples_in_query=2,
@@ -346,7 +389,7 @@ class TestWeb(DbIsolatedTest):
             participants=[get_test_participant(), get_test_participant_2()]
         )
 
-        expected_data_two_samples_filtered = ProjectSummary(
+        expected_data_two_samples_filtered = ProjectSummaryInternal(
             project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=2,
             total_samples_in_query=1,
@@ -423,7 +466,7 @@ class TestWeb(DbIsolatedTest):
         self.assertEqual(1, len(test_field_with_space.participants))
         test_field_with_space.participants = []
 
-        expected_data_two_samples_filtered = ProjectSummary(
+        expected_data_two_samples_filtered = ProjectSummaryInternal(
             project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=2,
             total_samples_in_query=1,

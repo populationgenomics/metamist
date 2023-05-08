@@ -43,7 +43,7 @@ class AssayInternal(BaseModel):
         return Assay(
             id=self.id,
             type=self.type,
-            external_ids=self.external_ids,
+            external_ids=self.external_ids or {},
             sample_id=sample_id_format(self.sample_id),
             meta=self.meta,
         )

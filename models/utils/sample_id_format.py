@@ -61,15 +61,15 @@ def sample_id_format_list(sample_ids: Iterable[int | str]) -> list[str]:
 def sample_id_format(sample_id: int | str) -> str:
     """
     Transform raw (int) sample identifier to format (CPGXXXH) where:
-        - CPG is the prefix
+        - XPG is the prefix
         - XXX is the original identifier
         - H is the Luhn checksum
 
     >>> sample_id_format(10)
-    'CPG109'
+    'XPGLCL109'
 
     >>> sample_id_format(12345)
-    'CPG123455'
+    'XPGLCL123455'
     """
 
     if isinstance(sample_id, str) and not sample_id.isdigit():

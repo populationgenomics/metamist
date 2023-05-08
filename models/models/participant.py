@@ -1,12 +1,17 @@
 import json
 
-from pydantic import BaseModel
-
 from db.python.utils import ProjectId
-from models.models.sample import SampleUpsertInternal, SampleUpsert
+from models.base import SMBase
+from models.models.sample import (
+    SampleUpsertInternal,
+    SampleUpsert,
+    NestedSampleInternal,
+    NestedSample,
+)
+from models.models.family import FamilySimple, FamilySimpleInternal
 
 
-class ParticipantInternal(BaseModel):
+class ParticipantInternal(SMBase):
     """Update participant model"""
 
     id: int
@@ -38,7 +43,32 @@ class ParticipantInternal(BaseModel):
         )
 
 
-class ParticipantUpsertInternal(BaseModel):
+class NestedParticipantInternal(SMBase):
+    """ParticipantInternal with nested samples"""
+    id: int
+    external_id: str = None
+    reported_sex: int | None = None
+    reported_gender: str | None = None
+    karyotype: str | None = None
+    meta: dict
+    samples: list[NestedSampleInternal] | None = None
+    families: list[FamilySimpleInternal] | None = None
+
+    def to_external(self):
+        """Convert to transport model"""
+        return NestedParticipant(
+            id=self.id,
+            external_id=self.external_id,
+            reported_sex=self.reported_sex,
+            reported_gender=self.reported_gender,
+            karyotype=self.karyotype,
+            meta=self.meta,
+            samples=[s.to_external() for s in self.samples or []],
+            families=[f.to_external() for f in self.families or []],
+        )
+
+
+class ParticipantUpsertInternal(SMBase):
     """Internal upsert model for participant"""
 
     id: int | None = None
@@ -63,7 +93,7 @@ class ParticipantUpsertInternal(BaseModel):
         )
 
 
-class Participant(BaseModel):
+class Participant(SMBase):
     """External participant model"""
 
     id: int
@@ -75,7 +105,20 @@ class Participant(BaseModel):
     meta: dict
 
 
-class ParticipantUpsert(BaseModel):
+class NestedParticipant(SMBase):
+    """External participant model with nested samples"""
+    id: int
+    external_id: str = None
+    reported_sex: int | None = None
+    reported_gender: str | None = None
+    karyotype: str | None = None
+    meta: dict
+
+    samples: list[NestedSample]
+    families: list[FamilySimple]
+
+
+class ParticipantUpsert(SMBase):
     """External upsert model for participant"""
 
     id: int | None = None

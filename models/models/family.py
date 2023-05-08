@@ -3,6 +3,19 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class FamilySimpleInternal(BaseModel):
+    """Simple family model for internal use"""
+    id: int
+    external_id: str
+
+    def to_external(self):
+        """Convert to external model"""
+        return FamilySimple(
+            id=self.id,
+            external_id=self.external_id,
+        )
+
+
 class FamilyInternal(BaseModel):
     """Family model"""
 
@@ -28,6 +41,12 @@ class FamilyInternal(BaseModel):
         )
 
 
+class FamilySimple(BaseModel):
+    """Simple family model, mostly for web access"""
+    id: int
+    external_id: str
+
+
 class Family(BaseModel):
     """Family model"""
 
@@ -36,11 +55,6 @@ class Family(BaseModel):
     project: int
     description: Optional[str] = None
     coded_phenotype: Optional[str] = None
-
-    @staticmethod
-    def from_db(d):
-        """From DB fields"""
-        return Family(**d)
 
     def to_internal(self):
         """Convert to internal model"""
