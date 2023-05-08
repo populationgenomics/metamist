@@ -86,6 +86,32 @@ class SequencingGroupTable(DbBase):
             sequencing_groups[row['sequencing_group_id']].append(row['assay_id'])
 
         return dict(sequencing_groups)
+    
+    async def search(
+        self, query, project_ids: list[ProjectId], limit: int = 5
+    ) -> list[tuple[ProjectId, int, str]]:
+        
+        """
+        Search by some term, return [ProjectId, SampleID, SequencingGroupID]
+        """
+        _query = """
+        SELECT s.project, sg.sample_id, sg.id
+        FROM sequencing_group sg
+        INNER JOIN sample s ON s.id = sg.sample_id
+        LIMIT :limit
+        """
+        # WHERE s.project in :project_ids AND sg.id LIKE :search_pattern
+        rows = await self.connection.fetch_all(
+            _query,
+            {
+                # 'project_ids': project_ids,
+                # 'search_pattern': self.escape_like_term(query) + '%',
+                'limit': limit,
+            },
+        )
+        print(rows)
+        return 'test'
+        return [(r['project'], r['id'], r['external_id']) for r in rows]
 
     async def query(
         self,

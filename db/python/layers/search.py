@@ -7,6 +7,7 @@ from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
+from db.python.tables.sequencing_group import SequencingGroupTable
 from models.enums.search import SearchResponseType
 from models.models.sample import (
     sample_id_format,
@@ -107,12 +108,15 @@ class SearchLayer(BaseLayer):
         ftable = FamilyTable(self.connection)
         ptable = ParticipantTable(self.connection)
         stable = SampleTable(self.connection)
+        sgtable = SequencingGroupTable(self.connection)
 
-        sample_rows, participant_rows, family_rows = await asyncio.gather(
+        sample_rows, participant_rows, family_rows, sg_rows = await asyncio.gather(
             stable.search(query, project_ids=project_ids, limit=5),
             ptable.search(query, project_ids=project_ids, limit=5),
             ftable.search(query, project_ids=project_ids, limit=5),
+            sgtable.search(query, project_ids=project_ids, limit=5),
         )
+        print(sg_rows)
 
         sample_participant_ids = [s[2] for s in sample_rows]
         all_participant_ids = list(

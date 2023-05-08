@@ -80,7 +80,7 @@ const resultRenderer = ({ ...props }) => {
         available = `No access to this ${props.type}`
         colour = 'gray'
     }
-    if (props.type === 'participant' || props.type === 'family') {
+    if (props.type === 'participant') {
         available = `${_.capitalize(props.type)} result is not supported`
         colour = 'gray'
     }
@@ -100,6 +100,10 @@ const resultRenderer = ({ ...props }) => {
         case 'family': {
             components.push(...(props.data.family_external_ids || []))
             icon = <Diversity3RoundedIcon sx={style} />
+            break
+        }
+        case 'seqGroup': {
+            components.push(...(props.data.sample_external_ids || []))
             break
         }
         case 'error': {
@@ -153,7 +157,7 @@ const Searchbar: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const [{ loading, results, value }, dispatch] = React.useReducer(SearchReducer, initialState)
 
-    const searchResultToRoute = (type: string, id: string) => {
+    const searchResultToRoute = (type: string, id: string, seqID?: string) => {
         // handle "no access to this project"
         if (!id) return
 
@@ -169,6 +173,8 @@ const Searchbar: React.FunctionComponent = () => {
                 // alert("Family page not implemented yet");
                 navigate(`/family/${id}`)
                 break
+            case 'seqGroup':
+                navigate(`/sample/${id}/${seqID}`)
             // no default
         }
     }
@@ -253,7 +259,11 @@ const Searchbar: React.FunctionComponent = () => {
                         query: '',
                         results: {},
                     } as Action)
-                    searchResultToRoute(data.result.type, data.result.data.id)
+                    searchResultToRoute(
+                        data.result.type,
+                        data.result.data.id,
+                        data.result.data?.seqID
+                    )
                 }}
                 resultRenderer={resultRenderer}
                 onSearchChange={handleSearchChange}
