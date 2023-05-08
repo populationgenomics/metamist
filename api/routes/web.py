@@ -6,67 +6,59 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from db.python.layers.search import SearchLayer
-from db.python.layers.seqr import SeqrLayer
-from db.python.tables.project import ProjectPermissionsTable
-from db.python.layers.web import WebLayer, NestedParticipant, SearchItem
-
-from models.models.sample import sample_id_format
-from models.models.search import SearchResponse
-
 from api.utils.db import (
     get_project_readonly_connection,
     get_projectless_db_connection,
     get_project_write_connection,
     Connection,
 )
+from db.python.layers.search import SearchLayer
+from db.python.layers.seqr import SeqrLayer
+from db.python.layers.web import WebLayer, SearchItem
+from db.python.tables.project import ProjectPermissionsTable
+from models.models.search import SearchResponse
+from models.models.web import ProjectSummary, PagingLinks
 
 
-class PagingLinks(BaseModel):
-    """Model for PAGING"""
-
-    self: str
-    next: str | None
-    token: str | None
-
-
-class WebProject(BaseModel):
-    """Minimal class to hold web info"""
-
-    id: int
-    name: str
-    dataset: str
-    meta: dict
-
-
-class ProjectSummaryResponse(BaseModel):
-    """Response for the project summary"""
-
-    project: WebProject
-    # high level stats
-    total_participants: int
-    total_samples: int
-    total_samples_in_query: int
-    total_sequencing_groups: int
-    total_assays: int
-    cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
-    batch_sequencing_group_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
-
-    # for display
-    participants: list[NestedParticipant]
-    participant_keys: list[list[str]]
-    sample_keys: list[list[str]]
-    sequencing_group_keys: list[list[str]]
-    assay_keys: list[list[str]]
-    seqr_links: dict[str, str]
-    seqr_sync_types: list[str]
-
-    links: PagingLinks | None
-
-    class Config:
-        """Config for ProjectSummaryResponse"""
-
-        fields = {'links': '_links'}
+#
+#
+# class WebProject(BaseModel):
+#     """Minimal class to hold web info"""
+#
+#     id: int
+#     name: str
+#     dataset: str
+#     meta: dict
+#
+#
+# class ProjectSummaryResponse(BaseModel):
+#     """Response for the project summary"""
+#
+#     project: WebProject
+#     # high level stats
+#     total_participants: int
+#     total_samples: int
+#     total_samples_in_query: int
+#     total_sequencing_groups: int
+#     total_assays: int
+#     cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
+#     batch_sequencing_group_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
+#
+#     # for display
+#     participants: list[NestedParticipant]
+#     participant_keys: list[list[str]]
+#     sample_keys: list[list[str]]
+#     sequencing_group_keys: list[list[str]]
+#     assay_keys: list[list[str]]
+#     seqr_links: dict[str, str]
+#     seqr_sync_types: list[str]
+#
+#     links: PagingLinks | None
+#
+#     class Config:
+#         """Config for ProjectSummaryResponse"""
+#
+#         fields = {'links': '_links'}
 
 
 class SearchResponseModel(BaseModel):
@@ -80,7 +72,7 @@ router = APIRouter(prefix='/web', tags=['web'])
 
 @router.post(
     '/{project}/summary',
-    response_model=ProjectSummaryResponse,
+    response_model=ProjectSummary,
     operation_id='getProjectSummary',
 )
 async def get_project_summary(
@@ -89,7 +81,7 @@ async def get_project_summary(
     limit: int = 20,
     token: Optional[int] = 0,
     connection: Connection = get_project_readonly_connection,
-) -> ProjectSummaryResponse:
+) -> ProjectSummary:
     """Creates a new sample, and returns the internal sample ID"""
     st = WebLayer(connection)
 
@@ -97,36 +89,12 @@ async def get_project_summary(
         token=token, limit=limit, grid_filter=grid_filter
     )
 
-    if len(summary.participants) == 0:
-        return ProjectSummaryResponse(
-            project=WebProject(**summary.project.__dict__),
-            participants=[],
-            participant_keys=[],
-            sample_keys=[],
-            sequencing_group_keys=[],
-            assay_keys=[],
-            _links=None,
-            total_samples=0,
-            total_samples_in_query=0,
-            total_participants=0,
-            total_sequencing_groups=0,
-            total_assays=0,
-            cram_seqr_stats={},
-            batch_sequencing_group_stats={},
-            seqr_links=summary.seqr_links,
-            seqr_sync_types=[],
-        )
-
     participants = summary.participants
 
     collected_samples = sum(len(p.samples) for p in participants)
     new_token = None
     if collected_samples >= limit:
         new_token = max(int(sample.id) for p in participants for sample in p.samples)
-
-    for participant in participants:
-        for sample in participant.samples:
-            sample.id = sample_id_format(sample.id)
 
     links = PagingLinks(
         next=str(request.base_url)
@@ -138,25 +106,7 @@ async def get_project_summary(
         token=str(new_token) if new_token else None,
     )
 
-    return ProjectSummaryResponse(
-        project=WebProject(**summary.project.__dict__),
-        total_samples=summary.total_samples,
-        total_samples_in_query=summary.total_samples_in_query,
-        total_participants=summary.total_participants,
-        total_sequencing_groups=summary.total_sequencing_groups,
-        total_assays=summary.total_assays,
-        cram_seqr_stats=summary.cram_seqr_stats,
-        batch_sequencing_group_stats=summary.batch_sequencing_group_stats,
-        # other stuff
-        participants=participants,
-        participant_keys=summary.participant_keys,
-        sample_keys=summary.sample_keys,
-        assay_keys=summary.assay_keys,
-        sequencing_group_keys=summary.sequencing_group_keys,
-        seqr_links=summary.seqr_links,
-        seqr_sync_types=summary.seqr_sync_types,
-        _links=links,
-    )
+    return summary.to_external(links)
 
 
 @router.get(

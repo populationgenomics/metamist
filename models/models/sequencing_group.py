@@ -60,6 +60,30 @@ class SequencingGroupInternal(SMBase):
         )
 
 
+class NestedSequencingGroupInternal(SMBase):
+    """SequencingGroupInternal with nested assays"""
+    id: int | None = None
+    type: str | None = None
+    technology: str | None = None
+    platform: str | None = None
+    meta: dict[str, str] | None = None
+    external_ids: dict[str, str] | None = None
+
+    assays: list[AssayInternal] | None = None
+
+    def to_external(self):
+        """Convert to transport model"""
+        return NestedSequencingGroup(
+            id=sequencing_group_id_format(self.id),
+            type=self.type,
+            technology=self.technology,
+            platform=self.platform,
+            meta=self.meta,
+            external_ids=self.external_ids,
+            assays=[a.to_external() for a in self.assays or []],
+        )
+
+
 class SequencingGroupUpsertInternal(SMBase):
     """
     Upsert model for sequence group
@@ -107,6 +131,16 @@ class SequencingGroup(SMBase):
     platform: str  # uppercase
     meta: dict[str, str]
     sample_id: str
+    external_ids: dict[str, str]
+
+
+class NestedSequencingGroup(SMBase):
+    """External model for sequencing group with nested assays"""
+    id: str
+    type: str
+    technology: str
+    platform: str
+    meta: dict[str, str]
     external_ids: dict[str, str]
 
     assays: list[Assay] | None = None
