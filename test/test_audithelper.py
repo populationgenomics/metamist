@@ -76,8 +76,6 @@ class TestAuditHelper(unittest.TestCase):
 
         self.assertDictEqual(buckets_subdirs_to_search, expected_result)
 
-        return
-
     def test_get_gcs_paths_for_subdir(self):
         """Iterate through a gcp bucket/subdir and get all the blobs with the specified file extension(s)"""
         bucket_name = 'cpg-dataset-main-upload'
@@ -102,8 +100,6 @@ class TestAuditHelper(unittest.TestCase):
         ]
 
         self.assertEqual(files_in_bucket_subdir, expected_results)
-
-        return
 
     def test_find_sequence_files_in_gcs_bucket(self):
         """Gets all the gs paths to sequence files of a type (e.g., fastqs) in the project's upload bucket"""
@@ -134,5 +130,3 @@ class TestAuditHelper(unittest.TestCase):
         ]
 
         self.assertEqual(sequence_paths, expected_result)
-
-        return

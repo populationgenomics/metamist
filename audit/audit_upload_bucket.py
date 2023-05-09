@@ -96,8 +96,6 @@ class UploadBucketAuditor(GenericAuditor):
         # Writing the output to files with the file type, sequence type, and date specified
         today = datetime.today().strftime('%Y-%m-%d')
 
-
-
         bucket_name = f'cpg-{self.project}-main-upload'
         if access_level == 'test':
             bucket_name = f'cpg-{self.project}-upload'
@@ -228,11 +226,11 @@ def main(
 
     auditor.write_upload_bucket_audit_reports(
         access_level,
-        sequence_type_str = sequence_type,
-        file_types_str = file_types,
-        sequence_reads_to_delete = sequence_reads_to_delete,
-        sequence_files_to_ingest = sequence_files_to_ingest,
-        incomplete_samples = incomplete_samples,
+        sequence_type_str=sequence_type,
+        file_types_str=file_types,
+        sequence_files_to_delete=sequence_reads_to_delete,
+        sequence_files_to_ingest=sequence_files_to_ingest,
+        incomplete_samples=incomplete_samples,
     )
 
 
