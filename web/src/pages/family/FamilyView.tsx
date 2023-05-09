@@ -19,7 +19,6 @@ import SampleInfo from '../../shared/components/SampleInfo'
 
 const sampleFieldsToDisplay = ['active', 'type']
 
-// TODO: Fix this query
 const GET_FAMILY_INFO = gql(`
 query FamilyInfo($family_id: Int!) {
   family(familyId: $family_id) {

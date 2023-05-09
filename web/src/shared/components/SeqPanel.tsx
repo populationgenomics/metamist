@@ -5,7 +5,7 @@ import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded'
 import { GraphQlSequencingGroup } from '../../__generated__/graphql'
 import iconStyle from '../iconStyle'
 import { DeepPartial } from '../utilities/deepPartial'
-import SeqGroupInfo from './SeqGroupInfo'
+import SequencingGroupInfo from './SequencingGroupInfo'
 
 const SeqPanel: React.FunctionComponent<{
     sequencingGroups: DeepPartial<GraphQlSequencingGroup>[]
@@ -33,7 +33,7 @@ const SeqPanel: React.FunctionComponent<{
             content: {
                 content: (
                     <div style={{ marginLeft: '30px' }}>
-                        <SeqGroupInfo data={seq} />
+                        <SequencingGroupInfo data={seq} />
                     </div>
                 ),
             },

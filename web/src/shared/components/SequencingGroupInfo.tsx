@@ -7,15 +7,15 @@ import Table from './Table'
 import { DeepPartial } from '../utilities/deepPartial'
 import AssayInfo from './AssayInfo'
 
-const excludedSequenceGroupFields = ['id', '__typename']
+const excludedSequencingGroupFields = ['id', '__typename']
 
-const SeqGroupInfo: React.FunctionComponent<{
+const SequencingGroupInfo: React.FunctionComponent<{
     data: DeepPartial<GraphQlSequencingGroup>
 }> = ({ data }) => (
     <Table celled collapsing>
         <SUITable.Body>
             {Object.entries(data)
-                .filter(([key]) => !excludedSequenceGroupFields.includes(key))
+                .filter(([key]) => !excludedSequencingGroupFields.includes(key))
                 .map(([key, value]) => {
                     if (key === 'assays') {
                         return (
@@ -47,4 +47,4 @@ const SeqGroupInfo: React.FunctionComponent<{
     </Table>
 )
 
-export default SeqGroupInfo
+export default SequencingGroupInfo

@@ -39,7 +39,7 @@ const Routes: React.FunctionComponent = () => (
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
 
         <Route
-            path="sample/:sampleName/:sequenceGroupName?"
+            path="sample/:sampleName/:sequencingGroupName?"
             element={
                 <ErrorBoundary>
                     <SampleView />

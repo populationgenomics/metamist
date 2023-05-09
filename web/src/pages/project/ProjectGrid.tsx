@@ -11,7 +11,7 @@ import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
-import SequenceGroupLink from '../../shared/components/links/SequenceGroupLink'
+import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -374,13 +374,13 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     rowSpan={seq.assays.length}
                                                 >
                                                     {k === 'id' ? (
-                                                        <SequenceGroupLink
+                                                        <SequencingGroupLink
                                                             projectName={projectName}
                                                             id={s.id}
                                                             sg_id={_.get(seq, 'id').toString()}
                                                         >
                                                             {sanitiseValue(_.get(seq, k))}
-                                                        </SequenceGroupLink>
+                                                        </SequencingGroupLink>
                                                     ) : (
                                                         sanitiseValue(_.get(seq, k))
                                                     )}
