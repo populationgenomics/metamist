@@ -22,6 +22,7 @@ class SequencingGroupTable(DbBase):
         'sg.platform',
         'sg.meta',
         'sg.author',
+        'sg.archived',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
 
@@ -76,9 +77,9 @@ class SequencingGroupTable(DbBase):
         Get sequence IDs in a sequencing_group
         """
         _query = """
-            SELECT sgs.sequencing_group_id, sgs.assay_id
-            FROM sequencing_group_sequence sgs
-            WHERE sequencing_group_id IN :sgids
+            SELECT sga.sequencing_group_id, sga.assay_id
+            FROM sequencing_group_assay sga
+            WHERE sga.sequencing_group_id IN :sgids
         """
         rows = await self.connection.fetch_all(_query, {'sgids': ids})
         sequencing_groups: dict[int, list[int]] = defaultdict(list)
@@ -247,6 +248,18 @@ class SequencingGroupTable(DbBase):
         open_transaction=True,
     ):
         """Create sequence group"""
+        _archive_query = """
+        UPDATE sequencing_group
+        SET archived = true
+        WHERE sample_id = :sample_id AND type = :type AND technology = :technology AND platform = :platform
+        """
+        archive_values = {
+            'sample_id': sample_id,
+            'type': type_.lower() if type_ else None,
+            'technology': technology.lower() if technology else None,
+            'platform': platform.lower() if platform else None,
+        }
+
         _query = """
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, author, archived)
@@ -276,6 +289,7 @@ class SequencingGroupTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
+            await self.connection.execute(_archive_query, archive_values)
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
                 {**values, 'author': author or self.author},
@@ -300,8 +314,13 @@ class SequencingGroupTable(DbBase):
         """
         Update meta / platform on sequencing_group
         """
-        updaters = ['JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)']
-        values = {'seqgid': sequencing_group_id, 'meta': to_db_json(meta)}
+        updaters = []
+        values = {'seqgid': sequencing_group_id, }
+
+        if meta:
+            values['meta'] = to_db_json(meta)
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+
         if platform:
             updaters.append('platform = :platform')
             values['platform'] = platform

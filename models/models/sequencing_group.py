@@ -34,6 +34,7 @@ class SequencingGroupInternal(SMBase):
     meta: dict[str, str] | None = None
     sample_id: int | None = None
     external_ids: dict[str, str] | None = None
+    archived: bool | None = None
 
     project: int | None = None
 
@@ -45,7 +46,12 @@ class SequencingGroupInternal(SMBase):
         meta = kwargs.pop('meta')
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
-        return SequencingGroupInternal(**kwargs, meta=meta)
+
+        _archived = kwargs.pop('archived', None)
+        if _archived is not None:
+            _archived = _archived != b'\x00'
+
+        return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
 
     def to_external(self):
         """Convert to transport model"""
@@ -57,11 +63,13 @@ class SequencingGroupInternal(SMBase):
             meta=self.meta,
             sample_id=sample_id_format(self.sample_id),
             assays=[a.to_external() for a in self.assays or []],
+            archived=self.archived,
         )
 
 
 class NestedSequencingGroupInternal(SMBase):
     """SequencingGroupInternal with nested assays"""
+
     id: int | None = None
     type: str | None = None
     technology: str | None = None
@@ -90,9 +98,9 @@ class SequencingGroupUpsertInternal(SMBase):
     """
 
     id: int | None = None
-    type: str
-    technology: str  # fk
-    platform: str | None  # fk
+    type: str | None = None
+    technology: str | None = None  # fk
+    platform: str | None = None # fk
     meta: dict[str, str] | None = None
     sample_id: int | None = None
     external_ids: dict[str, str] | None = None
@@ -132,10 +140,12 @@ class SequencingGroup(SMBase):
     meta: dict[str, str]
     sample_id: str
     external_ids: dict[str, str]
+    archived: bool
 
 
 class NestedSequencingGroup(SMBase):
     """External model for sequencing group with nested assays"""
+
     id: str
     type: str
     technology: str
