@@ -246,13 +246,26 @@ class SequencingGroupTable(DbBase):
         meta: dict = None,
         author: str = None,
         open_transaction=True,
-    ):
+    ) -> int:
         """Create sequence group"""
-        _archive_query = """
-        UPDATE sequencing_group
-        SET archived = true
-        WHERE sample_id = :sample_id AND type = :type AND technology = :technology AND platform = :platform
+        assert sample_id is not None
+        assert type_ is not None
+        assert technology is not None
+        assert platform is not None
+
+        get_existing_query = """
+        SELECT id
+        FROM sequencing_group
+        WHERE 
+            sample_id = :sample_id
+            AND type = :type
+            AND technology = :technology
+            AND platform = :platform
+            AND NOT archived
         """
+        existing_sg_ids = await self.connection.fetch_all(get_existing_query, {'sample_id': sample_id, 'type': type_.lower(), 'technology': technology.lower(), 'platform': platform.lower()})
+
+
         archive_values = {
             'sample_id': sample_id,
             'type': type_.lower() if type_ else None,
@@ -289,7 +302,9 @@ class SequencingGroupTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            await self.connection.execute(_archive_query, archive_values)
+            if existing_sg_ids:
+                await self.archive_sequencing_groups([s['id'] for s in existing_sg_ids])
+
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
                 {**values, 'author': author or self.author},
@@ -339,7 +354,7 @@ class SequencingGroupTable(DbBase):
         """
         _query = """
         UPDATE sequencing_group
-        SET archive = 1, author = :author
+        SET archived = 1, author = :author
         WHERE id = :sequencing_group_id;
         """
         # do this so we can reuse the sequencing_group_ids
@@ -353,7 +368,7 @@ class SequencingGroupTable(DbBase):
         )
         await self.connection.execute(
             _external_id_query,
-            {'sequencing_group_id': sequencing_group_id, 'author': self.author},
+            {'sequencing_group_id': sequencing_group_id},
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:

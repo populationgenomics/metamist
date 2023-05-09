@@ -240,7 +240,7 @@ class SequencingGroupLayer(BaseLayer):
         assays: list[int],
         meta: dict,
         open_transaction=True,
-    ):
+    ) -> int:
         """
         Change the list of assays in a sequence group:
             - this first archives the existing group,
@@ -251,10 +251,10 @@ class SequencingGroupLayer(BaseLayer):
         )
 
         seqgroup = await self.get_sequencing_group_by_id(sequencing_group_id)
-        async with with_function:
+        async with with_function():
             await self.archive_sequencing_group(seqgroup.id)
 
-            await self.seqgt.create_sequencing_group(
+            return await self.seqgt.create_sequencing_group(
                 sample_id=seqgroup.sample_id,
                 type_=seqgroup.type,
                 technology=seqgroup.technology,

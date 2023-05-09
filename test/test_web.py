@@ -1,3 +1,4 @@
+from db.python.layers import SequencingGroupLayer
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from models.enums import MetaSearchEntityPrefix
@@ -504,3 +505,27 @@ class TestWeb(DbIsolatedTest):
         )
 
         self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)
+
+    @run_as_sync
+    async def test_project_summary_inactive_sequencing_group(self):
+        """
+        Insert a sequencing-group, archive it, then check that the summary
+        doesn't return that sequencing group
+        """
+        participants = await self.partl.upsert_participants(
+            participants=[get_test_participant()]
+        )
+        sg = participants[0].samples[0].sequencing_groups[0]
+        assay_ids = [a.id for a in sg.assays]
+        sglayer = SequencingGroupLayer(self.connection)
+        new_sg_id = await sglayer.recreate_sequencing_group_with_new_assays(
+            sequencing_group_id=sg.id,
+            assays=assay_ids,
+            meta={'new-meta': 'value'},
+        )
+
+        psummary = await self.webl.get_project_summary(grid_filter=[])
+
+        summary_sgs = psummary.participants[0].samples[0].sequencing_groups
+        self.assertEqual(1, len(summary_sgs))
+        self.assertEqual(new_sg_id, summary_sgs[0].id)
