@@ -341,7 +341,9 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         for sg in to_update:
-            await self.seqgt.update_sequencing_group(int(sg.id), meta=sg.meta, platform=sg.platform)
+            await self.seqgt.update_sequencing_group(
+                int(sg.id), meta=sg.meta, platform=sg.platform
+            )
 
         for sg in to_replace:
             await self.recreate_sequencing_group_with_new_assays(

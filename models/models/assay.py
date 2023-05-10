@@ -1,15 +1,14 @@
 import json
 from typing import Any
 
-from pydantic import BaseModel
-
+from models.base import SMBase, OpenApiGenNoneType
 from models.utils.sample_id_format import (
     sample_id_format,
     sample_id_transform_to_raw,
 )
 
 
-class AssayInternal(BaseModel):
+class AssayInternal(SMBase):
     """Internal model for Assay"""
 
     id: int | None
@@ -49,7 +48,7 @@ class AssayInternal(BaseModel):
         )
 
 
-class AssayUpsertInternal(BaseModel):
+class AssayUpsertInternal(SMBase):
     """Internal upsert model for assay"""
 
     id: int | None = None
@@ -69,7 +68,7 @@ class AssayUpsertInternal(BaseModel):
         )
 
 
-class Assay(BaseModel):
+class Assay(SMBase):
     """Asssay model for external use"""
 
     id: int
@@ -89,14 +88,14 @@ class Assay(BaseModel):
         )
 
 
-class AssayUpsert(BaseModel):
+class AssayUpsert(SMBase):
     """Assay upsert model for external use"""
 
-    id: int | None = None
-    type: str | None = None
-    external_ids: dict[str, str] | None = None
-    sample_id: str | None = None
-    meta: dict[str, Any] | None = None
+    id: int | OpenApiGenNoneType = None
+    type: str | OpenApiGenNoneType = None
+    external_ids: dict[str, str] | OpenApiGenNoneType = None
+    sample_id: str | OpenApiGenNoneType = None
+    meta: dict[str, Any] | OpenApiGenNoneType = None
 
     def to_internal(self):
         """Convert to internal model"""

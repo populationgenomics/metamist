@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class FamilySimpleInternal(BaseModel):
     """Simple family model for internal use"""
+
     id: int
     external_id: str
 
@@ -43,6 +44,7 @@ class FamilyInternal(BaseModel):
 
 class FamilySimple(BaseModel):
     """Simple family model, mostly for web access"""
+
     id: int
     external_id: str
 

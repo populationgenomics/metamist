@@ -1,4 +1,3 @@
-from db.python.layers import SequencingGroupLayer
 from test.testbase import DbIsolatedTest, run_as_sync
 
 from models.enums import MetaSearchEntityPrefix
@@ -11,16 +10,16 @@ from models.models import (
     AssayInternal,
     Assay,
 )
+from models.models import WebProject, SearchItem
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
-from db.python.layers.assay import AssayLayer
-from db.python.layers.sample import SampleLayer
-from db.python.layers.participant import ParticipantLayer
-from db.python.layers.web import (
+from db.python.layers import (
+    AssayLayer,
+    SequencingGroupLayer,
+    SampleLayer,
+    ParticipantLayer,
     WebLayer,
-    WebProject,
-    SearchItem,
 )
 
 default_assay_meta = {

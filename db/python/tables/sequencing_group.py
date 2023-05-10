@@ -256,22 +256,22 @@ class SequencingGroupTable(DbBase):
         get_existing_query = """
         SELECT id
         FROM sequencing_group
-        WHERE 
+        WHERE
             sample_id = :sample_id
             AND type = :type
             AND technology = :technology
             AND platform = :platform
             AND NOT archived
         """
-        existing_sg_ids = await self.connection.fetch_all(get_existing_query, {'sample_id': sample_id, 'type': type_.lower(), 'technology': technology.lower(), 'platform': platform.lower()})
-
-
-        archive_values = {
-            'sample_id': sample_id,
-            'type': type_.lower() if type_ else None,
-            'technology': technology.lower() if technology else None,
-            'platform': platform.lower() if platform else None,
-        }
+        existing_sg_ids = await self.connection.fetch_all(
+            get_existing_query,
+            {
+                'sample_id': sample_id,
+                'type': type_.lower(),
+                'technology': technology.lower(),
+                'platform': platform.lower(),
+            },
+        )
 
         _query = """
         INSERT INTO sequencing_group
@@ -289,9 +289,9 @@ class SequencingGroupTable(DbBase):
 
         values = {
             'sample_id': sample_id,
-            'type': type_.lower() if type_ else None,
-            'technology': technology.lower() if technology else None,
-            'platform': platform.lower() if platform else None,
+            'type': type_.lower(),
+            'technology': technology.lower(),
+            'platform': platform.lower(),
             'meta': to_db_json(meta or {}),
         }
         # check if any values are None and raise an exception if so
@@ -330,7 +330,9 @@ class SequencingGroupTable(DbBase):
         Update meta / platform on sequencing_group
         """
         updaters = []
-        values = {'seqgid': sequencing_group_id, }
+        values: dict[str, Any] = {
+            'seqgid': sequencing_group_id,
+        }
 
         if meta:
             values['meta'] = to_db_json(meta)
