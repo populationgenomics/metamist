@@ -2,6 +2,7 @@
 import csv
 from datetime import datetime
 import logging
+import os
 import sys
 import click
 from google.cloud import storage
@@ -17,8 +18,12 @@ TODAY = datetime.today().strftime('%Y-%m-%d')
 def clean_up_cloud_storage(locations: list[CloudPath]):
     """Given a list of locations of files to be deleted"""
     for location in locations:
-        location.unlink()
-        logging.info(f'{location.name} was deleted from cloud storage.')
+        try:
+            location.unlink()
+            logging.info(f'{location.name} was deleted from cloud storage.')
+        # Many possible http exceptions could occur so use a broad exception
+        except Exception:  # pylint: disable=W0718
+            logging.warning(f'{location.name} threw an exception - file not deleted.')
 
 
 @click.command('Delete the sequence paths found by the audit')
@@ -44,17 +49,31 @@ def main(date, sequence_type, file_types):
     Relatively safe as only files in the specific audit results file can be deleted
     """
     config = get_config()
-    project = config['workflow']['dataset']
+    dataset = config['workflow']['dataset']
     access_level = config['workflow']['access_level']
-    subdir = f'audit_results/{date}'
-    if access_level == 'full':
-        bucket_name = f'cpg-{project}-main-upload'
-        file = f'{subdir}/{project}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
-    else:
-        bucket_name = f'cpg-{project}-test-upload'
-        file = f'{subdir}/{project}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv'
 
-    report_path = f'gs://{bucket_name}/{file}'
+    subdir = os.path.join('audit_results', date)
+
+    if access_level == 'standard':
+        raise ValueError(
+            'Standard cannot be used as the access level. Full or test is required.'
+        )
+
+    if access_level == 'full':
+        bucket_name = f'cpg-{dataset}-main-upload'
+        file = os.path.join(
+            subdir,
+            f'{dataset}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
+        )
+
+    else:
+        bucket_name = f'cpg-{dataset}-test-upload'
+        file = os.path.join(
+            subdir,
+            f'{dataset}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
+        )
+
+    report_path = os.path.join(f'gs://{bucket_name}', file)
 
     paths = set()
     with AnyPath(report_path).open('r') as f:  # pylint: disable=E1101

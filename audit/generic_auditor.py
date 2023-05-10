@@ -58,24 +58,24 @@ class GenericAuditor(AuditHelper):
 
     def __init__(
         self,
-        project: str,
+        dataset: str,
         sequence_type: list[str],
         file_types: tuple[str],
         default_analysis_type='cram',
         default_analysis_status='completed',
     ):
-        if not project:
-            raise ValueError('Metamist project is required')
+        if not dataset:
+            raise ValueError('Metamist dataset is required')
 
-        self.project = project
+        self.dataset = dataset
         self.sequence_type = sequence_type
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
 
         self.query = """
-                     query ProjectData($projectName: String!) {
-                         project(name: $projectName) {
+                     query DatasetData($datasetName: String!) {
+                         project(name: $datasetName) {
                              participants {
                                  externalId
                                  id
@@ -98,16 +98,16 @@ class GenericAuditor(AuditHelper):
 
         super().__init__()
 
-    def get_participant_data_for_project(self) -> list[dict]:
+    def get_participant_data_for_dataset(self) -> list[dict]:
         """
-        Uses a graphQL query to return all participants in a Metamist project.
+        Uses a graphQL query to return all participants in a Metamist dataset.
         Nested in the return are all samples associated with the participants,
         and then all the sequences associated with those samples.
         """
 
         participant_data = (
-            query(self.query, {'projectName': self.project})
-            .get('project')
+            query(self.query, {'datasetName': self.dataset})
+            .get('dataset')
             .get('participants')
         )
 
@@ -115,7 +115,7 @@ class GenericAuditor(AuditHelper):
         for participant in participant_data:
             if not participant.get('samples'):
                 logging.info(
-                    f'Participant {participant.get("id")} / {participant.get("externalId")} from {self.project} has no samples. Filtering this participant out.'
+                    f'Participant {participant.get("id")} / {participant.get("externalId")} from {self.dataset} has no samples. Filtering this participant out.'
                 )
         participant_data = [
             participant
@@ -127,7 +127,7 @@ class GenericAuditor(AuditHelper):
 
     def map_participants_to_samples(self, participants: list[dict]) -> dict[str, list]:
         """
-        Returns the {external_participant_id : sample_internal_id} mapping for a Metamist project
+        Returns the {external_participant_id : sample_internal_id} mapping for a Metamist dataset
         - Also reports if any participants have more than one sample
         """
 
@@ -160,7 +160,7 @@ class GenericAuditor(AuditHelper):
         participants: list[dict],
     ) -> dict[str, str]:
         """
-        Returns the {internal sample ID : external sample ID} mapping for all participants in a Metamist project
+        Returns the {internal sample ID : external sample ID} mapping for all participants in a Metamist dataset
         Also removes any samples that are part of the exclusions list
         """
         # Create a list of dictionaries, each mapping a sample ID to its external ID
@@ -263,24 +263,24 @@ class GenericAuditor(AuditHelper):
 
         return self.get_sequence_mapping(all_sequences)
 
-    def get_analysis_cram_paths_for_project_samples(
+    def get_analysis_cram_paths_for_dataset_samples(
         self,
         sample_internal_to_external_id_map: dict[str, str],
     ) -> defaultdict[str, dict[int, str]]:
         """
-        Queries all analyses for the list of samples in the given project AND the seqr project.
+        Queries all analyses for the list of samples in the given dataset AND the seqr dataset.
         Returns a dict mapping {sample_id : (analysis_id, cram_path) }
         """
         sample_ids = list(sample_internal_to_external_id_map.keys())
-        projects = [
-            self.project,
+        datasets = [
+            self.dataset,
         ]
-        if 'test' not in self.project:
-            projects.append('seqr')
+        if 'test' not in self.dataset:
+            datasets.append('seqr')
 
         analyses = self.aapi.query_analyses(
             AnalysisQueryModel(
-                projects=projects,
+                datasets=datasets,
                 type=AnalysisType(self.default_analysis_type),
                 status=AnalysisStatus(
                     self.default_analysis_status
@@ -297,7 +297,7 @@ class GenericAuditor(AuditHelper):
         ]
         if crams_with_missing_seq_type:
             raise ValueError(
-                f'CRAMs from dataset {self.project} did not have sequencing_type: {crams_with_missing_seq_type}'
+                f'CRAMs from dataset {self.dataset} did not have sequencing_type: {crams_with_missing_seq_type}'
             )
 
         # Filter the analyses based on input sequence type
@@ -337,11 +337,11 @@ class GenericAuditor(AuditHelper):
 
     def analyses_for_samples_without_crams(self, samples_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
-        projects = [
-            self.project,
+        datasets = [
+            self.dataset,
         ]
-        if 'test' not in self.project:
-            projects.append('seqr')
+        if 'test' not in self.dataset:
+            datasets.append('seqr')
 
         all_sample_analyses: defaultdict[
             str, list[tuple[int, AnalysisType, str, str]]
@@ -349,7 +349,7 @@ class GenericAuditor(AuditHelper):
         for analysis_type in ANALYSIS_TYPES:
             analyses = self.aapi.query_analyses(
                 AnalysisQueryModel(
-                    projects=projects,
+                    projects=datasets,
                     type=AnalysisType(analysis_type),
                     status=AnalysisStatus(
                         self.default_analysis_status
@@ -433,9 +433,9 @@ class GenericAuditor(AuditHelper):
         seq_id_sample_id_map_map: dict[int, str],
     ):
         """
-        Compares the sequences in a Metamist project to the sequences in the main-upload bucket
+        Compares the sequences in a Metamist dataset to the sequences in the main-upload bucket
 
-        Input: The project name, the {sequence_id : read_paths} mapping, and the sequence file types
+        Input: The dataset name, the {sequence_id : read_paths} mapping, and the sequence file types
         Returns: 1. Paths to sequences that have not yet been ingested.
                  2. A dict mapping sequence IDs to GS filepaths that have been ingested,
                     but where the path in the bucket is different to the path for this
@@ -443,9 +443,9 @@ class GenericAuditor(AuditHelper):
                     these are identified as sequence files that have been moved from
                     their original location to a new location.
         """
-        bucket_name = f'cpg-{self.project}-upload'
-        if 'test' not in self.project:
-            bucket_name = f'cpg-{self.project}-main-upload'
+        bucket_name = f'cpg-{self.dataset}-upload'
+        if 'test' not in self.dataset:
+            bucket_name = f'cpg-{self.dataset}-main-upload'
 
         # Get all the paths to sequence data anywhere in the main-upload bucket
         sequence_paths_in_bucket = self.find_sequence_files_in_gcs_bucket(

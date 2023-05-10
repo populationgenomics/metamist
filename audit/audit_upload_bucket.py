@@ -4,8 +4,8 @@ This auditor looks for sequence files in the main upload bucket that can be dele
 as well as samples that have no completed cram.
 
 Procedure:
-1. Input a Metamist project, sequence types to audit, and file types to search for in the bucket
-2. Get all the participants, samples, and sequences for this project from Metamist
+1. Input a Metamist dataset, sequence types to audit, and file types to search for in the bucket
+2. Get all the participants, samples, and sequences for this dataset from Metamist
 3. Search the upload bucket for all sequence files, and compare to the files in the metamist sequences
     - If there are discrepencies, check if the file name and size is the same in the bucket as it is in metamist
       - If the name and file size are the same, assume this file has just been moved around in the bucket
@@ -69,14 +69,14 @@ class UploadBucketAuditor(GenericAuditor):
 
     def __init__(
         self,
-        project: str,
+        dataset: str,
         sequence_type: list[str],
         file_types: tuple[str],
         default_analysis_type='cram',
         default_analysis_status='completed',
     ):
         super().__init__(
-            project=project,
+            dataset=dataset,
             sequence_type=sequence_type,
             file_types=file_types,
             default_analysis_type=default_analysis_type,
@@ -96,9 +96,9 @@ class UploadBucketAuditor(GenericAuditor):
         # Writing the output to files with the file type, sequence type, and date specified
         today = datetime.today().strftime('%Y-%m-%d')
 
-        bucket_name = f'cpg-{self.project}-main-upload'
+        bucket_name = f'cpg-{self.dataset}-main-upload'
         if access_level == 'test':
-            bucket_name = f'cpg-{self.project}-upload'
+            bucket_name = f'cpg-{self.dataset}-upload'
 
         report_path = f'gs://{bucket_name}/audit_results/{today}/'
 
@@ -106,7 +106,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_delete:
             logging.info('No sequence read files to delete found. Skipping report...')
         else:
-            sequences_to_delete_file = f'{self.project}_{file_types_str}_{sequence_type_str}_sequences_to_delete_{today}.txt'
+            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_delete_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_delete,
                 report_path=os.path.join(report_path, sequences_to_delete_file),
@@ -122,7 +122,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_ingest:
             logging.info('No sequence reads to ingest found. Skipping report...')
         else:
-            sequences_to_ingest_file = f'{self.project}_{file_types_str}_{sequence_type_str}_sequences_to_ingest_{today}.txt'
+            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_ingest_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_ingest,
                 report_path=os.path.join(report_path, sequences_to_ingest_file),
@@ -133,7 +133,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not incomplete_samples:
             logging.info(f'No samples without crams found. Skipping report...')
         else:
-            incomplete_samples_file = f'{self.project}_{file_types_str}_{sequence_type_str}_samples_without_crams_{today}.txt'
+            incomplete_samples_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_samples_without_crams_{today}.txt'
             self.write_csv_report_to_cloud(
                 data_to_write=incomplete_samples,
                 report_path=os.path.join(report_path, incomplete_samples_file),
@@ -143,8 +143,8 @@ class UploadBucketAuditor(GenericAuditor):
 
 @click.command()
 @click.option(
-    '--project',
-    help='Metamist project, used to filter samples',
+    '--dataset',
+    help='Metamist dataset, used to filter samples',
 )
 @click.option(
     '--sequence-type',
@@ -161,7 +161,7 @@ class UploadBucketAuditor(GenericAuditor):
     help='Find fastq, bam, cram, gvcf, vcf, all_reads (fastq + bam + cram), or all sequence file types',
 )
 def main(
-    project,
+    dataset,
     sequence_type,
     file_types,
     default_analysis_type='cram',
@@ -173,13 +173,13 @@ def main(
     Reports any files to delete, files to ingest, and samples without completed crams in output files
     """
     config = get_config()
-    if not project:
-        project = config['workflow']['dataset']
+    if not dataset:
+        dataset = config['workflow']['dataset']
 
     access_level = config['workflow']['access_level']
 
     auditor = UploadBucketAuditor(
-        project=project,
+        dataset=dataset,
         sequence_type=SEQUENCE_TYPES_MAP.get(sequence_type),
         file_types=FILE_TYPES_MAP.get(file_types),
         default_analysis_type=default_analysis_type,
@@ -187,21 +187,21 @@ def main(
     )
 
     # Get all the participants and all the samples mapped to participants
-    participant_data = auditor.get_participant_data_for_project()
+    participant_data = auditor.get_participant_data_for_dataset()
 
     # Get all the samples
     sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
         participant_data
     )
 
-    # Get all the sequences for the samples in the project and map them to their samples and reads
+    # Get all the sequences for the samples in the dataset and map them to their samples and reads
     (
         seq_id_sample_id_map,
         sequence_filepaths_filesizes,
     ) = auditor.get_sequences_from_participants(participant_data)
 
-    # Get all completed cram output paths for the samples in the project and validate them
-    sample_cram_paths = auditor.get_analysis_cram_paths_for_project_samples(
+    # Get all completed cram output paths for the samples in the dataset and validate them
+    sample_cram_paths = auditor.get_analysis_cram_paths_for_dataset_samples(
         sample_internal_external_id_map
     )
 

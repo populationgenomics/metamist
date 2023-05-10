@@ -9,6 +9,9 @@ from cloudpathlib import AnyPath, GSPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from google.cloud import storage
 
+# TODO remove cloudhelper functions
+# TODO make Sequence_Path a constant ??
+
 
 class AuditHelper:
     """General helper class for bucket auditing"""
@@ -173,7 +176,7 @@ class AuditHelper:
     def find_sequence_files_in_gcs_bucket(
         self, bucket_name: str, file_extensions: tuple[str]
     ) -> list[str]:
-        """Gets all the gs paths to fastq files in the projects upload bucket"""
+        """Gets all the gs paths to fastq files in the datasets upload bucket"""
         sequence_paths = []
         if 'upload' not in bucket_name:
             # No prefix means it will get all blobs in the bucket (regardless of path)
