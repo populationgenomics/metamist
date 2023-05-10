@@ -137,10 +137,10 @@ class ParticipantUpsert(SMBase):
         p = ParticipantUpsertInternal(
             id=self.id,
             external_id=self.external_id,
-            reported_sex=self,
-            reported_gender=self,
-            karyotype=self,
-            meta=self,
+            reported_sex=self.reported_sex,
+            reported_gender=self.reported_gender,
+            karyotype=self.karyotype,
+            meta=self.meta,
         )
 
         if self.samples:
