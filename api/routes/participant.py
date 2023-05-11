@@ -181,7 +181,6 @@ async def update_participant(
 
 @router.put(
     '/{project}/upsert-many',
-    response_model=Dict[str, Any],
     operation_id='upsertParticipants',
 )
 async def upsert_participants(
