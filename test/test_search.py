@@ -78,15 +78,31 @@ class TestSample(DbIsolatedTest):
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(external_id='EXS001', type='blood')
         )
-        sg = await self.sglayer.upsert_sequencing_groups([SequencingGroupUpsertInternal(sample_id=sample.id, technology='long-read', platform='illumina', meta={    'sequencing_type': 'transcriptome',
-                                'sequencing_technology': 'long-read',
-                                'sequencing_platform': 'illumina',
-                            }, external_id='EX001', type='transcriptome', assays=[AssayUpsertInternal(
-                            type='sequencing', meta={    'sequencing_type': 'transcriptome',
+        sg = await self.sglayer.upsert_sequencing_groups(
+            [
+                SequencingGroupUpsertInternal(
+                    sample_id=sample.id,
+                    technology='long-read',
+                    platform='illumina',
+                    meta={
+                        'sequencing_type': 'transcriptome',
+                        'sequencing_technology': 'long-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    type='transcriptome',
+                    assays=[
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            meta={
+                                'sequencing_type': 'transcriptome',
                                 'sequencing_technology': 'long-read',
                                 'sequencing_platform': 'illumina',
                             }
-                        )] )])
+                        )
+                    ]
+                )
+            ]
+        )
         cpg_sg_id = sequencing_group_id_format(sg[0].id)
         results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
 
@@ -94,7 +110,6 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(cpg_sg_id, results[0].title)
         self.assertEqual(cpg_sg_id, results[0].data.id)
         self.assertEqual(cpg_sg_id, results[0].data.sg_external_id)
-
 
     @run_as_sync
     async def test_search_isolated_sample_by_external_id(self):

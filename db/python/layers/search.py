@@ -44,7 +44,7 @@ class SearchLayer(BaseLayer):
             return sample_id_transform_to_raw(query, strict=False)
         except ValueError:
             return None
-    
+
     @staticmethod
     def try_get_sg_id_from_query(query: str) -> Optional[int]:
         """
@@ -103,7 +103,7 @@ class SearchLayer(BaseLayer):
                 participant_external_ids=participant_eids,
             ),
         )
-    
+
     async def _get_search_result_for_sequencing_group(
         self, sg_id: int, project_ids: list[int]
     ) -> SearchResponse | None:
@@ -116,11 +116,11 @@ class SearchLayer(BaseLayer):
         except NotFoundError:
             return None
         result = rows[0]
-        
-        sample_id= result.sample_id
+
+        sample_id = result.sample_id
         sg_id = result.id
         project = result.project
-        
+
         title = cpg_sg_id
         id_field = cpg_sg_id
         if project not in project_ids:
@@ -139,7 +139,6 @@ class SearchLayer(BaseLayer):
             ),
         )
 
-
     async def search(self, query: str, project_ids: list[int]) -> List[SearchResponse]:
         """
         Search metamist for some string, get some set of SearchResponses
@@ -157,7 +156,7 @@ class SearchLayer(BaseLayer):
             )
 
             return [response] if response else []
-    
+
         if cpg_sg_id := self.try_get_sg_id_from_query(query):
             # just get the sg
             response = await self._get_search_result_for_sequencing_group(
@@ -180,11 +179,13 @@ class SearchLayer(BaseLayer):
         all_participant_ids = list(
             set(sample_participant_ids + [p[1] for p in participant_rows])
         )
-        
+
         sample_participant_eids, participant_family_eids = await asyncio.gather(
             ptable.get_external_ids_by_participant(sample_participant_ids),
             ftable.get_family_external_ids_by_participant_ids(all_participant_ids),
         )
+
+        # TODO: add SG external ID searching
 
         samples = [
             SearchResponse(
