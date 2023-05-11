@@ -139,7 +139,7 @@ class ExistingCohortParser(GenericMetadataParser):
         """
 
         return [
-            path
+            filename
             for filename, path in self.filename_map.items()
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
         ]
