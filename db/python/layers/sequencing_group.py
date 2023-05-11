@@ -287,7 +287,6 @@ class SequencingGroupLayer(BaseLayer):
             for assay in sg.assays or []:
                 assay.sample_id = sg.sample_id
                 assays.append(assay)
-
         if assays:
             if not all(a.sample_id for a in assays):
                 raise ValueError(

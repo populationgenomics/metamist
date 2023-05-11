@@ -11,7 +11,8 @@ from models.enums import SearchResponseType
 from models.models.family import PedRowInternal
 from models.models.sample import sample_id_format, SampleUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
-from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal, sequencing_group_id_format
+from models.models.assay import AssayUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -74,14 +75,25 @@ class TestSample(DbIsolatedTest):
         """
         Search by valid CPG sequencing group ID (special case)
         """
-        sg = await self.sglayer.upsert_sequencing_groups(SequencingGroupUpsertInternal(external_id='EX001', type='transcriptome'))
-        cpg_sg_id = sample_id_format(sg.id)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EXS001', type='blood')
+        )
+        sg = await self.sglayer.upsert_sequencing_groups([SequencingGroupUpsertInternal(sample_id=sample.id, technology='long-read', platform='illumina', meta={    'sequencing_type': 'transcriptome',
+                                'sequencing_technology': 'long-read',
+                                'sequencing_platform': 'illumina',
+                            }, external_id='EX001', type='transcriptome', assays=[AssayUpsertInternal(
+                            type='sequencing', meta={    'sequencing_type': 'transcriptome',
+                                'sequencing_technology': 'long-read',
+                                'sequencing_platform': 'illumina',
+                            }
+                        )] )])
+        cpg_sg_id = sequencing_group_id_format(sg[0].id)
         results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
 
         self.assertEqual(1, len(results))
         self.assertEqual(cpg_sg_id, results[0].title)
         self.assertEqual(cpg_sg_id, results[0].data.id)
-        self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
+        self.assertEqual(cpg_sg_id, results[0].data.sg_external_id)
 
 
     @run_as_sync
