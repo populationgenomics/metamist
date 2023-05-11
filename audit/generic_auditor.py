@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Any
 
-from audithelper import AuditHelper
+from audit.audithelper import AuditHelper
 from sample_metadata.apis import AnalysisApi
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
 from sample_metadata.model.analysis_type import AnalysisType
@@ -43,13 +43,35 @@ EXCLUDED_SAMPLES = [
     'CPG265876',
 ]
 
+PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
+        query DatasetData($datasetName: String!) {
+            project(name: $datasetName) {
+                participants {
+                    externalId
+                    id
+                    samples {
+                        id
+                        externalId
+                        type
+                        sequences {
+                            id
+                            meta
+                            type
+                        }
+                    }
+                }
+            }
+        }
+        """
+
+# Variable type definitions
+SequenceId = int
+SampleId = str
+SampleExternalId = str
+ParticipantExternalId = str
 
 SequenceReportEntry = namedtuple(
-    'SequenceReportEntry', 'sampleID sequenceID sequence_file_path analysisIDs'
-)
-CompletedAnalysis = namedtuple(
-    'CompletedAnalysis',
-    'analysisID analysis_type analysis_output timestamp_completed',
+    'SequenceReportEntry', 'sample_id sequence_id sequence_file_path analysis_ids'
 )
 
 
@@ -67,36 +89,15 @@ class GenericAuditor(AuditHelper):
         if not dataset:
             raise ValueError('Metamist dataset is required')
 
+        super().__init__()
+
         self.dataset = dataset
         self.sequence_type = sequence_type
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
 
-        self.query = """
-                     query DatasetData($datasetName: String!) {
-                         project(name: $datasetName) {
-                             participants {
-                                 externalId
-                                 id
-                                 samples {
-                                     id
-                                     externalId
-                                     type
-                                     sequences {
-                                         id
-                                         meta
-                                         type
-                                     }
-                                 }
-                             }
-                         }
-                     }
-                     """
-
         self.aapi = AnalysisApi()
-
-        super().__init__()
 
     def get_participant_data_for_dataset(self) -> list[dict]:
         """
@@ -105,17 +106,15 @@ class GenericAuditor(AuditHelper):
         and then all the sequences associated with those samples.
         """
 
-        participant_data = (
-            query(self.query, {'datasetName': self.dataset})
-            .get('dataset')
-            .get('participants')
-        )
+        participant_data = query(
+            PARTICIPANTS_SAMPLES_SEQUENCES_QUERY, {'datasetName': self.dataset}
+        )['project']['participants']
 
         # Filter out any participants with no samples and log any found
         for participant in participant_data:
             if not participant.get('samples'):
                 logging.info(
-                    f'Participant {participant.get("id")} / {participant.get("externalId")} from {self.dataset} has no samples. Filtering this participant out.'
+                    f'{self.dataset} :: Filtering participant {participant.get("id")} ({participant.get("externalId")}) it has no samples.'
                 )
         participant_data = [
             participant
@@ -125,7 +124,10 @@ class GenericAuditor(AuditHelper):
 
         return participant_data
 
-    def map_participants_to_samples(self, participants: list[dict]) -> dict[str, list]:
+    @staticmethod
+    def map_participants_to_samples(
+        participants: list[dict],
+    ) -> dict[ParticipantExternalId, list[SampleId]]:
         """
         Returns the {external_participant_id : sample_internal_id} mapping for a Metamist dataset
         - Also reports if any participants have more than one sample
@@ -155,10 +157,10 @@ class GenericAuditor(AuditHelper):
 
         return participant_eid_sample_id_map
 
+    @staticmethod
     def map_internal_to_external_sample_ids(
-        self,
         participants: list[dict],
-    ) -> dict[str, str]:
+    ) -> dict[SampleId, SampleExternalId]:
         """
         Returns the {internal sample ID : external sample ID} mapping for all participants in a Metamist dataset
         Also removes any samples that are part of the exclusions list
@@ -167,7 +169,7 @@ class GenericAuditor(AuditHelper):
         samples_all = [
             {
                 sample.get('id'): sample.get('externalId')
-                for sample in participant.get('samples')
+                for sample in participant['samples']
             }
             for participant in participants
         ]
@@ -184,7 +186,7 @@ class GenericAuditor(AuditHelper):
 
     def get_sequence_mapping(
         self, all_sequences: list[dict]
-    ) -> tuple[dict[int, str], defaultdict[int, list]]:
+    ) -> tuple[dict[Any, Any], defaultdict[Any, list[tuple[Any, Any]]]]:
         """
         Input: A list of Metamist sequences
         Returns dict mappings of:
@@ -251,7 +253,7 @@ class GenericAuditor(AuditHelper):
 
     def get_sequences_from_participants(
         self, participants: list[dict]
-    ) -> tuple[dict[int, str], defaultdict[int, list]]:
+    ) -> tuple[dict[Any, Any], defaultdict[Any, list[tuple[Any, Any]]]]:
         """Return latest sequence ids for internal sample ids"""
         all_sequences = [
             {
@@ -280,7 +282,7 @@ class GenericAuditor(AuditHelper):
 
         analyses = self.aapi.query_analyses(
             AnalysisQueryModel(
-                datasets=datasets,
+                projects=datasets,
                 type=AnalysisType(self.default_analysis_type),
                 status=AnalysisStatus(
                     self.default_analysis_status
@@ -320,10 +322,9 @@ class GenericAuditor(AuditHelper):
                 continue
             try:
                 # Try getting the sample ID from the 'sample_ids' field
-                for sample in analysis.get('sample_ids'):
-                    sample_id = sample
+                sample_id = analysis['sample_ids'][0]
             except KeyError:
-                # Try getting the sample ID from the 'meta' field's 'sample' field
+                # Try getting the sample ID from the 'sample' meta field
                 sample_id = analysis.get('meta')['sample']
                 logging.warning(
                     f'Analysis: {analysis.get("id")} missing "sample_ids" field. Using analysis["meta"].get("sample") instead.'
@@ -343,9 +344,9 @@ class GenericAuditor(AuditHelper):
         if 'test' not in self.dataset:
             datasets.append('seqr')
 
-        all_sample_analyses: defaultdict[
-            str, list[tuple[int, AnalysisType, str, str]]
-        ] = defaultdict()
+        all_sample_analyses: defaultdict[str, list[dict[str, int | str]]] = defaultdict(
+            list
+        )
         for analysis_type in ANALYSIS_TYPES:
             analyses = self.aapi.query_analyses(
                 AnalysisQueryModel(
@@ -359,20 +360,31 @@ class GenericAuditor(AuditHelper):
             )
             for analysis in analyses:
                 try:
-                    # Try getting the sample ID from the 'sample_ids' field
-                    for sample in analysis.get('sample_ids'):
-                        sample_id = sample
+                    # Try getting the sample IDs from the 'sample_ids' field
+                    samples = analysis['sample_ids']
                 except KeyError:
-                    # Try getting the sample ID from the 'meta' field's 'sample' field
-                    sample_id = analysis.get('meta')['sample']
+                    # Try getting the sample IDs from the 'sample' meta field
+                    try:
+                        samples = analysis['meta']['sample']
+                    # Try getting the sample ID from the 'samples' meta field
+                    except KeyError:
+                        samples = analysis['meta']['samples']
 
-                analysis_entry = CompletedAnalysis(
-                    analysisID=analysis.get('id'),
-                    analysis_type=analysis.get('type'),
-                    analysis_output=analysis.get('output'),
-                    timestamp_completed=analysis.get('timestampCompleted'),
-                )
-                all_sample_analyses[sample_id].append(analysis_entry)
+                if not isinstance(samples, list):
+                    samples = [
+                        samples,
+                    ]
+
+                for sample_id in samples:
+                    if sample_id not in samples_without_crams:
+                        continue
+                    analysis_entry = {
+                        'analysis_id': analysis.get('id'),
+                        'analysis_type': analysis.get('type'),
+                        'analysis_output': analysis.get('output'),
+                        'timestamp_completed': analysis.get('timestampCompleted'),
+                    }
+                    all_sample_analyses[sample_id].append(analysis_entry)
 
         if all_sample_analyses:
             for sample_without_cram, completed_analyses in all_sample_analyses.items():
@@ -430,7 +442,7 @@ class GenericAuditor(AuditHelper):
         self,
         sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         completed_samples: defaultdict[str, list[int]],
-        seq_id_sample_id_map_map: dict[int, str],
+        seq_id_sample_id_map: dict[int, str],
     ):
         """
         Compares the sequences in a Metamist dataset to the sequences in the main-upload bucket
@@ -506,15 +518,15 @@ class GenericAuditor(AuditHelper):
         sequences_moved_paths = []
         for bucket_path, metamist_path in ingested_and_moved_filepaths:
             seq_id = reads_sequences.get(metamist_path)
-            sample_id = seq_id_sample_id_map_map.get(seq_id)
+            sample_id = seq_id_sample_id_map.get(seq_id)
             analysis_ids = completed_samples.get(sample_id)
             if sample_id not in EXCLUDED_SAMPLES:
                 sequences_moved_paths.append(
                     SequenceReportEntry(
-                        sampleID=sample_id,
-                        sequenceID=seq_id,
+                        sample_id=sample_id,
+                        sequence_id=seq_id,
                         sequence_file_path=bucket_path,
-                        analysisIDs=analysis_ids,
+                        analysis_ids=analysis_ids,
                     )
                 )
 
@@ -563,10 +575,10 @@ class GenericAuditor(AuditHelper):
                 for path in seq_read_paths:
                     sequence_reads_to_delete.append(
                         SequenceReportEntry(
-                            sampleID=sample_id,
-                            sequenceID=seq_id,
+                            sample_id=sample_id,
+                            sequence_id=seq_id,
                             sequence_file_path=path,
-                            analysisIDs=analysis_ids,
+                            analysis_ids=analysis_ids,
                         )
                     )
 

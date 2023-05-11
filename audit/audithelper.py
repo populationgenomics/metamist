@@ -5,12 +5,9 @@ import csv
 from datetime import datetime
 from typing import Any
 
-from cloudpathlib import AnyPath, GSPath
+from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from google.cloud import storage
-
-# TODO remove cloudhelper functions
-# TODO make Sequence_Path a constant ??
 
 
 class AuditHelper:
@@ -24,40 +21,6 @@ class AuditHelper:
         # gs specific
         self._gcs_client = None
         self.gcs_bucket_refs: dict[str, storage.Bucket] = {}
-
-    @staticmethod
-    def guess_delimiter_from_filename(filename: str):
-        """
-        Guess delimiter from filename
-        """
-        extension_to_delimiter = {'.csv': ',', '.tsv': '\t'}
-        relevant_delimiter = next(
-            (
-                delimiter
-                for ext, delimiter in extension_to_delimiter.items()
-                if filename.endswith(ext)
-            ),
-            None,
-        )
-        if relevant_delimiter:
-            return relevant_delimiter
-
-        raise ValueError(f'Unrecognised extension on file: {filename}')
-
-    async def file_contents(self, filepath: str) -> str | None:
-        """Get contents of file (decoded as utf8)"""
-        with AnyPath(filepath).open(encoding='utf-8-sig') as f:
-            return f.read()
-
-    async def file_exists(self, filepath: str) -> bool:
-        """Determines whether a file exists"""
-        if filepath.startswith('gs://'):
-            # add a specific case for GCS as the AnyPath implementation calls
-            # bucket.get_blob which triggers a read (which humans are not permitted)
-            blob = await self.get_gcs_blob(filepath)
-            return blob is not None
-
-        return AnyPath(filepath).exists()
 
     async def file_size(self, filepath: str) -> int:
         """Get size of file in bytes"""
@@ -106,20 +69,8 @@ class AuditHelper:
 
         return blob
 
-    def _list_gcs_directory(self, gcs_path) -> list[str]:
-        path = GSPath(gcs_path)
-        if path.parts[2:]:
-            remaining_path = '/'.join(path.parts[2:]) + '/'  # has to end with "/"
-        else:
-            remaining_path = None
-        blobs = self.gcs_client.list_blobs(
-            path.bucket, prefix=remaining_path, delimiter='/'
-        )
-        return [f'gs://{path.bucket}/{blob.name}' for blob in blobs]
-
-    def get_gcs_bucket_subdirs_to_search(
-        self, paths: list[str]
-    ) -> defaultdict[str, list]:
+    @staticmethod
+    def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
         """
         Takes a list of paths and extracts the bucket name and subdirectory, returning all unique pairs
         of buckets/subdirectories
