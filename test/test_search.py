@@ -4,12 +4,14 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
 from db.python.layers.family import FamilyLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
 from models.enums import SearchResponseType
 from models.models.family import PedRowInternal
 from models.models.sample import sample_id_format, SampleUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -24,6 +26,7 @@ class TestSample(DbIsolatedTest):
         self.slayer = SampleLayer(self.connection)
         self.player = ParticipantLayer(self.connection)
         self.flayer = FamilyLayer(self.connection)
+        self.sglayer = SequencingGroupLayer(self.connection)
 
     @run_as_sync
     async def test_search_non_existent_sample_by_internal_id(self):
@@ -65,6 +68,21 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(cpg_id, results[0].title)
         self.assertEqual(cpg_id, results[0].data.id)
         self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
+
+    @run_as_sync
+    async def test_search_isolated_sequencing_group_by_id(self):
+        """
+        Search by valid CPG sequencing group ID (special case)
+        """
+        sg = await self.sglayer.upsert_sequencing_groups(SequencingGroupUpsertInternal(external_id='EX001', type='transcriptome'))
+        cpg_sg_id = sample_id_format(sg.id)
+        results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
+
+        self.assertEqual(1, len(results))
+        self.assertEqual(cpg_sg_id, results[0].title)
+        self.assertEqual(cpg_sg_id, results[0].data.id)
+        self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
+
 
     @run_as_sync
     async def test_search_isolated_sample_by_external_id(self):

@@ -163,55 +163,28 @@ class SearchLayer(BaseLayer):
             response = await self._get_search_result_for_sequencing_group(
                 cpg_sg_id, project_ids=project_ids
             )
-            print(response)
 
             return [response] if response else []
 
         ftable = FamilyTable(self.connection)
         ptable = ParticipantTable(self.connection)
         stable = SampleTable(self.connection)
-        sgtable = SequencingGroupTable(self.connection)
 
         sample_rows, participant_rows, family_rows = await asyncio.gather(
             stable.search(query, project_ids=project_ids, limit=5),
             ptable.search(query, project_ids=project_ids, limit=5),
             ftable.search(query, project_ids=project_ids, limit=5),
-            # sgtable.search(query, project_ids=project_ids, limit=5),
         )
-        # print(sg_rows)
 
         sample_participant_ids = [s[2] for s in sample_rows]
         all_participant_ids = list(
             set(sample_participant_ids + [p[1] for p in participant_rows])
         )
-        # seq_group_participant_ids = [sg[3] for sg in sg_rows]
-
+        
         sample_participant_eids, participant_family_eids = await asyncio.gather(
             ptable.get_external_ids_by_participant(sample_participant_ids),
             ftable.get_family_external_ids_by_participant_ids(all_participant_ids),
-            # ptable.get_external_ids_by_participant(seq_group_participant_ids),
         )
-
-        # sequencing_groups = [
-        #     SearchResponse(
-        #         title=sample_id_format(s_id),
-        #         type=SearchResponseType.SEQGROUP,
-        #         data=SequencingGroupSearchResponseData(
-        #             project=project,
-        #             id=sample_id_format(s_id),
-        #             family_external_ids=participant_family_eids.get(p_id) or []
-        #             if p_id
-        #             else [],
-        #             participant_external_ids=sg_participant_eids.get(p_id) or []
-        #             if p_id
-        #             else [],
-        #             sample_external_ids=[s_id],
-        #             sg_external_ids=[sg_id],
-        #         ),
-        #     )
-        #     for project, sg_id, s_id, p_id in sg_rows
-        # ]
-        # print(sequencing_groups)
 
         samples = [
             SearchResponse(

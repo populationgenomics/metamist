@@ -387,13 +387,14 @@ class GraphQLSequencingGroup:
     technology: str
     platform: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON
+    external_ids: strawberry.scalars.JSON | None
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
+        print(internal)
         return GraphQLSequencingGroup(
             id=sequencing_group_id_format(internal.id),
             type=internal.type,

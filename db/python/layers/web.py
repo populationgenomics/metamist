@@ -459,7 +459,7 @@ WHERE fp.participant_id in :pids
             'sequencing_technology',
             'sequencing_type',
         }
-        ignore_sg_meta_keys: set[str] = {'facility'}
+        ignore_sg_meta_keys: set[str] = set()
 
         participant_meta_keys = set(
             pk
