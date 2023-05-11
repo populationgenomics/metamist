@@ -10,16 +10,16 @@ from models.models import (
     AssayInternal,
     Assay,
 )
+from models.models import WebProject, SearchItem
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
-from db.python.layers.assay import AssayLayer
-from db.python.layers.sample import SampleLayer
-from db.python.layers.participant import ParticipantLayer
-from db.python.layers.web import (
+from db.python.layers import (
+    AssayLayer,
+    SequencingGroupLayer,
+    SampleLayer,
+    ParticipantLayer,
     WebLayer,
-    WebProject,
-    SearchItem,
 )
 
 default_assay_meta = {
@@ -504,3 +504,27 @@ class TestWeb(DbIsolatedTest):
         )
 
         self.assertEqual(expected_data_two_samples_filtered, test_field_with_space)
+
+    @run_as_sync
+    async def test_project_summary_inactive_sequencing_group(self):
+        """
+        Insert a sequencing-group, archive it, then check that the summary
+        doesn't return that sequencing group
+        """
+        participants = await self.partl.upsert_participants(
+            participants=[get_test_participant()]
+        )
+        sg = participants[0].samples[0].sequencing_groups[0]
+        assay_ids = [a.id for a in sg.assays]
+        sglayer = SequencingGroupLayer(self.connection)
+        new_sg_id = await sglayer.recreate_sequencing_group_with_new_assays(
+            sequencing_group_id=sg.id,
+            assays=assay_ids,
+            meta={'new-meta': 'value'},
+        )
+
+        psummary = await self.webl.get_project_summary(grid_filter=[])
+
+        summary_sgs = psummary.participants[0].samples[0].sequencing_groups
+        self.assertEqual(1, len(summary_sgs))
+        self.assertEqual(new_sg_id, summary_sgs[0].id)

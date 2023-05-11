@@ -158,7 +158,7 @@ async def load_assays_by_samples(
     connection, ids, assay_type: str | None = None
 ) -> dict[int, list[AssayInternal]]:
     """
-    DataLoader: get_sequences_for_sample_ids
+    DataLoader: get_assays_for_sample_ids
     """
 
     assaylayer = AssayLayer(connection)

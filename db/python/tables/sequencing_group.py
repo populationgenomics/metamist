@@ -22,6 +22,7 @@ class SequencingGroupTable(DbBase):
         'sg.platform',
         'sg.meta',
         'sg.author',
+        'sg.archived',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
 
@@ -81,9 +82,9 @@ class SequencingGroupTable(DbBase):
         Get sequence IDs in a sequencing_group
         """
         _query = """
-            SELECT sgs.sequencing_group_id, sgs.assay_id
-            FROM sequencing_group_sequence sgs
-            WHERE sequencing_group_id IN :sgids
+            SELECT sga.sequencing_group_id, sga.assay_id
+            FROM sequencing_group_assay sga
+            WHERE sga.sequencing_group_id IN :sgids
         """
         rows = await self.connection.fetch_all(_query, {'sgids': ids})
         sequencing_groups: dict[int, list[int]] = defaultdict(list)
@@ -250,8 +251,33 @@ class SequencingGroupTable(DbBase):
         meta: dict = None,
         author: str = None,
         open_transaction=True,
-    ):
+    ) -> int:
         """Create sequence group"""
+        assert sample_id is not None
+        assert type_ is not None
+        assert technology is not None
+        assert platform is not None
+
+        get_existing_query = """
+        SELECT id
+        FROM sequencing_group
+        WHERE
+            sample_id = :sample_id
+            AND type = :type
+            AND technology = :technology
+            AND platform = :platform
+            AND NOT archived
+        """
+        existing_sg_ids = await self.connection.fetch_all(
+            get_existing_query,
+            {
+                'sample_id': sample_id,
+                'type': type_.lower(),
+                'technology': technology.lower(),
+                'platform': platform.lower(),
+            },
+        )
+
         _query = """
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, author, archived)
@@ -268,9 +294,9 @@ class SequencingGroupTable(DbBase):
 
         values = {
             'sample_id': sample_id,
-            'type': type_.lower() if type_ else None,
-            'technology': technology.lower() if technology else None,
-            'platform': platform.lower() if platform else None,
+            'type': type_.lower(),
+            'technology': technology.lower(),
+            'platform': platform.lower(),
             'meta': to_db_json(meta or {}),
         }
         # check if any values are None and raise an exception if so
@@ -281,6 +307,9 @@ class SequencingGroupTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
+            if existing_sg_ids:
+                await self.archive_sequencing_groups([s['id'] for s in existing_sg_ids])
+
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
                 {**values, 'author': author or self.author},
@@ -305,8 +334,15 @@ class SequencingGroupTable(DbBase):
         """
         Update meta / platform on sequencing_group
         """
-        updaters = ['JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)']
-        values = {'seqgid': sequencing_group_id, 'meta': to_db_json(meta)}
+        updaters = []
+        values: dict[str, Any] = {
+            'seqgid': sequencing_group_id,
+        }
+
+        if meta:
+            values['meta'] = to_db_json(meta)
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+
         if platform:
             updaters.append('platform = :platform')
             values['platform'] = platform
@@ -325,7 +361,7 @@ class SequencingGroupTable(DbBase):
         """
         _query = """
         UPDATE sequencing_group
-        SET archive = 1, author = :author
+        SET archived = 1, author = :author
         WHERE id = :sequencing_group_id;
         """
         # do this so we can reuse the sequencing_group_ids
@@ -339,7 +375,7 @@ class SequencingGroupTable(DbBase):
         )
         await self.connection.execute(
             _external_id_query,
-            {'sequencing_group_id': sequencing_group_id, 'author': self.author},
+            {'sequencing_group_id': sequencing_group_id},
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:

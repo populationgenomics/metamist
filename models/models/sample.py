@@ -1,6 +1,6 @@
 import json
 
-from models.base import SMBase
+from models.base import SMBase, OpenApiGenNoneType
 from models.models.assay import AssayUpsertInternal, AssayUpsert, AssayInternal, Assay
 from models.models.sequencing_group import (
     SequencingGroupUpsert,
@@ -60,6 +60,7 @@ class SampleInternal(SMBase):
 
 class NestedSampleInternal(SMBase):
     """SampleInternal with nested sequencing groups and assays"""
+
     id: int
     external_id: str
     meta: dict
@@ -147,6 +148,7 @@ class Sample(SMBase):
 
 class NestedSample(SMBase):
     """External sample model with nested sequencing groups and assays"""
+
     id: str
     external_id: str
     meta: dict
@@ -159,13 +161,13 @@ class NestedSample(SMBase):
 class SampleUpsert(SMBase):
     """Upsert model for a Sample"""
 
-    id: str | None = None
-    external_id: str | None = None
-    meta: dict | None = None
-    project: int | None = None
-    type: str | None = None
-    participant_id: int | None = None
-    active: bool | None = None
+    id: str | OpenApiGenNoneType = None
+    external_id: str | OpenApiGenNoneType = None
+    meta: dict | OpenApiGenNoneType = None
+    project: int | OpenApiGenNoneType = None
+    type: str | OpenApiGenNoneType = None
+    participant_id: int | OpenApiGenNoneType = None
+    active: bool | OpenApiGenNoneType = None
 
     sequencing_groups: list[SequencingGroupUpsert] | None = None
     non_sequencing_assays: list[AssayUpsert] | None = None
@@ -174,7 +176,7 @@ class SampleUpsert(SMBase):
         """Convert to internal model"""
         _id = None
         if self.id:
-            _id = sample_id_transform_to_raw(self.id)
+            _id = sample_id_transform_to_raw(str(self.id))
 
         sample_upsert = SampleUpsertInternal(
             id=_id,

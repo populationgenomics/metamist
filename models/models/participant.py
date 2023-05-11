@@ -1,7 +1,7 @@
 import json
 
 from db.python.utils import ProjectId
-from models.base import SMBase
+from models.base import SMBase, OpenApiGenNoneType
 from models.models.sample import (
     SampleUpsertInternal,
     SampleUpsert,
@@ -45,6 +45,7 @@ class ParticipantInternal(SMBase):
 
 class NestedParticipantInternal(SMBase):
     """ParticipantInternal with nested samples"""
+
     id: int
     external_id: str = None
     reported_sex: int | None = None
@@ -107,6 +108,7 @@ class Participant(SMBase):
 
 class NestedParticipant(SMBase):
     """External participant model with nested samples"""
+
     id: int
     external_id: str = None
     reported_sex: int | None = None
@@ -121,12 +123,12 @@ class NestedParticipant(SMBase):
 class ParticipantUpsert(SMBase):
     """External upsert model for participant"""
 
-    id: int | None = None
-    external_id: str = None
-    reported_sex: int | None = None
-    reported_gender: str | None = None
-    karyotype: str | None = None
-    meta: dict | None = None
+    id: int | OpenApiGenNoneType = None
+    external_id: str | OpenApiGenNoneType = None
+    reported_sex: int | OpenApiGenNoneType = None
+    reported_gender: str | OpenApiGenNoneType = None
+    karyotype: str | OpenApiGenNoneType = None
+    meta: dict | OpenApiGenNoneType = None
 
     samples: list[SampleUpsert] | None = None
 
@@ -135,10 +137,10 @@ class ParticipantUpsert(SMBase):
         p = ParticipantUpsertInternal(
             id=self.id,
             external_id=self.external_id,
-            reported_sex=self,
-            reported_gender=self,
-            karyotype=self,
-            meta=self,
+            reported_sex=self.reported_sex,
+            reported_gender=self.reported_gender,
+            karyotype=self.karyotype,
+            meta=self.meta,
         )
 
         if self.samples:

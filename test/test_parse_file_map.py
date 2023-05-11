@@ -2,6 +2,7 @@ from io import StringIO
 from unittest.mock import patch
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from metamist.parser.generic_parser import ParsedParticipant
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 
@@ -73,6 +74,36 @@ class TestSampleMapParser(DbIsolatedTest):
         }
         self.maxDiff = None
         self.assertDictEqual(expected_sequence_dict, assay.meta)
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_to_external(self, mock_graphql_query):
+        """
+        Test importing a single row, forms objects and checks response
+        - MOCKS: query_async
+        """
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
+        rows = [
+            'Individual ID\tFilenames',
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz',
+        ]
+        parser = SampleFileMapParser(
+            search_locations=[],
+            project=self.project_name,
+            default_sequencing_technology='short-read',
+        )
+        fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
+        parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
+        parser.skip_checking_gcs_objects = True
+
+        file_contents = '\n'.join(rows)
+        participants: list[ParsedParticipant]
+        _, participants = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+        for p in participants:
+            p.to_sm()
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')

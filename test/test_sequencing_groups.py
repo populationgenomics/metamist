@@ -67,10 +67,12 @@ class TestSequencingGroup(DbIsolatedTest):
 
     @run_as_sync
     async def test_update_sequencing_group(self):
+        """Test updating metadata on a sequencing group"""
         sample = await self.slayer.upsert_sample(get_sample_model())
 
         upsert_sg = SequencingGroupUpsertInternal(
-            id=sample.sequencing_groups[0].id, meta={'another-meta': 'field'}
+            id=sample.sequencing_groups[0].id,
+            meta={'another-meta': 'field'},
         )
         await self.sglayer.upsert_sequencing_groups([upsert_sg])
 
@@ -84,6 +86,7 @@ class TestSequencingGroup(DbIsolatedTest):
 
     @run_as_sync
     async def test_auto_deprecation_of_old_sequencing_group(self):
+        """Test creating a sequencing-group, and test the old one is archived"""
         sample = await self.slayer.upsert_sample(get_sample_model())
 
         # self.sglayer.get_sequencing_groups_by_ids()
@@ -107,11 +110,12 @@ class TestSequencingGroup(DbIsolatedTest):
                         # new assay to trigger deprecation
                         AssayUpsertInternal(
                             type='sequencing',
-                            external_ids={'second-sequencing-object'},
+                            external_ids={'second-key': 'second-sequencing-object'},
                             meta={
                                 'second-sequencing-object' 'sequencing_type': 'genome',
                                 'sequencing_platform': 'short-read',
                                 'sequencing_technology': 'illumina',
+                                'sequencing_type': 'genome',
                             },
                         ),
                     ],
@@ -119,6 +123,15 @@ class TestSequencingGroup(DbIsolatedTest):
             ],
         )
 
-        sample2 = await self.slayer.upsert_sample(new_upsert)
+        updated_sample = await self.slayer.upsert_sample(new_upsert)
 
-        # now check the sequencing group has changed
+        old_sg = await self.sglayer.get_sequencing_group_by_id(
+            sample.sequencing_groups[0].id
+        )
+        # now check the existing sequencing group was archived
+        self.assertTrue(old_sg.archived)
+
+        # check that the "active" sequencing group is the new one
+        active_sgs = await self.sglayer.query(sample_ids=[sample.id])
+        self.assertEqual(len(active_sgs), 1)
+        self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)

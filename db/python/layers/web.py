@@ -32,7 +32,7 @@ class WebLayer(BaseLayer):
     async def get_project_summary(
         self,
         grid_filter: list[SearchItem],
-        token: int | None,
+        token: int = 0,
         limit: int = 20,
     ) -> ProjectSummaryInternal:
         """
@@ -52,7 +52,7 @@ class WebDb(DbBase):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project']
+        wheres = ['s.project = :project', 'NOT sg.archived']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:
@@ -210,7 +210,7 @@ class WebDb(DbBase):
         SELECT COUNT(*)
         FROM sequencing_group sg
         INNER JOIN sample s ON s.id = sg.sample_id
-        WHERE project = :project"""
+        WHERE project = :project AND NOT sg.archived"""
         return await self.connection.fetch_val(_query, {'project': self.project})
 
     async def get_total_number_of_assays(self):
@@ -266,7 +266,7 @@ class WebDb(DbBase):
         self,
         grid_filter: list[SearchItem],
         limit: int,
-        token: int | None = 0,
+        token: int = 0,
     ) -> ProjectSummaryInternal:
         """
         Get project summary
@@ -316,7 +316,7 @@ class WebDb(DbBase):
                 sg.technology, sg.platform, sga.assay_id
             FROM sequencing_group sg
             INNER JOIN sequencing_group_assay sga ON sga.sequencing_group_id = sg.id
-            WHERE sg.sample_id IN :sids
+            WHERE sg.sample_id IN :sids AND NOT sg.archived
         """
         sequencing_group_promise = self.connection.fetch_all(sg_query, {'sids': sids})
 
@@ -324,7 +324,7 @@ class WebDb(DbBase):
             SELECT sgeid.sequencing_group_id, sgeid.name, sgeid.external_id
             FROM sequencing_group_external_id sgeid
             INNER JOIN sequencing_group sg ON sg.id = sgeid.sequencing_group_id
-            WHERE sg.sample_id IN :sids
+            WHERE sg.sample_id IN :sids AND NOT sg.archived
         """
         sequencing_group_eid_promise = self.connection.fetch_all(
             sg_eid_query, {'sids': sids}
