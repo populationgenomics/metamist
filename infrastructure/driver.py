@@ -29,6 +29,7 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
             project=self.config.sample_metadata.gcp.project,
         )
 
+    @cached_property
     def _svc_iam(self):
         return gcp.projects.Service(
             'metamist-iam-service',
@@ -91,31 +92,45 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
         )
 
     @cached_property
-    def eqtl_service_account(self):
+    def etl_service_account(self):
         """Service account to run endpoint + ingestion as"""
         return gcp.serviceaccount.Account(
             'metamist-etl-service-account',
             account_id='metamist-etl-sa',
             project=self.config.sample_metadata.gcp.project,
             opts=pulumi.ResourceOptions(
-                provider=self.config.gcp.provider,
-                depends_on=[self._svc_functions],
+                depends_on=[self._svc_iam],
             ),
         )
 
     @cached_property
-    def eqtl_pubsub_topic(self):
+    def etl_accessors(self):
+        """Service account to run endpoint + ingestion as"""
+        return {
+            name: gcp.serviceaccount.Account(
+                f'metamist-etl-accessor-{name}',
+                account_id=f'metamist-etl-{name}',
+                project=self.config.sample_metadata.gcp.project,
+                opts=pulumi.ResourceOptions(
+                    depends_on=[self._svc_iam],
+                ),
+            )
+            for name in self.config.sample_metadata.etl_accessors
+        }
+
+    @cached_property
+    def etl_pubsub_topic(self):
         """
         Pubsub topic to trigger the etl function
         """
         return gcp.pubsub.Topic(
-            f'metamist-eqtl-topic',
+            f'metamist-etl-topic',
             project=self.config.sample_metadata.gcp.project,
             opts=pulumi.ResourceOptions(depends_on=[self._svc_pubsub]),
         )
 
     @cached_property
-    def eqtl_bigquery_dataset(self):
+    def etl_bigquery_dataset(self):
         """
         Bigquery dataset to contain the bigquery table
         """
@@ -132,9 +147,9 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
         )
 
     @cached_property
-    def eqtl_bigquery_table(self):
+    def etl_bigquery_table(self):
         """
-        Bigquery table to contain the eqtl data
+        Bigquery table to contain the etl data
         """
         with open(PATH_TO_ETL_BQ_SCHEMA) as f:
             schema = f.read()
@@ -142,7 +157,7 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
         etl_table = gcp.bigquery.Table(
             'metamist-etl-bigquery-table',
             table_id='etl-incoming',
-            dataset=self.eqtl_bigquery_dataset.dataset_id,
+            dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
         )
@@ -188,13 +203,13 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
                 available_cpu=1,
                 timeout_seconds=540,
                 environment_variables={
-                    'BIGQUERY_TABLE': self.eqtl_bigquery_table.table_id,
+                    'BIGQUERY_TABLE': self.etl_bigquery_table.table_id,
                     'PUBSUB_TOPIC': '',
                     'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
                 },
                 ingress_settings='ALLOW_INTERNAL_ONLY',
                 all_traffic_on_latest_revision=True,
-                service_account_email=self.eqtl_service_account.email,
+                service_account_email=self.etl_service_account.email,
             ),
             project=self.config.sample_metadata.gcp.project,
             location=self.config.gcp.region,
@@ -202,5 +217,15 @@ class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
                 depends_on=[self._svc_functions, self._svc_build]
             ),
         )
+
+        for name, sa in self.etl_accessors.items():
+            gcp.cloudfunctionsv2.FunctionIamMember(
+                f'metamist-etl-accessor-{name}',
+                location=fxn.location,
+                project=fxn.project,
+                cloud_function=fxn.name,
+                role='roles/run.invoker',
+                member=pulumi.Output.concat('serviceAccount:', sa.email),
+            )
 
         return fxn
