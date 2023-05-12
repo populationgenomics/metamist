@@ -78,6 +78,7 @@ SequenceReportEntry = namedtuple(
 class GenericAuditor(AuditHelper):
     """Auditor for cloud storage buckets"""
 
+    # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
         dataset: str,
