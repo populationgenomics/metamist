@@ -16,7 +16,7 @@ PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'endpoint'
 
 
-class SampleMetadataInfrastructure(CpgInfrastructurePlugin):
+class MetamistInfrastructure(CpgInfrastructurePlugin):
     def main(self):
         self.setup_etl()
 
