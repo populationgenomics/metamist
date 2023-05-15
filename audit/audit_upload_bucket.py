@@ -20,6 +20,7 @@ from datetime import datetime
 import sys
 import logging
 import os
+import asyncio
 import click
 
 from cpg_utils.config import get_config
@@ -89,7 +90,7 @@ class UploadBucketAuditor(GenericAuditor):
         sequence_type_str: str,
         file_types_str: str,
         sequence_files_to_delete: list[tuple[str, int, str, list[int]]],
-        sequence_files_to_ingest: list[str],
+        sequence_files_to_ingest: dict[str, str],
         incomplete_samples: list[tuple[str, str]],
     ):
         """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
@@ -106,7 +107,7 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_delete:
             logging.info('No sequence read files to delete found. Skipping report...')
         else:
-            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_delete_{today}.txt'
+            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_delete_{today}.csv'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_delete,
                 report_path=os.path.join(report_path, sequences_to_delete_file),
@@ -115,6 +116,7 @@ class UploadBucketAuditor(GenericAuditor):
                     'Sequence_ID',
                     'Sequence_Path',
                     'Analysis_IDs',
+                    'Filesize',
                 ],
             )
 
@@ -122,18 +124,24 @@ class UploadBucketAuditor(GenericAuditor):
         if not sequence_files_to_ingest:
             logging.info('No sequence reads to ingest found. Skipping report...')
         else:
-            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_ingest_{today}.txt'
+            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_sequences_to_ingest_{today}.csv'
             self.write_csv_report_to_cloud(
                 data_to_write=sequence_files_to_ingest,
                 report_path=os.path.join(report_path, sequences_to_ingest_file),
-                header_row=None,
+                header_row=[
+                    'Sequence_Path',
+                    'Extenal_Sample_ID',
+                    'Internal_Sample_ID',
+                    'CRAM_Analysis_ID',
+                    'CRAM_Path',
+                ],
             )
 
         # Write the samples without any completed cram to a csv
         if not incomplete_samples:
             logging.info(f'No samples without crams found. Skipping report...')
         else:
-            incomplete_samples_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_samples_without_crams_{today}.txt'
+            incomplete_samples_file = f'{self.dataset}_{file_types_str}_{sequence_type_str}_samples_without_crams_{today}.csv'
             self.write_csv_report_to_cloud(
                 data_to_write=incomplete_samples,
                 report_path=os.path.join(report_path, incomplete_samples_file),
@@ -141,42 +149,21 @@ class UploadBucketAuditor(GenericAuditor):
             )
 
 
-@click.command()
-@click.option(
-    '--dataset',
-    help='Metamist dataset, used to filter samples',
-)
-@click.option(
-    '--sequence-type',
-    '-s',
-    type=click.Choice(['genome', 'exome', 'all']),
-    required='True',
-    help='genome, exome, or all',
-)
-@click.option(
-    '--file-types',
-    '-f',
-    type=click.Choice(['fastq', 'bam', 'cram', 'all_reads', 'gvcf', 'vcf', 'all']),
-    required='True',
-    help='Find fastq, bam, cram, gvcf, vcf, all_reads (fastq + bam + cram), or all sequence file types',
-)
-def main(
-    dataset,
-    sequence_type,
-    file_types,
-    default_analysis_type='cram',
-    default_analysis_status='completed',
+async def audit_upload_bucket_files(
+    dataset, sequence_type, file_types, default_analysis_type, default_analysis_status
 ):
     """
     Finds sequence files for samples with completed CRAMs and adds these to a csv for deletion.
     Also finds any extra files in the upload bucket which may be uningested sequence data.
     Reports any files to delete, files to ingest, and samples without completed crams in output files
     """
-    config = get_config()
-    if not dataset:
-        dataset = config['workflow']['dataset']
+    # config = get_config()
+    # if not dataset:
+    #     dataset = config['workflow']['dataset']
 
-    access_level = config['workflow']['access_level']
+    # access_level = config['workflow']['access_level']
+
+    access_level = 'full'
 
     auditor = UploadBucketAuditor(
         dataset=dataset,
@@ -218,10 +205,15 @@ def main(
     (
         sequence_reads_to_delete,
         sequence_files_to_ingest,
-    ) = auditor.get_reads_to_delete_or_ingest(
+    ) = await auditor.get_reads_to_delete_or_ingest(
         sample_completion.get('complete'),
         sequence_filepaths_filesizes,
         seq_id_sample_id_map,
+        sample_internal_external_id_map,
+    )
+
+    possible_sequence_ingests = auditor.find_crams_for_reads_to_ingest(
+        sequence_files_to_ingest, sample_cram_paths
     )
 
     auditor.write_upload_bucket_audit_reports(
@@ -229,8 +221,45 @@ def main(
         sequence_type_str=sequence_type,
         file_types_str=file_types,
         sequence_files_to_delete=sequence_reads_to_delete,
-        sequence_files_to_ingest=sequence_files_to_ingest,
+        sequence_files_to_ingest=possible_sequence_ingests,
         incomplete_samples=incomplete_samples,
+    )
+
+
+# @click.command()
+# @click.option(
+#     '--dataset',
+#     help='Metamist dataset, used to filter samples',
+# )
+# @click.option(
+#     '--sequence-type',
+#     '-s',
+#     type=click.Choice(['genome', 'exome', 'all']),
+#     required='True',
+#     help='genome, exome, or all',
+# )
+# @click.option(
+#     '--file-types',
+#     '-f',
+#     type=click.Choice(['fastq', 'bam', 'cram', 'all_reads', 'gvcf', 'vcf', 'all']),
+#     required='True',
+#     help='Find fastq, bam, cram, gvcf, vcf, all_reads (fastq + bam + cram), or all sequence file types',
+# )
+def main(
+    dataset,
+    sequence_type,
+    file_types,
+    default_analysis_type='cram',
+    default_analysis_status='completed',
+):
+    asyncio.run(
+        audit_upload_bucket_files(
+            dataset,
+            sequence_type,
+            file_types,
+            default_analysis_type,
+            default_analysis_status,
+        )
     )
 
 
@@ -241,5 +270,4 @@ if __name__ == '__main__':
         datefmt='%Y-%M-%d %H:%M:%S',
         stream=sys.stderr,
     )
-
-    main()  # pylint: disable=E1120
+    main()

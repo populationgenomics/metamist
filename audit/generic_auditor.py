@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Any
 
-from audit.audithelper import AuditHelper
+from audithelper import AuditHelper
 from sample_metadata.apis import AnalysisApi
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
 from sample_metadata.model.analysis_type import AnalysisType
@@ -71,7 +71,8 @@ SampleExternalId = str
 ParticipantExternalId = str
 
 SequenceReportEntry = namedtuple(
-    'SequenceReportEntry', 'sample_id sequence_id sequence_file_path analysis_ids'
+    'SequenceReportEntry',
+    'sample_id sequence_id sequence_file_path analysis_ids filesize',
 )
 
 
@@ -439,22 +440,26 @@ class GenericAuditor(AuditHelper):
 
         return {'complete': completed_samples, 'incomplete': list(incomplete_samples)}
 
-    def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
+    async def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
         self,
         sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         completed_samples: defaultdict[str, list[int]],
         seq_id_sample_id_map: dict[int, str],
+        sample_id_internal_external_map: dict[str, str],
     ):
         """
         Compares the sequences in a Metamist dataset to the sequences in the main-upload bucket
 
-        Input: The dataset name, the {sequence_id : read_paths} mapping, and the sequence file types
-        Returns: 1. Paths to sequences that have not yet been ingested.
+        Input: The dataset name, the {sequence_id : read_paths} mapping, the sequence file types,
+               and the sample internal -> external ID mapping.
+        Returns: 1. Paths to sequences that have not yet been ingested - checks if any completed
+                    sample external IDs are in the filename and includes this in output.
                  2. A dict mapping sequence IDs to GS filepaths that have been ingested,
                     but where the path in the bucket is different to the path for this
                     sequence in Metamist. If the filenames and file sizes match,
                     these are identified as sequence files that have been moved from
                     their original location to a new location.
+                 3. The paths saved in metamist for the read data that has been moved. These paths go nowhere.
         """
         bucket_name = f'cpg-{self.dataset}-upload'
         if 'test' not in self.dataset:
@@ -477,6 +482,10 @@ class GenericAuditor(AuditHelper):
         uningested_sequence_paths = set(sequence_paths_in_bucket).difference(
             set(sequence_paths_in_metamist)
         )
+        # These metamist paths lead nowhere so we can go ahead and ignore them
+        metamist_paths_to_nowhere = set(sequence_paths_in_metamist).difference(
+            set(sequence_paths_in_bucket)
+        )
 
         # Strip the metamist paths into just filenames
         # Map each file name to its file size and path
@@ -491,15 +500,17 @@ class GenericAuditor(AuditHelper):
 
         # Identify if any paths are to files that have actually just been moved by checking if they are in the bucket but not metamist
         ingested_and_moved_filepaths = []
+        new_sequence_path_sizes = {}
         for path in uningested_sequence_paths:
             filename = os.path.basename(path)
             # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
             if filename in metamist_sequence_file_size_map.keys():
-                filesize = self.file_size(path)
+                filesize = await self.file_size(path)
                 if filesize == metamist_sequence_file_size_map.get(filename):
                     ingested_and_moved_filepaths.append(
                         (path, metamist_sequence_file_path_map.get(filename))
                     )
+                    new_sequence_path_sizes[path] = filesize
         logging.info(
             f'Found {len(ingested_and_moved_filepaths)} ingested files that have been moved'
         )
@@ -508,6 +519,17 @@ class GenericAuditor(AuditHelper):
         uningested_sequence_paths -= {
             bucket_path for bucket_path, _ in ingested_and_moved_filepaths
         }
+
+        # Check the list of uningested paths to see if any of them contain sample IDs for ingested samples
+        # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
+        # but not ingested, such as bams and vcfs.
+        uningested_reads = defaultdict(list, {k: [] for k in uningested_sequence_paths})
+        for sample_id in completed_samples.keys():
+            sample_ext_id = sample_id_internal_external_map[sample_id]
+            for uningested_sequence in uningested_sequence_paths:
+                if sample_ext_id not in uningested_sequence:
+                    continue
+                uningested_reads[uningested_sequence].append((sample_id, sample_ext_id))
 
         # flip the sequence id : reads mapping to identify sequence IDs by their read paths
         reads_sequences = {}
@@ -522,22 +544,25 @@ class GenericAuditor(AuditHelper):
             sample_id = seq_id_sample_id_map.get(seq_id)
             analysis_ids = completed_samples.get(sample_id)
             if sample_id not in EXCLUDED_SAMPLES:
+                filesize = new_sequence_path_sizes[bucket_path]
                 sequences_moved_paths.append(
                     SequenceReportEntry(
                         sample_id=sample_id,
                         sequence_id=seq_id,
                         sequence_file_path=bucket_path,
                         analysis_ids=analysis_ids,
+                        filesize=filesize,
                     )
                 )
 
-        return uningested_sequence_paths, sequences_moved_paths
+        return uningested_reads, sequences_moved_paths, metamist_paths_to_nowhere
 
-    def get_reads_to_delete_or_ingest(
+    async def get_reads_to_delete_or_ingest(
         self,
         completed_samples: defaultdict[str, list[int]],
         sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         seq_id_sample_id_map: dict[int, str],
+        sample_id_internal_external_map: dict[str, str],
     ) -> tuple[list, list]:
         """
         Inputs: 1. List of samples which have completed CRAMs
@@ -552,10 +577,12 @@ class GenericAuditor(AuditHelper):
         (
             reads_to_ingest,
             moved_sequences_to_delete,
-        ) = self.check_for_uningested_or_moved_sequences(
+            metamist_paths_to_nowhere,
+        ) = await self.check_for_uningested_or_moved_sequences(
             sequence_filepaths_filesizes,
             completed_samples,
             seq_id_sample_id_map,
+            sample_id_internal_external_map,
         )
 
         # Create a mapping of sample ID: sequence ID - use defaultdict in case a sample has several sequences
@@ -569,20 +596,55 @@ class GenericAuditor(AuditHelper):
                 continue
             seq_ids = sample_id_seq_id_map[sample_id]
             for seq_id in seq_ids:
-                seq_read_paths = [
-                    reads_sizes[0]
-                    for reads_sizes in sequence_filepaths_filesizes[seq_id]
-                ]
-                for path in seq_read_paths:
+                seq_read_paths = sequence_filepaths_filesizes[seq_id]
+                for path, size in seq_read_paths:
+                    if path in metamist_paths_to_nowhere:
+                        continue
+                    filesize = size
                     sequence_reads_to_delete.append(
                         SequenceReportEntry(
                             sample_id=sample_id,
                             sequence_id=seq_id,
                             sequence_file_path=path,
                             analysis_ids=analysis_ids,
+                            filesize=filesize,
                         )
                     )
 
         reads_to_delete = sequence_reads_to_delete + moved_sequences_to_delete
 
         return reads_to_delete, reads_to_ingest
+
+    @staticmethod
+    def find_crams_for_reads_to_ingest(
+        reads_to_ingest: defaultdict[str, list],
+        sample_cram_paths: defaultdict[str, dict[int, str]],
+    ) -> list[tuple]:
+        """
+        Compares the external sample IDs for samples with completed CRAMs against the
+        uningested read files. This may turn up results for cases where multiple read types
+        have been provided for a sample, but only one type was ingested and used for alignment.
+        """
+        possible_sequence_ingests = []
+        for sequence_path, samples in reads_to_ingest.items():
+            if not samples:
+                # If no samples detected in filename, add the path in an empty tuple
+                possible_sequence_ingests.append((sequence_path, '', '', '', ''))
+                continue
+            for sample in samples:
+                # Else get the completed CRAM analysis ID and path for the sample
+                sample_internal_id, sample_ext_id = sample
+                sample_cram = sample_cram_paths[sample_internal_id]
+                analysis_id = list(sample_cram.keys())[0]
+                cram_path = sample_cram[analysis_id]
+                possible_sequence_ingests.append(
+                    (
+                        sequence_path,
+                        sample_ext_id,
+                        sample_internal_id,
+                        analysis_id,
+                        cram_path,
+                    )
+                )
+
+        return possible_sequence_ingests
