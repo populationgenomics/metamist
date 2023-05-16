@@ -17,6 +17,7 @@ from db.python.layers import (
     FamilyLayer,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import ProjectId, GenericFilter, GenericFilterModel
 from models.enums import AnalysisStatus
@@ -244,7 +245,8 @@ async def load_samples_for_ids(
     """
     DataLoader: get_samples_for_ids
     """
-    samples = await SampleLayer(connection).get_samples_by(sample_ids=sample_ids)
+    slayer = SampleLayer(connection)
+    samples = await slayer.query(SampleFilter(sample_id=GenericFilter(in_=sample_ids)))
     # in case it's not ordered
     samples_map = {s.id: s for s in samples}
     return [samples_map.get(s) for s in sample_ids]
@@ -256,16 +258,14 @@ async def load_samples_for_ids(
 async def load_samples_for_projects(
     connection,
     ids: list[ProjectId],
-    internal_sample_ids: list[int],
-    # external_sample_ids: list[str] = None,
+    filter: SampleFilter
 ):
     """
     DataLoader: get_samples_for_project_ids
     """
     # maybe handle the external_ids here
-    samples = await SampleLayer(connection).get_samples_by(
-        project_ids=ids, sample_ids=internal_sample_ids
-    )
+    filter.project = GenericFilter(in_=ids)
+    samples = await SampleLayer(connection).query(filter)
     samples_by_project = group_by(samples, lambda s: s.project)
     return samples_by_project
 

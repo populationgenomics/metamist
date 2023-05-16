@@ -2,8 +2,9 @@ import dataclasses
 from typing import TypeVar, Generic, Callable, Any
 import strawberry
 
+from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter
+from db.python.utils import GenericFilter, ProjectId
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
@@ -38,25 +39,42 @@ class GraphQLFilter(Generic[T]):
 
         return GenericFilter(eq=self.eq, in_=self.in_, nin=self.nin)
 
+GraphQLMetaFilter = strawberry.scalars.JSON
 
-class GraphQLFilterModel:
-    def to_internal_filter(self):
-        pass
+@strawberry.input(description="Simple filter for Samples")
+class GraphQLSampleFromProjectSpecificFilter:
+    type: GraphQLFilter[str] | None = None
+    external_id: GraphQLFilter[str] | None = None
+    meta: GraphQLMetaFilter | None = None
+    def to_internal(self):
+        return SampleFilter(
+            type=self.type.to_internal_filter() if self.type else None,
+            external_id=self.external_id.to_internal_filter() if self.external_id else None,
+            meta=self.meta,
+            # project gets set in the loader
+            # project=None
+        )
 
 
 @strawberry.input(description="Filter for GraphQL queries")
 class GraphQLSampleFilter:
+    project: GraphQLFilter[str]
     id: GraphQLFilter[str] | None = None
     type: GraphQLFilter[str] | None = None
+    meta: GraphQLMetaFilter | None = None
     external_id: GraphQLFilter[str] | None = None
     participant_id: GraphQLFilter[int] | None = None
+    active: GraphQLFilter[bool] | None = dataclasses.field(default_factory=lambda: GraphQLFilter(eq=True))
 
-    def to_internal(self):
+    def to_internal(self, project_id_map: dict[str, int]):
         return SampleFilter(
-            id=self.id.to_internal_filter(),
-            type=self.type.to_internal_filter(),
-            external_id=self.external_id.to_internal_filter(),
-            participant_id=self.participant_id.to_internal_filter(),
+            id=self.id.to_internal_filter(sample_id_transform_to_raw) if self.id else None,
+            type=self.type.to_internal_filter() if self.type else None,
+            meta=self.meta,
+            external_id=self.external_id.to_internal_filter() if self.external_id else None,
+            participant_id=self.participant_id.to_internal_filter() if self.participant_id else None,
+            project=self.project.to_internal_filter(lambda pname: project_id_map[pname]) if self.project else None,
+            active=self.active.to_internal_filter() if self.active else None,
         )
 
 
