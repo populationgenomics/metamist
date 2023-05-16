@@ -1,3 +1,4 @@
+from db.python.tables.assay import AssayFilter
 from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
 
@@ -51,7 +52,7 @@ class TestAssay(DbIsolatedTest):
 
         @run_as_sync
         async def get():
-            return await self.assaylayer.get_assay_by_id(9999, check_project_id=False)
+            return await self.assaylayer.get_assay_by_id(-1, check_project_id=False)
 
         self.assertRaises(NotFoundError, get)
 
@@ -198,14 +199,17 @@ class TestAssay(DbIsolatedTest):
             )
         )
 
+        fquery_1 = AssayFilter(external_id='SEQ01', project=self.project_id)
         self.assertEqual(
-            seq1.id, (await self.assaylayer.get_assay_by_external_id('SEQ01')).id
+            seq1.id, (await self.assaylayer.query(fquery_1))[0].id
         )
+        fquery_2 = AssayFilter(external_id='EXT_SEQ1', project=self.project_id)
         self.assertEqual(
-            seq1.id, (await self.assaylayer.get_assay_by_external_id('EXT_SEQ1')).id
+            seq1.id, (await self.assaylayer.query(fquery_2))[0].id
         )
+        fquery_3 = AssayFilter(external_id='SEQ02', project=self.project_id)
         self.assertEqual(
-            seq2.id, (await self.assaylayer.get_assay_by_external_id('SEQ02')).id
+            seq2.id, (await self.assaylayer.query(fquery_3))[0].id
         )
 
     @run_as_sync

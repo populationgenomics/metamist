@@ -5,7 +5,8 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequencing_group import SequencingGroupTable
+from db.python.tables.sequencing_group import SequencingGroupTable, \
+    SequencingGroupFilter
 from db.python.utils import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupUpsertInternal,
@@ -86,31 +87,17 @@ class SequencingGroupLayer(BaseLayer):
 
     async def query(
         self,
-        project_ids: list[ProjectId] = None,
-        sample_ids: list[int] = None,
-        sequencing_group_ids: list[int] = None,
-        types: list[str] = None,
-        technologies: list[str] = None,
-        platforms: list[str] = None,
-        active_only: bool = True,
+            filter: SequencingGroupFilter,
         check_project_ids: bool = True,
     ) -> list[SequencingGroupInternal]:
         """
         Query sequencing groups
         """
-        projects, sequencing_groups = await self.seqgt.query(
-            project_ids=project_ids,
-            sample_ids=sample_ids,
-            sequencing_group_ids=sequencing_group_ids,
-            types=types,
-            technologies=technologies,
-            platforms=platforms,
-            active_only=active_only,
-        )
+        projects, sequencing_groups = await self.seqgt.query(filter)
         if not sequencing_groups:
             return []
 
-        if check_project_ids and not project_ids:
+        if check_project_ids and not (filter.project and filter.project.in_):
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
             )

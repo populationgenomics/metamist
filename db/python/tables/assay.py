@@ -1,12 +1,13 @@
 # pylint: disable=too-many-locals,too-many-arguments
-
+import dataclasses
 import re
 from collections import defaultdict
 from typing import Iterable, Any
 from api.utils import group_by
 
 from db.python.connect import DbBase, NotFoundError, NoOpAenter
-from db.python.utils import to_db_json
+from db.python.utils import to_db_json, GenericFilterModel, GenericFilter, \
+    GenericMetaFilter
 from db.python.tables.project import ProjectId
 from models.models.assay import AssayInternal
 
@@ -23,6 +24,15 @@ def fix_replacement_key(k):
         k = 'k' + k
     return k
 
+@dataclasses.dataclass(kw_only=True)
+class AssayFilter(GenericFilterModel):
+    id: GenericFilter[int] | None = None
+    sample_id: GenericFilter[int] | None = None
+    external_id: GenericFilter[str] | None = None
+    assay_meta: GenericMetaFilter | None = None
+    sample_meta: GenericMetaFilter | None = None
+    project: GenericFilter[int] | None = None
+    assay_type: GenericMetaFilter | None = None
 
 class AssayTable(DbBase):
     """
@@ -32,11 +42,52 @@ class AssayTable(DbBase):
     table_name = 'assay'
 
     COMMON_GET_KEYS = [
-        'id',
-        'sample_id',
-        'meta',
-        'type',
+        'a.id',
+        'a.sample_id',
+        'a.meta',
+        'a.type',
+        's.project',
     ]
+
+    async def query(self, filter_: AssayFilter) -> tuple[set[ProjectId], list[AssayInternal]]:
+        sql_overides = {
+            'sample_id': 'a.sample_id',
+            'assay_id': 'a.id',
+            'external_id': 'aeid.external_id',
+            'assay_meta': 'a.meta',
+            'sample_meta': 's.meta',
+            'project': 's.project',
+            'assay_type': 'a.type',
+        }
+        if filter_.external_id is not None and filter_.project is None:
+            raise ValueError('Must provide a project if filtering by external_id')
+
+        conditions, values = filter_.to_sql(sql_overides)
+        keys = ', '.join(self.COMMON_GET_KEYS)
+        _query = f"""
+            SELECT {keys} 
+            FROM assay a
+            LEFT JOIN sample s ON s.id = a.sample_id
+            LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
+            WHERE {conditions}
+        """
+
+        assay_rows = await self.connection.fetch_all(_query, values)
+
+        # this will unique on the id, which we want due to joining on 1:many eid table
+        assay_ids = [a['id'] for a in assay_rows]
+        seq_eids = await self._get_assays_eids(assay_ids)
+        assays = []
+
+        project_ids: set[ProjectId] = set()
+        for row in assay_rows:
+            drow = dict(row)
+            project_ids.add(drow.pop('project'))
+            assay = AssayInternal.from_db(drow)
+            assay.external_ids = seq_eids.get(assay.id, {})
+            assays.append(assay)
+
+        return project_ids, assays
 
     async def get_projects_by_assay_ids(self, assay_ids: list[int]) -> set[ProjectId]:
         """Get project IDs for sampleIds (mostly for checking auth)"""
@@ -162,25 +213,17 @@ class AssayTable(DbBase):
         return id_of_new_assay
 
     async def get_assay_by_id(
-        self, sequence_id: int
+        self, assay_id: int
     ) -> tuple[ProjectId, AssayInternal]:
         """Get assay by internal ID"""
-        keys_str = ', '.join('a.' + k for k in self.COMMON_GET_KEYS)
+        f = AssayFilter(id=GenericFilter(eq=assay_id))
+        pjcts, assays = await self.query(f)
 
-        # left join allows project-less ASSAYs, can be sometimes useful
-        _query = f"""
-            SELECT {keys_str}, s.project as project
-            FROM assay a
-            LEFT JOIN sample s ON a.sample_id = s.id
-            WHERE a.id = :id
-        """
-        d = await self.connection.fetch_one(_query, {'id': sequence_id})
-        if not d:
-            raise NotFoundError(f'sequence with id = {sequence_id}')
+        if not assays:
+            raise NotFoundError(f'assay with id = {assay_id}')
 
-        d = dict(d)
-        d['external_ids'] = await self._get_assay_external_ids(sequence_id)
-        return d.pop('project'), AssayInternal.from_db(d)
+        return pjcts.pop(), assays.pop()
+
 
     async def get_assay_by_external_id(
         self, external_sequence_id: str, project: int = None
@@ -189,23 +232,15 @@ class AssayTable(DbBase):
         if not (project or self.project):
             raise ValueError('Getting assay by external ID requires a project')
 
-        keys_str = ', '.join('a.' + k for k in self.COMMON_GET_KEYS)
-        _query = f"""
-            SELECT {keys_str}
-            FROM assay a
-            INNER JOIN assay_external_id aeid ON aeid.assay_id = a.id
-            WHERE aeid.external_id = :external_id AND project = :project
-        """
-        d = await self.connection.fetch_one(
-            _query,
-            {'external_id': external_sequence_id, 'project': project or self.project},
-        )
-        if not d:
-            raise NotFoundError(f'assay with external id = {external_sequence_id}')
-        d = dict(d)
-        d['external_ids'] = await self._get_assay_external_ids(d['id'])
+        f = AssayFilter(external_id=GenericFilter(eq=external_sequence_id), project=GenericFilter(eq=project or self.project))
 
-        return AssayInternal.from_db(d)
+        pjcts, assays = await self.query(f)
+
+        if not assays:
+            raise NotFoundError(f'assay with external id = {external_sequence_id}')
+
+        return assays.pop()
+
 
     async def get_assay_ids_for_sample_id(
         self, sample_id: int

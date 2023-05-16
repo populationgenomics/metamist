@@ -1,10 +1,24 @@
+import dataclasses
 from collections import defaultdict
 from datetime import date
 from typing import Any
 
 from db.python.connect import DbBase, NoOpAenter
-from db.python.utils import ProjectId, to_db_json
+from db.python.utils import ProjectId, to_db_json, GenericFilterModel, GenericFilter
 from models.models.sequencing_group import SequencingGroupInternal
+
+@dataclasses.dataclass(kw_only=True)
+class SequencingGroupFilter(GenericFilterModel):
+    project: GenericFilter[ProjectId] | None = None
+    sample_id: GenericFilter[int] | None = None
+    id: GenericFilter[int] | None = None
+    type: GenericFilter[str] | None = None
+    technology: GenericFilter[str] | None = None
+    platform: GenericFilter[str] | None = None
+    active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
+
+    def __hash__(self):
+        return super().__hash__()
 
 
 class SequencingGroupTable(DbBase):
@@ -25,6 +39,30 @@ class SequencingGroupTable(DbBase):
         'sg.archived',
     ]
     common_get_keys_str = ', '.join(common_get_keys)
+
+    async def query(self, filter_: SequencingGroupFilter) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
+        """Query samples"""
+        sql_overrides = {
+            'project': 's.project',
+            'sample_id': 'sg.sample_id',
+            'id': 'sg.id',
+            'type': 'sg.type',
+            'technology': 'sg.technology',
+            'platform': 'sg.platform',
+            'active_only': 'NOT sg.archived',
+        }
+
+        wheres, values = filter_.to_sql(sql_overrides)
+        _query = f"""
+            SELECT {self.common_get_keys_str}
+            FROM sequencing_group sg
+            INNER JOIN sample s ON s.id = sg.sample_id
+            WHERE {wheres}
+        """
+        rows = await self.connection.fetch_all(_query, values)
+        sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
+        projects = set(sg.project for sg in sgs)
+        return projects, sgs
 
     async def get_projects_by_sequencing_group_ids(
         self, sequencing_group_ids: list[int]
@@ -88,55 +126,55 @@ class SequencingGroupTable(DbBase):
 
         return dict(sequencing_groups)
 
-    async def query(
-        self,
-        project_ids: list[ProjectId],
-        sample_ids: list[int],
-        sequencing_group_ids: list[int],
-        types: list[str],
-        technologies: list[str],
-        platforms: list[str],
-        active_only: bool = True,
-    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
-        """
-        Query sequencing groups
-        """
-        wheres = []
-        params: dict[str, Any] = {}
-        if project_ids:
-            wheres.append('s.project IN :project_ids')
-            params['project_ids'] = project_ids
-        if sample_ids:
-            wheres.append('s.id IN :sample_ids')
-            params['sample_ids'] = sample_ids
-        if sequencing_group_ids:
-            wheres.append('sg.id IN :sequencing_group_ids')
-            params['sequencing_group_ids'] = sequencing_group_ids
-        if types:
-            wheres.append('sg.type IN :types')
-            params['types'] = types
-        if technologies:
-            wheres.append('sg.technology IN :technologies')
-            params['technologies'] = technologies
-        if platforms:
-            wheres.append('sg.platform IN :platforms')
-            params['platforms'] = platforms
-
-        if active_only:
-            wheres.append('NOT sg.archived')
-
-        where = ' AND '.join(wheres)
-        _query = f"""
-            SELECT {SequencingGroupTable.common_get_keys_str}
-            FROM sequencing_group sg
-            INNER JOIN sample s ON s.id = sg.sample_id
-            {'WHERE ' + where if where else ''}
-        """
-
-        rows = await self.connection.fetch_all(_query, params)
-        sequencing_groups = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
-        projects = set(r.project for r in sequencing_groups)
-        return projects, sequencing_groups
+    # async def query(
+    #     self,
+    #     project_ids: list[ProjectId],
+    #     sample_ids: list[int],
+    #     sequencing_group_ids: list[int],
+    #     types: list[str],
+    #     technologies: list[str],
+    #     platforms: list[str],
+    #     active_only: bool = True,
+    # ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
+    #     """
+    #     Query sequencing groups
+    #     """
+    #     wheres = []
+    #     params: dict[str, Any] = {}
+    #     if project_ids:
+    #         wheres.append('s.project IN :project_ids')
+    #         params['project_ids'] = project_ids
+    #     if sample_ids:
+    #         wheres.append('s.id IN :sample_ids')
+    #         params['sample_ids'] = sample_ids
+    #     if sequencing_group_ids:
+    #         wheres.append('sg.id IN :sequencing_group_ids')
+    #         params['sequencing_group_ids'] = sequencing_group_ids
+    #     if types:
+    #         wheres.append('sg.type IN :types')
+    #         params['types'] = types
+    #     if technologies:
+    #         wheres.append('sg.technology IN :technologies')
+    #         params['technologies'] = technologies
+    #     if platforms:
+    #         wheres.append('sg.platform IN :platforms')
+    #         params['platforms'] = platforms
+    #
+    #     if active_only:
+    #         wheres.append('NOT sg.archived')
+    #
+    #     where = ' AND '.join(wheres)
+    #     _query = f"""
+    #         SELECT {SequencingGroupTable.common_get_keys_str}
+    #         FROM sequencing_group sg
+    #         INNER JOIN sample s ON s.id = sg.sample_id
+    #         {'WHERE ' + where if where else ''}
+    #     """
+    #
+    #     rows = await self.connection.fetch_all(_query, params)
+    #     sequencing_groups = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
+    #     projects = set(r.project for r in sequencing_groups)
+    #     return projects, sequencing_groups
 
     async def get_all_sequencing_group_ids_by_sample_ids_by_type(
         self,

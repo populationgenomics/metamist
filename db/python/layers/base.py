@@ -1,5 +1,6 @@
-from db.python.connect import Connection, ProjectPermissionsTable
 
+
+from db.python.connect import Connection, ProjectPermissionsTable
 
 class BaseLayer:
     """Base of all DB layers"""
@@ -12,3 +13,5 @@ class BaseLayer:
     def author(self):
         """Get author from connection"""
         return self.connection.author
+
+

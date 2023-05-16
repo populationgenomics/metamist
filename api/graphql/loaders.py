@@ -1,5 +1,6 @@
 # pylint: disable=no-value-for-parameter
 # ^ Do this because of the loader decorator
+import dataclasses
 import enum
 from collections import defaultdict
 from typing import Any
@@ -16,7 +17,8 @@ from db.python.layers import (
     FamilyLayer,
 )
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import ProjectId
+from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.utils import ProjectId, GenericFilter, GenericFilterModel
 from models.enums import AnalysisStatus
 from models.models import (
     AssayInternal,
@@ -94,6 +96,8 @@ def _prepare_partial_value_for_hashing(value):
                 key=lambda x: x[0],
             )
         )
+
+    return hash(value)
 
     raise ValueError(f'Cannot prepare value for hashing {value}')
 
@@ -219,18 +223,16 @@ async def load_sequencing_groups_for_ids(
     LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES, default_factory=list
 )
 async def load_sequencing_groups_for_samples(
-    connection, ids: list[int], sequencing_type: str | None, active_only: bool
+    connection, ids: list[int], filter: SequencingGroupFilter
 ) -> dict[int, list[SequencingGroupInternal]]:
     """
     Has format [(sample_id: int, sequencing_type?: string)]
     """
     sglayer = SequencingGroupLayer(connection)
+    _filter = dataclasses.replace(filter) if filter else SequencingGroupFilter()
+    _filter.sample_id = GenericFilter(in_=ids)
 
-    sequencing_groups = await sglayer.query(
-        sample_ids=ids,
-        types=[sequencing_type] if sequencing_type else None,
-        active_only=active_only,
-    )
+    sequencing_groups = await sglayer.query(_filter)
     sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
     return sg_map
 
@@ -296,18 +298,19 @@ async def load_sequencing_groups_for_analysis_ids(
     return [analysis_sg_map.get(aid, []) for aid in analysis_ids]
 
 
-@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS)
+@connected_data_loader_with_params(LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS)
 async def load_sequencing_groups_for_project_ids(
-    project_ids: list[int], connection
+    ids: list[int], filter: SequencingGroupFilter, connection
 ) -> list[list[SequencingGroupInternal]]:
     """
     DataLoader: get_sequencing_groups_for_project_ids
     """
     sglayer = SequencingGroupLayer(connection)
-    sequencing_groups = await sglayer.query(project_ids=project_ids)
+    filter.project = GenericFilter(in_=ids)
+    sequencing_groups = await sglayer.query(filter=filter)
     seq_group_map = group_by(sequencing_groups, lambda sg: sg.project)
 
-    return [seq_group_map.get(p, []) for p in project_ids]
+    return [seq_group_map.get(p, []) for p in ids]
 
 
 @connected_data_loader(LoaderKeys.PROJECTS_FOR_IDS)

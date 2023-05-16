@@ -223,6 +223,14 @@ class ProjectPermissionsTable:
         await self.ensure_project_id_cache_is_filled()
         return ProjectPermissionsTable._cached_project_names
 
+    async def get_project_id_map_for_names(self, project_names, author, readonly: bool, check_access=True) -> dict[str, ProjectId]:
+        m = await self.get_project_name_map()
+        project_name_map = {name: m[name] for name in project_names}
+        if check_access:
+            await self.check_access_to_project_ids(user=author, project_ids=project_name_map.values(), readonly=readonly)
+
+        return project_name_map
+
     async def get_project_id_from_name_and_user(
         self, user: str, project_name: str, readonly: bool
     ) -> ProjectId:

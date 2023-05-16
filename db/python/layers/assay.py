@@ -2,11 +2,11 @@
 from typing import Any
 
 from db.python.connect import NoOpAenter
+from db.python.utils import GenericFilterModel,    GenericFilter, GenericMetaFilter
 from db.python.layers.base import BaseLayer, Connection
-from db.python.tables.assay import AssayTable
+from db.python.tables.assay import AssayTable, AssayFilter
 from db.python.tables.sample import SampleTable
 from models.models.assay import AssayInternal, AssayUpsertInternal
-
 
 class AssayLayer(BaseLayer):
     """Layer for more complex sample logic"""
@@ -17,6 +17,22 @@ class AssayLayer(BaseLayer):
         self.sampt: SampleTable = SampleTable(connection)
 
     # GET
+    async def query(self, filter_: AssayFilter = None, check_project_id=True):
+        """Query for samples"""
+
+        projects, assays = await self.seqt.query(filter_)
+
+        if not assays:
+            return []
+
+        if check_project_id:
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=True
+            )
+
+        return assays
+
+
     async def get_assay_by_id(
         self, assay_id: int, check_project_id=True
     ) -> AssayInternal:
