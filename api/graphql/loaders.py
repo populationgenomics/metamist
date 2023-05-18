@@ -398,7 +398,7 @@ async def load_analyses_for_sequencing_groups(
     return by_sg_id
 
 
-async def get_context(connection=get_projectless_db_connection):
+async def get_context(connection=get_projectless_db_connection, **_):
     """Get loaders / cache context for strawberyy GraphQL"""
     mapped_loaders = {k: fn(connection) for k, fn in loaders.items()}
     return {
