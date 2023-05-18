@@ -3,11 +3,18 @@ import dataclasses
 import re
 from collections import defaultdict
 from typing import Iterable, Any
+
+import deprecation
+
 from api.utils import group_by
 
 from db.python.connect import DbBase, NotFoundError, NoOpAenter
-from db.python.utils import to_db_json, GenericFilterModel, GenericFilter, \
-    GenericMetaFilter
+from db.python.utils import (
+    to_db_json,
+    GenericFilterModel,
+    GenericFilter,
+    GenericMetaFilter,
+)
 from db.python.tables.project import ProjectId
 from models.models.assay import AssayInternal
 
@@ -24,15 +31,23 @@ def fix_replacement_key(k):
         k = 'k' + k
     return k
 
+
 @dataclasses.dataclass(kw_only=True)
 class AssayFilter(GenericFilterModel):
+    """
+    Filter for Assay model
+    """
     id: GenericFilter[int] | None = None
     sample_id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
-    assay_meta: GenericMetaFilter | None = None
+    meta: GenericMetaFilter | None = None
     sample_meta: GenericMetaFilter | None = None
     project: GenericFilter[int] | None = None
-    assay_type: GenericMetaFilter | None = None
+    type: GenericFilter | None = None
+
+    def __hash__(self):     # pylint: disable=useless-super-delegation
+        return super().__hash__()
+
 
 class AssayTable(DbBase):
     """
@@ -49,15 +64,20 @@ class AssayTable(DbBase):
         's.project',
     ]
 
-    async def query(self, filter_: AssayFilter) -> tuple[set[ProjectId], list[AssayInternal]]:
+    # region GETS
+
+    async def query(
+        self, filter_: AssayFilter
+    ) -> tuple[set[ProjectId], list[AssayInternal]]:
+        """Query assays"""
         sql_overides = {
             'sample_id': 'a.sample_id',
-            'assay_id': 'a.id',
+            'id': 'a.id',
             'external_id': 'aeid.external_id',
-            'assay_meta': 'a.meta',
+            'meta': 'a.meta',
             'sample_meta': 's.meta',
             'project': 's.project',
-            'assay_type': 'a.type',
+            'type': 'a.type',
         }
         if filter_.external_id is not None and filter_.project is None:
             raise ValueError('Must provide a project if filtering by external_id')
@@ -65,7 +85,7 @@ class AssayTable(DbBase):
         conditions, values = filter_.to_sql(sql_overides)
         keys = ', '.join(self.COMMON_GET_KEYS)
         _query = f"""
-            SELECT {keys} 
+            SELECT {keys}
             FROM assay a
             LEFT JOIN sample s ON s.id = a.sample_id
             LEFT JOIN assay_external_id aeid ON aeid.assay_id = a.id
@@ -108,29 +128,88 @@ class AssayTable(DbBase):
             )
         return projects
 
-    async def insert_many_assays(
-        self, assays: list[AssayInternal], author=None, open_transaction: bool = True
-    ):
-        """Insert many sequencing, returning no IDs"""
-        with_function = self.connection.transaction if open_transaction else NoOpAenter
+    async def get_assay_by_id(self, assay_id: int) -> tuple[ProjectId, AssayInternal]:
+        """Get assay by internal ID"""
+        f = AssayFilter(id=GenericFilter(eq=assay_id))
+        pjcts, assays = await self.query(f)
 
-        async with with_function():
-            assay_ids = []
-            for assay in assays:
-                # need to do it one by one to insert into relevant tables
-                # at least do it in a transaction
-                assay_ids.append(
-                    await self.insert_assay(
-                        sample_id=assay.sample_id,
-                        external_ids=assay.external_ids,
-                        meta=assay.meta,
-                        author=author,
-                        assay_type=assay.type,
-                        open_transaction=False,
-                    )
-                )
-            return assay_ids
+        if not assays:
+            raise NotFoundError(f'assay with id = {assay_id}')
 
+        return pjcts.pop(), assays.pop()
+
+    async def get_assay_by_external_id(
+        self, external_sequence_id: str, project: int = None
+    ) -> AssayInternal:
+        """Get assay by EXTERNAL ID"""
+        if not (project or self.project):
+            raise ValueError('Getting assay by external ID requires a project')
+
+        f = AssayFilter(
+            external_id=GenericFilter(eq=external_sequence_id),
+            project=GenericFilter(eq=project or self.project),
+        )
+
+        _, assays = await self.query(f)
+
+        if not assays:
+            raise NotFoundError(f'assay with external id = {external_sequence_id}')
+
+        return assays.pop()
+
+    async def get_assay_type_numbers_for_project(self, project: ProjectId):
+        """
+        This groups by samples, so one sample with many sequences ONLY reports one here,
+        In the future, this should report the number of sequence groups (or something like that).
+        """
+
+        _query = """
+            SELECT type, COUNT(*) as n
+            FROM (
+                SELECT a.type
+                FROM assay a
+                INNER JOIN sample s ON s.id = a.sample_id
+                WHERE s.project = :project
+                GROUP BY s.id, a.type
+            ) as s
+            GROUP BY type
+        """
+
+        rows = await self.connection.fetch_all(_query, {'project': project})
+
+        return {r['type']: r['n'] for r in rows}
+
+    async def get_assay_type_numbers_by_batch_for_project(self, project: ProjectId):
+        """
+        Grouped by the meta.batch field on an assay
+        """
+
+        # During the query, cast to the string null with IFNULL, as the GROUP BY
+        # treats a SQL NULL and JSON NULL (selected from the meta.batch) differently.
+        _query = """
+            SELECT
+                IFNULL(JSON_EXTRACT(a.meta, '$.batch'), 'null') as batch,
+                sg.type,
+                COUNT(*) AS n
+            FROM assay a
+            INNER JOIN sample s ON s.id = a.sample_id
+            LEFT JOIN sequencing_group sg ON sg.sample_id = s.id
+            WHERE s.project = :project
+            GROUP BY batch, sg.type
+        """
+        rows = await self.connection.fetch_all(_query, {'project': project})
+        batch_result: dict[str, dict[str, str]] = defaultdict(dict)
+        for batch, seqType, count in rows:
+            batch = str(batch).strip('\"') if batch != 'null' else 'no-batch'
+            batch_result[batch][seqType] = str(count)
+        if len(batch_result) == 1 and 'no-batch' in batch_result:
+            # if there are no batches, ignore the no-batch option
+            return {}
+        return batch_result
+
+    # endregion GETS
+
+    # region INSERTS
     async def insert_assay(
         self,
         sample_id,
@@ -212,144 +291,28 @@ class AssayTable(DbBase):
 
         return id_of_new_assay
 
-    async def get_assay_by_id(
-        self, assay_id: int
-    ) -> tuple[ProjectId, AssayInternal]:
-        """Get assay by internal ID"""
-        f = AssayFilter(id=GenericFilter(eq=assay_id))
-        pjcts, assays = await self.query(f)
+    async def insert_many_assays(
+        self, assays: list[AssayInternal], author=None, open_transaction: bool = True
+    ):
+        """Insert many sequencing, returning no IDs"""
+        with_function = self.connection.transaction if open_transaction else NoOpAenter
 
-        if not assays:
-            raise NotFoundError(f'assay with id = {assay_id}')
-
-        return pjcts.pop(), assays.pop()
-
-
-    async def get_assay_by_external_id(
-        self, external_sequence_id: str, project: int = None
-    ) -> AssayInternal:
-        """Get assay by EXTERNAL ID"""
-        if not (project or self.project):
-            raise ValueError('Getting assay by external ID requires a project')
-
-        f = AssayFilter(external_id=GenericFilter(eq=external_sequence_id), project=GenericFilter(eq=project or self.project))
-
-        pjcts, assays = await self.query(f)
-
-        if not assays:
-            raise NotFoundError(f'assay with external id = {external_sequence_id}')
-
-        return assays.pop()
-
-
-    async def get_assay_ids_for_sample_id(
-        self, sample_id: int
-    ) -> tuple[ProjectId, dict[str, list[int]]]:
-        """
-        Get the assay IDs from internal sample_id
-        Map them to be keyed on an assay type (eg: sequencing, proteomics, etc)
-        """
-        # TODO: how should we address this, because we ultimately want to split on the technology I think
-        _query = """\
-            SELECT a.id, a.type, s.project
-            FROM assay a
-            INNER JOIN sample s ON a.sample_id = s.id
-            WHERE s.sample_id = :sample_id
-            ORDER by a.id DESC
-        """
-        result = await self.connection.fetch_all(_query, {'sample_id': sample_id})
-        if not result:
-            raise NotFoundError
-
-        assay_by_type = defaultdict(list)
-        for r in result:
-            assay_by_type[r['type']].append(r['id'])
-
-        project = result[0]['project']
-
-        return project, assay_by_type
-
-    async def get_sequence_ids_for_sample_ids_by_type(
-        self, sample_ids: list[int]
-    ) -> tuple[Iterable[ProjectId], dict[int, dict[str, list[int]]]]:
-        """
-        Get the IDs of sequences for a sample, keyed by the internal sample ID
-        """
-        if not sample_ids:
-            return [], {}
-
-        _query = """
-             SELECT a.id, a.type, a.sample_id, s.project
-             FROM assay a
-             INNER JOIN sample s ON a.sample_id = s.id
-             WHERE a.sample_id IN :sample_ids
-             ORDER by a.id DESC;
-         """
-
-        # hopefully there aren't too many
-        assays = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
-        projects = set(s['project'] for s in assays)
-        sample_id_to_assay_id: dict[int, dict[str, list[int]]] = defaultdict(dict)
-
-        # group_by preserves ordering
-        for key, _assays in group_by(
-            assays, lambda s: (s['sample_id'], s['type'])
-        ).items():
-            sample_id, atype = key
-            # get all
-            sample_id_to_assay_id[sample_id][atype] = [s['id'] for s in _assays]
-
-        return projects, sample_id_to_assay_id
-
-    async def get_assay_type_numbers_for_project(self, project: ProjectId):
-        """
-        This groups by samples, so one sample with many sequences ONLY reports one here,
-        In the future, this should report the number of sequence groups (or something like that).
-        """
-
-        _query = """
-            SELECT type, COUNT(*) as n
-            FROM (
-                SELECT a.type
-                FROM assay a
-                INNER JOIN sample s ON s.id = a.sample_id
-                WHERE s.project = :project
-                GROUP BY s.id, a.type
-            ) as s
-            GROUP BY type
-        """
-
-        rows = await self.connection.fetch_all(_query, {'project': project})
-
-        return {r['type']: r['n'] for r in rows}
-
-    async def get_assay_type_numbers_by_batch_for_project(self, project: ProjectId):
-        """
-        Grouped by the meta.batch field on an assay
-        """
-
-        # During the query, cast to the string null with IFNULL, as the GROUP BY
-        # treats a SQL NULL and JSON NULL (selected from the meta.batch) differently.
-        _query = """
-            SELECT
-                IFNULL(JSON_EXTRACT(a.meta, '$.batch'), 'null') as batch,
-                sg.type,
-                COUNT(*) AS n
-            FROM assay a
-            INNER JOIN sample s ON s.id = a.sample_id
-            LEFT JOIN sequencing_group sg ON sg.sample_id = s.id
-            WHERE s.project = :project
-            GROUP BY batch, sg.type
-        """
-        rows = await self.connection.fetch_all(_query, {'project': project})
-        batch_result: dict[str, dict[str, str]] = defaultdict(dict)
-        for batch, seqType, count in rows:
-            batch = str(batch).strip('\"') if batch != 'null' else 'no-batch'
-            batch_result[batch][seqType] = str(count)
-        if len(batch_result) == 1 and 'no-batch' in batch_result:
-            # if there are no batches, ignore the no-batch option
-            return {}
-        return batch_result
+        async with with_function():
+            assay_ids = []
+            for assay in assays:
+                # need to do it one by one to insert into relevant tables
+                # at least do it in a transaction
+                assay_ids.append(
+                    await self.insert_assay(
+                        sample_id=assay.sample_id,
+                        external_ids=assay.external_ids,
+                        meta=assay.meta,
+                        author=author,
+                        assay_type=assay.type,
+                        open_transaction=False,
+                    )
+                )
+            return assay_ids
 
     async def update_assay(
         self,
@@ -590,3 +553,70 @@ class AssayTable(DbBase):
         return by_assay_id
 
     # endregion EIDs
+
+    # region DEPRECATED
+
+    @deprecation.deprecated(
+        details='With sequencing-groups, assays were refactored and this does not '
+        'strictly make sense anymore'
+    )
+    async def get_assay_ids_for_sample_id(
+        self, sample_id: int
+    ) -> tuple[ProjectId, dict[str, list[int]]]:
+        """
+        Get the assay IDs from internal sample_id
+        Map them to be keyed on an assay type (eg: sequencing, proteomics, etc)
+        """
+        # TODO: how should we address this, because we ultimately want to split on the technology I think
+        _query = """\
+             SELECT a.id, a.type, s.project
+             FROM assay a
+             INNER JOIN sample s ON a.sample_id = s.id
+             WHERE s.sample_id = :sample_id
+             ORDER by a.id DESC
+         """
+        result = await self.connection.fetch_all(_query, {'sample_id': sample_id})
+        if not result:
+            raise NotFoundError
+
+        assay_by_type = defaultdict(list)
+        for r in result:
+            assay_by_type[r['type']].append(r['id'])
+
+        project = result[0]['project']
+
+        return project, assay_by_type
+
+    async def get_sequence_ids_for_sample_ids_by_type(
+        self, sample_ids: list[int]
+    ) -> tuple[Iterable[ProjectId], dict[int, dict[str, list[int]]]]:
+        """
+        Get the IDs of sequences for a sample, keyed by the internal sample ID
+        """
+        if not sample_ids:
+            return [], {}
+
+        _query = """
+              SELECT a.id, a.type, a.sample_id, s.project
+              FROM assay a
+              INNER JOIN sample s ON a.sample_id = s.id
+              WHERE a.sample_id IN :sample_ids
+              ORDER by a.id DESC;
+          """
+
+        # hopefully there aren't too many
+        assays = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
+        projects = set(s['project'] for s in assays)
+        sample_id_to_assay_id: dict[int, dict[str, list[int]]] = defaultdict(dict)
+
+        # group_by preserves ordering
+        for key, _assays in group_by(
+            assays, lambda s: (s['sample_id'], s['type'])
+        ).items():
+            sample_id, atype = key
+            # get all
+            sample_id_to_assay_id[sample_id][atype] = [s['id'] for s in _assays]
+
+        return projects, sample_id_to_assay_id
+
+    # endregion DEPRECATED

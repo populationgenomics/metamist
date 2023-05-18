@@ -36,9 +36,14 @@ class SampleLayer(BaseLayer):
 
         return sample
 
-    async def query(self, filter: SampleFilter, check_project_ids: bool = True) -> list[SampleInternal]:
+    async def query(
+        self, filter_: SampleFilter, check_project_ids: bool = True
+    ) -> list[SampleInternal]:
         """Query samples"""
-        projects, samples = await self.st.query(filter)
+        projects, samples = await self.st.query(filter_)
+        if not samples:
+            return samples
+
         if check_project_ids:
             await self.pt.check_access_to_project_ids(
                 self.connection.author, projects, readonly=True
@@ -177,12 +182,14 @@ class SampleLayer(BaseLayer):
                 self.author, pjcts, readonly=True
             )
 
-        _returned_project_ids, samples = await self.st.get_samples_by(
-            sample_ids=sample_ids,
-            meta=meta,
-            participant_ids=participant_ids,
-            project_ids=project_ids,
-            active=active,
+        _returned_project_ids, samples = await self.st.query(
+            SampleFilter(
+                id=GenericFilter(in_=sample_ids),
+                meta=meta,
+                participant_id=GenericFilter(in_=participant_ids),
+                project=GenericFilter(in_=project_ids),
+                active=GenericFilter(eq=active) if active is not None else None
+            )
         )
         if not samples:
             return []

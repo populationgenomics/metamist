@@ -2,11 +2,11 @@
 from typing import Any
 
 from db.python.connect import NoOpAenter
-from db.python.utils import GenericFilterModel,    GenericFilter, GenericMetaFilter
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.assay import AssayTable, AssayFilter
 from db.python.tables.sample import SampleTable
 from models.models.assay import AssayInternal, AssayUpsertInternal
+
 
 class AssayLayer(BaseLayer):
     """Layer for more complex sample logic"""
@@ -31,7 +31,6 @@ class AssayLayer(BaseLayer):
             )
 
         return assays
-
 
     async def get_assay_by_id(
         self, assay_id: int, check_project_id=True
@@ -74,28 +73,6 @@ class AssayLayer(BaseLayer):
             )
 
         return assay_id_map
-
-    async def get_assays_for_sample_ids(
-        self,
-        sample_ids: list[int],
-        assay_type: str | None = None,
-        check_project_ids=True,
-    ) -> list[AssayInternal]:
-        """
-        Get ALL active assays for a list of internal sample IDs
-        """
-        projects, assays = await self.seqt.get_assays_by(
-            sample_ids=sample_ids, assay_types=[assay_type] if assay_type else None
-        )
-
-        if (
-            check_project_ids and assays
-        ):  # Only do this check if a sample actually has associated sequences
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
-
-        return assays
 
     async def get_assay_ids_for_sample_ids_by_type(
         self, sample_ids: list[int], check_project_ids=True

@@ -2,8 +2,11 @@ import logging
 import os
 import re
 import json
-from typing import Sequence, Optional, List
+import dataclasses
+from typing import Sequence, TypeVar, Generic, Any
 
+
+T = TypeVar('T')
 ProjectId = int
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
@@ -12,6 +15,7 @@ LOGGING_LEVEL = levels_map[os.getenv('SM_LOGGING_LEVEL', 'INFO').upper()]
 USE_GCP_LOGGING = os.getenv('SM_ENABLE_GCP_LOGGING', '0').lower() in ('y', 'true', '1')
 
 RE_FILENAME_SPLITTER = re.compile('[,;]')
+NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
 
 # pylint: disable=invalid-name
 _logger = None
@@ -55,7 +59,7 @@ class NoProjectAccess(Forbidden):
 
     def __init__(
         self,
-        project_names: Sequence[Optional[str]],
+        project_names: Sequence[str] | None,
         author: str,
         *args,
         readonly: bool = None,
@@ -72,13 +76,11 @@ class NoProjectAccess(Forbidden):
         )
 
 
-from typing import TypeVar, Generic, Any
-import dataclasses
-
-T = TypeVar("T")
-
-
 class GenericFilter(Generic[T]):
+    """
+    Generic filter for eq, in_ (in) and nin (not in)
+    """
+
     eq: T | None = None
     in_: list[T] | None = None
     nin: list[T] | None = None
@@ -94,57 +96,97 @@ class GenericFilter(Generic[T]):
         self.nin = nin
 
     def __hash__(self):
-        return hash(
-            (
-                self.eq,
-                tuple(self.in_) if self.in_ is not None else None,
-                tuple(self.nin) if self.nin is not None else None,
+        """Override to ensure we can hash this object"""
+        try:
+            return hash(
+                (
+                    self.eq,
+                    tuple(self.in_) if self.in_ is not None else None,
+                    tuple(self.nin) if self.nin is not None else None,
+                )
             )
-        )
+        except Exception as e:
+            raise e
 
     @staticmethod
     def generate_field_name(name):
-        return name.replace('.', '_').replace(' ', '_').lower()
+        """
+        Replace any non \\w characters with an underscore
 
-    def to_sql(self, column: str) -> tuple[str, dict[str, T]]:
+        >>> GenericFilter.generate_field_name('foo')
+        'foo'
+        >>> GenericFilter.generate_field_name('foo.bar')
+        'foo_bar'
+        >>> GenericFilter.generate_field_name('$foo bar:>baz')
+        '_foo_bar__baz'
+        """
+        return NONFIELD_CHARS_REGEX.sub('_', name)
+
+    def to_sql(
+        self, column: str, column_name: str = None
+    ) -> tuple[str, dict[str, T | list[T]]]:
         """Convert to SQL, and avoid SQL injection"""
         conditionals = []
-        values = {}
+        values: dict[str, T | list[T]] = {}
+        _column_name = column_name or column
+        if not isinstance(column, str):
+            raise ValueError(f'Column {_column_name!r} must be a string')
         if self.eq is not None:
-            k = self.generate_field_name(column + '_eq')
-            conditionals.append(f"{column} = :{k}")
+            k = self.generate_field_name(_column_name + '_eq')
+            conditionals.append(f'{column} = :{k}')
             values[k] = self.eq
         if self.in_ is not None:
             if not isinstance(self.in_, list):
-                raise ValueError("IN filter must be a list")
-            k = self.generate_field_name(column + '_in')
-            conditionals.append(f"{column} IN :{k}")
+                raise ValueError('IN filter must be a list')
+            k = self.generate_field_name(_column_name + '_in')
+            conditionals.append(f'{column} IN :{k}')
             values[k] = self.in_
         if self.nin is not None:
             if not isinstance(self.nin, list):
-                raise ValueError("NIN filter must be a list")
+                raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
-            conditionals.append(f"{column} NOT IN :{k}")
+            conditionals.append(f'{column} NOT IN :{k}')
             values[k] = self.nin
-        return " AND ".join(conditionals), values
+        return ' AND '.join(conditionals), values
 
 
+# pylint: disable=missing-class-docstring
 GenericMetaFilter = dict[str, GenericFilter[Any]]
 
 
 @dataclasses.dataclass(kw_only=True)
 class GenericFilterModel:
+    """
+    Class that contains fields of GenericFilters that can be used to filter
+    """
     def __hash__(self):
+        """Hash the GenericFilterModel, this doesn't override well"""
         return hash(dataclasses.astuple(self))
 
     def __post_init__(self):
-
         for field in dataclasses.fields(self):
             value = getattr(self, field.name)
             if value is None:
                 continue
 
-            if isinstance(value, (GenericFilter, dict)):
+            if isinstance(value, tuple) and len(value) == 1 and value[0] is None:
+                raise ValueError(
+                    f'There is very likely a trailing comma on the end of '
+                    f'{self.__class__.__name__}.{field.name}. If you actually want a '
+                    f'tuple of length one with the value = (None,), then use '
+                    f'dataclasses.field(default_factory=lambda: (None,))'
+                )
+            if isinstance(value, GenericFilter):
+                continue
+
+            if isinstance(value, dict):
+                # make sure each field is a GenericFilter, or set it to be one,
+                # in this case it's always 'eq', never automatically in_
+                new_value = {
+                    k: v if isinstance(v, GenericFilter) else GenericFilter(eq=v)
+                    for k, v in value.items()
+                }
+                setattr(self, field.name, new_value)
                 continue
 
             # lazily provided a value, which we'll correct
@@ -156,25 +198,36 @@ class GenericFilterModel:
     def to_sql(
         self, field_overrides: dict[str, str] = None
     ) -> tuple[str, dict[str, Any]]:
-        _foverrieds = field_overrides or {}
+        """Convert the model to SQL, and avoid SQL injection"""
+        _foverrides = field_overrides or {}
+
+        # check for bad field_overrides
+        bad_field_overrides = set(_foverrides.keys()) - set(
+            f.name for f in dataclasses.fields(self)
+        )
+        if bad_field_overrides:
+            raise ValueError(
+                f'Specified field overrides that were not used: {bad_field_overrides}'
+            )
 
         fields = dataclasses.fields(self)
         conditionals, values = [], {}
         for field in fields:
-            fcolumn = _foverrieds.get(field.name, field.name)
+            fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
                     for key, value in filter_.items():
                         if not isinstance(value, GenericFilter):
                             raise ValueError(
-                                f"Filter {field.name} must be a GenericFilter"
+                                f'Filter {field.name} must be a GenericFilter'
                             )
                         if '"' in key:
                             raise ValueError(
                                 'Meta key contains " character, which is not allowed'
                             )
                         fconditionals, fvalues = value.to_sql(
-                            f'JSON_EXTRACT({fcolumn}, "$.{key}")'
+                            f"JSON_EXTRACT({fcolumn}, '$.{key}')",
+                            column_name=f'{fcolumn}_{key}',
                         )
                         conditionals.append(fconditionals)
                         values.update(fvalues)
@@ -183,12 +236,14 @@ class GenericFilterModel:
                     conditionals.append(fconditionals)
                     values.update(fvalues)
                 else:
-
                     raise ValueError(
-                        f"Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]"
+                        f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        return " AND ".join(conditionals), values
+        if not conditionals:
+            return 'True', {}
+
+        return ' AND '.join(conditionals), values
 
 
 def get_logger():
@@ -226,7 +281,7 @@ def to_db_json(val):
     return json.dumps(val)
 
 
-def split_generic_terms(string: str) -> List[str]:
+def split_generic_terms(string: str) -> list[str]:
     """
     Take a string and split on both [,;]
     """

@@ -4,20 +4,32 @@ from typing import Iterable, Any
 import dataclasses
 
 from db.python.connect import DbBase, NotFoundError
-from db.python.utils import to_db_json, GenericFilterModel, GenericFilter, \
-    GenericMetaFilter
+from db.python.utils import (
+    to_db_json,
+    GenericFilterModel,
+    GenericFilter,
+    GenericMetaFilter,
+)
 from db.python.tables.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
-@dataclasses.dataclass
+
+@dataclasses.dataclass(kw_only=True)
 class SampleFilter(GenericFilterModel):
+    """
+    Sample filter model
+    """
     id: GenericFilter[int] | None = None
-    type: GenericFilter[str] | None = None,
+    type: GenericFilter[str] | None = None
     meta: GenericMetaFilter | None = None
-    external_id: GenericFilter[str] | None = None,
-    participant_id: GenericFilter[int] | None = None,
-    project: GenericFilter[ProjectId] | None = None,
-    active: GenericFilter[bool] | None = None,
+    external_id: GenericFilter[str] | None = None
+    participant_id: GenericFilter[int] | None = None
+    project: GenericFilter[ProjectId] | None = None
+    active: GenericFilter[bool] | None = None
+
+    def __hash__(self):     # pylint: disable=useless-super-delegation
+        return super().__hash__()
+
 
 class SampleTable(DbBase):
     """
@@ -47,28 +59,29 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 
-    async def query(self, filter: SampleFilter) -> tuple[set[ProjectId], list[SampleInternal]]:
+    async def query(
+        self, filter_: SampleFilter
+    ) -> tuple[set[ProjectId], list[SampleInternal]]:
         """Query samples"""
-        wheres, values = filter.to_sql(field_overrides={})
+        wheres, values = filter_.to_sql(field_overrides={})
         if not wheres:
-            raise ValueError(f'Invalid filter: {filter}')
+            raise ValueError(f'Invalid filter: {filter_}')
         common_get_keys_str = ', '.join(self.common_get_keys)
         _query = f"""
-SELECT {common_get_keys_str} 
+SELECT {common_get_keys_str}
 FROM sample
 WHERE {wheres}
 """
-        rows =  await self.connection.fetch_all(_query, values)
+        rows = await self.connection.fetch_all(_query, values)
         samples = [SampleInternal.from_db(dict(r)) for r in rows]
         projects = set(s.project for s in samples)
         return projects, samples
-
 
     async def get_sample_by_id(
         self, internal_id: int
     ) -> tuple[ProjectId, SampleInternal]:
         """Get a Sample by its external_id"""
-        projects, samples = await self.query(SampleFilter(id=internal_id))
+        projects, samples = await self.query(SampleFilter(id=GenericFilter(eq=internal_id)))
         if not samples:
             raise NotFoundError(
                 f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
@@ -79,8 +92,11 @@ WHERE {wheres}
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
     ) -> SampleInternal:
-        projects, samples = await self.query(
-            SampleFilter(external_id=external_id, project=project, active=check_active)
+        """
+        Get a single sample by its external_id
+        """
+        _, samples = await self.query(
+            SampleFilter(external_id=GenericFilter(eq=external_id), project=GenericFilter(eq=project), active=GenericFilter(eq=check_active))
         )
 
         if not samples:

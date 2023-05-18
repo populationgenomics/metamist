@@ -8,7 +8,8 @@ from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.utils import get_logger
+from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.utils import get_logger, GenericFilter
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
 
@@ -145,7 +146,9 @@ class AnalysisLayer(BaseLayer):
 
         # Get samples from pids
         sglayer = SequencingGroupLayer(self.connection)
-        sequencing_groups = await sglayer.query(project_ids=project_ids)
+        sequencing_groups = await sglayer.query(
+            SequencingGroupFilter(project=GenericFilter(in_=project_ids))
+        )
 
         sequencing_group_ids = [sg.id for sg in sequencing_groups]
 

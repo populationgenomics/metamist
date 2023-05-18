@@ -1,7 +1,6 @@
 import csv
 import io
 from datetime import date
-from typing import Any, List, Optional, Dict
 
 from fastapi import APIRouter
 from fastapi.params import Query
@@ -46,7 +45,7 @@ async def fill_in_missing_participants(
 async def get_individual_metadata_template_for_seqr(
     project: str,
     export_type: ExportType = ExportType.JSON,
-    external_participant_ids: Optional[List[str]] = Query(default=None),  # type: ignore[assignment]
+    external_participant_ids: list[str] | None = Query(default=None),  # type: ignore[assignment]
     # pylint: disable=invalid-name
     replace_with_participant_external_ids: bool = True,
     connection: Connection = get_project_readonly_connection,
@@ -90,7 +89,7 @@ async def get_individual_metadata_template_for_seqr(
     operation_id='getParticipantIdMapByExternalIds',
 )
 async def get_id_map_by_external_ids(
-    external_participant_ids: List[str],
+    external_participant_ids: list[str],
     allow_missing: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
@@ -105,7 +104,7 @@ async def get_id_map_by_external_ids(
 
 @router.post('/update-many', operation_id='updateManyParticipants')
 async def update_many_participant_external_ids(
-    internal_to_external_id: Dict[int, str],
+    internal_to_external_id: dict[int, str],
     connection: Connection = get_projectless_db_connection,
 ):
     """Update external_ids of participants by providing an update map"""
@@ -198,12 +197,12 @@ async def upsert_participants(
 
 @router.post(
     '/{project}',
-    # response_model=List[ParticipantModel],
+    # response_model=list[ParticipantModel],
     operation_id='getParticipants',
 )
 async def get_participants(
-    external_participant_ids: List[str] = None,
-    internal_participant_ids: List[int] = None,
+    external_participant_ids: list[str] = None,
+    internal_participant_ids: list[int] = None,
     connection: Connection = get_project_readonly_connection,
 ):
     """Get participants, default ALL participants in project"""

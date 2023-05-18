@@ -9,7 +9,8 @@ from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
-from db.python.tables.sample import SampleTable
+from db.python.tables.sample import SampleTable, SampleFilter
+from db.python.utils import GenericFilter
 from models.models.family import PedRowInternal, FamilyInternal
 from models.models.participant import ParticipantUpsertInternal
 
@@ -343,8 +344,8 @@ class FamilyLayer(BaseLayer):
 
         # Find the participants from the given samples
         if sample_ids is not None and len(sample_ids) > 0:
-            _, samples = await self.stable.get_samples_by(
-                project_ids=[project], sample_ids=sample_ids
+            _, samples = await self.stable.query(
+                SampleFilter(project=GenericFilter(eq=project), id=GenericFilter(in_=sample_ids))
             )
 
             all_participants += [

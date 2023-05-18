@@ -1,23 +1,34 @@
+# pylint: disable=too-many-instance-attributes
 import dataclasses
 from collections import defaultdict
 from datetime import date
 from typing import Any
 
 from db.python.connect import DbBase, NoOpAenter
-from db.python.utils import ProjectId, to_db_json, GenericFilterModel, GenericFilter
+from db.python.utils import (
+    ProjectId,
+    to_db_json,
+    GenericFilterModel,
+    GenericFilter,
+    GenericMetaFilter,
+)
 from models.models.sequencing_group import SequencingGroupInternal
+
 
 @dataclasses.dataclass(kw_only=True)
 class SequencingGroupFilter(GenericFilterModel):
+    """Sequencing Group Filter"""
     project: GenericFilter[ProjectId] | None = None
     sample_id: GenericFilter[int] | None = None
+    external_id: GenericFilter[str] | None = None
     id: GenericFilter[int] | None = None
     type: GenericFilter[str] | None = None
     technology: GenericFilter[str] | None = None
     platform: GenericFilter[str] | None = None
     active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
+    meta: GenericMetaFilter | None = None
 
-    def __hash__(self):
+    def __hash__(self):     # pylint: disable=useless-super-delegation
         return super().__hash__()
 
 
@@ -40,23 +51,28 @@ class SequencingGroupTable(DbBase):
     ]
     common_get_keys_str = ', '.join(common_get_keys)
 
-    async def query(self, filter_: SequencingGroupFilter) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
+    async def query(
+        self, filter_: SequencingGroupFilter
+    ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
         """Query samples"""
         sql_overrides = {
             'project': 's.project',
             'sample_id': 'sg.sample_id',
             'id': 'sg.id',
+            'meta': 'sg.meta',
             'type': 'sg.type',
             'technology': 'sg.technology',
             'platform': 'sg.platform',
             'active_only': 'NOT sg.archived',
+            'external_id': 'sgexid.external_id',
         }
 
         wheres, values = filter_.to_sql(sql_overrides)
         _query = f"""
             SELECT {self.common_get_keys_str}
             FROM sequencing_group sg
-            INNER JOIN sample s ON s.id = sg.sample_id
+            LEFT JOIN sample s ON s.id = sg.sample_id
+            LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
             WHERE {wheres}
         """
         rows = await self.connection.fetch_all(_query, values)

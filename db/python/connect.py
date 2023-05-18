@@ -1,5 +1,5 @@
 # pylint: disable=unused-import
-#
+# flake8: noqa
 """
 Code for connecting to Postgres database
 """
@@ -34,9 +34,6 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
 ][::-1]
-
-
-
 
 
 class Connection:

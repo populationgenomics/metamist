@@ -5,8 +5,10 @@ from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequencing_group import SequencingGroupTable, \
-    SequencingGroupFilter
+from db.python.tables.sequencing_group import (
+    SequencingGroupTable,
+    SequencingGroupFilter,
+)
 from db.python.utils import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupUpsertInternal,
@@ -87,17 +89,17 @@ class SequencingGroupLayer(BaseLayer):
 
     async def query(
         self,
-            filter: SequencingGroupFilter,
+        filter_: SequencingGroupFilter,
         check_project_ids: bool = True,
     ) -> list[SequencingGroupInternal]:
         """
         Query sequencing groups
         """
-        projects, sequencing_groups = await self.seqgt.query(filter)
+        projects, sequencing_groups = await self.seqgt.query(filter_)
         if not sequencing_groups:
             return []
 
-        if check_project_ids and not (filter.project and filter.project.in_):
+        if check_project_ids and not (filter_.project and filter_.project.in_):
             await self.ptable.check_access_to_project_ids(
                 self.author, projects, readonly=True
             )
