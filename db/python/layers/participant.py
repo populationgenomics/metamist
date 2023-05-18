@@ -665,6 +665,35 @@ class ParticipantLayer(BaseLayer):
             internal_to_external_id
         )
 
+    async def remove_participant_from_family(self, family_id: int, participant_id: int):
+        """Deletes a participant from a family"""
+        fptable = FamilyParticipantTable(self.connection)
+
+        return await fptable.delete_participant_family_row(
+            family_id=family_id, participant_id=participant_id
+        )
+
+    async def add_participant_to_family(
+        self,
+        family_id: int,
+        participant_id: int,
+        paternal_id: int,
+        maternal_id: int,
+        affected: int,
+    ):
+        """Adds a participant to a family"""
+        fpttable = FamilyParticipantTable(self.connection)
+
+        await fpttable.create_row(
+            family_id=family_id,
+            participant_id=participant_id,
+            paternal_id=paternal_id,
+            maternal_id=maternal_id,
+            affected=affected,
+            notes=None,
+            author=None,
+        )
+
     @staticmethod
     def _validate_individual_metadata_headers(headers):
         lheader_set = set(h.lower() for h in headers)

@@ -187,6 +187,43 @@ async def update_participant(
     }
 
 
+@router.post(
+    '/{participant_id}/delete-participant-family', operation_id='delParticipantFamily'
+)
+async def remove_participant_from_family(
+    participant_id: int,
+    family_id: int,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Delete a participant from a family"""
+    player = ParticipantLayer(connection)
+    return await player.remove_participant_from_family(
+        family_id=family_id, participant_id=participant_id
+    )
+
+
+@router.post(
+    '/{participant_id}/add-participant-family', operation_id='addParticipantFamily'
+)
+async def add_participant_to_family(
+    participant_id: int,
+    family_id: int,
+    paternal_id: int,
+    maternal_id: int,
+    affected: int,
+    connection: Connection = get_projectless_db_connection,
+):
+    """Add a participant to a family"""
+    player = ParticipantLayer(connection)
+    return await player.add_participant_to_family(
+        family_id=family_id,
+        participant_id=participant_id,
+        paternal_id=paternal_id,
+        maternal_id=maternal_id,
+        affected=affected,
+    )
+
+
 @router.put(
     '/{project}/batch',
     response_model=Dict[str, Any],
