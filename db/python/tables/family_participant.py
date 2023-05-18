@@ -183,3 +183,25 @@ WHERE fp.participant_id in :participant_ids
         m = {r['id']: r['family_id'] for r in rows}
 
         return projects, m
+
+    async def update_participants_family(
+        self, family_id: int, participant_ids: List[int]
+    ):
+        """
+        Update the family_id for participant_ids
+        """
+
+        if len(participant_ids) == 0 or not family_id:
+            return False
+
+        _query = """
+UPDATE family_participant
+SET family_id = :family_id
+WHERE participant_id IN :participant_ids
+        """
+
+        await self.connection.execute(
+            _query, {'family_id': family_id, 'participant_ids': participant_ids}
+        )
+
+        return True
