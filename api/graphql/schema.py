@@ -26,6 +26,7 @@ from db.python import enum_tables
 from db.python.layers import AnalysisLayer, SequencingGroupLayer, SampleLayer
 from db.python.layers.assay import AssayLayer
 from db.python.layers.family import FamilyLayer
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
@@ -187,13 +188,23 @@ class GraphQLProject:
         self,
         info: Info,
         root: 'Project',
-        type: str | None = None,
-        active: bool | None = None,
+        type: GraphQLFilter[str] | None = None,
+        status: GraphQLFilter[strawberry.enum(AnalysisStatus)] | None = None,
+        active: GraphQLFilter[bool] | None = None,
+        meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
-        internal_analysis = await AnalysisLayer(connection).query_analysis(
-            project_ids=[root.id], analysis_type=type, active=active
+        internal_analysis = await AnalysisLayer(connection).query(
+            AnalysisFilter(
+                type=type.to_internal_filter() if type else None,
+                status=status.to_internal_filter()
+                if status
+                else GenericFilter(eq=AnalysisStatus.COMPLETED),
+                active=active.to_internal_filter() if active else None,
+                project=GenericFilter(eq=root.id),
+                meta=meta,
+            )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
 
@@ -456,15 +467,23 @@ class GraphQLSequencingGroup:
         self,
         info: Info,
         root: 'GraphQLSequencingGroup',
-        analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
-        analysis_type: str | None = None,
+        status: GraphQLFilter[strawberry.enum(AnalysisStatus)] | None = None,
+        type: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
+        active: GraphQLFilter[bool] | None = None,
     ) -> list[GraphQLAnalysis]:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
         analyses = await loader.load(
             {
                 'id': root.internal_id,
-                'status': analysis_status,
-                'analysis_type': analysis_type,
+                'filter': AnalysisFilter(
+                    status=status.to_internal_filter() if status else None,
+                    type=type.to_internal_filter() if type else None,
+                    meta=meta,
+                    active=active.to_internal_filter()
+                    if active
+                    else GenericFilter(eq=True),
+                ),
             }
         )
         return [GraphQLAnalysis.from_internal(a) for a in analyses]
@@ -557,9 +576,7 @@ class Query:
             project=project.to_internal_filter(lambda pname: project_id_map[pname])
             if project
             else None,
-            active=active.to_internal_filter()
-            if active
-            else GenericFilter(eq=True),
+            active=active.to_internal_filter() if active else GenericFilter(eq=True),
         )
 
         samples = await slayer.query(filter_)

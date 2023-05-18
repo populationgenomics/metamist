@@ -188,7 +188,7 @@ class SampleLayer(BaseLayer):
                 meta=meta,
                 participant_id=GenericFilter(in_=participant_ids),
                 project=GenericFilter(in_=project_ids),
-                active=GenericFilter(eq=active) if active is not None else None
+                active=GenericFilter(eq=active) if active is not None else None,
             )
         )
         if not samples:

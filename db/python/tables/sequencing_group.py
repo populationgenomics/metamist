@@ -18,6 +18,7 @@ from models.models.sequencing_group import SequencingGroupInternal
 @dataclasses.dataclass(kw_only=True)
 class SequencingGroupFilter(GenericFilterModel):
     """Sequencing Group Filter"""
+
     project: GenericFilter[ProjectId] | None = None
     sample_id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
@@ -28,7 +29,7 @@ class SequencingGroupFilter(GenericFilterModel):
     active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
     meta: GenericMetaFilter | None = None
 
-    def __hash__(self):     # pylint: disable=useless-super-delegation
+    def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
 
 

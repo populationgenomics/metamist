@@ -345,7 +345,9 @@ class FamilyLayer(BaseLayer):
         # Find the participants from the given samples
         if sample_ids is not None and len(sample_ids) > 0:
             _, samples = await self.stable.query(
-                SampleFilter(project=GenericFilter(eq=project), id=GenericFilter(in_=sample_ids))
+                SampleFilter(
+                    project=GenericFilter(eq=project), id=GenericFilter(in_=sample_ids)
+                )
             )
 
             all_participants += [

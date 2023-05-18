@@ -3,6 +3,7 @@ import os
 import re
 import json
 import dataclasses
+from enum import Enum
 from typing import Sequence, TypeVar, Generic, Any
 
 
@@ -95,6 +96,13 @@ class GenericFilter(Generic[T]):
         self.in_ = in_
         self.nin = nin
 
+    def __repr__(self):
+        keys = ['eq', 'in_', 'nin']
+        inner_values = ', '.join(
+            f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
+        )
+        return f'{self.__class__.__name__}({inner_values})'
+
     def __hash__(self):
         """Override to ensure we can hash this object"""
         try:
@@ -129,25 +137,38 @@ class GenericFilter(Generic[T]):
         conditionals = []
         values: dict[str, T | list[T]] = {}
         _column_name = column_name or column
+
         if not isinstance(column, str):
             raise ValueError(f'Column {_column_name!r} must be a string')
         if self.eq is not None:
             k = self.generate_field_name(_column_name + '_eq')
             conditionals.append(f'{column} = :{k}')
-            values[k] = self.eq
+            values[k] = self._sql_value_prep(self.eq)
         if self.in_ is not None:
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
             k = self.generate_field_name(_column_name + '_in')
             conditionals.append(f'{column} IN :{k}')
-            values[k] = self.in_
+            values[k] = self._sql_value_prep(self.in_)
         if self.nin is not None:
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
             conditionals.append(f'{column} NOT IN :{k}')
-            values[k] = self.nin
+            values[k] = self._sql_value_prep(self.nin)
         return ' AND '.join(conditionals), values
+
+    @staticmethod
+    def _sql_value_prep(value):
+        if isinstance(value, list):
+            return [GenericFilter._sql_value_prep(v) for v in value]
+        if isinstance(value, Enum):
+            return value.value
+        if isinstance(value, dict):
+            return {k: GenericFilter._sql_value_prep(v) for k, v in value.items()}
+
+        # nothing else to do at this itme
+        return value
 
 
 # pylint: disable=missing-class-docstring
@@ -159,6 +180,7 @@ class GenericFilterModel:
     """
     Class that contains fields of GenericFilters that can be used to filter
     """
+
     def __hash__(self):
         """Hash the GenericFilterModel, this doesn't override well"""
         return hash(dataclasses.astuple(self))

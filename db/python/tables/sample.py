@@ -19,6 +19,7 @@ class SampleFilter(GenericFilterModel):
     """
     Sample filter model
     """
+
     id: GenericFilter[int] | None = None
     type: GenericFilter[str] | None = None
     meta: GenericMetaFilter | None = None
@@ -27,7 +28,7 @@ class SampleFilter(GenericFilterModel):
     project: GenericFilter[ProjectId] | None = None
     active: GenericFilter[bool] | None = None
 
-    def __hash__(self):     # pylint: disable=useless-super-delegation
+    def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
 
 
@@ -81,7 +82,9 @@ WHERE {wheres}
         self, internal_id: int
     ) -> tuple[ProjectId, SampleInternal]:
         """Get a Sample by its external_id"""
-        projects, samples = await self.query(SampleFilter(id=GenericFilter(eq=internal_id)))
+        projects, samples = await self.query(
+            SampleFilter(id=GenericFilter(eq=internal_id))
+        )
         if not samples:
             raise NotFoundError(
                 f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
@@ -96,7 +99,11 @@ WHERE {wheres}
         Get a single sample by its external_id
         """
         _, samples = await self.query(
-            SampleFilter(external_id=GenericFilter(eq=external_id), project=GenericFilter(eq=project), active=GenericFilter(eq=check_active))
+            SampleFilter(
+                external_id=GenericFilter(eq=external_id),
+                project=GenericFilter(eq=project),
+                active=GenericFilter(eq=check_active),
+            )
         )
 
         if not samples:

@@ -7,12 +7,14 @@ from db.python.utils import GenericFilter, GenericFilterModel
 @dataclasses.dataclass(kw_only=True)
 class GenericFilterTest(GenericFilterModel):
     """Test model for GenericFilter"""
+
     test_string: GenericFilter[str] | None = None
     test_dict: dict[str, GenericFilter[str]] | None = None
 
 
 class TestGenericFilters(unittest.TestCase):
     """Test generic filters SQL generation"""
+
     def test_post_init_correction(self):
         """Test that the post init correction works"""
         filter_ = GenericFilterTest(test_string='test')

@@ -17,12 +17,12 @@ from db.python.layers import (
     SequencingGroupLayer,
     FamilyLayer,
 )
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import ProjectId, GenericFilter
-from models.enums import AnalysisStatus
 from models.models import (
     AssayInternal,
     SampleInternal,
@@ -376,8 +376,7 @@ async def load_participants_for_projects(
 )
 async def load_analyses_for_sequencing_groups(
     ids: list[int],
-    status: AnalysisStatus | None,
-    analysis_type: str | None,
+    filter_: AnalysisFilter,
     connection,
 ) -> dict[int, list[AnalysisInternal]]:
     """
@@ -385,12 +384,8 @@ async def load_analyses_for_sequencing_groups(
         -> list[list[AnalysisInternal]]
     """
     alayer = AnalysisLayer(connection)
-
-    analyses = await alayer.query_analysis(
-        sequencing_group_ids=ids,
-        status=status,
-        analysis_type=analysis_type,
-    )
+    filter_.id = GenericFilter(in_=ids)
+    analyses = await alayer.query(filter_)
     by_sg_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
     for a in analyses:
         for sg in a.sequencing_group_ids:

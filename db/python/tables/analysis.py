@@ -1,12 +1,33 @@
+# pylint: disable=too-many-instance-attributes
+import dataclasses
 from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional, Set, Tuple, Dict, Any
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
-from db.python.utils import to_db_json
+from db.python.utils import (
+    to_db_json,
+    GenericFilterModel,
+    GenericFilter,
+    GenericMetaFilter,
+)
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
+
+
+@dataclasses.dataclass
+class AnalysisFilter(GenericFilterModel):
+    """Filter for analysis"""
+    id: GenericFilter[int] = None
+    sample_id: GenericFilter[int] = None
+    sequencing_group_id: GenericFilter[int] = None
+    project: GenericFilter[int] = None
+    type: GenericFilter[str] = None
+    status: GenericFilter[AnalysisStatus] = None
+    meta: GenericMetaFilter = None
+    output: GenericFilter[str] = None
+    active: GenericFilter[bool] = None
 
 
 class AnalysisTable(DbBase):
@@ -135,66 +156,39 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         await self.connection.execute(_query, fields)
 
-    async def query_analysis(
-        self,
-        sample_ids: List[int] = None,
-        sequencing_group_ids: List[int] = None,
-        project_ids: List[int] = None,
-        analysis_type: str = None,
-        status: AnalysisStatus = None,
-        meta: Dict[str, Any] = None,
-        output: str = None,
-        active: bool = None,
-    ) -> List[AnalysisInternal]:
+    async def query(self, filter_: AnalysisFilter) -> List[AnalysisInternal]:
         """
         Get analysis by various (AND'd) criteria
         """
 
-        if not sequencing_group_ids and not project_ids and not sample_ids:
+        required_fields = [
+            filter_.id,
+            filter_.sequencing_group_id,
+            filter_.project,
+            filter_.sample_id,
+        ]
+
+        if not any(required_fields):
             raise ValueError(
-                'Must provide at least one of sample_ids, sequencing_group_ids, '
-                'or project_ids'
+                'Must provide at least one of id, sample_id, sequencing_group_id, '
+                'or project to filter on'
             )
 
-        wheres = []
-        values: Dict[str, Any] = {}
+        where_str, values = filter_.to_sql(
+            {
+                'id': 'a.id',
+                'sample_id': 'a_sg.sample_id',
+                'sequencing_group_id': 'a_sg.sequencing_group_id',
+                'project': 'a.project',
+                'type': 'a.type',
+                'status': 'a.status',
+                'meta': 'a.meta',
+                'output': 'a.output',
+                'active': 'a.active',
+            },
 
-        if project_ids:
-            wheres.append('project in :project_ids')
-            values['project_ids'] = project_ids
+        )
 
-        if sample_ids:
-            wheres.append('sg.sample_id in :sample_ids')
-            values['sample_ids'] = sample_ids
-
-        if sequencing_group_ids:
-            wheres.append('a_sg.sequencing_group_id in :sequencing_group_ids')
-            values['sequencing_group_ids'] = sequencing_group_ids
-
-        if analysis_type is not None:
-            wheres.append('a.type = :type')
-            values['type'] = analysis_type
-        if status is not None:
-            wheres.append('a.status = :status')
-            values['status'] = status.value
-        if output is not None:
-            wheres.append('a.output = :output')
-            values['output'] = output
-        if active is not None:
-            if active:
-                wheres.append('a.active = 1')
-            else:
-                wheres.append('a.active = 0')
-        if meta:
-            for k, v in meta.items():
-                k_replacer = f'meta_{k}'
-                wheres.append(f"json_extract(a.meta, '$.{k}') = :{k_replacer}")
-                if v is None:
-                    # mariadb does a bad cast for NULL
-                    v = 'null'
-                values[k_replacer] = v
-
-        where_str = ' AND '.join(wheres)
         _query = f"""
         SELECT a.id as id, a.type as type, a.status as status,
                 a.output as output, a_sg.sequencing_group_id as sequencing_group_id,

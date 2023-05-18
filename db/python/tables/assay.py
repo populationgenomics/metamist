@@ -37,6 +37,7 @@ class AssayFilter(GenericFilterModel):
     """
     Filter for Assay model
     """
+
     id: GenericFilter[int] | None = None
     sample_id: GenericFilter[int] | None = None
     external_id: GenericFilter[str] | None = None
@@ -45,7 +46,7 @@ class AssayFilter(GenericFilterModel):
     project: GenericFilter[int] | None = None
     type: GenericFilter | None = None
 
-    def __hash__(self):     # pylint: disable=useless-super-delegation
+    def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
 
 
