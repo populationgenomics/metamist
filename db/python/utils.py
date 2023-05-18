@@ -105,16 +105,13 @@ class GenericFilter(Generic[T]):
 
     def __hash__(self):
         """Override to ensure we can hash this object"""
-        try:
-            return hash(
-                (
-                    self.eq,
-                    tuple(self.in_) if self.in_ is not None else None,
-                    tuple(self.nin) if self.nin is not None else None,
-                )
+        return hash(
+            (
+                self.eq,
+                tuple(self.in_) if self.in_ is not None else None,
+                tuple(self.nin) if self.nin is not None else None,
             )
-        except Exception as e:
-            raise e
+        )
 
     @staticmethod
     def generate_field_name(name):
