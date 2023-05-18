@@ -18,6 +18,8 @@ PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'endpoint'
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
     def main(self):
+        # todo, eventually configure metamist cloud run server
+        # to be deployed here, but for now it's manually deployed
         self.setup_etl()
 
     @cached_property
@@ -171,6 +173,18 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
         archive = archive_folder(str(PATH_TO_ETL_ENDPOINT.absolute()))
+
+        # give the etl_service_account ability to write to bigquery
+        gcp.bigquery.IamMember(
+            "metamist-etl-function-bq-table-access",
+            project=self.config.sample_metadata.gcp.project,
+            dataset_id=self.etl_bigquery_dataset.id,
+            table_id=self.etl_bigquery_table.table_id,
+            role="roles/bigquery.dataOwner",
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_service_account.email
+            ),
+        )
 
         # Create the single Cloud Storage object, which contains the source code
         source_archive_object = gcp.storage.BucketObject(

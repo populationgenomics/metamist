@@ -1,1 +1,26 @@
-[]
+[
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "Timestamp of receiving the row as inserted"
+    },
+    {
+        "name": "type",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Type, as designated in the cloud function, and required to handle."
+    },
+    {
+        "name": "submitting_user",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "User as requested"
+    },
+    {
+        "name": "body",
+        "type": "JSON",
+        "mode": "REQUIRED",
+        "description": "Body of request JSON"
+    }
+]

@@ -1,2 +1,5 @@
 functions_framework
 flask
+cpg-utils
+google-cloud-bigquery
+google-cloud-logging
