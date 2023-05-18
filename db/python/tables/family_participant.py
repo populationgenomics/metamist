@@ -184,24 +184,22 @@ WHERE fp.participant_id in :participant_ids
 
         return projects, m
 
-    async def update_participants_family(
-        self, family_id: int, participant_ids: List[int]
-    ):
+    async def delete_participant_family_row(self, family_id: int, participant_id: int):
         """
-        Update the family_id for participant_ids
+        Delete a participant from a family
         """
 
-        if len(participant_ids) == 0 or not family_id:
+        if not participant_id or not family_id:
             return False
 
         _query = """
-UPDATE family_participant
-SET family_id = :family_id
-WHERE participant_id IN :participant_ids
+DELETE FROM family_participant
+WHERE participant_id = :participant_id
+AND family_id = :family_id
         """
 
         await self.connection.execute(
-            _query, {'family_id': family_id, 'participant_ids': participant_ids}
+            _query, {'family_id': family_id, 'participant_ids': participant_id}
         )
 
         return True
