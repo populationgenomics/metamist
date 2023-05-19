@@ -153,7 +153,7 @@ async def exception_handler(request: Request, e: Exception):
 
 
 # graphql
-app.include_router(MetamistGraphQLRouter, prefix='/graphql')
+app.include_router(MetamistGraphQLRouter, prefix='/graphql', include_in_schema=False)
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):
