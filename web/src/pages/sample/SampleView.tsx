@@ -13,7 +13,7 @@ import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {
-    sample(id: $sample_id) {
+    sample(id: { eq: $sample_id }) {
       id
       externalId
       participant {

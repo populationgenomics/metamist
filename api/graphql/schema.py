@@ -547,8 +547,8 @@ class Query:
     async def sample(
         self,
         info: Info,
-        project: GraphQLFilter[str],
         id: GraphQLFilter[str] | None = None,
+        project: GraphQLFilter[str] | None = None,
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         external_id: GraphQLFilter[str] | None = None,
@@ -558,6 +558,12 @@ class Query:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
         slayer = SampleLayer(connection)
+
+        if not id and not project:
+            raise ValueError('Must provide either id or project')
+
+        if external_id and not project:
+            raise ValueError('Must provide project when using external_id filter')
 
         if project:
             project_ids = project.all_values()

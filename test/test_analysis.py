@@ -1,10 +1,10 @@
 # pylint: disable=invalid-overridden-method
 from datetime import timedelta, datetime
 
-from db.python.tables.analysis import AnalysisFilter
-from db.python.utils import GenericFilter
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.tables.analysis import AnalysisFilter
+from db.python.utils import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer
@@ -15,7 +15,6 @@ from models.models import (
     SequencingGroupUpsertInternal,
     SampleUpsertInternal,
 )
-
 from models.enums import AnalysisStatus
 
 

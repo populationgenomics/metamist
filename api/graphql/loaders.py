@@ -6,6 +6,7 @@ import enum
 from collections import defaultdict
 from typing import Any
 
+from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import get_projectless_db_connection, group_by
@@ -393,7 +394,7 @@ async def load_analyses_for_sequencing_groups(
     return by_sg_id
 
 
-async def get_context(connection=get_projectless_db_connection, **_):
+async def get_context(request: Request, connection=get_projectless_db_connection):  # pylint: disable=unused-argument
     """Get loaders / cache context for strawberyy GraphQL"""
     mapped_loaders = {k: fn(connection) for k, fn in loaders.items()}
     return {
