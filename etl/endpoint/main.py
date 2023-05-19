@@ -3,7 +3,6 @@ import os
 import functions_framework
 import flask
 import google.cloud.bigquery as bq
-import google.cloud.logging
 
 from cpg_utils.cloud import email_from_id_token
 
@@ -31,9 +30,6 @@ def etl_post(request: flask.Request):
         <https://cloud.google.com/functions/docs/writing/http#http_frameworks>
     """
 
-    timestamp = datetime.datetime.utcnow()
-    auth_token = request.headers.get('Authorization', '')
-
     auth = request.authorization
     user = 'unknown'
     auth_error = None
@@ -45,7 +41,7 @@ def etl_post(request: flask.Request):
         user = f'No auth token, header fields: {request.headers}'
 
     bq_obj = {
-        'timestamp': timestamp.isoformat(),
+        'timestamp': datetime.datetime.utcnow().isoformat(),
         'type': 'UNKNOWN',
         'submitting_user': user,
         'body': request.json(),
@@ -53,7 +49,7 @@ def etl_post(request: flask.Request):
     error = None
     try:
         _BQ_CLIENT.insert_rows(BIGQUERY_TABLE, [bq_obj])
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         error = str(e)
 
     return {

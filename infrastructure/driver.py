@@ -17,7 +17,11 @@ PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'endpoint'
 
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
+    """
+    Metamist Infrastructure (as code) for Pulumi
+    """
     def main(self):
+        """Driver for the metamist infrastructure as code plugin"""
         # todo, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
         self.setup_etl()
@@ -176,11 +180,11 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         # give the etl_service_account ability to write to bigquery
         gcp.bigquery.IamMember(
-            "metamist-etl-function-bq-table-access",
+            'metamist-etl-function-bq-table-access',
             project=self.config.sample_metadata.gcp.project,
             dataset_id=self.etl_bigquery_dataset.id,
             table_id=self.etl_bigquery_table.table_id,
-            role="roles/bigquery.dataOwner",
+            role='roles/bigquery.dataOwner',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_service_account.email
             ),
