@@ -684,7 +684,7 @@ class ParticipantLayer(BaseLayer):
         """Adds a participant to a family"""
         fpttable = FamilyParticipantTable(self.connection)
 
-        await fpttable.create_row(
+        return await fpttable.create_row(
             family_id=family_id,
             participant_id=participant_id,
             paternal_id=paternal_id,
