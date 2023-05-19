@@ -444,6 +444,7 @@ class TestGenericAuditor(unittest.TestCase):
         },
         completed_samples={'CPG123': [1]},  # noqa: B006
         seq_sample_map={1: 'CPG123'},  # noqa: B006
+        sample_id_internal_external_map={'CPG123': 'EXT123'},  # noqa: B006
     ):
         """Test 2 ingested reads, one ingested and moved read, and one uningested read"""
         auditor = GenericAuditor(
@@ -467,10 +468,12 @@ class TestGenericAuditor(unittest.TestCase):
         (
             uningested_sequence_paths,
             sequences_moved_paths,
+            _,
         ) = auditor.check_for_uningested_or_moved_sequences(
             sequence_filepaths_filesizes=seq_reads_sizes,
             completed_samples=completed_samples,
             seq_id_sample_id_map=seq_sample_map,
+            sample_id_internal_external_map=sample_id_internal_external_map,
         )
 
         SequenceReportEntry = namedtuple(

@@ -619,7 +619,7 @@ class GenericAuditor(AuditHelper):
     def find_crams_for_reads_to_ingest(
         reads_to_ingest: defaultdict[str, list],
         sample_cram_paths: defaultdict[str, dict[int, str]],
-    ) -> list[tuple]:
+    ) -> list[tuple[str, str, str, int, str]]:
         """
         Compares the external sample IDs for samples with completed CRAMs against the
         uningested read files. This may turn up results for cases where multiple read types
@@ -629,13 +629,13 @@ class GenericAuditor(AuditHelper):
         for sequence_path, samples in reads_to_ingest.items():
             if not samples:
                 # If no samples detected in filename, add the path in an empty tuple
-                possible_sequence_ingests.append((sequence_path, '', '', '', ''))
+                possible_sequence_ingests.append((sequence_path, '', '', 0, ''))
                 continue
             for sample in samples:
                 # Else get the completed CRAM analysis ID and path for the sample
                 sample_internal_id, sample_ext_id = sample
                 sample_cram = sample_cram_paths[sample_internal_id]
-                analysis_id = list(sample_cram.keys())[0]
+                analysis_id = int(list(sample_cram.keys())[0])
                 cram_path = sample_cram[analysis_id]
                 possible_sequence_ingests.append(
                     (
