@@ -25,7 +25,7 @@ import click
 
 from cpg_utils.config import get_config
 
-from generic_auditor import GenericAuditor
+from audit.generic_auditor import GenericAuditor
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
@@ -90,7 +90,7 @@ class UploadBucketAuditor(GenericAuditor):
         sequence_type_str: str,
         file_types_str: str,
         sequence_files_to_delete: list[tuple[str, int, str, list[int]]],
-        sequence_files_to_ingest: dict[str, str],
+        sequence_files_to_ingest: list[tuple[str, str, str, int, str]],
         incomplete_samples: list[tuple[str, str]],
     ):
         """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
