@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Any
 
-from audithelper import AuditHelper
+from audit.audithelper import AuditHelper
 from sample_metadata.apis import AnalysisApi
 from sample_metadata.model.analysis_query_model import AnalysisQueryModel
 from sample_metadata.model.analysis_type import AnalysisType
@@ -523,7 +523,9 @@ class GenericAuditor(AuditHelper):
         # Check the list of uningested paths to see if any of them contain sample IDs for ingested samples
         # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
         # but not ingested, such as bams and vcfs.
-        uningested_reads = defaultdict(list, {k: [] for k in uningested_sequence_paths})
+        uningested_reads: defaultdict[str, list[tuple[str, str]]] = defaultdict(
+            list, {k: [] for k in uningested_sequence_paths}
+        )
         for sample_id in completed_samples.keys():
             sample_ext_id = sample_id_internal_external_map[sample_id]
             for uningested_sequence in uningested_sequence_paths:

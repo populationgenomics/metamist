@@ -437,7 +437,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(result, expected_result)
 
-    def test_check_for_uningested_or_moved_sequences(
+    async def test_check_for_uningested_or_moved_sequences(
         self,
         seq_reads_sizes={  # noqa: B006
             1: [('read1.fq', 10), ('read2.fq', 11), ('dir1/read3.fq', 12)]
@@ -469,7 +469,7 @@ class TestGenericAuditor(unittest.TestCase):
             uningested_sequence_paths,
             sequences_moved_paths,
             _,
-        ) = auditor.check_for_uningested_or_moved_sequences(
+        ) = await auditor.check_for_uningested_or_moved_sequences(
             sequence_filepaths_filesizes=seq_reads_sizes,
             completed_samples=completed_samples,
             seq_id_sample_id_map=seq_sample_map,
