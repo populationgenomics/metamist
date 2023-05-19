@@ -4,8 +4,6 @@ import re
 from collections import defaultdict
 from typing import Iterable, Any
 
-import deprecation
-
 from api.utils import group_by
 
 from db.python.connect import DbBase, NotFoundError, NoOpAenter
@@ -557,10 +555,10 @@ class AssayTable(DbBase):
 
     # region DEPRECATED
 
-    @deprecation.deprecated(
-        details='With sequencing-groups, assays were refactored and this does not '
-        'strictly make sense anymore'
-    )
+    # @deprecation.deprecated(
+    #     details='With sequencing-groups, assays were refactored and this does not '
+    #     'strictly make sense anymore'
+    # )
     async def get_assay_ids_for_sample_id(
         self, sample_id: int
     ) -> tuple[ProjectId, dict[str, list[int]]]:
