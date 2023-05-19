@@ -19,7 +19,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='6.0.2',
+    version='6.0.3',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
