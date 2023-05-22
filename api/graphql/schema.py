@@ -444,7 +444,7 @@ class GraphQLSequencingGroup:
 
     @staticmethod
     def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
-        print(internal)
+        # print(internal)
         return GraphQLSequencingGroup(
             id=sequencing_group_id_format(internal.id),
             type=internal.type,
