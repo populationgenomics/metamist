@@ -1,11 +1,35 @@
 import asyncio
 from datetime import date
 from typing import Iterable, Any
+import dataclasses
 
 from db.python.connect import DbBase, NotFoundError
-from db.python.utils import to_db_json
+from db.python.utils import (
+    to_db_json,
+    GenericFilterModel,
+    GenericFilter,
+    GenericMetaFilter,
+)
 from db.python.tables.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
+
+
+@dataclasses.dataclass(kw_only=True)
+class SampleFilter(GenericFilterModel):
+    """
+    Sample filter model
+    """
+
+    id: GenericFilter[int] | None = None
+    type: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
+    external_id: GenericFilter[str] | None = None
+    participant_id: GenericFilter[int] | None = None
+    project: GenericFilter[ProjectId] | None = None
+    active: GenericFilter[bool] | None = None
+
+    def __hash__(self):  # pylint: disable=useless-super-delegation
+        return super().__hash__()
 
 
 class SampleTable(DbBase):
@@ -14,6 +38,16 @@ class SampleTable(DbBase):
     """
 
     table_name = 'sample'
+
+    common_get_keys = [
+        'id',
+        'external_id',
+        'participant_id',
+        'meta',
+        'active',
+        'type',
+        'project',
+    ]
 
     # region GETS
 
@@ -26,130 +60,58 @@ class SampleTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sample_ids': sample_ids})
         return set(r['project'] for r in rows)
 
+    async def query(
+        self, filter_: SampleFilter
+    ) -> tuple[set[ProjectId], list[SampleInternal]]:
+        """Query samples"""
+        wheres, values = filter_.to_sql(field_overrides={})
+        if not wheres:
+            raise ValueError(f'Invalid filter: {filter_}')
+        common_get_keys_str = ', '.join(self.common_get_keys)
+        _query = f"""
+SELECT {common_get_keys_str}
+FROM sample
+WHERE {wheres}
+"""
+        rows = await self.connection.fetch_all(_query, values)
+        samples = [SampleInternal.from_db(dict(r)) for r in rows]
+        projects = set(s.project for s in samples)
+        return projects, samples
+
     async def get_sample_by_id(
         self, internal_id: int
     ) -> tuple[ProjectId, SampleInternal]:
         """Get a Sample by its external_id"""
-        keys = [
-            'id',
-            'external_id',
-            'participant_id',
-            'meta',
-            'active',
-            'type',
-            'project',
-        ]
-        _query = f'SELECT {", ".join(keys)} from sample where id = :id LIMIT 1;'
-
-        sample_row = await self.connection.fetch_one(_query, {'id': internal_id})
-
-        if sample_row is None:
+        projects, samples = await self.query(
+            SampleFilter(id=GenericFilter(eq=internal_id))
+        )
+        if not samples:
             raise NotFoundError(
                 f'Couldn\'t find sample with internal id {internal_id} (CPG id: {sample_id_format(internal_id)})'
             )
 
-        d = dict(sample_row)
-        project = d.get('project')
-        sample = SampleInternal.from_db(d)
-        return project, sample
+        return projects.pop(), samples.pop()
 
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
     ) -> SampleInternal:
-        """Get a Sample by its external_id"""
-        keys = [
-            'id',
-            'external_id',
-            'participant_id',
-            'meta',
-            'active',
-            'type',
-            'project',
-            'author',
-        ]
-        wheres = ['external_id = :external_id', 'project = :project']
-        proj = project or self.project
-        values = {'external_id': external_id, 'project': proj}
-        if check_active:
-            wheres.append('active')
-
-        wheres_str = ' AND '.join(wheres)
-        _query = f"""\
-            SELECT {", ".join(keys)} FROM sample
-            WHERE {wheres_str}
-            LIMIT 1;
         """
+        Get a single sample by its external_id
+        """
+        _, samples = await self.query(
+            SampleFilter(
+                external_id=GenericFilter(eq=external_id),
+                project=GenericFilter(eq=project),
+                active=GenericFilter(eq=check_active),
+            )
+        )
 
-        sample_row = await self.connection.fetch_one(_query, values)
-
-        if sample_row is None:
+        if not samples:
             raise NotFoundError(
-                f'Couldn\'t find active sample with external id {external_id} in project {proj}'
+                f'Couldn\'t find sample with external id {external_id} in project {project}'
             )
 
-        sample_row = dict(sample_row)
-        sample_row.update(values)
-
-        return SampleInternal.from_db(sample_row)
-
-    async def get_samples_by(
-        self,
-        sample_ids: list[int] = None,
-        meta: dict[str, Any] = None,
-        participant_ids: list[int] = None,
-        project_ids=None,
-        active=True,
-    ) -> tuple[Iterable[ProjectId], list[SampleInternal]]:
-        """Get samples by some criteria"""
-        keys = [
-            'id',
-            'external_id',
-            'participant_id',
-            'meta',
-            'active+1 as active',
-            'type',
-            'project',
-        ]
-        keys_str = ', '.join(keys)
-
-        where = []
-        replacements = {}
-
-        if project_ids:
-            where.append('project in :project_ids')
-            replacements['project_ids'] = project_ids
-
-        if sample_ids:
-            where.append('id in :sample_ids')
-            replacements['sample_ids'] = sample_ids
-
-        if meta:
-            for k, v in meta.items():
-                k_replacer = f'meta_{k}'
-                where.append(f"json_extract(meta, '$.{k}') = :{k_replacer}")
-                replacements[k_replacer] = v
-
-        if participant_ids:
-            where.append('participant_id in :participant_ids')
-            replacements['participant_ids'] = participant_ids
-
-        if active is True:
-            where.append('active')
-        elif active is False:
-            where.append('NOT active')
-
-        _query = f'SELECT {keys_str} FROM sample'
-        if where:
-            _query += f' WHERE {" AND ".join(where)}'
-
-        sample_rows = await self.connection.fetch_all(_query, replacements)
-
-        sample_dicts = [dict(s) for s in sample_rows]
-        projects: Iterable[int] = set(
-            s['project'] for s in sample_dicts if s.get('project')
-        )
-        samples = list(map(SampleInternal.from_db, sample_dicts))
-        return projects, samples
+        return samples.pop()
 
     async def get_sample_id_to_project_map(
         self, project_ids: list[int], active_only: bool = True

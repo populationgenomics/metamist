@@ -7,10 +7,12 @@ from api.utils.db import (
     Connection,
     get_projectless_db_connection,
 )
+from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.layers.assay import (
     AssayLayer,
 )
+from db.python.utils import GenericFilter
 from models.models.assay import AssayUpsert
 from models.utils.sample_id_format import (
     sample_id_format,
@@ -75,7 +77,6 @@ async def get_assays_by_criteria(
     assay_meta: dict = None,
     sample_meta: dict = None,
     projects: list[str] = None,
-    active: bool = True,
     assay_types: list[str] = None,
     connection: Connection = get_projectless_db_connection,
 ):
@@ -93,16 +94,21 @@ async def get_assays_by_criteria(
     if sample_ids:
         unwrapped_sample_ids = sample_id_transform_to_raw_list(sample_ids)
 
-    result = await assay_layer.get_assays_by(
-        sample_ids=unwrapped_sample_ids,
-        assay_ids=assay_ids,
-        external_assay_ids=external_assay_ids,
-        assay_meta=assay_meta,
+    filter_ = AssayFilter(
+        sample_id=GenericFilter(in_=unwrapped_sample_ids)
+        if unwrapped_sample_ids
+        else None,
+        id=GenericFilter(in_=assay_ids) if assay_ids else None,
+        external_id=GenericFilter(in_=external_assay_ids)
+        if external_assay_ids
+        else None,
+        meta=assay_meta,
         sample_meta=sample_meta,
-        project_ids=pids,
-        active=active,
-        assay_types=assay_types,
+        project=GenericFilter(in_=pids) if pids else None,
+        type=GenericFilter(in_=assay_types) if assay_types else None,
     )
+
+    result = await assay_layer.query(filter_)
 
     return [a.to_external() for a in result]
 

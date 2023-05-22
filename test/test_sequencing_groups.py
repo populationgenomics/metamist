@@ -1,5 +1,6 @@
 from test.testbase import DbIsolatedTest, run_as_sync
-
+from db.python.utils import GenericFilter
+from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.layers import SequencingGroupLayer, SampleLayer
 from models.models import (
     SequencingGroupUpsertInternal,
@@ -132,6 +133,8 @@ class TestSequencingGroup(DbIsolatedTest):
         self.assertTrue(old_sg.archived)
 
         # check that the "active" sequencing group is the new one
-        active_sgs = await self.sglayer.query(sample_ids=[sample.id])
+        active_sgs = await self.sglayer.query(
+            SequencingGroupFilter(sample_id=GenericFilter(sample.id))
+        )
         self.assertEqual(len(active_sgs), 1)
         self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)

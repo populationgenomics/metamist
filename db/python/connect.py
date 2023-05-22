@@ -1,5 +1,5 @@
 # pylint: disable=unused-import
-#
+# flake8: noqa
 """
 Code for connecting to Postgres database
 """
@@ -13,7 +13,7 @@ import databases
 
 from api.settings import LOG_DATABASE_QUERIES
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import InternalError
+from db.python.utils import InternalError, NoOpAenter
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -34,20 +34,6 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_participant',
     'participant_phenotypes',
 ][::-1]
-
-
-class NoOpAenter:
-    """
-    Sometimes it's useful to use `async with VARIABLE()`, and have
-    either VARIABLE be a transaction, or noop (eg: when a transaction
-    is already taking place). Use this in place.
-    """
-
-    async def __aenter__(self):
-        pass
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
 
 
 class Connection:

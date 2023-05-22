@@ -212,7 +212,15 @@ class ParsedParticipant:
 
     def to_sm(self) -> ParticipantUpsert:
         """Convert to SM upsert model"""
-        return ParticipantUpsert(samples=[s.to_sm() for s in self.samples])
+        samples = [s.to_sm() for s in self.samples]
+        return ParticipantUpsert(
+            external_id=self.external_pid,
+            reported_sex=self.reported_sex,
+            reported_gender=self.reported_gender,
+            karyotype=self.karyotype,
+            meta=self.meta,
+            samples=samples,
+        )
 
 
 class ParsedSample:
@@ -311,6 +319,7 @@ class ParsedAssay:
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
         return AssayUpsert(
+            type=self.assay_type,
             id=self.internal_id,
             external_ids=self.external_ids,
             # sample_id=self.s,

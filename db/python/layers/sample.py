@@ -8,7 +8,8 @@ from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.assay import NoOpAenter
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
-from db.python.tables.sample import SampleTable
+from db.python.tables.sample import SampleTable, SampleFilter
+from db.python.utils import GenericFilter
 from models.models.sample import SampleInternal, SampleUpsertInternal
 from models.utils.sample_id_format import (
     sample_id_format_list,
@@ -35,13 +36,30 @@ class SampleLayer(BaseLayer):
 
         return sample
 
+    async def query(
+        self, filter_: SampleFilter, check_project_ids: bool = True
+    ) -> list[SampleInternal]:
+        """Query samples"""
+        projects, samples = await self.st.query(filter_)
+        if not samples:
+            return samples
+
+        if check_project_ids:
+            await self.pt.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        return samples
+
     async def get_samples_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
     ) -> dict[int, list[SampleInternal]]:
         """Get map of samples by participants"""
 
-        projects, samples = await self.st.get_samples_by(
-            participant_ids=participant_ids
+        projects, samples = await self.st.query(
+            SampleFilter(
+                participant_id=GenericFilter(in_=participant_ids),
+            ),
         )
 
         if not samples:
@@ -164,12 +182,14 @@ class SampleLayer(BaseLayer):
                 self.author, pjcts, readonly=True
             )
 
-        _returned_project_ids, samples = await self.st.get_samples_by(
-            sample_ids=sample_ids,
-            meta=meta,
-            participant_ids=participant_ids,
-            project_ids=project_ids,
-            active=active,
+        _returned_project_ids, samples = await self.st.query(
+            SampleFilter(
+                id=GenericFilter(in_=sample_ids),
+                meta=meta,
+                participant_id=GenericFilter(in_=participant_ids),
+                project=GenericFilter(in_=project_ids),
+                active=GenericFilter(eq=active) if active is not None else None,
+            )
         )
         if not samples:
             return []

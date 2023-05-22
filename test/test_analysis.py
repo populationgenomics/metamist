@@ -3,6 +3,8 @@ from datetime import timedelta, datetime
 
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.tables.analysis import AnalysisFilter
+from db.python.utils import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer
@@ -13,7 +15,6 @@ from models.models import (
     SequencingGroupUpsertInternal,
     SampleUpsertInternal,
 )
-
 from models.enums import AnalysisStatus
 
 
@@ -75,7 +76,7 @@ class TestAnalysis(DbIsolatedTest):
         )
         self.sample_id = sample.id
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
-        self.exome_sequencing_group_id = sample.sequencing_groups[1].id
+        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
 
         await self.al.create_analysis(
             AnalysisInternal(
@@ -117,8 +118,11 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        analyses = await self.al.query_analysis(
-            project_ids=[1], analysis_type='analysis-runner'
+        analyses = await self.al.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.project_id),
+                type=GenericFilter(eq='analysis-runner'),
+            )
         )
         expected = [
             AnalysisInternal(
@@ -145,7 +149,7 @@ class TestAnalysis(DbIsolatedTest):
 
         today = datetime.utcnow().date()
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[1])
+        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
         expected = {
             'project': self.project_id,
             'sequencing_groups': {
@@ -201,7 +205,7 @@ class TestAnalysis(DbIsolatedTest):
         }
 
         # Assert that the exome size was added correctly
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[1])
+        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
         self.assertDictEqual(expected, result[0])
 
     @run_as_sync
@@ -215,7 +219,7 @@ class TestAnalysis(DbIsolatedTest):
         # that is doesn't show up in the map
         yesterday = today - timedelta(days=3)
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[1], end_date=yesterday
+            project_ids=[self.project_id], end_date=yesterday
         )
 
         self.assertEqual([], result)
@@ -249,7 +253,7 @@ class TestAnalysis(DbIsolatedTest):
             },
         }
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[1])
+        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
         self.assertDictEqual(expected, result[0])
 
     @run_as_sync
@@ -315,5 +319,5 @@ class TestAnalysis(DbIsolatedTest):
             },
         }
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[1])
+        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
         self.assertDictEqual(expected, result[0])

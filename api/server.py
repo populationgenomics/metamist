@@ -20,7 +20,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.0.2'
+_VERSION = '6.0.3'
 
 logger = get_logger()
 
@@ -153,7 +153,7 @@ async def exception_handler(request: Request, e: Exception):
 
 
 # graphql
-app.include_router(MetamistGraphQLRouter, prefix='/graphql')
+app.include_router(MetamistGraphQLRouter, prefix='/graphql', include_in_schema=False)
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):

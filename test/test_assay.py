@@ -5,6 +5,8 @@ from db.python.connect import NotFoundError
 from db.python.layers.sample import SampleLayer
 from db.python.layers.assay import AssayLayer
 from db.python.enum_tables import AssayTypeTable
+from db.python.tables.assay import AssayFilter
+from db.python.utils import GenericFilter
 from models.models.assay import AssayUpsertInternal
 from models.models.sample import SampleUpsertInternal
 
@@ -51,7 +53,7 @@ class TestAssay(DbIsolatedTest):
 
         @run_as_sync
         async def get():
-            return await self.assaylayer.get_assay_by_id(9999, check_project_id=False)
+            return await self.assaylayer.get_assay_by_id(-1, check_project_id=False)
 
         self.assertRaises(NotFoundError, get)
 
@@ -198,15 +200,12 @@ class TestAssay(DbIsolatedTest):
             )
         )
 
-        self.assertEqual(
-            seq1.id, (await self.assaylayer.get_assay_by_external_id('SEQ01')).id
-        )
-        self.assertEqual(
-            seq1.id, (await self.assaylayer.get_assay_by_external_id('EXT_SEQ1')).id
-        )
-        self.assertEqual(
-            seq2.id, (await self.assaylayer.get_assay_by_external_id('SEQ02')).id
-        )
+        fquery_1 = AssayFilter(external_id='SEQ01', project=self.project_id)
+        self.assertEqual(seq1.id, (await self.assaylayer.query(fquery_1))[0].id)
+        fquery_2 = AssayFilter(external_id='EXT_SEQ1', project=self.project_id)
+        self.assertEqual(seq1.id, (await self.assaylayer.query(fquery_2))[0].id)
+        fquery_3 = AssayFilter(external_id='SEQ02', project=self.project_id)
+        self.assertEqual(seq2.id, (await self.assaylayer.query(fquery_3))[0].id)
 
     @run_as_sync
     async def test_get_assays_by_sample_id(self):
@@ -270,10 +269,9 @@ class TestAssay(DbIsolatedTest):
             ]
         )
 
-        async def search_result_to_ids(**query):
-            seqs = await self.assaylayer.get_assays_by(
-                **query, project_ids=[self.project_id]
-            )
+        async def search_result_to_ids(filter_: AssayFilter):
+            filter_.project = GenericFilter(eq=self.project_id)
+            seqs = await self.assaylayer.query(filter_)
             return {s.id for s in seqs}
 
         seq1_id = seqs[0].id
@@ -282,57 +280,84 @@ class TestAssay(DbIsolatedTest):
         # sample_ids
         self.assertSetEqual(
             {seq1_id, seq2_id},
-            await search_result_to_ids(sample_ids=[sample_id_for_test]),
+            await search_result_to_ids(
+                AssayFilter(sample_id=GenericFilter(in_=[sample_id_for_test]))
+            ),
         )
-        self.assertSetEqual(set(), await search_result_to_ids(sample_ids=[9_999_999]))
+        self.assertSetEqual(
+            set(),
+            await search_result_to_ids(
+                AssayFilter(sample_id=GenericFilter(in_=[9_999_999]))
+            ),
+        )
 
         # external assay IDs
         self.assertSetEqual(
-            {seq1_id}, await search_result_to_ids(external_assay_ids=['SEQ01'])
+            {seq1_id},
+            await search_result_to_ids(
+                AssayFilter(external_id=GenericFilter(eq='SEQ01'))
+            ),
         )
         self.assertSetEqual(
             {seq1_id, seq2_id},
-            await search_result_to_ids(external_assay_ids=['SEQ01', 'SEQ02']),
+            await search_result_to_ids(
+                AssayFilter(
+                    external_id=GenericFilter(in_=['SEQ01', 'SEQ02']),
+                )
+            ),
         )
 
         # seq_meta
         self.assertSetEqual(
-            {seq2_id}, await search_result_to_ids(assay_meta={'unique': 'b'})
+            {seq2_id},
+            await search_result_to_ids(
+                AssayFilter(meta={'unique': GenericFilter(eq='b')})
+            ),
         )
         self.assertSetEqual(
             {seq1_id, seq2_id},
-            await search_result_to_ids(assay_meta={'common': 'common'}),
+            await search_result_to_ids(AssayFilter(meta={'common': 'common'})),
         )
 
         # sample meta
         self.assertSetEqual(
             {seq1_id, seq2_id},
-            await search_result_to_ids(sample_meta={'collection-year': '2022'}),
+            await search_result_to_ids(
+                AssayFilter(sample_meta={'collection-year': '2022'})
+            ),
         )
         self.assertSetEqual(
-            set(), await search_result_to_ids(sample_meta={'unknown_key': '2022'})
+            set(),
+            await search_result_to_ids(
+                AssayFilter(sample_meta={'unknown_key': '2022'})
+            ),
         )
 
         # assay types
         self.assertSetEqual(
-            {seq1_id, seq2_id}, await search_result_to_ids(assay_types=['sequencing'])
+            {seq1_id, seq2_id},
+            await search_result_to_ids(
+                AssayFilter(type=GenericFilter(in_=['sequencing']))
+            ),
         )
-        # self.assertSetEqual(
-        #     {seq1_id, seq2_id},
-        #     await search_result_to_ids(types=[SequenceType.GENOME, SequenceType.EXOME]),
-        # )
 
         # combination
         self.assertSetEqual(
             {seq2_id},
             await search_result_to_ids(
-                sample_meta={'collection-year': '2022'}, external_assay_ids=['SEQ02']
+                AssayFilter(
+                    sample_meta={'collection-year': '2022'},
+                    external_id=GenericFilter(in_=['SEQ02']),
+                )
             ),
         )
         self.assertSetEqual(
             {seq1_id},
             await search_result_to_ids(
-                external_assay_ids=['SEQ01'], assay_types=['sequencing']
+                AssayFilter(
+                    external_id=GenericFilter(in_=['SEQ01']),
+                    type=GenericFilter(eq='sequencing'),
+                )
             ),
         )
         # self.assertSetEqual(

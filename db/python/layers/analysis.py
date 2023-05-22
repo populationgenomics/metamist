@@ -5,10 +5,11 @@ from typing import Any
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.analysis import AnalysisTable
+from db.python.tables.analysis import AnalysisTable, AnalysisFilter
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.utils import get_logger
+from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.utils import get_logger, GenericFilter
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
 
@@ -105,31 +106,15 @@ class AnalysisLayer(BaseLayer):
             participant_ids=participant_ids,
         )
 
-    async def query_analysis(
-        self,
-        sample_ids: list[int] = None,
-        sequencing_group_ids: list[int] = None,
-        project_ids: list[int] = None,
-        analysis_type: str = None,
-        status: AnalysisStatus = None,
-        meta: dict[str, Any] = None,
-        output: str = None,
-        active: bool = None,
-    ) -> list[AnalysisInternal]:
-        """
-        :param sample_ids: sample_ids means it contains the analysis contains at least one of the sample_ids in the list
-        """
-        analyses = await self.at.query_analysis(
-            sample_ids=sample_ids,
-            sequencing_group_ids=sequencing_group_ids,
-            project_ids=project_ids,
-            analysis_type=analysis_type,
-            status=status,
-            meta=meta,
-            output=output,
-            active=active,
-        )
-        # print(analyses)
+    async def query(self, filter_: AnalysisFilter, check_project_ids=True):
+        """Query analyses"""
+        analyses = await self.at.query(filter_)
+
+        if check_project_ids and not filter_.project:
+            await self.ptable.check_access_to_project_ids(
+                self.author, set(a.project for a in analyses), readonly=True
+            )
+
         return analyses
 
     async def get_sequencing_group_file_sizes(
@@ -145,7 +130,9 @@ class AnalysisLayer(BaseLayer):
 
         # Get samples from pids
         sglayer = SequencingGroupLayer(self.connection)
-        sequencing_groups = await sglayer.query(project_ids=project_ids)
+        sequencing_groups = await sglayer.query(
+            SequencingGroupFilter(project=GenericFilter(in_=project_ids))
+        )
 
         sequencing_group_ids = [sg.id for sg in sequencing_groups]
 
@@ -170,10 +157,12 @@ class AnalysisLayer(BaseLayer):
             # if there are no sequencing group IDs, the query analysis treats that
             # as not including a filter (so returns all for the project IDs)
             return []
-        crams = await self.at.query_analysis(
-            sequencing_group_ids=filtered_sequencing_group_ids,
-            analysis_type='cram',
-            status=AnalysisStatus.COMPLETED,
+        crams = await self.at.query(
+            AnalysisFilter(
+                sequencing_group_id=GenericFilter(in_=filtered_sequencing_group_ids),
+                type=GenericFilter(eq='cram'),
+                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
+            )
         )
         crams_by_project: dict[int, dict[int, list[dict]]] = defaultdict(dict)
         sg_by_id = {s.id: s for s in sequencing_groups}

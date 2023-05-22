@@ -17,7 +17,9 @@ from api.utils.db import (
 )
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
+from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models.analysis import (
     AnalysisInternal,
@@ -78,6 +80,25 @@ class AnalysisQueryModel(BaseModel):
     meta: dict[str, Any] | None = None
     output: str | None = None
     active: bool | None = None
+
+    def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
+        """Convert to internal analysis filter"""
+        return AnalysisFilter(
+            sample_id=GenericFilter(
+                in_=sample_id_transform_to_raw_list(self.sample_ids)
+            )
+            if self.sample_ids
+            else None,
+            sequencing_group_id=GenericFilter(
+                in_=sequencing_group_id_transform_to_raw_list(self.sequencing_group_ids)
+            )
+            if self.sequencing_group_ids
+            else None,
+            project=GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
+            if self.projects
+            else None,
+            type=GenericFilter(eq=self.type) if self.type else None,
+        )
 
 
 @router.put('/{project}/', operation_id='createAnalysis', response_model=int)
@@ -211,24 +232,11 @@ async def query_analyses(
         raise ValueError('Must specify "projects"')
 
     pt = ProjectPermissionsTable(connection=connection.connection)
-    project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, query.projects, readonly=True
+    project_name_map = await pt.get_project_id_map_for_names(
+        author=connection.author, project_names=query.projects, readonly=True
     )
     atable = AnalysisLayer(connection)
-    analyses = await atable.query_analysis(
-        sample_ids=sample_id_transform_to_raw_list(query.sample_ids)
-        if query.sample_ids
-        else None,
-        sequencing_group_ids=sequencing_group_id_transform_to_raw_list(
-            query.sequencing_group_ids
-        ),
-        project_ids=project_ids,
-        analysis_type=query.type,
-        status=query.status,
-        meta=query.meta,
-        output=query.output,
-        active=query.active,
-    )
+    analyses = await atable.query(query.to_filter(project_name_map))
     return [a.to_external() for a in analyses]
 
 

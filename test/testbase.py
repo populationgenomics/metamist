@@ -196,7 +196,10 @@ class DbTest(unittest.TestCase):
         value = await schema.execute(
             query,
             variable_values=variables,
-            context_value=await get_context(connection=self.connection),
+            context_value=await get_context(
+                connection=self.connection,
+                request=None,   # pylint: disable
+            ),
         )
         if value.errors:
             raise value.errors[0]

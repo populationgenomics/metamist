@@ -27,9 +27,10 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.enum_tables import SequencingTypeTable
-from db.python.utils import ProjectId
+from db.python.utils import ProjectId, GenericFilter
 from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
@@ -405,11 +406,13 @@ class SeqrLayer(BaseLayer):
         # pylint: disable=no-member
 
         alayer = AnalysisLayer(connection=self.connection)
-        es_index_analyses = await alayer.query_analysis(
-            project_ids=[self.connection.project],
-            analysis_type='es-index',
-            meta={'sequencing_type': sequencing_type},
-            status=AnalysisStatus('completed'),
+        es_index_analyses = await alayer.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.connection.project),
+                type=GenericFilter(eq='es-index'),
+                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
+                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
+            )
         )
 
         es_index_analyses = sorted(

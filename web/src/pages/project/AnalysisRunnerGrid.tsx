@@ -11,7 +11,7 @@ import sanitiseValue from '../../shared/utilities/sanitiseValue'
 const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
-        analyses(type: "analysis-runner") {
+        analyses(type: { eq: "analysis-runner" }) {
           author
           id
           meta
