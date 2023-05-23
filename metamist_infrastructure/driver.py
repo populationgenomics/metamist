@@ -11,7 +11,8 @@ from cpg_infra.utils import archive_folder
 import pulumi
 import pulumi_gcp as gcp
 
-ETL_FOLDER = Path(__file__).parent.parent / 'etl'
+# this gets moved around during the pip install
+ETL_FOLDER = Path(__file__).parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'endpoint'
 

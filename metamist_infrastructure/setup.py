@@ -21,9 +21,20 @@ setup(
     long_description_content_type='text/markdown',
     url=f'https://github.com/populationgenomics/sample-metadata',
     license='MIT',
-    packages=['metamist_infrastructure'],
+    packages=[
+        'metamist_infrastructure',
+        'metamist_infrastructure.etl',
+        'metamist_infrastructure.etl.endpoint',
+    ],
     # set package_dir so that files in THIS directory are included as metamist_infrastructure
-    package_dir={'metamist_infrastructure': '.'},
+    package_dir={
+        'metamist_infrastructure': '.',
+        'metamist_infrastructure.etl': '../etl',
+        'metamist_infrastructure.etl.endpoint': '../etl/endpoint',
+    },
+    package_data={
+        'metamist_infrastructure.etl': ['*.json'],
+    },
     install_requires=[],
     entry_points={
         'cpginfra.plugins': [
