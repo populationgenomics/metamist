@@ -91,7 +91,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         return gcp.storage.Bucket(
             f'metamist-source-bucket',
-            name=f'{self.config.dataset_storage_prefix}metamist-source-bucket',
+            name=f'{self.config.gcp.dataset_storage_prefix}metamist-source-bucket',
             location=self.config.gcp.region,
             project=self.config.sample_metadata.gcp.project,
             uniform_bucket_level_access=True,
