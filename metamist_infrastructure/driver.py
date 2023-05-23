@@ -20,6 +20,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     """
     Metamist Infrastructure (as code) for Pulumi
     """
+
     def main(self):
         """Driver for the metamist infrastructure as code plugin"""
         # todo, eventually configure metamist cloud run server
