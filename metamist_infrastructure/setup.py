@@ -34,6 +34,7 @@ setup(
     },
     package_data={
         'metamist_infrastructure.etl': ['*.json'],
+        'metamist_infrastructure.etl.endpoint': ['*.txt'],
     },
     install_requires=[],
     entry_points={

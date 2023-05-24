@@ -86,6 +86,15 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
     @cached_property
+    def _svc_bigquery(self):
+        return gcp.projects.Service(
+            'metamist-bigquery-service',
+            service='bigquery.googleapis.com',
+            project=self.config.sample_metadata.gcp.project,
+            disable_on_destroy=False,
+        )
+
+    @cached_property
     def source_bucket(self):
         """
         We will store the source code to the Cloud Function
@@ -152,6 +161,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             labels={
                 'project': 'metamist',
             },
+            project=self.config.sample_metadata.gcp.project,
+            opts=pulumi.ResourceOptions(
+                depends_on=[self._svc_bigquery],
+            ),
         )
 
     @cached_property
@@ -168,6 +181,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
+            project=self.config.sample_metadata.gcp.project,
+            # docs say: Note: On newer versions of the provider, you must explicitly set
+            deletion_protection=False,
+            opts=pulumi.ResourceOptions(
+                depends_on=[self.etl_bigquery_dataset],
+            ),
+
         )
 
         return etl_table
@@ -185,7 +205,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-function-bq-table-access',
             project=self.config.sample_metadata.gcp.project,
             dataset_id=self.etl_bigquery_dataset.id,
-            table_id=self.etl_bigquery_table.table_id,
+            table_id=self.etl_bigquery_table.id,
             role='roles/bigquery.dataOwner',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_service_account.email
@@ -205,6 +225,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         fxn = gcp.cloudfunctionsv2.Function(
             'metamist-etl-endpoint-source-code',
+            name='metamist-etl',
             build_config=gcp.cloudfunctionsv2.FunctionBuildConfigArgs(
                 runtime='python311',
                 entry_point='etl_post',
@@ -219,12 +240,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             service_config=gcp.cloudfunctionsv2.FunctionServiceConfigArgs(
                 max_instance_count=1,
                 min_instance_count=0,
-                available_memory='2GiB',
+                available_memory='2Gi',
                 available_cpu=1,
                 timeout_seconds=540,
                 environment_variables={
                     'BIGQUERY_TABLE': self.etl_bigquery_table.table_id,
-                    'PUBSUB_TOPIC': '',
+                    'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
                     'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
                 },
                 ingress_settings='ALLOW_INTERNAL_ONLY',
@@ -244,7 +265,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 location=fxn.location,
                 project=fxn.project,
                 cloud_function=fxn.name,
-                role='roles/run.invoker',
+                role='roles/cloudfunctions.invoker',
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
