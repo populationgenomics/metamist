@@ -327,7 +327,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         resource.type="cloud_function"
                         AND resource.labels.function_name="{fxn_name}"
                         AND severity >= WARNING
-                    """
+                    """  # noqa: B028
         )
 
         # Create the Cloud Function's event alert
