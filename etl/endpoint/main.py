@@ -1,17 +1,20 @@
 import datetime
+import json
+import logging
 import os
+import uuid
 import functions_framework
 import flask
 import google.cloud.bigquery as bq
+from google.cloud import pubsub_v1
 
 from cpg_utils.cloud import email_from_id_token
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
 
-ALLOWED_USERS = os.getenv('ALLOWED_USERS').split(',')
-
 _BQ_CLIENT = bq.Client()
+_PUBSUB_CLIENT = pubsub_v1.PublisherClient()
 
 
 @functions_framework.http
@@ -31,33 +34,62 @@ def etl_post(request: flask.Request):
     """
 
     auth = request.authorization
-    user = 'unknown'
-    auth_error = None
-    if not auth:
-        auth_error = f'Unknown auth mechanism: {request.headers}'
-    elif token := auth.token:
-        auth_error = email_from_id_token(token)
-    else:
-        user = f'No auth token, header fields: {request.headers}'
+    if not auth or not auth.token:
+        raise ValueError('No auth token')
+
+    request_id = str(uuid.uuid4())
+
+    jbody = request.json
+    if callable(jbody):
+        # request.json is it in reality, but the type checker is saying it's callable
+        jbody = jbody()
+
+    jbody_str = json.dumps(jbody)
+
+    check_for_pii(jbody_str)
 
     bq_obj = {
+        'request_id': request_id,
         'timestamp': datetime.datetime.utcnow().isoformat(),
-        'type': 'UNKNOWN',
-        'submitting_user': user,
-        'body': request.json(),
+        'type': request.path,
+        'submitting_user': email_from_id_token(auth.token),
+        'body': jbody_str,
     }
-    error = None
-    try:
-        _BQ_CLIENT.insert_rows(BIGQUERY_TABLE, [bq_obj])
-    except Exception as e:  # pylint: disable=broad-except
-        error = str(e)
 
-    return {
-        'success': error is not None,
-        'queue': PUBSUB_TOPIC,
-        'bigquery-table': BIGQUERY_TABLE,
-        'url': request.url,
-        'route': request.access_route,
-        'bq-row': bq_obj,
-        'user': user or auth_error,
-    }
+    # throw an exception if one occurs
+    errors = _BQ_CLIENT.insert_rows_json(BIGQUERY_TABLE, [bq_obj])
+    if errors:
+        raise ValueError(
+            f'An internal error occurred when processing this response: {errors}'
+        )
+
+    # publish to pubsub
+    try:
+        _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
+    except Exception as e:
+        logging.error(f'Failed to publish to pubsub: {e}')
+
+    return {'id': request_id}
+
+
+def check_for_pii(text):
+    """Check if text contains PII."""
+    keys = [
+        'first name',
+        'first_name',
+        'last name',
+        'last_name',
+        'email',
+        'phone',
+        'dob',
+        'date of birth',
+        'mobile',
+    ]
+
+    text_lower = text.lower()
+    keys_in_text = [k for k in keys if k in text_lower]
+    if keys_in_text:
+        raise ValueError(
+            f'Potentially detected PII, the following keys were found in the '
+            f'body: {keys_in_text}'
+        )

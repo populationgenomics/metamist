@@ -1,3 +1,4 @@
+# pylint: disable=missing-function-docstring,import-error
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -5,11 +6,12 @@ so it can be centrally deployed. Do this through a plugin, and submodule.
 from functools import cached_property
 from pathlib import Path
 
-from cpg_infra.plugin import CpgInfrastructurePlugin
-from cpg_infra.utils import archive_folder
-
 import pulumi
 import pulumi_gcp as gcp
+from cpg_utils.cloud import read_secret
+
+from cpg_infra.plugin import CpgInfrastructurePlugin
+from cpg_infra.utils import archive_folder
 
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
@@ -177,7 +179,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         etl_table = gcp.bigquery.Table(
             'metamist-etl-bigquery-table',
-            table_id='etl-incoming',
+            table_id='etl-data',
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
@@ -191,25 +193,53 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         return etl_table
 
+    @cached_property
+    def slack_channel(self):
+        """
+        Create a Slack notification channel for all functions
+        Use cli command below to retrieve the required 'labels'
+        $ gcloud beta monitoring channel-descriptors describe slack
+        """
+        if not self.config.sample_metadata.slack_channel:
+            return None
+        return gcp.monitoring.NotificationChannel(
+            'metamist-etl-slack-notification-channel',
+            display_name='Metamist ETL Slack Notification Channel',
+            type='slack',
+            labels={'channel_name': self.config.sample_metadata.slack_channel},
+            sensitive_labels=gcp.monitoring.NotificationChannelSensitiveLabelsArgs(
+                auth_token=read_secret(
+                    # reuse this secret :)
+                    project_id=self.config.billing.gcp.project_id,
+                    secret_name=self.config.billing.aggregator.slack_token_secret_name,
+                    fail_gracefully=False,
+                ),
+            ),
+            description='Slack notification channel for all cost aggregator functions',
+            project=self.config.sample_metadata.gcp.project,
+        )
+
     def setup_etl(self):
+        # give the etl_service_account ability to write to bigquery
+        gcp.bigquery.DatasetAccess(
+            'metamist-etl-bq-dataset-access',
+            project=self.config.sample_metadata.gcp.project,
+            dataset_id=self.etl_bigquery_dataset.dataset_id,
+            role='OWNER',
+            user_by_email=self.etl_service_account.email,
+        )
+
+        self.setup_metamist_etl_accessors()
+        self.setup_slack_notification()
+
+    @cached_property
+    def etl_function(self):
         """
         Driver function to setup the etl infrastructure
         """
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
         archive = archive_folder(str(PATH_TO_ETL_ENDPOINT.absolute()))
-
-        # give the etl_service_account ability to write to bigquery
-        gcp.bigquery.IamMember(
-            'metamist-etl-function-bq-table-access',
-            project=self.config.sample_metadata.gcp.project,
-            dataset_id=self.etl_bigquery_dataset.id,
-            table_id=self.etl_bigquery_table.id,
-            role='roles/bigquery.dataOwner',
-            member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_service_account.email
-            ),
-        )
 
         # Create the single Cloud Storage object, which contains the source code
         source_archive_object = gcp.storage.BucketObject(
@@ -243,11 +273,18 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 available_cpu=1,
                 timeout_seconds=540,
                 environment_variables={
-                    'BIGQUERY_TABLE': self.etl_bigquery_table.table_id,
+                    # format: "project.dataset.table_id
+                    'BIGQUERY_TABLE': pulumi.Output.concat(
+                        self.etl_bigquery_table.project,
+                        '.',
+                        self.etl_bigquery_table.dataset_id,
+                        '.',
+                        self.etl_bigquery_table.table_id,
+                    ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
                     'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
                 },
-                ingress_settings='ALLOW_INTERNAL_ONLY',
+                ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
                 service_account_email=self.etl_service_account.email,
             ),
@@ -258,14 +295,62 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
+        return fxn
+
+    def setup_metamist_etl_accessors(self):
         for name, sa in self.etl_accessors.items():
             gcp.cloudfunctionsv2.FunctionIamMember(
                 f'metamist-etl-accessor-{name}',
-                location=fxn.location,
-                project=fxn.project,
-                cloud_function=fxn.name,
+                location=self.etl_function.location,
+                project=self.etl_function.project,
+                cloud_function=self.etl_function.name,
                 role='roles/cloudfunctions.invoker',
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
-        return fxn
+            gcp.cloudrun.IamMember(
+                f'metamist-etl-run-accessor-{name}',
+                location=self.etl_function.location,
+                project=self.etl_function.project,
+                service=self.etl_function.name,  # it shared the name
+                role='roles/run.invoker',
+                member=pulumi.Output.concat('serviceAccount:', sa.email),
+            )
+
+    def setup_slack_notification(self):
+        if self.slack_channel is None:
+            return
+
+        # Slack notifications
+        filter_string = self.etl_function.name.apply(
+            lambda fxn_name: f"""
+                        resource.type="cloud_function"
+                        AND resource.labels.function_name="{fxn_name}"
+                        AND severity >= WARNING
+                    """
+        )
+
+        # Create the Cloud Function's event alert
+        alert_condition = gcp.monitoring.AlertPolicyConditionArgs(
+            condition_matched_log=(
+                gcp.monitoring.AlertPolicyConditionConditionMatchedLogArgs(
+                    filter=filter_string,
+                )
+            ),
+            display_name='Function warning/error',
+        )
+        gcp.monitoring.AlertPolicy(
+            f'metamist-etl-alert-policy',
+            display_name=f'Metamist ETL Function Error Alert',
+            combiner='OR',
+            notification_channels=[self.slack_channel.id],
+            conditions=[alert_condition],
+            alert_strategy=gcp.monitoring.AlertPolicyAlertStrategyArgs(
+                notification_rate_limit=(
+                    gcp.monitoring.AlertPolicyAlertStrategyNotificationRateLimitArgs(
+                        period='300s'
+                    )
+                ),
+            ),
+            opts=pulumi.ResourceOptions(depends_on=[self.etl_function]),
+        )

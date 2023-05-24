@@ -1,5 +1,11 @@
 [
     {
+        "name": "request_id",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Unique UUID for the row"
+    },
+    {
         "name": "timestamp",
         "type": "TIMESTAMP",
         "mode": "REQUIRED",
