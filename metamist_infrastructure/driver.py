@@ -187,7 +187,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             opts=pulumi.ResourceOptions(
                 depends_on=[self.etl_bigquery_dataset],
             ),
-
         )
 
         return etl_table
