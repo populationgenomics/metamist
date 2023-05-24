@@ -66,7 +66,7 @@ def etl_post(request: flask.Request):
     # publish to pubsub
     try:
         _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to publish to pubsub: {e}')
 
     return {'id': request_id}
