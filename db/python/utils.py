@@ -262,7 +262,7 @@ class GenericFilterModel:
         if not conditionals:
             return 'True', {}
 
-        return ' AND '.join(conditionals), values
+        return ' AND '.join(filter(None, conditionals)), values
 
 
 def get_logger():
