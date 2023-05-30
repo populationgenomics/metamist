@@ -110,6 +110,9 @@ class AnalysisLayer(BaseLayer):
         """Query analyses"""
         analyses = await self.at.query(filter_)
 
+        if not analyses:
+            return []
+
         if check_project_ids and not filter_.project:
             await self.ptable.check_access_to_project_ids(
                 self.author, set(a.project for a in analyses), readonly=True
