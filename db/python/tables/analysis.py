@@ -29,6 +29,9 @@ class AnalysisFilter(GenericFilterModel):
     output: GenericFilter[str] = None
     active: GenericFilter[bool] = None
 
+    def __hash__(self):
+        return super().__hash__()
+
 
 class AnalysisTable(DbBase):
     """

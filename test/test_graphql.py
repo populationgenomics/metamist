@@ -1,12 +1,14 @@
+from models.enums import AnalysisStatus
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 from test.testbase import DbIsolatedTest, run_as_sync
 from graphql.error import GraphQLError, GraphQLSyntaxError
 
-from db.python.layers import ParticipantLayer
+from db.python.layers import ParticipantLayer, AnalysisLayer
 from models.models import (
     SampleUpsertInternal,
     ParticipantUpsertInternal,
     SequencingGroupUpsertInternal,
-    AssayUpsertInternal,
+    AssayUpsertInternal, AnalysisInternal,
 )
 import api.graphql.schema
 from metamist.graphql import gql, validate, configure_sync_client
@@ -18,7 +20,9 @@ default_assay_meta = {
     'sequencing_platform': 'illumina',
 }
 
-SINGLE_PARTICIPANT_UPSERT = ParticipantUpsertInternal(
+def get_single_participant_upsert():
+
+    return ParticipantUpsertInternal(
     external_id='Demeter',
     meta={},
     samples=[
@@ -141,7 +145,7 @@ class TestGraphQL(DbIsolatedTest):
     @run_as_sync
     async def test_basic_graphql_query(self):
         """Test getting the summary for a project"""
-        p = (await self.player.upsert_participants([SINGLE_PARTICIPANT_UPSERT]))[0]
+        p = (await self.player.upsert_participants([get_single_participant_upsert()]))[0]
 
         query = """
 query MyQuery($project: String!) {
@@ -183,3 +187,41 @@ query MyQuery($project: String!) {
         self.assertEqual(
             p.samples[0].sequencing_groups[0].assays[0].id, assays[0]['id']
         )
+
+    @run_as_sync
+    async def test_sg_analyses_query(self):
+
+        p = await self.player.upsert_participant(get_single_participant_upsert())
+        sg_id = p.samples[0].sequencing_groups[0].id
+
+        alayer = AnalysisLayer(self.connection)
+        await alayer.create_analysis(AnalysisInternal(
+            sequencing_group_ids=[sg_id],
+            type='cram',
+            status=AnalysisStatus.COMPLETED,
+            meta={},
+            output='some-output',
+        ))
+
+        q = """
+query MyQuery($sg_id: String!) {
+  sequencingGroups(id: {in_: [$sg_id]}) {
+    analyses {
+      id
+      meta
+      output
+    }
+  }
+}"""
+
+        resp = await self.run_graphql_query_async(
+            q, {'sg_id': sequencing_group_id_format(sg_id)}
+        )
+        self.assertIn('sequencingGroups', resp)
+        self.assertEqual(1, len(resp['sequencingGroups']))
+        self.assertIn('analyses', resp['sequencingGroups'][0])
+        self.assertEqual(1, len(resp['sequencingGroups'][0]['analyses']))
+        analyses = resp['sequencingGroups'][0]['analyses']
+        self.assertIn('id', analyses[0])
+        self.assertIn('meta', analyses[0])
+        self.assertIn('output', analyses[0])

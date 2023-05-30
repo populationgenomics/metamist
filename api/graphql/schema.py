@@ -476,7 +476,7 @@ class GraphQLSequencingGroup:
         analyses = await loader.load(
             {
                 'id': root.internal_id,
-                'filter': AnalysisFilter(
+                'filter_': AnalysisFilter(
                     status=status.to_internal_filter() if status else None,
                     type=type.to_internal_filter() if type else None,
                     meta=meta,
