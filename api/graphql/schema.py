@@ -405,6 +405,7 @@ class GraphQLSample:
         self,
         info: Info,
         root: 'GraphQLSample',
+        id: GraphQLFilter[str] | None = None,
         type: GraphQLFilter[str] | None = None,
         technology: GraphQLFilter[str] | None = None,
         platform: GraphQLFilter[str] | None = None,
@@ -414,6 +415,9 @@ class GraphQLSample:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
+            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
+            if id
+            else None,
             meta=meta,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
