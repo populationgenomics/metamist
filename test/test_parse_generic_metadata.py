@@ -3,6 +3,15 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
+from db.python.layers import ParticipantLayer
+from models.models import (
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+    AssayUpsertInternal,
+)
+from models.utils.sample_id_format import sample_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 from test.testbase import run_as_sync, DbIsolatedTest
 
 from metamist.graphql import validate, configure_sync_client
@@ -13,10 +22,64 @@ from metamist.parser.generic_parser import (
     QUERY_MATCH_SAMPLES,
     QUERY_MATCH_SEQUENCING_GROUPS,
     QUERY_MATCH_ASSAYS,
+    ParsedSequencingGroup,
 )
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
 import api.graphql.schema
+
+
+def get_basic_participant_to_upsert():
+    default_assay_meta = {
+        'sequencing_type': 'genome',
+        'sequencing_technology': 'short-read',
+        'sequencing_platform': 'illumina',
+    }
+
+    return ParticipantUpsertInternal(
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
 
 
 class TestValidateParserQueries(unittest.TestCase):
@@ -670,6 +733,79 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
             str(ctx.exception),
         )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
+    async def test_matching_sequencing_groups_and_assays(
+        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
+    ):
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = False
+        mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
+
+        player = ParticipantLayer(self.connection)
+        participant = await player.upsert_participant(get_basic_participant_to_upsert())
+
+        filenames = [
+            'sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz',
+        ]
+
+        rows = [
+            'Participant ID\tSample ID\tFilename',
+            f'Demeter\tsample_id001\t{filenames[0]}',
+            f'Demeter\tsample_id001\t{filenames[1]}',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_column='Participant ID',
+            sample_name_column='Sample ID',
+            reads_column='Filename',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+        )
+
+        parser.filename_map = {f: '/path/to/' + f for f in filenames}
+
+        summary, parsed_files = await parser.parse_manifest(
+            StringIO('\n'.join(rows)), delimiter='\t', dry_run=True
+        )
+
+        self.assertEqual(1, summary['participants']['update'])
+        self.assertEqual(1, summary['samples']['update'])
+        self.assertEqual(1, summary['sequencing_groups']['update'])
+        self.assertEqual(1, summary['assays']['update'])
+        self.assertEqual(0, summary['participants']['insert'])
+        self.assertEqual(0, summary['samples']['insert'])
+        self.assertEqual(0, summary['sequencing_groups']['insert'])
+        self.assertEqual(0, summary['assays']['insert'])
+
+        parsed_p: ParsedParticipant = parsed_files[0]
+        self.assertEqual(participant.id, parsed_p.internal_pid)
+        self.assertEqual(
+            sample_id_format(participant.samples[0].id),
+            parsed_p.samples[0].internal_sid,
+        )
+
+        sg: SequencingGroupUpsertInternal = participant.samples[0].sequencing_groups[0]
+        sg_parsed: ParsedSequencingGroup = (
+            parsed_files[0].samples[0].sequencing_groups[0]
+        )
+
+        self.assertEqual(
+            sequencing_group_id_format(sg.id), sg_parsed.internal_seqgroup_id
+        )
+        self.assertEqual(len(sg.assays), len(sg_parsed.assays))
+        self.assertEqual(sg.assays[0].id, sg_parsed.assays[0].internal_id)
 
 
 class FastqPairMatcher(unittest.TestCase):

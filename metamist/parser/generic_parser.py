@@ -128,8 +128,9 @@ query GetSampleEidMapQuery($project: String!) {
   project(name: $project) {
     samples {
       assays {
-        externalIds
         id
+        externalIds
+        meta
       }
     }
   }
@@ -795,7 +796,7 @@ class GenericParser(
             reads_to_key(assay['meta']['reads']): assay['id']
             for sample in values['project']['samples']
             for assay in sample['assays']
-            if assay.get('meta', {}).get('reads')
+            if assay['meta'].get('reads')
         }
 
         def _map_assay(assay: ParsedAssay):

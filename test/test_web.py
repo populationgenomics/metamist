@@ -71,7 +71,6 @@ def get_test_participant():
                                 type='sequencing',
                                 meta={
                                     'reads': [
-                                        [
                                             {
                                                 'basename': 'sample_id001.filename-R1.fastq.gz',
                                                 'checksum': None,
@@ -86,7 +85,6 @@ def get_test_participant():
                                                 'location': '/path/to/sample_id001.filename-R2.fastq.gz',
                                                 'size': 111,
                                             },
-                                        ]
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',

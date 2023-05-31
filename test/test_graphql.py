@@ -8,7 +8,8 @@ from models.models import (
     SampleUpsertInternal,
     ParticipantUpsertInternal,
     SequencingGroupUpsertInternal,
-    AssayUpsertInternal, AnalysisInternal,
+    AssayUpsertInternal,
+    AnalysisInternal,
 )
 import api.graphql.schema
 from metamist.graphql import gql, validate, configure_sync_client
@@ -20,54 +21,54 @@ default_assay_meta = {
     'sequencing_platform': 'illumina',
 }
 
+
 def get_single_participant_upsert():
 
     return ParticipantUpsertInternal(
-    external_id='Demeter',
-    meta={},
-    samples=[
-        SampleUpsertInternal(
-            external_id='sample_id001',
-            meta={},
-            type='blood',
-            sequencing_groups=[
-                SequencingGroupUpsertInternal(
-                    type='genome',
-                    technology='short-read',
-                    platform='illumina',
-                    assays=[
-                        AssayUpsertInternal(
-                            type='sequencing',
-                            meta={
-                                'reads': [
-                                    [
-                                        {
-                                            'basename': 'sample_id001.filename-R1.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                            'size': 111,
-                                        },
-                                        {
-                                            'basename': 'sample_id001.filename-R2.fastq.gz',
-                                            'checksum': None,
-                                            'class': 'File',
-                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                            'size': 111,
-                                        },
-                                    ]
-                                ],
-                                'reads_type': 'fastq',
-                                'batch': 'M001',
-                                **default_assay_meta,
-                            },
-                        ),
-                    ],
-                )
-            ],
-        )
-    ],
-)
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                type='blood',
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'reads': [
+                                            {
+                                                'basename': 'sample_id001.filename-R1.fastq.gz',
+                                                'checksum': None,
+                                                'class': 'File',
+                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                                'size': 111,
+                                            },
+                                            {
+                                                'basename': 'sample_id001.filename-R2.fastq.gz',
+                                                'checksum': None,
+                                                'class': 'File',
+                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                                'size': 111,
+                                            },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    'batch': 'M001',
+                                    **default_assay_meta,
+                                },
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+
 
 TEST_QUERY = gql(
     """
@@ -145,7 +146,9 @@ class TestGraphQL(DbIsolatedTest):
     @run_as_sync
     async def test_basic_graphql_query(self):
         """Test getting the summary for a project"""
-        p = (await self.player.upsert_participants([get_single_participant_upsert()]))[0]
+        p = (await self.player.upsert_participants([get_single_participant_upsert()]))[
+            0
+        ]
 
         query = """
 query MyQuery($project: String!) {
@@ -195,13 +198,15 @@ query MyQuery($project: String!) {
         sg_id = p.samples[0].sequencing_groups[0].id
 
         alayer = AnalysisLayer(self.connection)
-        await alayer.create_analysis(AnalysisInternal(
-            sequencing_group_ids=[sg_id],
-            type='cram',
-            status=AnalysisStatus.COMPLETED,
-            meta={},
-            output='some-output',
-        ))
+        await alayer.create_analysis(
+            AnalysisInternal(
+                sequencing_group_ids=[sg_id],
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                meta={},
+                output='some-output',
+            )
+        )
 
         q = """
 query MyQuery($sg_id: String!) {
