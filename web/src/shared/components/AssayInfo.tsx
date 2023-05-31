@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Table as SUITable } from 'semantic-ui-react'
 
 import _ from 'lodash'
-import { GraphQlSampleSequencing } from '../../__generated__/graphql'
+import { GraphQlAssay } from '../../__generated__/graphql'
 import formatBytes from '../utilities/formatBytes'
 import safeValue from '../utilities/safeValue'
 import Table from './Table'
@@ -23,8 +23,8 @@ interface SequenceMeta {
 
 const excludedSequenceFields = ['id', '__typename']
 
-const SeqInfo: React.FunctionComponent<{
-    data: Partial<GraphQlSampleSequencing>
+const AssayInfo: React.FunctionComponent<{
+    data: Partial<GraphQlAssay>
 }> = ({ data }) => {
     const renderReadsMetadata = (readsMetadata: File[], key: number | string) => (
         <Table celled key={key}>
@@ -64,7 +64,7 @@ const SeqInfo: React.FunctionComponent<{
         )
     }
 
-    const renderSeqInfo = (seqInfo: Partial<GraphQlSampleSequencing>) =>
+    const renderSeqInfo = (seqInfo: Partial<GraphQlAssay>) =>
         Object.entries(seqInfo)
             .filter(([key]) => !excludedSequenceFields.includes(key))
             .map(([key, value]) => {
@@ -154,4 +154,4 @@ const SeqInfo: React.FunctionComponent<{
     )
 }
 
-export default SeqInfo
+export default AssayInfo

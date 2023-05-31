@@ -4,12 +4,15 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
 from db.python.layers.family import FamilyLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
 from models.enums import SearchResponseType
 from models.models.family import PedRowInternal
 from models.models.sample import sample_id_format, SampleUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal, sequencing_group_id_format
+from models.models.assay import AssayUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -24,6 +27,7 @@ class TestSample(DbIsolatedTest):
         self.slayer = SampleLayer(self.connection)
         self.player = ParticipantLayer(self.connection)
         self.flayer = FamilyLayer(self.connection)
+        self.sglayer = SequencingGroupLayer(self.connection)
 
     @run_as_sync
     async def test_search_non_existent_sample_by_internal_id(self):
@@ -65,6 +69,47 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(cpg_id, results[0].title)
         self.assertEqual(cpg_id, results[0].data.id)
         self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
+
+    @run_as_sync
+    async def test_search_isolated_sequencing_group_by_id(self):
+        """
+        Search by valid CPG sequencing group ID (special case)
+        """
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EXS001', type='blood')
+        )
+        sg = await self.sglayer.upsert_sequencing_groups(
+            [
+                SequencingGroupUpsertInternal(
+                    sample_id=sample.id,
+                    technology='long-read',
+                    platform='illumina',
+                    meta={
+                        'sequencing_type': 'transcriptome',
+                        'sequencing_technology': 'long-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    type='transcriptome',
+                    assays=[
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            meta={
+                                'sequencing_type': 'transcriptome',
+                                'sequencing_technology': 'long-read',
+                                'sequencing_platform': 'illumina',
+                            }
+                        )
+                    ]
+                )
+            ]
+        )
+        cpg_sg_id = sequencing_group_id_format(sg[0].id)
+        results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
+
+        self.assertEqual(1, len(results))
+        self.assertEqual(cpg_sg_id, results[0].title)
+        self.assertEqual(cpg_sg_id, results[0].data.id)
+        self.assertEqual(cpg_sg_id, results[0].data.sg_external_id)
 
     @run_as_sync
     async def test_search_isolated_sample_by_external_id(self):

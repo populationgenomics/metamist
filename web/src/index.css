@@ -11,8 +11,9 @@
     --color-bg: #f5f7f9;
     --color-bg-card: #fff;
     --color-bg-disabled-card: #eeeeee;
+    --color-table-header: #eaeaea;
 
-    --color-border-color: #3a3a3a;
+    --color-border-color: #c8c9ca;
     --color-border-default: #d0d7de;
 
     --color-divider: rgba(0, 0, 0, 0.3);
@@ -31,6 +32,7 @@ html[data-theme='dark-mode'] {
     --color-bg: #1d1d1d;
     --color-bg-card: #2c2c2c;
     --color-bg-disabled-card: #353535;
+    --color-table-header: #383838;
 
     --color-border-color: #3a3a3a;
     --color-border-default: #292a2b;

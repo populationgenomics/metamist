@@ -172,11 +172,12 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
     ],
     sequencing_group_keys=[
         ('id', 'Sequencing Group ID'),
-        ('created_date', 'Created date'),
+        ('platform', 'Platform'),
+        ('technology', 'Technology'),
+        ('type', 'Type'),
     ],
     assay_keys=[
         ('type', 'type'),
-        ('technology', 'technology'),
         ('meta.batch', 'batch'),
         ('meta.reads_type', 'reads_type'),
     ],
@@ -359,11 +360,12 @@ class TestWeb(DbIsolatedTest):
             ],
             sequencing_group_keys=[
                 ('id', 'Sequencing Group ID'),
-                ('created_date', 'Created date'),
+                ('platform', 'Platform'),
+                ('technology', 'Technology'),
+                ('type', 'Type'),
             ],
             assay_keys=[
                 ('type', 'type'),
-                ('technology', 'technology'),
                 ('meta.batch', 'batch'),
                 ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
@@ -411,11 +413,12 @@ class TestWeb(DbIsolatedTest):
             ],
             sequencing_group_keys=[
                 ('id', 'Sequencing Group ID'),
-                ('created_date', 'Created date'),
+                ('platform', 'Platform'),
+                ('technology', 'Technology'),
+                ('type', 'Type'),
             ],
             assay_keys=[
                 ('type', 'type'),
-                ('technology', 'technology'),
                 ('meta.batch', 'batch'),
                 ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
@@ -488,11 +491,12 @@ class TestWeb(DbIsolatedTest):
             ],
             sequencing_group_keys=[
                 ('id', 'Sequencing Group ID'),
-                ('created_date', 'Created date'),
+                ('platform', 'Platform'),
+                ('technology', 'Technology'),
+                ('type', 'Type'),
             ],
             assay_keys=[
                 ('type', 'type'),
-                ('technology', 'technology'),
                 ('meta.batch', 'batch'),
                 ('meta.field with spaces', 'field with spaces'),
                 ('meta.reads_type', 'reads_type'),
