@@ -292,7 +292,7 @@ async def load_participants_for_ids(
     missing_pids = set(participant_ids) - set(p_by_id.keys())
     if missing_pids:
         raise NotFoundError(
-            f"Could not find participants with ids {missing_pids}"
+            f'Could not find participants with ids {missing_pids}'
         )
     return [p_by_id.get(p) for p in participant_ids]
 
