@@ -297,6 +297,10 @@ class GraphQLParticipant:
     external_id: str
     meta: strawberry.scalars.JSON
 
+    reported_sex: int | None
+    reported_gender: str | None
+    karyotype: str | None
+
     project_id: strawberry.Private[int]
 
     @staticmethod
@@ -305,6 +309,9 @@ class GraphQLParticipant:
             id=internal.id,
             external_id=internal.external_id,
             meta=internal.meta,
+            reported_sex=internal.reported_sex,
+            reported_gender=internal.reported_gender,
+            karyotype=internal.karyotype,
             project_id=internal.project,
         )
 

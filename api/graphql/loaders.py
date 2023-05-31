@@ -10,6 +10,7 @@ from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import get_projectless_db_connection, group_by
+from db.python.connect import NotFoundError
 from db.python.layers import (
     AnalysisLayer,
     SampleLayer,
@@ -288,6 +289,11 @@ async def load_participants_for_ids(
         [p for p in participant_ids if p is not None]
     )
     p_by_id = {p.id: p for p in persons}
+    missing_pids = set(participant_ids) - set(p_by_id.keys())
+    if missing_pids:
+        raise NotFoundError(
+            f"Could not find participants with ids {missing_pids}"
+        )
     return [p_by_id.get(p) for p in participant_ids]
 
 
