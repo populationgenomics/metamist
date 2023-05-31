@@ -385,7 +385,7 @@ async def load_analyses_for_sequencing_groups(
         -> list[list[AnalysisInternal]]
     """
     alayer = AnalysisLayer(connection)
-    filter_.id = GenericFilter(in_=ids)
+    filter_.sequencing_group_id = GenericFilter(in_=ids)
     analyses = await alayer.query(filter_)
     by_sg_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
     for a in analyses:
