@@ -3,6 +3,9 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
+from test.testbase import run_as_sync, DbIsolatedTest
+
+import api.graphql.schema
 from db.python.layers import ParticipantLayer
 from models.models import (
     ParticipantUpsertInternal,
@@ -12,7 +15,6 @@ from models.models import (
 )
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from test.testbase import run_as_sync, DbIsolatedTest
 
 from metamist.graphql import validate, configure_sync_client
 from metamist.parser.generic_parser import (
@@ -26,10 +28,8 @@ from metamist.parser.generic_parser import (
 )
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
-import api.graphql.schema
 
-
-def get_basic_participant_to_upsert():
+def _get_basic_participant_to_upsert():
     default_assay_meta = {
         'sequencing_type': 'genome',
         'sequencing_technology': 'short-read',
@@ -742,13 +742,14 @@ class TestParseGenericMetadata(DbIsolatedTest):
     async def test_matching_sequencing_groups_and_assays(
         self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
     ):
+        """Test basic import with data that exists in the database"""
         mock_graphql_query.side_effect = self.run_graphql_query_async
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
         mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
 
         player = ParticipantLayer(self.connection)
-        participant = await player.upsert_participant(get_basic_participant_to_upsert())
+        participant = await player.upsert_participant(_get_basic_participant_to_upsert())
 
         filenames = [
             'sample_id001.filename-R1.fastq.gz',

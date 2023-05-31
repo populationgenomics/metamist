@@ -1,8 +1,7 @@
-from models.enums import AnalysisStatus
-from models.utils.sequencing_group_id_format import sequencing_group_id_format
 from test.testbase import DbIsolatedTest, run_as_sync
 from graphql.error import GraphQLError, GraphQLSyntaxError
 
+import api.graphql.schema
 from db.python.layers import ParticipantLayer, AnalysisLayer
 from models.models import (
     SampleUpsertInternal,
@@ -11,7 +10,9 @@ from models.models import (
     AssayUpsertInternal,
     AnalysisInternal,
 )
-import api.graphql.schema
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
+from models.enums import AnalysisStatus
+
 from metamist.graphql import gql, validate, configure_sync_client
 
 
@@ -22,7 +23,7 @@ default_assay_meta = {
 }
 
 
-def get_single_participant_upsert():
+def _get_single_participant_upsert():
 
     return ParticipantUpsertInternal(
         external_id='Demeter',
@@ -146,7 +147,7 @@ class TestGraphQL(DbIsolatedTest):
     @run_as_sync
     async def test_basic_graphql_query(self):
         """Test getting the summary for a project"""
-        p = (await self.player.upsert_participants([get_single_participant_upsert()]))[
+        p = (await self.player.upsert_participants([_get_single_participant_upsert()]))[
             0
         ]
 
@@ -193,8 +194,8 @@ query MyQuery($project: String!) {
 
     @run_as_sync
     async def test_sg_analyses_query(self):
-
-        p = await self.player.upsert_participant(get_single_participant_upsert())
+        """Example graphql query of analyses from sequencing-group"""
+        p = await self.player.upsert_participant(_get_single_participant_upsert())
         sg_id = p.samples[0].sequencing_groups[0].id
 
         alayer = AnalysisLayer(self.connection)

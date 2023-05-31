@@ -30,7 +30,7 @@ class AnalysisFilter(GenericFilterModel):
     active: GenericFilter[bool] = None
 
     def __hash__(self):
-        return super().__hash__()
+        return super().__hash__()   # pylint: disable=useless-parent-delegation
 
 
 class AnalysisTable(DbBase):
