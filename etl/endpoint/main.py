@@ -35,7 +35,10 @@ def etl_post(request: flask.Request):
 
     auth = request.authorization
     if not auth or not auth.token:
-        raise ValueError('No auth token')
+        return {
+            'success': False,
+            'message': 'No auth token provided'
+        }, 401
 
     request_id = str(uuid.uuid4())
 
@@ -46,7 +49,13 @@ def etl_post(request: flask.Request):
 
     jbody_str = json.dumps(jbody)
 
-    check_for_pii(jbody_str)
+    pii_error = check_for_pii(jbody_str)
+    if pii_error:
+        return {
+            'success': False,
+            'id': request_id,
+            'message': pii_error,
+        }, 400
 
     bq_obj = {
         'request_id': request_id,
@@ -59,9 +68,11 @@ def etl_post(request: flask.Request):
     # throw an exception if one occurs
     errors = _BQ_CLIENT.insert_rows_json(BIGQUERY_TABLE, [bq_obj])
     if errors:
-        raise ValueError(
-            f'An internal error occurred when processing this response: {errors}'
-        )
+        return {
+            'success': False,
+            'id': request_id,
+            'message': f'An internal error occurred when processing this response: {errors}',
+        }, 500
 
     # publish to pubsub
     try:
@@ -69,16 +80,18 @@ def etl_post(request: flask.Request):
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to publish to pubsub: {e}')
 
-    return {'id': request_id}
+    return {'id': request_id, 'success': True}
 
 
-def check_for_pii(text):
+def check_for_pii(text) -> str | None:
     """Check if text contains PII."""
     keys = [
         'first name',
         'first_name',
+        'first-name',
         'last name',
         'last_name',
+        'last-name',
         'email',
         'phone',
         'dob',
@@ -89,7 +102,7 @@ def check_for_pii(text):
     text_lower = text.lower()
     keys_in_text = [k for k in keys if k in text_lower]
     if keys_in_text:
-        raise ValueError(
-            f'Potentially detected PII, the following keys were found in the '
+        return (
+            'Potentially detected PII, the following keys were found in the '
             f'body: {keys_in_text}'
         )
