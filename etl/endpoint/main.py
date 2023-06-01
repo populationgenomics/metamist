@@ -35,10 +35,7 @@ def etl_post(request: flask.Request):
 
     auth = request.authorization
     if not auth or not auth.token:
-        return {
-            'success': False,
-            'message': 'No auth token provided'
-        }, 401
+        return {'success': False, 'message': 'No auth token provided'}, 401
 
     request_id = str(uuid.uuid4())
 
@@ -106,3 +103,5 @@ def check_for_pii(text) -> str | None:
             'Potentially detected PII, the following keys were found in the '
             f'body: {keys_in_text}'
         )
+
+    return None
