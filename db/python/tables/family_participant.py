@@ -201,15 +201,6 @@ ON DUPLICATE KEY UPDATE
         ]
         ds = dict(zip(ordered_keys, row))
 
-        # ds = {
-        #     'family_id': row[0],
-        #     'individual_id': row[1],
-        #     'paternal_id': row[2],
-        #     'maternal_id': row[3],
-        #     'sex': row[4],
-        #     'affected': row[5],
-        # }
-
         return ds
 
     async def get_participant_family_map(
