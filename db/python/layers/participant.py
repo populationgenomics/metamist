@@ -665,11 +665,17 @@ class ParticipantLayer(BaseLayer):
             internal_to_external_id
         )
 
+    async def get_family_participant_data(self, family_id: int, participant_id: int):
+        """Gets the family_participant row for a specific participant"""
+        fptable = FamilyParticipantTable(self.connection)
+
+        return await fptable.get_row(family_id=family_id, participant_id=participant_id)
+
     async def remove_participant_from_family(self, family_id: int, participant_id: int):
         """Deletes a participant from a family"""
         fptable = FamilyParticipantTable(self.connection)
 
-        return await fptable.delete_participant_family_row(
+        return await fptable.delete_family_participant_row(
             family_id=family_id, participant_id=participant_id
         )
 
@@ -682,9 +688,9 @@ class ParticipantLayer(BaseLayer):
         affected: int,
     ):
         """Adds a participant to a family"""
-        fpttable = FamilyParticipantTable(self.connection)
+        fptable = FamilyParticipantTable(self.connection)
 
-        return await fpttable.create_row(
+        return await fptable.create_row(
             family_id=family_id,
             participant_id=participant_id,
             paternal_id=paternal_id,

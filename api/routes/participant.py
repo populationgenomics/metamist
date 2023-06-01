@@ -251,38 +251,36 @@ async def get_participants(
 
 
 @router.post(
-    '/{participant_id}/add-participant-family', operation_id='addParticipantFamily'
+    '/{participant_id}/update-participant-family',
+    operation_id='updateParticipantFamily',
 )
-async def add_participant_to_family(
+async def update_participant_family(
     participant_id: int,
-    family_id: int,
-    paternal_id: int,
-    maternal_id: int,
-    affected: int,
+    old_family_id: int,
+    new_family_id: int,
     connection: Connection = get_projectless_db_connection,
 ):
-    """Add a participant to a family"""
+    """
+    Change a participants family from old_family_id
+    to new_family_id, maintaining all other fields.
+    The new_family_id must already exist.
+    """
     player = ParticipantLayer(connection)
-    return await player.add_participant_to_family(
-        family_id=family_id,
-        participant_id=participant_id,
-        paternal_id=paternal_id,
-        maternal_id=maternal_id,
-        affected=affected,
+
+    # Save current family_participant values to reinsert them
+    fp_row = await player.get_family_participant_data(
+        family_id=old_family_id, participant_id=participant_id
     )
 
+    await player.remove_participant_from_family(
+        family_id=old_family_id, participant_id=participant_id
+    )
 
-@router.delete(
-    '/{participant_id}/delete-participant-family',
-    operation_id='deleteParticipantFamily',
-)
-async def remove_participant_from_family(
-    participant_id: int,
-    family_id: int,
-    connection: Connection = get_projectless_db_connection,
-):
-    """Delete a participant from a family"""
-    player = ParticipantLayer(connection)
-    return await player.remove_participant_from_family(
-        family_id=family_id, participant_id=participant_id
+    # Use saved values to maintain the fields in the new row
+    return await player.add_participant_to_family(
+        family_id=new_family_id,
+        participant_id=participant_id,
+        paternal_id=fp_row['paternal_id'],
+        maternal_id=fp_row['maternal_id'],
+        affected=fp_row['affected'],
     )
