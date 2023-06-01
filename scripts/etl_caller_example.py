@@ -14,7 +14,7 @@ from urllib3 import Retry
 from requests.adapters import HTTPAdapter
 
 URL = 'https://metamist-etl-mnrpw3mdza-ts.a.run.app'
-TYPE = "bbv/v1"
+TYPE = "NAME_OF_EXTERNAL_PARTY/v1"
 
 
 def make_request(body: dict | list):
