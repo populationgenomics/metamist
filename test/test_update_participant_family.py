@@ -59,7 +59,7 @@ class TestParticipantFamily(DbIsolatedTest):
             family_id=2, participant_id=pid
         )
 
-        updated_expected_fp_row = {
+        expected_updated_fp_row = {
             'family_id': 2,
             'individual_id': pid,
             'paternal_id': 2,
@@ -67,4 +67,4 @@ class TestParticipantFamily(DbIsolatedTest):
             'sex': 2,
             'affected': 2,
         }
-        self.assertDictEqual(updated_fp_row, updated_expected_fp_row)
+        self.assertDictEqual(updated_fp_row, expected_updated_fp_row)
