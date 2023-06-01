@@ -12,12 +12,13 @@ class TestParticipantFamily(DbIsolatedTest):
 
         fl = FamilyLayer(self.connection)
         await fl.create_family(external_id='FAM01')
-        await fl.create_family(external_id='FAM04')
+        await fl.create_family(external_id='FAM02')
 
         pl = ParticipantLayer(self.connection)
         pid = await pl.create_participant(external_id='EX01', reported_sex=2)
         await pl.create_participant(external_id='EX01_pat', reported_sex=1)
         await pl.create_participant(external_id='EX01_mat', reported_sex=2)
+
         await pl.add_participant_to_family(
             family_id=1, participant_id=pid, paternal_id=2, maternal_id=3, affected=2
         )
