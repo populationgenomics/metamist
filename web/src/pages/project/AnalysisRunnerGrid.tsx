@@ -214,7 +214,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
                                 <SUITable.Row key={`${log.id}`}>
                                     <SUITable.Cell collapsing>
                                         <Checkbox
-                                            defaultChecked={openRows.includes(log.position)}
+                                            checked={openRows.includes(log.position)}
                                             slider
                                             onChange={() => handleToggle(log.position)}
                                         />
@@ -332,7 +332,11 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
                                             case 'script':
                                                 return (
                                                     <SUITable.Cell key={`${category}`}>
-                                                        <code>
+                                                        <code
+                                                            onClick={() =>
+                                                                handleToggle(log.position)
+                                                            }
+                                                        >
                                                             {parseScript(
                                                                 sanitiseValue(_.get(log, category))
                                                             )}
