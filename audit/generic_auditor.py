@@ -8,15 +8,15 @@ from sample_metadata.graphql import query
 
 
 ANALYSIS_TYPES = [
-    'qc',
-    'joint-calling',
-    'gvcf',
-    'cram',
-    'custom',
-    'es-index',
-    'sv',
-    'web',
-    'analysis-runner',
+    'QC',
+    'JOINT_CALLING',
+    'GVCF',
+    'CRAM',
+    'CUSTOM',
+    'ES_INDEX',
+    'SV',
+    'WEB',
+    'ANALYSIS_RUNNER',
 ]
 
 EXCLUDED_SAMPLES = [
