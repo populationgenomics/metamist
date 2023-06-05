@@ -554,6 +554,7 @@ class TestGenericAuditor(unittest.TestCase):
             sequences_moved_paths,
             _,
         ) = await auditor.check_for_uningested_or_moved_sequences(
+            bucket_name='gs://cpg-test-upload',
             sequence_filepaths_filesizes=seq_reads_sizes,
             completed_samples=completed_samples,
             seq_id_sample_id_map=seq_sample_map,
