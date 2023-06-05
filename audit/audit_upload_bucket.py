@@ -157,6 +157,8 @@ async def audit_upload_bucket_files(
     config = get_config()
     if not dataset:
         dataset = config['workflow']['dataset']
+    if config['workflow']['access_level'] == 'test':
+        dataset = f'{dataset}-test'
 
     auditor = UploadBucketAuditor(
         dataset=dataset,
