@@ -4,10 +4,6 @@ import os
 from typing import Any
 
 from audit.audithelper import AuditHelper
-from sample_metadata.apis import AnalysisApi
-from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.model.analysis_type import AnalysisType
-from sample_metadata.model.analysis_status import AnalysisStatus
 from sample_metadata.graphql import query
 
 
@@ -64,6 +60,19 @@ PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
         }
         """
 
+SAMPLE_ANALYSIS_QUERY = """
+        query sampleCrams($sampleId: String!, $analysisType: String!) {
+          sample(id: $sampleId) {
+            analyses(status: COMPLETED, type: $analysisType}) {
+              id
+              meta
+              output
+              timestampCompleted
+            }
+          }
+        }
+"""
+
 # Variable type definitions
 SequenceId = int
 SampleId = str
@@ -98,8 +107,6 @@ class GenericAuditor(AuditHelper):
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
-
-        self.aapi = AnalysisApi()
 
     def get_participant_data_for_dataset(self) -> list[dict]:
         """
@@ -186,14 +193,23 @@ class GenericAuditor(AuditHelper):
 
         return sample_internal_external_id_map
 
-    def get_sequence_mapping(
-        self, all_sequences: list[dict]
+    def get_sequence_map_from_participants(
+        self, participants: list[dict]
     ) -> tuple[dict[Any, Any], defaultdict[Any, list[tuple[Any, Any]]]]:
         """
-        Input: A list of Metamist sequences
-        Returns dict mappings of:
+        Input the list of Metamist participant dictionaries from the master graphql Query
+
+        Returns dictionary mappings:
         {sequence_id : sample_internal_id}, and {sequence_id : (sequence_filepath, sequence_filesize)}
         """
+        all_sequences = [
+            {
+                sample.get('id'): sample.get('sequences')
+                for sample in participant.get('samples')
+            }
+            for participant in participants
+        ]
+
         seq_id_sample_id_map = {}
         # multiple reads per sequence is possible so use defaultdict(list)
         sequence_filepaths_filesizes = defaultdict(list)
@@ -253,20 +269,6 @@ class GenericAuditor(AuditHelper):
 
         return seq_id_sample_id_map, sequence_filepaths_filesizes
 
-    def get_sequences_from_participants(
-        self, participants: list[dict]
-    ) -> tuple[dict[Any, Any], defaultdict[Any, list[tuple[Any, Any]]]]:
-        """Return latest sequence ids for internal sample ids"""
-        all_sequences = [
-            {
-                sample.get('id'): sample.get('sequences')
-                for sample in participant.get('samples')
-            }
-            for participant in participants
-        ]
-
-        return self.get_sequence_mapping(all_sequences)
-
     def get_analysis_cram_paths_for_dataset_samples(
         self,
         sample_internal_to_external_id_map: dict[str, str],
@@ -276,22 +278,14 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sample_id : (analysis_id, cram_path) }
         """
         sample_ids = list(sample_internal_to_external_id_map.keys())
-        datasets = [
-            self.dataset,
-        ]
-        if 'test' not in self.dataset:
-            datasets.append('seqr')
 
-        analyses = self.aapi.query_analyses(
-            AnalysisQueryModel(
-                projects=datasets,
-                type=AnalysisType(self.default_analysis_type),
-                status=AnalysisStatus(
-                    self.default_analysis_status
-                ),  # Only interested in aligned crams
-                sample_ids=sample_ids,
+        analyses = []
+        for sample in sample_ids:
+            analyses.extend(
+                query(
+                    SAMPLE_ANALYSIS_QUERY, {'sampleId': sample, 'analysisType': 'CRAM'}
+                )['sample']['analyses']
             )
-        )
 
         # Report any crams missing the sequence type
         crams_with_missing_seq_type = [
@@ -349,44 +343,46 @@ class GenericAuditor(AuditHelper):
         all_sample_analyses: defaultdict[str, list[dict[str, int | str]]] = defaultdict(
             list
         )
+
+        analyses = []
         for analysis_type in ANALYSIS_TYPES:
-            analyses = self.aapi.query_analyses(
-                AnalysisQueryModel(
-                    projects=datasets,
-                    type=AnalysisType(analysis_type),
-                    status=AnalysisStatus(
-                        self.default_analysis_status
-                    ),  # Only interested in completed analyses
-                    sample_ids=samples_without_crams,
+            if analysis_type == 'CRAM':
+                continue
+            for sample in samples_without_crams:
+                analyses.extend(
+                    query(
+                        SAMPLE_ANALYSIS_QUERY,
+                        {'sampleId': sample, 'analysisType': analysis_type},
+                    )['sample']['analyses']
                 )
-            )
-            for analysis in analyses:
+
+        for analysis in analyses:
+            try:
+                # Try getting the sample IDs from the 'sample_ids' field
+                samples = analysis['sample_ids']
+            except KeyError:
+                # Try getting the sample IDs from the 'sample' meta field
                 try:
-                    # Try getting the sample IDs from the 'sample_ids' field
-                    samples = analysis['sample_ids']
+                    samples = analysis['meta']['sample']
+                # Try getting the sample ID from the 'samples' meta field
                 except KeyError:
-                    # Try getting the sample IDs from the 'sample' meta field
-                    try:
-                        samples = analysis['meta']['sample']
-                    # Try getting the sample ID from the 'samples' meta field
-                    except KeyError:
-                        samples = analysis['meta']['samples']
+                    samples = analysis['meta']['samples']
 
-                if not isinstance(samples, list):
-                    samples = [
-                        samples,
-                    ]
+            if not isinstance(samples, list):
+                samples = [
+                    samples,
+                ]
 
-                for sample_id in samples:
-                    if sample_id not in samples_without_crams:
-                        continue
-                    analysis_entry = {
-                        'analysis_id': analysis.get('id'),
-                        'analysis_type': analysis.get('type'),
-                        'analysis_output': analysis.get('output'),
-                        'timestamp_completed': analysis.get('timestampCompleted'),
-                    }
-                    all_sample_analyses[sample_id].append(analysis_entry)
+            for sample_id in samples:
+                if sample_id not in samples_without_crams:
+                    continue
+                analysis_entry = {
+                    'analysis_id': analysis.get('id'),
+                    'analysis_type': analysis.get('type'),
+                    'analysis_output': analysis.get('output'),
+                    'timestamp_completed': analysis.get('timestampCompleted'),
+                }
+                all_sample_analyses[sample_id].append(analysis_entry)
 
         if all_sample_analyses:
             for sample_without_cram, completed_analyses in all_sample_analyses.items():
