@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Any
 
-from audit.audithelper import AuditHelper
+from sample_metadata.audit.audithelper import AuditHelper
 from sample_metadata.graphql import query
 
 
