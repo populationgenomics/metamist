@@ -15,7 +15,7 @@ ANALYSIS_TYPES = [
     'CUSTOM',
     'ES_INDEX',
     'SV',
-    'WEB',
+    'WEB_REPORT',
     'ANALYSIS_RUNNER',
 ]
 
