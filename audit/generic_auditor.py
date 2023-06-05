@@ -431,6 +431,7 @@ class GenericAuditor(AuditHelper):
 
     async def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
         self,
+        bucket_name: str,
         sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         completed_samples: defaultdict[str, list[int]],
         seq_id_sample_id_map: dict[int, str],
@@ -450,10 +451,6 @@ class GenericAuditor(AuditHelper):
                     their original location to a new location.
                  3. The paths saved in metamist for the read data that has been moved. These paths go nowhere.
         """
-        bucket_name = f'cpg-{self.dataset}-upload'
-        if 'test' not in self.dataset:
-            bucket_name = f'cpg-{self.dataset}-main-upload'
-
         # Get all the paths to sequence data anywhere in the main-upload bucket
         sequence_paths_in_bucket = self.find_sequence_files_in_gcs_bucket(
             bucket_name, self.file_types
@@ -550,6 +547,7 @@ class GenericAuditor(AuditHelper):
 
     async def get_reads_to_delete_or_ingest(
         self,
+        bucket_name: str,
         completed_samples: defaultdict[str, list[int]],
         sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
         seq_id_sample_id_map: dict[int, str],
@@ -570,6 +568,7 @@ class GenericAuditor(AuditHelper):
             moved_sequences_to_delete,
             metamist_paths_to_nowhere,
         ) = await self.check_for_uningested_or_moved_sequences(
+            bucket_name,
             sequence_filepaths_filesizes,
             completed_samples,
             seq_id_sample_id_map,

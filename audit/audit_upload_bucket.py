@@ -86,6 +86,7 @@ class UploadBucketAuditor(GenericAuditor):
 
     def write_upload_bucket_audit_reports(
         self,
+        bucket_name: str,
         sequence_type_str: str,
         file_types_str: str,
         sequence_files_to_delete: list[tuple[str, int, str, list[int]]],
@@ -96,9 +97,7 @@ class UploadBucketAuditor(GenericAuditor):
         # Writing the output to files with the file type, sequence type, and date specified
         today = datetime.today().strftime('%Y-%m-%d')
 
-        bucket_name = get_config()['storage']['default']['upload']
-
-        report_path = f'gs://{bucket_name}/audit_results/{today}/'
+        report_path = f'{bucket_name}/audit_results/{today}/'
 
         # Sequences to delete report has several data points for validation
         if not sequence_files_to_delete:
@@ -158,6 +157,8 @@ async def audit_upload_bucket_files(
     if not dataset:
         dataset = config['workflow']['dataset']
 
+    bucket_name = config['storage']['default']['upload']
+
     auditor = UploadBucketAuditor(
         dataset=dataset,
         sequence_type=SEQUENCE_TYPES_MAP.get(sequence_type),
@@ -199,6 +200,7 @@ async def audit_upload_bucket_files(
         sequence_reads_to_delete,
         sequence_files_to_ingest,
     ) = await auditor.get_reads_to_delete_or_ingest(
+        bucket_name,
         sample_completion.get('complete'),
         sequence_filepaths_filesizes,
         seq_id_sample_id_map,
@@ -210,6 +212,7 @@ async def audit_upload_bucket_files(
     )
 
     auditor.write_upload_bucket_audit_reports(
+        bucket_name,
         sequence_type_str=sequence_type,
         file_types_str=file_types,
         sequence_files_to_delete=sequence_reads_to_delete,
