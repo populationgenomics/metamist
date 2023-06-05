@@ -3,13 +3,20 @@ import { Table as SUITable, Popup, Checkbox } from 'semantic-ui-react'
 import _ from 'lodash'
 import Table from '../../../shared/components/Table'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
-import parseEmail from '../../../shared/utilities/parseEmail'
-import parseDate from '../../../shared/utilities/parseDate'
-import parseDriverImage from '../../../shared/utilities/parseDriverImage'
+
 import { Filter } from './Filter'
 import './AnalysisGrid.css'
 
-const EXCLUDED_FIELDS = ['id', 'commit', 'source', 'position', 'batch_url', 'repo']
+const EXCLUDED_FIELDS = [
+    'id',
+    'commit',
+    'source',
+    'position',
+    'batch_url',
+    'repo',
+    'email',
+    'timestamp',
+]
 
 const MAIN_FIELDS = [
     {
@@ -17,11 +24,11 @@ const MAIN_FIELDS = [
         title: 'Hail Batch',
     },
     { category: 'GitHub', title: 'GitHub' },
-    { category: 'author', title: 'Author' },
-    { category: 'timestamp', title: 'Date' },
+    { category: 'Author', title: 'Author' },
+    { category: 'Date', title: 'Date' },
     { category: 'script', title: 'Script' },
     { category: 'accessLevel', title: 'Access Level' },
-    { category: 'driverImage', title: 'Driver Image' },
+    { category: 'Image', title: 'Driver Image' },
     { category: 'description', title: 'Description' },
 ]
 
@@ -146,10 +153,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                     rel="noopener noreferrer"
                                                     target="_blank"
                                                 >
-                                                    {log.batch_url.replace(
-                                                        'https://batch.hail.populationgenomics.org.au/',
-                                                        ''
-                                                    )}
+                                                    {_.get(log, category)}
                                                 </a>
                                             </SUITable.Cell>
                                         )
@@ -164,11 +168,11 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                     rel="noopener noreferrer"
                                                     target="_blank"
                                                 >
-                                                    {log.repo}@{log.commit.substring(0, 7)}
+                                                    {_.get(log, category)}
                                                 </a>
                                             </SUITable.Cell>
                                         )
-                                    case 'author':
+                                    case 'Author':
                                         return (
                                             <SUITable.Cell
                                                 key={category}
@@ -182,63 +186,54 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                                 cursor: 'pointer',
                                                             }}
                                                             onClick={() => {
+                                                                const author = _.get(log, category)
                                                                 if (
-                                                                    filters.filter(
+                                                                    filters.find(
                                                                         (f) =>
                                                                             f.category === category
-                                                                    ).length > 0
+                                                                    )?.value === author
                                                                 ) {
-                                                                    updateFilter('', 'author')
+                                                                    updateFilter('', 'Author')
                                                                 } else {
                                                                     updateFilter(
                                                                         _.get(log, category),
-                                                                        'author'
+                                                                        'Author'
                                                                     )
                                                                 }
                                                             }}
                                                         >
-                                                            {parseEmail(
-                                                                sanitiseValue(_.get(log, category))
-                                                            )}
+                                                            {_.get(log, category)}
                                                         </span>
                                                     }
                                                     hoverable
                                                     position="bottom center"
                                                 >
-                                                    {sanitiseValue(_.get(log, category))}
+                                                    {_.get(log, 'email')}
                                                 </Popup>
                                             </SUITable.Cell>
                                         )
-                                    case 'timestamp':
+                                    case 'Date':
                                         return (
                                             <SUITable.Cell
                                                 key={category}
                                                 style={{ width: '100px' }}
                                             >
                                                 <Popup
-                                                    trigger={
-                                                        <span>
-                                                            {parseDate(
-                                                                sanitiseValue(_.get(log, category))
-                                                            )}
-                                                        </span>
-                                                    }
+                                                    trigger={<span>{_.get(log, 'Date')}</span>}
                                                     hoverable
                                                     position="bottom center"
                                                 >
-                                                    {sanitiseValue(_.get(log, category))}
+                                                    {_.get(log, 'timestamp')}
                                                 </Popup>
                                             </SUITable.Cell>
                                         )
-                                    case 'driverImage':
+                                    case 'Image':
                                         return (
                                             <SUITable.Cell
                                                 key={category}
                                                 style={{ width: '100px' }}
                                             >
-                                                {parseDriverImage(
-                                                    sanitiseValue(_.get(log, category))
-                                                )}
+                                                {_.get(log, category)}
                                             </SUITable.Cell>
                                         )
                                     case 'script':
@@ -281,9 +276,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                         }
                                                     }}
                                                 >
-                                                    {parseEmail(
-                                                        sanitiseValue(_.get(log, category))
-                                                    )}
+                                                    {_.get(log, category)}
                                                 </span>
                                             </SUITable.Cell>
                                         )

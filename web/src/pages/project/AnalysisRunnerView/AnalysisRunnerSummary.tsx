@@ -10,6 +10,10 @@ import MuckError from '../../../shared/components/MuckError'
 import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import PageOptions from '../PageOptions'
 import { Filter } from './Filter'
+import sanitiseValue from '../../../shared/utilities/sanitiseValue'
+import parseDate from '../../../shared/utilities/parseDate'
+import parseEmail from '../../../shared/utilities/parseEmail'
+import parseDriverImage from '../../../shared/utilities/parseDriverImage'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -86,11 +90,16 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         )
 
     const flatData = data.project.analyses.map(({ author, id, output, meta }, i) => ({
-        author,
+        email: author,
         id,
         output,
         ...meta,
         position: i,
+        'Hail Batch': meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', ''),
+        GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
+        Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
+        Author: `${parseEmail(sanitiseValue(author))}`,
+        Image: `${parseDriverImage(sanitiseValue(meta?.driverImage))}`,
     }))
 
     return (
@@ -98,6 +107,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
             <ProjectSelector onClickFunction={projectSelectorOnClick} />
             <div
                 style={{
+                    marginTop: '10px',
                     marginBottom: '10px',
                     justifyContent: 'flex-end',
                     display: 'flex',
