@@ -6,7 +6,6 @@ import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 import parseEmail from '../../../shared/utilities/parseEmail'
 import parseDate from '../../../shared/utilities/parseDate'
 import parseDriverImage from '../../../shared/utilities/parseDriverImage'
-import parseScript from '../../../shared/utilities/parseScript'
 import { Filter } from './Filter'
 import './AnalysisGrid.css'
 
