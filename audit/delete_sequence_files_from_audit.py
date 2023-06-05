@@ -62,7 +62,7 @@ def main(date, sequence_type, file_types):
     bucket_name = config['storage']['default']['upload']
     file = os.path.join(
         subdir,
-        f'{dataset}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
+        f'{dataset}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
     )
 
     report_path = os.path.join(f'gs://{bucket_name}', file)

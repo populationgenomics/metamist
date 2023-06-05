@@ -1,7 +1,6 @@
 from collections import namedtuple
 import unittest
 from unittest.mock import MagicMock, patch
-import pytest
 from audit.generic_auditor import GenericAuditor
 
 # pylint: disable=dangerous-default-value
@@ -522,7 +521,6 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(result, expected_result)
 
-    @pytest.mark.asyncio
     async def test_check_for_uningested_or_moved_sequences(
         self,
         seq_reads_sizes={  # noqa: B006
