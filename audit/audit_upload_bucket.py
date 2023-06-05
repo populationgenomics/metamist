@@ -86,7 +86,6 @@ class UploadBucketAuditor(GenericAuditor):
 
     def write_upload_bucket_audit_reports(
         self,
-        access_level: str,
         sequence_type_str: str,
         file_types_str: str,
         sequence_files_to_delete: list[tuple[str, int, str, list[int]]],
@@ -97,9 +96,7 @@ class UploadBucketAuditor(GenericAuditor):
         # Writing the output to files with the file type, sequence type, and date specified
         today = datetime.today().strftime('%Y-%m-%d')
 
-        bucket_name = f'cpg-{self.dataset}-main-upload'
-        if access_level == 'test':
-            bucket_name = f'cpg-{self.dataset}-upload'
+        bucket_name = get_config()['storage']['default']['upload']
 
         report_path = f'gs://{bucket_name}/audit_results/{today}/'
 
@@ -161,10 +158,6 @@ async def audit_upload_bucket_files(
     if not dataset:
         dataset = config['workflow']['dataset']
 
-    access_level = config['workflow']['access_level']
-
-    access_level = 'full'
-
     auditor = UploadBucketAuditor(
         dataset=dataset,
         sequence_type=SEQUENCE_TYPES_MAP.get(sequence_type),
@@ -185,7 +178,7 @@ async def audit_upload_bucket_files(
     (
         seq_id_sample_id_map,
         sequence_filepaths_filesizes,
-    ) = auditor.get_sequences_from_participants(participant_data)
+    ) = auditor.get_sequence_map_from_participants(participant_data)
 
     # Get all completed cram output paths for the samples in the dataset and validate them
     sample_cram_paths = auditor.get_analysis_cram_paths_for_dataset_samples(
@@ -217,7 +210,6 @@ async def audit_upload_bucket_files(
     )
 
     auditor.write_upload_bucket_audit_reports(
-        access_level,
         sequence_type_str=sequence_type,
         file_types_str=file_types,
         sequence_files_to_delete=sequence_reads_to_delete,

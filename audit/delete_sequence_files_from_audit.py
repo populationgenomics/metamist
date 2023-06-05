@@ -46,7 +46,7 @@ def main(date, sequence_type, file_types):
     """
     Read the csv containing the results of the upload bucket audit
     Deletes the files given in the 'Sequence_Path' field of the csv
-    Relatively safe as only files in the specific audit results file can be deleted
+    Relatively safe as only files in the specific audit results csv can be deleted
     """
     config = get_config()
     dataset = config['workflow']['dataset']
@@ -59,19 +59,11 @@ def main(date, sequence_type, file_types):
             'Standard cannot be used as the access level. Full or test is required.'
         )
 
-    if access_level == 'full':
-        bucket_name = f'cpg-{dataset}-main-upload'
-        file = os.path.join(
-            subdir,
-            f'{dataset}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
-        )
-
-    else:
-        bucket_name = f'cpg-{dataset}-test-upload'
-        file = os.path.join(
-            subdir,
-            f'{dataset}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
-        )
+    bucket_name = config['storage']['default']['upload']
+    file = os.path.join(
+        subdir,
+        f'{dataset}-test_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
+    )
 
     report_path = os.path.join(f'gs://{bucket_name}', file)
 
