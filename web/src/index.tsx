@@ -8,6 +8,7 @@ import reportWebVitals from './reportWebVitals'
 import 'swagger-ui-react/swagger-ui.css'
 import 'semantic-ui-css/semantic.min.css'
 import './index.css'
+import { ThemeProvider } from './shared/components/ThemeProvider'
 
 const httpLink = createHttpLink({
     uri: '/graphql',
@@ -18,11 +19,15 @@ const client = new ApolloClient({
     cache: new InMemoryCache(),
 })
 
-// 4
+const storedTheme = localStorage.getItem('theme') || 'light-mode'
+if (storedTheme) document.documentElement.setAttribute('data-theme', storedTheme)
+
 ReactDOM.render(
     <React.StrictMode>
         <ApolloProvider client={client}>
-            <App />
+            <ThemeProvider>
+                <App />
+            </ThemeProvider>
         </ApolloProvider>
     </React.StrictMode>,
     document.getElementById('root')

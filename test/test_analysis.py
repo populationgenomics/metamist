@@ -5,6 +5,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from models.enums.sequencing import SequenceType
 from models.enums import AnalysisType, AnalysisStatus
+from models.models.analysis import Analysis
 
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer, SampleType
@@ -50,6 +51,40 @@ class TestAnalysis(DbIsolatedTest):
 
         self.assertEqual(1, analysis_samples[0]['sample_id'])
         self.assertEqual(analyses[0]['id'], analysis_samples[0]['analysis_id'])
+
+    @run_as_sync
+    async def test_get_analysis(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        """
+
+        await self.al.insert_analysis(
+            analysis_type=AnalysisType.ANALYSIS_RUNNER,
+            status=AnalysisStatus.UNKNOWN,
+            # no sample IDs to check join
+            sample_ids=[],
+            meta={},
+        )
+
+        analyses = await self.al.query_analysis(
+            project_ids=[1], analysis_type=AnalysisType.ANALYSIS_RUNNER
+        )
+        expected = [
+            Analysis(
+                id=3,
+                type=AnalysisType.ANALYSIS_RUNNER,
+                status=AnalysisStatus.UNKNOWN,
+                sample_ids=[],
+                output=None,
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author='testuser',
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
 
     @run_as_sync
     async def test_get_sample_file_sizes(self):

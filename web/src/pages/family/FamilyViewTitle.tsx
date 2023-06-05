@@ -4,18 +4,21 @@ import { useNavigate } from 'react-router-dom'
 import { Popup, Button, Grid } from 'semantic-ui-react'
 
 import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 const FamilyViewTitle: React.FunctionComponent<{
     externalId: string
     families: { id: number; externalId: string; participants: { id: number }[] }[]
     projectName: string
 }> = ({ externalId, families, projectName }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
     const navigate = useNavigate()
 
     return (
         <div
             style={{
-                borderBottom: `1px solid black`,
+                borderBottom: `1px solid  ${isDarkMode ? 'white' : 'black'}`,
             }}
         >
             <h1
