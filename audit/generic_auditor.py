@@ -60,7 +60,7 @@ PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
         """
 
 SAMPLE_ANALYSIS_QUERY = """
-        query sampleCrams($sampleId: String!, $analysisType: String!) {
+        query sampleCrams($sampleId: String!, $analysisType: AnalysisType!) {
           sample(id: $sampleId) {
             analyses(status: COMPLETED, type: $analysisType) {
               id
