@@ -128,6 +128,8 @@ class AuditHelper:
         self, bucket_name: str, file_extensions: tuple[str]
     ) -> list[str]:
         """Gets all the gs paths to fastq files in the datasets upload bucket"""
+        if bucket_name.startswith('gs://'):
+            bucket_name = bucket_name.removeprefix('gs://')
         sequence_paths = []
         if 'upload' not in bucket_name:
             # No prefix means it will get all blobs in the bucket (regardless of path)
