@@ -190,7 +190,6 @@ class GenericAuditor(AuditHelper):
             if sample_id not in EXCLUDED_SAMPLES
         }
 
-        logging.info(f'Sample Map: {sample_internal_external_id_map}')
         return sample_internal_external_id_map
 
     def get_sequence_map_from_participants(
@@ -513,8 +512,13 @@ class GenericAuditor(AuditHelper):
         uningested_reads: defaultdict[str, list[tuple[str, str]]] = defaultdict(
             list, {k: [] for k in uningested_sequence_paths}
         )
-        for sample_id in completed_samples.keys():
-            sample_ext_id = sample_id_internal_external_map[sample_id]
+        for sample_id, analysis_ids in completed_samples.items():
+            try:
+                sample_ext_id = sample_id_internal_external_map[sample_id]
+            except KeyError:
+                logging.warning(
+                    f'{sample_id} from analyses: {analysis_ids} not found in sample map.'
+                )
             for uningested_sequence in uningested_sequence_paths:
                 if sample_ext_id not in uningested_sequence:
                     continue
