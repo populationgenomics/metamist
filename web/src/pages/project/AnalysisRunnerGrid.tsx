@@ -336,6 +336,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
                                                             onClick={() =>
                                                                 handleToggle(log.position)
                                                             }
+                                                            style={{ cursor: 'pointer' }}
                                                         >
                                                             {parseScript(
                                                                 sanitiseValue(_.get(log, category))
