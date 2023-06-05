@@ -60,7 +60,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
     const [filters, setFilters] = React.useState<Filter[]>([])
     const [openRows, setOpenRows] = React.useState<number[]>([])
     const [pageNumber, setPageNumber] = React.useState<number>(1)
-    const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[0])
+    const [pageLimit, _setPageLimit] = React.useState<number>(PAGE_SIZES[2])
 
     const handleOnClick = React.useCallback((p) => {
         setPageNumber(p)
