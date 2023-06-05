@@ -42,7 +42,9 @@ jobs:
           wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
           popd
           # liquibase
-          VERSION=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/liquibase/liquibase/releases/latest | grep -o "v.*" | sed s/'>.*'//g |  sed s/'v'//g | sed 's/"//g')
+          # VERSION=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/liquibase/liquibase/releases/latest | grep -o "v.*" | sed s/'>.*'//g |  sed s/'v'//g | sed 's/"//g')
+          # v4.22.0 unavailable, manual change to use v4.21.1
+          VERSION=4.21.1
           curl -L https://github.com/liquibase/liquibase/releases/download/v${VERSION}/liquibase-${VERSION}.zip --output liquibase-${VERSION}.zip
           unzip -o -d liquibase liquibase-${VERSION}.zip
           echo "$(pwd)/liquibase" >> $GITHUB_PATH
@@ -65,7 +67,7 @@ jobs:
       - name: "Run unit tests"
         id: runtests
         run: |
-          coverage run -m unittest discover
+          coverage run -m unittest discover -s test/
           rc=$?
           coverage xml
 
