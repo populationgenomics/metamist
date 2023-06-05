@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useQuery } from '@apollo/client'
 import { Table as SUITable, Popup, Checkbox, Dropdown } from 'semantic-ui-react'
-import _, { update } from 'lodash'
+import _ from 'lodash'
 import { gql } from '../../__generated__/gql'
 import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -116,8 +116,10 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
     }))
 
     const updateFilter = (v: string, c: string) => {
-        const toAdd = v ? [{ value: v, category: c }] : []
-        setFilters([...filters.filter(({ category }) => c !== category), ...toAdd])
+        setFilters([
+            ...filters.filter(({ category }) => c !== category),
+            ...(v ? [{ value: v, category: c }] : []),
+        ])
     }
 
     return (
@@ -158,6 +160,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{ projectName: string }> = ({ 
                     )}
                     pageNumber={pageNumber}
                     handleOnClick={handleOnClick}
+                    title={'logs'}
                 />
             </div>
             <Table celled compact sortable>
