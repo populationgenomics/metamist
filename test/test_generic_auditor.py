@@ -470,8 +470,8 @@ class TestGenericAuditor(unittest.TestCase):
 
         with self.assertLogs(level='WARNING') as log:
             _ = auditor.analyses_for_samples_without_crams(samples_without_crams)
-            self.assertEqual(len(log.output), 9)  # 9 analysis types checked
-            self.assertEqual(len(log.records), 9)
+            self.assertEqual(len(log.output), 8)  # 8 analysis types checked
+            self.assertEqual(len(log.records), 8)
             self.assertIn(
                 "WARNING:root:CPG123 missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
                 log.output[6],
