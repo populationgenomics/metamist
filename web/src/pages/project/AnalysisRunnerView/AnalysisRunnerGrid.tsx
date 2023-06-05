@@ -73,9 +73,15 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                 <input
                                     type="text"
                                     key={category}
-                                    id={`${category}`}
+                                    id={category}
                                     onChange={(e) => updateFilter(e.target.value, category)}
                                     placeholder="Filter..."
+                                    value={
+                                        filters.find(
+                                            ({ category: FilterCategory }) =>
+                                                FilterCategory === category
+                                        )?.value ?? ''
+                                    }
                                     style={{ border: 'none', width: '100%', borderRadius: '25px' }}
                                 />
                             </SUITable.HeaderCell>
