@@ -1,6 +1,7 @@
 from collections import namedtuple
 import unittest
 from unittest.mock import MagicMock, patch
+import pytest
 from audit.generic_auditor import GenericAuditor
 
 # pylint: disable=dangerous-default-value
@@ -63,44 +64,54 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        sequences = [
+        participants = [
             {
-                'CPG123': [
+                'externalId': 'EX01',
+                'id': 1,
+                'samples': [
                     {
-                        'id': 1,
-                        'type': 'genome',
-                        'meta': {
-                            'reads': {
-                                'location': 'gs://cpg-dataset-main-upload/read.fq',
-                                'size': 12,
-                            }
-                        },
-                    },
-                    {
-                        'id': 2,
-                        'type': 'genome',
-                        'meta': {
-                            'reads': [
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/R1.fq',
-                                    'size': 12,
+                        'id': 'CPG123',
+                        'externalId': 'EX01',
+                        'sequences': [
+                            {
+                                'id': 1,
+                                'type': 'genome',
+                                'meta': {
+                                    'reads': {
+                                        'location': 'gs://cpg-dataset-main-upload/read.fq',
+                                        'size': 12,
+                                    }
                                 },
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/R2.fq',
-                                    'size': 13,
+                            },
+                            {
+                                'id': 2,
+                                'type': 'genome',
+                                'meta': {
+                                    'reads': [
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/R1.fq',
+                                            'size': 12,
+                                        },
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/R2.fq',
+                                            'size': 13,
+                                        },
+                                    ]
                                 },
-                            ]
-                        },
+                            },
+                            {
+                                'id': 3,
+                                'type': 'exome',
+                                'meta': {'reads': {'location': 'test', 'size': 0}},
+                            },
+                        ],
                     },
-                    {
-                        'id': 3,
-                        'type': 'exome',
-                        'meta': {'reads': {'location': 'test', 'size': 0}},
-                    },
-                ]
+                ],
             },
         ]
-        seq_sample_id_map, seq_reads_sizes = auditor.get_sequence_mapping(sequences)
+        seq_sample_id_map, seq_reads_sizes = auditor.get_sequence_map_from_participants(
+            participants
+        )
 
         expected_mapping = {1: 'CPG123', 2: 'CPG123'}
         expected_read_sizes = {
@@ -125,50 +136,67 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        sequences = [
+        participants = [
             {
-                'CPG123': [
+                'externalId': 'EX01',
+                'id': 1,
+                'samples': [
                     {
-                        'id': 1,
-                        'type': 'genome',
-                        'meta': {
-                            'reads': [
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/R1.fq',
-                                    'size': 12,
+                        'id': 'CPG123',
+                        'externalId': 'EX01',
+                        'sequences': [
+                            {
+                                'id': 1,
+                                'type': 'genome',
+                                'meta': {
+                                    'reads': [
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/R1.fq',
+                                            'size': 12,
+                                        },
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/R2.fq',
+                                            'size': 13,
+                                        },
+                                    ]
                                 },
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/R2.fq',
-                                    'size': 13,
-                                },
-                            ]
-                        },
+                            },
+                        ],
                     },
                 ],
             },
             {
-                'CPG456': [
+                'externalId': 'EX02',
+                'id': 2,
+                'samples': [
                     {
-                        'id': 2,
-                        'type': 'exome',
-                        'meta': {
-                            'reads': [
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/exomes/R1.fq',
-                                    'size': 14,
+                        'id': 'CPG456',
+                        'externalId': 'EX02',
+                        'sequences': [
+                            {
+                                'id': 2,
+                                'type': 'exome',
+                                'meta': {
+                                    'reads': [
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/exomes/R1.fq',
+                                            'size': 14,
+                                        },
+                                        {
+                                            'location': 'gs://cpg-dataset-main-upload/exomes/R2.fq',
+                                            'size': 15,
+                                        },
+                                    ]
                                 },
-                                {
-                                    'location': 'gs://cpg-dataset-main-upload/exomes/R2.fq',
-                                    'size': 15,
-                                },
-                            ],
-                        },
-                    }
+                            },
+                        ],
+                    },
                 ],
             },
         ]
-        seq_sample_id_map, seq_reads_sizes = auditor.get_sequence_mapping(sequences)
-
+        seq_sample_id_map, seq_reads_sizes = auditor.get_sequence_map_from_participants(
+            participants
+        )
         expected_mapping = {1: 'CPG123', 2: 'CPG456'}
         expected_read_sizes = {
             1: [
@@ -193,19 +221,29 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        sequences = [
+        participants = [
             {
-                'CPG123': [
+                'externalId': 'EX01',
+                'id': 1,
+                'samples': [
                     {
-                        'id': 1,
-                        'type': 'genome',
-                        'meta': {'reads': 'gs://cpg-dataset-main-upload/read.cram'},
+                        'id': 'CPG123',
+                        'externalId': 'EX01',
+                        'sequences': [
+                            {
+                                'id': 1,
+                                'type': 'genome',
+                                'meta': {
+                                    'reads': 'gs://cpg-dataset-main-upload/read.cram'
+                                },
+                            },
+                        ],
                     },
                 ],
             },
         ]
         with self.assertLogs(level='ERROR') as log:
-            _, _ = auditor.get_sequence_mapping(sequences)
+            _, _ = auditor.get_sequence_map_from_participants(participants)
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
@@ -213,7 +251,8 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    def test_query_genome_analyses_crams(self):
+    @patch('audit.generic_auditor.query')
+    def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
             'dev',
@@ -222,27 +261,40 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        auditor.aapi = MagicMock()
-        auditor.aapi.query_analyses.return_value = [
+        mock_query.side_effect = [
             {
-                'id': 1,
-                'meta': {
-                    'sequencing_type': 'genome',
+                'sample': {
+                    'id': 'CPG123',
+                    'analyses': [
+                        {
+                            'id': 1,
+                            'meta': {
+                                'sequencing_type': 'genome',
+                            },
+                            'sample_ids': [
+                                'CPG123',
+                            ],
+                            'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                        },
+                    ],
                 },
-                'sample_ids': [
-                    'CPG123',
-                ],
-                'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
             },
             {
-                'id': 2,
-                'meta': {
-                    'sequencing_type': 'exome',
+                'sample': {
+                    'id': 'CPG456',
+                    'analyses': [
+                        {
+                            'id': 2,
+                            'meta': {
+                                'sequencing_type': 'exome',
+                            },
+                            'sample_ids': [
+                                'CPG456',
+                            ],
+                            'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
+                        },
+                    ],
                 },
-                'sample_ids': [
-                    'CPG456',
-                ],
-                'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
             },
         ]
 
@@ -254,7 +306,8 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    def test_query_genome_and_exome_analyses_crams(self):
+    @patch('audit.generic_auditor.query')
+    def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
             'dev',
@@ -263,27 +316,40 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        auditor.aapi = MagicMock()
-        auditor.aapi.query_analyses.return_value = [
+        mock_query.side_effect = [
             {
-                'id': 1,
-                'meta': {
-                    'sequencing_type': 'genome',
+                'sample': {
+                    'id': 'CPG123',
+                    'analyses': [
+                        {
+                            'id': 1,
+                            'meta': {
+                                'sequencing_type': 'genome',
+                            },
+                            'sample_ids': [
+                                'CPG123',
+                            ],
+                            'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                        },
+                    ],
                 },
-                'sample_ids': [
-                    'CPG123',
-                ],
-                'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
             },
             {
-                'id': 2,
-                'meta': {
-                    'sequencing_type': 'exome',
+                'sample': {
+                    'id': 'CPG456',
+                    'analyses': [
+                        {
+                            'id': 2,
+                            'meta': {
+                                'sequencing_type': 'exome',
+                            },
+                            'sample_ids': [
+                                'CPG456',
+                            ],
+                            'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
+                        },
+                    ],
                 },
-                'sample_ids': [
-                    'CPG456',
-                ],
-                'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
             },
         ]
 
@@ -298,7 +364,8 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    def test_query_broken_analyses_crams(self):
+    @patch('audit.generic_auditor.query')
+    def test_query_broken_analyses_crams(self, mock_query):
         """All analysis crams must have 'sequencing_type' meta field, ValueError raised if not"""
         auditor = GenericAuditor(
             'dev',
@@ -307,25 +374,30 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        auditor.aapi = MagicMock()
-        auditor.aapi.query_analyses.return_value = [
-            {
-                'id': 1,
-                'meta': {
-                    'sequence_type': 'genome',
-                },
-                'sample_ids': [
-                    'CPG123',
+        mock_query.return_value = {
+            'sample': {
+                'id': 'CPG123',
+                'analyses': [
+                    {
+                        'id': 1,
+                        'meta': {
+                            'sequence_type': 'genome',
+                        },
+                        'sample_ids': [
+                            'CPG123',
+                        ],
+                    },
                 ],
             },
-        ]
+        }
 
         with self.assertRaises(ValueError):
             auditor.get_analysis_cram_paths_for_dataset_samples(
                 sample_internal_to_external_id_map={'CPG123': 'EXT123'}
             )
 
-    def test_query_analyses_crams_warning(self):
+    @patch('audit.generic_auditor.query')
+    def test_query_analyses_crams_warning(self, mock_query):
         """Warn if the sample_ids field is absent and the sample meta field is used instead"""
         auditor = GenericAuditor(
             'dev',
@@ -334,17 +406,21 @@ class TestGenericAuditor(unittest.TestCase):
                 'fastq',
             ],
         )
-        auditor.aapi = MagicMock()
-        auditor.aapi.query_analyses.return_value = [
-            {
-                'id': 1,
-                'meta': {
-                    'sequencing_type': 'genome',
-                    'sample': 'CPG123',
-                },
-                'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
-            },
-        ]
+        mock_query.return_value = {
+            'sample': {
+                'id': 'CPG123',
+                'analyses': [
+                    {
+                        'id': 1,
+                        'meta': {
+                            'sequencing_type': 'genome',
+                            'sample': 'CPG123',
+                        },
+                        'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                    },
+                ],
+            }
+        }
 
         with self.assertLogs(level='WARNING') as log:
             test_result = auditor.get_analysis_cram_paths_for_dataset_samples(
@@ -361,10 +437,15 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
+    @patch('audit.generic_auditor.query')
     def test_analyses_for_samples_without_crams(
-        self, samples_without_crams=['CPG123', 'CPG456']  # noqa: B006
+        self,
+        mock_query,
+        samples_without_crams=[  # noqa: B006
+            'CPG123',
+        ],
     ):
-        """ "Log any analyses found for samples without completed CRAMs"""
+        """Log any analyses found for samples without completed CRAMs"""
         auditor = GenericAuditor(
             'dev',
             ['genome'],
@@ -373,16 +454,20 @@ class TestGenericAuditor(unittest.TestCase):
             ],
         )
 
-        auditor.aapi = MagicMock()
-        auditor.aapi.query_analyses.return_value = [
-            {
-                'id': 1,
-                'meta': {'sequencing_type': 'genome', 'sample': 'CPG123'},
-                'output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz',
-                'type': 'gvcf',
-                'timestampCompleted': '2023-05-11T16:33:00',
-            },
-        ]
+        mock_query.return_value = {
+            'sample': {
+                'id': 'CPG123',
+                'analyses': [
+                    {
+                        'id': 1,
+                        'meta': {'sequencing_type': 'genome', 'sample': 'CPG123'},
+                        'output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz',
+                        'type': 'gvcf',
+                        'timestampCompleted': '2023-05-11T16:33:00',
+                    }
+                ],
+            }
+        }
 
         with self.assertLogs(level='WARNING') as log:
             _ = auditor.analyses_for_samples_without_crams(samples_without_crams)
@@ -437,6 +522,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(result, expected_result)
 
+    @pytest.mark.asyncio
     async def test_check_for_uningested_or_moved_sequences(
         self,
         seq_reads_sizes={  # noqa: B006
