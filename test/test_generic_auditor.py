@@ -1,7 +1,7 @@
 from collections import namedtuple
 import unittest
 from unittest.mock import MagicMock, patch
-from audit.generic_auditor import GenericAuditor
+from sample_metadata.audit.generic_auditor import GenericAuditor
 
 # pylint: disable=dangerous-default-value
 # noqa: B006
