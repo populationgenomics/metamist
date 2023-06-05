@@ -48,7 +48,6 @@ PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
                     samples {
                         id
                         externalId
-                        type
                         sequences {
                             id
                             meta
@@ -286,7 +285,6 @@ class GenericAuditor(AuditHelper):
                     SAMPLE_ANALYSIS_QUERY, {'sampleId': sample, 'analysisType': 'CRAM'}
                 )['sample']['analyses']
             )
-
         # Report any crams missing the sequence type
         crams_with_missing_seq_type = [
             analysis.get('id')
@@ -334,11 +332,6 @@ class GenericAuditor(AuditHelper):
 
     def analyses_for_samples_without_crams(self, samples_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
-        datasets = [
-            self.dataset,
-        ]
-        if 'test' not in self.dataset:
-            datasets.append('seqr')
 
         all_sample_analyses: defaultdict[str, list[dict[str, int | str]]] = defaultdict(
             list
