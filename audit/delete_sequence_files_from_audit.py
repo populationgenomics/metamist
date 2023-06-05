@@ -65,7 +65,7 @@ def main(date, sequence_type, file_types):
         f'{dataset}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
     )
 
-    report_path = os.path.join(f'gs://{bucket_name}', file)
+    report_path = os.path.join(bucket_name, file)
 
     paths = set()
     with AnyPath(report_path).open('r') as f:  # pylint: disable=E1101
