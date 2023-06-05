@@ -190,6 +190,7 @@ class GenericAuditor(AuditHelper):
             if sample_id not in EXCLUDED_SAMPLES
         }
 
+        logging.info(f'Sample Map: {sample_internal_external_id_map}')
         return sample_internal_external_id_map
 
     def get_sequence_map_from_participants(
