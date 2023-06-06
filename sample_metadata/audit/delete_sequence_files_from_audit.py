@@ -1,4 +1,17 @@
 #!/usr/bin/env python
+
+"""
+This script will take a path to a csv file, containing a column with rows populated
+by paths to delete. The --delete-field-name option allows you to specify which field
+of the csv contains the paths to delete.
+Creates a log file of all the deletes, in the same directory as the input csv.
+
+The typical upload-bucket audit results will be found in a file such as:
+ > gs://cpg-dataset-main-upload/audit_results/2023-xx-xx/dataset_seqtype_readstype_sequences_to_delete_2023-xx-xx.csv
+And the field name containing the delete paths will be
+ > "Sequence_Path"
+"""
+
 import csv
 from datetime import datetime
 import logging
