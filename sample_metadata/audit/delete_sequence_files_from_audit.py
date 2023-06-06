@@ -8,6 +8,7 @@ import click
 from google.cloud import storage
 from cloudpathlib import CloudPath, AnyPath
 from cpg_utils.config import get_config
+from sample_metadata.audit.audithelper import AuditHelper
 
 
 CLIENT = storage.Client()
@@ -17,65 +18,55 @@ TODAY = datetime.today().strftime('%Y-%m-%d')
 
 def clean_up_cloud_storage(locations: list[CloudPath]):
     """Given a list of locations of files to be deleted"""
+    deleted_files = []
     for location in locations:
         try:
             location.unlink()
             logging.info(f'{location.name} was deleted from cloud storage.')
+            deleted_files.append(location.name)
         # Many possible http exceptions could occur so use a broad exception
         except Exception:  # pylint: disable=W0718
             logging.warning(f'{location.name} threw an exception - file not deleted.')
 
+    return deleted_files
+
 
 @click.command('Delete the sequence paths found by the audit')
-@click.option('--date', help='Date of audit results to pass to delete', default=TODAY)
 @click.option(
-    '--sequence-type',
-    '-s',
-    type=click.Choice(['genome', 'exome', 'all']),
-    required='True',
-    help='genome, exome, or all',
+    '--delete-field-name',
+    '-d',
+    help='The field in the input csv corresponding to the files to delete',
+    required=True,
 )
-@click.option(
-    '--file-types',
-    '-f',
-    type=click.Choice(['fastq', 'bam', 'cram', 'all_reads', 'gvcf', 'vcf', 'all']),
-    required='True',
-    help='Delete fastq, bam, cram, all_reads (fastq + bam + cram), gvcf, vcf, or all sequence file types',
-)
-def main(date, sequence_type, file_types):
+@click.argument('delete-file-path')
+def main(delete_field_name, delete_file_path):
     """
-    Read the csv containing the results of the upload bucket audit
-    Deletes the files given in the 'Sequence_Path' field of the csv
-    Relatively safe as only files in the specific audit results csv can be deleted
+    Inputs:
+        - The name of the field containing the paths to delete in the input csv
+        - The full GSPath to the csv containing the paths to delete
     """
-    config = get_config()
-    dataset = config['workflow']['dataset']
-    access_level = config['workflow']['access_level']
-
-    subdir = os.path.join('audit_results', date)
+    access_level = get_config()['workflow']['access_level']
 
     if access_level == 'standard':
         raise ValueError(
             'Standard cannot be used as the access level. Full or test is required.'
         )
 
-    bucket_name = config['storage']['default']['upload']
-    file = os.path.join(
-        subdir,
-        f'{dataset}_{file_types}_{sequence_type}_sequences_to_delete_{date}.csv',
-    )
-
-    report_path = os.path.join(bucket_name, file)
-
     paths = set()
-    with AnyPath(report_path).open('r') as f:  # pylint: disable=E1101
-        logging.info(f'Getting file {report_path}...')
+    with AnyPath(delete_file_path).open('r') as f:  # pylint: disable=E1101
+        logging.info(f'Getting file {delete_file_path}...')
         reader = csv.DictReader(f)
         for row in reader:
-            paths.add(CloudPath(row['Sequence_Path']))
+            paths.add(CloudPath(row[delete_field_name]))
 
-    clean_up_cloud_storage(list(paths))
-    logging.info(f'{len(paths)} sequence files deleted.')
+    deleted_files = clean_up_cloud_storage(list(paths))
+    logging.info(f'{len(deleted_files)} sequence files deleted.')
+
+    # Write a log of the deleted files to the same location
+    log_path = f'{delete_file_path.removesuffix(os.path.basename(delete_file_path))}deleted_{TODAY}.csv'
+    AuditHelper.write_csv_report_to_cloud(
+        deleted_files, log_path, header_row=['Deleted_file_path']
+    )
 
 
 if __name__ == '__main__':

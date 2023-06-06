@@ -99,7 +99,7 @@ class GenericAuditor(AuditHelper):
         if not dataset:
             raise ValueError('Metamist dataset is required')
 
-        super().__init__()
+        super().__init__(search_paths=None)
 
         self.dataset = dataset
         self.sequence_type = sequence_type

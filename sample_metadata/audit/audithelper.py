@@ -1,73 +1,16 @@
 # pylint: disable=no-member
-import logging
-from collections import defaultdict
 import csv
-from datetime import datetime
+from collections import defaultdict
+import logging
 from typing import Any
 
 from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from google.cloud import storage
+from sample_metadata.parser.cloudhelper import CloudHelper
 
 
-class AuditHelper:
+class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
-
-    LOCAL_PREFIX = '/'
-    GCS_PREFIX = 'gs://'
-    AZ_PREFIX = 'az://'
-
-    def __init__(self):
-        # gs specific
-        self._gcs_client = None
-        self.gcs_bucket_refs: dict[str, storage.Bucket] = {}
-
-    async def file_size(self, filepath: str) -> int:
-        """Get size of file in bytes"""
-        return AnyPath(filepath).stat().st_size
-
-    async def datetime_added(self, filepath: str) -> datetime | None:
-        """Get the date and time the file was created"""
-        if filepath.startswith('gs://'):
-            # add a specific case for GCS as the AnyPath implementation calls
-            # bucket.get_blob which triggers a read (which humans are not permitted)
-            blob = await self.get_gcs_blob(filepath)
-            return blob.time_created
-
-        ctime = AnyPath(filepath).stat().st_ctime
-        if not ctime:
-            return None
-
-        return datetime.utcfromtimestamp(ctime)
-
-    # GCS specific methods
-    @property
-    def gcs_client(self) -> storage.Client:
-        """Get GCP storage client"""
-        if not self._gcs_client:
-            self._gcs_client = storage.Client()
-        return self._gcs_client
-
-    def get_gcs_bucket(self, bucket_name: str) -> storage.Bucket:
-        """Get cached bucket client from optional bucket name"""
-        assert bucket_name
-        if bucket_name not in self.gcs_bucket_refs:
-            self.gcs_bucket_refs[bucket_name] = self.gcs_client.get_bucket(bucket_name)
-
-        return self.gcs_bucket_refs[bucket_name]
-
-    async def get_gcs_blob(self, filepath: str) -> storage.Blob | None:
-        """Convenience function for getting blob from fully qualified GCS path"""
-        if not filepath.startswith(self.GCS_PREFIX):
-            raise ValueError('No blob available')
-
-        blob = storage.Blob.from_string(filepath, client=self.gcs_client)
-
-        if not blob.exists():
-            # maintain existing behaviour
-            return None
-
-        return blob
 
     @staticmethod
     def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
