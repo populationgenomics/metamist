@@ -4,7 +4,7 @@ from db.python.layers.family import FamilyLayer
 
 
 class TestParticipantFamily(DbIsolatedTest):
-    """Test getting participants"""
+    """Test moving a participant from one family to another"""
 
     @run_as_sync
     async def setUp(self) -> None:
