@@ -80,6 +80,7 @@ def main(delete_field_name, delete_file_path):
     AuditHelper.write_csv_report_to_cloud(
         deleted_files, log_path, header_row=['Deleted_file_path']
     )
+    logging.info(f'Wrote deletion log to {log_path}.')
 
 
 if __name__ == '__main__':
