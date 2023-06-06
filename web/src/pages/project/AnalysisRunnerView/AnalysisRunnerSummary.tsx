@@ -58,7 +58,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
     }
 
     const projectSelectorOnClick = React.useCallback(
-        ({ value }) => {
+        (__, { value }) => {
             navigate(`/analysis-runner/${value}`)
         },
         [navigate]
@@ -80,16 +80,7 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         ])
     }
 
-    if (loading) return <LoadingDucks />
-    if (error) return <>Error! {error.message}</>
-    if (!data?.project.analyses.length)
-        return (
-            <MuckError
-                message={`Ah Muck, there are no analysis-runner logs for this project here`}
-            />
-        )
-
-    const flatData = data.project.analyses.map(({ author, id, output, meta }, i) => ({
+    const flatData = data?.project.analyses.map(({ author, id, output, meta }, i) => ({
         email: author,
         id,
         output,
@@ -99,87 +90,102 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
         Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
         Author: `${parseEmail(sanitiseValue(author))}`,
-        Image: `${parseDriverImage(sanitiseValue(meta?.driverImage))}`,
+        Image: meta?.driverImage ? `${parseDriverImage(sanitiseValue(meta?.driverImage))}` : '',
     }))
 
     return (
         <>
             <ProjectSelector onClickFunction={projectSelectorOnClick} />
-            <div
-                style={{
-                    marginTop: '10px',
-                    marginBottom: '10px',
-                    justifyContent: 'flex-end',
-                    display: 'flex',
-                    flexDirection: 'row',
-                }}
-            >
-                <Dropdown
-                    selection
-                    onChange={setPageLimit}
-                    value={pageLimit}
-                    options={PAGE_SIZES.map((s) => ({
-                        key: s,
-                        text: `${s} samples`,
-                        value: s,
-                    }))}
+            {projectName && loading && <LoadingDucks />}
+            {projectName && error && <>Error! {error.message}</>}
+            {projectName && !loading && !flatData?.length && (
+                <MuckError
+                    message={`Ah Muck, there are no analysis-runner logs for this project here`}
                 />
-                <PageOptions
-                    isLoading={loading}
-                    totalPageNumbers={Math.ceil(
-                        (flatData.filter((log) =>
-                            filters.every(({ category, value }) =>
-                                _.get(log, category, '').includes(value)
-                            )
-                        ).length || 0) / pageLimit
-                    )}
-                    totalSamples={Math.ceil(
-                        flatData.filter((log) =>
-                            filters.every(({ category, value }) =>
-                                _.get(log, category, '').includes(value)
-                            )
-                        ).length
-                    )}
-                    pageNumber={pageNumber}
-                    handleOnClick={handleOnClick}
-                    title={'logs'}
-                />
-            </div>
-            <AnalysisRunnerGrid
-                data={(!sort.column
-                    ? flatData
-                    : _.orderBy(
-                          flatData,
-                          [sort.column],
-                          sort.direction === 'ascending' ? ['asc'] : ['desc']
-                      )
-                )
-                    .filter((log) =>
-                        filters.every(({ category, value }) =>
-                            _.get(log, category, '').includes(value)
+            )}
+            {!!flatData?.length && !loading && (
+                <>
+                    <div
+                        style={{
+                            marginTop: '10px',
+                            marginBottom: '10px',
+                            justifyContent: 'flex-end',
+                            display: 'flex',
+                            flexDirection: 'row',
+                        }}
+                    >
+                        <Dropdown
+                            selection
+                            onChange={setPageLimit}
+                            value={pageLimit}
+                            options={PAGE_SIZES.map((s) => ({
+                                key: s,
+                                text: `${s} samples`,
+                                value: s,
+                            }))}
+                        />
+                        <PageOptions
+                            isLoading={loading}
+                            totalPageNumbers={Math.ceil(
+                                (flatData.filter((log) =>
+                                    filters.every(({ category, value }) =>
+                                        _.get(log, category, '').includes(value)
+                                    )
+                                ).length || 0) / pageLimit
+                            )}
+                            totalSamples={Math.ceil(
+                                flatData.filter((log) =>
+                                    filters.every(({ category, value }) =>
+                                        _.get(log, category, '').includes(value)
+                                    )
+                                ).length
+                            )}
+                            pageNumber={pageNumber}
+                            handleOnClick={handleOnClick}
+                            title={'logs'}
+                        />
+                    </div>
+                    <AnalysisRunnerGrid
+                        data={(!sort.column
+                            ? flatData
+                            : _.orderBy(
+                                  flatData,
+                                  [sort.column],
+                                  sort.direction === 'ascending' ? ['asc'] : ['desc']
+                              )
                         )
-                    )
-                    .slice((pageNumber - 1) * pageLimit, pageNumber * pageLimit)}
-                filters={filters}
-                updateFilter={updateFilter}
-                handleSort={handleSort}
-                sort={sort}
-            />
-            <PageOptions
-                isLoading={loading}
-                totalPageNumbers={Math.ceil(
-                    (flatData.filter((log) =>
-                        filters.every(({ category, value }) => _.get(log, category) === value)
-                    ).length || 0) / pageLimit
-                )}
-                totalSamples={Math.ceil(
-                    flatData.filter((log) =>
-                        filters.every(({ category, value }) => _.get(log, category) === value)
-                    ).length
-                )}
-                pageNumber={pageNumber}
-                handleOnClick={handleOnClick}
-            />
+                            .filter((log) =>
+                                filters.every(({ category, value }) =>
+                                    _.get(log, category, '').includes(value)
+                                )
+                            )
+                            .slice((pageNumber - 1) * pageLimit, pageNumber * pageLimit)}
+                        filters={filters}
+                        updateFilter={updateFilter}
+                        handleSort={handleSort}
+                        sort={sort}
+                    />
+                    <PageOptions
+                        isLoading={loading}
+                        totalPageNumbers={Math.ceil(
+                            (flatData.filter((log) =>
+                                filters.every(
+                                    ({ category, value }) => _.get(log, category) === value
+                                )
+                            ).length || 0) / pageLimit
+                        )}
+                        totalSamples={Math.ceil(
+                            flatData.filter((log) =>
+                                filters.every(
+                                    ({ category, value }) => _.get(log, category) === value
+                                )
+                            ).length
+                        )}
+                        pageNumber={pageNumber}
+                        handleOnClick={handleOnClick}
+                    />
+                </>
+            )}
         </>
     )
 }
