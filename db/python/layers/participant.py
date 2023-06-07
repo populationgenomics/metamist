@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,too-many-lines
+# pylint: disable=invalid-name
 from typing import Dict, List, Tuple, Optional, Any
 
 import re
@@ -665,56 +665,14 @@ class ParticipantLayer(BaseLayer):
             internal_to_external_id
         )
 
-    async def get_family_participant_data(
-        self, family_id: int, participant_id: int, check_project_ids: bool = True
-    ):
+    async def get_family_participant_data(self, family_id: int, participant_id: int):
         """Gets the family_participant row for a specific participant"""
-        if check_project_ids:
-            pprojects = await self.pttable.get_project_ids_for_participant_ids(
-                [
-                    participant_id,
-                ]
-            )
-            ftable = FamilyTable(self.connection)
-            fprojects = await ftable.get_projects_by_family_ids(
-                (
-                    [
-                        family_id,
-                    ]
-                )
-            )
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author,
-                list(set().union(pprojects, fprojects)),
-                readonly=True,
-            )
-
         fptable = FamilyParticipantTable(self.connection)
 
         return await fptable.get_row(family_id=family_id, participant_id=participant_id)
 
-    async def remove_participant_from_family(
-        self, family_id: int, participant_id: int, check_project_ids: bool = True
-    ):
+    async def remove_participant_from_family(self, family_id: int, participant_id: int):
         """Deletes a participant from a family"""
-        if check_project_ids:
-            pprojects = await self.pttable.get_project_ids_for_participant_ids(
-                [
-                    participant_id,
-                ]
-            )
-            ftable = FamilyTable(self.connection)
-            fprojects = await ftable.get_projects_by_family_ids(
-                [
-                    family_id,
-                ]
-            )
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author,
-                list(set().union(pprojects, fprojects)),
-                readonly=True,
-            )
-
         fptable = FamilyParticipantTable(self.connection)
 
         return await fptable.delete_family_participant_row(
@@ -728,26 +686,8 @@ class ParticipantLayer(BaseLayer):
         paternal_id: int,
         maternal_id: int,
         affected: int,
-        check_project_ids: bool = True,
     ):
         """Adds a participant to a family"""
-        if check_project_ids:
-            pprojects = await self.pttable.get_project_ids_for_participant_ids(
-                [
-                    participant_id,
-                ]
-            )
-            ftable = FamilyTable(self.connection)
-            fprojects = await ftable.get_projects_by_family_ids(
-                [
-                    family_id,
-                ]
-            )
-            await self.ptable.check_access_to_project_ids(
-                self.connection.author,
-                list(set().union(pprojects, fprojects)),
-                readonly=True,
-            )
         fptable = FamilyParticipantTable(self.connection)
 
         return await fptable.create_row(
@@ -998,10 +938,31 @@ class ParticipantLayer(BaseLayer):
         # Format and return response
         return dict(zip(pids, results))
 
+    async def check_project_access_for_participants_families(
+        self, participant_ids: List[int], family_ids: List[int]
+    ):
+        """Checks user access for the projects associated with participant IDs and family IDs"""
+        pprojects = await self.pttable.get_project_ids_for_participant_ids(
+            participant_ids=participant_ids
+        )
+        ftable = FamilyTable(self.connection)
+        fprojects = await ftable.get_projects_by_family_ids(family_ids=family_ids)
+        return await self.ptable.check_access_to_project_ids(
+            self.connection.author,
+            list(pprojects | fprojects),
+            readonly=True,
+        )
+
     async def update_participant_family(
         self, participant_id: int, old_family_id: int, new_family_id: int
     ):
         """Updates a participants family from old_family_id to new_family_id"""
+        await self.check_project_access_for_participants_families(
+            participant_ids=[
+                participant_id,
+            ],
+            family_ids=[old_family_id, new_family_id],
+        )
 
         # Save current family_participant values to reinsert them
         fp_row = await self.get_family_participant_data(
