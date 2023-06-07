@@ -267,20 +267,8 @@ async def update_participant_family(
     """
     player = ParticipantLayer(connection)
 
-    # Save current family_participant values to reinsert them
-    fp_row = await player.get_family_participant_data(
-        family_id=old_family_id, participant_id=participant_id
-    )
-
-    await player.remove_participant_from_family(
-        family_id=old_family_id, participant_id=participant_id
-    )
-
-    # Use saved values to maintain the fields in the new row
-    return await player.add_participant_to_family(
-        family_id=new_family_id,
+    return await player.update_participant_family(
         participant_id=participant_id,
-        paternal_id=fp_row['paternal_id'],
-        maternal_id=fp_row['maternal_id'],
-        affected=fp_row['affected'],
+        old_family_id=old_family_id,
+        new_family_id=new_family_id,
     )

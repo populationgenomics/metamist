@@ -165,29 +165,18 @@ ON DUPLICATE KEY UPDATE
         participant_id: int,
     ):
         """Get a single row from the family_participant table"""
-        keys = [
-            'fp.family_id',
-            'p.id as individual_id',
-            'fp.paternal_participant_id',
-            'fp.maternal_participant_id',
-            'p.reported_sex as sex',
-            'fp.affected',
-        ]
-        keys_str = ', '.join(keys)
-
         values: Dict[str, Any] = {
             'family_id': family_id,
             'participant_id': participant_id,
         }
 
-        wheres = ['f.id = :family_id', 'p.id = :participant_id']
-        conditions = ' AND '.join(wheres)
-
-        _query = f"""
-            SELECT {keys_str} FROM family_participant fp
-            INNER JOIN family f ON f.id = fp.family_id
-            INNER JOIN participant p on fp.participant_id = p.id
-            WHERE {conditions}"""
+        _query = """
+SELECT fp.family_id, p.id as individual_id, fp.paternal_participant_id, fp.maternal_participant_id, p.reported_sex as sex, fp.affected
+FROM family_participant fp
+INNER JOIN family f ON f.id = fp.family_id
+INNER JOIN participant p on fp.participant_id = p.id
+WHERE f.id = :family_id AND p.id = :participant_id
+"""
 
         row = await self.connection.fetch_one(_query, values)
 
