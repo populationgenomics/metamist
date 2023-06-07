@@ -1,5 +1,5 @@
 cachetools==4.2.2
-certifi==2021.5.30
+certifi==2022.12.07
 cffi==1.14.6
 charset-normalizer==2.0.4
 google-api-core==2.0.0
