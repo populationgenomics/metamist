@@ -4,7 +4,7 @@ aiohttp
 async_lru
 cloudpathlib
 requests
-google-auth==1.35.0
+google-auth>=2.19.0
 google-cloud-secret-manager==2.8.0
 google-cloud-logging==2.7.0
 google-cloud-storage==1.43.0
@@ -14,6 +14,6 @@ strawberry-graphql[fastapi]==0.177.1
 python-multipart==0.0.5
 databases[mysql]==0.6.1
 SQLAlchemy==1.4.41
-cryptography==36.0.1
+cryptography>=41.0.0
 python-dateutil==2.8.2
 slack-sdk==3.20.2
