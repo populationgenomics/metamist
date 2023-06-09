@@ -7,6 +7,7 @@ interface PageOptionsProps {
     totalSamples?: number
     totalPageNumbers: number
     isLoading: boolean
+    title?: string
 }
 
 const PageOptions: React.FunctionComponent<PageOptionsProps> = ({
@@ -15,6 +16,7 @@ const PageOptions: React.FunctionComponent<PageOptionsProps> = ({
     totalSamples,
     totalPageNumbers,
     isLoading,
+    title = 'samples',
 }) => (
     <>
         {pageNumber > 1 && (
@@ -30,7 +32,7 @@ const PageOptions: React.FunctionComponent<PageOptionsProps> = ({
         )}
         {!!totalSamples && (
             <span style={{ padding: '8px 10px 0 10px' }}>
-                Page {pageNumber} / {totalPageNumbers} ({totalSamples} samples)
+                Page {pageNumber} / {totalPageNumbers} ({totalSamples} {title})
             </span>
         )}
         {pageNumber < totalPageNumbers && (
