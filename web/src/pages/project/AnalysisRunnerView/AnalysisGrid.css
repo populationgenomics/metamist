@@ -1,0 +1,25 @@
+.sizeRow {
+    position: sticky;
+    top: 0;
+    resize: horizontal;
+    overflow: auto;
+    min-width: 70px;
+}
+
+.scriptField {
+    position: relative;
+}
+
+.scriptField code {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    position: absolute;
+    width: 100%;
+    padding-right: 15px;
+}
+
+.scriptField::before {
+    content: '';
+    display: inline-block;
+}
