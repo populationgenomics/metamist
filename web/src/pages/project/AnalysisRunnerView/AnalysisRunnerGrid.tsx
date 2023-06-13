@@ -30,6 +30,7 @@ const MAIN_FIELDS = [
     { category: 'accessLevel', title: 'Access Level' },
     { category: 'Image', title: 'Driver Image' },
     { category: 'description', title: 'Description' },
+    { category: 'mode', title: 'Mode' },
 ]
 
 const AnalysisRunnerGrid: React.FunctionComponent<{
@@ -228,6 +229,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                             </SUITable.Cell>
                                         )
                                     case 'Image':
+                                    case 'mode':
                                         return (
                                             <SUITable.Cell
                                                 key={category}
@@ -236,6 +238,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                 {_.get(log, category)}
                                             </SUITable.Cell>
                                         )
+
                                     case 'script':
                                         return (
                                             <SUITable.Cell key={category} className="scriptField">
