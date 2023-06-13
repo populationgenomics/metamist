@@ -86,7 +86,9 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         output,
         ...meta,
         position: i,
-        'Hail Batch': meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', ''),
+        'Hail Batch': meta?.batch_url
+            ? meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', '')
+            : '',
         GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
         Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
         Author: `${parseEmail(sanitiseValue(author))}`,
