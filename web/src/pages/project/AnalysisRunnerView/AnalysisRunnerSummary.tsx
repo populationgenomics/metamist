@@ -80,8 +80,6 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         ])
     }
 
-    // console.table(data?.project.analyses)
-
     const flatData = data?.project.analyses.map(({ author, id, output, meta }, i) => ({
         email: author,
         id,
