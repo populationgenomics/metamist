@@ -5,7 +5,7 @@ import re
 import shlex
 from functools import reduce
 from io import StringIO
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Union
 
 import click
 
@@ -178,10 +178,7 @@ class GenericMetadataParser(GenericParser):
         """Get list of sequence technologies for rows"""
         if isinstance(row, dict):
             return [self.get_sequence_technology(row)]
-        return [
-            self.get_sequence_technology(r)
-            for r in row
-        ]
+        return [self.get_sequence_technology(r) for r in row]
 
     def get_sequence_technology(self, row: SingleRow) -> SequenceTechnology:
         """Get sequence technology for single row"""
@@ -253,11 +250,16 @@ class GenericMetadataParser(GenericParser):
 
     def has_participants(self, file_pointer, delimiter: str) -> bool:
         """Returns True if the file has a Participants column"""
-        reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
-        first_line = next(reader)
-        has_participants = self.participant_column in first_line
-        file_pointer.seek(0)
-        return has_participants
+        try:
+            reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
+            first_line = next(reader)
+            has_participants = self.participant_column in first_line
+            file_pointer.seek(0)
+            return has_participants
+        except StopIteration as e:
+            raise ValueError(
+                f'The manifest file appears empty. Check that header metadata is enclosed by double quotes. {e}'
+            ) from e
 
     async def validate_participant_map(
         self, participant_map: Dict[Any, Dict[str, List[Dict[str, Any]]]]
@@ -577,7 +579,7 @@ class GenericMetadataParser(GenericParser):
             seq_group = SequenceMetaGroup(
                 rows=list(row_group),
                 sequence_type=SequenceType(stype),
-                sequence_technology=SequenceTechnology(stech)
+                sequence_technology=SequenceTechnology(stech),
             )
             sequence_meta.append(await self.get_sequence_meta(seq_group, sample_id))
         return sequence_meta
@@ -735,12 +737,28 @@ class GenericMetadataParser(GenericParser):
 )
 @click.option('--sample-name-column', required=True)
 @click.option(
+    '--participant-column',
+    help='Column where the external participant id is held',
+)
+@click.option(
     '--reads-column',
     help='Column where the reads information is held, comma-separated if multiple',
 )
 @click.option(
     '--gvcf-column',
     help='Column where the reads information is held, comma-separated if multiple',
+)
+@click.option(
+    '--reported-sex-column',
+    help='Column where the reported sex is held',
+)
+@click.option(
+    '--reported-gender-column',
+    help='Column where the reported gender is held',
+)
+@click.option(
+    '--karyotype-column',
+    help='Column where the karyotype is held',
 )
 @click.option(
     '--qc-meta-field-map',
@@ -791,18 +809,22 @@ class GenericMetadataParser(GenericParser):
 @run_as_sync
 async def main(
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project,
     sample_name_column: str,
-    participant_meta_field: List[str],
-    participant_meta_field_map: List[Tuple[str, str]],
-    sample_meta_field: List[str],
-    sample_meta_field_map: List[Tuple[str, str]],
-    sequence_meta_field: List[str],
-    sequence_meta_field_map: List[Tuple[str, str]],
-    qc_meta_field_map: List[Tuple[str, str]] = None,
+    participant_meta_field: list[str],
+    participant_meta_field_map: list[tuple[str, str]],
+    sample_meta_field: list[str],
+    sample_meta_field_map: list[tuple[str, str]],
+    sequence_meta_field: list[str],
+    sequence_meta_field_map: list[tuple[str, str]],
+    qc_meta_field_map: list[tuple[str, str]] = None,
     reads_column: Optional[str] = None,
     gvcf_column: Optional[str] = None,
+    participant_column: Optional[str] = None,
+    reported_sex_column: Optional[str] = None,
+    reported_gender_column: Optional[str] = None,
+    karyotype_column: Optional[str] = None,
     default_sample_type='blood',
     default_sequence_type='wgs',
     confirm=False,
@@ -836,12 +858,16 @@ async def main(
     parser = GenericMetadataParser(
         project=project,
         sample_name_column=sample_name_column,
+        participant_column=participant_column,
         participant_meta_map=participant_meta_map,
         sample_meta_map=sample_meta_map,
         sequence_meta_map=sequence_meta_map,
         qc_meta_map=qc_meta_map,
         reads_column=reads_column,
         gvcf_column=gvcf_column,
+        reported_sex_column=reported_sex_column,
+        reported_gender_column=reported_gender_column,
+        karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
         default_sequence_type=default_sequence_type,
         search_locations=search_path,

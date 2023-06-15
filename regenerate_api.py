@@ -222,7 +222,7 @@ def copy_python_files_from(tmpdir):
     This clears the ./sample_metadata folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'README.md', 'parser'}
+    files_to_ignore = {'README.md', 'parser', 'graphql', 'audit'}
 
     module_dir = MODULE_NAME.replace('.', '/')
     dir_to_copy_to = module_dir  # should be relative to this script
@@ -299,7 +299,7 @@ def main():
 
         shutil.copy(
             './resources/muck-the-duck.svg',
-            os.path.join(STATIC_DIR, 'muck-the-duck.svg'),
+            os.path.join('web/src', 'muck-the-duck.svg'),
         )
         shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
 

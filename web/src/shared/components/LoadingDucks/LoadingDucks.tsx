@@ -6,7 +6,7 @@ const LoadingDucks: React.FunctionComponent = () => (
     <>
         <h2 style={{ textAlign: 'center', paddingTop: '200px' }}>Loading...</h2>
         <div style={{ textAlign: 'center', paddingTop: '20px' }}>
-            <MuckTheDuck height={28} className="loadingScreen" />
+            <MuckTheDuck height={28} className="loadingScreen loadingScreenBig" />
         </div>
     </>
 )

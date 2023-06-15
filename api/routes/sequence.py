@@ -72,6 +72,7 @@ async def update_sequence(
     _ = await sequence_layer.update_sequence(
         sequence_id,
         external_ids=sequence.external_ids,
+        sequence_type=sequence.type,
         status=sequence.status,
         meta=sequence.meta,
     )
@@ -147,6 +148,9 @@ async def get_sequences_by_criteria(
         if technologies
         else None,
     )
+
+    for sequence in result:
+        sequence.sample_id = sample_id_format(sequence.sample_id)
 
     return result
 

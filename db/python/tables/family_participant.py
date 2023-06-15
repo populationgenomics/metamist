@@ -3,6 +3,7 @@ from typing import Tuple, List, Dict, Optional, Set, Any
 
 from db.python.connect import DbBase
 from db.python.tables.project import ProjectId
+from models.models.family import PedRowInternal
 
 
 class FamilyParticipantTable(DbBase):
@@ -50,7 +51,7 @@ VALUES
 
     async def create_rows(
         self,
-        dictionaries: List[Dict[str, Any]],
+        rows: list[PedRowInternal],
         author=None,
     ):
         """
@@ -63,22 +64,20 @@ VALUES
         - notes
         - author
         """
-        keys = {
-            'family_id',
-            'participant_id',
-            'paternal_participant_id',
-            'maternal_participant_id',
-            'affected',
-            'notes',
-            'author',
-        }
         ignore_keys_during_update = {'participant_id'}
 
         remapped_ds_by_keys: Dict[Tuple, List[Dict]] = defaultdict(list)
         # this now works when only a portion of the keys are specified
-        for row in dictionaries:
-            d: Dict[str, Any] = {k: row.get(k) for k in keys if k in row}
-            d['author'] = author or self.author
+        for row in rows:
+            d: dict[str, Any] = {
+                'family_id': row.family_id,
+                'participant_id': row.participant_id,
+                'paternal_participant_id': row.paternal_id,
+                'maternal_participant_id': row.maternal_id,
+                'affected': row.affected,
+                'notes': row.notes,
+                'author': author or self.author,
+            }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
 
@@ -160,6 +159,39 @@ ON DUPLICATE KEY UPDATE
 
         return ds
 
+    async def get_row(
+        self,
+        family_id: int,
+        participant_id: int,
+    ):
+        """Get a single row from the family_participant table"""
+        values: Dict[str, Any] = {
+            'family_id': family_id,
+            'participant_id': participant_id,
+        }
+
+        _query = """
+SELECT fp.family_id, p.id as individual_id, fp.paternal_participant_id, fp.maternal_participant_id, p.reported_sex as sex, fp.affected
+FROM family_participant fp
+INNER JOIN family f ON f.id = fp.family_id
+INNER JOIN participant p on fp.participant_id = p.id
+WHERE f.id = :family_id AND p.id = :participant_id
+"""
+
+        row = await self.connection.fetch_one(_query, values)
+
+        ordered_keys = [
+            'family_id',
+            'individual_id',
+            'paternal_id',
+            'maternal_id',
+            'sex',
+            'affected',
+        ]
+        ds = dict(zip(ordered_keys, row))
+
+        return ds
+
     async def get_participant_family_map(
         self, participant_ids: List[int]
     ) -> Tuple[Set[int], Dict[int, int]]:
@@ -184,3 +216,23 @@ WHERE fp.participant_id in :participant_ids
         m = {r['id']: r['family_id'] for r in rows}
 
         return projects, m
+
+    async def delete_family_participant_row(self, family_id: int, participant_id: int):
+        """
+        Delete a participant from a family
+        """
+
+        if not participant_id or not family_id:
+            return False
+
+        _query = """
+DELETE FROM family_participant
+WHERE participant_id = :participant_id
+AND family_id = :family_id
+        """
+
+        await self.connection.execute(
+            _query, {'family_id': family_id, 'participant_id': participant_id}
+        )
+
+        return True

@@ -248,3 +248,27 @@ async def get_participants(
         external_participant_ids=external_participant_ids,
         internal_participant_ids=internal_participant_ids,
     )
+
+
+@router.post(
+    '/{participant_id}/update-participant-family',
+    operation_id='updateParticipantFamily',
+)
+async def update_participant_family(
+    participant_id: int,
+    old_family_id: int,
+    new_family_id: int,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Change a participants family from old_family_id
+    to new_family_id, maintaining all other fields.
+    The new_family_id must already exist.
+    """
+    player = ParticipantLayer(connection)
+
+    return await player.update_participant_family(
+        participant_id=participant_id,
+        old_family_id=old_family_id,
+        new_family_id=new_family_id,
+    )

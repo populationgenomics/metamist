@@ -1,6 +1,7 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Table } from 'semantic-ui-react'
+import { Table as SUITable } from 'semantic-ui-react'
+import Table from '../../shared/components/Table'
 
 interface BatchStatisticsProps {
     cramSeqrStats: Record<string, Record<string, string>>
@@ -13,27 +14,28 @@ const BatchStatistics: React.FunctionComponent<BatchStatisticsProps> = ({
     batchSequenceStats,
     projectName,
 }) => {
-    if (!cramSeqrStats.length || !batchSequenceStats.length) {
-        return <></>
-    }
     const seqTypes = Object.keys(cramSeqrStats)
     const batchEntries = Object.entries(batchSequenceStats)
 
+    if (!seqTypes.length || !batchEntries.length) {
+        return <></>
+    }
+
     return (
         <Table celled compact>
-            <Table.Header>
-                <Table.Row>
-                    <Table.HeaderCell>Batch</Table.HeaderCell>
+            <SUITable.Header>
+                <SUITable.Row>
+                    <SUITable.HeaderCell>Batch</SUITable.HeaderCell>
                     {seqTypes.map((item) => (
-                        <Table.HeaderCell key={`header-${item}-${projectName}`}>
+                        <SUITable.HeaderCell key={`header-${item}-${projectName}`}>
                             {_.capitalize(item)}
-                        </Table.HeaderCell>
+                        </SUITable.HeaderCell>
                     ))}
-                    <Table.HeaderCell>Total</Table.HeaderCell>
-                </Table.Row>
-            </Table.Header>
+                    <SUITable.HeaderCell>Total</SUITable.HeaderCell>
+                </SUITable.Row>
+            </SUITable.Header>
 
-            <Table.Body>
+            <SUITable.Body>
                 {batchEntries
                     .sort((a, b) => {
                         if (a[0] === b[0]) {
@@ -50,17 +52,19 @@ const BatchStatistics: React.FunctionComponent<BatchStatisticsProps> = ({
                         })
                     })
                     .map(([key, value]) => (
-                        <Table.Row key={`body-${key}-${projectName}`}>
-                            <Table.Cell>{_.capitalize(key)}</Table.Cell>
+                        <SUITable.Row key={`body-${key}-${projectName}`}>
+                            <SUITable.Cell>{_.capitalize(key)}</SUITable.Cell>
                             {seqTypes.map((seq) => (
-                                <Table.Cell key={`${key}-${seq}`}>{`${value[seq]}`}</Table.Cell>
+                                <SUITable.Cell
+                                    key={`${key}-${seq}`}
+                                >{`${value[seq]}`}</SUITable.Cell>
                             ))}
-                            <Table.Cell>
+                            <SUITable.Cell>
                                 {Object.values(value).reduce((a, b) => +a + +b, 0)}
-                            </Table.Cell>
-                        </Table.Row>
+                            </SUITable.Cell>
+                        </SUITable.Row>
                     ))}
-            </Table.Body>
+            </SUITable.Body>
         </Table>
     )
 }

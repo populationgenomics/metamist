@@ -153,6 +153,31 @@ async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
         for s in sample_ids
     ]
 
+    analyses_to_insert.extend(
+        [
+            AnalysisModel(
+                sample_ids=[s],
+                type=AnalysisType('analysis-runner'),
+                status=AnalysisStatus('completed'),
+                output=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
+                active=True,
+                meta={
+                    'accessLevel': 'full',
+                    'commit': 'some-hash',
+                    'script': 'myFakeScript.py',
+                    'description': 'just analysis things',
+                    'hailVersion': '1.0',
+                    'source': 'analysis-runner',
+                    'cwd': 'scripts',
+                    'repo': 'some-repo',
+                    'driverImage': 'fake-australia-southeast1-fake-docker.pkg',
+                    'batch_url': f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
+                },
+            )
+            for s in sample_ids
+        ]
+    )
+
     # es-index
     analyses_to_insert.append(
         AnalysisModel(

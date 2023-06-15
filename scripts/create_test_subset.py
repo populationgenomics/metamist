@@ -540,9 +540,6 @@ def _validate_opts(
             f'{samples_n} samples'
         )
 
-    if samples_n is not None and samples_n < 1:
-        raise click.BadParameter('Please specify --samples higher than 0')
-
     if families_n is not None and families_n < 1:
         raise click.BadParameter('Please specify --families higher than 0')
 

@@ -3,7 +3,12 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { Dropdown } from 'semantic-ui-react'
 import ProjectSelector from './ProjectSelector'
-import { WebApi, ProjectSummaryResponse } from '../../sm-api/api'
+import {
+    WebApi,
+    ProjectSummaryResponse,
+    SearchItem,
+    MetaSearchEntityPrefix,
+} from '../../sm-api/api'
 
 import PageOptions from './PageOptions'
 import SeqrLinks from './SeqrLinks'
@@ -12,6 +17,9 @@ import SummaryStatistics from './SummaryStatistics'
 import BatchStatistics from './BatchStatistics'
 import ProjectGrid from './ProjectGrid'
 import TotalsStats from './TotalsStats'
+import MuckError from '../../shared/components/MuckError'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
+import SeqrSync from './SeqrSync'
 
 const PAGE_SIZES = [20, 40, 100, 1000]
 
@@ -36,6 +44,13 @@ const ProjectSummary: React.FunctionComponent = () => {
     const [pageLimit, _setPageLimit] = React.useState<number>(
         validPages ? +pageSize : PAGE_SIZES[0]
     )
+    const [filterValues, setFilterValues] = React.useState<SearchItem[]>([])
+    const [gridFilterValues, setGridFilterValues] = React.useState<
+        Record<
+            string,
+            { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+        >
+    >({})
 
     const handleOnClick = React.useCallback(
         (p) => {
@@ -46,7 +61,7 @@ const ProjectSummary: React.FunctionComponent = () => {
     )
 
     const getProjectSummary = React.useCallback(
-        async (token: any) => {
+        async (token: number) => {
             if (!projectName) {
                 setSummary(undefined)
                 return
@@ -57,6 +72,7 @@ const ProjectSummary: React.FunctionComponent = () => {
             try {
                 const response = await new WebApi().getProjectSummary(
                     projectName,
+                    filterValues,
                     pageLimit,
                     sanitisedToken
                 )
@@ -67,7 +83,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                 setIsLoading(false)
             }
         },
-        [projectName, pageLimit]
+        [projectName, pageLimit, filterValues]
     )
 
     const setPageLimit = React.useCallback(
@@ -77,6 +93,34 @@ const ProjectSummary: React.FunctionComponent = () => {
             setPageNumber(1)
         },
         [projectName, navigate]
+    )
+
+    const updateFilters = React.useCallback(
+        (
+            e: Record<
+                string,
+                { value: string; category: MetaSearchEntityPrefix; title: string; field: string }
+            >
+        ) => {
+            if (!summary) return
+            /* eslint-disable no-param-reassign */
+            const processedFilter = Object.entries(e).reduce(
+                (filter, [, { value, category, field }]) => {
+                    if (!value) {
+                        return filter
+                    }
+                    const is_meta = field.startsWith('meta.')
+                    const fieldName = is_meta ? field.slice(5) : field
+                    filter.push({ query: value, is_meta, model_type: category, field: fieldName })
+                    return filter
+                },
+                [] as SearchItem[]
+            )
+            /* eslint-enable no-param-reassign */
+            setFilterValues(processedFilter)
+            setGridFilterValues(Object.entries(processedFilter).length ? e : {})
+        },
+        [summary]
     )
 
     const _updateProjectSummary = React.useCallback(() => {
@@ -91,68 +135,102 @@ const ProjectSummary: React.FunctionComponent = () => {
         _updateProjectSummary,
     ])
 
-    const totalPageNumbers = Math.ceil((summary?.total_samples || 0) / pageLimit)
+    const totalPageNumbers = Math.ceil((summary?.total_samples_in_query || 0) / pageLimit)
+
+    const projectSelectorOnClick = React.useCallback(
+        (_, { value }) => {
+            navigate(`/project/${value}`)
+            setPageNumber(1)
+            _setPageLimit(pageLimit)
+            setFilterValues([])
+            setGridFilterValues({})
+        },
+        [navigate, _setPageLimit, setPageNumber, pageLimit, setFilterValues, setGridFilterValues]
+    )
 
     return (
         <>
-            <ProjectSelector
-                setPageLimit={_setPageLimit}
-                setPageNumber={setPageNumber}
-                pageLimit={PAGE_SIZES[0]}
-            />
+            <ProjectSelector onClickFunction={projectSelectorOnClick} />
             <hr />
-            {projectName && summary?.participants.length !== 0 && (
-                <>
-                    <TotalsStats summary={summary ?? {}} />
-                    <SummaryStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                    />
-                    <BatchStatistics
-                        projectName={projectName}
-                        cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                        batchSequenceStats={summary?.batch_sequence_stats ?? {}}
-                    />
-                    <hr />
-                    <MultiQCReports projectName={projectName} />
-                    <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
-                    <hr />
-                    <div
-                        style={{
-                            marginBottom: '10px',
-                            justifyContent: 'flex-end',
-                            display: 'flex',
-                            flexDirection: 'row',
-                        }}
-                    >
-                        <Dropdown
-                            selection
-                            onChange={setPageLimit}
-                            value={pageLimit}
-                            options={PAGE_SIZES.map((s) => ({
-                                key: s,
-                                text: `${s} samples`,
-                                value: s,
-                            }))}
+            {error && (
+                <MuckError message={`Ah Muck, An error occurred when fetching samples: ${error}`} />
+            )}
+            {isLoading && <LoadingDucks />}
+            {!projectName && (
+                <p>
+                    <em>Please select a project</em>
+                </p>
+            )}
+            {projectName &&
+                !error &&
+                !isLoading &&
+                summary &&
+                summary.participants.length === 0 &&
+                !Object.keys(filterValues).length && (
+                    <MuckError message={`Ah Muck, there aren't any samples in this project`} />
+                )}
+            {projectName &&
+                !error &&
+                !isLoading &&
+                summary &&
+                !!(summary.participants.length !== 0 || Object.keys(filterValues).length) && (
+                    <>
+                        <TotalsStats summary={summary ?? {}} />
+                        <SummaryStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                        />
+                        <BatchStatistics
+                            projectName={projectName}
+                            cramSeqrStats={summary?.cram_seqr_stats ?? {}}
+                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                        />
+                        <hr />
+                        <MultiQCReports projectName={projectName} />
+                        <SeqrLinks seqrLinks={summary?.seqr_links ?? {}} />
+                        <SeqrSync syncTypes={summary?.seqr_sync_types} project={projectName} />
+                        <hr />
+                        <div
+                            style={{
+                                marginBottom: '10px',
+                                justifyContent: 'flex-end',
+                                display: 'flex',
+                                flexDirection: 'row',
+                            }}
+                        >
+                            <Dropdown
+                                selection
+                                onChange={setPageLimit}
+                                value={pageLimit}
+                                options={PAGE_SIZES.map((s) => ({
+                                    key: s,
+                                    text: `${s} samples`,
+                                    value: s,
+                                }))}
+                            />
+                            <PageOptions
+                                isLoading={isLoading}
+                                totalPageNumbers={totalPageNumbers}
+                                totalSamples={summary?.total_samples_in_query}
+                                pageNumber={pageNumber}
+                                handleOnClick={handleOnClick}
+                            />
+                        </div>
+                        <ProjectGrid
+                            summary={summary}
+                            projectName={projectName}
+                            updateFilters={updateFilters}
+                            filterValues={gridFilterValues}
                         />
                         <PageOptions
                             isLoading={isLoading}
                             totalPageNumbers={totalPageNumbers}
-                            totalSamples={summary?.total_samples}
+                            totalSamples={summary?.total_samples_in_query}
                             pageNumber={pageNumber}
                             handleOnClick={handleOnClick}
                         />
-                    </div>
-                </>
-            )}
-            <ProjectGrid summary={summary} projectName={projectName} error={error} />
-            <PageOptions
-                isLoading={isLoading}
-                totalPageNumbers={totalPageNumbers}
-                totalSamples={summary?.total_samples}
-                pageNumber={pageNumber}
-                handleOnClick={handleOnClick}
-            />
+                    </>
+                )}
         </>
     )
 }

@@ -10,7 +10,7 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from models.models.family import Family
+from models.models.family import Family, PedRowInternal
 
 
 class PedRow:
@@ -355,6 +355,30 @@ class FamilyLayer(BaseLayer):
             project=project, participant_ids=all_participants
         )
 
+    async def get_families_by_ids(
+        self,
+        family_ids: list[int],
+        check_missing: bool = True,
+        check_project_ids: bool = True,
+    ) -> list[Family]:
+        """Get families by internal IDs"""
+        projects, families = await self.ftable.get_families_by_ids(
+            family_ids=family_ids
+        )
+        if not families:
+            return []
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.connection.author, projects, readonly=True
+            )
+
+        if check_missing and len(family_ids) != len(families):
+            missing_ids = set(family_ids) - set(f.id for f in families)
+            raise ValueError(f'Missing family IDs: {missing_ids}')
+
+        return families
+
     async def get_families_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
     ) -> dict[int, list[Family]]:
@@ -553,18 +577,14 @@ class FamilyLayer(BaseLayer):
             # now let's map participants back
 
             insertable_rows = [
-                {
-                    'family_id': external_family_id_map[row.family_id],
-                    'participant_id': external_participant_ids_map[row.individual_id],
-                    'paternal_participant_id': external_participant_ids_map.get(
-                        row.paternal_id
-                    ),
-                    'maternal_participant_id': external_participant_ids_map.get(
-                        row.maternal_id
-                    ),
-                    'affected': row.affected,
-                    'notes': row.notes,
-                }
+                PedRowInternal(
+                    family_id=external_family_id_map[row.family_id],
+                    participant_id=external_participant_ids_map[row.individual_id],
+                    paternal_id=external_participant_ids_map.get(row.paternal_id),
+                    maternal_id=external_participant_ids_map.get(row.maternal_id),
+                    affected=row.affected,
+                    notes=row.notes,
+                )
                 for row in pedrows
             ]
 
@@ -577,6 +597,10 @@ class FamilyLayer(BaseLayer):
             await self.fptable.create_rows(insertable_rows)
 
         return True
+
+    async def update_family_members(self, rows: list[PedRowInternal]):
+        """Update family members"""
+        await self.fptable.create_rows(rows)
 
     async def import_families(
         self, headers: Optional[List[str]], rows: List[List[str]]

@@ -146,6 +146,7 @@ class ExistingCohortParser(GenericMetadataParser):
 
     def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from sequence file name"""
+
         for filename, _path in self.filename_map.items():
             if (
                 fastq_file_name_to_sample_id(filename)
@@ -153,8 +154,33 @@ class ExistingCohortParser(GenericMetadataParser):
             ):
                 split_filename = filename.split('_')[0:4]
                 external_sequence_id = '_'.join(split_filename)
+                return {'kccg_id': external_sequence_id}
 
-        return {'kccg_id': external_sequence_id}
+        raise ValueError(
+            f'Ingestion of {row[0][Columns.EXTERNAL_ID]} / {row[0][Columns.MANIFEST_FLUID_X]} failed. '
+            f'Does the corresponding FASTQ exist in the search locations?'
+        )
+
+    def get_existing_external_sequence_ids(self, participant_map: dict[str, dict]):
+        """
+        Overwrites get_existing_sequence function to pull
+        external sequence IDs from the filename_map as opposed to the input CSV
+        """
+
+        external_sequence_ids = []
+        sample_id_to_seq_id_map = {
+            fastq_file_name_to_sample_id(filename): '_'.join(filename.split('_')[:4])
+            for filename in self.filename_map
+        }
+        for participant in participant_map.values():
+            for sample in participant.values():
+                for sequence in sample:
+                    external_seq_id = sample_id_to_seq_id_map.get(
+                        sequence.get('Sample/Name')
+                    )
+                    if external_seq_id:
+                        external_sequence_ids.append(external_seq_id)
+        return external_sequence_ids
 
 
 @click.command(help='GCS path to manifest file')

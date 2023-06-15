@@ -1,3 +1,4 @@
 sm-api/
 graphql-types/
 __generated__/
+.eslintrc.cjs

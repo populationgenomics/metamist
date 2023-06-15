@@ -1,28 +1,33 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
-import './index.css'
 import { ApolloProvider, ApolloClient, createHttpLink, InMemoryCache } from '@apollo/client'
 import App from './App'
 import reportWebVitals from './reportWebVitals'
 
-// 1
+// make sure our stylesheet is last
+import 'swagger-ui-react/swagger-ui.css'
+import 'semantic-ui-css/semantic.min.css'
+import './index.css'
+import { ThemeProvider } from './shared/components/ThemeProvider'
 
-// 2
 const httpLink = createHttpLink({
     uri: '/graphql',
 })
 
-// 3
 const client = new ApolloClient({
     link: httpLink,
     cache: new InMemoryCache(),
 })
 
-// 4
+const storedTheme = localStorage.getItem('theme') || 'light-mode'
+if (storedTheme) document.documentElement.setAttribute('data-theme', storedTheme)
+
 ReactDOM.render(
     <React.StrictMode>
         <ApolloProvider client={client}>
-            <App />
+            <ThemeProvider>
+                <App />
+            </ThemeProvider>
         </ApolloProvider>
     </React.StrictMode>,
     document.getElementById('root')

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional, Dict, Union, List, Sequence
+from typing import Optional, Dict, Union, List, Sequence, Iterable
 
 from models.base import SMBase
 from models.enums.sample import SampleType
@@ -96,7 +96,7 @@ def sample_id_transform_to_raw(identifier: SampleIdRaw, strict=True) -> int:
     return int(stripped_identifier[:-1])
 
 
-def sample_id_format_list(sample_ids: Sequence[Union[int, str]]) -> List[str]:
+def sample_id_format_list(sample_ids: Iterable[Union[int, str]]) -> List[str]:
     """
     Transform LIST of raw (int) sample identifier to format (CPGXXXH) where:
         - CPG is the prefix

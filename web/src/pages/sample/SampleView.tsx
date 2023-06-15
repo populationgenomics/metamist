@@ -9,6 +9,7 @@ import Pedigree from '../../shared/components/pedigree/Pedigree'
 import SeqPanel from '../../shared/components/SeqPanel'
 import MuckError from '../../shared/components/MuckError'
 import SampleInfo from '../../shared/components/SampleInfo'
+import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 const GET_SAMPLE_INFO = gql(`
 query SampleInfo($sample_id: String!) {
@@ -37,6 +38,9 @@ query SampleInfo($sample_id: String!) {
 const sampleFieldsToDisplay = ['active', 'type', 'participantId']
 
 const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+
     const { sampleName } = useParams()
     const sampleID = sampleName || ''
 
@@ -52,7 +56,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
             <div className="dataStyle">
                 <div
                     style={{
-                        borderBottom: `1px solid black`,
+                        borderBottom: `1px solid ${isDarkMode ? 'white' : 'black'}`,
                     }}
                 >
                     <h1
@@ -81,7 +85,7 @@ const SampleView: React.FunctionComponent<Record<string, unknown>> = () => {
                 <div style={{ paddingBottom: '20px' }}>
                     <h4
                         style={{
-                            borderBottom: `1px solid black`,
+                            borderBottom: `1px solid ${isDarkMode ? 'white' : 'black'}`,
                         }}
                     >
                         Sample Information

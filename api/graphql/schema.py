@@ -131,7 +131,7 @@ async def load_participants_for_families(
 ) -> list[list['Participant']]:
     player = ParticipantLayer(connection)
     pmap = await player.get_participants_by_families(family_ids)
-    return [pmap.get(fid) for fid in family_ids]
+    return [pmap.get(fid, []) for fid in family_ids]
 
 
 @connected_data_loader
@@ -253,8 +253,8 @@ class GraphQLProject:
     @strawberry.field()
     async def families(self, info: Info, root: 'Project') -> list['GraphQLFamily']:
         connection = info.context['connection']
-        participants = await FamilyLayer(connection).get_families(project=root.id)
-        return participants
+        families = await FamilyLayer(connection).get_families(project=root.id)
+        return families
 
     @strawberry.field()
     async def participants(
@@ -267,9 +267,19 @@ class GraphQLProject:
 
         return participants
 
-    # @strawberry.field()
-    # async def samples(self, info: Info, root: 'Project') -> list['GraphQLSample']:
-    #     return []
+    @strawberry.field()
+    async def analyses(
+        self,
+        info: Info,
+        root: 'Project',
+        type: strawberry.enum(AnalysisType) | None = None,
+        active: bool | None = None,
+    ) -> list['GraphQLAnalysis']:
+        connection = info.context['connection']
+        connection.project = root.id
+        return await AnalysisLayer(connection).query_analysis(
+            project_ids=[root.id], analysis_type=type, active=active
+        )
 
 
 @strawberry.type

@@ -57,7 +57,7 @@ logging.basicConfig()
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 
-FASTQ_EXTENSIONS = ('.fq', '.fastq', '.fq.gz', '.fastq.gz')
+FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
@@ -73,9 +73,10 @@ ALL_EXTENSIONS = (
 
 # construct rmatch string to capture all fastq patterns
 rmatch_str = (
-    r'[_\.-][Rr]?[12](_\d+)?(?:'
+    r'(?:[<>]|\/|_|\.|-|[0-9]|[a-z]|[A-Z])+'
+    + r'(?=[_|-]([12]|R[12])?(_[0-9]*?)?('
     + '|'.join(s.replace('.', '\\.') for s in FASTQ_EXTENSIONS)
-    + ')$'
+    + '$))'
 )
 rmatch = re.compile(rmatch_str)
 SingleRow = Dict[str, Any]
@@ -395,9 +396,8 @@ class GenericParser(
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
-    @staticmethod
     def get_existing_external_sequence_ids(
-        participant_map: Dict[str, Dict[Any, List[Any]]]
+        self, participant_map: Dict[str, Dict[Any, List[Any]]]
     ):
         """Pulls external sequence IDs from participant map"""
         external_sequence_ids: list[str] = []
@@ -502,6 +502,7 @@ class GenericParser(
             'sequences': sequences_to_upsert,
         }
         if cpg_sample_id:
+            # If we have a CPG ID, we can update
             sample_args['id'] = cpg_sample_id
 
         sample_to_upsert = SampleBatchUpsert(**sample_args)
@@ -1154,6 +1155,9 @@ class GenericParser(
         >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'])
         [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz']]
 
+        >>> GenericParser.parse_fastqs_structure(['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz', 'ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz'])
+        [['ACG0xx_2_1.fastq.gz', 'ACG0xx_2_2.fastq.gz'], ['ACG0xx_3_1.fastq.gz', 'ACG0xx_3_2.fastq.gz']]
+
         >>> GenericParser.parse_fastqs_structure(['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz'])
         [['21R2112345-20210326-A00123_S70_L001_R1_001.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_001.fastq.gz'], ['21R2112345-20210326-A00123_S70_L001_R1_002.fastq.gz', '21R2112345-20210326-A00123_S70_L001_R2_002.fastq.gz']]
 
@@ -1187,11 +1191,13 @@ class GenericParser(
         fastq_groups = defaultdict(list)
         for full_filename, (basename, matched) in r_matches.items():
             # use only file path basename to define prefix first
-
-            pre_r_basename = basename[: matched.start()]
+            pre_r_basename = basename[: matched.end()]
             bits_to_group_on = [pre_r_basename]
-            for group in matched.groups():
-                bits_to_group_on.append(group)
+            groups = matched.groups()
+            # group fasts based on the regex groups 1 / 2
+            for i in (1, 2):
+                # index 1: optional _001 group. index 2: file extension
+                bits_to_group_on.append(groups[i])
 
             fastq_groups[tuple(bits_to_group_on)].append(full_filename)
 
@@ -1215,6 +1221,7 @@ class GenericParser(
         """Takes filename, returns formed CWL dictionary"""
         _checksum = checksum
         file_size = None
+        datetime_added = None
 
         if not self.skip_checking_gcs_objects:
             if not _checksum:
@@ -1224,7 +1231,9 @@ class GenericParser(
                     if contents:
                         _checksum = f'md5:{contents.strip()}'
 
-            file_size = await self.file_size(filename)
+            file_size, datetime_added = await asyncio.gather(
+                self.file_size(filename), self.datetime_added(filename)
+            )
 
         d = {
             'location': self.file_path(filename),
@@ -1232,6 +1241,7 @@ class GenericParser(
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
+            'datetime_added': datetime_added.isoformat() if datetime_added else None,
         }
 
         if secondary_files:

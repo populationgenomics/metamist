@@ -160,6 +160,29 @@ class SampleSequenceLayer(BaseLayer):
 
         return seqs
 
+    async def get_pids_sids_for_sequence_type(
+        self, sequence_type: SequenceType, check_project_ids: bool = True
+    ) -> dict[int, list[int]]:
+        """
+        Get list of partiicpant IDs for a specific sequence type,
+        useful for synchronisation seqr projects
+        """
+        (
+            projects,
+            pids,
+        ) = await self.seqt.get_participant_ids_and_sample_ids_for_sequence_type(
+            sequence_type
+        )
+        if not pids:
+            return {}
+
+        if check_project_ids:
+            await self.ptable.check_access_to_project_ids(
+                self.author, projects, readonly=True
+            )
+
+        return pids
+
     # region INSERTS
 
     async def insert_many_sequencing(
@@ -222,6 +245,7 @@ class SampleSequenceLayer(BaseLayer):
         external_ids: dict[str, str] | None = None,
         status: SequenceStatus | None = None,
         technology: SequenceTechnology | None = None,
+        sequence_type: SequenceType | None = None,
         meta: dict | None = None,
         author: str | None = None,
         check_project_id=True,
@@ -241,6 +265,7 @@ class SampleSequenceLayer(BaseLayer):
             status=status,
             meta=meta,
             technology=technology,
+            sequence_type=sequence_type,
             author=author,
             project=project_id,
         )
