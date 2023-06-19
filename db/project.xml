@@ -695,5 +695,36 @@
 			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 		</sql>
 	</changeSet>
+    <changeSet id="2023-06-20_cohort-builder" author="michael.franklin">
+        <createTable tableName="cohort">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="derived_from" type="INT">
+                <constraints nullable="false" foreignKeyName="FK_COHORT_DERIVED_FROM_ID_SQG" references="cohort(id)" />
+            </column>
+            <column name="description" type="VARCHAR(255)" />
+            <column name="author" type="VARCHAR(255)" />
+            <column name="timestamp" type="TIMESTAMP" />
+        </createTable>
+        <!--		How SGs belong to a cohort -->
+        <createTable tableName="cohort_sequencing_group">
+            <column name="cohort_id" type="INT">
+                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_COHORT_ID" references="cohort(id)" />
+            </column>
+            <column name="sequencing_group_id" type="INT">
+                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_SQG_ID" references="sequencing_group(id)" />
+            </column>
+        </createTable>
+        <!--		Linking cohort to an analysis -->
+        <createTable tableName="analysis_cohort">
+            <column name="cohort_id" type="INT">
+                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_COHORT_ID" references="cohort(id)" />
+            </column>
+            <column name="sequencing_group_id" type="INT">
+                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_SQG_ID" references="sequencing_group(id)" />
+            </column>
+        </createTable>
+    </changeSet>
 
 </databaseChangeLog>
