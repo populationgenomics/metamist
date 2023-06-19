@@ -707,9 +707,15 @@
 					references="cohort(id)"
 				/>
             </column>
-            <column name="description" nullable="false" type="VARCHAR(255)" />
-            <column name="author" nullable="false" type="VARCHAR(255)" />
-            <column name="timestamp" nullable="false" type="TIMESTAMP" />
+            <column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+            <column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+            <column name="timestamp" type="TIMESTAMP">
+				<constraints nullable="false" />
+			</column>
         </createTable>
         <!--		How SGs belong to a cohort -->
         <createTable tableName="cohort_sequencing_group">
