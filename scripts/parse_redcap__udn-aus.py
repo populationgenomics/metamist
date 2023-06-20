@@ -43,12 +43,13 @@ def parse_redcap(redcap_csv: str):
                     family_rows['family_metadata'] = row
                     continue
                 else:
-                    print(f'WARNING: redcap_event_name == "family_information_arm_1" AND redcap_repeat_instrument == {row["redcap_repeat_instrument"]}. SKIPPING')
+                    print(
+                        f'WARNING: redcap_event_name == "family_information_arm_1" AND redcap_repeat_instrument == {row["redcap_repeat_instrument"]}. SKIPPING'
+                    )
                     continue
 
             # Process individual level rows (sample_info and individual_metadata)
             if '_infor' in row['redcap_event_name']:
-
                 individual_label = (
                     row['redcap_event_name'].split('_infor')[0].replace('_', '')
                 )
@@ -63,6 +64,9 @@ def parse_redcap(redcap_csv: str):
                     row_type = 'sample_metadata'
                     if row['sample_id']:
                         samples[row['sample_id']] = individual_id
+                    elif row['sendaway_tracking_num']:
+                        # Some sample IDs end up in this column
+                        samples[row['sendaway_tracking_num']] = individual_id
                 else:
                     assert False, f'I was not expecting this row: {row}'
             else:
@@ -80,11 +84,11 @@ def parse_redcap(redcap_csv: str):
 
 def recover_missing_individuals(family):
     """
-    If the parental ID(s) are provided in the 'family_information_arm_1' row, 
+    If the parental ID(s) are provided in the 'family_information_arm_1' row,
     but either parent does not have their own individual row like:
-        'redcap_event_name' == 'maternal_informati_arm_1' 
+        'redcap_event_name' == 'maternal_informati_arm_1'
         OR
-        'redcap_event_name' == 'paternal_informati_arm_1', 
+        'redcap_event_name' == 'paternal_informati_arm_1',
     then we must create the individual data for the missing parent(s) and add it
     to the family.
     """
@@ -93,32 +97,48 @@ def recover_missing_individuals(family):
     individual_ids = individual_data.keys()
 
     # If at least one of parents missing, use the proband metadata as a template to add the missing parent(s)
-    if ((family_metadata['maternal_id'] and family_metadata['maternal_id'] not in individual_ids) 
-            or (family_metadata['paternal_id'] and family_metadata['paternal_id'] not in individual_ids)):
-        
+    if (
+        family_metadata['maternal_id']
+        and family_metadata['maternal_id'] not in individual_ids
+    ) or (
+        family_metadata['paternal_id']
+        and family_metadata['paternal_id'] not in individual_ids
+    ):
         proband_data = individual_data[family_metadata['proband_id']]
         proband_metadata = proband_data['individual_metadata']
 
         # Copy the proband metadata keys without copying the values to create parent metadata entries
-        if family_metadata['maternal_id'] and family_metadata['maternal_id'] not in individual_ids:    
-                
+        if (
+            family_metadata['maternal_id']
+            and family_metadata['maternal_id'] not in individual_ids
+        ):
             maternal_metadata = {}.fromkeys(proband_metadata, '')
             maternal_metadata['sex'] = 2
-            
-            print(f'Adding individual: {family_metadata["maternal_id"]} to family: {family_metadata["fam_id"]}')
-            individual_data[family_metadata['maternal_id']] = {'individual_metadata': maternal_metadata}
-        
-        if family_metadata['paternal_id'] and family_metadata['paternal_id'] not in individual_ids:
-                        
+
+            print(
+                f'Adding individual: {family_metadata["maternal_id"]} to family: {family_metadata["fam_id"]}'
+            )
+            individual_data[family_metadata['maternal_id']] = {
+                'individual_metadata': maternal_metadata
+            }
+
+        if (
+            family_metadata['paternal_id']
+            and family_metadata['paternal_id'] not in individual_ids
+        ):
             paternal_metadata = {}.fromkeys(proband_metadata, '')
             paternal_metadata['sex'] = 1
 
-            print(f'Adding individual: {family_metadata["paternal_id"]} to family: {family_metadata["fam_id"]}')
-            individual_data[family_metadata['paternal_id']] = {'individual_metadata' : paternal_metadata}
+            print(
+                f'Adding individual: {family_metadata["paternal_id"]} to family: {family_metadata["fam_id"]}'
+            )
+            individual_data[family_metadata['paternal_id']] = {
+                'individual_metadata': paternal_metadata
+            }
 
         # Save the added parent(s) to the family
         family['individual_data'] = individual_data
-    
+
     return family
 
 
@@ -176,7 +196,7 @@ def prepare_ind_row(individual_id, individual_metadata, family_metadata):
     '--facility',
     type=click.Choice(list(map(lambda x: x.name, Facility)), case_sensitive=False),
     default="VCGS",
-    help="Facility to use for fastq file parsing."
+    help="Facility to use for fastq file parsing.",
 )
 @click.argument('redcap_csv')
 @run_as_sync
@@ -225,7 +245,6 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
 
         family_metadata = fam['family_metadata']
         for individual_id, individual_data in fam['individual_data'].items():
-
             # Skip incomplete families
             if not individual_id:
                 continue
@@ -286,7 +305,6 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
             search_path, Facility(facility), recursive=False
         ).items():
             if sample_id in samples:
-
                 for fastq_pair in fastq_pairs:
                     row = {
                         'Individual ID': samples[sample_id],
