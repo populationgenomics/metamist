@@ -14,7 +14,7 @@ from urllib3 import Retry
 from requests.adapters import HTTPAdapter
 
 URL = 'https://metamist-etl-mnrpw3mdza-ts.a.run.app'
-TYPE = "NAME_OF_EXTERNAL_PARTY/v1"
+TYPE = 'NAME_OF_EXTERNAL_PARTY/v1'
 
 
 def make_request(body: dict | list):
@@ -38,7 +38,7 @@ def make_request(body: dict | list):
         total=3, backoff_factor=0.5, status_forcelist=[429, 502, 503, 504]
     )
     session = requests.Session()
-    session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
+    session.mount('https://', HTTPAdapter(max_retries=retry_strategy))
 
     resp = session.post(
         os.path.join(URL, TYPE),
