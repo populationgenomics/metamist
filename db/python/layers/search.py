@@ -16,14 +16,14 @@ from models.models.sample import (
 
 from models.models.sequencing_group import (
     sequencing_group_id_format,
-    sequencing_group_id_transform_to_raw
+    sequencing_group_id_transform_to_raw,
 )
 from models.models.search import (
     SearchResponse,
     SampleSearchResponseData,
     ParticipantSearchResponseData,
     FamilySearchResponseData,
-    SequencingGroupSearchResponseData
+    SequencingGroupSearchResponseData,
 )
 
 
@@ -135,7 +135,7 @@ class SearchLayer(BaseLayer):
                 project=project,
                 id=id_field,
                 sample_external_id=sample_id_format(sample_id),
-                sg_external_id=sequencing_group_id_format(sg_id)
+                sg_external_id=sequencing_group_id_format(sg_id),
             ),
         )
 

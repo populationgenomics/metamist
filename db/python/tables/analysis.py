@@ -19,6 +19,7 @@ from models.models.analysis import AnalysisInternal
 @dataclasses.dataclass
 class AnalysisFilter(GenericFilterModel):
     """Filter for analysis"""
+
     id: GenericFilter[int] = None
     sample_id: GenericFilter[int] = None
     sequencing_group_id: GenericFilter[int] = None
@@ -29,7 +30,7 @@ class AnalysisFilter(GenericFilterModel):
     output: GenericFilter[str] = None
     active: GenericFilter[bool] = None
 
-    def __hash__(self):     # pylint: disable=useless-parent-delegation
+    def __hash__(self):  # pylint: disable=useless-parent-delegation
         return super().__hash__()
 
 
@@ -189,7 +190,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'output': 'a.output',
                 'active': 'a.active',
             },
-
         )
 
         _query = f"""

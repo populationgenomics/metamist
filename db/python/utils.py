@@ -235,11 +235,11 @@ class GenericFilterModel:
             fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
-                    fconditionals, fvalues = prepare_query_from_dict_field(
+                    meta_conditionals, meta_values = prepare_query_from_dict_field(
                         filter_=filter_, field_name=field.name, column_name=fcolumn
                     )
-                    conditionals.extend(fconditionals)
-                    values.update(fvalues)
+                    conditionals.extend(meta_conditionals)
+                    values.update(meta_values)
                 elif isinstance(filter_, GenericFilter):
                     fconditionals, fvalues = filter_.to_sql(fcolumn)
                     conditionals.append(fconditionals)
@@ -254,18 +254,21 @@ class GenericFilterModel:
 
         return ' AND '.join(filter(None, conditionals)), values
 
-def prepare_query_from_dict_field(filter_, field_name, column_name) -> tuple[list[str], dict[str, Any]]:
+
+def prepare_query_from_dict_field(
+    filter_, field_name, column_name
+) -> tuple[list[str], dict[str, Any]]:
+    """
+    Prepare a SQL query from a dict field, which is a dict of GenericFilters.
+    Usually this is a JSON field in the database that we want to query on.
+    """
     conditionals: list[str] = []
     values: dict[str, Any] = {}
     for key, value in filter_.items():
         if not isinstance(value, GenericFilter):
-            raise ValueError(
-                f'Filter {field_name} must be a GenericFilter'
-            )
+            raise ValueError(f'Filter {field_name} must be a GenericFilter')
         if '"' in key:
-            raise ValueError(
-                'Meta key contains " character, which is not allowed'
-            )
+            raise ValueError('Meta key contains " character, which is not allowed')
         fconditionals, fvalues = value.to_sql(
             f"JSON_EXTRACT({column_name}, '$.{key}')",
             column_name=f'{column_name}_{key}',
@@ -274,6 +277,7 @@ def prepare_query_from_dict_field(filter_, field_name, column_name) -> tuple[lis
         values.update(fvalues)
 
     return conditionals, values
+
 
 def get_logger():
     """
