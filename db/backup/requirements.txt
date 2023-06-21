@@ -1,5 +1,5 @@
 cachetools==4.2.2
-certifi==2021.5.30
+certifi==2022.12.07
 cffi==1.14.6
 charset-normalizer==2.0.4
 google-api-core==2.0.0
@@ -19,13 +19,13 @@ mysql-connector-python==8.0.26
 packaging==21.0
 parameterized==0.8.1
 proto-plus==1.19.0
-protobuf==3.17.3
+protobuf==3.18.3
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pycparser==2.20
 pyparsing==2.4.7
 PyYAML==5.4.1
-requests==2.26.0
+requests==2.31.0
 rsa==4.7.2
 typing-extensions==3.10.0.2
 typing-inspect==0.7.1

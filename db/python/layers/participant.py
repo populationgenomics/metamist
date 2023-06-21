@@ -744,6 +744,57 @@ class ParticipantLayer(BaseLayer):
             'header_map': json_header_map,
         }
 
+    async def update_many_participant_external_ids(
+        self, internal_to_external_id: Dict[int, str], check_project_ids=True
+    ):
+        """Update many participant external ids"""
+        if check_project_ids:
+            projects = await self.pttable.get_project_ids_for_participant_ids(
+                list(internal_to_external_id.keys())
+            )
+            await self.ptable.check_access_to_project_ids(
+                user=self.author, project_ids=projects, readonly=False
+            )
+
+        return await self.pttable.update_many_participant_external_ids(
+            internal_to_external_id
+        )
+
+    async def get_family_participant_data(self, family_id: int, participant_id: int):
+        """Gets the family_participant row for a specific participant"""
+        fptable = FamilyParticipantTable(self.connection)
+
+        return await fptable.get_row(family_id=family_id, participant_id=participant_id)
+
+    async def remove_participant_from_family(self, family_id: int, participant_id: int):
+        """Deletes a participant from a family"""
+        fptable = FamilyParticipantTable(self.connection)
+
+        return await fptable.delete_family_participant_row(
+            family_id=family_id, participant_id=participant_id
+        )
+
+    async def add_participant_to_family(
+        self,
+        family_id: int,
+        participant_id: int,
+        paternal_id: int,
+        maternal_id: int,
+        affected: int,
+    ):
+        """Adds a participant to a family"""
+        fptable = FamilyParticipantTable(self.connection)
+
+        return await fptable.create_row(
+            family_id=family_id,
+            participant_id=participant_id,
+            paternal_id=paternal_id,
+            maternal_id=maternal_id,
+            affected=affected,
+            notes=None,
+            author=None,
+        )
+
     @staticmethod
     def _validate_individual_metadata_headers(headers):
         lheader_set = set(h.lower() for h in headers)
@@ -852,3 +903,47 @@ class ParticipantLayer(BaseLayer):
         return insertable_rows
 
     # endregion PHENOTYPES / SEQR
+
+    async def check_project_access_for_participants_families(
+        self, participant_ids: List[int], family_ids: List[int]
+    ):
+        """Checks user access for the projects associated with participant IDs and family IDs"""
+        pprojects = await self.pttable.get_project_ids_for_participant_ids(
+            participant_ids=participant_ids
+        )
+        ftable = FamilyTable(self.connection)
+        fprojects = await ftable.get_projects_by_family_ids(family_ids=family_ids)
+        return await self.ptable.check_access_to_project_ids(
+            self.connection.author,
+            list(pprojects | fprojects),
+            readonly=True,
+        )
+
+    async def update_participant_family(
+        self, participant_id: int, old_family_id: int, new_family_id: int
+    ):
+        """Updates a participants family from old_family_id to new_family_id"""
+        await self.check_project_access_for_participants_families(
+            participant_ids=[
+                participant_id,
+            ],
+            family_ids=[old_family_id, new_family_id],
+        )
+
+        # Save current family_participant values to reinsert them
+        fp_row = await self.get_family_participant_data(
+            family_id=old_family_id, participant_id=participant_id
+        )
+        async with self.connection.connection.transaction():
+            await self.remove_participant_from_family(
+                family_id=old_family_id, participant_id=participant_id
+            )
+
+            # Use saved values to maintain the fields in the new row
+            return await self.add_participant_to_family(
+                family_id=new_family_id,
+                participant_id=participant_id,
+                paternal_id=fp_row['paternal_id'],
+                maternal_id=fp_row['maternal_id'],
+                affected=fp_row['affected'],
+            )

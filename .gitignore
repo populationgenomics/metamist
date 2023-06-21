@@ -18,7 +18,9 @@ metamist/*
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated
 !sample_metadata/parser/
+!sample_metadata/audit/
 !metamist/parser
+!metamist/audit
 
 *.egg-info/
 db/liquibase.jar

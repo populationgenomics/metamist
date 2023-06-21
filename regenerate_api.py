@@ -234,7 +234,7 @@ def copy_python_files_from(tmpdir):
     This clears the ./metamist folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'README.md', 'parser', 'graphql'}
+    files_to_ignore = {'README.md', 'parser', 'graphql', 'audit'}
 
     dir_to_copy_to = MODULE_DIR  # should be relative to this script
     dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)

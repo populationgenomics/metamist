@@ -25,6 +25,7 @@
     --color-text-disabled: rgba(0, 0, 0, 0.38);
 
     --color-check-green: #7ac142;
+    --color-table-header: #f9fafb;
 }
 
 html[data-theme='dark-mode'] {
@@ -43,6 +44,7 @@ html[data-theme='dark-mode'] {
     --color-text-disabled: rgba(255, 255, 255, 0.38);
 
     --color-check-green: #659251;
+    --color-table-header: rgba(0, 0, 0, 0.15);
 }
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
 html[data-theme='dark-mode'] .swagger-ui {

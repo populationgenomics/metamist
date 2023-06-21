@@ -8,7 +8,7 @@ import FamilyView from './pages/family/FamilyView'
 import ProjectSummary from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
-import AnalysisRunnerSummary from './pages/project/AnalysisRunnerSummary'
+import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
