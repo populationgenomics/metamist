@@ -113,21 +113,6 @@ async def get_assays_by_criteria(
     return [a.to_external() for a in result]
 
 
-@router.get(
-    '/ids-for-sample-by-type',
-    operation_id='getAssayIdsForSampleIdByType',
-)
-async def get_assay_ids_for_sample_id(
-    sample_id: str,
-    connection: Connection = get_projectless_db_connection,
-) -> dict[str, list[int]]:
-    """Get all assay IDs for internal Sample ID"""
-    assay_layer = AssayLayer(connection)
-    sample_id_raw = sample_id_transform_to_raw(sample_id)
-    assay_ids_map = await assay_layer.get_assay_ids_for_sample_id(sample_id_raw)
-    return assay_ids_map
-
-
 @router.post(
     '/ids-for-samples-by-type',
     operation_id='getAssayIdsForSampleIdsByType',

@@ -58,46 +58,6 @@ class AssayLayer(BaseLayer):
         )
         return assay
 
-    async def get_assay_ids_for_sample_id(
-        self, sample_id: int, check_project_id=True
-    ) -> dict[str, list[int]]:
-        """Get all sequence IDs for a sample id, returned as a map with key being sequence type"""
-        (
-            projects,
-            assay_id_map,
-        ) = await self.seqt.get_assay_ids_for_sample_id(sample_id)
-
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids=[projects], readonly=True
-            )
-
-        return assay_id_map
-
-    async def get_assay_ids_for_sample_ids_by_type(
-        self, sample_ids: list[int], check_project_ids=True
-    ) -> dict[int, dict[str, list[int]]]:
-        """
-        Get the IDs of all sequences for a sample, keyed by the internal sample ID,
-        then by the sequence type
-        """
-        (
-            project_ids,
-            sample_assay_map,
-        ) = await self.seqt.get_sequence_ids_for_sample_ids_by_type(
-            sample_ids=sample_ids
-        )
-
-        if not sample_assay_map:
-            return sample_assay_map
-
-        if check_project_ids:
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=True
-            )
-
-        return sample_assay_map
-
     async def get_assays_for_sequencing_group_ids(
         self, sequencing_group_ids: list[int], check_project_ids=True
     ) -> dict[int, list[AssayInternal]]:
