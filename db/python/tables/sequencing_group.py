@@ -148,56 +148,6 @@ class SequencingGroupTable(DbBase):
 
         return dict(sequencing_groups)
 
-    # async def query(
-    #     self,
-    #     project_ids: list[ProjectId],
-    #     sample_ids: list[int],
-    #     sequencing_group_ids: list[int],
-    #     types: list[str],
-    #     technologies: list[str],
-    #     platforms: list[str],
-    #     active_only: bool = True,
-    # ) -> tuple[set[ProjectId], list[SequencingGroupInternal]]:
-    #     """
-    #     Query sequencing groups
-    #     """
-    #     wheres = []
-    #     params: dict[str, Any] = {}
-    #     if project_ids:
-    #         wheres.append('s.project IN :project_ids')
-    #         params['project_ids'] = project_ids
-    #     if sample_ids:
-    #         wheres.append('s.id IN :sample_ids')
-    #         params['sample_ids'] = sample_ids
-    #     if sequencing_group_ids:
-    #         wheres.append('sg.id IN :sequencing_group_ids')
-    #         params['sequencing_group_ids'] = sequencing_group_ids
-    #     if types:
-    #         wheres.append('sg.type IN :types')
-    #         params['types'] = types
-    #     if technologies:
-    #         wheres.append('sg.technology IN :technologies')
-    #         params['technologies'] = technologies
-    #     if platforms:
-    #         wheres.append('sg.platform IN :platforms')
-    #         params['platforms'] = platforms
-    #
-    #     if active_only:
-    #         wheres.append('NOT sg.archived')
-    #
-    #     where = ' AND '.join(wheres)
-    #     _query = f"""
-    #         SELECT {SequencingGroupTable.common_get_keys_str}
-    #         FROM sequencing_group sg
-    #         INNER JOIN sample s ON s.id = sg.sample_id
-    #         {'WHERE ' + where if where else ''}
-    #     """
-    #
-    #     rows = await self.connection.fetch_all(_query, params)
-    #     sequencing_groups = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
-    #     projects = set(r.project for r in sequencing_groups)
-    #     return projects, sequencing_groups
-
     async def get_all_sequencing_group_ids_by_sample_ids_by_type(
         self,
     ) -> dict[int, dict[str, list[int]]]:
@@ -230,10 +180,10 @@ class SequencingGroupTable(DbBase):
         Particularly useful for seqr like cases
         """
         _query = """
-    SELECT s.project as project, sg.id as sid, s.participant_id as pid
-    FROM sequencing_group sg
-    INNER JOIN sample s ON sg.sample_id = s.id
-    WHERE sg.type = :seqtype AND project = :project
+        SELECT s.project as project, sg.id as sid, s.participant_id as pid
+        FROM sequencing_group sg
+        INNER JOIN sample s ON sg.sample_id = s.id
+        WHERE sg.type = :seqtype AND project = :project
         """
 
         rows = list(

@@ -20,47 +20,6 @@ from models.models.search import SearchResponse
 from models.models.web import ProjectSummary, PagingLinks
 
 
-#
-#
-# class WebProject(BaseModel):
-#     """Minimal class to hold web info"""
-#
-#     id: int
-#     name: str
-#     dataset: str
-#     meta: dict
-#
-#
-# class ProjectSummaryResponse(BaseModel):
-#     """Response for the project summary"""
-#
-#     project: WebProject
-#     # high level stats
-#     total_participants: int
-#     total_samples: int
-#     total_samples_in_query: int
-#     total_sequencing_groups: int
-#     total_assays: int
-#     cram_seqr_stats: dict[str, dict[str, str]]  # {seqType: {seqr/seq/cram count: }}
-#     batch_sequencing_group_stats: dict[str, dict[str, str]]  # {batch: {seqType: }}
-#
-#     # for display
-#     participants: list[NestedParticipant]
-#     participant_keys: list[list[str]]
-#     sample_keys: list[list[str]]
-#     sequencing_group_keys: list[list[str]]
-#     assay_keys: list[list[str]]
-#     seqr_links: dict[str, str]
-#     seqr_sync_types: list[str]
-#
-#     links: PagingLinks | None
-#
-#     class Config:
-#         """Config for ProjectSummaryResponse"""
-#
-#         fields = {'links': '_links'}
-
-
 class SearchResponseModel(BaseModel):
     """Parent model class, allows flexibility later on"""
 

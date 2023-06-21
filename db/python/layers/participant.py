@@ -19,30 +19,6 @@ from models.models.participant import ParticipantInternal, ParticipantUpsertInte
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
 
-# class ParticipantUpdateModel(BaseModel):
-#     """Update participant model"""
-#
-#     external_id: Optional[str] = None
-#     reported_sex: Optional[int] = None
-#     reported_gender: Optional[str] = None
-#     karyotype: Optional[str] = None
-#     meta: Optional[Dict] = None
-#
-#
-# class ParticipantUpsert(ParticipantUpdateModel):
-#     """Update model for sample with sequences list"""
-#
-#     id: int | None
-#     samples: list[SampleUpsert]
-#
-#
-# class ParticipantUpsertBody(BaseModel):
-#     """Upsert model for batch Participants"""
-#
-#     participants: list[ParticipantUpsert]
-#
-
-
 class ExtraParticipantImporterHandler(Enum):
     """How to handle extra participants during metadata import"""
 

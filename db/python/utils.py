@@ -235,21 +235,11 @@ class GenericFilterModel:
             fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
-                    for key, value in filter_.items():
-                        if not isinstance(value, GenericFilter):
-                            raise ValueError(
-                                f'Filter {field.name} must be a GenericFilter'
-                            )
-                        if '"' in key:
-                            raise ValueError(
-                                'Meta key contains " character, which is not allowed'
-                            )
-                        fconditionals, fvalues = value.to_sql(
-                            f"JSON_EXTRACT({fcolumn}, '$.{key}')",
-                            column_name=f'{fcolumn}_{key}',
-                        )
-                        conditionals.append(fconditionals)
-                        values.update(fvalues)
+                    fconditionals, fvalues = prepare_query_from_dict_field(
+                        filter_=filter_, field_name=field.name, column_name=fcolumn
+                    )
+                    conditionals.extend(fconditionals)
+                    values.update(fvalues)
                 elif isinstance(filter_, GenericFilter):
                     fconditionals, fvalues = filter_.to_sql(fcolumn)
                     conditionals.append(fconditionals)
@@ -264,6 +254,26 @@ class GenericFilterModel:
 
         return ' AND '.join(filter(None, conditionals)), values
 
+def prepare_query_from_dict_field(filter_, field_name, column_name) -> tuple[list[str], dict[str, Any]]:
+    conditionals: list[str] = []
+    values: dict[str, Any] = {}
+    for key, value in filter_.items():
+        if not isinstance(value, GenericFilter):
+            raise ValueError(
+                f'Filter {field_name} must be a GenericFilter'
+            )
+        if '"' in key:
+            raise ValueError(
+                'Meta key contains " character, which is not allowed'
+            )
+        fconditionals, fvalues = value.to_sql(
+            f"JSON_EXTRACT({column_name}, '$.{key}')",
+            column_name=f'{column_name}_{key}',
+        )
+        conditionals.append(fconditionals)
+        values.update(fvalues)
+
+    return conditionals, values
 
 def get_logger():
     """

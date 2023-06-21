@@ -172,8 +172,6 @@ if __name__ == '__main__':
     import uvicorn
     import logging
 
-    #     'testcontainers.core.waiting_utils',
-    # ):
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 

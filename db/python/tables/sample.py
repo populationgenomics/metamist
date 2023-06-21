@@ -69,10 +69,10 @@ class SampleTable(DbBase):
             raise ValueError(f'Invalid filter: {filter_}')
         common_get_keys_str = ', '.join(self.common_get_keys)
         _query = f"""
-SELECT {common_get_keys_str}
-FROM sample
-WHERE {wheres}
-"""
+        SELECT {common_get_keys_str}
+        FROM sample
+        WHERE {wheres}
+        """
         rows = await self.connection.fetch_all(_query, values)
         samples = [SampleInternal.from_db(dict(r)) for r in rows]
         projects = set(s.project for s in samples)
@@ -160,9 +160,9 @@ WHERE {wheres}
         cs_keys = ', '.join(keys)
         cs_id_keys = ', '.join(f':{k}' for k in keys)
         _query = f"""\
-            INSERT INTO sample
-                ({cs_keys})
-            VALUES ({cs_id_keys}) RETURNING id;
+        INSERT INTO sample
+            ({cs_keys})
+        VALUES ({cs_id_keys}) RETURNING id;
         """
 
         id_of_new_sample = await self.connection.fetch_val(

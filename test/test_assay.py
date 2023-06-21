@@ -369,7 +369,7 @@ class TestAssay(DbIsolatedTest):
 
     @run_as_sync
     async def test_update(self):
-        """Test updating a assay, and all fields are updated correctly"""
+        """Test updating an assay, and all fields are updated correctly"""
         # insert
         assay = await self.assaylayer.upsert_assay(
             AssayUpsertInternal(
