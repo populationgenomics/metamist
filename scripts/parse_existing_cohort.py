@@ -138,7 +138,14 @@ class ExistingCohortParser(GenericMetadataParser):
         urls from a bucket listing.
         """
 
+        relevant_extensions = ('.cram', '.fastq.gz', '.fastq', 'fq.gz', '.fq', '.bam')
         return [
+            filename
+            for filename, path in self.filename_map.items()
+            if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
+            and any(filename.endswith(ext) for ext in relevant_extensions)
+        ]
+        
             filename
             for filename, path in self.filename_map.items()
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
