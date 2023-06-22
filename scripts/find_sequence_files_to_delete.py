@@ -19,11 +19,8 @@ from typing import Any
 
 import click
 from google.cloud import storage
-from sample_metadata.apis import SampleApi, SequenceApi, ProjectApi, AnalysisApi
-
-from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
+from metamist.apis import ProjectApi
+from metamist.graphql import query_async
 
 # Global vars
 EXTENSIONS = ['.fastq.gz', '.fastq', '.bam', '.cram', '.fq', 'fq.gz']
@@ -34,12 +31,9 @@ logger.setLevel(level=logging.INFO)
 client = storage.Client()
 
 projapi = ProjectApi()
-sampapi = SampleApi()
-seqapi = SequenceApi()
-aapi = AnalysisApi()
 
 # TODO: fetch this from metamist
-CPG_SAMPLES_TO_SKIP = {
+CPG_SEQUENCING_GROUP_IDS_TO_SKIP = {
     'CPG11783',  # acute-care, no FASTQ data
     'CPG255232',  # perth-neuro: new
     'CPG255240',  # perth-neuro: new
@@ -66,13 +60,15 @@ def get_bucket_name_from_path(path_input):
     return path[len('gs://') :].split('/', maxsplit=1)[0]
 
 
-def get_filenames_from_sequences(sequences: list[dict[str, Any]]) -> set[str]:
+def get_filenames_from_assays(assays: list[dict[str, Any]]) -> set[str]:
     """
     Convert sm-formatted files to list of gs:// filenames
     """
     all_filenames = set()
-    for sequence in sequences:
-        reads = sequence['meta'].get('reads')
+    if not isinstance(assays, list):
+        assays = list(assays)
+    for assay in assays:
+        reads = assay['meta'].get('reads')
         if not reads:
             continue
         # support up to three levels of nesting, because:
@@ -102,81 +98,60 @@ def get_filenames_from_sequences(sequences: list[dict[str, Any]]) -> set[str]:
                     all_filenames.add(inner_read['location'])
             else:
                 if not isinstance(read, dict):
-                    logging.error(
-                        f'Got {type(inner_read)} read, expected dict: {inner_read}'
-                    )
+                    logging.error(f'Got {type(read)} read, expected dict: {read}')
                     continue
                 all_filenames.add(read['location'])
 
     return all_filenames
 
 
-async def get_sequences_for_which_crams_exist(
-    cpg_project, sequence_types_to_remove: set[str]
-):
+async def get_filenames_from_assays_for_which_crams_exist(
+    cpg_project, sequencing_types_to_remove: set[str]
+) -> set[str]:
     """
     Get all sequence files for a project
     """
     try:
-        resp = await sampapi.get_all_sample_id_map_by_internal_async(cpg_project)
-        if len(resp) == 0:
-            return []
+        sg_query = """
+query GetSgIdsQuery($project: String!) {
+    project(name: $project) {
+        samples {
+            # activeOnly to find assays for older excluded samples
+            sequencing_groups(activeOnly: false) {
+                id
+                assays {
+                    id
+                    meta
+                }
+                analyses(type: "cram") {
+                    id
+                    meta
+                }
+            }
+        }
+    }
+}
+        """
+        response = await query_async(sg_query, {'project': cpg_project})
+        filenames_to_remove: set[str] = set()
+        for _ in response['project']['samples']:
+            for sg in _['sequencing_groups']:
+                if 'analyses' not in sg:
+                    # there are no crams, so we won't remove
+                    continue
+                if sg['id'] in CPG_SEQUENCING_GROUP_IDS_TO_SKIP:
+                    continue
+                if sg['type'] not in sequencing_types_to_remove:
+                    continue
 
-        crams = await aapi.query_analyses_async(
-            AnalysisQueryModel(
-                projects=[cpg_project],
-                type=AnalysisType('cram'),
-                status=AnalysisStatus('completed'),
-            )
-        )
+                filenames_to_remove |= get_filenames_from_assays(sg['assays'])
 
-        crams_with_missing_seq_type = [
-            analysis for analysis in crams if 'sequencing_type' not in analysis['meta']
-        ]
-        if crams_with_missing_seq_type:
-            raise ValueError(
-                f'CRAMs from dataset {cpg_project} did not have sequencing_type'
-            )
+        return filenames_to_remove
 
-        sapi_seqtype_with_crams = set(
-            (sample_id, analysis['meta']['sequencing_type'])
-            for analysis in crams
-            for sample_id in analysis['sample_ids']
-        )
-
-        sapis_without_crams = set(resp.keys()) - set(
-            # crams always have only one sample_id, so take the first element safely
-            s[0]
-            for s in sapi_seqtype_with_crams
-        )
-        if sapis_without_crams:
-            logging.warning(
-                f'{cpg_project} :: {len(sapis_without_crams)} samples missing crams: {sapis_without_crams}'
-            )
-
-        sapis_to_remove = [
-            sid
-            for sid, seq_type in sapi_seqtype_with_crams
-            if sid not in CPG_SAMPLES_TO_SKIP and seq_type in sequence_types_to_remove
-        ]
-        if len(sapis_to_remove) == 0:
-            return []
-
-        sequences = await seqapi.get_sequences_by_sample_ids_async(
-            request_body=sapis_to_remove
-        )
-
-        sequences_to_remove = [
-            seq
-            for seq in sequences
-            if (seq['sample_id'], str(seq['type'])) in sapi_seqtype_with_crams
-        ]
-
-        return sequences_to_remove
     except Exception as err:
-        logging.error(f'{cpg_project} :: Cannot get sequences {repr(err)}')
+        logging.error(f'{cpg_project} :: Cannot get assays {repr(err)}')
 
-    return []
+    return set()
 
 
 def find_existing_files_in_bucket(
@@ -208,10 +183,10 @@ def find_existing_files_in_bucket(
 
 
 async def find_files_to_delete(
-    sequence_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
+    sequencing_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
 ):
     """
-    Get all the sequences across all the projects from sample_metadata
+    Get all the sequences across all the projects from metamist
     """
 
     _projects_to_ignore = set(projects_to_ignore or [])
@@ -235,19 +210,22 @@ async def find_files_to_delete(
     print(names)
 
     jobs = [
-        get_sequences_for_which_crams_exist(p, set(sequence_types_to_remove))
+        get_filenames_from_assays_for_which_crams_exist(
+            p, set(sequencing_types_to_remove)
+        )
         for p in names
     ]
-    sequences = await asyncio.gather(*jobs)
-    sequences = sum(sequences, [])
+    list_of_filenames: list[set[str]] = await asyncio.gather(*jobs)
+    assay_filenames = list_of_filenames[0]
+    for _assay_filenames in list_of_filenames[1:]:
+        assay_filenames |= _assay_filenames
 
-    if not sequences:
-        raise ValueError('Probably an error as no sequences were found to remove')
+    if not assay_filenames:
+        raise ValueError('Probably an error as no filenames were found to remove')
 
-    sequence_filenames = get_filenames_from_sequences(sequences)
     filenames_by_buckets: dict[str, set[str]] = defaultdict(set)
 
-    for file in sequence_filenames:
+    for file in assay_filenames:
         bucket = get_bucket_name_from_path(file)
         filenames_by_buckets[bucket].add(file)
 
@@ -277,11 +255,11 @@ async def find_files_to_delete(
 )
 @click.option('--project-to-ignore', multiple=True)
 @click.option('--output-path', default='files-to-remove.txt')
-def main(sequence_type: list[str], project_to_ignore: list[str], output_path: str):
+def main(sequencing_type: list[str], project_to_ignore: list[str], output_path: str):
     """Main from CLI"""
     asyncio.run(
         find_files_to_delete(
-            sequence_types_to_remove=sequence_type,
+            sequencing_types_to_remove=sequencing_type,
             projects_to_ignore=project_to_ignore,
             output_path=output_path,
         )

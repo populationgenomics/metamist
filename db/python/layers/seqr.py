@@ -26,15 +26,21 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
-from db.python.layers.sequence import SampleSequenceLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import ProjectId
-from models.enums import SequenceType, AnalysisStatus, AnalysisType
-from models.models.sample import sample_id_format, sample_id_format_list
+from db.python.enum_tables import SequencingTypeTable
+from db.python.utils import ProjectId, GenericFilter
+from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
-SAMPLES_TO_IGNORE = {22735, 22739}
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
+    sequencing_group_id_format,
+)
+
+SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
 
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
@@ -63,14 +69,15 @@ def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[list[T]]:
 
 
 class SeqrLayer(BaseLayer):
-    """Layer for more complex sample logic"""
+    """Layer for more complex seqr logic"""
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.flayer = FamilyLayer(connection)
         self.player = ParticipantLayer(connection)
 
-    async def is_seqr_sync_setup(self):
+    @staticmethod
+    async def is_seqr_sync_setup():
         """Check if metamist is configured to interact with seqr"""
         return SEQR_URL and SEQR_AUDIENCE
 
@@ -80,18 +87,18 @@ class SeqrLayer(BaseLayer):
         return f'{SEQR_URL}/project/{guid}/project_page'
 
     @staticmethod
-    def get_meta_key_from_sequence_type(sequence_type: SequenceType):
+    def get_meta_key_from_sequencing_type(sequencing_type: str):
         """
         Convenience method for computing the key where the SEQR_GUID
         is stored within the project.meta
         """
-        return f'seqr-project-{sequence_type.value}'
+        return f'seqr-project-{sequencing_type}'
 
     async def get_synchronisable_types(
         self, project_id: ProjectId | None = None
-    ) -> list[SequenceType]:
+    ) -> list[str]:
         """
-        Check the project meta to find out which sequence_types are synchronisable
+        Check the project meta to find out which sequencing_types are synchronisable
         """
         if not await self.is_seqr_sync_setup():
             return []
@@ -108,16 +115,17 @@ class SeqrLayer(BaseLayer):
         if not has_access:
             return []
 
+        sequencing_types = await SequencingTypeTable(connection=self.connection).get()
         sts = [
             st
-            for st in SequenceType
-            if self.get_meta_key_from_sequence_type(st) in project.meta
+            for st in sequencing_types
+            if self.get_meta_key_from_sequencing_type(st) in project.meta
         ]
         return sts
 
     async def sync_dataset(
         self,
-        sequence_type: SequenceType,
+        sequencing_type: str,
         sync_families: bool = True,
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
@@ -135,20 +143,26 @@ class SeqrLayer(BaseLayer):
         project = await pptable.get_project_by_id(self.connection.project)
 
         seqr_guid = project.meta.get(
-            self.get_meta_key_from_sequence_type(sequence_type)
+            self.get_meta_key_from_sequencing_type(sequencing_type)
         )
 
         if not seqr_guid:
             raise ValueError(
                 f'The project {project.name} does NOT have an appropriate seqr '
-                f'project attached for {sequence_type.value}'
+                f'project attached for {sequencing_type}'
             )
 
-        seqlayer = SampleSequenceLayer(self.connection)
+        seqlayer = SequencingGroupLayer(self.connection)
 
-        pid_to_sid_map = await seqlayer.get_pids_sids_for_sequence_type(sequence_type)
+        pid_to_sid_map = (
+            await seqlayer.get_participant_ids_sequencing_group_ids_for_sequencing_type(
+                sequencing_type
+            )
+        )
         participant_ids = list(pid_to_sid_map.keys())
-        sample_ids = set(sid for sids in pid_to_sid_map.values() for sid in sids)
+        sequencing_group_ids = set(
+            sid for sids in pid_to_sid_map.values() for sid in sids
+        )
         families = await self.flayer.get_families_by_participants(participant_ids)
         family_ids = set(f.id for fams in families.values() for f in fams)
 
@@ -182,7 +196,7 @@ class SeqrLayer(BaseLayer):
                         _errors.extend(
                             self.send_slack_notification(
                                 project_name=project.name,
-                                sequence_type=sequence_type,
+                                sequencing_type=sequencing_type,
                                 errors=_errors,
                                 messages=messages,
                                 seqr_guid=seqr_guid,
@@ -203,8 +217,8 @@ class SeqrLayer(BaseLayer):
             if sync_es_index:
                 promises.append(
                     self.update_es_index(
-                        sequence_type=sequence_type,
-                        internal_sample_ids=sample_ids,
+                        sequencing_type=sequencing_type,
+                        sequencing_group_ids=sequencing_group_ids,
                         **params,
                     )
                 )
@@ -213,7 +227,7 @@ class SeqrLayer(BaseLayer):
             if sync_cram_map:
                 promises.append(
                     self.sync_cram_map(
-                        sequence_type=sequence_type,
+                        sequencing_type=sequencing_type,
                         participant_ids=participant_ids,
                         **params,
                     )
@@ -238,7 +252,7 @@ class SeqrLayer(BaseLayer):
             _errors.extend(
                 self.send_slack_notification(
                     project_name=project.name,
-                    sequence_type=sequence_type,
+                    sequencing_type=sequencing_type,
                     seqr_guid=seqr_guid,
                     errors=_errors,
                     messages=messages,
@@ -358,32 +372,33 @@ class SeqrLayer(BaseLayer):
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
-        sequence_type: SequenceType,
+        sequencing_type: str,
         project_guid,
         headers,
-        internal_sample_ids: set[int],
+        sequencing_group_ids: set[int],
     ) -> list[str]:
         """Update seqr samples for latest elastic-search index"""
-        eid_to_sid_rows = (
-            await self.player.get_external_participant_id_to_internal_sample_id_map(
-                self.connection.project
-            )
+        eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
+            self.connection.project, sequencing_type=sequencing_type
         )
 
         # format sample ID for transport
         person_sample_map_rows: list[tuple[str, str]] = [
-            (p[0], sample_id_format(p[1]))
-            for p in eid_to_sid_rows
-            if p[1] not in SAMPLES_TO_IGNORE
+            (p[0], sequencing_group_id_format(p[1]))
+            for p in eid_to_sgid_rows
+            if p[1] not in SEQUENCING_GROUPS_TO_IGNORE
         ]
 
+        # highlighting that seqr wants:
+        #   Col 1: Sample Ids (sequencing group ID in our case)
+        #   Col 2: Seqr Individual Ids (column 2).
         rows_to_write = [
             '\t'.join(s[::-1])
             for s in person_sample_map_rows
-            if not any(sid in s for sid in SAMPLES_TO_IGNORE)
+            if not any(sid in s for sid in SEQUENCING_GROUPS_TO_IGNORE)
         ]
 
-        filename = f'{project_guid}_pid_sid_map_{datetime.now().isoformat()}.tsv'
+        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
         # remove any non-filename compliant filenames
         filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
@@ -391,11 +406,13 @@ class SeqrLayer(BaseLayer):
         # pylint: disable=no-member
 
         alayer = AnalysisLayer(connection=self.connection)
-        es_index_analyses = await alayer.query_analysis(
-            project_ids=[self.connection.project],
-            analysis_type=AnalysisType('es-index'),
-            meta={'sequencing_type': sequence_type.value},
-            status=AnalysisStatus('completed'),
+        es_index_analyses = await alayer.query(
+            AnalysisFilter(
+                project=GenericFilter(eq=self.connection.project),
+                type=GenericFilter(eq='es-index'),
+                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
+                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
+            )
         )
 
         es_index_analyses = sorted(
@@ -413,26 +430,30 @@ class SeqrLayer(BaseLayer):
 
         messages = []
 
-        if internal_sample_ids:
-            samples_in_new_index = set(es_index_analyses[-1].sample_ids)
+        if sequencing_group_ids:
+            sequencing_groups_in_new_index = set(
+                es_index_analyses[-1].sequencing_group_ids
+            )
 
             if len(es_index_analyses) > 1:
-                samples_in_old_index = set(es_index_analyses[-2].sample_ids)
-                samples_diff = sample_id_format_list(
-                    samples_in_new_index - samples_in_old_index
+                sequencing_groups_in_old_index = set(
+                    es_index_analyses[-2].sequencing_group_ids
                 )
-                if samples_diff:
+                sequencing_groups_diff = sequencing_group_id_format_list(
+                    sequencing_groups_in_new_index - sequencing_groups_in_old_index
+                )
+                if sequencing_groups_diff:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(samples_diff),
+                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
                     )
 
-            sample_ids_missing_from_index = sample_id_format_list(
-                internal_sample_ids - samples_in_new_index
+            sg_ids_missing_from_index = sequencing_group_id_format_list(
+                sequencing_group_ids - sequencing_groups_in_new_index
             )
-            if sample_ids_missing_from_index:
+            if sg_ids_missing_from_index:
                 messages.append(
-                    'Samples missing from index: '
-                    + ', '.join(sample_ids_missing_from_index),
+                    'Sequencing groups missing from index: '
+                    + ', '.join(sg_ids_missing_from_index),
                 )
 
         req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
@@ -471,7 +492,7 @@ class SeqrLayer(BaseLayer):
         self,
         session: aiohttp.ClientSession,
         participant_ids: list[int],
-        sequence_type: SequenceType,
+        sequencing_type: str,
         project_guid: str,
         headers,
     ):
@@ -481,14 +502,14 @@ class SeqrLayer(BaseLayer):
 
         reads_map = await alayer.get_sample_cram_path_map_for_seqr(
             project=self.connection.project,
-            sequence_types=[sequence_type],
+            sequencing_types=[sequencing_type],
             participant_ids=participant_ids,
         )
         output_filter = lambda row: True  # noqa
         # eventually solved by sequence groups
-        if sequence_type.value == 'genome':
+        if sequencing_type == 'genome':
             output_filter = lambda output: 'exome' not in output  # noqa
-        elif sequence_type.value == 'exome':
+        elif sequencing_type == 'exome':
             output_filter = lambda output: 'exome' in output  # noqa
 
         parsed_records = defaultdict(list)
@@ -499,7 +520,10 @@ class SeqrLayer(BaseLayer):
                 continue
             participant_id = row['participant_id']
             parsed_records[participant_id].append(
-                {'filePath': output, 'sampleId': sample_id_format(row['sample_id'])}
+                {
+                    'filePath': output,
+                    'sampleId': sequencing_group_id_format(row['sequencing_group_id']),
+                }
             )
 
         if not reads_map:
@@ -520,10 +544,12 @@ class SeqrLayer(BaseLayer):
             req_igv_update_url = SEQR_URL + _url_igv_individual_update.format(
                 individualGuid=individual_guid
             )
-            resp = await session.post(req_igv_update_url, json=update, headers=headers)
+            igv_resp = await session.post(
+                req_igv_update_url, json=update, headers=headers
+            )
 
-            resp.raise_for_status()
-            return await resp.text()
+            igv_resp.raise_for_status()
+            return await igv_resp.text()
 
         chunk_size = 10
         all_updates = response['updates']
@@ -531,7 +557,7 @@ class SeqrLayer(BaseLayer):
         for idx, updates in enumerate(chunk(all_updates, chunk_size=10)):
             start = idx * chunk_size + 1
             finish = start + len(updates)
-            print(f'Updating CRAMs {start} -> {finish} (/{len(all_updates)}')
+            print(f'Updating CRAMs {start} -> {finish} (/{len(all_updates)})')
 
             responses = await asyncio.gather(
                 *[_make_update_igv_call(update) for update in updates],
@@ -690,7 +716,7 @@ class SeqrLayer(BaseLayer):
     def send_slack_notification(
         self,
         project_name: str,
-        sequence_type: SequenceType,
+        sequencing_type: str,
         messages: list[str],
         errors: list[str],
         seqr_guid: str,
@@ -707,10 +733,10 @@ class SeqrLayer(BaseLayer):
             if errors:
                 text = (
                     f':rotating_light: Error syncing *{pn_link}* '
-                    f'(_{sequence_type.value}_) seqr project :rotating_light:'
+                    f'(_{sequencing_type}_) seqr project :rotating_light:'
                 )
             else:
-                text = f'Synced {pn_link} ({sequence_type.value}) seqr project'
+                text = f'Synced {pn_link} ({sequencing_type}) seqr project'
 
             blocks = []
             if errors:

@@ -4,7 +4,16 @@
 import * as React from 'react'
 import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
 import Table from '../../shared/components/Table'
-import { ProjectApi, Project, SequenceType } from '../../sm-api'
+import { ProjectApi, Project } from '../../sm-api'
+import { gql } from '../../__generated__/gql'
+import { useQuery } from '@apollo/client'
+
+const GET_SEQUENCING_TYPES = gql(`
+query GetSequencingTypes {
+    enum {
+        sequencingType
+    }
+}`)
 
 interface ControlledInputProps extends InputProps {
     project: Project
@@ -14,6 +23,7 @@ interface ControlledInputProps extends InputProps {
 const ProjectsAdmin = () => {
     const [projects, setProjects] = React.useState<Project[]>([])
     const [error, setError] = React.useState<string | undefined>()
+    const seqTypeData = useQuery(GET_SEQUENCING_TYPES)
 
     const getProjects = () => {
         setError(undefined)
@@ -78,7 +88,7 @@ const ProjectsAdmin = () => {
         )
     }
 
-    const seqTypes = Object.values(SequenceType)
+    const seqTypes: (string | null)[] = seqTypeData?.data?.enum?.sequencingType || [null]
 
     return (
         <>

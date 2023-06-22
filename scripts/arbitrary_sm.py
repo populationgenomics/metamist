@@ -19,8 +19,8 @@ import subprocess
 import argparse
 import json
 
-from sample_metadata import apis
-from sample_metadata.model_utils import file_type
+from metamist import apis
+from metamist.model_utils import file_type
 
 
 def run_sm(

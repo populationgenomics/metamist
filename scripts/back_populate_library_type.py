@@ -8,8 +8,8 @@ import logging
 import re
 import click
 
-from sample_metadata.apis import SequenceApi
-from sample_metadata.models import SequenceUpdateModel
+from metamist.apis import AssayApi
+from metamist.models import AssayUpsert
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(
@@ -56,21 +56,21 @@ garvan_fastq_regex = (
 )
 def main(project: str, dry_run: bool):
     """Back populate facility and library_type meta fields for existing sequences"""
-    seqapi = SequenceApi()
+    asapi = AssayApi()
     # Pull all the sequences
-    sequences = seqapi.get_sequences_by_criteria(
+    assays = asapi.get_assays_by_criteria(
         active=True,
-        body_get_sequences_by_criteria={
+        body_get_assays_by_criteria={
             'projects': [project],
         },
     )
 
     # For logs
-    updated_sequences: list[dict[str, dict]] = []
+    updated_assays: list[dict[str, dict]] = []
 
-    for sequence in sequences:
-        internal_sequence_id = sequence.get('id')
-        current_library_type = sequence['meta'].get('library_type')
+    for assay in assays:
+        internal_sequence_id = assay.get('id')
+        current_library_type = assay['meta'].get('library_type')
 
         # Quick validation
         if current_library_type:
@@ -82,17 +82,17 @@ def main(project: str, dry_run: bool):
         meta_fields_to_update = {}
 
         try:
-            fastq_filename = sequence.get('meta').get('reads')[0][0].get('basename')
+            fastq_filename = assay.get('meta').get('reads')[0].get('basename')
 
         except (TypeError, KeyError):
             # Check if this is a bam ingested with a manifest that includes design_description
-            if design_description := sequence.get('meta', {}).get('design_description'):
+            if design_description := assay.get('meta', {}).get('design_description'):
                 meta_fields_to_update['library_type'] = design_description
                 fastq_filename = 'dummy-file-name'
             else:
                 # Can't determine fastq_filename
                 logging.warning(
-                    f'Cant extract fastq_filename for {internal_sequence_id} skipping {sequence}'
+                    f'Cant extract fastq_filename for {internal_sequence_id} skipping {assay}'
                 )
                 continue
 
@@ -111,8 +111,8 @@ def main(project: str, dry_run: bool):
             meta_fields_to_update['facility'] = 'garvan'
 
         # Check if this is a bam ingested with a manifest that includes design_description
-        elif sequence['meta'].get('design_description'):
-            meta_fields_to_update['library_type'] = sequence['meta'].get(
+        elif assay['meta'].get('design_description'):
+            meta_fields_to_update['library_type'] = assay['meta'].get(
                 'design_description'
             )
 
@@ -123,18 +123,17 @@ def main(project: str, dry_run: bool):
 
         if meta_fields_to_update:
             if not dry_run:
-                seqapi.update_sequence(
-                    internal_sequence_id,
-                    SequenceUpdateModel(meta=meta_fields_to_update),
+                asapi.update_assay(
+                    AssayUpsert(id=internal_sequence_id, meta=meta_fields_to_update),
                 )
-            updated_sequences.append({internal_sequence_id: meta_fields_to_update})
+            updated_assays.append({internal_sequence_id: meta_fields_to_update})
 
     if dry_run:
         logging.info(
-            f'Dummy run. Would have updated {len(updated_sequences)} sequences. {updated_sequences}'
+            f'Dummy run. Would have updated {len(updated_assays)} sequences. {updated_assays}'
         )
     else:
-        logging.info(f'Updated {len(updated_sequences)} sequences. {updated_sequences}')
+        logging.info(f'Updated {len(updated_assays)} sequences. {updated_assays}')
 
 
 if __name__ == '__main__':

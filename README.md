@@ -2,18 +2,19 @@
 
 [![codecov](https://codecov.io/gh/populationgenomics/sample-metadata/branch/dev/graph/badge.svg?token=OI3XZYR9HK)](https://codecov.io/gh/populationgenomics/sample-metadata)
 
-The sample-metadata system is database that stores **de-identified** metadata.
+Metamist is database that stores **de-identified** -omics metadata.
 
-There are three components to the sample-metadata system:
+There are three components to the metamist system:
 
 - System-versioned MariaDB database,
 - Python web API to manage permissions, and store frequently used queries,
+  - Including a GraphQL API for querying the database
 - An installable python library that wraps the Python web API (using OpenAPI generator)
 
-Every resource in sample-metadata belongs to a project. All resources are access
+Every resource in metamist belongs to a project. All resources are access
 controlled through membership of the google groups:
 `$dataset-sample-metadata-main-{read,write}`. Note that members of google-groups
-are cached in a secret as group-membership identity checks are slow.
+are cached in a blob as group-membership identity lookups are slow.
 
 ## API
 
@@ -46,7 +47,7 @@ print(query(_query, {"sampleId": "CPG18"}))
 ### Sample IDs
 
 In an effort to reduce our dependency on potentially mutable external sample IDs with inconsistent format,
-the sample-metadata server generates an internal sample id for every sample. Internally they're an
+the metamist server generates an internal sample id for every sample. Internally they're an
 incrementing integer, but they're transformed externally to have a prefix, and checksum - this allows durability
 when transcribing sample IDs to reduce mistypes, and allow to quickly check whether a sample ID is valid.
 
@@ -70,7 +71,7 @@ If you import a pedigree, the sex value is written to the `reported_sex` attribu
 
 ## Local develompent of SM
 
-The recommended way to develop the sample-metadata system is to run a local copy of SM.
+The recommended way to develop the metamist system is to run a local copy of SM.
 
 > There have been some reported issues of running a local SM environment on an M1 mac.
 
@@ -79,7 +80,7 @@ You can configure the MariaDB connection with environment variables.
 
 ### Creating the environment
 
-Dependencies for the `sample-metadata` API package are listed in `setup.py`.
+Dependencies for the `metamist` API package are listed in `setup.py`.
 Additional dev requirements are listed in `requirements-dev.txt`, and packages for
 the sever-side code are listed in `requirements.txt`.
 
@@ -245,7 +246,7 @@ npm start
 
 #### Unauthenticated access
 
-You'll want to set the `SM_LOCALONLY_DEFAULTUSER` environment variable along with `ALLOWALLACCESS` to allow access to a local sample-metadata server without providing a bearer token. This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
+You'll want to set the `SM_LOCALONLY_DEFAULTUSER` environment variable along with `ALLOWALLACCESS` to allow access to a local metamist server without providing a bearer token. This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
 
 ```shell
 export SM_ALLOWALLACCESS=1
@@ -272,7 +273,7 @@ The web API exposes this schema in two ways:
 - OpenAPI schema: `http://localhost:8000/schema.json`
   - Returns a JSON with the full OpenAPI 3 compliant schema.
   - You could put this into the [Swagger editor](https://editor.swagger.io/) to see the same "Swagger UI" that `/api/docs` exposes.
-  - We generate the sample_metadata installable Python API based on this schema.
+  - We generate the metamist installable Python API based on this schema.
 
 #### Generating the installable API
 
@@ -315,7 +316,7 @@ python regenerate_apy.py
 
 ## Deployment
 
-The sample-metadata server
+The metamist server
 
 You'll want to complete the following steps:
 
@@ -328,5 +329,4 @@ export SM_ENVIRONMENT='PRODUCTION'
 
 # OR, point to the dev instance with
 export SM_ENVIRONMENT='DEVELOPMENT'
-
 ```

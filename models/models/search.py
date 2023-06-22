@@ -1,6 +1,7 @@
 from db.python.utils import ProjectId
 from models.base import SMBase
 from models.enums.search import SearchResponseType
+from models.enums.web import MetaSearchEntityPrefix
 
 
 class SearchResponseData(SMBase):
@@ -33,6 +34,14 @@ class SampleSearchResponseData(SearchResponseData):
     sample_external_ids: list[str]
 
 
+class SequencingGroupSearchResponseData(SearchResponseData):
+    """Sequencing group search response data"""
+
+    id: str | None
+    sample_external_id: str
+    sg_external_id: str
+
+
 class ErrorResponse(SMBase):
     """Error search response data"""
 
@@ -44,5 +53,14 @@ class SearchResponse(SMBase):
 
     type: SearchResponseType
     title: str
-    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData
+    data: SampleSearchResponseData | ParticipantSearchResponseData | FamilySearchResponseData | SequencingGroupSearchResponseData
     error: ErrorResponse | None = None
+
+
+class SearchItem(SMBase):
+    """Summary Grid Filter Model"""
+
+    model_type: MetaSearchEntityPrefix
+    query: str
+    field: str
+    is_meta: bool

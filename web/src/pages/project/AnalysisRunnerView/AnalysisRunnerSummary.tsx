@@ -20,7 +20,7 @@ const PAGE_SIZES = [20, 40, 100, 1000]
 const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
-        analyses(type: ANALYSIS_RUNNER) {
+        analyses({ eq: "analysis-runner" }) {
           author
           id
           meta
@@ -86,7 +86,9 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         output,
         ...meta,
         position: i,
-        'Hail Batch': meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', ''),
+        'Hail Batch': meta?.batch_url
+            ? meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', '')
+            : '',
         GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
         Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
         Author: `${parseEmail(sanitiseValue(author))}`,

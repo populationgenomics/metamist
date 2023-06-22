@@ -7,9 +7,10 @@ import Diversity3RoundedIcon from '@mui/icons-material/Diversity3Rounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded'
+import VaccinesRoundedIcon from '@mui/icons-material/VaccinesRounded'
 import SearchIcon from '@mui/icons-material/Search'
 
-import { SearchResponse, WebApi } from '../../../sm-api/api'
+import { SearchResponse, WebApi, SearchResponseType } from '../../../sm-api/api'
 import './Search.css'
 
 type State = {
@@ -80,29 +81,34 @@ const resultRenderer = ({ ...props }) => {
         available = `No access to this ${props.type}`
         colour = 'gray'
     }
-    if (props.type === 'participant' || props.type === 'family') {
+    if (props.type === SearchResponseType.Participant) {
         available = `${_.capitalize(props.type)} result is not supported`
         colour = 'gray'
     }
     const style = { fontSize: 50, color: colour, height: '33px' }
 
     switch (props.type) {
-        case 'sample': {
+        case SearchResponseType.Sample: {
             components.push(...(props.data.sample_external_ids || []))
             icon = <BloodtypeRoundedIcon sx={style} />
             break
         }
-        case 'participant': {
+        case SearchResponseType.Participant: {
             components.push(...(props.data.participant_external_ids || []))
             icon = <PersonRoundedIcon sx={style} />
             break
         }
-        case 'family': {
+        case SearchResponseType.Family: {
             components.push(...(props.data.family_external_ids || []))
             icon = <Diversity3RoundedIcon sx={style} />
             break
         }
-        case 'error': {
+        case SearchResponseType.SequencingGroup: {
+            components.push(...(props.data.sample_external_ids || []))
+            icon = <VaccinesRoundedIcon sx={style} />
+            break
+        }
+        case SearchResponseType.Error: {
             components.push(props.data.error)
             icon = <ErrorRoundedIcon sx={style} />
             break
@@ -153,7 +159,7 @@ const Searchbar: React.FunctionComponent = () => {
     const navigate = useNavigate()
     const [{ loading, results, value }, dispatch] = React.useReducer(SearchReducer, initialState)
 
-    const searchResultToRoute = (type: string, id: string) => {
+    const searchResultToRoute = (type: string, id: string, seqID?: string) => {
         // handle "no access to this project"
         if (!id) return
 
@@ -166,9 +172,10 @@ const Searchbar: React.FunctionComponent = () => {
                 navigate(`/sample/${id}`)
                 break
             case 'family':
-                // alert("Family page not implemented yet");
                 navigate(`/family/${id}`)
                 break
+            case 'sequencing-group':
+                navigate(`/sample/${id}/${seqID}`)
             // no default
         }
     }
@@ -253,7 +260,11 @@ const Searchbar: React.FunctionComponent = () => {
                         query: '',
                         results: {},
                     } as Action)
-                    searchResultToRoute(data.result.type, data.result.data.id)
+                    searchResultToRoute(
+                        data.result.type,
+                        data.result.data.sample_external_id,
+                        data.result.data?.sg_external_id
+                    )
                 }}
                 resultRenderer={resultRenderer}
                 onSearchChange={handleSearchChange}

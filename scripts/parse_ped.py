@@ -4,7 +4,7 @@ import click
 
 from cloudpathlib import CloudPath
 
-from sample_metadata.apis import (
+from metamist.apis import (
     FamilyApi,
 )
 
