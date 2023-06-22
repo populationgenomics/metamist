@@ -208,37 +208,6 @@ class TestAssay(DbIsolatedTest):
         self.assertEqual(seq2.id, (await self.assaylayer.query(fquery_3))[0].id)
 
     @run_as_sync
-    async def test_get_assays_by_sample_id(self):
-        """Get many assays by sample ID"""
-        seq1 = await self.assaylayer.upsert_assay(
-            AssayUpsertInternal(
-                sample_id=self.sample_id_raw,
-                type='sequencing',
-                meta={**default_sequencing_meta},
-                external_ids={},
-            )
-        )
-        seq2 = await self.assaylayer.upsert_assay(
-            AssayUpsertInternal(
-                sample_id=self.sample_id_raw,
-                type='sequencing',
-                meta={**default_sequencing_meta},
-                external_ids={},
-            )
-        )
-
-        by_type = await self.assaylayer.get_assay_ids_for_sample_ids_by_type(
-            [self.sample_id_raw], check_project_ids=False
-        )
-
-        self.assertIn(self.sample_id_raw, by_type)
-        self.assertEqual(1, len(by_type))
-
-        self.assertSetEqual(
-            {seq1.id, seq2.id}, set(by_type[self.sample_id_raw]['sequencing'])
-        )
-
-    @run_as_sync
     async def test_query(self):
         """Test query_assays in different combinations"""
         sample = await self.slayer.upsert_sample(

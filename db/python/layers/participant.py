@@ -744,22 +744,6 @@ class ParticipantLayer(BaseLayer):
             'header_map': json_header_map,
         }
 
-    async def update_many_participant_external_ids(
-        self, internal_to_external_id: Dict[int, str], check_project_ids=True
-    ):
-        """Update many participant external ids"""
-        if check_project_ids:
-            projects = await self.pttable.get_project_ids_for_participant_ids(
-                list(internal_to_external_id.keys())
-            )
-            await self.ptable.check_access_to_project_ids(
-                user=self.author, project_ids=projects, readonly=False
-            )
-
-        return await self.pttable.update_many_participant_external_ids(
-            internal_to_external_id
-        )
-
     async def get_family_participant_data(self, family_id: int, participant_id: int):
         """Gets the family_participant row for a specific participant"""
         fptable = FamilyParticipantTable(self.connection)

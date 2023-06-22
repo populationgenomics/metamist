@@ -2,20 +2,17 @@
 import dataclasses
 import re
 from collections import defaultdict
-from typing import Iterable, Any
-
-from api.utils import group_by
+from typing import Any
 
 from db.python.connect import DbBase, NotFoundError, NoOpAenter
+from db.python.tables.project import ProjectId
 from db.python.utils import (
     to_db_json,
     GenericFilterModel,
     GenericFilter,
     GenericMetaFilter,
 )
-from db.python.tables.project import ProjectId
 from models.models.assay import AssayInternal
-
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 

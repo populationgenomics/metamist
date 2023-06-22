@@ -14,11 +14,8 @@ from db.python.layers.assay import (
 )
 from db.python.utils import GenericFilter
 from models.models.assay import AssayUpsert
-from models.utils.sample_id_format import (
-    sample_id_format,
-    sample_id_transform_to_raw,
-    sample_id_transform_to_raw_list,
-)
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
+
 
 router = APIRouter(prefix='/assay', tags=['assay'])
 
@@ -111,20 +108,3 @@ async def get_assays_by_criteria(
     result = await assay_layer.query(filter_)
 
     return [a.to_external() for a in result]
-
-
-@router.post(
-    '/ids-for-samples-by-type',
-    operation_id='getAssayIdsForSampleIdsByType',
-)
-async def get_assay_ids_for_sample_ids_by_type(
-    sample_ids: list[str],
-    connection: Connection = get_projectless_db_connection,
-) -> dict[str, dict[str, list[int]]]:
-    """Get all assay IDs keyed by internal Sample ID"""
-    assay_layer = AssayLayer(connection)
-    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids)
-    assay_id_map = await assay_layer.get_assay_ids_for_sample_ids_by_type(
-        sample_ids_raw
-    )
-    return {sample_id_format(k): v for k, v in assay_id_map.items()}
