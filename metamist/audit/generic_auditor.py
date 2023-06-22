@@ -114,7 +114,7 @@ class GenericAuditor(AuditHelper):
         and then all the sequences associated with those samples.
         """
 
-        participant_data = query(
+        participant_data = query(   # pylint: disable=unsubscriptable-object
             PARTICIPANTS_SAMPLES_SEQUENCES_QUERY, {'datasetName': self.dataset}
         )['project']['participants']
 
@@ -281,7 +281,7 @@ class GenericAuditor(AuditHelper):
         analyses = []
         for sample in sample_ids:
             analyses.extend(
-                query(
+                query(   # pylint: disable=unsubscriptable-object
                     SAMPLE_ANALYSIS_QUERY, {'sampleId': sample, 'analysisType': 'CRAM'}
                 )['sample']['analyses']
             )
@@ -343,7 +343,7 @@ class GenericAuditor(AuditHelper):
                 continue
             for sample in samples_without_crams:
                 analyses.extend(
-                    query(
+                    query(  # pylint: disable=unsubscriptable-object
                         SAMPLE_ANALYSIS_QUERY,
                         {'sampleId': sample, 'analysisType': analysis_type},
                     )['sample']['analyses']

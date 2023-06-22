@@ -10,7 +10,7 @@ from metamist.audit.generic_auditor import GenericAuditor
 class TestGenericAuditor(unittest.TestCase):
     """Test the audit helper functions"""
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_get_participant_data_for_dataset(self, mock_query):
         """Only participants with a non-empty samples field should be returned"""
         auditor = GenericAuditor(
@@ -250,7 +250,7 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -305,7 +305,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -363,7 +363,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_query_broken_analyses_crams(self, mock_query):
         """All analysis crams must have 'sequencing_type' meta field, ValueError raised if not"""
         auditor = GenericAuditor(
@@ -395,7 +395,7 @@ class TestGenericAuditor(unittest.TestCase):
                 sample_internal_to_external_id_map={'CPG123': 'EXT123'}
             )
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_query_analyses_crams_warning(self, mock_query):
         """Warn if the sample_ids field is absent and the sample meta field is used instead"""
         auditor = GenericAuditor(
@@ -436,7 +436,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @patch('sample_metadata.audit.generic_auditor.query')
+    @patch('metamist.audit.generic_auditor.query')
     def test_analyses_for_samples_without_crams(
         self,
         mock_query,
