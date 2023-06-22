@@ -139,15 +139,17 @@ class ExistingCohortParser(GenericMetadataParser):
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
         """
-        if row['External ID'] == 'CT_85':
-            print('Stop here')
 
-        return [
+        read_filenames = [
             filename
             for filename, path in self.filename_map.items()
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
             and any(filename.endswith(ext) for ext in READS_EXTENSIONS)
         ]
+
+        if not read_filenames:
+            raise ValueError(f'No read files found for {sample_id}')
+        return read_filenames
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from sequence file name"""
