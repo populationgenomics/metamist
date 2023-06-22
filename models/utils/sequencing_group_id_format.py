@@ -7,7 +7,7 @@ def sequencing_group_id_transform_to_raw_list(
     identifier: Iterable[int | str], strict=True
 ) -> list[int]:
     """
-    Transform LIST of STRING sample identifier (CPGXXXH) to XXX by:
+    Transform LIST of STRING Sequencing Group identifiers (CPGXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
@@ -16,7 +16,7 @@ def sequencing_group_id_transform_to_raw_list(
 
 def sequencing_group_id_transform_to_raw(identifier: int | str, strict=True) -> int:
     """
-    Transform STRING sample identifier (CPGXXXH) to XXX by:
+    Transform STRING Sequencing Group identifier (CPGXXXH) to XXX by:
         - validating prefix
         - validating checksum
     """
@@ -41,25 +41,25 @@ def sequencing_group_id_transform_to_raw(identifier: int | str, strict=True) -> 
 
     stripped_identifier = identifier.lstrip(SEQUENCING_GROUP_PREFIX)
     if not stripped_identifier.isdigit():
-        raise ValueError(f'Invalid sample identifier {identifier!r}')
+        raise ValueError(f'Invalid sequencing-group identifier {identifier!r}')
 
     sequencing_group_id_with_checksum = int(stripped_identifier)
     if not luhn_is_valid(
         sequencing_group_id_with_checksum, offset=SEQUENCING_GROUP_CHECKSUM_OFFSET
     ):
-        raise ValueError(f'The provided sample ID was not valid: {identifier!r}')
+        raise ValueError(f'The provided sequencing group ID was not valid: {identifier!r}')
 
     return int(stripped_identifier[:-1])
 
 
-def sequencing_group_id_format_list(sample_ids: Iterable[int | str]) -> list[str]:
+def sequencing_group_id_format_list(sg_ids: Iterable[int | str]) -> list[str]:
     """
     Transform LIST of raw sequencing-group identifiers to format (CPGXXXH) where:
         - CPG is the prefix
         - XXX is the original identifier
         - H is the Luhn checksum
     """
-    return [sequencing_group_id_format(s) for s in sample_ids]
+    return [sequencing_group_id_format(s) for s in sg_ids]
 
 
 def sequencing_group_id_format(sequencing_group_id: int | str) -> str:
@@ -82,7 +82,7 @@ def sequencing_group_id_format(sequencing_group_id: int | str) -> str:
         if sequencing_group_id.startswith(SEQUENCING_GROUP_PREFIX):
             return sequencing_group_id
         raise ValueError(
-            f'Unexpected format for sample identifier {sequencing_group_id!r}'
+            f'Unexpected format for sequencing-group identifier {sequencing_group_id!r}'
         )
 
     sequencing_group_id = int(sequencing_group_id)
