@@ -58,11 +58,7 @@ BAM_EXTENSIONS = ('.bam',)
 CRAM_EXTENSIONS = ('.cram',)
 GVCF_EXTENSIONS = ('.g.vcf.gz',)
 VCF_EXTENSIONS = ('.vcf', '.vcf.gz')
-READS_EXTENSIONS = (
-    FASTQ_EXTENSIONS
-    + CRAM_EXTENSIONS
-    + BAM_EXTENSIONS
-)
+READS_EXTENSIONS = FASTQ_EXTENSIONS + CRAM_EXTENSIONS + BAM_EXTENSIONS
 
 ALL_EXTENSIONS = (
     FASTQ_EXTENSIONS
@@ -297,7 +293,7 @@ class ParsedSequencingGroup:
             technology=self.sequencing_technology,
             platform=self.sequencing_platform,
             meta=self.meta,
-            assays=[sq.to_sm() for sq in self.assays],
+            assays=[sq.to_sm() for sq in self.assays or []],
             id=self.internal_seqgroup_id,
         )
 

@@ -121,6 +121,7 @@ class ExistingCohortParser(GenericMetadataParser):
             participant_meta_map={},
             assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
+            allow_extra_files_in_search_path=True,
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -138,6 +139,8 @@ class ExistingCohortParser(GenericMetadataParser):
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
         """
+        if row['External ID'] == 'CT_85':
+            print('Stop here')
 
         return [
             filename
