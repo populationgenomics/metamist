@@ -20,7 +20,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.0.5'
+_VERSION = '6.0.6'
 
 logger = get_logger()
 
