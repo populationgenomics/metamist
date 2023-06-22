@@ -25,7 +25,7 @@ import click
 
 from cpg_utils.config import get_config
 
-from sample_metadata.audit.generic_auditor import GenericAuditor
+from metamist.audit.generic_auditor import GenericAuditor
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)

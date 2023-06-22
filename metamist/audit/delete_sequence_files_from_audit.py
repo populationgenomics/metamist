@@ -21,7 +21,7 @@ import click
 from google.cloud import storage
 from cloudpathlib import CloudPath, AnyPath
 from cpg_utils.config import get_config
-from sample_metadata.audit.audithelper import AuditHelper
+from metamist.audit.audithelper import AuditHelper
 
 
 CLIENT = storage.Client()

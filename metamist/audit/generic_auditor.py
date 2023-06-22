@@ -3,8 +3,8 @@ import logging
 import os
 from typing import Any
 
-from sample_metadata.audit.audithelper import AuditHelper
-from sample_metadata.graphql import query
+from metamist.audit.audithelper import AuditHelper
+from metamist.graphql import query
 
 
 ANALYSIS_TYPES = [

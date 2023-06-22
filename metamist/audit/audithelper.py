@@ -6,7 +6,7 @@ from typing import Any
 
 from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from sample_metadata.parser.cloudhelper import CloudHelper
+from metamist.parser.cloudhelper import CloudHelper
 
 
 class AuditHelper(CloudHelper):
