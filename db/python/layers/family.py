@@ -9,8 +9,10 @@ from db.python.tables.family import FamilyTable
 from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.project import ProjectId
-from db.python.tables.sample import SampleTable
-from models.models.family import Family, PedRowInternal
+from db.python.tables.sample import SampleTable, SampleFilter
+from db.python.utils import GenericFilter
+from models.models.family import PedRowInternal, FamilyInternal
+from models.models.participant import ParticipantUpsertInternal
 
 
 class PedRow:
@@ -312,7 +314,7 @@ class FamilyLayer(BaseLayer):
 
     async def get_family_by_internal_id(
         self, family_id: int, check_project_id: bool = True
-    ) -> Family:
+    ) -> FamilyInternal:
         """Get family by internal ID"""
         project, family = await self.ftable.get_family_by_internal_id(family_id)
         if check_project_id:
@@ -342,8 +344,10 @@ class FamilyLayer(BaseLayer):
 
         # Find the participants from the given samples
         if sample_ids is not None and len(sample_ids) > 0:
-            _, samples = await self.stable.get_samples_by(
-                project_ids=[project], sample_ids=sample_ids
+            _, samples = await self.stable.query(
+                SampleFilter(
+                    project=GenericFilter(eq=project), id=GenericFilter(in_=sample_ids)
+                )
             )
 
             all_participants += [
@@ -360,7 +364,7 @@ class FamilyLayer(BaseLayer):
         family_ids: list[int],
         check_missing: bool = True,
         check_project_ids: bool = True,
-    ) -> list[Family]:
+    ) -> list[FamilyInternal]:
         """Get families by internal IDs"""
         projects, families = await self.ftable.get_families_by_ids(
             family_ids=family_ids
@@ -381,7 +385,7 @@ class FamilyLayer(BaseLayer):
 
     async def get_families_by_participants(
         self, participant_ids: list[int], check_project_ids: bool = True
-    ) -> dict[int, list[Family]]:
+    ) -> dict[int, list[FamilyInternal]]:
         """
         Get families keyed by participant_ids, this will duplicate families
         """
@@ -560,11 +564,15 @@ class FamilyLayer(BaseLayer):
                 for row in pedrows:
                     if row.individual_id not in missing_participant_ids:
                         continue
+                    upserted_participant = await participant_table.upsert_participant(
+                        ParticipantUpsertInternal(
+                            external_id=row.individual_id,
+                            reported_sex=row.sex,
+                        )
+                    )
                     external_participant_ids_map[
                         row.individual_id
-                    ] = await participant_table.create_participant(
-                        external_id=row.individual_id, reported_sex=row.sex
-                    )
+                    ] = upserted_participant.id
 
             for external_family_id in missing_external_family_ids:
                 internal_family_id = await self.ftable.create_family(
@@ -588,11 +596,14 @@ class FamilyLayer(BaseLayer):
                 for row in pedrows
             ]
 
-            await participant_table.update_participants(
-                participant_ids=[
-                    external_participant_ids_map[row.individual_id] for row in pedrows
-                ],
-                reported_sexes=[row.sex for row in pedrows],
+            await participant_table.upsert_participants(
+                [
+                    ParticipantUpsertInternal(
+                        id=external_participant_ids_map[row.individual_id],
+                        reported_sex=row.sex,
+                    )
+                    for row in pedrows
+                ]
             )
             await self.fptable.create_rows(insertable_rows)
 

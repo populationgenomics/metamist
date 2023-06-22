@@ -223,6 +223,19 @@ class ProjectPermissionsTable:
         await self.ensure_project_id_cache_is_filled()
         return ProjectPermissionsTable._cached_project_names
 
+    async def get_project_id_map_for_names(
+        self, project_names, author, readonly: bool, check_access=True
+    ) -> dict[str, ProjectId]:
+        """Get {project_name: project_id} map for a list of project names"""
+        m = await self.get_project_name_map()
+        project_name_map = {name: m[name] for name in project_names}
+        if check_access:
+            await self.check_access_to_project_ids(
+                user=author, project_ids=project_name_map.values(), readonly=readonly
+            )
+
+        return project_name_map
+
     async def get_project_id_from_name_and_user(
         self, user: str, project_name: str, readonly: bool
     ) -> ProjectId:
@@ -444,13 +457,29 @@ RETURNING ID"""
 
         async with self.connection.transaction():
             _query = """
-DELETE FROM participant_phenotypes where participant_id IN (SELECT id FROM participant WHERE project = :project);
-DELETE FROM family_participant WHERE family_id IN (SELECT id FROM family where project = :project);
+DELETE FROM participant_phenotypes where participant_id IN (
+    SELECT id FROM participant WHERE project = :project
+);
+DELETE FROM family_participant WHERE family_id IN (
+    SELECT id FROM family where project = :project
+);
 DELETE FROM family WHERE project = :project;
-DELETE FROM sample_sequencing_eid WHERE project = :project;
-DELETE FROM sample_sequencing WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE project = :project);
+DELETE FROM sequencing_group_external_id WHERE project = :project;
+DELETE FROM assay_external_id WHERE project = :project;
+DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM sequencing_group WHERE sample_id IN (
+    SELECT id FROM sample WHERE project = :project
+);
 DELETE FROM sample WHERE project = :project;
 DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;

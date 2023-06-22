@@ -183,7 +183,7 @@ const ProjectSummary: React.FunctionComponent = () => {
                         <BatchStatistics
                             projectName={projectName}
                             cramSeqrStats={summary?.cram_seqr_stats ?? {}}
-                            batchSequenceStats={summary?.batch_sequence_stats ?? {}}
+                            batchSequenceStats={summary?.batch_sequencing_group_stats ?? {}}
                         />
                         <hr />
                         <MultiQCReports projectName={projectName} />

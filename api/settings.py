@@ -5,6 +5,9 @@ from cpg_utils.cloud import read_secret
 
 TRUTH_SET = ('1', 'y', 't', 'true')
 
+LOG_DATABASE_QUERIES = (
+    os.getenv('SM_LOG_DATABASE_QUERIES', 'false').lower() in TRUTH_SET
+)
 _ALLOW_ALL_ACCESS: bool = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in TRUTH_SET
 _DEFAULT_USER = os.getenv('SM_LOCALONLY_DEFAULTUSER')
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
@@ -24,6 +27,12 @@ _SLACK_SECRET_ID = os.getenv('SM_SLACK_SECRET_ID')
 _SLACK_TOKEN = os.getenv('SM_SLACK_TOKEN')
 
 SEQR_SLACK_NOTIFICATION_CHANNEL = os.getenv('SM_SEQR_SLACK_NOTIFICATION_CHANNEL')
+
+SAMPLE_PREFIX = os.getenv('SM_SAMPLEPREFIX', 'XPGLCL').upper()
+SAMPLE_CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
+
+SEQUENCING_GROUP_PREFIX = os.getenv('SM_SEQUENCINGGROUPPREFIX', 'CPGLCL').upper()
+SEQUENCING_GROUP_CHECKSUM_OFFSET = int(os.getenv('SM_SEQUENCINGGROUPCHECKOFFSET', '9'))
 
 
 def get_default_user() -> str | None:

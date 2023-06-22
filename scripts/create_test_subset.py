@@ -24,24 +24,19 @@ import csv
 import click
 from google.cloud import storage
 
-from sample_metadata import exceptions
-from sample_metadata.apis import (
+from metamist import exceptions
+from metamist.apis import (
     AnalysisApi,
-    SequenceApi,
+    AssayApi,
     SampleApi,
     FamilyApi,
     ParticipantApi,
 )
-from sample_metadata.models import (
-    AnalysisType,
-    NewSequence,
-    NewSample,
-    AnalysisModel,
-    SampleUpdateModel,
-    SequenceType,
-    SampleType,
-    SequenceStatus,
-    SequenceTechnology,
+from metamist.models import (
+    BodyGetAssaysByCriteria,
+    AssayUpsert,
+    SampleUpsert,
+    Analysis,
     AnalysisStatus,
 )
 
@@ -51,7 +46,7 @@ logger.setLevel(logging.INFO)
 
 sapi = SampleApi()
 aapi = AnalysisApi()
-seqapi = SequenceApi()
+assayapi = AssayApi()
 fapi = FamilyApi()
 papi = ParticipantApi()
 
@@ -213,7 +208,11 @@ def main(
     test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
 
     try:
-        seq_infos: list[dict[str, str]] = seqapi.get_sequences_by_sample_ids(sample_ids)
+        seq_infos: list[dict[str, str]] = assayapi.get_assays_by_criteria(
+            body_get_assays_by_criteria=BodyGetAssaysByCriteria(
+                sample_ids=sample_ids,
+            )
+        )
     except exceptions.ApiException:
         seq_info_by_s_id = {}
     else:
@@ -225,11 +224,12 @@ def main(
     }
     for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
         try:
+            # TODO: fix this
             analyses: list[
                 dict[str, str]
             ] = aapi.get_latest_analysis_for_samples_and_type(
                 project=project,
-                analysis_type=AnalysisType(a_type),
+                analysis_type=str(a_type),
                 request_body=sample_ids,
             )
         except exceptions.ApiException:
@@ -269,11 +269,11 @@ def main(
 
         else:
             logger.info('Creating test sample entry')
-            new_s_id = sapi.create_new_sample(
+            new_s_id = sapi.create_sample(
                 project=target_project,
-                new_sample=NewSample(
+                sample_upsert=SampleUpsert(
                     external_id=s['external_id'],
-                    type=SampleType(s['type']),
+                    type=s['type'],
                     meta=(_copy_files_in_dict(s['meta'], project) or {}),
                     participant_id=external_sample_internal_participant_map[
                         s['external_id']
@@ -287,14 +287,12 @@ def main(
                 logger.info('Processing sequence entry')
                 new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
                 logger.info('Creating sequence entry in test')
-                seqapi.create_new_sequence(
-                    new_sequence=NewSequence(
+                assayapi.create_assay(
+                    assay_upsert=AssayUpsert(
                         sample_id=new_s_id,
                         meta=new_meta,
-                        type=SequenceType(seq_info['type']),
+                        type=seq_info['type'],
                         external_ids=seq_info['external_ids'],
-                        status=SequenceStatus(seq_info['status']),
-                        technology=SequenceTechnology(seq_info['technology']),
                     ),
                 )
 
@@ -302,8 +300,8 @@ def main(
             analysis = analysis_by_sid_by_type[a_type].get(s['id'])
             if analysis:
                 logger.info(f'Processing {a_type} analysis entry')
-                am = AnalysisModel(
-                    type=AnalysisType(a_type),
+                am = Analysis(
+                    type=str(a_type),
                     output=_copy_files_in_dict(
                         analysis['output'],
                         project,
@@ -314,7 +312,7 @@ def main(
                     meta=analysis['meta'],
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
-                aapi.create_new_analysis(project=target_project, analysis_model=am)
+                aapi.create_analysis(project=target_project, analysis=am)
         logger.info(f'-')
 
 
@@ -407,8 +405,8 @@ def transfer_participants(
         transfer_participant['samples'] = []
         participants_to_transfer.append(transfer_participant)
 
-    upserted_participants = papi.batch_upsert_participants(
-        target_project, {'participants': participants_to_transfer}
+    upserted_participants = papi.upsert_participants(
+        target_project, participant_upsert=participants_to_transfer
     )
     return list(upserted_participants.keys())
 
@@ -702,7 +700,7 @@ def _process_existing_test_samples(
             f'Removing test samples: {_pretty_format_samples(test_samples_to_remove)}'
         )
         for s in test_samples_to_remove:
-            sapi.update_sample(s['id'], SampleUpdateModel(active=False))
+            sapi.update_sample(s['id'], SampleUpsert(active=False))
 
     if test_samples_to_keep:
         logger.info(

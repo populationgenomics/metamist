@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 import os
 import asyncio
 import logging
@@ -6,16 +7,15 @@ from collections import namedtuple
 
 import click
 
-from sample_metadata.apis import SampleApi, AnalysisApi
-from sample_metadata.model.analysis_model import AnalysisModel
-from sample_metadata.model.analysis_type import AnalysisType
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.parser.cloudhelper import CloudHelper
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.apis import SampleApi, AnalysisApi, SequencingGroupApi
+from metamist.model.analysis import Analysis
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.parser.cloudhelper import CloudHelper
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
-from sample_metadata.parser.generic_parser import chunk, CustomDictReader
+from metamist.parser.generic_parser import chunk, CustomDictReader
 
 OntAnalysesPreparer = namedtuple(
     'OntAnalysesPreparer',
@@ -79,6 +79,7 @@ class OntProductParser(CloudHelper):
 
         self.sapi = SampleApi()
         self.aapi = AnalysisApi()
+        self.sgapi = SequencingGroupApi()
 
     async def parse_manifest(self, file_pointer, delimiter):
         """Parse manifest"""
@@ -125,10 +126,7 @@ class OntProductParser(CloudHelper):
         for grp in chunk(analyses, 10):
             logging.info(f'Inserting {len(grp)} analyses')
             await asyncio.gather(
-                *[
-                    self.aapi.create_new_analysis_async(self.project, a)
-                    for a in analyses
-                ]
+                *[self.aapi.create_analysis_async(self.project, a) for a in analyses]
             )
 
         return analyses
@@ -204,13 +202,13 @@ class OntProductParser(CloudHelper):
             file_size = await self.file_size(dest)
             meta = {
                 'size': file_size,
-                'sequence_type': 'ont',
+                'sequencing_type': 'ont',
                 **preparer.meta,
             }
 
             analyses.append(
-                AnalysisModel(
-                    type=AnalysisType(preparer.atype),
+                Analysis(
+                    type=preparer.atype,
                     meta=meta,
                     status=AnalysisStatus('completed'),
                     sample_ids=[cpg_sample_id],
