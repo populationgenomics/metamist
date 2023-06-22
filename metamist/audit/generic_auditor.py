@@ -137,7 +137,8 @@ class GenericAuditor(AuditHelper):
         participants: list[dict],
     ) -> dict[ParticipantExternalId, list[SampleId]]:
         """
-        Returns the {external_participant_id : sample_internal_id} mapping for a Metamist dataset
+        Returns the {external_participant_id : sample_internal_id}
+            mapping for a Metamist dataset
         - Also reports if any participants have more than one sample
         """
 
@@ -159,8 +160,9 @@ class GenericAuditor(AuditHelper):
         for participant_eid, sample_ids in participant_eid_sample_id_map.items():
             if len(sample_ids) > 1:
                 logging.info(
-                    f'Participant {participant_eid_to_iid[participant_eid]} (external ID: {participant_eid})'
-                    + f' associated with more than one sample id: {sample_ids}'
+                    f'Participant {participant_eid_to_iid[participant_eid]} '
+                    f'(external ID: {participant_eid}) associated with more than '
+                    f'one sample id: {sample_ids}'
                 )
 
         return participant_eid_sample_id_map
@@ -170,7 +172,8 @@ class GenericAuditor(AuditHelper):
         participants: list[dict],
     ) -> dict[SampleId, SampleExternalId]:
         """
-        Returns the {internal sample ID : external sample ID} mapping for all participants in a Metamist dataset
+        Returns the {internal sample ID : external sample ID} mapping for all
+            participants in a Metamist dataset
         Also removes any samples that are part of the exclusions list
         """
         # Create a list of dictionaries, each mapping a sample ID to its external ID
@@ -194,7 +197,7 @@ class GenericAuditor(AuditHelper):
 
     def get_sequence_map_from_participants(
         self, participants: list[dict]
-    ) -> tuple[dict[Any, Any], defaultdict[Any, list[tuple[Any, Any]]]]:
+    ) -> tuple[dict[Any, Any], dict[Any, list[tuple[Any, Any]]]]:
         """
         Input the list of Metamist participant dictionaries from the master graphql Query
 
@@ -259,7 +262,7 @@ class GenericAuditor(AuditHelper):
                         else:
                             if not isinstance(read, dict):
                                 logging.error(
-                                    f'Got {type(inner_read)} read, expected dict: {inner_read}'
+                                    f'Got {type(read)} read, expected dict: {read}'
                                 )
                                 continue
                             sequence_filepaths_filesizes[sequence.get('id')].append(
@@ -271,7 +274,7 @@ class GenericAuditor(AuditHelper):
     def get_analysis_cram_paths_for_dataset_samples(
         self,
         sample_internal_to_external_id_map: dict[str, str],
-    ) -> defaultdict[str, dict[int, str]]:
+    ) -> dict[str, dict[int, str]]:
         """
         Queries all analyses for the list of samples in the given dataset AND the seqr dataset.
         Returns a dict mapping {sample_id : (analysis_id, cram_path) }
@@ -304,7 +307,7 @@ class GenericAuditor(AuditHelper):
         ]
 
         # For each sample ID, collect the analysis IDs and cram paths
-        sample_cram_paths: defaultdict[str, dict[int, str]] = defaultdict(dict)
+        sample_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
         for analysis in analyses:
             # Check the analysis output path is a valid gs path to a .cram file
             if not analysis['output'].startswith('gs://') and analysis[
@@ -333,7 +336,7 @@ class GenericAuditor(AuditHelper):
     def analyses_for_samples_without_crams(self, samples_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
 
-        all_sample_analyses: defaultdict[str, list[dict[str, int | str]]] = defaultdict(
+        all_sample_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(
             list
         )
 
@@ -432,8 +435,8 @@ class GenericAuditor(AuditHelper):
     async def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
         self,
         bucket_name: str,
-        sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
-        completed_samples: defaultdict[str, list[int]],
+        sequence_filepaths_filesizes: dict[int, list[tuple[str, int]]],
+        completed_samples: dict[str, list[int]],
         seq_id_sample_id_map: dict[int, str],
         sample_id_internal_external_map: dict[str, str],
     ):
@@ -509,20 +512,21 @@ class GenericAuditor(AuditHelper):
         # Check the list of uningested paths to see if any of them contain sample IDs for ingested samples
         # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
         # but not ingested, such as bams and vcfs.
-        uningested_reads: defaultdict[str, list[tuple[str, str]]] = defaultdict(
+        uningested_reads: dict[str, list[tuple[str, str]]] = defaultdict(
             list, {k: [] for k in uningested_sequence_paths}
         )
         for sample_id, analysis_ids in completed_samples.items():
             try:
                 sample_ext_id = sample_id_internal_external_map[sample_id]
+                for uningested_sequence in uningested_sequence_paths:
+                    if sample_ext_id not in uningested_sequence:
+                        continue
+                    uningested_reads[uningested_sequence].append(
+                        (sample_id, sample_ext_id))
             except KeyError:
                 logging.warning(
                     f'{sample_id} from analyses: {analysis_ids} not found in sample map.'
                 )
-            for uningested_sequence in uningested_sequence_paths:
-                if sample_ext_id not in uningested_sequence:
-                    continue
-                uningested_reads[uningested_sequence].append((sample_id, sample_ext_id))
 
         # flip the sequence id : reads mapping to identify sequence IDs by their read paths
         reads_sequences = {}
@@ -553,8 +557,8 @@ class GenericAuditor(AuditHelper):
     async def get_reads_to_delete_or_ingest(
         self,
         bucket_name: str,
-        completed_samples: defaultdict[str, list[int]],
-        sequence_filepaths_filesizes: defaultdict[int, list[tuple[str, int]]],
+        completed_samples: dict[str, list[int]],
+        sequence_filepaths_filesizes: dict[int, list[tuple[str, int]]],
         seq_id_sample_id_map: dict[int, str],
         sample_id_internal_external_map: dict[str, str],
     ) -> tuple[list, list]:
@@ -581,7 +585,7 @@ class GenericAuditor(AuditHelper):
         )
 
         # Create a mapping of sample ID: sequence ID - use defaultdict in case a sample has several sequences
-        sample_id_seq_id_map: defaultdict[str, list[int]] = defaultdict(list)
+        sample_id_seq_id_map: dict[str, list[int]] = defaultdict(list)
         for sequence, sample in seq_id_sample_id_map.items():
             sample_id_seq_id_map[sample].append(sequence)
 
@@ -612,8 +616,8 @@ class GenericAuditor(AuditHelper):
 
     @staticmethod
     def find_crams_for_reads_to_ingest(
-        reads_to_ingest: defaultdict[str, list],
-        sample_cram_paths: defaultdict[str, dict[int, str]],
+        reads_to_ingest: dict[str, list],
+        sample_cram_paths: dict[str, dict[int, str]],
     ) -> list[tuple[str, str, str, int, str]]:
         """
         Compares the external sample IDs for samples with completed CRAMs against the
