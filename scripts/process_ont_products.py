@@ -7,8 +7,7 @@ from collections import namedtuple
 
 import click
 
-from metamist.api.sequencing_group_api import SequencingGroupApi
-from metamist.apis import SampleApi, AnalysisApi
+from metamist.apis import SampleApi, AnalysisApi, SequencingGroupApi
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.parser.cloudhelper import CloudHelper

@@ -6,12 +6,12 @@ import datetime
 import random
 from pprint import pprint
 
-from metamist.api.analysis_api import AnalysisApi
 from metamist.apis import (
     ProjectApi,
     ParticipantApi,
     FamilyApi,
     SampleApi,
+    AnalysisApi,
 )
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
