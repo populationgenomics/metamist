@@ -33,7 +33,7 @@ class Facility(str, Enum):
     GARVAN = "Garvan"
     VCGS = "VCGS"
     NSWPath = "NSWPath"
-    QPATH = "QPath"
+    QPath = "QPath"
 
 
 class SeqType(Enum):
@@ -80,7 +80,7 @@ class FacilityFastq:
             self.parse_garvan_fastq_name()
         elif facility == Facility.NSWPath:
             self.parse_nswpath_fastq_name()
-        elif facility == Facility.QPATH:
+        elif facility == Facility.QPath:
             self.parse_qpath_fastq_name()
         else:
             assert False, f"Facility {facility} not supported"
