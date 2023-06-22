@@ -271,7 +271,7 @@ async def get_analysis_runner_log(
 )
 async def get_sample_reads_map(
     export_type: ExportType = ExportType.JSON,
-    sequence_types: list[str] = Query(None),  # type: ignore
+    sequencing_types: list[str] = Query(None),  # type: ignore
     connection: Connection = get_project_readonly_connection,
 ):
     """
@@ -289,7 +289,7 @@ async def get_sample_reads_map(
     at = AnalysisLayer(connection)
     assert connection.project
     objs = await at.get_sample_cram_path_map_for_seqr(
-        project=connection.project, sequence_types=sequence_types
+        project=connection.project, sequencing_types=sequencing_types
     )
 
     for r in objs:

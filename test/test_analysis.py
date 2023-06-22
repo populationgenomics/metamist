@@ -83,7 +83,7 @@ class TestAnalysis(DbIsolatedTest):
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[self.genome_sequencing_group_id],
-                meta={'sequence_type': 'genome', 'size': 1024},
+                meta={'sequencing_type': 'genome', 'size': 1024},
             )
         )
 
@@ -181,7 +181,7 @@ class TestAnalysis(DbIsolatedTest):
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[self.exome_sequencing_group_id],
-                meta={'sequence_type': 'exome', 'size': 3141},
+                meta={'sequencing_type': 'exome', 'size': 3141},
             )
         )
         expected = {
@@ -237,7 +237,7 @@ class TestAnalysis(DbIsolatedTest):
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[self.genome_sequencing_group_id],
-                meta={'sequence_type': 'genome', 'size': 11111},
+                meta={'sequencing_type': 'genome', 'size': 11111},
             )
         )
         expected = {
@@ -295,7 +295,7 @@ class TestAnalysis(DbIsolatedTest):
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[sequencing_group_2_id],
-                meta={'sequence_type': 'genome', 'size': 987654321},
+                meta={'sequencing_type': 'genome', 'size': 987654321},
             )
         )
 

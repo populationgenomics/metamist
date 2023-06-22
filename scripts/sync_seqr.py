@@ -85,18 +85,18 @@ genome:
 ES_INDICES = yaml.safe_load(StringIO(ES_INDICES_YAML))
 
 
-def sync_dataset(dataset: str, seqr_guid: str, sequence_type: str):
+def sync_dataset(dataset: str, seqr_guid: str, sequencing_type: str):
     """Sync single dataset without looking up seqr guid"""
     return asyncio.new_event_loop().run_until_complete(
-        sync_dataset_async(dataset, seqr_guid, sequence_type)
+        sync_dataset_async(dataset, seqr_guid, sequencing_type)
     )
 
 
-async def sync_dataset_async(dataset: str, seqr_guid: str, sequence_type: str):
+async def sync_dataset_async(dataset: str, seqr_guid: str, sequencing_type: str):
     """
     Synchronisation driver for a single dataset
     """
-    print(f'{dataset} ({sequence_type}) :: Syncing to {seqr_guid}')
+    print(f'{dataset} ({sequencing_type}) :: Syncing to {seqr_guid}')
 
     # sync people first
     token = get_token()
@@ -128,7 +128,7 @@ query MyQuery($project: String!, $seqType: String!) {
   }
 }"""
         data = await query_async(
-            mm_query, {'project': dataset, 'seqType': sequence_type}
+            mm_query, {'project': dataset, 'seqType': sequencing_type}
         )
 
         family_eids: set[str] = set()
@@ -163,12 +163,12 @@ query MyQuery($project: String!, $seqType: String!) {
         await sync_individual_metadata(**params, participant_eids=set(participant_eids))
         await update_es_index(
             **params,
-            sequence_type=sequence_type,
+            sequencing_type=sequencing_type,
             external_pid_to_internal_sgid_map=external_pid_to_internal_sgid_map,
         )
 
         await sync_cram_map(
-            **params, participant_eids=participant_eids, sequence_type=sequence_type
+            **params, participant_eids=participant_eids, sequencing_type=sequencing_type
         )
 
 
@@ -385,7 +385,7 @@ async def sync_individual_metadata(
 async def update_es_index(
     session: aiohttp.ClientSession,
     dataset,
-    sequence_type: str,
+    sequencing_type: str,
     project_guid,
     headers,
     check_metamist=True,
@@ -418,7 +418,7 @@ async def update_es_index(
             AnalysisQueryModel(
                 projects=[dataset, 'seqr'],
                 type='es-index',
-                meta={'sequencing_type': sequence_type, 'dataset': dataset},
+                meta={'sequencing_type': sequencing_type, 'dataset': dataset},
                 status=AnalysisStatus('completed'),
             )
         )
@@ -445,11 +445,11 @@ async def update_es_index(
             )
             if sample_ids_missing_from_index:
                 print(
-                    f'{dataset}.{sequence_type} :: Samples missing from index: ',
+                    f'{dataset}.{sequencing_type} :: Samples missing from index: ',
                     ', '.join(sample_ids_missing_from_index),
                 )
     else:
-        es_index = ES_INDICES[sequence_type][dataset]
+        es_index = ES_INDICES[sequencing_type][dataset]
         print(f'{dataset} :: Falling back to YAML es-index: {es_index!r}')
 
     data = {
@@ -477,7 +477,7 @@ async def sync_cram_map(
     session: aiohttp.ClientSession,
     dataset,
     participant_eids: set[str],
-    sequence_type,
+    sequencing_type,
     project_guid,
     headers,
 ):
@@ -490,9 +490,9 @@ async def sync_cram_map(
     def _sequence_filter(output_path: str):
         if output_path.removeprefix('gs://').split('/')[0].endswith('-test'):
             return False
-        if sequence_type == 'genome' and 'exome' in output_path:
+        if sequencing_type == 'genome' and 'exome' in output_path:
             return False
-        if sequence_type == 'exome' and 'exome' not in output_path:
+        if sequencing_type == 'exome' and 'exome' not in output_path:
             return False
 
         return True
@@ -658,7 +658,7 @@ def get_token():
         return credentials.token
 
 
-def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
+def sync_all_datasets(sequencing_type: str, ignore: set[str] = None):
     """
     Sync all datasets
     """
@@ -671,14 +671,14 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
             # print(f'Skipping {project_name}')
             continue
 
-        meta_key = f'seqr-project-{sequence_type}'
+        meta_key = f'seqr-project-{sequencing_type}'
         seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
             # print(f'Skipping {project_name!r} as meta.{meta_key} is not set')
             continue
         try:
             el.run_until_complete(
-                sync_dataset_async(project_name, seqr_guid, sequence_type=sequence_type)
+                sync_dataset_async(project_name, seqr_guid, sequencing_type=sequencing_type)
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             print(
@@ -695,21 +695,21 @@ def sync_all_datasets(sequence_type: str, ignore: set[str] = None):
     return error_projects
 
 
-def sync_single_dataset_from_name(dataset, sequence_type: str):
+def sync_single_dataset_from_name(dataset, sequencing_type: str):
     """Sync dataset, and fetch seqr guid"""
     seqr_projects = ProjectApi().get_seqr_projects()
     for project in seqr_projects:
         project_name = project['name']
         if project_name != dataset:
             continue
-        meta_key = f'seqr-project-{sequence_type}'
+        meta_key = f'seqr-project-{sequencing_type}'
         seqr_guid = project.get('meta', {}).get(meta_key)
         if not seqr_guid:
             raise ValueError(f'{project_name} does NOT have meta.{meta_key} set')
         print(f'Syncing {project_name} to {seqr_guid}')
 
         return sync_dataset(
-            project_name, seqr_guid=seqr_guid, sequence_type=sequence_type
+            project_name, seqr_guid=seqr_guid, sequencing_type=sequencing_type
         )
 
     raise ValueError(f'Could not find {dataset} seqr project')
@@ -719,9 +719,9 @@ if __name__ == '__main__':
     # datasets = ['acute-care']
     # for dataset in datasets:
     #     sync_single_dataset_from_name(dataset, 'genome')
-    # sync_dataset('kidgen', 'R0001_seqr_test_project', sequence_type='exome')
+    # sync_dataset('kidgen', 'R0001_seqr_test_project', sequencing_type='exome')
     # sync_single_dataset_from_name('ag-hidden', 'genome')
     sync_single_dataset_from_name('acute-care', 'genome')
-    # sync_all_datasets(sequence_type='genome', ignore={'acute-care'})
-    # sync_all_datasets(sequence_type='exome', ignore={'flinders-ophthal'})
+    # sync_all_datasets(sequencing_type='genome', ignore={'acute-care'})
+    # sync_all_datasets(sequencing_type='exome', ignore={'flinders-ophthal'})
     # sync_single_dataset_from_name('udn-aus', 'exome')

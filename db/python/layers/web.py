@@ -97,13 +97,13 @@ class WebDb(DbBase):
 
     @staticmethod
     def _project_summary_process_assay_rows_by_sample_id(
-        sequence_rows,
+        assay_rows,
     ) -> dict[int, list[AssayInternal]]:
         """
         Get sequences for samples for project summary
         """
 
-        seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in sequence_rows}
+        seq_id_to_sample_id_map = {seq['id']: seq['sample_id'] for seq in assay_rows}
         seq_models = [
             AssayInternal(
                 id=seq['id'],
@@ -111,7 +111,7 @@ class WebDb(DbBase):
                 meta=json.loads(seq['meta']),
                 sample_id=seq['sample_id'],
             )
-            for seq in sequence_rows
+            for seq in assay_rows
         ]
         seq_models_by_sample_id = group_by(
             seq_models, lambda s: seq_id_to_sample_id_map[s.id]
@@ -381,7 +381,7 @@ WHERE fp.participant_id in :pids
             atable.get_number_of_crams_by_sequencing_type(project=self.project),
             sgtable.get_type_numbers_for_project(project=self.project),
             seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
-            atable.get_seqr_stats_by_sequence_type(project=self.project),
+            atable.get_seqr_stats_by_sequencing_type(project=self.project),
             SeqrLayer(self._connection).get_synchronisable_types(self.project),
         )
 

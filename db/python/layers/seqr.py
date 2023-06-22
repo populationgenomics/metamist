@@ -87,18 +87,18 @@ class SeqrLayer(BaseLayer):
         return f'{SEQR_URL}/project/{guid}/project_page'
 
     @staticmethod
-    def get_meta_key_from_sequence_type(sequence_type: str):
+    def get_meta_key_from_sequencing_type(sequencing_type: str):
         """
         Convenience method for computing the key where the SEQR_GUID
         is stored within the project.meta
         """
-        return f'seqr-project-{sequence_type}'
+        return f'seqr-project-{sequencing_type}'
 
     async def get_synchronisable_types(
         self, project_id: ProjectId | None = None
     ) -> list[str]:
         """
-        Check the project meta to find out which sequence_types are synchronisable
+        Check the project meta to find out which sequencing_types are synchronisable
         """
         if not await self.is_seqr_sync_setup():
             return []
@@ -119,13 +119,13 @@ class SeqrLayer(BaseLayer):
         sts = [
             st
             for st in sequencing_types
-            if self.get_meta_key_from_sequence_type(st) in project.meta
+            if self.get_meta_key_from_sequencing_type(st) in project.meta
         ]
         return sts
 
     async def sync_dataset(
         self,
-        sequence_type: str,
+        sequencing_type: str,
         sync_families: bool = True,
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
@@ -143,20 +143,20 @@ class SeqrLayer(BaseLayer):
         project = await pptable.get_project_by_id(self.connection.project)
 
         seqr_guid = project.meta.get(
-            self.get_meta_key_from_sequence_type(sequence_type)
+            self.get_meta_key_from_sequencing_type(sequencing_type)
         )
 
         if not seqr_guid:
             raise ValueError(
                 f'The project {project.name} does NOT have an appropriate seqr '
-                f'project attached for {sequence_type}'
+                f'project attached for {sequencing_type}'
             )
 
         seqlayer = SequencingGroupLayer(self.connection)
 
         pid_to_sid_map = (
             await seqlayer.get_participant_ids_sequencing_group_ids_for_sequencing_type(
-                sequence_type
+                sequencing_type
             )
         )
         participant_ids = list(pid_to_sid_map.keys())
@@ -196,7 +196,7 @@ class SeqrLayer(BaseLayer):
                         _errors.extend(
                             self.send_slack_notification(
                                 project_name=project.name,
-                                sequence_type=sequence_type,
+                                sequencing_type=sequencing_type,
                                 errors=_errors,
                                 messages=messages,
                                 seqr_guid=seqr_guid,
@@ -217,7 +217,7 @@ class SeqrLayer(BaseLayer):
             if sync_es_index:
                 promises.append(
                     self.update_es_index(
-                        sequencing_type=sequence_type,
+                        sequencing_type=sequencing_type,
                         sequencing_group_ids=sequencing_group_ids,
                         **params,
                     )
@@ -227,7 +227,7 @@ class SeqrLayer(BaseLayer):
             if sync_cram_map:
                 promises.append(
                     self.sync_cram_map(
-                        sequence_type=sequence_type,
+                        sequencing_type=sequencing_type,
                         participant_ids=participant_ids,
                         **params,
                     )
@@ -252,7 +252,7 @@ class SeqrLayer(BaseLayer):
             _errors.extend(
                 self.send_slack_notification(
                     project_name=project.name,
-                    sequence_type=sequence_type,
+                    sequencing_type=sequencing_type,
                     seqr_guid=seqr_guid,
                     errors=_errors,
                     messages=messages,
@@ -492,7 +492,7 @@ class SeqrLayer(BaseLayer):
         self,
         session: aiohttp.ClientSession,
         participant_ids: list[int],
-        sequence_type: str,
+        sequencing_type: str,
         project_guid: str,
         headers,
     ):
@@ -502,14 +502,14 @@ class SeqrLayer(BaseLayer):
 
         reads_map = await alayer.get_sample_cram_path_map_for_seqr(
             project=self.connection.project,
-            sequence_types=[sequence_type],
+            sequencing_types=[sequencing_type],
             participant_ids=participant_ids,
         )
         output_filter = lambda row: True  # noqa
         # eventually solved by sequence groups
-        if sequence_type == 'genome':
+        if sequencing_type == 'genome':
             output_filter = lambda output: 'exome' not in output  # noqa
-        elif sequence_type == 'exome':
+        elif sequencing_type == 'exome':
             output_filter = lambda output: 'exome' in output  # noqa
 
         parsed_records = defaultdict(list)
@@ -716,7 +716,7 @@ class SeqrLayer(BaseLayer):
     def send_slack_notification(
         self,
         project_name: str,
-        sequence_type: str,
+        sequencing_type: str,
         messages: list[str],
         errors: list[str],
         seqr_guid: str,
@@ -733,10 +733,10 @@ class SeqrLayer(BaseLayer):
             if errors:
                 text = (
                     f':rotating_light: Error syncing *{pn_link}* '
-                    f'(_{sequence_type}_) seqr project :rotating_light:'
+                    f'(_{sequencing_type}_) seqr project :rotating_light:'
                 )
             else:
-                text = f'Synced {pn_link} ({sequence_type}) seqr project'
+                text = f'Synced {pn_link} ({sequencing_type}) seqr project'
 
             blocks = []
             if errors:

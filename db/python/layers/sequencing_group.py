@@ -29,7 +29,7 @@ class SequencingGroupLayer(BaseLayer):
         self, sequencing_group_id: int, check_project_id: bool = True
     ) -> SequencingGroupInternal:
         """
-        Get sequence group by internal ID
+        Get sequencing group by internal ID
         """
         groups = await self.get_sequencing_groups_by_ids(
             [sequencing_group_id], check_project_ids=check_project_id
@@ -59,7 +59,7 @@ class SequencingGroupLayer(BaseLayer):
             missing_ids = set(sequencing_group_ids) - set(sg.id for sg in groups)
 
             raise NotFoundError(
-                f'Missing sequence groups with IDs: {", ".join(map(sequencing_group_id_format, missing_ids))}'
+                f'Missing sequencing groups with IDs: {", ".join(map(sequencing_group_id_format, missing_ids))}'
             )
 
         return groups

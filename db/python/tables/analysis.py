@@ -419,7 +419,7 @@ WHERE a.id = :analysis_id
     async def get_sample_cram_path_map_for_seqr(
         self,
         project: ProjectId,
-        sequence_types: list[str],
+        sequencing_types: list[str],
         participant_ids: list[int] = None,
     ) -> List[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
@@ -431,13 +431,13 @@ WHERE a.id = :analysis_id
             'a.status = "completed"',
             'p.project = :project',
         ]
-        if sequence_types:
-            if len(sequence_types) == 1:
+        if sequencing_types:
+            if len(sequencing_types) == 1:
                 seq_check = '= :seq_type'
-                values['seq_type'] = sequence_types[0]
+                values['seq_type'] = sequencing_types[0]
             else:
                 seq_check = 'IN :seq_types'
-                values['seq_types'] = sequence_types
+                values['seq_types'] = sequencing_types
 
             filters.append(f'JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
@@ -526,7 +526,7 @@ GROUP BY seq_type
 
         return n_counts
 
-    async def get_seqr_stats_by_sequence_type(
+    async def get_seqr_stats_by_sequencing_type(
         self, project: ProjectId
     ) -> dict[str, int]:
         """

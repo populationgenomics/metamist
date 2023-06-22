@@ -54,7 +54,7 @@ e.g.
 
 Example with optional columns
 Note: Individual ID column must contain values in every row
-Note: Any missing values in Type will default to the default_sequence_type ('genome')
+Note: Any missing values in Type will default to the default_sequencing_type ('genome')
 e.g.
     Individual ID	Sample ID	    Filenames	                                                                    Type
     Demeter	        sample_id001	sample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz	            WGS
@@ -158,7 +158,7 @@ async def main(
     search_path: List[str],
     project,
     default_sample_type='blood',
-    default_sequence_type='genome',
+    default_sequencing_type='genome',
     default_sequence_technology='short-read',
     default_reference_assembly: str = None,
     confirm=False,
@@ -176,7 +176,7 @@ async def main(
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
         default_sequencing_technology=default_sequence_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,

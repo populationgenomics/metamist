@@ -90,9 +90,9 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequence_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post('/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject')
 async def sync_seqr_project(
-    sequence_type: str,
+    sequencing_type: str,
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,
@@ -108,7 +108,7 @@ async def sync_seqr_project(
     seqr = SeqrLayer(connection)
     try:
         data = await seqr.sync_dataset(
-            sequence_type,
+            sequencing_type,
             sync_families=sync_families,
             sync_individual_metadata=sync_individual_metadata,
             sync_individuals=sync_individuals,

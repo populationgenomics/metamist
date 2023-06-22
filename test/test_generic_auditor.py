@@ -380,7 +380,7 @@ class TestGenericAuditor(unittest.TestCase):
                     {
                         'id': 1,
                         'meta': {
-                            'sequence_type': 'genome',
+                            'sequencing_type': 'genome',
                         },
                         'sample_ids': [
                             'CPG123',

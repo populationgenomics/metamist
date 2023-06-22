@@ -92,14 +92,14 @@ This script cleans up the FASTQ sequences and metadata within GCS and Metamist.
 #         logging.info(f'{location.name} was deleted from cloud storage.')
 #
 #
-# def get_sequences_from_sample(sample_ids: list[str], sequence_type, batch_filter):
+# def get_sequences_from_sample(sample_ids: list[str], sequencing_type, batch_filter):
 #     """Return latest sequence ids for sample ids"""
 #     sequences: list[dict] = []
 #     all_sequences = seqapi.get_sequences_by_sample_ids(
 #         sample_ids, get_latest_sequence_only=False
 #     )
 #     for sequence in all_sequences:
-#         if sequence_type != sequence.get('type'):
+#         if sequencing_type != sequence.get('type'):
 #             continue
 #
 #         if batch_filter:
@@ -149,7 +149,7 @@ This script cleans up the FASTQ sequences and metadata within GCS and Metamist.
 #     project,
 #     external_sample_ids,
 #     batch_filter,
-#     sequence_type,
+#     sequencing_type,
 #     force,
 #     dry_run,
 # ):
@@ -178,7 +178,7 @@ This script cleans up the FASTQ sequences and metadata within GCS and Metamist.
 #     internal_sample_ids_to_remove = validate_crams(internal_sample_ids, project)
 #
 #     sequences = get_sequences_from_sample(
-#         internal_sample_ids_to_remove, sequence_type, batch_filter
+#         internal_sample_ids_to_remove, sequencing_type, batch_filter
 #     )
 #     sequence_ids = [seq['id'] for seq in sequences]
 #

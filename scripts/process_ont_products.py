@@ -203,7 +203,7 @@ class OntProductParser(CloudHelper):
             file_size = await self.file_size(dest)
             meta = {
                 'size': file_size,
-                'sequence_type': 'ont',
+                'sequencing_type': 'ont',
                 **preparer.meta,
             }
 

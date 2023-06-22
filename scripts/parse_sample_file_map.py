@@ -66,7 +66,7 @@ async def main(
     search_path: List[str],
     project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='wgs',
     default_sequence_technology='short-read',
     confirm=False,
     dry_run=False,
@@ -84,7 +84,7 @@ async def main(
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
         default_sequencing_technology=default_sequence_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,

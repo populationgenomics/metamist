@@ -5,7 +5,7 @@ import re
 from typing import Dict, List, Any
 
 import click
-from metamist.model.sequence_type import SequenceType
+from metamist.model.sequencing_type import SequenceType
 
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
@@ -162,7 +162,7 @@ async def main(
     manifests,
     project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='wgs',
     confirm=False,
     search_path: List[str] = None,
     allow_extra_files_in_search_path=False,
@@ -171,7 +171,7 @@ async def main(
     _search_locations = search_path or list(set(os.path.basename(s) for s in manifests))
     parser = VcgsManifestParser(
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
         project=project,
         search_locations=_search_locations,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,

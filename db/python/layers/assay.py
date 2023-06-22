@@ -35,7 +35,7 @@ class AssayLayer(BaseLayer):
     async def get_assay_by_id(
         self, assay_id: int, check_project_id=True
     ) -> AssayInternal:
-        """Get sequence by sequence ID"""
+        """Get assay by ID"""
         project, assay = await self.seqt.get_assay_by_id(assay_id)
 
         if check_project_id:

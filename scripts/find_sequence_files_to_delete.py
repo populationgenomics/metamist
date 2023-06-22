@@ -106,7 +106,7 @@ def get_filenames_from_assays(assays: list[dict[str, Any]]) -> set[str]:
 
 
 async def get_filenames_from_assays_for_which_crams_exist(
-    cpg_project, sequence_types_to_remove: set[str]
+    cpg_project, sequencing_types_to_remove: set[str]
 ) -> set[str]:
     """
     Get all sequence files for a project
@@ -141,7 +141,7 @@ query GetSgIdsQuery($project: String!) {
                     continue
                 if sg['id'] in CPG_SEQUENCING_GROUP_IDS_TO_SKIP:
                     continue
-                if sg['type'] not in sequence_types_to_remove:
+                if sg['type'] not in sequencing_types_to_remove:
                     continue
 
                 filenames_to_remove |= get_filenames_from_assays(sg['assays'])
@@ -183,7 +183,7 @@ def find_existing_files_in_bucket(
 
 
 async def find_files_to_delete(
-    sequence_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
+    sequencing_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
 ):
     """
     Get all the sequences across all the projects from metamist
@@ -211,7 +211,7 @@ async def find_files_to_delete(
 
     jobs = [
         get_filenames_from_assays_for_which_crams_exist(
-            p, set(sequence_types_to_remove)
+            p, set(sequencing_types_to_remove)
         )
         for p in names
     ]
@@ -255,11 +255,11 @@ async def find_files_to_delete(
 )
 @click.option('--project-to-ignore', multiple=True)
 @click.option('--output-path', default='files-to-remove.txt')
-def main(sequence_type: list[str], project_to_ignore: list[str], output_path: str):
+def main(sequencing_type: list[str], project_to_ignore: list[str], output_path: str):
     """Main from CLI"""
     asyncio.run(
         find_files_to_delete(
-            sequence_types_to_remove=sequence_type,
+            sequencing_types_to_remove=sequencing_type,
             projects_to_ignore=project_to_ignore,
             output_path=output_path,
         )

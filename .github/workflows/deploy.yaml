@@ -5,8 +5,7 @@ on:
   push:
     branches:
       - main
-#      - dev
-      - sequence-groups
+      - dev
 
 jobs:
   deploy:
@@ -54,9 +53,6 @@ jobs:
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             echo DEPLOYMENT_TYPE=prod >> $GITHUB_ENV
             echo SM_ENVIRONMENT=production >> $GITHUB_ENV
-          elif [[ $GITHUB_REF == 'refs/heads/sequence-groups' ]]; then
-            echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
-            echo SM_ENVIRONMENT=development >> $GITHUB_ENV
           else
             echo DEPLOYMENT_TYPE=dev >> $GITHUB_ENV
             echo SM_ENVIRONMENT=development >> $GITHUB_ENV

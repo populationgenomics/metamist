@@ -268,7 +268,7 @@ class ParsedSequencingGroup:
         rows: GroupedRow,
         internal_seqgroup_id: int | None,
         external_seqgroup_id: str | None,
-        sequence_type: str,
+        sequencing_type: str,
         sequence_technology: str,
         sequence_platform: str | None,
         meta: dict[str, Any] | None,
@@ -278,7 +278,7 @@ class ParsedSequencingGroup:
 
         self.internal_seqgroup_id = internal_seqgroup_id
         self.external_seqgroup_id = external_seqgroup_id
-        self.sequencing_type = sequence_type
+        self.sequencing_type = sequencing_type
         self.sequencing_technology = sequence_technology
         self.sequencing_platform = sequence_platform
         self.meta = meta
@@ -951,7 +951,7 @@ class GenericParser(
             seq_group = ParsedSequencingGroup(
                 internal_seqgroup_id=None,
                 external_seqgroup_id=self.get_sequencing_group_id(seq_rows[0]),
-                sequence_type=seq_type,
+                sequencing_type=seq_type,
                 sequence_technology=seq_tech,
                 sequence_platform=seq_platform,
                 meta={},

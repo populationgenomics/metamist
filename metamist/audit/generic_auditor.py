@@ -91,7 +91,7 @@ class GenericAuditor(AuditHelper):
     def __init__(
         self,
         dataset: str,
-        sequence_type: list[str],
+        sequencing_type: list[str],
         file_types: tuple[str],
         default_analysis_type='cram',
         default_analysis_status='completed',
@@ -102,7 +102,7 @@ class GenericAuditor(AuditHelper):
         super().__init__(search_paths=None)
 
         self.dataset = dataset
-        self.sequence_type = sequence_type
+        self.sequencing_type = sequencing_type
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
@@ -218,7 +218,7 @@ class GenericAuditor(AuditHelper):
             ]  # Extract the sample ID
             for sequences in sample_sequence.values():
                 for sequence in sequences:
-                    if not sequence.get('type').lower() in self.sequence_type:
+                    if not sequence.get('type').lower() in self.sequencing_type:
                         continue
                     meta = sequence.get('meta')
                     reads = meta.get('reads')
@@ -300,7 +300,7 @@ class GenericAuditor(AuditHelper):
         analyses = [
             analysis
             for analysis in analyses
-            if analysis.get('meta')['sequencing_type'] in self.sequence_type
+            if analysis.get('meta')['sequencing_type'] in self.sequencing_type
         ]
 
         # For each sample ID, collect the analysis IDs and cram paths

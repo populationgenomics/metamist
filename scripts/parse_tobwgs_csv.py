@@ -184,7 +184,7 @@ async def main(
     manifests,
     project,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='wgs',
     path_prefix=None,
     confirm=False,
     dry_run=False,
@@ -194,7 +194,7 @@ async def main(
 
     parser = TobWgsParser(
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
         project=project,
         search_locations=_search_locations,
     )
