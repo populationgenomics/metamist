@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring
+# pylint: disable=missing-function-docstring,too-many-locals
 """
 This script performs the major migration to using sequencing groups!
 Importantly, this upgrade changes the regular sample "CPG" IDs to be
@@ -27,12 +27,10 @@ import asyncio
 import json
 from collections import defaultdict
 from textwrap import dedent
-from typing import Any
+from typing import Any, List, Dict, Tuple
 
 import click
 from databases import Database
-
-from db.python.connect import CredentialedDatabaseConfiguration
 
 SEQTYPE_ORDER = ('genome', 'exome', 'mtseq', 'transcriptome', 'chip')
 
@@ -44,6 +42,9 @@ SequenceType = str
 
 
 def _get_connection_string():
+    # pylint: disable=import-outside-toplevel
+    from db.python.connect import CredentialedDatabaseConfiguration
+
     config = CredentialedDatabaseConfiguration(dbname='sm_dev', username='root')
     return config.get_connection_string()
 
@@ -128,7 +129,8 @@ async def migrate_sequences_to_assays(connection: Database, dry_run=True):
             'sequencing_technology': technology,
             'sequencing_platform': get_platform_from_technology(technology),
         }
-        if reads := meta.get('reads'):
+        reads = meta.get('reads')
+        if reads:
             # split into multiple assays
             for read in reads:
                 inserts.append(
@@ -173,11 +175,41 @@ async def migrate_sequences_to_assays(connection: Database, dry_run=True):
     await execute_many(connection, query, inserts, dry_run)
 
 
+async def get_sequencing_eids_by_sample_type(
+    connection: Database,
+) -> Dict[Tuple[str, str], List[Dict[str, Any]]]:
+    query = dedent(
+        """
+    SELECT seq_eid.project, seq.type, seq.sample_id, seq_eid.external_id, seq_eid.name
+    FROM sample_sequencing_eid seq_eid
+    INNER JOIN sample_sequencing seq
+        ON seq_eid.sequencing_id = seq.id
+     """
+    )
+    rows = await connection.fetch_all(query)
+
+    sequencing_eids_by_sample_type: Dict[Tuple[str, str], list] = defaultdict(list)
+    for row in rows:
+        sample_id = row['sample_id']
+        seq_type = row['type']
+        sequencing_eids_by_sample_type[(sample_id, seq_type)].append(
+            {
+                'project': row['project'],
+                'external_id': row['external_id'],
+                'name': row['name'],
+            }
+        )
+
+    return sequencing_eids_by_sample_type
+
+
 async def create_sequencing_groups(connection: Database, author: str, dry_run=True):
     assays = await connection.fetch_all('SELECT * FROM assay')
+    # we can't safely put them on assays, so let's put it on the sequencing-group
+    seq_eids = await get_sequencing_eids_by_sample_type(connection)
 
     # group assays by sample, then by sequencing type
-    grouped_assays: dict[SampleId, dict[SequenceType, list[dict]]] = defaultdict(
+    grouped_assays: Dict[SampleId, Dict[SequenceType, List[dict]]] = defaultdict(
         lambda: defaultdict(list)
     )
     for assay in assays:
@@ -186,11 +218,12 @@ async def create_sequencing_groups(connection: Database, author: str, dry_run=Tr
         seq_type: SequenceType = assay_meta['sequencing_type']
         grouped_assays[sample_id][seq_type].append(dict(assay))
 
-    seq_groups_to_insert: dict[SequenceGroupId, dict[str, Any]] = {}
-    seq_group_assays_to_insert: dict[SequenceGroupId, list[AssayId]] = defaultdict(list)
+    seq_groups_to_insert: Dict[SequenceGroupId, Dict[str, Any]] = {}
+    seq_group_assays_to_insert: Dict[SequenceGroupId, List[AssayId]] = defaultdict(list)
 
     # sequenceGroup, [assayIDs]
-    seq_groups_to_insert_later: list[tuple[dict, list[AssayId]]] = []
+    seq_groups_to_insert_later: List[Tuple[dict, List[AssayId]]] = []
+    sample_seqtype_to_sg_id = {}
 
     for sample_id, sample_assays in grouped_assays.items():
         for seqtype in SEQTYPE_ORDER:
@@ -222,6 +255,7 @@ async def create_sequencing_groups(connection: Database, author: str, dry_run=Tr
                     'id': sample_id,
                     **seqgroup,
                 }
+                sample_seqtype_to_sg_id[(sample_id, seqtype)] = sample_id
                 seq_group_assays_to_insert[sample_id] = sample_seqgroup_assay_ids
 
     # insert sequencing groups
@@ -248,6 +282,9 @@ async def create_sequencing_groups(connection: Database, author: str, dry_run=Tr
         new_seqgroup = await mutate_fetch_one(
             connection, seq_group_insert_returning_id_query, seqgroup, dry_run
         )
+        sample_id = seqgroup['sample_id']
+        seqtype = seqgroup['type']
+        sample_seqtype_to_sg_id[(sample_id, seqtype)] = new_seqgroup['id']
         seq_group_assays_to_insert[new_seqgroup['id']] = assay_ids
 
     seq_group_assay_insert_query = dedent(
@@ -264,6 +301,28 @@ async def create_sequencing_groups(connection: Database, author: str, dry_run=Tr
     await execute_many(
         connection, seq_group_assay_insert_query, prepared_assay_insert_values, dry_run
     )
+
+    sg_eids_to_insert = []
+    sg_eid_to_insert_query = dedent(
+        """
+    INSERT INTO sequencing_group_external_id
+        (project, sequencing_group_id, external_id, name, author)
+    VALUES (:project, :sequencing_group_id, :external_id, :name, :author)
+    """
+    )
+    for (sid, seqtype), seqs in seq_eids.items():
+        for seq_eid in seqs:
+            sg_eids_to_insert.append(
+                {
+                    'project': seq_eid['project'],
+                    'sequencing_group_id': sample_seqtype_to_sg_id[(sid, seqtype)],
+                    'external_id': seq_eid['external_id'],
+                    'name': seq_eid['name'],
+                    'author': author,
+                }
+            )
+
+    await execute_many(connection, sg_eid_to_insert_query, sg_eids_to_insert, dry_run)
 
 
 async def migrate_analyses(connection: Database, dry_run: bool = True):
@@ -296,14 +355,14 @@ ORDER BY sg.sample_id DESC;
     sequence_group_ids_of_duplicate_samples = await connection.fetch_all(
         sequence_group_ids_of_duplicate_samples_query
     )
-    duplicate_sg_id_map: dict[
-        SampleId, dict[SequenceType, SequenceGroupId]
+    duplicate_sg_id_map: Dict[
+        SampleId, Dict[SequenceType, SequenceGroupId]
     ] = defaultdict(dict)
     for row in sequence_group_ids_of_duplicate_samples:
         duplicate_sg_id_map[row['sample_id']][row['type']] = row['id']
 
-    values_to_insert: list[tuple[int, SequenceGroupId]] = []
-    potential_issues: list[tuple[int, SequenceGroupId]] = []
+    values_to_insert: List[Tuple[int, SequenceGroupId]] = []
+    potential_issues: List[Tuple[int, SequenceGroupId]] = []
     for analysis in analysis_samples:
         analysis_id = analysis['id']
         sample_id = analysis['sample_id']
@@ -317,7 +376,8 @@ ORDER BY sg.sample_id DESC;
             potential_sg_ids = duplicate_sg_id_map[sample_id]
             meta = json.loads(analysis['meta'])
             seqtype = meta.get('sequencing_type') or meta.get('sequence_type')
-            if sg_id := potential_sg_ids.get(seqtype):
+            sg_id = potential_sg_ids.get(seqtype)
+            if sg_id:
                 values_to_insert.append((analysis_id, sg_id))
             else:
                 # we can't find the sequencing group ID for this analysis
@@ -350,22 +410,30 @@ VALUES (:analysis_id, :sequencing_group_id)
     sg_ids_inserted = set(a['id'] for a in sg_ids_inserted_rows)
     bad_sg_ids = sg_ids - sg_ids_inserted
     if bad_sg_ids:
-        raise ValueError(f'Bad SG IDs: {bad_sg_ids}')
+        bad_analysis = [
+            a for a in remapped_values if a['sequencing_group_id'] in bad_sg_ids
+        ]
+        remapped_values = [
+            a for a in remapped_values if a['sequencing_group_id'] not in bad_sg_ids
+        ]
+        print(f'Bad analysis: {bad_analysis}')
     await execute_many(connection, insert_query, remapped_values, dry_run)
 
 
 @click.command()
 @click.option('--dry-run/--no-dry-run', default=True)
+@click.option('--connection-string', default=None)
 @click.argument('author', default='sequencing-group-migration')
-def main_sync(author, dry_run: bool = True):
+def main_sync(author, dry_run: bool = True, connection_string: str = None):
     """Run synchronisation"""
-    asyncio.get_event_loop().run_until_complete(main(author, dry_run=dry_run))
+    asyncio.get_event_loop().run_until_complete(
+        main(author, dry_run=dry_run, connection_string=connection_string)
+    )
 
 
-async def main(author, dry_run: bool = True):
+async def main(author, dry_run: bool = True, connection_string: str = None):
     """Run synchronisation"""
-    dry_run = False
-    connection = Database(_get_connection_string(), echo=True)
+    connection = Database(connection_string or _get_connection_string(), echo=True)
     await connection.connect()
     async with connection.transaction():
         await check_assay_types_before_starting(connection)
