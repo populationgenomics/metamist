@@ -497,8 +497,6 @@ class SampleTable(DbBase):
         sample_rows = await self.connection.fetch_all(_query, replacements)
 
         sample_dicts = [dict(s) for s in sample_rows]
-        for sample_dict in sample_dicts:
-            sample_dict['active'] = ord(sample_dict['active'])
 
         projects: Iterable[int] = set(
             s['project'] for s in sample_dicts if s.get('project')
