@@ -1,5 +1,5 @@
 import * as React from 'react'
-import _ from 'lodash'
+import _, { capitalize } from 'lodash'
 import { Table as SUITable, Form, Popup } from 'semantic-ui-react'
 
 import FilterAltIcon from '@mui/icons-material/FilterAlt'
@@ -11,6 +11,7 @@ import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
 import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
+import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 
 interface ProjectGridProps {
     summary: ProjectSummaryResponse
@@ -36,22 +37,44 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
     updateFilters,
 }) => {
     let headers = [
-        { name: 'external_id', title: 'Family ID', category: MetaSearchEntityPrefix.F },
-        ...summary.participant_keys.map((field) => ({
+        {
+            name: 'external_id',
+            title: 'Family ID',
+            category: MetaSearchEntityPrefix.F,
+            first: true,
+        },
+        ...summary.participant_keys.map((field, i) => ({
             category: MetaSearchEntityPrefix.P,
             name: field[0],
             title: field[1],
+            first: i === 0,
         })),
-        ...summary.sample_keys.map((field) => ({
+        ...summary.sample_keys.map((field, i) => ({
             category: MetaSearchEntityPrefix.S,
             name: field[0],
             title: field[1],
+            first: i === 0,
         })),
-        ...summary.sequence_keys.map((field) => ({
-            category: MetaSearchEntityPrefix.Sq,
+        ...summary.sequencing_group_keys.map((field, i) => ({
+            category: MetaSearchEntityPrefix.Sg,
             name: field[0],
-            title: `sequence.${field[1]}`,
+            title: `${field[1]}`,
+            first: i === 0,
         })),
+        ...summary.assay_keys.map((field, i) => ({
+            category: MetaSearchEntityPrefix.A,
+            name: field[0],
+            title: `${field[1]}`,
+            first: i === 0,
+        })),
+    ]
+
+    let headerGroups = [
+        { title: 'Family', width: 1 },
+        { title: 'Participant', width: summary.participant_keys.length },
+        { title: 'Sample', width: summary.sample_keys.length },
+        { title: 'Sequencing Group', width: summary.sequencing_group_keys.length },
+        { title: 'Assay', width: summary.assay_keys.length },
     ]
 
     const [tempFilterValues, setTempFilterValues] =
@@ -94,26 +117,68 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
             name: field,
             category,
             title,
+            first: true,
         }))
+        headerGroups = []
     }
 
     return (
-        <Table celled>
+        <Table
+            celled
+            style={{
+                borderCollapse: 'collapse',
+                borderTop: '2px solid var(--color-border-color)',
+                borderRight: '2px solid var(--color-border-color)',
+                borderBottom: '2px solid var(--color-border-color)',
+            }}
+        >
             <SUITable.Header>
                 <SUITable.Row>
-                    {headers.map(({ name, category, title }, i) => {
-                        if (title === 'Sample ID' || title === 'Created date') {
+                    {headerGroups.map(({ title, width }) => (
+                        <SUITable.HeaderCell
+                            key={`${title}`}
+                            colSpan={width}
+                            style={{
+                                textAlign: 'center',
+                                borderLeft: '2px solid var(--color-border-color)',
+                                borderBottom: '2px solid var(--color-border-default)',
+                                backgroundColor: 'var(--color-table-header)',
+                            }}
+                        >
+                            {title}
+                        </SUITable.HeaderCell>
+                    ))}
+                </SUITable.Row>
+            </SUITable.Header>
+            <SUITable.Header>
+                <SUITable.Row>
+                    {headers.map(({ name, category, title, first }, i) => {
+                        if (
+                            title === 'Sample ID' ||
+                            title === 'Created date' ||
+                            title === 'Sequencing Group ID'
+                        ) {
                             return (
                                 <SUITable.HeaderCell
                                     key={`filter-${name}-${i}`}
-                                    style={{ borderBottom: 'none' }}
+                                    style={{
+                                        borderBottom: 'none',
+                                        borderLeft: first
+                                            ? '2px solid var(--color-border-color)'
+                                            : '1px solid var(--color-border-default)',
+                                    }}
                                 ></SUITable.HeaderCell>
                             )
                         }
                         return (
                             <SUITable.HeaderCell
                                 key={`filter-${title}-${i}`}
-                                style={{ borderBottom: 'none' }}
+                                style={{
+                                    borderBottom: 'none',
+                                    borderLeft: first
+                                        ? '2px solid var(--color-border-color)'
+                                        : '1px solid var(--color-border-default)',
+                                }}
                             >
                                 <div style={{ position: 'relative' }}>
                                     <div style={{ position: 'absolute', top: 0, right: 0 }}>
@@ -180,8 +245,18 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
             </SUITable.Header>
             <SUITable.Header>
                 <SUITable.Row>
-                    {headers.map(({ name, title }, i) => (
-                        <SUITable.HeaderCell key={`${name}-${i}`}>{title}</SUITable.HeaderCell>
+                    {headers.map(({ name, title, first }, i) => (
+                        <SUITable.HeaderCell
+                            key={`${name}-${i}`}
+                            style={{
+                                borderLeft: first
+                                    ? '2px solid var(--color-border-color)'
+                                    : '1px solid var(--color-border-default)',
+                                borderBottom: '2px solid var(--color-border-default)',
+                            }}
+                        >
+                            {title.includes(' ') ? title : capitalize(title)}
+                        </SUITable.HeaderCell>
                     ))}
                 </SUITable.Row>
             </SUITable.Header>
@@ -190,74 +265,150 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                     p.samples.map((s, sidx) => {
                         const backgroundColor =
                             pidx % 2 === 0 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
+                        // const border = '1px solid #dee2e6'
                         const lengthOfParticipant = p.samples
-                            .map((s_) => s_.sequences.length)
+                            .map((s_) =>
+                                s_.sequencing_groups
+                                    .map((a_) => a_.assays.length)
+                                    .reduce((a, b) => a + b, 0)
+                            )
                             .reduce((a, b) => a + b, 0)
-                        return s.sequences.map((seq, seqidx) => {
-                            const isFirstOfGroup = sidx === 0 && seqidx === 0
-                            return (
-                                <SUITable.Row key={`${p.external_id}-${s.id}-${seq.id}`}>
-                                    {isFirstOfGroup && (
-                                        <SUITable.Cell
-                                            style={{ backgroundColor }}
-                                            rowSpan={lengthOfParticipant}
-                                        >
-                                            {
-                                                <FamilyLink
-                                                    id={p.families.map((f) => f.id).join(', ')}
-                                                    projectName={projectName}
-                                                >
-                                                    {p.families
-                                                        .map((f) => f.external_id)
-                                                        .join(', ')}
-                                                </FamilyLink>
-                                            }
-                                        </SUITable.Cell>
-                                    )}
-                                    {isFirstOfGroup &&
-                                        summary.participant_keys.map(([k]) => (
+                        return s.sequencing_groups.map((seq, seqidx) =>
+                            seq.assays.map((assay, assayidx) => {
+                                const isFirstOfGroup = sidx === 0 && seqidx === 0 && assayidx === 0
+                                const border = '1px solid #dee2e6'
+                                // const border = '1px solid'
+                                return (
+                                    <SUITable.Row
+                                        key={`${p.external_id}-${s.id}-${seq.id}-${assay.id}`}
+                                    >
+                                        {isFirstOfGroup && (
                                             <SUITable.Cell
                                                 style={{
                                                     backgroundColor,
+                                                    borderRight: border,
+                                                    borderBottom: border,
+                                                    borderTop: border,
+                                                    borderLeft:
+                                                        '2px solid var(--color-border-color)',
                                                 }}
-                                                key={`${p.id}participant.${k}`}
                                                 rowSpan={lengthOfParticipant}
                                             >
-                                                {sanitiseValue(_.get(p, k))}
+                                                {
+                                                    <FamilyLink
+                                                        id={p.families.map((f) => f.id).join(', ')}
+                                                        projectName={projectName}
+                                                    >
+                                                        {p.families
+                                                            .map((f) => f.external_id)
+                                                            .join(', ')}
+                                                    </FamilyLink>
+                                                }
                                             </SUITable.Cell>
-                                        ))}
-                                    {seqidx === 0 &&
-                                        summary.sample_keys.map(([k]) => (
-                                            <SUITable.Cell
-                                                style={{
-                                                    backgroundColor,
-                                                }}
-                                                key={`${s.id}sample.${k}`}
-                                                rowSpan={s.sequences.length}
-                                            >
-                                                {k === 'external_id' || k === 'id' ? (
-                                                    <SampleLink id={s.id} projectName={projectName}>
-                                                        {sanitiseValue(_.get(s, k))}
-                                                    </SampleLink>
-                                                ) : (
-                                                    sanitiseValue(_.get(s, k))
-                                                )}
-                                            </SUITable.Cell>
-                                        ))}
-                                    {seq &&
-                                        summary.sequence_keys.map(([k]) => (
-                                            <SUITable.Cell
-                                                style={{
-                                                    backgroundColor,
-                                                }}
-                                                key={`${s.id}sequence.${k}`}
-                                            >
-                                                {sanitiseValue(_.get(seq, k))}
-                                            </SUITable.Cell>
-                                        ))}
-                                </SUITable.Row>
-                            )
-                        })
+                                        )}
+                                        {isFirstOfGroup &&
+                                            summary.participant_keys.map(([k], i) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                        borderRight: border,
+                                                        borderBottom: border,
+                                                        borderTop: border,
+                                                        borderLeft:
+                                                            i === 0
+                                                                ? '2px solid var(--color-border-color)'
+                                                                : '1px solid var(--color-border-default)',
+                                                    }}
+                                                    key={`${p.id}participant.${k}`}
+                                                    rowSpan={lengthOfParticipant}
+                                                >
+                                                    {sanitiseValue(_.get(p, k))}
+                                                </SUITable.Cell>
+                                            ))}
+                                        {seqidx === 0 &&
+                                            assayidx === 0 &&
+                                            summary.sample_keys.map(([k], i) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                        borderRight: border,
+                                                        borderBottom: border,
+                                                        borderTop: border,
+                                                        borderLeft:
+                                                            i === 0
+                                                                ? '2px solid var(--color-border-color)'
+                                                                : '1px solid var(--color-border-default)',
+                                                        // border,
+                                                    }}
+                                                    key={`${s.id}sample.${k}`}
+                                                    rowSpan={s.sequencing_groups
+                                                        .map((a_) => a_.assays.length)
+                                                        .reduce((a, b) => a + b, 0)}
+                                                >
+                                                    {k === 'external_id' || k === 'id' ? (
+                                                        <SampleLink
+                                                            id={s.id}
+                                                            projectName={projectName}
+                                                        >
+                                                            {sanitiseValue(_.get(s, k))}
+                                                        </SampleLink>
+                                                    ) : (
+                                                        sanitiseValue(_.get(s, k))
+                                                    )}
+                                                </SUITable.Cell>
+                                            ))}
+                                        {assayidx === 0 &&
+                                            summary.sequencing_group_keys.map(([k], i) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        borderRight: border,
+                                                        borderBottom: border,
+                                                        borderTop: border,
+                                                        borderLeft:
+                                                            i === 0
+                                                                ? '2px solid var(--color-border-color)'
+                                                                : '1px solid var(--color-border-default)',
+                                                        backgroundColor,
+                                                    }}
+                                                    key={`${s.id}sequence_group.${k}`}
+                                                    rowSpan={seq.assays.length}
+                                                >
+                                                    {k === 'id' ? (
+                                                        <SequencingGroupLink
+                                                            projectName={projectName}
+                                                            id={s.id}
+                                                            sg_id={_.get(seq, 'id').toString()}
+                                                        >
+                                                            {sanitiseValue(_.get(seq, k))}
+                                                        </SequencingGroupLink>
+                                                    ) : (
+                                                        sanitiseValue(_.get(seq, k))
+                                                    )}
+                                                </SUITable.Cell>
+                                            ))}
+                                        {assay &&
+                                            summary.assay_keys.map(([k], i) => (
+                                                <SUITable.Cell
+                                                    style={{
+                                                        backgroundColor,
+                                                        borderRight: border,
+                                                        borderBottom: border,
+                                                        borderTop: border,
+                                                        borderLeft:
+                                                            i === 0
+                                                                ? '2px solid var(--color-border-color)'
+                                                                : '1px solid var(--color-border-default)',
+                                                        // border,
+                                                    }}
+                                                    key={`${s.id}assay.${k}`}
+                                                >
+                                                    {sanitiseValue(_.get(assay, k))}
+                                                </SUITable.Cell>
+                                            ))}
+                                    </SUITable.Row>
+                                )
+                            })
+                        )
                     })
                 )}
             </SUITable.Body>

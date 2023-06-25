@@ -37,7 +37,8 @@ import csv
 from typing import List, Optional
 import click
 
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.parser.generic_parser import READS_EXTENSIONS
+from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     SingleRow,
     GroupedRow,
@@ -118,8 +119,9 @@ class ExistingCohortParser(GenericMetadataParser):
             sample_meta_map={},
             qc_meta_map={},
             participant_meta_map={},
-            sequence_meta_map=Columns.sequence_meta_map(),
+            assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
+            allow_extra_files_in_search_path=True,
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -138,13 +140,18 @@ class ExistingCohortParser(GenericMetadataParser):
         urls from a bucket listing.
         """
 
-        return [
-            path
+        read_filenames = [
+            filename
             for filename, path in self.filename_map.items()
             if fastq_file_name_to_sample_id(filename) == row[Columns.MANIFEST_FLUID_X]
+            and any(filename.endswith(ext) for ext in READS_EXTENSIONS)
         ]
 
-    def get_sequence_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
+        if not read_filenames:
+            raise ValueError(f'No read files found for {sample_id}')
+        return read_filenames
+
+    def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external sequence ID from sequence file name"""
 
         for filename, _path in self.filename_map.items():

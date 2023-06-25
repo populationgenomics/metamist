@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 from pymysql.err import IntegrityError
+
+from models.models import ParticipantUpsertInternal
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.family import FamilyLayer
 
@@ -17,13 +19,13 @@ class TestParticipantFamily(DbIsolatedTest):
         self.fid_2 = await fl.create_family(external_id='FAM02')
 
         pl = ParticipantLayer(self.connection)
-        self.pid = await pl.create_participant(external_id='EX01', reported_sex=2)
-        self.pat_pid = await pl.create_participant(
-            external_id='EX01_pat', reported_sex=1
-        )
-        self.mat_pid = await pl.create_participant(
-            external_id='EX01_mat', reported_sex=2
-        )
+        self.pid = (await pl.upsert_participant(ParticipantUpsertInternal(external_id='EX01', reported_sex=2))).id
+        self.pat_pid = (await pl.upsert_participant(
+            ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
+        )).id
+        self.mat_pid = (await pl.upsert_participant(
+            ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
+        )).id
 
         await pl.add_participant_to_family(
             family_id=self.fid_1,

@@ -2,27 +2,30 @@ import * as React from 'react'
 
 import { Accordion } from 'semantic-ui-react'
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded'
-import { GraphQlSampleSequencing } from '../../__generated__/graphql'
-import SeqInfo from './SeqInfo'
+import { GraphQlSequencingGroup } from '../../__generated__/graphql'
 import iconStyle from '../iconStyle'
+import { DeepPartial } from '../utilities/deepPartial'
+import SequencingGroupInfo from './SequencingGroupInfo'
 
 const SeqPanel: React.FunctionComponent<{
-    sequences: Partial<GraphQlSampleSequencing>[]
+    sequencingGroups: DeepPartial<GraphQlSequencingGroup>[]
+    highlighted?: string
     isOpen?: boolean
-}> = ({ sequences, isOpen = false }) => (
+}> = ({ sequencingGroups, isOpen = false, highlighted }) => (
     <Accordion
         styled
         className="accordionStyle"
-        panels={sequences.map((seq) => ({
+        panels={sequencingGroups.map((seq) => ({
             key: seq.id,
             title: {
                 content: (
                     <h3
                         style={{
                             display: 'inline',
+                            color: seq.id === highlighted ? 'red' : 'black',
                         }}
                     >
-                        Sequence ID: {seq.id}
+                        Sequencing Group ID: {seq.id}
                     </h3>
                 ),
                 icon: <ScienceRoundedIcon sx={iconStyle} />,
@@ -30,7 +33,7 @@ const SeqPanel: React.FunctionComponent<{
             content: {
                 content: (
                     <div style={{ marginLeft: '30px' }}>
-                        <SeqInfo data={seq} />
+                        <SequencingGroupInfo data={seq} />
                     </div>
                 ),
             },

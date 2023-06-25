@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from models.models.participant import ParticipantUpsertInternal
+
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 
@@ -48,11 +50,15 @@ class TestPedigree(DbIsolatedTest):
         pl = ParticipantLayer(self.connection)
         fl = FamilyLayer(self.connection)
 
-        await pl.create_participant(
-            external_id='EX01',
-            reported_sex=1,
+        await pl.upsert_participant(
+            ParticipantUpsertInternal(
+                external_id='EX01',
+                reported_sex=1,
+            )
         )
-        await pl.create_participant(external_id='EX02', reported_sex=None)
+        await pl.upsert_participant(
+            ParticipantUpsertInternal(external_id='EX02', reported_sex=None)
+        )
 
         rows = await fl.get_pedigree(
             project=self.connection.project,

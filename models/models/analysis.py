@@ -1,26 +1,30 @@
 import json
 from datetime import date
-from typing import Optional, List, Union, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel
 
 from models.base import SMBase
-from models.enums import AnalysisType, AnalysisStatus, SequenceType
+from models.enums import AnalysisStatus
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
+    sequencing_group_id_transform_to_raw_list,
+)
 
 
-class Analysis(SMBase):
+class AnalysisInternal(SMBase):
     """Model for Analysis"""
 
-    id: Optional[int]
-    type: AnalysisType
+    id: int | None
+    type: str
     status: AnalysisStatus
-    output: Optional[str] = None
-    sample_ids: List[Union[int, str]]
-    timestamp_completed: Optional[str] = None
-    project: Optional[int] = None
-    active: Optional[bool] = None
-    meta: Dict[str, Any] = {}
-    author: Optional[str] = None
+    output: str = None
+    sequencing_group_ids: list[int] = []
+    timestamp_completed: str | None = None
+    project: int | None = None
+    active: bool | None = None
+    meta: dict[str, Any] = {}
+    author: str | None = None
 
     @staticmethod
     def from_db(**kwargs):
@@ -38,16 +42,15 @@ class Analysis(SMBase):
         if timestamp_completed is not None and not isinstance(timestamp_completed, str):
             timestamp_completed = timestamp_completed.isoformat()
 
-        sample_ids = (
-            [kwargs.pop('sample_id')]
-            if ('sample_id' in kwargs and kwargs.get('sample_id') is not None)
-            else []
-        )
-        return Analysis(
+        sequencing_group_ids = []
+        if sg := kwargs.pop('sequencing_group_id', None):
+            sequencing_group_ids.append(sg)
+
+        return AnalysisInternal(
             id=kwargs.pop('id'),
-            type=AnalysisType(analysis_type),
+            type=analysis_type,
             status=AnalysisStatus(status),
-            sample_ids=sample_ids,
+            sequencing_group_ids=sequencing_group_ids or [],
             output=kwargs.pop('output', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
@@ -56,19 +59,72 @@ class Analysis(SMBase):
             author=kwargs.get('author'),
         )
 
+    def to_external(self):
+        """
+        Convert to external model
+        """
+        return Analysis(
+            id=self.id,
+            type=self.type,
+            status=self.status,
+            sequencing_group_ids=sequencing_group_id_format_list(
+                self.sequencing_group_ids
+            ),
+            output=self.output,
+            timestamp_completed=self.timestamp_completed,
+            project=self.project,
+            active=self.active,
+            meta=self.meta,
+            author=self.author,
+        )
+
+
+class Analysis(BaseModel):
+    """Model for Analysis"""
+
+    id: int | None
+    type: str
+    status: AnalysisStatus
+    output: str = None
+    sequencing_group_ids: list[str] = []
+    author: str | None = None
+    timestamp_completed: str | None = None
+    project: int | None = None
+    active: bool | None = None
+    meta: dict[str, Any] = {}
+
+    def to_internal(self):
+        """
+        Convert to internal model
+        """
+        return AnalysisInternal(
+            id=self.id,
+            type=self.type,
+            status=self.status,
+            sequencing_group_ids=sequencing_group_id_transform_to_raw_list(
+                self.sequencing_group_ids
+            ),
+            output=self.output,
+            timestamp_completed=self.timestamp_completed,
+            project=self.project,
+            active=self.active,
+            meta=self.meta,
+            author=self.author,
+        )
+
 
 class DateSizeModel(BaseModel):
     """Date Size model"""
 
     start: date
     end: date | None
-    size: dict[SequenceType, int]
+    size: dict[str, int]
 
 
-class SampleSizeModel(BaseModel):
+class SequencingGroupSizeModel(BaseModel):
     """Project Size model"""
 
-    sample: str
+    sequencing_group: str
     dates: list[DateSizeModel]
 
 
@@ -76,4 +132,4 @@ class ProjectSizeModel(BaseModel):
     """Project Size model"""
 
     project: str
-    samples: list[SampleSizeModel]
+    sequencing_groups: list[SequencingGroupSizeModel]

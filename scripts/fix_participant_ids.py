@@ -3,7 +3,7 @@ Small script to update external participant IDs
 """
 import json
 import click
-from sample_metadata.apis import ParticipantApi
+from metamist.apis import ParticipantApi
 
 
 @click.command()
