@@ -144,7 +144,7 @@ class WebDb(DbBase):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project']
+        wheres = ['s.project = :project', 's.active']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:
@@ -168,7 +168,7 @@ class WebDb(DbBase):
             wheres.append(q)
             values[key] = self.escape_like_term(value) + '%'
         if wheres:
-            where_str = 'WHERE ' + ' AND '.join(wheres) + ' AND s.active'
+            where_str = 'WHERE ' + ' AND '.join(wheres)
 
         # Skip 'limit' and 'after' SQL commands so we can get all samples that match the query to determine
         # the total count, then take the selection of samples for the current page.
