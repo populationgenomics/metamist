@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { ProjectSummaryResponse } from '../../sm-api/api'
+import { ProjectSummary } from '../../sm-api/api'
 
 interface TotalStatsProps {
-    summary: Partial<ProjectSummaryResponse>
+    summary: Partial<ProjectSummary>
 }
 
 const TotalsStats: React.FunctionComponent<TotalStatsProps> = ({ summary }) => {
@@ -19,9 +19,9 @@ const TotalsStats: React.FunctionComponent<TotalStatsProps> = ({ summary }) => {
             {'    '}
             {summary?.total_samples}
             <br />
-            <b>Total Sequences: </b>
+            <b>Total Sequencing Groups: </b>
             {'    '}
-            {summary?.total_sequences}
+            {summary?.total_sequencing_groups}
             <br />
         </>
     )

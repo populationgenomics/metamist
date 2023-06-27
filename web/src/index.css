@@ -136,6 +136,15 @@ blockquote {
     width: 100% !important;
 }
 
+.projectSummaryGrid::after {
+    content: '';
+    display: block;
+    position: absolute;
+    right: -80px;
+    width: 80px;
+    height: 1px;
+}
+
 html[data-theme='dark-mode'] .ui.styled.accordion {
     box-shadow: 0 1px 2px 0 rgba(84, 84, 84, 0.87), 0 0 0 1px rgba(84, 84, 84, 0.87);
 }
