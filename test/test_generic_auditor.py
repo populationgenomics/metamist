@@ -1,7 +1,9 @@
 from collections import namedtuple
 import unittest
 from unittest.mock import MagicMock, patch
-from metamist.audit.generic_auditor import GenericAuditor
+import api.graphql.schema
+from metamist.audit.generic_auditor import GenericAuditor, SAMPLE_ANALYSIS_QUERY
+from metamist.graphql import validate, configure_sync_client
 
 # pylint: disable=dangerous-default-value
 # noqa: B006
@@ -9,6 +11,19 @@ from metamist.audit.generic_auditor import GenericAuditor
 
 class TestGenericAuditor(unittest.TestCase):
     """Test the audit helper functions"""
+
+    def test_queries(self):
+        """
+        We have the luxury of getting the schema directly, so we can validate
+        the current development version! Oustide metamist, you'd just leave the
+        schema option blank, and it would fetch the schema from the server.
+        """
+
+        # only need to apply schema to the first client to create, then it gets cached
+        client = configure_sync_client(
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+        )
+        validate(SAMPLE_ANALYSIS_QUERY, client=client)
 
     @patch('metamist.audit.generic_auditor.query')
     def test_get_participant_data_for_dataset(self, mock_query):

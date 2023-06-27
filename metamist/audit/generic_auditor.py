@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from metamist.audit.audithelper import AuditHelper
-from metamist.graphql import query
+from metamist.graphql import query, gql
 
 
 ANALYSIS_TYPES = [
@@ -39,7 +39,8 @@ EXCLUDED_SAMPLES = [
     'CPG265876',
 ]
 
-PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
+PARTICIPANTS_SAMPLES_ASSAYS_QUERY = gql(
+    """
         query DatasetData($datasetName: String!) {
             project(name: $datasetName) {
                 participants {
@@ -48,18 +49,23 @@ PARTICIPANTS_SAMPLES_SEQUENCES_QUERY = """
                     samples {
                         id
                         externalId
-                        sequences {
+                        sequencingGroups {
                             id
-                            meta
                             type
+                            assays {
+                                id
+                                meta
+                            }
                         }
                     }
                 }
             }
         }
         """
+)
 
-SAMPLE_ANALYSIS_QUERY = """
+SAMPLE_ANALYSIS_QUERY = gql(
+    """
         query sampleCrams($sampleId: String!, $analysisType: AnalysisType!) {
           sample(id: $sampleId) {
             analyses(status: COMPLETED, type: $analysisType) {
@@ -71,16 +77,17 @@ SAMPLE_ANALYSIS_QUERY = """
           }
         }
 """
+)
 
 # Variable type definitions
-SequenceId = int
+AssayId = int
 SampleId = str
 SampleExternalId = str
 ParticipantExternalId = str
 
-SequenceReportEntry = namedtuple(
-    'SequenceReportEntry',
-    'sample_id sequence_id sequence_file_path analysis_ids filesize',
+AssayReportEntry = namedtuple(
+    'AssayReportEntry',
+    'sample_id assay_id assay_file_path analysis_ids filesize',
 )
 
 
@@ -111,23 +118,21 @@ class GenericAuditor(AuditHelper):
         """
         Uses a graphQL query to return all participants in a Metamist dataset.
         Nested in the return are all samples associated with the participants,
-        and then all the sequences associated with those samples.
+        and then all the assays associated with those samples.
         """
 
-        participant_data = query(   # pylint: disable=unsubscriptable-object
-            PARTICIPANTS_SAMPLES_SEQUENCES_QUERY, {'datasetName': self.dataset}
+        participant_data = query(  # pylint: disable=unsubscriptable-object
+            PARTICIPANTS_SAMPLES_ASSAYS_QUERY, {'datasetName': self.dataset}
         )['project']['participants']
 
         # Filter out any participants with no samples and log any found
         for participant in participant_data:
-            if not participant.get('samples'):
+            if not participant['samples']:
                 logging.info(
-                    f'{self.dataset} :: Filtering participant {participant.get("id")} ({participant.get("externalId")}) it has no samples.'
+                    f'{self.dataset} :: Filtering participant {participant["id"]} ({participant["externalId"]}) it has no samples.'
                 )
         participant_data = [
-            participant
-            for participant in participant_data
-            if participant.get('samples')
+            participant for participant in participant_data if participant['samples']
         ]
 
         return participant_data
@@ -144,16 +149,15 @@ class GenericAuditor(AuditHelper):
 
         # Create mapping of participant external ID to sample ID
         participant_eid_sample_id_map = {
-            participant.get('externalId'): [
-                sample.get('id') for sample in participant.get('samples')
+            participant['externalId']: [
+                sample['id'] for sample in participant['samples']
             ]
             for participant in participants
         }
 
         # Create mapping of participant external ID to internal ID
         participant_eid_to_iid = {
-            participant.get('externalId'): participant.get('id')
-            for participant in participants
+            participant['externalId']: participant['id'] for participant in participants
         }
 
         # Report if any participants have more than one sample ID
@@ -178,10 +182,7 @@ class GenericAuditor(AuditHelper):
         """
         # Create a list of dictionaries, each mapping a sample ID to its external ID
         samples_all = [
-            {
-                sample.get('id'): sample.get('externalId')
-                for sample in participant['samples']
-            }
+            {sample['id']: sample['externalId'] for sample in participant['samples']}
             for participant in participants
         ]
 
@@ -195,81 +196,75 @@ class GenericAuditor(AuditHelper):
 
         return sample_internal_external_id_map
 
-    def get_sequence_map_from_participants(
+    def get_assay_map_from_participants(
         self, participants: list[dict]
     ) -> tuple[dict[Any, Any], dict[Any, list[tuple[Any, Any]]]]:
         """
         Input the list of Metamist participant dictionaries from the master graphql Query
 
         Returns dictionary mappings:
-        {sequence_id : sample_internal_id}, and {sequence_id : (sequence_filepath, sequence_filesize)}
+        {assay_id : sample_internal_id}, and {assay_id : (read_filepath, read_filesize)}
         """
-        all_sequences = [
+        all_sequencinggroups = [
             {
-                sample.get('id'): sample.get('sequences')
-                for sample in participant.get('samples')
+                sample['id']: sample['sequencingGroups']
+                for sample in participant['samples']
             }
             for participant in participants
         ]
 
-        seq_id_sample_id_map = {}
-        # multiple reads per sequence is possible so use defaultdict(list)
-        sequence_filepaths_filesizes = defaultdict(list)
-        for sample_sequence in all_sequences:  # pylint: disable=R1702
-            sample_internal_id = list(sample_sequence.keys())[
+        assay_id_sample_id_map = {}
+        # multiple reads per assay is possible so use defaultdict(list)
+        assay_filepaths_filesizes = defaultdict(list)
+        for sample_sequencinggroup in all_sequencinggroups:  # pylint: disable=R1702
+            sample_internal_id = list(sample_sequencinggroup.keys())[
                 0
             ]  # Extract the sample ID
-            for sequences in sample_sequence.values():
-                for sequence in sequences:
-                    if not sequence.get('type').lower() in self.sequencing_type:
+            for sequencinggroups in sample_sequencinggroup.values():
+                for sg in sequencinggroups:
+                    if not sg['type'].lower() in self.sequencing_type:
                         continue
-                    meta = sequence.get('meta')
-                    reads = meta.get('reads')
-                    seq_id_sample_id_map[sequence.get('id')] = sample_internal_id
-                    if not reads:
-                        logging.info(
-                            f'Sample {sample_internal_id} has no sequence reads'
-                        )
-                        continue
-                    # support up to three levels of nesting, because:
-                    #
-                    #   - reads is typically an array
-                    #       - handle the case where it's not an array
-                    #   - fastqs exist in pairs.
-                    # eg:
-                    #   - reads: cram   # this shouldn't happen, but handle it anyway
-                    #   - reads: [cram1, cram2]
-                    #   - reads: [[fq1_forward, fq1_back], [fq2_forward, fq2_back]]
-                    if isinstance(reads, dict):
-                        sequence_filepaths_filesizes[sequence.get('id')].append(
-                            (reads.get('location'), reads.get('size'))
-                        )
-                        continue
-                    if not isinstance(reads, list):
-                        logging.error(f'Invalid read type: {type(reads)}: {reads}')
-                        continue
-                    for read in reads:
-                        if isinstance(read, list):
-                            for inner_read in read:
-                                if not isinstance(inner_read, dict):
-                                    logging.error(
-                                        f'Got {type(inner_read)} read, expected dict: {inner_read}'
-                                    )
-                                    continue
-                                sequence_filepaths_filesizes[sequence.get('id')].append(
-                                    (inner_read.get('location'), inner_read.get('size'))
-                                )
-                        else:
-                            if not isinstance(read, dict):
-                                logging.error(
-                                    f'Got {type(read)} read, expected dict: {read}'
-                                )
-                                continue
-                            sequence_filepaths_filesizes[sequence.get('id')].append(
-                                (read.get('location'), read.get('size'))
-                            )
+                    for assay in sg['assays']:
+                        assay_id_sample_id_map[assay['id']] = sample_internal_id
+                        meta = assay['meta']
+                        reads = meta.get('reads')
 
-        return seq_id_sample_id_map, sequence_filepaths_filesizes
+                        if not reads:
+                            # No reads in the assay
+                            logging.info(
+                                f'Sample {sample_internal_id} has no assay reads'
+                            )
+                            continue
+
+                        if isinstance(reads, dict):
+                            # One read in the assay
+                            assay_filepaths_filesizes[assay['id']].append(
+                                (reads.get('location'), reads.get('size'))
+                            )
+                            continue
+
+                        for read in reads:
+                            # Multiple reads in the assay
+                            # TODO is the below necessary or should we just keep what's below the 'else:'
+                            if isinstance(read, list):
+                                for inner_read in read:
+                                    if not isinstance(inner_read, dict):
+                                        logging.error(
+                                            f'Got {type(inner_read)} read, expected dict: {inner_read}'
+                                        )
+                                        continue
+                                    assay_filepaths_filesizes[assay['id']].append(
+                                        (
+                                            inner_read.get('location'),
+                                            inner_read.get('size'),
+                                        )
+                                    )
+                            else:
+                                assay_filepaths_filesizes[assay['id']].append(
+                                    (read.get('location'), read.get('size'))
+                                )
+
+        return assay_id_sample_id_map, assay_filepaths_filesizes
 
     def get_analysis_cram_paths_for_dataset_samples(
         self,
@@ -284,13 +279,13 @@ class GenericAuditor(AuditHelper):
         analyses = []
         for sample in sample_ids:
             analyses.extend(
-                query(   # pylint: disable=unsubscriptable-object
+                query(  # pylint: disable=unsubscriptable-object
                     SAMPLE_ANALYSIS_QUERY, {'sampleId': sample, 'analysisType': 'CRAM'}
                 )['sample']['analyses']
             )
-        # Report any crams missing the sequence type
+        # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
-            analysis.get('id')
+            analysis['id']
             for analysis in analyses
             if 'sequencing_type' not in analysis['meta']
         ]
@@ -299,7 +294,7 @@ class GenericAuditor(AuditHelper):
                 f'CRAMs from dataset {self.dataset} did not have sequencing_type: {crams_with_missing_seq_type}'
             )
 
-        # Filter the analyses based on input sequence type
+        # Filter the analyses based on input sequencing type
         analyses = [
             analysis
             for analysis in analyses
@@ -324,7 +319,7 @@ class GenericAuditor(AuditHelper):
                 # Try getting the sample ID from the 'sample' meta field
                 sample_id = analysis.get('meta')['sample']
                 logging.warning(
-                    f'Analysis: {analysis.get("id")} missing "sample_ids" field. Using analysis["meta"].get("sample") instead.'
+                    f'{self.dataset} Analysis: {analysis.get("id")} missing "sample_ids" field. Using analysis["meta"].get("sample") instead.'
                 )
 
             sample_cram_paths[sample_id].update(
@@ -336,9 +331,7 @@ class GenericAuditor(AuditHelper):
     def analyses_for_samples_without_crams(self, samples_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
 
-        all_sample_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(
-            list
-        )
+        all_sample_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
         analyses = []
         for analysis_type in ANALYSIS_TYPES:
@@ -432,80 +425,80 @@ class GenericAuditor(AuditHelper):
 
         return {'complete': completed_samples, 'incomplete': list(incomplete_samples)}
 
-    async def check_for_uningested_or_moved_sequences(  # pylint: disable=R0914
+    async def check_for_uningested_or_moved_assays(  # pylint: disable=R0914
         self,
         bucket_name: str,
-        sequence_filepaths_filesizes: dict[int, list[tuple[str, int]]],
+        assay_filepaths_filesizes: dict[int, list[tuple[str, int]]],
         completed_samples: dict[str, list[int]],
-        seq_id_sample_id_map: dict[int, str],
+        assay_id_sample_id_map: dict[int, str],
         sample_id_internal_external_map: dict[str, str],
     ):
         """
-        Compares the sequences in a Metamist dataset to the sequences in the main-upload bucket
+        Compares the assays in a Metamist dataset to the assays in the main-upload bucket
 
-        Input: The dataset name, the {sequence_id : read_paths} mapping, the sequence file types,
+        Input: The dataset name, the {assay_id : read_paths} mapping, the assay file types,
                and the sample internal -> external ID mapping.
-        Returns: 1. Paths to sequences that have not yet been ingested - checks if any completed
+        Returns: 1. Paths to assays that have not yet been ingested - checks if any completed
                     sample external IDs are in the filename and includes this in output.
-                 2. A dict mapping sequence IDs to GS filepaths that have been ingested,
+                 2. A dict mapping assay IDs to GS filepaths that have been ingested,
                     but where the path in the bucket is different to the path for this
-                    sequence in Metamist. If the filenames and file sizes match,
-                    these are identified as sequence files that have been moved from
+                    assay in Metamist. If the filenames and file sizes match,
+                    these are identified as assay files that have been moved from
                     their original location to a new location.
                  3. The paths saved in metamist for the read data that has been moved. These paths go nowhere.
         """
-        # Get all the paths to sequence data anywhere in the main-upload bucket
-        sequence_paths_in_bucket = self.find_sequence_files_in_gcs_bucket(
+        # Get all the paths to assay data anywhere in the main-upload bucket
+        assay_paths_in_bucket = self.find_assay_files_in_gcs_bucket(
             bucket_name, self.file_types
         )
 
-        # Flatten all the Metamist sequence file paths and sizes into a single list
-        sequence_paths_sizes_in_metamist: list[tuple[str, int]] = []
-        for sequence in sequence_filepaths_filesizes.values():
-            sequence_paths_sizes_in_metamist.extend(sequence)
+        # Flatten all the Metamist assay file paths and sizes into a single list
+        assay_paths_sizes_in_metamist: list[tuple[str, int]] = []
+        for assay in assay_filepaths_filesizes.values():
+            assay_paths_sizes_in_metamist.extend(assay)
 
         # Find the paths that exist in the bucket and not in metamist
-        sequence_paths_in_metamist = [
-            path_size[0] for path_size in sequence_paths_sizes_in_metamist
+        assay_paths_in_metamist = [
+            path_size[0] for path_size in assay_paths_sizes_in_metamist
         ]
-        uningested_sequence_paths = set(sequence_paths_in_bucket).difference(
-            set(sequence_paths_in_metamist)
+        uningested_assay_paths = set(assay_paths_in_bucket).difference(
+            set(assay_paths_in_metamist)
         )
         # These metamist paths lead nowhere so we can go ahead and ignore them
-        metamist_paths_to_nowhere = set(sequence_paths_in_metamist).difference(
-            set(sequence_paths_in_bucket)
+        metamist_paths_to_nowhere = set(assay_paths_in_metamist).difference(
+            set(assay_paths_in_bucket)
         )
 
         # Strip the metamist paths into just filenames
         # Map each file name to its file size and path
-        metamist_sequence_file_size_map = {
+        metamist_assay_file_size_map = {
             os.path.basename(path_size[0]): path_size[1]
-            for path_size in sequence_paths_sizes_in_metamist
+            for path_size in assay_paths_sizes_in_metamist
         }
-        metamist_sequence_file_path_map = {
+        metamist_assay_file_path_map = {
             os.path.basename(path_size[0]): path_size[0]
-            for path_size in sequence_paths_sizes_in_metamist
+            for path_size in assay_paths_sizes_in_metamist
         }
 
         # Identify if any paths are to files that have actually just been moved by checking if they are in the bucket but not metamist
         ingested_and_moved_filepaths = []
-        new_sequence_path_sizes = {}
-        for path in uningested_sequence_paths:
+        new_assay_path_sizes = {}
+        for path in uningested_assay_paths:
             filename = os.path.basename(path)
             # If the file in the bucket has the exact same name and size as one in metamist, assume its the same
-            if filename in metamist_sequence_file_size_map.keys():
+            if filename in metamist_assay_file_size_map.keys():
                 filesize = await self.file_size(path)
-                if filesize == metamist_sequence_file_size_map.get(filename):
+                if filesize == metamist_assay_file_size_map.get(filename):
                     ingested_and_moved_filepaths.append(
-                        (path, metamist_sequence_file_path_map.get(filename))
+                        (path, metamist_assay_file_path_map.get(filename))
                     )
-                    new_sequence_path_sizes[path] = filesize
+                    new_assay_path_sizes[path] = filesize
         logging.info(
             f'Found {len(ingested_and_moved_filepaths)} ingested files that have been moved'
         )
 
         # If the file has just been moved, we consider it ingested
-        uningested_sequence_paths -= {
+        uningested_assay_paths -= {
             bucket_path for bucket_path, _ in ingested_and_moved_filepaths
         }
 
@@ -513,104 +506,105 @@ class GenericAuditor(AuditHelper):
         # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
         # but not ingested, such as bams and vcfs.
         uningested_reads: dict[str, list[tuple[str, str]]] = defaultdict(
-            list, {k: [] for k in uningested_sequence_paths}
+            list, {k: [] for k in uningested_assay_paths}
         )
         for sample_id, analysis_ids in completed_samples.items():
             try:
                 sample_ext_id = sample_id_internal_external_map[sample_id]
-                for uningested_sequence in uningested_sequence_paths:
-                    if sample_ext_id not in uningested_sequence:
+                for uningested_assay in uningested_assay_paths:
+                    if sample_ext_id not in uningested_assay:
                         continue
-                    uningested_reads[uningested_sequence].append(
-                        (sample_id, sample_ext_id))
+                    uningested_reads[uningested_assay].append(
+                        (sample_id, sample_ext_id)
+                    )
             except KeyError:
                 logging.warning(
                     f'{sample_id} from analyses: {analysis_ids} not found in sample map.'
                 )
 
-        # flip the sequence id : reads mapping to identify sequence IDs by their read paths
-        reads_sequences = {}
-        for sequence_id, reads_sizes in sequence_filepaths_filesizes.items():
+        # flip the assay id : reads mapping to identify assay IDs by their read paths
+        reads_assays = {}
+        for assay_id, reads_sizes in assay_filepaths_filesizes.items():
             for read_size in reads_sizes:
-                reads_sequences[read_size[0]] = sequence_id
+                reads_assays[read_size[0]] = assay_id
 
-        # Collect the sequences for files that have been ingested and moved to a different bucket location
-        sequences_moved_paths = []
+        # Collect the assays for files that have been ingested and moved to a different bucket location
+        assays_moved_paths = []
         for bucket_path, metamist_path in ingested_and_moved_filepaths:
-            seq_id = reads_sequences.get(metamist_path)
-            sample_id = seq_id_sample_id_map.get(seq_id)
+            assay_id = reads_assays.get(metamist_path)
+            sample_id = assay_id_sample_id_map.get(assay_id)
             analysis_ids = completed_samples.get(sample_id)
             if sample_id not in EXCLUDED_SAMPLES:
-                filesize = new_sequence_path_sizes[bucket_path]
-                sequences_moved_paths.append(
-                    SequenceReportEntry(
+                filesize = new_assay_path_sizes[bucket_path]
+                assays_moved_paths.append(
+                    AssayReportEntry(
                         sample_id=sample_id,
-                        sequence_id=seq_id,
-                        sequence_file_path=bucket_path,
+                        assay_id=assay_id,
+                        assay_file_path=bucket_path,
                         analysis_ids=analysis_ids,
                         filesize=filesize,
                     )
                 )
 
-        return uningested_reads, sequences_moved_paths, metamist_paths_to_nowhere
+        return uningested_reads, assays_moved_paths, metamist_paths_to_nowhere
 
     async def get_reads_to_delete_or_ingest(
         self,
         bucket_name: str,
         completed_samples: dict[str, list[int]],
-        sequence_filepaths_filesizes: dict[int, list[tuple[str, int]]],
+        assay_filepaths_filesizes: dict[int, list[tuple[str, int]]],
         seq_id_sample_id_map: dict[int, str],
         sample_id_internal_external_map: dict[str, str],
     ) -> tuple[list, list]:
         """
         Inputs: 1. List of samples which have completed CRAMs
-                2. Dictionary mapping of sequence IDs to sequence file paths and file sizes
-                3. Dictionary mapping sample IDs to sequence IDs
-                4. Dictionary mapping sequence IDs to sample IDs
-        Returns a tuple of two lists, each containing sequences IDs and sequence file paths.
+                2. Dictionary mapping of assay IDs to assay file paths and file sizes
+                3. Dictionary mapping sample IDs to assay IDs
+                4. Dictionary mapping assay IDs to sample IDs
+        Returns a tuple of two lists, each containing assays IDs and assay file paths.
         The first containins reads which can be deleted, the second containing reads to ingest.
-        The sample ID, sequence ID, and analysis ID (of completed cram) are included in the delete list.
+        The sample ID, assay ID, and analysis ID (of completed cram) are included in the delete list.
         """
-        # Check for uningested sequence data that may be hiding or sequence data that has been moved
+        # Check for uningested assay data that may be hiding or assay data that has been moved
         (
             reads_to_ingest,
-            moved_sequences_to_delete,
+            moved_assays_to_delete,
             metamist_paths_to_nowhere,
-        ) = await self.check_for_uningested_or_moved_sequences(
+        ) = await self.check_for_uningested_or_moved_assays(
             bucket_name,
-            sequence_filepaths_filesizes,
+            assay_filepaths_filesizes,
             completed_samples,
             seq_id_sample_id_map,
             sample_id_internal_external_map,
         )
 
-        # Create a mapping of sample ID: sequence ID - use defaultdict in case a sample has several sequences
-        sample_id_seq_id_map: dict[str, list[int]] = defaultdict(list)
-        for sequence, sample in seq_id_sample_id_map.items():
-            sample_id_seq_id_map[sample].append(sequence)
+        # Create a mapping of sample ID: assay ID - use defaultdict in case a sample has several assays
+        sample_id_assay_id_map: dict[str, list[int]] = defaultdict(list)
+        for assay, sample in seq_id_sample_id_map.items():
+            sample_id_assay_id_map[sample].append(assay)
 
-        sequence_reads_to_delete = []
+        assay_reads_to_delete = []
         for sample_id, analysis_ids in completed_samples.items():
             if sample_id in EXCLUDED_SAMPLES:
                 continue
-            seq_ids = sample_id_seq_id_map[sample_id]
-            for seq_id in seq_ids:
-                seq_read_paths = sequence_filepaths_filesizes[seq_id]
-                for path, size in seq_read_paths:
+            assay_ids = sample_id_assay_id_map[sample_id]
+            for assay_id in assay_ids:
+                assay_read_paths = assay_filepaths_filesizes[assay_id]
+                for path, size in assay_read_paths:
                     if path in metamist_paths_to_nowhere:
                         continue
                     filesize = size
-                    sequence_reads_to_delete.append(
-                        SequenceReportEntry(
+                    assay_reads_to_delete.append(
+                        AssayReportEntry(
                             sample_id=sample_id,
-                            sequence_id=seq_id,
-                            sequence_file_path=path,
+                            assay_id=assay_id,
+                            assay_file_path=path,
                             analysis_ids=analysis_ids,
                             filesize=filesize,
                         )
                     )
 
-        reads_to_delete = sequence_reads_to_delete + moved_sequences_to_delete
+        reads_to_delete = assay_reads_to_delete + moved_assays_to_delete
 
         return reads_to_delete, reads_to_ingest
 
@@ -624,11 +618,11 @@ class GenericAuditor(AuditHelper):
         uningested read files. This may turn up results for cases where multiple read types
         have been provided for a sample, but only one type was ingested and used for alignment.
         """
-        possible_sequence_ingests = []
-        for sequence_path, samples in reads_to_ingest.items():
+        possible_assay_ingests = []
+        for assay_path, samples in reads_to_ingest.items():
             if not samples:
                 # If no samples detected in filename, add the path in an empty tuple
-                possible_sequence_ingests.append((sequence_path, '', '', 0, ''))
+                possible_assay_ingests.append((assay_path, '', '', 0, ''))
                 continue
             for sample in samples:
                 # Else get the completed CRAM analysis ID and path for the sample
@@ -636,9 +630,9 @@ class GenericAuditor(AuditHelper):
                 sample_cram = sample_cram_paths[sample_internal_id]
                 analysis_id = int(list(sample_cram.keys())[0])
                 cram_path = sample_cram[analysis_id]
-                possible_sequence_ingests.append(
+                possible_assay_ingests.append(
                     (
-                        sequence_path,
+                        assay_path,
                         sample_ext_id,
                         sample_internal_id,
                         analysis_id,
@@ -646,4 +640,4 @@ class GenericAuditor(AuditHelper):
                     )
                 )
 
-        return possible_sequence_ingests
+        return possible_assay_ingests
