@@ -6,9 +6,9 @@ import sys
 from collections import defaultdict
 import click
 
-from sample_metadata.apis import FamilyApi, ImportApi
-from sample_metadata.parser.generic_metadata_parser import run_as_sync
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
+from metamist.apis import FamilyApi, ImportApi
+from metamist.parser.generic_metadata_parser import run_as_sync
+from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 from redcap_parsing_utils import (
     PEDFILE_HEADERS,
