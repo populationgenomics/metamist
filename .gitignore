@@ -47,3 +47,13 @@ coverage/
 
 web/schema.graphql
 web/src/__generated__
+
+# local files to ignore
+metadata_to_ingest/
+data_management_scripts/
+*.ipynb
+*.csv
+*.xlsx
+.ipynb_checkpoints/
+scripts/.ipynb_checkpoints/
+scripts/eds_scripts
