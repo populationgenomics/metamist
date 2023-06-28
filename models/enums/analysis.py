@@ -1,20 +1,6 @@
 from enum import Enum
 
 
-class AnalysisType(Enum):
-    """Types of analysis"""
-
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    CUSTOM = 'custom'
-    ES_INDEX = 'es-index'
-    SV = 'sv'
-    WEB_REPORT = 'web'
-    ANALYSIS_RUNNER = 'analysis-runner'
-
-
 class AnalysisStatus(Enum):
     """Status that an analysis can be run"""
 

@@ -432,13 +432,14 @@
 		</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2023-01-25_">
-		    <renameColumn
-				columnDataType="VARCHAR(255)"
-				newColumnName="read_group_name"
-				oldColumnName="read_secret_name"
-				remarks="Migration of groups membership cache to blobs"
-				tableName="project"
-			/>
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<renameColumn
+			columnDataType="VARCHAR(255)"
+			newColumnName="read_group_name"
+			oldColumnName="read_secret_name"
+			remarks="Migration of groups membership cache to blobs"
+			tableName="project"
+		/>
 		<renameColumn
 				columnDataType="VARCHAR(255)"
 				newColumnName="write_group_name"
@@ -454,6 +455,244 @@
 			UPDATE project SET
 			read_group_name=SUBSTRING(read_group_name, 1, LENGTH(read_group_name) - 14),
 			write_group_name=SUBSTRING(write_group_name, 1, LENGTH(write_group_name) - 14)
+		</sql>
+	</changeSet>
+
+	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+
+<!--		Instead of ENUMs, make some fields FKs -->
+		<createTable tableName="assay_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_technology">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_platform">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sample_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="analysis_type">
+			<column name="id" type="VARCHAR(255)">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+<!--		Create assay table linking to assay_type FK-->
+		<createTable tableName="assay">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_ASSAY" references="sample(id)"/>
+			</column>
+			<column name="type" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_TYPE" references="assay_type(id)"/>
+			</column>
+			<column name="meta" type="json" />
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="assay_external_id">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_PROJECT" references="project(id)" />
+			</column>
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY" references="assay(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints unique="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+
+		</createTable>
+		<addPrimaryKey
+				columnNames="assay_id,name"
+				constraintName="PK_ASSAY_EXTERNAL_ID"
+				tableName="assay_external_id"
+				validate="true"
+		/>
+		<addUniqueConstraint
+			columnNames="project,external_id"
+			tableName="assay_external_id"
+			constraintName="UK_PROJECT_ASSAY_EXTERNAL_ID"
+			validate="true"
+		/>
+
+<!--		Create sequencing_group tables -->
+		<createTable tableName="sequencing_group">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+<!--			<column name="project" type="INT">-->
+<!--				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />-->
+<!--			</column>-->
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
+			</column>
+			<column name="type" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_type" references="sequencing_type(id)"/>
+			</column>
+			<column name="technology" type="VARCHAR(255)">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_technology" references="sequencing_technology(id)"/>
+			</column>
+			<column name="platform" type="VARCHAR(255)">
+<!--				<constraints nullable="true" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>-->
+			</column>
+			<column name="meta" type="JSON" />
+			<column name="archived" type="BOOLEAN" />
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+		<createTable tableName="sequencing_group_assay">
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id" references="sequencing_group(id)" />
+			</column>
+			<column name="assay_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id" references="assay(id)" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+
+<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
+			You make a combined key, with one of the fields only NOT NULL when the row should participant in the check.
+			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow multiple
+			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
+		<createTable tableName="sequencing_group_external_id">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_sequencing_group_id" references="sequencing_group(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+					<constraints nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="nullIfInactive" type="BIT" defaultValue="true">
+				<constraints nullable="true" />
+			</column>
+		</createTable>
+		<addUniqueConstraint
+			columnNames="project,external_id,nullIfInactive"
+			tableName="sequencing_group_external_id"
+			constraintName="UK_SEQUENCING_GROUP_EXTERNALID"
+			validate="true"
+		/>
+
+<!-- 		Replaces the analysis_sample table.
+			We cannot delete the old table, so it's around for legacy purposes. -->
+		<createTable tableName="analysis_sequencing_group">
+			<column name="analysis_id" type="INT">
+				<constraints
+						nullable="false"
+						foreignKeyName="FK_ANALYSIS_SQG_ANALYSIS"
+						references="analysis(id)"/>
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints
+						nullable="false"
+						foreignKeyName="FK_ANALYSIS_SQG_SEQUENCING_GROUP"
+						references="sequencing_group(id)"
+				/>
+			</column>
+		</createTable>
+
+
+<!--		Default data -->
+
+		<sql>
+
+			ALTER TABLE assay ADD SYSTEM VERSIONING;
+			ALTER TABLE assay_external_id ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group_assay ADD SYSTEM VERSIONING;
+			ALTER TABLE sequencing_group_external_id ADD SYSTEM VERSIONING;
+			ALTER TABLE analysis_sequencing_group ADD SYSTEM VERSIONING;
+
+			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
+
+			INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
+			INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva');
+
+			INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
+			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
+			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
+			INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
+			INSERT INTO sequencing_type (id, name) VALUES ('chip', 'chip');
+
+			INSERT INTO sequencing_technology (id, name) VALUES ('short-read', 'short-read');
+			INSERT INTO sequencing_technology (id, name) VALUES ('long-read', 'long-read');
+			INSERT INTO sequencing_technology (id, name) VALUES ('single-cell-rna-seq', 'single-cell-rna-seq');
+			INSERT INTO sequencing_technology (id, name) VALUES ('bulk-rna-seq', 'bulk-rna-seq');
+
+			INSERT INTO sequencing_platform (id, name) VALUES ('illumina', 'illumina');
+			INSERT INTO sequencing_platform (id, name) VALUES ('pacbio', 'pacbio');
+			INSERT INTO sequencing_platform (id, name) VALUES ('oxford-nanopore', 'oxford-nanopore');
+
+			INSERT INTO analysis_type (id, name) VALUES ('qc', 'qc');
+			INSERT INTO analysis_type (id, name) VALUES ('joint-calling', 'joint-calling');
+			INSERT INTO analysis_type (id, name) VALUES ('gvcf', 'gvcf');
+			INSERT INTO analysis_type (id, name) VALUES ('cram', 'cram');
+			INSERT INTO analysis_type (id, name) VALUES ('custom', 'custom');
+			INSERT INTO analysis_type (id, name) VALUES ('es-index', 'es-index');
+			INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv');
+			INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
+			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 		</sql>
 	</changeSet>
 

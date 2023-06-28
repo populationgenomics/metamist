@@ -8,4 +8,4 @@ coverage:
         paths:
           - "db"
           - "scripts"
-          - "sample_metadata/parser"
+          - "metamist/parser"

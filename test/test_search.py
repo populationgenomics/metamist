@@ -4,10 +4,15 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
 from db.python.layers.family import FamilyLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.family_participant import FamilyParticipantTable
 
-from models.enums import SampleType, SearchResponseType
-from models.models.sample import sample_id_format
+from models.enums import SearchResponseType
+from models.models.family import PedRowInternal
+from models.models.sample import sample_id_format, SampleUpsertInternal
+from models.models.participant import ParticipantUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal, sequencing_group_id_format
+from models.models.assay import AssayUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -22,6 +27,7 @@ class TestSample(DbIsolatedTest):
         self.slayer = SampleLayer(self.connection)
         self.player = ParticipantLayer(self.connection)
         self.flayer = FamilyLayer(self.connection)
+        self.sglayer = SequencingGroupLayer(self.connection)
 
     @run_as_sync
     async def test_search_non_existent_sample_by_internal_id(self):
@@ -38,8 +44,10 @@ class TestSample(DbIsolatedTest):
         Search by CPG sample ID that you do not have access to
         Mock this in testing by limiting scope to non-existent project IDs
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
-        cpg_id = sample_id_format(sample_id)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type='blood')
+        )
+        cpg_id = sample_id_format(sample.id)
 
         results = await self.schlay.search(
             query=cpg_id, project_ids=[self.project_id + 1]
@@ -51,8 +59,10 @@ class TestSample(DbIsolatedTest):
         """
         Search by valid CPG sample ID (special case)
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
-        cpg_id = sample_id_format(sample_id)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type='blood')
+        )
+        cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
 
         self.assertEqual(1, len(results))
@@ -61,15 +71,58 @@ class TestSample(DbIsolatedTest):
         self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
 
     @run_as_sync
+    async def test_search_isolated_sequencing_group_by_id(self):
+        """
+        Search by valid CPG sequencing group ID (special case)
+        """
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EXS001', type='blood')
+        )
+        sg = await self.sglayer.upsert_sequencing_groups(
+            [
+                SequencingGroupUpsertInternal(
+                    sample_id=sample.id,
+                    technology='long-read',
+                    platform='illumina',
+                    meta={
+                        'sequencing_type': 'transcriptome',
+                        'sequencing_technology': 'long-read',
+                        'sequencing_platform': 'illumina',
+                    },
+                    type='transcriptome',
+                    assays=[
+                        AssayUpsertInternal(
+                            type='sequencing',
+                            meta={
+                                'sequencing_type': 'transcriptome',
+                                'sequencing_technology': 'long-read',
+                                'sequencing_platform': 'illumina',
+                            }
+                        )
+                    ]
+                )
+            ]
+        )
+        cpg_sg_id = sequencing_group_id_format(sg[0].id)
+        results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
+
+        self.assertEqual(1, len(results))
+        self.assertEqual(cpg_sg_id, results[0].title)
+        self.assertEqual(cpg_sg_id, results[0].data.id)
+        self.assertEqual(cpg_sg_id, results[0].data.sg_external_id)
+
+    @run_as_sync
     async def test_search_isolated_sample_by_external_id(self):
         """
         Search by External sample ID with no participant / family,
         should only return one result
         """
-        sample_id = await self.slayer.insert_sample('EX001', SampleType.BLOOD)
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(external_id='EX001', type='blood')
+        )
         results = await self.schlay.search(query='EX001', project_ids=[self.project_id])
 
-        cpg_id = sample_id_format(sample_id)
+        cpg_id = sample_id_format(sample.id)
 
         self.assertEqual(1, len(results))
         result = results[0]
@@ -85,13 +138,15 @@ class TestSample(DbIsolatedTest):
         Search participant w/ no family by External ID
         should only return one result
         """
-        p_id = await self.player.create_participant(external_id='PART01')
+        p = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='PART01')
+        )
         results = await self.schlay.search(
             query='PART01', project_ids=[self.project_id]
         )
         self.assertEqual(1, len(results))
         result = results[0]
-        self.assertEqual(p_id, result.data.id)
+        self.assertEqual(p.id, result.data.id)
         self.assertEqual('PART01', result.title)
         self.assertListEqual(['PART01'], result.data.participant_external_ids)
         self.assertListEqual([], result.data.family_external_ids)
@@ -120,23 +175,29 @@ class TestSample(DbIsolatedTest):
         """Create a number of resources, and search for all of them"""
         fptable = FamilyParticipantTable(self.connection)
 
-        p_id = await self.player.create_participant(external_id='X:PART01')
+        p = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='X:PART01')
+        )
         f_id = await self.flayer.create_family(external_id='X:FAM01')
         await fptable.create_rows(
             [
-                {
-                    'family_id': f_id,
-                    'participant_id': p_id,
-                    'paternal_participant_id': None,
-                    'maternal_participant_id': None,
-                    'affected': 0,
-                    'notes': None,
-                }
+                PedRowInternal(
+                    family_id=f_id,
+                    participant_id=p.id,
+                    paternal_id=None,
+                    maternal_id=None,
+                    affected=0,
+                    notes=None,
+                )
             ]
         )
 
-        s_id = await self.slayer.insert_sample(
-            'X:SAM001', SampleType.BLOOD, participant_id=p_id
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_id='X:SAM001',
+                sample_type='blood',
+                participant_id=p.id,
+            )
         )
 
         all_results = await self.schlay.search(
@@ -162,7 +223,7 @@ class TestSample(DbIsolatedTest):
         self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)
 
         # linked sample matches
-        cpg_id = sample_id_format(s_id)
+        cpg_id = sample_id_format(sample.id)
         self.assertEqual(cpg_id, sample_result.data.id)
         self.assertListEqual(['X:SAM001'], sample_result.data.sample_external_ids)
         self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)

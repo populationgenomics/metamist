@@ -14,12 +14,12 @@ from google.api_core.exceptions import NotFound
 
 from api.utils import group_by
 
-from sample_metadata.apis import AnalysisApi, ProjectApi
-from sample_metadata.model.analysis_query_model import AnalysisQueryModel
-from sample_metadata.model.analysis_update_model import AnalysisUpdateModel
-from sample_metadata.model.analysis_status import AnalysisStatus
-from sample_metadata.model.analysis_type import AnalysisType
-from sample_metadata.parser.generic_parser import chunk
+from metamist.apis import AnalysisApi, ProjectApi
+from metamist.model.analysis_query_model import AnalysisQueryModel
+from metamist.model.analysis_update_model import AnalysisUpdateModel
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.model.analysis_type import AnalysisType
+from metamist.parser.generic_parser import chunk
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -142,7 +142,7 @@ async def process_project(project: str):
     for updates in chunk(list(updaters.items())):
         promises = []
         for aid, aupdate in updates:
-            promises.append(aapi.update_analysis_status_async(aid, aupdate))
+            promises.append(aapi.update_analysis(aid, aupdate))
         await asyncio.gather(*promises)
 
     if missing_files:

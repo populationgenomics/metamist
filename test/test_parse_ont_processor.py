@@ -11,14 +11,18 @@ class TestOntSampleSheetParser(unittest.TestCase):
     """Test the TestOntSampleSheetParser"""
 
     @run_as_sync
-    @patch('sample_metadata.apis.SampleApi.get_sample_id_map_by_external')
-    @patch('sample_metadata.parser.cloudhelper.AnyPath')
-    async def test_single_row_all_files_exist(self, mock_anypath, mock_get_sample_id):
+    @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
+    @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
+    async def test_single_row_all_files_exist(
+        self, mock_filesize, mock_fileexists, mock_get_sample_id
+    ):
         """
         Test processing one row with all files existing
         """
         mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
-        mock_anypath.return_value.stat.return_value.st_size = 111
+        mock_filesize.return_value = 111
+        mock_fileexists.return_value = True
 
         rows = [
             'Experiment name,Sample ID,Alignment_file,Alignment_software,SV_file,SV_software,SNV_file,SNV_software,Indel_file,Indel_software',

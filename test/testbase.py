@@ -10,11 +10,13 @@ from functools import wraps
 
 from typing import Dict
 
+import nest_asyncio
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
-import nest_asyncio
 
-from api.settings import set_full_access
+from api.graphql.loaders import get_context  # type: ignore
+from api.graphql.schema import schema  # type: ignore
+from api.settings import set_all_access
 from db.python.connect import (
     ConnectionStringDatabaseConfiguration,
     Connection,
@@ -89,7 +91,7 @@ class DbTest(unittest.TestCase):
             """
             logger = logging.getLogger()
             try:
-                set_full_access(True)
+                set_all_access(True)
                 db = MySqlContainer('mariadb:10.8.3')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
@@ -134,9 +136,10 @@ class DbTest(unittest.TestCase):
                 ppt = ProjectPermissionsTable(
                     connection.connection, allow_full_access=True
                 )
-                await ppt.create_project(
-                    project_name='test',
-                    dataset_name='test',
+                cls.project_name = 'test'
+                cls.project_id = await ppt.create_project(
+                    project_name=cls.project_name,
+                    dataset_name=cls.project_name,
                     create_test_project=False,
                     author='testuser',
                     read_group_name='None',
@@ -170,7 +173,37 @@ class DbTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.project_id = 1
+        self.project_name = 'test'
         self.connection = self.connections[self.__class__.__name__]
+
+    @run_as_sync
+    async def run_graphql_query(self, query, variables=None):
+        """Run SYNC graphql query on internal database"""
+        return await self.run_graphql_query_async(query, variables=variables)
+
+    async def run_graphql_query_async(self, query, variables=None):
+        """Run ASYNC graphql query on internal database"""
+        if not isinstance(query, str):
+            # if the query was wrapped in a gql() call, unwrap it
+            try:
+                query = query.loc.source.body
+            except KeyError as exc:
+                # it obviously wasn't of type document
+                raise ValueError(
+                    f'Invalid test query (type: {type(query)}): {query}'
+                ) from exc
+
+        value = await schema.execute(
+            query,
+            variable_values=variables,
+            context_value=await get_context(
+                connection=self.connection,
+                request=None,   # pylint: disable
+            ),
+        )
+        if value.errors:
+            raise value.errors[0]
+        return value.data
 
 
 class DbIsolatedTest(DbTest):

@@ -17,13 +17,14 @@ DOCKER_IMAGE = os.getenv('SM_DOCKER')
 PORT = os.getenv('PORT', '8000')
 SCHEMA_URL = os.getenv('SM_SCHEMAURL', f'http://localhost:{PORT}/openapi.json')
 OPENAPI_COMMAND = os.getenv('OPENAPI_COMMAND', 'openapi-generator').split(' ')
-MODULE_NAME = 'sample_metadata'
+MODULE_NAME = 'metamist'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = 'web/src/static'
 OUTPUT_DOCS_DIR = os.path.join(STATIC_DIR, 'sm_docs')
+MODULE_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), MODULE_NAME)
 
 
 def check_if_server_is_accessible() -> bool:
@@ -166,6 +167,17 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
     shutil.rmtree(tmpdir)
 
 
+def generate_schema_file():
+    """
+    Generate schema file and place int he metamist/graphql/ directory
+    """
+    command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
+    schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
+
+    with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
+        f.write(schema)
+
+
 def copy_typescript_files_from(tmpdir):
     """Copy typescript files to web/src/sm-api/"""
     files_to_ignore = {
@@ -216,17 +228,16 @@ def copy_python_files_from(tmpdir):
     """
     Copy a selection of API files generated from openapi-generator:
 
-        FROM:   $tmpdir/sample_metadata
-        TO:     ./sample_metadata
+        FROM:   $tmpdir/metamist
+        TO:     ./metamist
 
-    This clears the ./sample_metadata folder except for 'files_to_ignore'.
+    This clears the ./metamist folder except for 'files_to_ignore'.
     """
 
-    files_to_ignore = {'README.md', 'parser'}
+    files_to_ignore = {'README.md', 'parser', 'graphql', 'audit'}
 
-    module_dir = MODULE_NAME.replace('.', '/')
-    dir_to_copy_to = module_dir  # should be relative to this script
-    dir_to_copy_from = os.path.join(tmpdir, module_dir)
+    dir_to_copy_to = MODULE_DIR  # should be relative to this script
+    dir_to_copy_from = os.path.join(tmpdir, MODULE_NAME)
 
     if not os.path.exists(dir_to_copy_to):
         raise FileNotFoundError(
@@ -277,8 +288,8 @@ def main():
     Generates installable python API using:
         - Start API server (if applicable);
         - Call openapi-generator to generate python API to temp folder;
-        - Empty the 'sample_metadata' folder (except for some files);
-        - Copy relevant files to 'sample_metadata' in CWD;
+        - Empty the 'metamist' folder (except for some files);
+        - Copy relevant files to 'metamist' in CWD;
         - Stop the server (if applicable)
 
     """
@@ -297,9 +308,10 @@ def main():
         )
         generate_api_and_copy('typescript-axios', copy_typescript_files_from)
 
+        generate_schema_file()
         shutil.copy(
             './resources/muck-the-duck.svg',
-            os.path.join(STATIC_DIR, 'muck-the-duck.svg'),
+            os.path.join('web/src', 'muck-the-duck.svg'),
         )
         shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
 

@@ -1,0 +1,64 @@
+.loadingScreen {
+    animation-name: loading;
+    animation-duration: 5s;
+    animation-timing-function: cubic-bezier(0.075, 0.82, 0.165, 1);
+    left: 0;
+    width: 50px;
+    position: sticky;
+    animation-iteration-count: infinite;
+}
+
+.loadingScreenBig {
+    position: static;
+}
+
+@keyframes loading {
+    0% {
+        left: 0%;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 0;
+    }
+
+    17% {
+        left: 0%;
+        opacity: 100%;
+    }
+
+    24% {
+        opacity: 0;
+    }
+
+    43% {
+        opacity: 0;
+    }
+
+    50% {
+        left: 50%;
+        opacity: 100%;
+    }
+
+    57% {
+        opacity: 0;
+    }
+
+    80% {
+        opacity: 0;
+    }
+
+    87% {
+        left: 100%;
+        opacity: 100%;
+    }
+
+    94% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 0;
+        left: 100%;
+    }
+}

@@ -3,7 +3,7 @@ from typing import List, Optional, Set, Any, Dict
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
-from models.models.family import Family
+from models.models.family import FamilyInternal
 
 
 class FamilyTable(DbBase):
@@ -32,7 +32,7 @@ class FamilyTable(DbBase):
 
     async def get_families(
         self, project: int = None, participant_ids: List[int] = None
-    ) -> List[Family]:
+    ) -> List[FamilyInternal]:
         """Get all families for some project"""
         _query = """
             SELECT id, external_id, description, coded_phenotype, project
@@ -61,14 +61,14 @@ class FamilyTable(DbBase):
         families = []
         for r in rows:
             if r['id'] not in seen:
-                families.append(Family.from_db(dict(r)))
+                families.append(FamilyInternal.from_db(dict(r)))
                 seen.add(r['id'])
 
         return families
 
     async def get_families_by_participants(
         self, participant_ids: list[int]
-    ) -> tuple[set[ProjectId], dict[int, list[Family]]]:
+    ) -> tuple[set[ProjectId], dict[int, list[FamilyInternal]]]:
         """Get families, keyed by participants"""
         if not participant_ids:
             return set(), {}
@@ -85,7 +85,7 @@ class FamilyTable(DbBase):
             drow = dict(row)
             pid = drow.pop('participant_id')
             projects.add(drow.get('project'))
-            ret_map[pid].append(Family.from_db(drow))
+            ret_map[pid].append(FamilyInternal.from_db(drow))
 
         return projects, ret_map
 
@@ -101,11 +101,11 @@ class FamilyTable(DbBase):
         row = await self.connection.fetch_one(
             _query, {'project': project or self.project, 'external_id': external_id}
         )
-        return Family.from_db(row)
+        return FamilyInternal.from_db(row)
 
     async def get_family_by_internal_id(
         self, family_id: int
-    ) -> tuple[ProjectId, Family]:
+    ) -> tuple[ProjectId, FamilyInternal]:
         """Get family (+ project) by internal ID"""
         _query = """
         SELECT id, external_id, description, coded_phenotype, project
@@ -115,7 +115,20 @@ class FamilyTable(DbBase):
         if not row:
             raise NotFoundError
         project = row['project']
-        return project, Family.from_db(row)
+        return project, FamilyInternal.from_db(row)
+
+    async def get_families_by_ids(
+        self, family_ids: list[int]
+    ) -> tuple[set[ProjectId], list[FamilyInternal]]:
+        """Get family (+ project) by internal ID"""
+        _query = """
+        SELECT id, external_id, description, coded_phenotype, project
+        FROM family WHERE id IN :fids
+        """
+        rows = list(await self.connection.fetch_all(_query, {'fids': family_ids}))
+        fams = [FamilyInternal.from_db(row) for row in rows]
+        project = set(f.project for f in fams)
+        return project, fams
 
     async def search(
         self, query, project_ids: list[ProjectId], limit: int = 5

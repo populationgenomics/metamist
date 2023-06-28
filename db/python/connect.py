@@ -1,5 +1,5 @@
 # pylint: disable=unused-import
-#
+# flake8: noqa
 """
 Code for connecting to Postgres database
 """
@@ -11,8 +11,9 @@ from typing import Optional
 
 import databases
 
+from api.settings import LOG_DATABASE_QUERIES
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import InternalError
+from db.python.utils import InternalError, NoOpAenter
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -22,9 +23,13 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'analysis',
     'participant',
     'sample',
-    'analysis_sample',
-    'sample_sequencing',
-    'sample_sequencing_eid',
+    'sequencing_group',
+    'assay',
+    'sequencing_group_assay',
+    'analysis_sequencing_group',
+    'assay_external_id',
+    'sequencing_group_external_id',
+    'analysis_sequencing_group',
     'family',
     'family_participant',
     'participant_phenotypes',
@@ -152,7 +157,9 @@ class SMConnections:
     def make_connection(config: DatabaseConfiguration):
         """Create connection from dbname"""
         # the connection string will prepare pooling automatically
-        return databases.Database(config.get_connection_string())
+        return databases.Database(
+            config.get_connection_string(), echo=LOG_DATABASE_QUERIES
+        )
 
     @staticmethod
     async def connect():
@@ -179,6 +186,7 @@ class SMConnections:
 
         conn = SMConnections.make_connection(credentials)
         await conn.connect()
+
         return conn
 
     @staticmethod

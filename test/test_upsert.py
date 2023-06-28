@@ -2,11 +2,221 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.layers.participant import (
     ParticipantLayer,
-    ParticipantUpsert,
-    ParticipantUpsertBody,
 )
-from db.python.layers.sample import SampleUpsert, SequenceUpsert
-from models.enums import SequenceType, SampleType, SequenceStatus, SequenceTechnology
+from models.models.participant import ParticipantUpsertInternal
+from models.models.sample import SampleUpsertInternal
+from models.models.sequencing_group import SequencingGroupUpsertInternal
+from models.models.assay import AssayUpsertInternal
+
+default_assay_meta = {
+    'sequencing_type': 'genome',
+    'sequencing_technology': 'short-read',
+    'sequencing_platform': 'illumina',
+}
+
+all_participants = [
+    ParticipantUpsertInternal(
+        external_id='Demeter',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id001',
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        assays=[
+                            AssayUpsertInternal(
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
+                                },
+                                type='sequencing',
+                            )
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        assays=[
+                            AssayUpsertInternal(
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id001.exome.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.exome.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.exome.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.exome.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
+                                },
+                                type='sequencing',
+                            )
+                        ],
+                    ),
+                ],
+                type='blood',
+            )
+        ],
+    ),
+    ParticipantUpsertInternal(
+        external_id='Apollo',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id002',
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        assays=[
+                            AssayUpsertInternal(
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id002.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id002.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id002.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id002.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
+                                },
+                                type='sequencing',
+                            )
+                        ],
+                    ),
+                ],
+                type='blood',
+            ),
+            SampleUpsertInternal(
+                external_id='sample_id004',
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        assays=[
+                            AssayUpsertInternal(
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id004.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id004.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id004.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id004.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
+                                },
+                                type='sequencing',
+                            )
+                        ],
+                    )
+                ],
+                type='blood',
+            ),
+        ],
+    ),
+    ParticipantUpsertInternal(
+        external_id='Athena',
+        meta={},
+        samples=[
+            SampleUpsertInternal(
+                external_id='sample_id003',
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        assays=[
+                            AssayUpsertInternal(
+                                meta={
+                                    'reads': [
+                                        {
+                                            'basename': 'sample_id003.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id003.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id003.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id003.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
+                                    ],
+                                    'reads_type': 'fastq',
+                                    **default_assay_meta,
+                                },
+                                type='sequencing',
+                            )
+                        ],
+                    )
+                ],
+                type='blood',
+            )
+        ],
+    ),
+]
 
 
 class TestUpsert(DbIsolatedTest):
@@ -22,218 +232,11 @@ class TestUpsert(DbIsolatedTest):
         Tests the other side of:
             tests.test_parse_generic_metadata:TestParseGenericMetadata.test_rows_with_participants
         """
-        all_participants = [
-            ParticipantUpsert.construct(
-                **{
-                    'external_id': 'Demeter',
-                    'meta': {},
-                    'samples': [
-                        SampleUpsert.construct(
-                            **{
-                                'external_id': 'sample_id001',
-                                'meta': {},
-                                'sequences': [
-                                    SequenceUpsert.construct(
-                                        **{
-                                            'meta': {
-                                                'reads': [
-                                                    [
-                                                        {
-                                                            'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                        {
-                                                            'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                    ]
-                                                ],
-                                                'reads_type': 'fastq',
-                                            },
-                                            'status': SequenceStatus('uploaded'),
-                                            'type': SequenceType('genome'),
-                                        }
-                                    ),
-                                    SequenceUpsert.construct(
-                                        **{
-                                            'meta': {
-                                                'reads': [
-                                                    [
-                                                        {
-                                                            'basename': 'sample_id001.exome.filename-R1.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id001.exome.filename-R1.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                        {
-                                                            'basename': 'sample_id001.exome.filename-R2.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id001.exome.filename-R2.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                    ]
-                                                ],
-                                                'reads_type': 'fastq',
-                                            },
-                                            'status': SequenceStatus('uploaded'),
-                                            'type': SequenceType('exome'),
-                                        }
-                                    ),
-                                ],
-                                'type': SampleType('blood'),
-                            }
-                        )
-                    ],
-                }
-            ),
-            ParticipantUpsert.construct(
-                **{
-                    'external_id': 'Apollo',
-                    'meta': {},
-                    'samples': [
-                        SampleUpsert.construct(
-                            **{
-                                'external_id': 'sample_id002',
-                                'meta': {},
-                                'sequences': [
-                                    SequenceUpsert.construct(
-                                        **{
-                                            'meta': {
-                                                'reads': [
-                                                    [
-                                                        {
-                                                            'basename': 'sample_id002.filename-R1.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id002.filename-R1.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                        {
-                                                            'basename': 'sample_id002.filename-R2.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id002.filename-R2.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                    ]
-                                                ],
-                                                'reads_type': 'fastq',
-                                            },
-                                            'status': SequenceStatus('uploaded'),
-                                            'type': SequenceType('genome'),
-                                            'technology': SequenceTechnology(
-                                                'short-read'
-                                            ),
-                                        }
-                                    )
-                                ],
-                                'type': SampleType('blood'),
-                            }
-                        ),
-                        SampleUpsert.construct(
-                            **{
-                                'external_id': 'sample_id004',
-                                'meta': {},
-                                'sequences': [
-                                    SequenceUpsert.construct(
-                                        **{
-                                            'meta': {
-                                                'reads': [
-                                                    [
-                                                        {
-                                                            'basename': 'sample_id004.filename-R1.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id004.filename-R1.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                        {
-                                                            'basename': 'sample_id004.filename-R2.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id004.filename-R2.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                    ]
-                                                ],
-                                                'reads_type': 'fastq',
-                                            },
-                                            'status': SequenceStatus('uploaded'),
-                                            'type': SequenceType('genome'),
-                                            'technology': SequenceTechnology(
-                                                'short-read'
-                                            ),
-                                        }
-                                    )
-                                ],
-                                'type': SampleType('blood'),
-                            }
-                        ),
-                    ],
-                }
-            ),
-            ParticipantUpsert.construct(
-                **{
-                    'external_id': 'Athena',
-                    'meta': {},
-                    'samples': [
-                        SampleUpsert.construct(
-                            **{
-                                'external_id': 'sample_id003',
-                                'meta': {},
-                                'sequences': [
-                                    SequenceUpsert.construct(
-                                        **{
-                                            'meta': {
-                                                'reads': [
-                                                    [
-                                                        {
-                                                            'basename': 'sample_id003.filename-R1.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id003.filename-R1.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                        {
-                                                            'basename': 'sample_id003.filename-R2.fastq.gz',
-                                                            'checksum': None,
-                                                            'class': 'File',
-                                                            'location': '/path/to/sample_id003.filename-R2.fastq.gz',
-                                                            'size': 111,
-                                                        },
-                                                    ]
-                                                ],
-                                                'reads_type': 'fastq',
-                                            },
-                                            'status': SequenceStatus('uploaded'),
-                                            'type': SequenceType('genome'),
-                                            'technology': SequenceTechnology(
-                                                'short-read'
-                                            ),
-                                        }
-                                    )
-                                ],
-                                'type': SampleType('blood'),
-                            }
-                        )
-                    ],
-                }
-            ),
-        ]
 
-        body = ParticipantUpsertBody.construct(participants=all_participants)
         # Table interfaces
         pt = ParticipantLayer(self.connection)
 
-        await pt.batch_upsert_participants(body)
+        await pt.upsert_participants(all_participants, open_transaction=False)
 
         expected_sample_eid_to_participant_eid = {
             sample.external_id: participant.external_id
@@ -264,3 +267,19 @@ class TestUpsert(DbIsolatedTest):
                 participant_id_map[expected_participant_eid],
                 db_sample['participant_id'],
             )
+
+        db_sequencing_groups = await self.connection.connection.fetch_all(
+            'SELECT * FROM sequencing_group'
+        )
+        self.assertEqual(5, len(db_sequencing_groups))
+        for db_sg in db_sequencing_groups:
+            self.assertIsNotNone(db_sg['sample_id'])
+            self.assertIsNotNone(db_sg['type'])
+
+        db_sequencing = await self.connection.connection.fetch_all(
+            'SELECT * FROM assay'
+        )
+        self.assertEqual(5, len(db_sequencing))
+        for db_sg in db_sequencing_groups:
+            self.assertIsNotNone(db_sg['sample_id'])
+            # self.assertIsNotNone(db_sg['type'])

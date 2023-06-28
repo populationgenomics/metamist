@@ -12,10 +12,15 @@ db/mariadb-java-client-*.jar
 # see next comment for why
 !sample_metadata/
 sample_metadata/*
+!metamist/
+metamist/*
 
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated
 !sample_metadata/parser/
+!sample_metadata/audit/
+!metamist/parser
+!metamist/audit
 
 *.egg-info/
 db/liquibase.jar
@@ -33,6 +38,12 @@ coverage.xml
 temp.json
 data-dump.sql
 local.py
+cram-map/
+graphql-types/
+openapi-generator-cli.jar
+scripts/*.json
 lcov-report/
 coverage/
-cram-map/
+
+web/schema.graphql
+web/src/__generated__

@@ -7,12 +7,10 @@ in requirements.txt, dev dependencies are listed in requirements-dev.txt.
 
 from setuptools import setup, find_packages
 
-PKG = 'sample_metadata'
+PKG = 'metamist'
 
-all_packages = ['sample_metadata']
-all_packages.extend(
-    'sample_metadata.' + p for p in sorted(find_packages(f'./sample_metadata'))
-)
+all_packages = ['metamist']
+all_packages.extend('metamist.' + p for p in sorted(find_packages(f'./metamist')))
 
 with open('README.md', encoding='utf-8') as f:
     readme = f.read()
@@ -21,7 +19,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='5.5.3',
+    version='6.0.6',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -39,6 +37,7 @@ setup(
         'typing-extensions',
         # for get id-token
         'cpg-utils >= 4.9.4',
+        'gql[aiohttp,requests]',
     ],
     include_package_data=True,
     zip_safe=False,

@@ -77,7 +77,7 @@ jobs:
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
           python regenerate_api.py
-          ls -lGh sample_metadata
+          ls -lGh metamist
 
         # also copies build artifacts to api/public
       - name: "build web front-end"
@@ -114,9 +114,10 @@ jobs:
             --platform managed
 
       - name: Publish package
-        if: github.ref == 'refs/heads/main'
+#        if: github.ref == 'refs/heads/main'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
           packages_dir: dist/
+          skip_existing: true

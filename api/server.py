@@ -6,10 +6,11 @@ from fastapi import FastAPI, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 from starlette.responses import FileResponse
 
 from db.python.connect import SMConnections
-from db.python.tables.project import is_full_access
+from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 from api import routes
@@ -18,9 +19,8 @@ from api.utils.exceptions import determine_code_from_error
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
-
 # This tag is automatically updated by bump2version
-_VERSION = '5.5.3'
+_VERSION = '6.0.6'
 
 logger = get_logger()
 
@@ -35,7 +35,7 @@ if PROFILE_REQUESTS:
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 
-if is_full_access():
+if is_all_access():
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -98,33 +98,62 @@ async def not_found(request, exc):
 
 
 @app.exception_handler(Exception)
-async def exception_handler(_: Request, e: Exception):
+async def exception_handler(request: Request, e: Exception):
     """Generic exception handler"""
     add_stacktrace = True
+    description: str
 
     if isinstance(e, HTTPException):
         code = e.status_code
         name = e.detail
-
+        description = str(e)
+    elif isinstance(e, ValidationError):
+        # for whatever reason, calling str(e) here fails
+        code = 500
+        name = 'ValidationError'
+        description = str(e.args)
     else:
         code = determine_code_from_error(e)
         name = str(type(e).__name__)
+        description = str(e)
 
-    base_params = {'name': name, 'description': str(e)}
+    base_params = {'name': name, 'description': description}
 
     if add_stacktrace:
         st = traceback.format_exc()
         base_params['stacktrace'] = st
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=code,
         content=base_params,
     )
 
+    # https://github.com/tiangolo/fastapi/issues/457#issuecomment-851547205
+    # FastAPI doesn't run middleware on exception, but if we make a non-GET/INFO
+    # request, then we lose CORS and hence lose the exception in the body of the
+    # response. Grab it manually, and explicitly allow origin if so.
+    middlewares = [
+        m
+        for m in app.user_middleware
+        if isinstance(m, CORSMiddleware) or m.cls == CORSMiddleware
+    ]
+    if middlewares:
+        cors_middleware = middlewares[0]
+
+        request_origin = request.headers.get('origin', '')
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        elif (
+            cors_middleware
+            and request_origin in cors_middleware.options['allow_origins']
+        ):
+            response.headers['Access-Control-Allow-Origin'] = request_origin
+
+    return response
+
 
 # graphql
-app.include_router(MetamistGraphQLRouter, prefix='/graphql')
-
+app.include_router(MetamistGraphQLRouter, prefix='/graphql', include_in_schema=False)
 
 for route in routes.__dict__.values():
     if not isinstance(route, APIRouter):
@@ -141,11 +170,15 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 if __name__ == '__main__':
     import uvicorn
+    import logging
+
+    logging.getLogger('watchfiles').setLevel(logging.WARNING)
+    logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
     uvicorn.run(
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        debug=True,
+        # debug=True,
         reload=True,
     )

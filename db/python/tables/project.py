@@ -9,7 +9,7 @@ from databases import Database
 from google.cloud import secretmanager
 from cpg_utils.cloud import get_cached_group_members
 
-from api.settings import MEMBERS_CACHE_LOCATION, is_full_access
+from api.settings import MEMBERS_CACHE_LOCATION, is_all_access
 from db.python.utils import (
     ProjectId,
     Forbidden,
@@ -66,7 +66,7 @@ class ProjectPermissionsTable:
             )
         self.connection: Database = connection
         self.allow_full_access = (
-            allow_full_access if allow_full_access is not None else is_full_access()
+            allow_full_access if allow_full_access is not None else is_all_access()
         )
 
     def _get_secret_manager_client(self):
@@ -101,14 +101,21 @@ class ProjectPermissionsTable:
             )
         if self.allow_full_access:
             return True
-        missing_project_ids = []
-        spids = set(project_ids)
-        for project_id in spids:
-            has_access = await self.check_access_to_project_id(
+        spids = list(set(project_ids))
+        # do this all at once to save time
+        promises = [
+            self.check_access_to_project_id(
                 user, project_id, readonly=readonly, raise_exception=False
             )
-            if not has_access:
-                missing_project_ids.append(project_id)
+            for project_id in spids
+        ]
+        has_access_map = await asyncio.gather(*promises)
+
+        missing_project_ids = [
+            project_id
+            for project_id, has_access in zip(spids, has_access_map)
+            if not has_access
+        ]
 
         if missing_project_ids:
             if raise_exception:
@@ -215,6 +222,19 @@ class ProjectPermissionsTable:
         """Get {project_name: project_id} map"""
         await self.ensure_project_id_cache_is_filled()
         return ProjectPermissionsTable._cached_project_names
+
+    async def get_project_id_map_for_names(
+        self, project_names, author, readonly: bool, check_access=True
+    ) -> dict[str, ProjectId]:
+        """Get {project_name: project_id} map for a list of project names"""
+        m = await self.get_project_name_map()
+        project_name_map = {name: m[name] for name in project_names}
+        if check_access:
+            await self.check_access_to_project_ids(
+                user=author, project_ids=project_name_map.values(), readonly=readonly
+            )
+
+        return project_name_map
 
     async def get_project_id_from_name_and_user(
         self, user: str, project_name: str, readonly: bool
@@ -426,24 +446,46 @@ RETURNING ID"""
 
         return projects
 
-    async def delete_project(self, project_id: int, author: str) -> bool:
-        """Delete metamist project, reuqires project_creator_permissions"""
+    async def delete_project_data(
+        self, project_id: int, delete_project: bool, author: str
+    ) -> bool:
+        """
+        Delete data in metamist project, requires project_creator_permissions
+        Can optionally delete the project also.
+        """
         await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
             _query = """
-DELETE FROM participant_phenotypes where participant_id IN (SELECT id FROM participant WHERE project = :project);
-DELETE FROM family_participant WHERE family_id IN (SELECT id FROM family where project = :project);
+DELETE FROM participant_phenotypes where participant_id IN (
+    SELECT id FROM participant WHERE project = :project
+);
+DELETE FROM family_participant WHERE family_id IN (
+    SELECT id FROM family where project = :project
+);
 DELETE FROM family WHERE project = :project;
-DELETE FROM sample_sequencing_eid WHERE project = :project;
-DELETE FROM sample_sequencing WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
-DELETE FROM analysis_sample WHERE analysis_id in (SELECT id FROM analysis WHERE project = :project);
+DELETE FROM sequencing_group_external_id WHERE project = :project;
+DELETE FROM assay_external_id WHERE project = :project;
+DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM sequencing_group WHERE sample_id IN (
+    SELECT id FROM sample WHERE project = :project
+);
 DELETE FROM sample WHERE project = :project;
 DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
-DELETE FROM project WHERE id = :project;
             """
+            if delete_project:
+                _query += 'DELETE FROM project WHERE id = :project;\n'
 
             await self.connection.execute(_query, {'project': project_id})
 

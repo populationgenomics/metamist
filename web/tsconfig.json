@@ -2,6 +2,7 @@
     "compilerOptions": {
         "target": "es5",
         "lib": ["dom", "dom.iterable", "esnext"],
+        "downlevelIteration": true,
         "allowJs": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -14,7 +15,8 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
-        "jsx": "react"
+        "jsx": "react-jsx",
+        "types": ["vite/client", "node"]
     },
-    "include": ["src", ".eslintrc.js"]
+    "include": ["src", ".eslintrc.cjs", "codegen.ts"]
 }

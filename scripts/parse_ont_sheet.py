@@ -5,11 +5,11 @@ import logging
 
 import click
 
-from sample_metadata.parser.generic_metadata_parser import (
+from metamist.parser.generic_parser import ParsedSample, ParsedSequencingGroup
+from metamist.parser.generic_metadata_parser import (
     run_as_sync,
     GenericMetadataParser,
 )
-from sample_metadata.parser.generic_parser import SequenceMetaGroup
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -40,8 +40,9 @@ class OntParser(GenericMetadataParser):
         self,
         search_locations: List[str],
         project: str,
-        default_sequence_type='genome',
-        default_sequence_technology='long-read',
+        default_sequencing_type='genome',
+        default_sequencing_technology='long-read',
+        default_sequencing_platform='oxford-nanopore',
         default_sample_type='blood',
         allow_extra_files_in_search_path=False,
     ):
@@ -67,12 +68,13 @@ class OntParser(GenericMetadataParser):
             participant_column=Columns.SAMPLE_ID,
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
-            default_sequence_type=default_sequence_type,
             default_sample_type=default_sample_type,
-            default_sequence_technology=default_sequence_technology,
+            default_sequencing_type=default_sequencing_type,
+            default_sequencing_technology=default_sequencing_technology,
+            default_sequencing_platform=default_sequencing_platform,
             participant_meta_map={},
             sample_meta_map={},
-            sequence_meta_map=sequence_meta_map,
+            assay_meta_map=sequence_meta_map,
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         )
@@ -94,39 +96,33 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
-    async def get_sequence_meta(
-        self,
-        seq_group: SequenceMetaGroup,
-        sample_id: str | None = None,
-    ) -> SequenceMetaGroup:
-        """
-        Get sequence meta, override to include formed failed_fastqs
-        """
-        seq_group = await super().get_sequence_meta(seq_group, sample_id)
+    async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+        sequence_groups = await super().group_assays(sample)
 
-        failed_fastqs: list[str] = []
+        for sequence_group in sequence_groups:
+            failed_fastqs: list[str] = []
 
-        for r in seq_group.rows:
-            parsed_failed_fastqs = await self.parse_files(
-                sample_id, r[Columns.FAIL_FASTQ_FILENAME]
-            )
-            if 'reads' not in parsed_failed_fastqs:
-                raise ValueError(
-                    f'Could not find "reads" key in parsed failed fastqs: {parsed_failed_fastqs}'
+            for r in sequence_group.rows:
+                parsed_failed_fastqs = await self.parse_files(
+                    sequence_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
                 )
-            parsed_failed_fastq_reads = parsed_failed_fastqs['reads']
-            if (
-                len(parsed_failed_fastq_reads) != 1
-                or 'fastq' not in parsed_failed_fastq_reads
-            ):
-                raise ValueError(
-                    f'Failed to parse ONT failed fastqs, expected 1 key "fastq": {parsed_failed_fastq_reads}'
-                )
-            failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
+                if 'reads' not in parsed_failed_fastqs:
+                    raise ValueError(
+                        f'Could not find "reads" key in parsed failed fastqs: {parsed_failed_fastqs}'
+                    )
+                parsed_failed_fastq_reads = parsed_failed_fastqs['reads']
+                if (
+                    len(parsed_failed_fastq_reads) != 1
+                    or 'fastq' not in parsed_failed_fastq_reads
+                ):
+                    raise ValueError(
+                        f'Failed to parse ONT failed fastqs, expected 1 key "fastq": {parsed_failed_fastq_reads}'
+                    )
+                failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
 
-        seq_group.meta['failed_reads'] = failed_fastqs
+            sequence_group.meta['failed_reads'] = failed_fastqs
 
-        return seq_group
+        return sequence_groups
 
 
 @click.command()
@@ -135,7 +131,9 @@ class OntParser(GenericMetadataParser):
     help='The sample-metadata project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='ont')
+@click.option('--default-sequence-type', default='genome')
+@click.option('--default-sequencing-technology', default='long-read')
+@click.option('--default-sequencing-platform', default='oxford-nanopore')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -161,7 +159,9 @@ async def main(
     search_path: List[str],
     project: str,
     default_sample_type='blood',
-    default_sequence_type='wgs',
+    default_sequencing_type='genome',
+    default_sequencing_technology='long-read',
+    default_sequencing_platform='oxford-nanopore',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
@@ -177,7 +177,9 @@ async def main(
     parser = OntParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequence_type=default_sequence_type,
+        default_sequencing_type=default_sequencing_type,
+        default_sequencing_platform=default_sequencing_platform,
+        default_sequencing_technology=default_sequencing_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )
