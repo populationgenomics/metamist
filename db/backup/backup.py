@@ -3,10 +3,35 @@
 """ Daily back up function for databases within a local
 MariaDB instance """
 
-from datetime import datetime
+import json
 import subprocess
+from datetime import datetime
+from typing import Literal
+
 from google.cloud import storage
 from google.cloud import logging
+from google.cloud import secretmanager
+
+STORAGE_CLIENT = storage.Client()
+LOGGING_CLIENT = logging.Client()
+SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
+
+SECRET_PROJECT = 'sample-metadata'
+SECRET_NAME = 'mariadb-backup-user-credentials'
+
+
+def read_db_credentials() -> dict[Literal['username', 'password'], str]:
+    """Get database credentials from Secret Manager."""
+    try:
+        # noinspection PyTypeChecker
+        secret_path = SECRET_CLIENT.secret_version_path(
+            SECRET_PROJECT, SECRET_NAME, 'latest'
+        )
+        response = SECRET_CLIENT.access_secret_version(request={'name': secret_path})
+        return json.loads(response.payload.data.decode('UTF-8'))
+    except Exception as e:
+        # Fail gracefully if there's no secret version yet.
+        raise Exception(f'Could not access database credentials: {e}') from e
 
 
 def perform_backup():
@@ -14,9 +39,9 @@ def perform_backup():
     and uploads this backup to GCS."""
 
     # Logging: Any log with `severity >= ERROR` get's logged to #software-alerts
-    logging_client = logging.Client()
+
     log_name = 'backup_log'
-    logger = logging_client.logger(log_name)
+    logger = LOGGING_CLIENT.logger(log_name)
 
     # Get timestamp
     timestamp_str = (
@@ -29,6 +54,10 @@ def perform_backup():
     # grant permissions, so that mariadb can read ib_logfile0
     subprocess.run(['sudo', 'chmod', '-R', '777', tmp_dir], check=True)
 
+    credentials = read_db_credentials()
+    db_username = credentials['username']
+    db_password = credentials['password']
+
     # Export SQL Data
     try:
         text = f'Performed mariabackup to pull data {timestamp_str}.'
@@ -38,7 +67,8 @@ def perform_backup():
                 'mariabackup',
                 '--backup',
                 f'--target-dir={tmp_dir}/',
-                '--user=root',
+                f'--user={db_username}',
+                f'-p{db_password}',
             ],
             check=True,
             stderr=subprocess.DEVNULL,
@@ -78,9 +108,8 @@ def perform_backup():
     subprocess.run(['rm', '-rf', tmp_dir, tar_archive_path], check=True)
 
     # Validates file exists and was uploaded to GCS
-    client = storage.Client()
-    bucket = client.get_bucket('cpg-sm-backups')
-    files_in_gcs = list(client.list_blobs(bucket, prefix=tar_archive_path))
+    bucket = STORAGE_CLIENT.get_bucket('cpg-sm-backups')
+    files_in_gcs = list(STORAGE_CLIENT.list_blobs(bucket, prefix=tar_archive_path))
 
     if len(files_in_gcs) > 0:
         text = f'Successfully backed up: {timestamp_str}'
