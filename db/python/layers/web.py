@@ -52,7 +52,7 @@ class WebDb(DbBase):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project', 'NOT sg.archived']
+        wheres = ['s.project = :project', 's.active', 'NOT sg.archived']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:

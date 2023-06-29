@@ -36,7 +36,7 @@ class SampleInternal(SMBase):
         meta = d.pop('meta', None)
         active = d.pop('active', None)
         if active is not None:
-            active = bool(active)
+            active = bool(ord(active))
         if meta:
             if isinstance(meta, bytes):
                 meta = meta.decode()

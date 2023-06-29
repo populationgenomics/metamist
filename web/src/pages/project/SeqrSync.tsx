@@ -1,12 +1,12 @@
 import * as React from 'react'
 import _ from 'lodash'
 import { Button, CheckboxProps, Form, Message, Modal } from 'semantic-ui-react'
-import { SequenceType, WebApi } from '../../sm-api'
+import { WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
 interface SeqrSyncProps {
     project: string
-    syncTypes: SequenceType[]
+    syncTypes: string[]
 }
 
 interface SeqrSyncFormOptions {
@@ -22,7 +22,7 @@ interface SeqrSyncFormOptions {
 const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }) => {
     const [isLoading, setIsLoading] = React.useState<boolean>(false)
     const [messages, setMessages] = React.useState<string[]>([])
-    const [seqTypeInModal, setSeqTypeInModal] = React.useState<SequenceType | null>(null)
+    const [seqTypeInModal, setSeqTypeInModal] = React.useState<string | null>(null)
     const [errors, setErrors] = React.useState<string[] | null>()
 
     const [syncOptions, setSyncOptions] = React.useState<SeqrSyncFormOptions>({
@@ -37,7 +37,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
 
     if (!syncTypes || syncTypes.length === 0) return <></>
 
-    const syncSeqrProject = (seqType: SequenceType | null) => {
+    const syncSeqrProject = (seqType: string | null) => {
         if (!seqType) return
         setIsLoading(true)
         setErrors(null)
