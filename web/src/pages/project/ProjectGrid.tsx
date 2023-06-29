@@ -10,11 +10,11 @@ import Table from '../../shared/components/Table'
 import SampleLink from '../../shared/components/links/SampleLink'
 import FamilyLink from '../../shared/components/links/FamilyLink'
 import sanitiseValue from '../../shared/utilities/sanitiseValue'
-import { ProjectSummaryResponse, MetaSearchEntityPrefix } from '../../sm-api/api'
+import { ProjectSummary, MetaSearchEntityPrefix } from '../../sm-api/api'
 import SequencingGroupLink from '../../shared/components/links/SequencingGroupLink'
 
 interface ProjectGridProps {
-    summary: ProjectSummaryResponse
+    summary: ProjectSummary
     projectName: string
     filterValues: Record<
         string,
@@ -124,6 +124,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
 
     return (
         <Table
+            className="projectSummaryGrid"
             celled
             style={{
                 borderCollapse: 'collapse',
@@ -266,15 +267,16 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                         const backgroundColor =
                             pidx % 2 === 0 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
                         // const border = '1px solid #dee2e6'
-                        const lengthOfParticipant = p.samples
-                            .map((s_) =>
-                                s_.sequencing_groups
-                                    .map((a_) => a_.assays.length)
-                                    .reduce((a, b) => a + b, 0)
-                            )
-                            .reduce((a, b) => a + b, 0)
-                        return s.sequencing_groups.map((seq, seqidx) =>
-                            seq.assays.map((assay, assayidx) => {
+                        const lengthOfParticipant =
+                            p.samples
+                                .map((s_) =>
+                                    (s_.sequencing_groups ?? [])
+                                        .map((a_) => (a_.assays ?? []).length)
+                                        .reduce((a, b) => a + b, 0)
+                                )
+                                .reduce((a, b) => a + b, 0) ?? 0
+                        return (s.sequencing_groups ?? []).map((seq, seqidx) =>
+                            (seq.assays ?? []).map((assay, assayidx) => {
                                 const isFirstOfGroup = sidx === 0 && seqidx === 0 && assayidx === 0
                                 const border = '1px solid #dee2e6'
                                 // const border = '1px solid'
@@ -341,8 +343,8 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         // border,
                                                     }}
                                                     key={`${s.id}sample.${k}`}
-                                                    rowSpan={s.sequencing_groups
-                                                        .map((a_) => a_.assays.length)
+                                                    rowSpan={(s.sequencing_groups ?? [])
+                                                        .map((a_) => (a_.assays ?? []).length)
                                                         .reduce((a, b) => a + b, 0)}
                                                 >
                                                     {k === 'external_id' || k === 'id' ? (
@@ -371,7 +373,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         backgroundColor,
                                                     }}
                                                     key={`${s.id}sequence_group.${k}`}
-                                                    rowSpan={seq.assays.length}
+                                                    rowSpan={(seq.assays ?? []).length}
                                                 >
                                                     {k === 'id' ? (
                                                         <SequencingGroupLink
