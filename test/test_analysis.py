@@ -78,7 +78,10 @@ class TestAnalysis(DbIsolatedTest):
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
         self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
 
-        await self.al.create_analysis(
+
+    @run_as_sync
+    async def test_get_analysis_by_id(self):
+        analysis_id = await self.al.create_analysis(
             AnalysisInternal(
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
@@ -87,11 +90,25 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        self.assertEqual(analysis_id, analysis.id)
+        self.assertEqual('cram', analysis.type)
+        self.assertEqual(AnalysisStatus.COMPLETED, analysis.status)
+
     @run_as_sync
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
         """
+
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
 
         analyses = await self.connection.connection.fetch_all('SELECT * FROM analysis')
         analysis_sgs = await self.connection.connection.fetch_all(
@@ -99,7 +116,7 @@ class TestAnalysis(DbIsolatedTest):
         )
 
         self.assertEqual(1, len(analyses))
-
+        self.assertEqual(analysis_id, analyses[0]['id'])
         self.assertEqual(1, analysis_sgs[0]['sequencing_group_id'])
         self.assertEqual(analyses[0]['id'], analysis_sgs[0]['analysis_id'])
 
@@ -149,6 +166,16 @@ class TestAnalysis(DbIsolatedTest):
 
         today = datetime.utcnow().date()
 
+        # insert analysis
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
+
         result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
         expected = {
             'project': self.project_id,
@@ -174,6 +201,16 @@ class TestAnalysis(DbIsolatedTest):
             1 sample, w/ 2 sequencing groups
         """
         today = datetime.utcnow().date()
+
+        # Add genome cram
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
 
         # Add exome cram
         await self.al.create_analysis(
@@ -230,6 +267,16 @@ class TestAnalysis(DbIsolatedTest):
         Update analysis for sequencing group, making sure we only return the later one
         """
         today = datetime.utcnow().date()
+
+        # Add genome cram that's older
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
 
         # Add another genome cram that's newer
         await self.al.create_analysis(
@@ -289,6 +336,16 @@ class TestAnalysis(DbIsolatedTest):
                 ],
             )
         )
+        # add for sg 1
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
+
         sequencing_group_2_id = sample_2.sequencing_groups[0].id
         await self.al.create_analysis(
             AnalysisInternal(

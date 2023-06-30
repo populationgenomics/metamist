@@ -355,7 +355,7 @@ SELECT
     a_sg.sequencing_group_id as sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
-LEFT JOIN analysis_sequencing_group a_s ON a_sg.analysis_id = a.id
+LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 WHERE a.id = :analysis_id
 """
         rows = await self.connection.fetch_all(_query, {'analysis_id': analysis_id})
