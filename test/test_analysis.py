@@ -78,9 +78,11 @@ class TestAnalysis(DbIsolatedTest):
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
         self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
 
-
     @run_as_sync
     async def test_get_analysis_by_id(self):
+        """
+        Test getting an analysis by id
+        """
         analysis_id = await self.al.create_analysis(
             AnalysisInternal(
                 type='cram',
@@ -176,7 +178,9 @@ class TestAnalysis(DbIsolatedTest):
             )
         )
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
+        result = await self.al.get_sequencing_group_file_sizes(
+            project_ids=[self.project_id]
+        )
         expected = {
             'project': self.project_id,
             'sequencing_groups': {
@@ -242,7 +246,9 @@ class TestAnalysis(DbIsolatedTest):
         }
 
         # Assert that the exome size was added correctly
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
+        result = await self.al.get_sequencing_group_file_sizes(
+            project_ids=[self.project_id]
+        )
         self.assertDictEqual(expected, result[0])
 
     @run_as_sync
@@ -300,7 +306,9 @@ class TestAnalysis(DbIsolatedTest):
             },
         }
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
+        result = await self.al.get_sequencing_group_file_sizes(
+            project_ids=[self.project_id]
+        )
         self.assertDictEqual(expected, result[0])
 
     @run_as_sync
@@ -376,5 +384,7 @@ class TestAnalysis(DbIsolatedTest):
             },
         }
 
-        result = await self.al.get_sequencing_group_file_sizes(project_ids=[self.project_id])
+        result = await self.al.get_sequencing_group_file_sizes(
+            project_ids=[self.project_id]
+        )
         self.assertDictEqual(expected, result[0])
