@@ -573,7 +573,14 @@ class GenericParser(
 
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
-            return summary, (participants if participants else samples)
+            participants_str = [
+                participant.external_pid for participant in participants
+            ]
+            return (
+                summary,
+                'Participant list:',
+                (participants_str if participants else samples),
+            )
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
