@@ -5,7 +5,7 @@ import sys
 
 import click
 import pandas as pd
-from sample_metadata.apis import FamilyApi, ImportApi
+from metamist.apis import FamilyApi, ImportApi
 
 
 def save_xlsx_as_csv(filepath: str):
