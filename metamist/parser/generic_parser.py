@@ -591,7 +591,6 @@ class GenericParser(
             logger.info(message)
 
         if participants:
-            participants_tosm = [p.to_sm() for p in participants]
             result = await self.papi.upsert_participants_async(
                 self.project,
                 [p.to_sm() for p in participants],
