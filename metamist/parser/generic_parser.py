@@ -216,6 +216,7 @@ class ParsedParticipant:
         """Convert to SM upsert model"""
         samples = [s.to_sm() for s in self.samples]
         return ParticipantUpsert(
+            id=self.internal_pid,
             external_id=self.external_pid,
             reported_sex=self.reported_sex,
             reported_gender=self.reported_gender,
@@ -590,6 +591,7 @@ class GenericParser(
             logger.info(message)
 
         if participants:
+            participants_tosm = [p.to_sm() for p in participants]
             result = await self.papi.upsert_participants_async(
                 self.project,
                 [p.to_sm() for p in participants],

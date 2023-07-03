@@ -651,6 +651,8 @@ class ParticipantLayer(BaseLayer):
             internal_to_external_id
         )
 
+    # endregion UPSERTS / UPDATES
+
     # region PHENOTYPES / SEQR
 
     async def get_seqr_individual_template(
