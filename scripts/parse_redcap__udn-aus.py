@@ -64,9 +64,9 @@ def parse_redcap(redcap_csv: str):
                     row_type = 'sample_metadata'
                     if row['sample_id']:
                         samples[row['sample_id']] = individual_id
-                    # elif row['sendaway_tracking_num']:
-                    # Some sample IDs end up in this column
-                    #    samples[row['sendaway_tracking_num']] = individual_id
+                    elif row['sendaway_tracking_num']:
+                        # Some sample IDs end up in this column
+                        samples[row['sendaway_tracking_num']] = individual_id
                 else:
                     assert False, f'I was not expecting this row: {row}'
             else:
