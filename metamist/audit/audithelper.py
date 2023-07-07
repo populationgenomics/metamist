@@ -67,13 +67,13 @@ class AuditHelper(CloudHelper):
 
         return files_in_bucket
 
-    def find_sequence_files_in_gcs_bucket(
+    def find_assay_files_in_gcs_bucket(
         self, bucket_name: str, file_extensions: tuple[str]
     ) -> list[str]:
         """Gets all the gs paths to fastq files in the datasets upload bucket"""
         if bucket_name.startswith('gs://'):
             bucket_name = bucket_name.removeprefix('gs://')
-        sequence_paths = []
+        assay_paths = []
         if 'upload' not in bucket_name:
             # No prefix means it will get all blobs in the bucket (regardless of path)
             # This can be a dangerous call outside of the upload buckets
@@ -83,10 +83,45 @@ class AuditHelper(CloudHelper):
 
         for blob in self.gcs_client.list_blobs(bucket_name, prefix=''):
             if blob.name.endswith(file_extensions):
-                sequence_paths.append(f'gs://{bucket_name}/{blob.name}')
+                assay_paths.append(f'gs://{bucket_name}/{blob.name}')
             continue
 
-        return sequence_paths
+        return assay_paths
+
+    def get_sequencing_group_ids_from_analysis(analysis) -> list[str]:
+        """Tries a number of different field names to retrieve the sg ids from an analysis"""
+        while True:
+            try:
+                sg_ids = analysis['meta']['sample']
+                break
+            except KeyError:
+                pass
+
+            try:
+                sg_ids = analysis['meta']['sample_ids']
+                break
+            except KeyError:
+                pass
+
+            try:
+                sg_ids = analysis['meta']['sequencing_group']
+                break
+            except KeyError:
+                pass
+
+            try:
+                sg_ids = analysis['meta']['sequencing_groups']
+                break
+            except KeyError:
+                raise ValueError(
+                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
+                )
+
+        if isinstance(sg_ids, str):
+            return [
+                sg_ids,
+            ]
+        return sg_ids
 
     @staticmethod
     def write_csv_report_to_cloud(

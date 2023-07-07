@@ -51,7 +51,7 @@ FILE_TYPES_MAP = {
     'all': ALL_EXTENSIONS,
 }
 
-SEQUENCE_TYPES_MAP = {
+SEQUENCING_TYPES_MAP = {
     'genome': [
         'genome',
     ],
@@ -89,59 +89,63 @@ class UploadBucketAuditor(GenericAuditor):
         bucket_name: str,
         sequencing_type_str: str,
         file_types_str: str,
-        sequence_files_to_delete: list[tuple[str, int, str, list[int]]],
-        sequence_files_to_ingest: list[tuple[str, str, str, int, str]],
-        incomplete_samples: list[tuple[str, str]],
+        assay_files_to_delete: list[tuple[str, int, str, list[int]]],
+        assay_files_to_ingest: list[tuple[str, str, str, int, str]],
+        unaligned_sgs: list[tuple[str, str]],
     ):
-        """Write the sequences to delete and ingest to csv files and upload them to the bucket"""
-        # Writing the output to files with the file type, sequence type, and date specified
+        """
+        Writes the 'sequence files to delete/ingest' csv reports and upload them to the bucket.
+        Also writes a report for any sequence files found that match existing samples and may
+        require ingestion.
+
+        The reports name includes the file types, sequencing types, and date of the audit.
+        """
         today = datetime.today().strftime('%Y-%m-%d')
 
         report_path = f'{bucket_name}/audit_results/{today}/'
 
-        # Sequences to delete report has several data points for validation
-        if not sequence_files_to_delete:
+        if not assay_files_to_delete:
             logging.info('No sequence read files to delete found. Skipping report...')
         else:
-            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequences_to_delete_{today}.csv'
+            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequence_files_to_delete_{today}.csv'
             self.write_csv_report_to_cloud(
-                data_to_write=sequence_files_to_delete,
+                data_to_write=assay_files_to_delete,
                 report_path=os.path.join(report_path, sequences_to_delete_file),
                 header_row=[
                     'Sample_ID',
-                    'Sequence_ID',
-                    'Sequence_Path',
+                    'SG_ID',
+                    'Sequence_File_Path',
                     'Analysis_IDs',
                     'Filesize',
                 ],
             )
 
-        # Sequences to ingest file only contains paths to the (possibly) uningested files
-        if not sequence_files_to_ingest:
+        # 'Sequences to ingest' report contains paths to the (possibly) uningested files - and any samples/SGs that might be related
+        if not assay_files_to_ingest:
             logging.info('No sequence reads to ingest found. Skipping report...')
         else:
-            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequences_to_ingest_{today}.csv'
+            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequence_files_to_ingest_{today}.csv'
             self.write_csv_report_to_cloud(
-                data_to_write=sequence_files_to_ingest,
+                data_to_write=assay_files_to_ingest,
                 report_path=os.path.join(report_path, sequences_to_ingest_file),
                 header_row=[
-                    'Sequence_Path',
-                    'Extenal_Sample_ID',
-                    'Internal_Sample_ID',
+                    'Sequence_File_Path',
+                    'SG_ID' 'Sample_ID',
+                    'Sample_External_ID',
                     'CRAM_Analysis_ID',
                     'CRAM_Path',
                 ],
             )
 
-        # Write the samples without any completed cram to a csv
-        if not incomplete_samples:
+        # Write the sequencing groups without any completed cram to a csv
+        if not unaligned_sgs:
             logging.info(f'No samples without crams found. Skipping report...')
         else:
-            incomplete_samples_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_samples_without_crams_{today}.csv'
+            unaligned_sgs_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_unaligned_sgs_{today}.csv'
             self.write_csv_report_to_cloud(
-                data_to_write=incomplete_samples,
-                report_path=os.path.join(report_path, incomplete_samples_file),
-                header_row=['Internal_Sample_ID', 'External_Sample_ID'],
+                data_to_write=unaligned_sgs,
+                report_path=os.path.join(report_path, unaligned_sgs_file),
+                header_row=['SG_ID', 'Sample_ID', 'Sample_External_ID'],
             )
 
 
@@ -161,7 +165,7 @@ async def audit_upload_bucket_files(
 
     auditor = UploadBucketAuditor(
         dataset=dataset,
-        sequencing_type=SEQUENCE_TYPES_MAP.get(sequencing_type),
+        sequencing_type=SEQUENCING_TYPES_MAP.get(sequencing_type),
         file_types=FILE_TYPES_MAP.get(file_types),
         default_analysis_type=default_analysis_type,
         default_analysis_status=default_analysis_status,
@@ -177,47 +181,51 @@ async def audit_upload_bucket_files(
 
     # Get all the sequences for the samples in the dataset and map them to their samples and reads
     (
-        seq_id_sample_id_map,
-        sequence_filepaths_filesizes,
-    ) = auditor.get_sequence_map_from_participants(participant_data)
+        sg_sample_id_map,
+        assay_sg_id_map,
+        assay_filepaths_filesizes,
+    ) = auditor.get_assay_map_from_participants(participant_data)
 
     # Get all completed cram output paths for the samples in the dataset and validate them
-    sample_cram_paths = auditor.get_analysis_cram_paths_for_dataset_samples(
-        sample_internal_external_id_map
-    )
+    sg_cram_paths = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
 
-    # Identify samples with and without completed crams
-    sample_completion = auditor.get_complete_and_incomplete_samples(
-        sample_internal_external_id_map, sample_cram_paths
+    # Identify sgs with and without completed crams
+    sg_completion = auditor.get_complete_and_incomplete_sgs(
+        assay_sg_id_map, sg_cram_paths
     )
-    incomplete_samples = [
-        (sample_id, sample_internal_external_id_map.get(sample_id))
-        for sample_id in sample_completion.get('incomplete')
+    unaligned_sgs = [
+        (
+            sg_id,
+            sg_sample_id_map[sg_id],
+            sample_internal_external_id_map.get(sg_sample_id_map[sg_id]),
+        )
+        for sg_id in sg_completion.get('incomplete')
     ]
 
     # Samples with completed crams can have their sequences deleted - these are the obvious ones
     (
-        sequence_reads_to_delete,
-        sequence_files_to_ingest,
+        reads_to_delete,
+        reads_to_ingest,
     ) = await auditor.get_reads_to_delete_or_ingest(
         bucket_name,
-        sample_completion.get('complete'),
-        sequence_filepaths_filesizes,
-        seq_id_sample_id_map,
+        sg_completion.get('complete'),
+        assay_filepaths_filesizes,
+        sg_sample_id_map,
+        assay_sg_id_map,
         sample_internal_external_id_map,
     )
 
-    possible_sequence_ingests = auditor.find_crams_for_reads_to_ingest(
-        sequence_files_to_ingest, sample_cram_paths
+    possible_assay_ingests = auditor.find_crams_for_reads_to_ingest(
+        reads_to_ingest, sg_cram_paths
     )
 
     auditor.write_upload_bucket_audit_reports(
         bucket_name,
         sequencing_type_str=sequencing_type,
         file_types_str=file_types,
-        sequence_files_to_delete=sequence_reads_to_delete,
-        sequence_files_to_ingest=possible_sequence_ingests,
-        incomplete_samples=incomplete_samples,
+        assay_files_to_delete=reads_to_delete,
+        assay_files_to_ingest=possible_assay_ingests,
+        unaligned_sgs=unaligned_sgs,
     )
 
 
