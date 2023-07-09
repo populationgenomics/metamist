@@ -5,14 +5,14 @@ as well as samples that have no completed cram.
 
 Procedure:
 1. Input a Metamist dataset, sequence types to audit, and file types to search for in the bucket
-2. Get all the participants, samples, and sequences for this dataset from Metamist
-3. Search the upload bucket for all sequence files, and compare to the files in the metamist sequences
+2. Get all the participants, samples, sequencing groups, and assays for this dataset
+3. Search the upload bucket for all assay files, and compare to the files in the metamist assay reads
     - If there are discrepencies, check if the file name and size is the same in the bucket as it is in metamist
       - If the name and file size are the same, assume this file has just been moved around in the bucket
-4. Check if a sample has a completed cram - if so, its sequence data can be removed
-5. Any remaining sequence data in the bucket might require ingestion
-6. Create reports in the audit_results folder of the upload bucket, containing sequence files to delete,
-   ingest, and any samples without completed crams.
+4. Check if a sequencing group has a completed cram - if so, its assay read files can be removed
+5. Any remaining assay data in the bucket might require ingestion
+6. Create reports in the audit_results folder of the upload bucket, containing assay read files to delete,
+   ingest, and any sequencing groups without completed crams.
 """
 
 
@@ -105,16 +105,16 @@ class UploadBucketAuditor(GenericAuditor):
         report_path = f'{bucket_name}/audit_results/{today}/'
 
         if not assay_files_to_delete:
-            logging.info('No sequence read files to delete found. Skipping report...')
+            logging.info('No assay read files to delete found. Skipping report...')
         else:
-            sequences_to_delete_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequence_files_to_delete_{today}.csv'
+            assays_to_delete_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_assay_files_to_delete_{today}.csv'
             self.write_csv_report_to_cloud(
                 data_to_write=assay_files_to_delete,
-                report_path=os.path.join(report_path, sequences_to_delete_file),
+                report_path=os.path.join(report_path, assays_to_delete_file),
                 header_row=[
-                    'Sample_ID',
                     'SG_ID',
-                    'Sequence_File_Path',
+                    'Assay_ID',
+                    'Assay_Read_File_Path',
                     'Analysis_IDs',
                     'Filesize',
                 ],
@@ -122,15 +122,16 @@ class UploadBucketAuditor(GenericAuditor):
 
         # 'Sequences to ingest' report contains paths to the (possibly) uningested files - and any samples/SGs that might be related
         if not assay_files_to_ingest:
-            logging.info('No sequence reads to ingest found. Skipping report...')
+            logging.info('No assay reads to ingest found. Skipping report...')
         else:
-            sequences_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_sequence_files_to_ingest_{today}.csv'
+            assays_to_ingest_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_assay_files_to_ingest_{today}.csv'
             self.write_csv_report_to_cloud(
                 data_to_write=assay_files_to_ingest,
-                report_path=os.path.join(report_path, sequences_to_ingest_file),
+                report_path=os.path.join(report_path, assays_to_ingest_file),
                 header_row=[
-                    'Sequence_File_Path',
-                    'SG_ID' 'Sample_ID',
+                    'Assay_File_Path',
+                    'SG_ID',
+                    'Sample_ID',
                     'Sample_External_ID',
                     'CRAM_Analysis_ID',
                     'CRAM_Path',
@@ -139,7 +140,9 @@ class UploadBucketAuditor(GenericAuditor):
 
         # Write the sequencing groups without any completed cram to a csv
         if not unaligned_sgs:
-            logging.info(f'No samples without crams found. Skipping report...')
+            logging.info(
+                f'No sequencing groups without crams found. Skipping report...'
+            )
         else:
             unaligned_sgs_file = f'{self.dataset}_{file_types_str}_{sequencing_type_str}_unaligned_sgs_{today}.csv'
             self.write_csv_report_to_cloud(
@@ -157,11 +160,12 @@ async def audit_upload_bucket_files(
     Also finds any extra files in the upload bucket which may be uningested sequence data.
     Reports any files to delete, files to ingest, and samples without completed crams in output files
     """
-    config = get_config()
-    if not dataset:
-        dataset = config['workflow']['dataset']
+    # config = get_config()
+    # if not dataset:
+    #     dataset = config['workflow']['dataset']
 
-    bucket_name = config['storage']['default']['upload']
+    # bucket_name = config['storage']['default']['upload']
+    bucket_name = f'gs://cpg-{dataset}-main-upload'
 
     auditor = UploadBucketAuditor(
         dataset=dataset,
@@ -232,10 +236,11 @@ async def audit_upload_bucket_files(
 @click.command()
 @click.option(
     '--dataset',
+    '-d',
     help='Metamist dataset, used to filter samples',
 )
 @click.option(
-    '--sequence-type',
+    '--sequencing-type',
     '-s',
     type=click.Choice(['genome', 'exome', 'all']),
     required='True',

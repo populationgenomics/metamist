@@ -88,11 +88,18 @@ class AuditHelper(CloudHelper):
 
         return assay_paths
 
+    @staticmethod
     def get_sequencing_group_ids_from_analysis(analysis) -> list[str]:
         """Tries a number of different field names to retrieve the sg ids from an analysis"""
         while True:
             try:
                 sg_ids = analysis['meta']['sample']
+                break
+            except KeyError:
+                pass
+
+            try:
+                sg_ids = analysis['meta']['samples']
                 break
             except KeyError:
                 pass

@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Any
 
+from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
 from metamist.graphql import query, gql
 
@@ -42,7 +43,7 @@ EXCLUDED_SGS = [
 QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
     """
         query DatasetData($datasetName: String!) {
-            project(name: {eq: $datasetName}) {
+            project(name: $datasetName) {
                 participants {
                     externalId
                     id
@@ -66,7 +67,7 @@ QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
 
 QUERY_SG_ANALYSES = gql(
     """
-        query sgCrams($sgId: String!, $analysisType: AnalysisType!) {
+        query sgAnalyses($sgId: String!, $analysisType: String!) {
           sequencingGroups(id: {eq: $sgId}) {
             analyses(status: {eq: COMPLETED}, type: {eq: $analysisType}) {
               id
@@ -113,6 +114,8 @@ class GenericAuditor(AuditHelper):
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
+
+        requests_logger.setLevel(logging.WARNING)
 
     def get_participant_data_for_dataset(self) -> list[dict]:
         """
@@ -215,7 +218,7 @@ class GenericAuditor(AuditHelper):
                 for assay in sg['assays']:
                     reads = assay['meta'].get('reads')
                     if not reads:
-                        logging.info(
+                        logging.warning(
                             f'{self.dataset} :: SG: {sg["id"]} assay {assay["id"]} has no reads field'
                         )
                         continue
@@ -250,11 +253,16 @@ class GenericAuditor(AuditHelper):
         analyses = []
         for sg_id in sg_ids:
             analyses.extend(
-                sg['analyses']
-                for sg in query(  # pylint: disable=unsubscriptable-object
-                    QUERY_SG_ANALYSES, {'sgId': sg_id, 'analysisType': 'CRAM'}
-                )['sequencingGroups']
+                [
+                    sg['analyses']
+                    for sg in query(  # pylint: disable=unsubscriptable-object
+                        QUERY_SG_ANALYSES, {'sgId': sg_id, 'analysisType': 'CRAM'}
+                    )['sequencingGroups']
+                ]
             )
+        analyses = [
+            analysis for analyses_list in analyses for analysis in analyses_list
+        ]
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
             analysis['id']
@@ -270,7 +278,7 @@ class GenericAuditor(AuditHelper):
         analyses = [
             analysis
             for analysis in analyses
-            if analysis.get('meta')['sequencing_type'] in self.sequencing_type
+            if analysis['meta'].get('sequencing_type') in self.sequencing_type
         ]
 
         # For each sg id, collect the analysis ids and cram paths
@@ -280,14 +288,21 @@ class GenericAuditor(AuditHelper):
             if not analysis['output'].startswith('gs://') and analysis[
                 'output'
             ].endswith('cram'):
-                logging.info(
+                logging.warning(
                     f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
                 )
                 continue
 
-            sg_id = self.get_sequencing_group_ids_from_analysis(analysis)[0]
-
-            sg_cram_paths[sg_id].update([(analysis.get('id'), analysis.get('output'))])
+            try:
+                sg_id = self.get_sequencing_group_ids_from_analysis(analysis)[0]
+                sg_cram_paths[sg_id].update(
+                    [(analysis.get('id'), analysis.get('output'))]
+                )
+            except ValueError:
+                logging.warning(
+                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
+                )
+                continue
 
         return sg_cram_paths
 
@@ -302,15 +317,25 @@ class GenericAuditor(AuditHelper):
                 continue
             for sg in sgs_without_crams:
                 analyses.extend(
-                    sg['analyses']
-                    for sg in query(  # pylint: disable=unsubscriptable-object
-                        QUERY_SG_ANALYSES,
-                        {'sgId': sg, 'analysisType': analysis_type},
-                    )['sequencingGroups']
+                    [
+                        sg['analyses']
+                        for sg in query(  # pylint: disable=unsubscriptable-object
+                            QUERY_SG_ANALYSES,
+                            {'sgId': sg, 'analysisType': analysis_type},
+                        )['sequencingGroups']
+                    ]
                 )
-
+        analyses = [
+            analysis for analyses_list in analyses for analysis in analyses_list
+        ]
         for analysis in analyses:
-            sg_ids = self.get_sequencing_group_ids_from_analysis(analysis)
+            try:
+                sg_ids = self.get_sequencing_group_ids_from_analysis(analysis)
+            except ValueError:
+                logging.warning(
+                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
+                )
+                continue
 
             for sg_id in sg_ids:
                 if sg_id not in sgs_without_crams:
@@ -368,8 +393,8 @@ class GenericAuditor(AuditHelper):
                 incomplete_sgs.update(sg_id)
 
         if incomplete_sgs:
-            logging.info(
-                f'{self.dataset} :: SGs without CRAMs found: {list(incomplete_sgs)}'
+            logging.warning(
+                f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {list(incomplete_sgs)}'
             )
             self.analyses_for_sgs_without_crams(list(incomplete_sgs))
 
@@ -487,7 +512,7 @@ class GenericAuditor(AuditHelper):
             assay_id = reads_assays.get(metamist_path)
             sg_id = assay_sg_id_map.get(assay_id)
             analysis_ids = completed_sgs.get(sg_id)
-            if sg_id not in EXCLUDED_SGS:
+            if sg_id not in EXCLUDED_SGS and analysis_ids:
                 filesize = new_assay_path_sizes[bucket_path]
                 assays_moved_paths.append(
                     AssayReportEntry(
