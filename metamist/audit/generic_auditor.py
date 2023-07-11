@@ -462,7 +462,7 @@ class GenericAuditor(AuditHelper):
         # Check the list of uningested paths to see if any of them contain sample ids for ingested samples
         # This could happen when we ingest a fastq read pair for a sample, and additional read files were provided
         # but not ingested, such as bams and vcfs.
-        uningested_reads: dict[str, list[tuple[str, str]]] = defaultdict(
+        uningested_reads: dict[str, list[tuple[str, str, str]]] = defaultdict(
             list, {k: [] for k in uningested_assay_paths}
         )
         for sg_id, analysis_ids in completed_sgs.items():
@@ -572,7 +572,7 @@ class GenericAuditor(AuditHelper):
     def find_crams_for_reads_to_ingest(
         reads_to_ingest: dict[str, list],
         sg_cram_paths: dict[str, dict[int, str]],
-    ) -> list[tuple[str, str, str, int, str]]:
+    ) -> list[tuple[str, str, str, str, int, str]]:
         """
         Compares the external sample IDs for samples with completed CRAMs against the
         uningested read files. This may turn up results for cases where multiple read types
