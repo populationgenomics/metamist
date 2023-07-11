@@ -4,6 +4,8 @@
 
 Metamist is database that stores **de-identified** -omics metadata.
 
+Testing the tests.
+
 There are three components to the metamist system:
 
 - System-versioned MariaDB database,
