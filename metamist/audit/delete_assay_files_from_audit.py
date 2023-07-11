@@ -7,9 +7,9 @@ of the csv contains the paths to delete.
 Creates a log file of all the deletes, in the same directory as the input csv.
 
 The typical upload-bucket audit results will be found in a file such as:
- > gs://cpg-dataset-main-upload/audit_results/2023-xx-xx/dataset_seqtype_readstype_sequences_to_delete_2023-xx-xx.csv
+ > gs://cpg-dataset-main-upload/audit_results/2023-xx-xx/dataset_seqtype_readstype_assay_files_to_delete_20xx-xx-xx.csv
 And the field name containing the delete paths will be
- > "Sequence_Path"
+ > "Assay_Read_File_Path"
 """
 
 import csv
@@ -44,7 +44,7 @@ def clean_up_cloud_storage(locations: list[CloudPath]):
     return deleted_files
 
 
-@click.command('Delete the sequence paths found by the audit')
+@click.command('Delete the assay files found by the audit')
 @click.option(
     '--delete-field-name',
     '-d',
@@ -80,7 +80,6 @@ def main(delete_field_name, delete_file_path):
     AuditHelper.write_csv_report_to_cloud(
         deleted_files, log_path, header_row=['Deleted_file_path']
     )
-    logging.info(f'Wrote deletion log to {log_path}.')
 
 
 if __name__ == '__main__':

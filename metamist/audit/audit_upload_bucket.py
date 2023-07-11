@@ -160,11 +160,11 @@ async def audit_upload_bucket_files(
     Also finds any extra files in the upload bucket which may be uningested sequence data.
     Reports any files to delete, files to ingest, and samples without completed crams in output files
     """
-    # config = get_config()
-    # if not dataset:
-    #     dataset = config['workflow']['dataset']
+    config = get_config()
+    if not dataset:
+        dataset = config['workflow']['dataset']
 
-    # bucket_name = config['storage']['default']['upload']
+    bucket_name = config['storage']['default']['upload']
     bucket_name = f'gs://cpg-{dataset}-main-upload'
 
     auditor = UploadBucketAuditor(

@@ -12,6 +12,61 @@ from metamist.parser.cloudhelper import CloudHelper
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
+    RD_DATASETS = [
+        'acute-care',
+        'ag-cardiac',
+        'ag-hidden',
+        'ag-very-hidden',
+        'brain-malf',
+        'broad-rgp',
+        'circa',
+        'epileptic-enceph',
+        'flinders-ophthal',
+        'genomic-autopsy',
+        'heartkids',
+        'hereditary-neuro',
+        'ibmdx',
+        'kidgen',
+        'leukodystrophies',
+        'lof-curation',
+        'mcri-lrp',
+        'mito-disease',
+        'mito-mdt',
+        'ohmr3-mendelian',
+        'ohmr4-epilepsy',
+        'perth-neuro',
+        'rare-disease',
+        'ravenscroft-arch',
+        'ravenscroft-rdstudy',
+        'rdnow',
+        'rdp-kidney',
+        'rdp-neuro',
+        'schr-neuro',
+        'seqr',
+        'udn-aus',
+        'validation',
+    ]
+
+    EXCLUDED_SGS = [
+        'CPG11783',  # acute-care, no FASTQ data
+        'CPG13409',  # perth-neuro, coverage ~0x
+        'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
+        'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
+        'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
+        'CPG261792',  # rdp-kidney misformated fastq - https://batch.hail.populationgenomics.org.au/batches/378736/jobs/43
+        # acute care fasq parsing errors https://batch.hail.populationgenomics.org.au/batches/379303/jobs/24
+        'CPG259150',
+        'CPG258814',
+        'CPG258137',
+        'CPG258111',
+        'CPG258012',
+        # ohmr4 cram parsing in align issues
+        'CPG261339',
+        'CPG261347',
+        # IBMDX truncated sample? https://batch.hail.populationgenomics.org.au/batches/422181/jobs/99
+        'CPG265876',
+    ]
+
     @staticmethod
     def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
         """
@@ -119,10 +174,10 @@ class AuditHelper(CloudHelper):
             try:
                 sg_ids = analysis['meta']['sequencing_groups']
                 break
-            except KeyError:
+            except KeyError as exc:
                 raise ValueError(
                     f'Analysis {analysis["id"]} missing sample or sequencing group field.'
-                )
+                ) from exc
 
         if isinstance(sg_ids, str):
             return [

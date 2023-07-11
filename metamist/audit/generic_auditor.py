@@ -20,26 +20,6 @@ ANALYSIS_TYPES = [
     'ANALYSIS-RUNNER',
 ]
 
-EXCLUDED_SGS = [
-    'CPG11783',  # acute-care, no FASTQ data
-    'CPG13409',  # perth-neuro, coverage ~0x
-    'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
-    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
-    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
-    'CPG261792',  # rdp-kidney misformated fastq - https://batch.hail.populationgenomics.org.au/batches/378736/jobs/43
-    # acute care fasq parsing errors https://batch.hail.populationgenomics.org.au/batches/379303/jobs/24
-    'CPG259150',
-    'CPG258814',
-    'CPG258137',
-    'CPG258111',
-    'CPG258012',
-    # ohmr4 cram parsing in align issues
-    'CPG261339',
-    'CPG261347',
-    # IBMDX truncated sample? https://batch.hail.populationgenomics.org.au/batches/422181/jobs/99
-    'CPG265876',
-]
-
 QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
     """
         query DatasetData($datasetName: String!) {
@@ -512,7 +492,7 @@ class GenericAuditor(AuditHelper):
             assay_id = reads_assays.get(metamist_path)
             sg_id = assay_sg_id_map.get(assay_id)
             analysis_ids = completed_sgs.get(sg_id)
-            if sg_id not in EXCLUDED_SGS and analysis_ids:
+            if sg_id not in AuditHelper.EXCLUDED_SGS and analysis_ids:
                 filesize = new_assay_path_sizes[bucket_path]
                 assays_moved_paths.append(
                     AssayReportEntry(
@@ -565,7 +545,7 @@ class GenericAuditor(AuditHelper):
 
         assay_reads_to_delete = []
         for sg_id, analysis_ids in completed_sgs.items():
-            if sg_id in EXCLUDED_SGS:
+            if sg_id in AuditHelper.EXCLUDED_SGS:
                 continue
             assay_ids = sg_assays_id_map[sg_id]
             for assay_id in assay_ids:
