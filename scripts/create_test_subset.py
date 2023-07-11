@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-arguments
+# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments
 
 """ Example Invocation
 
@@ -11,12 +11,13 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Optional, Counter as CounterType
+from typing import Optional
 import logging
 import os
 import random
 import subprocess
 import traceback
+import typing
 from collections import Counter
 import csv
 
@@ -98,13 +99,6 @@ DEFAULT_SAMPLES_N = 10
     This is in addition to the number of families specified in
     --families and the number of samples specified in -n""",
 )
-@click.option(
-    '--noninteractive',
-    'noninteractive',
-    is_flag=True,
-    default=False,
-    help='Skip interactive confirmation',
-)
 def main(
     project: str,
     samples_n: Optional[int],
@@ -112,14 +106,13 @@ def main(
     skip_ped: Optional[bool] = True,
     additional_families: Optional[tuple[str]] = None,
     additional_samples: Optional[tuple[str]] = None,
-    noninteractive: Optional[bool] = False,
 ):
     """
     Script creates a test subset for a given project.
     A new project with a prefix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
-    samples_n, families_n = _validate_opts(samples_n, families_n, noninteractive)
+    samples_n, families_n = _validate_opts(samples_n, families_n)
     _additional_families: list[str] = list(additional_families)
     _additional_samples: list[str] = list(additional_samples)
 
@@ -130,7 +123,7 @@ def main(
         }
     )
     logger.info(f'Found {len(all_samples)} samples')
-    if (samples_n and samples_n >= len(all_samples)) and not noninteractive:
+    if samples_n and samples_n >= len(all_samples):
         resp = str(
             input(
                 f'Requesting {samples_n} samples which is >= '
@@ -449,7 +442,8 @@ def get_map_ipid_esid(
 
     ip_es_map = []
     for ip_is_pair in ip_is_map:
-        samples_per_participant = [ip_is_pair[0]]
+        samples_per_participant = []
+        samples_per_participant.append(ip_is_pair[0])
         for isid in ip_is_pair[1:]:
             if isid in is_es_map:
                 samples_per_participant.append(is_es_map[isid])
@@ -461,9 +455,10 @@ def get_map_ipid_esid(
     return external_sample_internal_participant_map
 
 
-def get_samples_for_families(project: str, additional_families: list[str]) -> list[str]:
+def get_samples_for_families(project: str, additional_families: list[str]):
     """Returns the samples that belong to a list of families"""
 
+    samples: list[str] = []
     full_pedigree = fapi.get_pedigree(
         project=project,
         replace_with_participant_external_ids=False,
@@ -484,7 +479,7 @@ def get_samples_for_families(project: str, additional_families: list[str]) -> li
         }
     )
 
-    samples: list[str] = [sample['id'] for sample in sample_objects]
+    samples = [sample['id'] for sample in sample_objects]
 
     return samples
 
@@ -492,8 +487,9 @@ def get_samples_for_families(project: str, additional_families: list[str]) -> li
 def get_fams_for_samples(
     project: str,
     additional_samples: Optional[list[str]] = None,
-) -> list[str]:
+):
     """Returns the families that a list of samples belong to"""
+    fams: set[str] = set()
     sample_objects = sapi.get_samples(
         body_get_samples={
             'project_ids': [project],
@@ -509,7 +505,7 @@ def get_fams_for_samples(
         replace_with_family_external_ids=True,
     )
 
-    fams: set[str] = {
+    fams = {
         fam['family_id'] for fam in full_pedigree if str(fam['individual_id']) in pids
     }
 
@@ -530,7 +526,7 @@ def _normalise_map(unformatted_map: list[list[str]]) -> dict[str, str]:
 
 
 def _validate_opts(
-    samples_n: int, families_n: int, noninteractive: bool
+    samples_n: int, families_n: int
 ) -> tuple[Optional[int], Optional[int]]:
     if samples_n is not None and families_n is not None:
         raise click.BadParameter('Please specify only one of --samples or --families')
@@ -545,7 +541,7 @@ def _validate_opts(
     if families_n is not None and families_n < 1:
         raise click.BadParameter('Please specify --families higher than 0')
 
-    if (families_n is not None and families_n >= 30) and not noninteractive:
+    if families_n is not None and families_n >= 30:
         resp = str(
             input(
                 f'You requested a subset of {families_n} families. '
@@ -555,7 +551,7 @@ def _validate_opts(
         if resp.lower() != 'y':
             raise SystemExit()
 
-    if (samples_n is not None and samples_n >= 100) and not noninteractive:
+    if samples_n is not None and samples_n >= 100:
         resp = str(
             input(
                 f'You requested a subset of {samples_n} samples. '
@@ -569,7 +565,7 @@ def _validate_opts(
 
 def _print_fam_stats(families: list[dict[str, str]]):
     family_sizes = Counter([fam['family_id'] for fam in families])
-    fam_by_size: CounterType[int] = Counter()
+    fam_by_size: typing.Counter[int] = Counter()
     # determine number of singles, duos, trios, etc
     for fam in family_sizes:
         fam_by_size[family_sizes[fam]] += 1
