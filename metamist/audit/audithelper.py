@@ -12,41 +12,6 @@ from metamist.parser.cloudhelper import CloudHelper
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
-    RD_DATASETS = [
-        'acute-care',
-        'ag-cardiac',
-        'ag-hidden',
-        'ag-very-hidden',
-        'brain-malf',
-        'broad-rgp',
-        'circa',
-        'epileptic-enceph',
-        'flinders-ophthal',
-        'genomic-autopsy',
-        'heartkids',
-        'hereditary-neuro',
-        'ibmdx',
-        'kidgen',
-        'leukodystrophies',
-        'lof-curation',
-        'mcri-lrp',
-        'mito-disease',
-        'mito-mdt',
-        'ohmr3-mendelian',
-        'ohmr4-epilepsy',
-        'perth-neuro',
-        'rare-disease',
-        'ravenscroft-arch',
-        'ravenscroft-rdstudy',
-        'rdnow',
-        'rdp-kidney',
-        'rdp-neuro',
-        'schr-neuro',
-        'seqr',
-        'udn-aus',
-        'validation',
-    ]
-
     EXCLUDED_SGS = [
         'CPG11783',  # acute-care, no FASTQ data
         'CPG13409',  # perth-neuro, coverage ~0x
