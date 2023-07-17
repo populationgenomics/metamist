@@ -148,14 +148,12 @@ class GraphQLProject:
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
-        print(id)
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
             external_id=external_id.to_internal_filter() if external_id else None,
             id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
             meta=meta,
         )
-        print(filter_)
         samples = await loader.load({'id': root.id, 'filter': filter_})
         return [GraphQLSample.from_internal(p) for p in samples]
 
@@ -370,7 +368,6 @@ class GraphQLSample:
 
     @staticmethod
     def from_internal(sample: SampleInternal):
-        print(sample.id)
         return GraphQLSample(
             id=sample_id_format(sample.id),
             external_id=sample.external_id,
