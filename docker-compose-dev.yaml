@@ -1,0 +1,18 @@
+version: '3.7'
+
+services: 
+  database: 
+    image: mariadb:latest 
+    environment: 
+      MYSQL_ROOT_PASSWORD: ${SM_DEV_DB_PASSWORD}
+      MYSQL_DATABASE: ${SM_DEV_DB_NAME} 
+      MYSQL_USER: ${SM_DEV_DB_USER}
+      MYSQL_PASSWORD: ${SM_DEV_DB_PASSWORD}
+      MYSQL_ALLOW_EMPTY_PASSWORD: true
+    ports: 
+      - ${SM_DEV_DB_PORT}:3306
+    volumes:
+      - database:/var/lib/mysql
+
+volumes:
+  database:
