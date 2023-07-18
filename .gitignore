@@ -47,3 +47,6 @@ coverage/
 
 web/schema.graphql
 web/src/__generated__
+
+.envrc
+.python-version
