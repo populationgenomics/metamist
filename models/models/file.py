@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class FileType(Enum):
     """Type of File that we record"""
+
     FILE = 'file'
     DIRECTORY = 'directory'
 
@@ -15,7 +16,11 @@ class File(BaseModel):
     id: int
     type: FileType
     path: str
-    # in bytes
-    size: int
+    size: int  # in bytes
     checksum: str | None
     exists: bool
+
+    @staticmethod
+    def from_db(**kwargs) -> 'File':
+        """From DB fields"""
+        return File(**kwargs)
