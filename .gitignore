@@ -53,3 +53,6 @@ web/src/__generated__
 
 # pyenv
 .python-version
+
+# mypy
+.mypy_cache/
