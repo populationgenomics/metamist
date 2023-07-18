@@ -190,6 +190,10 @@ class CloudHelper:
             # maintain existing behaviour
             return None
 
+        if not blob.time_created:
+            # GCP blobs sometimes need a reload
+            blob.reload()
+
         return blob
 
     def _list_gcs_directory(self, gcs_path) -> list[str]:

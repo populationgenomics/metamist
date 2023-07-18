@@ -47,3 +47,12 @@ coverage/
 
 web/schema.graphql
 web/src/__generated__
+
+# dotenv
+.envrc
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
