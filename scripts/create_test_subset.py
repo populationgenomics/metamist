@@ -204,13 +204,6 @@ QUERY_FAMILY_SGID = gql(
     This is in addition to the number of families specified in
     --families and the number of samples specified in -n""",
 )
-@click.option(
-    '--noninteractive',
-    'noninteractive',
-    is_flag=True,
-    default=False,
-    help='Skip interactive confirmation',
-)
 def main(
     project: str,
     samples_n: Optional[int],
@@ -218,14 +211,13 @@ def main(
     skip_ped: Optional[bool] = True,
     additional_families: Optional[tuple[str]] = None,
     additional_samples: Optional[tuple[str]] = None,
-    noninteractive: Optional[bool] = False,
 ):
     """
     Script creates a test subset for a given project.
     A new project with a prefix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
-    samples_n, families_n = _validate_opts(samples_n, families_n, noninteractive)
+    samples_n, families_n = _validate_opts(samples_n, families_n)
     _additional_families: list[str] = list(additional_families)
     _additional_samples: list[str] = list(additional_samples)
 
@@ -713,11 +705,9 @@ def _normalise_map(unformatted_map: list[list[str]]) -> dict[str, str]:
 
 
 def _validate_opts(
-    samples_n: int, families_n: int, noninteractive: bool
+    samples_n: int, families_n: int
 ) -> tuple[Optional[int], Optional[int]]:
-    if samples_n is not None and families_n is not None:
-        raise click.BadParameter('Please specify only one of --samples or --families')
-
+    """Validates the options passed to the script"""
     if samples_n is None and families_n is None:
         samples_n = DEFAULT_SAMPLES_N
         logger.info(
@@ -725,28 +715,6 @@ def _validate_opts(
             f'{samples_n} samples'
         )
 
-    if families_n is not None and families_n < 1:
-        raise click.BadParameter('Please specify --families higher than 0')
-
-    if (families_n is not None and families_n >= 30) and not noninteractive:
-        resp = str(
-            input(
-                f'You requested a subset of {families_n} families. '
-                f'Please confirm (y): '
-            )
-        )
-        if resp.lower() != 'y':
-            raise SystemExit()
-
-    if (samples_n is not None and samples_n >= 100) and not noninteractive:
-        resp = str(
-            input(
-                f'You requested a subset of {samples_n} samples. '
-                f'Please confirm (y): '
-            )
-        )
-        if resp.lower() != 'y':
-            raise SystemExit()
     return samples_n, families_n
 
 
