@@ -314,7 +314,7 @@ def main():
         # Loop until Docker has initialised server and is ready to accept connections
         startup_tries = 5
         wait_time_in_seconds = 2
-        while not check_if_server_is_accessible() and startup_tries > 0:
+        while (not check_if_server_is_accessible()) and startup_tries > 0:
             startup_tries -= 1
             logger.info(
                 f'Dockerised API server is not ready yet. '
