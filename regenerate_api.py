@@ -132,7 +132,9 @@ def check_openapi_version():
     logger.info(f'Got openapi version: {version}')
 
 
-def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] = None):
+def generate_api_and_copy(
+    output_type, output_copyer, extra_commands: List[str] | None = None
+):
     """
     Use OpenApiGenerator to generate the installable API
     """
@@ -315,9 +317,9 @@ def main():
         while not check_if_server_is_accessible() and startup_tries > 0:
             startup_tries -= 1
             logger.info(
-                f"Dockerised API server is not ready yet. "
-                + f"Retrying in {wait_time_in_seconds} seconds. "
-                + f"Remaining tries: {startup_tries}"
+                f'Dockerised API server is not ready yet. '
+                + f'Retrying in {wait_time_in_seconds} seconds. '
+                + f'Remaining tries: {startup_tries}'
             )
             time.sleep(wait_time_in_seconds)
         assert_server_is_accessible()
