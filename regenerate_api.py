@@ -322,9 +322,9 @@ def main():
                 + f'Remaining tries: {startup_tries}'
             )
             time.sleep(wait_time_in_seconds)
-        assert_server_is_accessible()
 
     try:
+        assert_server_is_accessible()
         check_openapi_version()
 
         # Generate the installable Python API
