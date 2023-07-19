@@ -76,8 +76,8 @@ jobs:
       - name: "build deployable API"
         run: |
           export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
-          python regenerate_api.py
-          ls -lGh metamist
+          set -e;
+          python regenerate_api.py && ls -lGh metamist
 
         # also copies build artifacts to api/public
       - name: "build web front-end"
