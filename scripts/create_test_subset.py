@@ -16,14 +16,12 @@ import logging
 import os
 import random
 import subprocess
-import traceback
 from collections import Counter
 import csv
 
 import click
 from google.cloud import storage
 
-from metamist import exceptions
 from metamist.apis import (
     AnalysisApi,
     AssayApi,
@@ -32,11 +30,12 @@ from metamist.apis import (
     ParticipantApi,
 )
 from metamist.models import (
-    BodyGetAssaysByCriteria,
     AssayUpsert,
     SampleUpsert,
     Analysis,
     AnalysisStatus,
+    AnalysisUpdateModel,
+    SequencingGroupUpsert,
 )
 
 from metamist.graphql import gql, query
@@ -52,6 +51,111 @@ fapi = FamilyApi()
 papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
+
+SG_ID_QUERY = gql(
+    """
+    query getSGIds($project: String!) {
+        project(name: $project) {
+            samples{
+                id
+                externalId
+                sequencingGroups {
+                    id
+                }
+            }
+        }
+    }
+    """
+)
+
+QUERY_ALL_DATA = gql(
+    """
+    query getAllData($project: String!, $sids: [String!]) {
+        project(name: $project) {
+            samples(id: {in_: $sids}) {
+                id
+                meta
+                type
+                externalId
+                participant {
+                    externalId
+                    id
+                    karyotype
+                    meta
+                    reportedGender
+                    reportedSex
+                }
+                sequencingGroups{
+                    id
+                    meta
+                    platform
+                    technology
+                    type
+                    assays {
+                        id
+                        meta
+                        type
+                    }
+                    analyses {
+                        active
+                        id
+                        meta
+                        output
+                        status
+                        timestampCompleted
+                        type
+                    }
+                }
+            }
+        }
+    }
+    """
+)
+
+# TODO: We can change this to filter external sample ids
+EXISTING_DATA_QUERY = gql(
+    """
+    query getExistingData($project: String!) {
+        project(name: $project) {
+            samples{
+                id
+                externalId
+                sequencingGroups {
+                    id
+                    type
+                    assays {
+                        id
+                        type
+                    }
+                    analyses {
+                        id
+                        type
+                    }
+                }
+            }
+        }
+    }
+    """
+)
+
+QUERY_FAMILY_SGID = gql(
+    """
+    query FamilyQuery($project: String!) {
+        project(name: $project) {
+            families {
+                id
+                externalId
+                participants {
+                    samples {
+                        id
+                    }
+                }
+            }
+
+        }
+    }
+"""
+)
 
 
 @click.command()
@@ -125,205 +229,313 @@ def main(
     _additional_families: list[str] = list(additional_families)
     _additional_samples: list[str] = list(additional_samples)
 
-    all_samples = sapi.get_samples(
-        body_get_samples={
-            'project_ids': [project],
-            'active': True,
-        }
+    specific_sids = _get_sids_for_families(
+        project,
+        families_n,
+        _additional_families,
     )
-    logger.info(f'Found {len(all_samples)} samples')
-    if (samples_n and samples_n >= len(all_samples)) and not noninteractive:
-        resp = str(
-            input(
-                f'Requesting {samples_n} samples which is >= '
-                f'than the number of available samples ({len(all_samples)}). '
-                f'The test project will be a copy of the production project. '
-                f'Please confirm (y): '
-            )
-        )
-        if resp.lower() != 'y':
-            raise SystemExit()
+    if not samples_n and not families_n:
+        samples_n = DEFAULT_SAMPLES_N
+    if not samples_n and families_n:
+        samples_n = 0
 
+    specific_sids = specific_sids + _additional_samples
+
+    # 1. Query all the SGIDS
+    sid_output = query(SG_ID_QUERY, variables={'project': project})
+    all_sids = [sid['id'] for sid in sid_output.get('project').get('samples')]
+
+    # 2. Subtract the specific_sgs from all the sgs
+    sgids_after_inclusions = list(set(all_sids) - set(specific_sids))
+    # 3. Randomly select from the remaining sgs
+    random_sgs: list[str] = []
     random.seed(42)  # for reproducibility
-
-    pid_sid = papi.get_external_participant_id_to_internal_sample_id(project)
-    sample_id_by_participant_id = dict(pid_sid)
-
-    if families_n:
-        if _additional_samples:
-            _additional_families.extend(
-                get_fams_for_samples(
-                    project,
-                    _additional_samples,
-                )
-            )
-        fams = fapi.get_families(project)
-        _additional_families_set = set(_additional_families)
-        families_to_subset = [
-            family['id']
-            for family in fams
-            if family['external_id'] not in _additional_families_set
-        ]
-        full_pedigree = fapi.get_pedigree(
-            project=project, internal_family_ids=families_to_subset
+    if (samples_n - len(specific_sids)) > 0:
+        random_sgs = random.sample(
+            sgids_after_inclusions, samples_n - len(specific_sids)
         )
-        external_family_ids = _get_random_families(full_pedigree, families_n)
-        external_family_ids.extend(_additional_families)
-        internal_family_ids = [
-            fam['id'] for fam in fams if fam['external_id'] in external_family_ids
-        ]
-        pedigree = fapi.get_pedigree(
-            project=project, internal_family_ids=internal_family_ids
-        )
-        _print_fam_stats(pedigree)
-
-        p_ids = [ped['individual_id'] for ped in pedigree]
-        sample_ids = [
-            sample
-            for (participant, sample) in sample_id_by_participant_id.items()
-            if participant in p_ids
-        ]
-        sample_set = set(sample_ids)
-        samples = [s for s in all_samples if s['id'] in sample_set]
-
-    else:
-        if _additional_families:
-            _additional_samples.extend(
-                get_samples_for_families(project, _additional_families)
-            )
-
-        _additional_samples_set = set(_additional_samples)
-        samples_to_subset = [
-            sample
-            for sample in all_samples
-            if sample['id'] not in _additional_samples_set
-        ]
-        samples_to_add = [
-            sample for sample in all_samples if sample['id'] in _additional_samples_set
-        ]
-        samples = random.sample(list(samples_to_subset), samples_n)
-        samples.extend(samples_to_add)
-        sample_ids = [s['id'] for s in samples]
-
-    logger.info(
-        f'Subset to {len(samples)} samples (internal ID / external ID): '
-        f'{_pretty_format_samples(samples)}'
+    # 4. Add the specific_sgs to the randomly selected sgs
+    final_subset_sids = specific_sids + random_sgs
+    # 5. Query all the samples from the selected sgs
+    original_project_subset_data = query(
+        QUERY_ALL_DATA, {'project': project, 'sids': final_subset_sids}
     )
 
     # Populating test project
     target_project = project + '-test'
-    logger.info('Checking any existing test samples in the target test project')
 
-    test_sample_by_external_id = _process_existing_test_samples(target_project, samples)
-
-    try:
-        seq_infos: list[dict[str, str]] = assayapi.get_assays_by_criteria(
-            body_get_assays_by_criteria=BodyGetAssaysByCriteria(
-                sample_ids=sample_ids,
-            )
-        )
-    except exceptions.ApiException:
-        seq_info_by_s_id = {}
-    else:
-        seq_info_by_s_id = {seq['sample_id']: seq for seq in seq_infos}
-
-    analysis_by_sid_by_type: dict[str, dict[str, dict[str, str]]] = {
-        'cram': {},
-        'gvcf': {},
-    }
-    for a_type, analysis_by_sid in analysis_by_sid_by_type.items():
-        try:
-            # TODO: fix this
-            # analyses: list[
-            #     dict[str, str]
-            # ] = aapi.get_latest_analysis_for_samples_and_type(
-            #     project=project,
-            #     analysis_type=str(a_type),
-            #     request_body=sample_ids,
-            # )
-            analyses: list[dict[str, str]] = []
-        except exceptions.ApiException:
-            traceback.print_exc()
-        else:
-            for a in analyses:
-                analysis_by_sid[a['sample_ids'][0]] = a
-        logger.info(f'Will copy {a_type} analysis entries: {analysis_by_sid}')
+    # Pull Participant Data
+    participant_data = []
+    participant_ids: list = []
+    for sg in original_project_subset_data.get('project').get('samples'):
+        participant = sg.get('participant')
+        if participant:
+            participant_data.append(participant)
+            participant_ids.append(participant.get('externalId'))
 
     # Parse Families & Participants
-    participant_ids = [int(sample['participant_id']) for sample in samples]
     if skip_ped:
         # If no family data is available, only the participants should be transferred.
-        external_participant_ids = transfer_participants(
-            initial_project=project,
+        upserted_participant_map = transfer_participants(
             target_project=target_project,
-            participant_ids=participant_ids,
+            participant_data=participant_data,
         )
 
     else:
         family_ids = transfer_families(project, target_project, participant_ids)
-        external_participant_ids = transfer_ped(project, target_project, family_ids)
+        transfer_ped(project, target_project, family_ids)
 
-    external_sample_internal_participant_map = get_map_ipid_esid(
-        project, target_project, external_participant_ids
+    existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
+
+    samples = original_project_subset_data.get('project').get('samples')
+    transfer_samples_sgs_assays(
+        samples, existing_data, upserted_participant_map, target_project, project
     )
+    transfer_analyses(samples, existing_data, target_project, project)
 
-    new_sample_map = {}
+
+def transfer_samples_sgs_assays(
+    samples: dict,
+    existing_data: dict,
+    upserted_participant_map: dict[str, int],
+    target_project: str,
+    project: str,
+):
+    """
+    Transfer samples, sequencing groups, and assays from the original project to the
+    test project.
+    """
+    for s in samples:
+        sample_sgs: list[SequencingGroupUpsert] = []
+        for sg in s.get('sequencingGroups'):
+            sg_assays: list[AssayUpsert] = []
+            _existing_sg = _get_existing_sg(
+                existing_data, s.get('externalId'), sg.get('type')
+            )
+            _existing_sgid = _existing_sg.get('id', None)
+            for assay in sg.get('assays'):
+                _existing_assay: dict[str, str] = {}
+                if _existing_sgid:
+                    _existing_assay = _get_existing_assay(
+                        existing_data,
+                        s.get('externalId'),
+                        _existing_sgid,
+                        assay.get('type'),
+                    )
+                assay_upsert = AssayUpsert(
+                    type=assay.get('type'),
+                    id=_existing_assay.get('id', None),
+                    external_ids=assay.get('externalIds') or {},
+                    # sample_id=self.s,
+                    meta=assay.get('meta'),
+                )
+                sg_assays.append(assay_upsert)
+            sg_upsert = SequencingGroupUpsert(
+                id=_existing_sgid,
+                external_ids=sg.get('externalIds') or {},
+                meta=sg.get('meta'),
+                platform=sg.get('platform'),
+                technology=sg.get('technology'),
+                type=sg.get('type'),
+                assays=sg_assays,
+            )
+            sample_sgs.append(sg_upsert)
+
+        _sample_type = None if s['type'] == 'None' else s['type']
+        _existing_sid: str = None
+        _existing_sample = _get_existing_sample(existing_data, s['externalId'])
+        if _existing_sample:
+            _existing_sid = _existing_sample['id']
+
+        _existing_pid: int = None
+        if s['participant']:
+            _existing_pid = upserted_participant_map[s['participant']['externalId']]
+
+        sample_upsert = SampleUpsert(
+            external_id=s['externalId'],
+            type=_sample_type or None,
+            meta=(_copy_files_in_dict(s['meta'], project) or {}),
+            participant_id=_existing_pid,
+            sequencing_groups=sample_sgs,
+            id=_existing_sid,
+        )
+
+        logger.info(f'Processing sample {s["id"]}')
+        logger.info('Creating test sample entry')
+        sapi.create_sample(
+            project=target_project,
+            sample_upsert=sample_upsert,
+        )
+
+
+def transfer_analyses(
+    samples: dict, existing_data: dict, target_project: str, project: str
+):
+    """
+    This function will transfer the analyses from the original project to the test project.
+    """
+    new_sg_data = query(SG_ID_QUERY, {'project': target_project})
+
+    new_sg_map = {}
+    for s in new_sg_data.get('project').get('samples'):
+        sg_ids: list = []
+        for sg in s.get('sequencingGroups'):
+            sg_ids.append(sg.get('id'))
+        new_sg_map[s.get('externalId')] = sg_ids
 
     for s in samples:
-        logger.info(f'Processing sample {s["id"]}')
-
-        if s['external_id'] in test_sample_by_external_id:
-            new_s_id = test_sample_by_external_id[s['external_id']]['id']
-            logger.info(f'Sample already in test project, with ID {new_s_id}')
-            new_sample_map[s['id']] = new_s_id
-
-        else:
-            logger.info('Creating test sample entry')
-            new_s_id = sapi.create_sample(
-                project=target_project,
-                sample_upsert=SampleUpsert(
-                    external_id=s['external_id'],
-                    type=s['type'],
-                    meta=(_copy_files_in_dict(s['meta'], project) or {}),
-                    participant_id=external_sample_internal_participant_map[
-                        s['external_id']
-                    ],
-                ),
+        for sg in s['sequencingGroups']:
+            _existing_sg = _get_existing_sg(
+                existing_data, s.get('externalId'), sg.get('type')
             )
-            new_sample_map[s['id']] = new_s_id
+            _existing_sgid = _existing_sg.get('id', None)
+            for analysis in sg['analyses']:
+                if analysis['type'] not in ['cram', 'gvcf']:
+                    # Currently the create_test_subset script only handles crams or gvcf files.
+                    continue
 
-            seq_info = seq_info_by_s_id.get(s['id'])
-            if seq_info:
-                logger.info('Processing sequence entry')
-                new_meta = _copy_files_in_dict(seq_info.get('meta'), project)
-                logger.info('Creating sequence entry in test')
-                assayapi.create_assay(
-                    assay_upsert=AssayUpsert(
-                        sample_id=new_s_id,
-                        meta=new_meta,
-                        type=seq_info['type'],
-                        external_ids=seq_info['external_ids'],
-                    ),
-                )
+                _existing_analysis_id = None
+                _existing_analysis: dict = {}
+                if _existing_sgid:
+                    _existing_analysis = _get_existing_analysis(
+                        existing_data,
+                        s['externalId'],
+                        _existing_sgid,
+                        analysis['type'],
+                    )
+                    _existing_analysis_id = _existing_analysis.get('id', None)
+                if _existing_analysis_id:
+                    am = AnalysisUpdateModel(
+                        type=analysis['type'],
+                        output=_copy_files_in_dict(
+                            analysis['output'],
+                            project,
+                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                        ),
+                        status=AnalysisStatus(analysis['status'].lower()),
+                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        meta=analysis['meta'],
+                    )
+                    aapi.update_analysis(
+                        analysis_id=_existing_analysis_id,
+                        analysis_update_model=am,
+                    )
+                else:
+                    am = Analysis(
+                        type=analysis['type'],
+                        output=_copy_files_in_dict(
+                            analysis['output'],
+                            project,
+                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                        ),
+                        status=AnalysisStatus(analysis['status'].lower()),
+                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        meta=analysis['meta'],
+                    )
 
-        for a_type in ['cram', 'gvcf']:
-            analysis = analysis_by_sid_by_type[a_type].get(s['id'])
-            if analysis:
-                logger.info(f'Processing {a_type} analysis entry')
-                am = Analysis(
-                    type=str(a_type),
-                    output=_copy_files_in_dict(
-                        analysis['output'],
-                        project,
-                        (str(s['id']), new_sample_map[s['id']]),
-                    ),
-                    status=AnalysisStatus(analysis['status']),
-                    sample_ids=[new_sample_map[s['id']]],
-                    meta=analysis['meta'],
-                )
-                logger.info(f'Creating {a_type} analysis entry in test')
-                aapi.create_analysis(project=target_project, analysis=am)
-        logger.info(f'-')
+                    logger.info(f'Creating {analysis["type"]}analysis entry in test')
+                    aapi.create_analysis(project=target_project, analysis=am)
+
+
+def _get_existing_sample(data: dict, sample_id: str) -> dict:
+    for sample in data.get('project').get('samples'):
+        if sample.get('externalId') == sample_id:
+            return sample
+
+    return None
+
+
+def _get_existing_sg(
+    existing_data: dict, sample_id: str, sg_type: str = None, sg_id: str = None
+) -> dict:
+    if not sg_type and not sg_id:
+        raise ValueError('Must provide sg_type or sg_id when getting exsisting sg')
+    sample = _get_existing_sample(existing_data, sample_id)
+    for sg in sample.get('sequencingGroups'):
+        if sg_id and sg.get('id') == sg_id:
+            return sg
+        if sg_type and sg.get('type') == sg_type:
+            return sg
+
+    return None
+
+
+def _get_existing_assay(
+    data: dict, sample_id: str, sg_id: str, assay_type: str
+) -> dict:
+    sg = _get_existing_sg(
+        existing_data=data,
+        sample_id=sample_id,
+        sg_id=sg_id,
+    )
+    for assay in sg.get('assays'):
+        if assay.get('type') == assay_type:
+            return assay
+
+    return None
+
+
+def _get_existing_analysis(
+    data: dict, sample_id: str, sg_id: str, analysis_type: str
+) -> dict:
+    sg = _get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id)
+    for analysis in sg.get('analyses'):
+        if analysis.get('type') == analysis_type:
+            return analysis
+    return None
+
+
+def _get_sids_for_families(
+    project: str,
+    families_n: int,
+    additional_families,
+) -> list[str]:
+    """Returns specific sequencing groups to be included in the test project."""
+
+    included_sids: list = []
+    _num_families_to_subset: int = None
+    _randomly_selected_families: list = []
+
+    # Case 1: If neither families_n nor _additional_families
+    if not families_n and not additional_families:
+        return included_sids
+
+    # Case 2: If families_n but not _additional_families
+    if families_n and not additional_families:
+        _num_families_to_subset = families_n
+
+    # Case 3: If both families_n and _additional_families
+    if families_n and additional_families:
+        _num_families_to_subset = families_n - len(additional_families)
+
+    family_sgid_output = query(QUERY_FAMILY_SGID, {'project': project})
+
+    # 1. Remove the families in _families_to_subset
+    all_family_sgids = family_sgid_output.get('project').get('families')
+    _filtered_family_sgids = [
+        fam for fam in all_family_sgids if fam['externalId'] not in additional_families
+    ]
+    _user_input_families = [
+        fam for fam in all_family_sgids if fam['externalId'] in additional_families
+    ]
+
+    # TODO: Replace this with the nice script that randomly selects better :)
+    # 2. Randomly select _num_families_to_subset from the remaining families
+    if _num_families_to_subset:
+        _randomly_selected_families = random.sample(
+            _filtered_family_sgids, _num_families_to_subset
+        )
+
+    # 3. Combine the families in _families_to_subset with the randomly selected families & return sequencing group ids
+
+    _all_families_to_subset = _randomly_selected_families + _user_input_families
+
+    for fam in _all_families_to_subset:
+        for participant in fam['participants']:
+            for sample in participant['samples']:
+                included_sids.append(sample['id'])
+
+    return included_sids
 
 
 def transfer_families(
@@ -391,14 +603,10 @@ def transfer_ped(
 
 
 def transfer_participants(
-    initial_project: str, target_project: str, participant_ids: list[int]
-) -> list[str]:
+    target_project: str,
+    participant_data,
+) -> dict[str, int]:
     """Transfers relevant participants between projects"""
-
-    current_participants = papi.get_participants(
-        initial_project,
-        body_get_participants={'internal_participant_ids': participant_ids},
-    )
     existing_participants = papi.get_participants(target_project)
 
     target_project_epids = [
@@ -406,11 +614,19 @@ def transfer_participants(
     ]
 
     participants_to_transfer = []
-    for participant in current_participants:
-        if participant['external_id'] not in target_project_epids:
+    for participant in participant_data:
+        if participant['externalId'] not in target_project_epids:
             # Participants with id field will be updated & those without will be inserted
             del participant['id']
-        transfer_participant = {k: v for k, v in participant.items() if v is not None}
+        # transfer_participant = {k: v for k, v in participant.items() if v is not None}
+        transfer_participant = {
+            'external_id': participant['externalId'],
+            'meta': participant.get('meta') or {},
+            'karyotype': participant.get('karyotype'),
+            'reported_gender': participant.get('reportedGender'),
+            'reported_sex': participant.get('reportedSex'),
+            'id': participant.get('id'),
+        }
         # Participants are being created before the samples are, so this will be empty for now.
         transfer_participant['samples'] = []
         participants_to_transfer.append(transfer_participant)
@@ -418,50 +634,14 @@ def transfer_participants(
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
     )
-    return list(upserted_participants.keys())
 
+    external_to_internal_participant_id_map: dict[str, int] = {}
 
-def get_map_ipid_esid(
-    project: str, target_project: str, external_participant_ids: list[str]
-) -> dict[str, str]:
-    """Intermediate steps to determine the mapping of esid to ipid
-    Acronyms
-    ep : external participant id
-    ip : internal participant id
-    es : external sample id
-    is : internal sample id
-    """
-
-    # External PID: Internal PID
-    ep_ip_map = papi.get_participant_id_map_by_external_ids(
-        target_project, request_body=external_participant_ids
-    )
-
-    # External PID : Internal SID
-    ep_is_map = papi.get_external_participant_id_to_internal_sample_id(project)
-
-    # Internal PID : Internal SID
-    ip_is_map = []
-    for ep_is_pair in ep_is_map:
-        if ep_is_pair[0] in ep_ip_map:
-            ep_is_pair[0] = ep_ip_map[ep_is_pair[0]]
-            ip_is_map.append(ep_is_pair)
-
-    # Internal PID : External SID
-    is_es_map = sapi.get_all_sample_id_map_by_internal(project)
-
-    ip_es_map = []
-    for ip_is_pair in ip_is_map:
-        samples_per_participant = [ip_is_pair[0]]
-        for isid in ip_is_pair[1:]:
-            if isid in is_es_map:
-                samples_per_participant.append(is_es_map[isid])
-        ip_es_map.append(samples_per_participant)
-
-    # External SID : Internal PID (Normalised)
-    external_sample_internal_participant_map = _normalise_map(ip_es_map)
-
-    return external_sample_internal_participant_map
+    for participant in upserted_participants:
+        external_to_internal_participant_id_map[
+            participant['external_id']
+        ] = participant['id']
+    return external_to_internal_participant_id_map
 
 
 def get_samples_for_families(project: str, additional_families: list[str]) -> list[str]:
@@ -685,38 +865,6 @@ def _pretty_format_samples(samples: list[dict[str, str]]) -> str:
     return ', '.join(f"{s['id']}/{s['external_id']}" for s in samples)
 
 
-def _process_existing_test_samples(
-    test_project: str, samples: list[dict[str, str]]
-) -> dict[str, dict[str, str]]:
-    """
-    Removes samples that need to be removed and returns those that need to be kept
-    """
-    test_samples = sapi.get_samples(
-        body_get_samples={
-            'project_ids': [test_project],
-            'active': True,
-        }
-    )
-    external_ids = [s['external_id'] for s in samples]
-    test_samples_to_remove = [
-        s for s in test_samples if s['external_id'] not in external_ids
-    ]
-    test_samples_to_keep = [s for s in test_samples if s['external_id'] in external_ids]
-    if test_samples_to_remove:
-        logger.info(
-            f'Removing test samples: {_pretty_format_samples(test_samples_to_remove)}'
-        )
-        for s in test_samples_to_remove:
-            sapi.update_sample(s['id'], SampleUpsert(active=False))
-
-    if test_samples_to_keep:
-        logger.info(
-            f'Test samples already exist: {_pretty_format_samples(test_samples_to_keep)}'
-        )
-
-    return {s['external_id']: s for s in test_samples_to_keep}
-
-
 def file_exists(path: str) -> bool:
     """
     Check if the object exists, where the object can be:
@@ -732,80 +880,6 @@ def file_exists(path: str) -> bool:
         gs = storage.Client()
         return gs.get_bucket(bucket).get_blob(path)
     return os.path.exists(path)
-
-
-def _get_sgs_for_families(
-    project: str,
-    families_n: int,
-    additional_families,
-) -> list[str]:
-    """Returns specific sequencing groups to be included in the test project."""
-
-    included_sgids: list = []
-    _num_families_to_subset: int = None
-    _randomly_selected_families: list = []
-
-    # Case 1: If neither families_n nor _additional_families
-    if not families_n and not additional_families:
-        return included_sgids
-
-    # Case 2: If families_n but not _additional_families
-    if families_n and not additional_families:
-        _num_families_to_subset = families_n
-
-    # Case 3: If both families_n and _additional_families
-    if families_n and additional_families:
-        _num_families_to_subset = families_n - len(additional_families)
-
-    QUERY_FAMILY_SGID = gql(
-        """
-        query FamilyQuery($project: String!) {
-            project(name: $project) {
-                families {
-                    id
-                    externalId
-                    participants {
-                        samples {
-                            sequencingGroups {
-                                id
-                            }
-                        }
-                    }
-                }
-
-            }
-        }
-    """
-    )
-
-    family_sgid_output = query(QUERY_FAMILY_SGID, {'project': project})
-
-    # 1. Remove the families in _families_to_subset
-    all_family_sgids = family_sgid_output.get('project').get('families')
-    _filtered_family_sgids = [
-        fam for fam in all_family_sgids if fam['externalId'] not in additional_families
-    ]
-    _user_input_families = [
-        fam for fam in all_family_sgids if fam['externalId'] in additional_families
-    ]
-
-    # 2. Randomly select _num_families_to_subset from the remaining families
-    if _num_families_to_subset:
-        _randomly_selected_families = random.sample(
-            _filtered_family_sgids, _num_families_to_subset
-        )
-
-    # 3. Combine the families in _families_to_subset with the randomly selected families & return sequencing group ids
-
-    _all_families_to_subset = _randomly_selected_families + _user_input_families
-
-    for fam in _all_families_to_subset:
-        for participant in fam['participants']:
-            for sample in participant['samples']:
-                for sg in sample['sequencingGroups']:
-                    included_sgids.append(sg['id'])
-
-    return included_sgids
 
 
 if __name__ == '__main__':
