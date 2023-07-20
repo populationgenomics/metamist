@@ -181,7 +181,7 @@ def generate_api_and_copy(
 
 def generate_schema_file():
     """
-    Generate schema file and place int the metamist/graphql/ directory
+    Generate schema file and place in the metamist/graphql/ directory
     """
     command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
     schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
