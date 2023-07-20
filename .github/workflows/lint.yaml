@@ -19,7 +19,6 @@ jobs:
       - name: Install packages
         run: |
           pip install -r requirements-dev.txt
-          pip install -r requirements-server.txt
           pip install .
 
       - name: pre-commit
