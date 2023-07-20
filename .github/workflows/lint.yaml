@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -eo pipefail -l {0}
 
     steps:
       - uses: actions/checkout@v2
@@ -19,7 +19,6 @@ jobs:
       - name: Install packages
         run: |
           pip install -r requirements-dev.txt
-          pip install -r requirements-server.txt
           pip install .
 
       - name: pre-commit

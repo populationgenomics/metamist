@@ -19,7 +19,7 @@ jobs:
       SM_API_DOCKER: australia-southeast1-docker.pkg.dev/cpg-common/images/sm-api
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -eo pipefail -l {0}
     steps:
       - uses: actions/checkout@main
 
