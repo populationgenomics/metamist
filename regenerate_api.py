@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # pylint: disable=logging-not-lazy,subprocess-popen-preexec-fn,consider-using-with
 import logging
-import re
-from typing import Optional, List
-
 import os
-import signal
-import tempfile
+import re
 import shutil
-import time
+import signal
 import subprocess
+import tempfile
+import time
+from typing import List, Optional
 
 import requests
 
@@ -33,6 +32,15 @@ def check_if_server_is_accessible() -> bool:
         return requests.get(SCHEMA_URL, timeout=30).ok
     except requests.ConnectionError:
         return False
+
+
+def assert_server_is_accessible():
+    """Assert that the server is accessible"""
+    if not check_if_server_is_accessible():
+        raise requests.ConnectionError(
+            f'Could not connect to server at {SCHEMA_URL}. '
+            'Please make sure the server is running and accessible.'
+        )
 
 
 def start_server() -> Optional[subprocess.Popen]:
@@ -124,7 +132,9 @@ def check_openapi_version():
     logger.info(f'Got openapi version: {version}')
 
 
-def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] = None):
+def generate_api_and_copy(
+    output_type, output_copyer, extra_commands: List[str] | None = None
+):
     """
     Use OpenApiGenerator to generate the installable API
     """
@@ -161,7 +171,9 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
             time.sleep(2)
 
     if not succeeded:
-        return
+        raise RuntimeError(
+            f'openapi generation failed after trying {n_attempts} time(s)'
+        )
 
     output_copyer(tmpdir)
     shutil.rmtree(tmpdir)
@@ -169,7 +181,7 @@ def generate_api_and_copy(output_type, output_copyer, extra_commands: List[str] 
 
 def generate_schema_file():
     """
-    Generate schema file and place int he metamist/graphql/ directory
+    Generate schema file and place in the metamist/graphql/ directory
     """
     command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
     schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
@@ -299,21 +311,47 @@ def main():
     else:
         process = start_server()
 
+        # Loop until Docker has initialised server and is ready to accept connections
+        startup_tries = 5
+        wait_time_in_seconds = 2
+        while (not check_if_server_is_accessible()) and startup_tries > 0:
+            startup_tries -= 1
+            logger.info(
+                f'Dockerised API server is not ready yet. '
+                + f'Retrying in {wait_time_in_seconds} seconds. '
+                + f'Remaining tries: {startup_tries}'
+            )
+            time.sleep(wait_time_in_seconds)
+
     try:
+        assert_server_is_accessible()
         check_openapi_version()
+
+        # Generate the installable Python API
         generate_api_and_copy(
             'python',
             copy_python_files_from,
             ['--template-dir', 'openapi-templates'],
         )
-        generate_api_and_copy('typescript-axios', copy_typescript_files_from)
 
+        # Generate the Typescript API for React application
+        generate_api_and_copy(
+            'typescript-axios',
+            copy_typescript_files_from,
+        )
+
+        # Generate the GraphQL schema
         generate_schema_file()
+
+        # Copy resources and README
         shutil.copy(
             './resources/muck-the-duck.svg',
             os.path.join('web/src', 'muck-the-duck.svg'),
         )
-        shutil.copy('README.md', os.path.join(OUTPUT_DOCS_DIR, 'index.md'))
+        shutil.copy(
+            'README.md',
+            os.path.join(OUTPUT_DOCS_DIR, 'index.md'),
+        )
 
     # pylint: disable=broad-except
     except BaseException as e:

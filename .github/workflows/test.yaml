@@ -14,7 +14,7 @@ jobs:
       SM_DOCKER: samplemetadata:dev
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -eo pipefail -l {0}
     steps:
       - uses: actions/checkout@main
 
