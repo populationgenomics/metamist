@@ -52,22 +52,6 @@ papi = ParticipantApi()
 
 DEFAULT_SAMPLES_N = 10
 
-SG_ID_QUERY = gql(
-    """
-    query getSGIds($project: String!) {
-        project(name: $project) {
-            samples{
-                id
-                externalId
-                sequencingGroups {
-                    id
-                }
-            }
-        }
-    }
-    """
-)
-
 QUERY_ALL_DATA = gql(
     """
     query getAllData($project: String!, $sids: [String!]) {
@@ -157,6 +141,33 @@ QUERY_FAMILY_SGID = gql(
 """
 )
 
+SG_ID_QUERY = gql(
+    """
+    query getSGIds($project: String!) {
+        project(name: $project) {
+            samples{
+                id
+                externalId
+                sequencingGroups {
+                    id
+                }
+            }
+        }
+    }
+    """
+)
+
+PARTICIPANT_QUERY = """
+    query ($project: String!) {
+        project (externalId: $project) {
+            participants {
+                id
+                externalId
+            }
+        }
+    }
+    """
+
 
 @click.command()
 @click.option(
@@ -221,6 +232,7 @@ def main(
     _additional_families: list[str] = list(additional_families)
     _additional_samples: list[str] = list(additional_samples)
 
+    # 1. Determine the sids to be moved into -test.
     specific_sids = _get_sids_for_families(
         project,
         families_n,
@@ -233,28 +245,25 @@ def main(
 
     specific_sids = specific_sids + _additional_samples
 
-    # 1. Query all the SGIDS
+    # 2. Get all sids in project.
     sid_output = query(SG_ID_QUERY, variables={'project': project})
     all_sids = [sid['id'] for sid in sid_output.get('project').get('samples')]
 
-    # 2. Subtract the specific_sgs from all the sgs
+    # 3. Subtract the specific_sgs from all the sgs
     sgids_after_inclusions = list(set(all_sids) - set(specific_sids))
-    # 3. Randomly select from the remaining sgs
+    # 4. Randomly select from the remaining sgs
     random_sgs: list[str] = []
     random.seed(42)  # for reproducibility
     if (samples_n - len(specific_sids)) > 0:
         random_sgs = random.sample(
             sgids_after_inclusions, samples_n - len(specific_sids)
         )
-    # 4. Add the specific_sgs to the randomly selected sgs
+    # 5. Add the specific_sgs to the randomly selected sgs
     final_subset_sids = specific_sids + random_sgs
-    # 5. Query all the samples from the selected sgs
+    # 6. Query all the samples from the selected sgs
     original_project_subset_data = query(
         QUERY_ALL_DATA, {'project': project, 'sids': final_subset_sids}
     )
-
-    # Populating test project
-    target_project = project + '-test'
 
     # Pull Participant Data
     participant_data = []
@@ -264,6 +273,9 @@ def main(
         if participant:
             participant_data.append(participant)
             participant_ids.append(participant.get('externalId'))
+
+    # Populating test project
+    target_project = project + '-test'
 
     # Parse Families & Participants
     if skip_ped:
@@ -275,7 +287,7 @@ def main(
 
     else:
         family_ids = transfer_families(project, target_project, participant_ids)
-        transfer_ped(project, target_project, family_ids)
+        upserted_participant_map = transfer_ped(project, target_project, family_ids)
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
 
@@ -304,7 +316,7 @@ def transfer_samples_sgs_assays(
             _existing_sg = _get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
-            _existing_sgid = _existing_sg.get('id', None)
+            _existing_sgid = _existing_sg.get('id') if _existing_sg else None
             for assay in sg.get('assays'):
                 _existing_assay: dict[str, str] = {}
                 if _existing_sgid:
@@ -314,9 +326,12 @@ def transfer_samples_sgs_assays(
                         _existing_sgid,
                         assay.get('type'),
                     )
+                existing_assay_id = (
+                    _existing_assay.get('id') if _existing_assay else None
+                )
                 assay_upsert = AssayUpsert(
                     type=assay.get('type'),
-                    id=_existing_assay.get('id', None),
+                    id=existing_assay_id,
                     external_ids=assay.get('externalIds') or {},
                     # sample_id=self.s,
                     meta=assay.get('meta'),
@@ -380,13 +395,12 @@ def transfer_analyses(
             _existing_sg = _get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
-            _existing_sgid = _existing_sg.get('id', None)
+            _existing_sgid = _existing_sg.get('id') if _existing_sg else None
             for analysis in sg['analyses']:
                 if analysis['type'] not in ['cram', 'gvcf']:
                     # Currently the create_test_subset script only handles crams or gvcf files.
                     continue
 
-                _existing_analysis_id = None
                 _existing_analysis: dict = {}
                 if _existing_sgid:
                     _existing_analysis = _get_existing_analysis(
@@ -395,7 +409,9 @@ def transfer_analyses(
                         _existing_sgid,
                         analysis['type'],
                     )
-                    _existing_analysis_id = _existing_analysis.get('id', None)
+                _existing_analysis_id = (
+                    _existing_analysis.get('id') if _existing_analysis else None
+                )
                 if _existing_analysis_id:
                     am = AnalysisUpdateModel(
                         type=analysis['type'],
@@ -443,11 +459,12 @@ def _get_existing_sg(
     if not sg_type and not sg_id:
         raise ValueError('Must provide sg_type or sg_id when getting exsisting sg')
     sample = _get_existing_sample(existing_data, sample_id)
-    for sg in sample.get('sequencingGroups'):
-        if sg_id and sg.get('id') == sg_id:
-            return sg
-        if sg_type and sg.get('type') == sg_type:
-            return sg
+    if sample:
+        for sg in sample.get('sequencingGroups'):
+            if sg_id and sg.get('id') == sg_id:
+                return sg
+            if sg_type and sg.get('type') == sg_type:
+                return sg
 
     return None
 
@@ -564,20 +581,13 @@ def transfer_families(
 
 def transfer_ped(
     initial_project: str, target_project: str, family_ids: list[int]
-) -> list[str]:
+) -> dict[str, int]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
         initial_project,
         export_type='tsv',
         internal_family_ids=family_ids,
     )
-    ped_json = fapi.get_pedigree(
-        initial_project,
-        export_type='json',
-        internal_family_ids=family_ids,
-    )
-
-    external_participant_ids = [ped['individual_id'] for ped in ped_json]
     tmp_ped_tsv = 'tmp_ped.tsv'
     # Work-around as import_pedigree takes a file.
     with open(tmp_ped_tsv, 'w') as tmp_ped:
@@ -591,7 +601,14 @@ def transfer_ped(
             create_missing_participants=True,
         )
 
-    return external_participant_ids
+    # Get map of external participant id to internal
+    participant_output = query(PARTICIPANT_QUERY, {'project': target_project})
+    participant_map = {
+        participant['externalId']: participant['id']
+        for participant in participant_output.get('project').get('participants')
+    }
+
+    return participant_map
 
 
 def transfer_participants(
