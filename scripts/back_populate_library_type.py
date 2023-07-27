@@ -7,9 +7,9 @@ updates the sequence.meta field with `facility` and `library_type` annotations.
 import logging
 import re
 import click
-
-from metamist.apis import AssayApi
-from metamist.models import AssayUpsert
+from metamist.graphql import gql, query
+from metamist.api.project_api import ProjectApi
+import csv
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(
@@ -41,12 +41,11 @@ garvan_fastq_regex = (
 )
 
 
+def get_sequencing_groups(dataset, gql_query):
+    return query(gql_query, {"dataset": dataset})["project"]["sequencingGroups"]
+
+
 @click.command()
-@click.option(
-    '--project',
-    required=True,
-    help='The sample-metadata project ($DATASET)',
-)
 @click.option(
     '-d',
     '--dry-run',
@@ -54,28 +53,54 @@ garvan_fastq_regex = (
     default=False,
     help='Do not save changes to metamist',
 )
-def main(project: str, dry_run: bool):
+def main(dry_run: bool):
     """Back populate facility and library_type meta fields for existing sequences"""
-    asapi = AssayApi()
-    # Pull all the sequences
-    assays = asapi.get_assays_by_criteria(
-        active=True,
-        body_get_assays_by_criteria={
-            'projects': [project],
-        },
+    _query = gql(
+        """
+            query MyQuery($dataset: String!) {
+                project(name: $dataset) {
+                    sequencingGroups(type: {eq: "exome"}) {
+                    id
+                    meta
+                    platform
+                    technology
+                    type
+                    assays {
+                        id
+                        meta
+                        type
+                    }
+                    }
+                }
+            }
+        """
     )
+    # Pull all the sequences
+    projects = ProjectApi().get_my_projects()
+    projects = [
+        project
+        for project in projects
+        if 'test' not in project and 'training' not in project and 'seqr' not in project
+    ]
+
+    assays = []
+    for project in projects:
+        sgs = get_sequencing_groups(project, _query)
+        for sg in sgs:
+            assays.extend(sg['assays'])
 
     # For logs
     updated_assays: list[dict[str, dict]] = []
+    match_no_match = {}
 
     for assay in assays:
-        internal_sequence_id = assay.get('id')
+        internal_assay_id = assay['id']
         current_library_type = assay['meta'].get('library_type')
 
         # Quick validation
         if current_library_type:
             logging.info(
-                f'{internal_sequence_id} already has current_library_type set: {current_library_type}. Skipping'
+                f'{internal_assay_id} already has current_library_type set: {current_library_type}. Skipping'
             )
             continue
 
@@ -92,7 +117,7 @@ def main(project: str, dry_run: bool):
             else:
                 # Can't determine fastq_filename
                 logging.warning(
-                    f'Cant extract fastq_filename for {internal_sequence_id} skipping {assay}'
+                    f'Cant extract fastq_filename for {internal_assay_id} skipping {assay}'
                 )
                 continue
 
@@ -117,16 +142,41 @@ def main(project: str, dry_run: bool):
             )
 
         else:
+            for lt in (
+                'ILMNDNAPCRFREE',
+                'TruSeqDNAPCR-Free',
+                'NexteraDNAFLEX',
+                'NEXTERAFLEXWGS',
+                'SSQXT-CRE',
+                'SSQXTCRE',
+                'SSXTLICREV2',
+                'SSQXTCREV2',
+                'TwistWES1VCGS1',
+                'TSStrmRNA',
+                'TSStrtRNA',
+                'TruSeq-Stranded-mRNA',
+                'ILLStrtRNA',
+            ):
+                if lt in fastq_filename:
+                    match_no_match[internal_assay_id] = (lt, fastq_filename)
+                    continue
             logging.warning(
-                f'No file name match found for {internal_sequence_id} skipping {fastq_filename}'
+                f'No file name match found for {internal_assay_id} skipping {fastq_filename}'
             )
 
         if meta_fields_to_update:
             if not dry_run:
-                asapi.update_assay(
-                    AssayUpsert(id=internal_sequence_id, meta=meta_fields_to_update),
-                )
-            updated_assays.append({internal_sequence_id: meta_fields_to_update})
+                #     seqapi.update_sequence(
+                #         internal_sequence_id,
+                #         SequenceUpdateModel(meta=meta_fields_to_update),
+                #     )
+                # updated_sequences.append({internal_sequence_id: meta_fields_to_update})
+                pass
+
+    for assay_id, (libtype, fq) in match_no_match.items():
+        logging.info(
+            f'{assay_id} does not match regex but has {libtype} in read filename: {fq}'
+        )
 
     if dry_run:
         logging.info(
