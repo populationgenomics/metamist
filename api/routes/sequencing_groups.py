@@ -1,11 +1,15 @@
+from typing import Any
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from api.utils.db import (
     get_project_readonly_connection,
     Connection,
     get_projectless_db_connection,
+    get_project_write_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
     # Sample,
@@ -16,6 +20,15 @@ from models.utils.sequencing_group_id_format import (
 router = APIRouter(prefix='/sequencing-group', tags=['sequencing-group'])
 
 # region CREATES
+
+
+class SequencingGroupUpdateModel(BaseModel):
+    """Update sequencing group model"""
+
+    meta: dict[str, Any] | None = None
+    platform: str | None = None
+    technology: str | None = None
+    type: str | None = None
 
 
 @router.get('{sequencing_group_id}', operation_id='getSequencingGroup')
@@ -44,3 +57,28 @@ async def get_all_sequencing_group_ids_by_sample_by_type(
         }
         for sid, sg_type_to_sg_ids in sg.items()
     }
+
+
+@router.get('/project/{sequencing_group_id}', operation_id='updateSequencingGroup')
+async def update_sequencing_group(
+    sequencing_group_id: str,
+    sequencing_group: SequencingGroupUpdateModel,
+    connection: Connection = get_project_write_connection,
+) -> bool:
+    """Update the meta fields of a sequencing group"""
+    st = SequencingGroupLayer(connection)
+    await st.upsert_sequencing_groups(
+        [
+            SequencingGroupUpsertInternal(
+                id=sequencing_group_id_transform_to_raw(sequencing_group_id),
+                meta=sequencing_group.meta,
+                platform=sequencing_group.platform,
+                technology=sequencing_group.technology,
+                type=sequencing_group.type,
+            )
+        ]
+    )
+    return True
+
+
+# endregion
