@@ -27,11 +27,10 @@ from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.enum_tables import SequencingTypeTable
-from db.python.utils import ProjectId, GenericFilter
-from models.enums import AnalysisStatus
+from db.python.utils import ProjectId
+from metamist.graphql import query_async, gql
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
@@ -217,6 +216,7 @@ class SeqrLayer(BaseLayer):
             if sync_es_index:
                 promises.append(
                     self.update_es_index(
+                        dataset=project.name,
                         sequencing_type=sequencing_type,
                         sequencing_group_ids=sequencing_group_ids,
                         **params,
@@ -371,6 +371,7 @@ class SeqrLayer(BaseLayer):
 
     async def update_es_index(
         self,
+        dataset,
         session: aiohttp.ClientSession,
         sequencing_type: str,
         project_guid,
@@ -405,46 +406,63 @@ class SeqrLayer(BaseLayer):
         fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
         # pylint: disable=no-member
 
-        alayer = AnalysisLayer(connection=self.connection)
-        es_index_analyses = await alayer.query(
-            AnalysisFilter(
-                project=GenericFilter(eq=self.connection.project),
-                type=GenericFilter(eq='es-index'),
-                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
-            )
+        es_index_query = gql(
+            """
+            query MyQuery($project: String!) {
+                project(name: $project) {
+                    analyses(status: {eq: COMPLETED}, type: {eq: "ES-INDEX"}) {
+                        id
+                        timestampCompleted
+                        output
+                        type
+                        meta
+                        sequencingGroups {
+                            id
+                        }
+                    }
+                }
+            }
+            """
         )
+
+        es_index_query_results = await query_async(es_index_query, {'project': dataset})
+        es_index_analyses = [
+            analysis
+            for analysis in es_index_query_results['project']['analyses']
+            if analysis['meta'].get('sequencing_type') == sequencing_type
+        ]
+
+        if len(es_index_analyses) == 0:
+            return [f'{dataset} :: No ES index to synchronise']
 
         es_index_analyses = sorted(
             es_index_analyses,
-            key=lambda el: el.timestamp_completed,
+            key=lambda el: el['timestampCompleted'],
         )
-
-        if len(es_index_analyses) == 0:
-            return [f'No ES index to synchronise']
 
         with AnyPath(fn_path).open('w+') as f:
             f.write('\n'.join(rows_to_write))
 
-        es_index = es_index_analyses[-1].output
+        es_index = es_index_analyses[-1]['output']
 
         messages = []
 
         if sequencing_group_ids:
             sequencing_groups_in_new_index = set(
-                es_index_analyses[-1].sequencing_group_ids
+                sg['id'] for sg in es_index_analyses[-1]['sequencingGroups']
             )
 
             if len(es_index_analyses) > 1:
                 sequencing_groups_in_old_index = set(
-                    es_index_analyses[-2].sequencing_group_ids
+                    sg['id'] for sg in es_index_analyses[-2]['sequencingGroups']
                 )
                 sequencing_groups_diff = sequencing_group_id_format_list(
                     sequencing_groups_in_new_index - sequencing_groups_in_old_index
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
+                        'Sequencing groups added to index: '
+                        + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
