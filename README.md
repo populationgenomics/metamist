@@ -241,6 +241,7 @@ We could now place breakpoints on the sample route (ie: `api/routes/sample.py`),
 # This will automatically proxy request to the server.
 cd web
 npm install
+npm run compile
 npm start
 ```
 
@@ -311,7 +312,7 @@ Or you can build the docker file, and specify that
 # SM_DOCKER is a known env variable to regenerate_api.py
 export SM_DOCKER="cpg/sample-metadata-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
-python regenerate_apy.py
+python regenerate_api.py
 ```
 
 ## Deployment
