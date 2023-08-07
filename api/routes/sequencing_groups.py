@@ -22,13 +22,10 @@ router = APIRouter(prefix='/sequencing-group', tags=['sequencing-group'])
 # region CREATES
 
 
-class SequencingGroupUpdateModel(BaseModel):
+class SequencingGroupMetaUpdateModel(BaseModel):
     """Update sequencing group model"""
 
     meta: dict[str, Any] | None = None
-    platform: str | None = None
-    technology: str | None = None
-    type: str | None = None
 
 
 @router.get('{sequencing_group_id}', operation_id='getSequencingGroup')
@@ -62,7 +59,7 @@ async def get_all_sequencing_group_ids_by_sample_by_type(
 @router.get('/project/{sequencing_group_id}', operation_id='updateSequencingGroup')
 async def update_sequencing_group(
     sequencing_group_id: str,
-    sequencing_group: SequencingGroupUpdateModel,
+    sequencing_group: SequencingGroupMetaUpdateModel,
     connection: Connection = get_project_write_connection,
 ) -> bool:
     """Update the meta fields of a sequencing group"""
@@ -72,9 +69,6 @@ async def update_sequencing_group(
             SequencingGroupUpsertInternal(
                 id=sequencing_group_id_transform_to_raw(sequencing_group_id),
                 meta=sequencing_group.meta,
-                platform=sequencing_group.platform,
-                technology=sequencing_group.technology,
-                type=sequencing_group.type,
             )
         ]
     )
