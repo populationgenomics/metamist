@@ -1,12 +1,9 @@
 """ Parses acute-care redcap dump ingest into metamist """
+# pylint: disable=too-many-locals
 
 import csv
 import tempfile
 import click
-
-from sample_metadata.apis import FamilyApi, ImportApi
-from sample_metadata.parser.generic_metadata_parser import run_as_sync
-from sample_metadata.parser.sample_file_map_parser import SampleFileMapParser
 
 from redcap_parsing_utils import (
     PEDFILE_HEADERS,
@@ -17,10 +14,17 @@ from redcap_parsing_utils import (
     find_fastq_pairs,
 )
 
-PROJECT = "mcri-lrp"
+from metamist.apis import FamilyApi, ImportApi
+from metamist.parser.generic_metadata_parser import run_as_sync
+from metamist.parser.sample_file_map_parser import SampleFileMapParser
+
+
+PROJECT = 'mcri-lrp'
 UPLOAD_BUCKET_SEARCH_PATH = 'gs://cpg-mcri-lrp-main-upload/'
 
+
 def get_individual_sample_ids(individual_id, column_keys, row):
+    """Converts a row of redcap data into a dictionary of sample_id to sequencing_group_id"""
     sample_id_to_individual_id = {}
     for key in column_keys:
         if row[key].strip():
@@ -35,8 +39,8 @@ def get_individual_sample_ids(individual_id, column_keys, row):
     '-f',
     '--facility',
     type=click.Choice(list(map(lambda x: x.name, Facility)), case_sensitive=False),
-    default="VCGS",
-    help="Facility to use for fastq file parsing.",
+    default='VCGS',
+    help='Facility to use for fastq file parsing.',
 )
 @click.argument('redcap_csv')
 @run_as_sync
@@ -57,7 +61,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
 
     # Sanity check: use redcap auto generated filename to ensure this file is from
     # the acute-care project
-    assert 'AustralianLeukodystr' in redcap_csv, "Is this an LRP redcap csv?"
+    assert 'AustralianLeukodystr' in redcap_csv, 'Is this an LRP redcap csv?'
 
     # Prepare temp out files
     pedfile = tempfile.NamedTemporaryFile(mode='w')
@@ -76,7 +80,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
     filemap_writer.writeheader()
 
     # Parse rows into family units
-    print("Parsing redcap csv")
+    print('Parsing redcap csv')
     samples_by_individual_id = {}
     with open(redcap_csv) as csvfile:
         # The columns in redcap reports, and even their relative order can change
@@ -94,64 +98,94 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
             if not row['pt_study_id']:
                 continue
             proband_id = row['pt_study_id']
-            family_id = proband_id.rsplit('-',1)[0]
+            family_id = proband_id.rsplit('-', 1)[0]
 
             paternal_id = f'{family_id}-2'
             maternal_id = f'{family_id}-1'
 
-            proband_sample_id_columns = ['vcgs_exome_id','stored_dna_sampleno', 'vcgs_genome_id', 'research_rna_program_id']
-            maternal_sample_id_columns = ['maternal_vcgs_exome_id','bio_mat_sam', 'maternal_vcgs_genome_id']
-            paternal_sample_id_columns = ['paternal_vcgs_exome_id','bio_pat_sam', 'bio_pat_sam', 'paternal_vcgs_genome_id']
+            proband_sample_id_columns = [
+                'vcgs_exome_id',
+                'stored_dna_sampleno',
+                'vcgs_genome_id',
+                'research_rna_program_id',
+            ]
+            maternal_sample_id_columns = [
+                'maternal_vcgs_exome_id',
+                'bio_mat_sam',
+                'maternal_vcgs_genome_id',
+            ]
+            paternal_sample_id_columns = [
+                'paternal_vcgs_exome_id',
+                'bio_pat_sam',
+                'bio_pat_sam',
+                'paternal_vcgs_genome_id',
+            ]
 
             # collect all of the different sample ids per individual
-            samples_by_individual_id.update(get_individual_sample_ids(proband_id, proband_sample_id_columns, row))
-            samples_by_individual_id.update(get_individual_sample_ids(paternal_id, paternal_sample_id_columns, row))
-            samples_by_individual_id.update(get_individual_sample_ids(maternal_id, maternal_sample_id_columns, row))
+            samples_by_individual_id.update(
+                get_individual_sample_ids(proband_id, proband_sample_id_columns, row)
+            )
+            samples_by_individual_id.update(
+                get_individual_sample_ids(paternal_id, paternal_sample_id_columns, row)
+            )
+            samples_by_individual_id.update(
+                get_individual_sample_ids(maternal_id, maternal_sample_id_columns, row)
+            )
 
             # Write proband pedfile line
-            ped_writer.writerow({
-                'Family ID': family_id,
-                'Individual ID': proband_id,
-                'Paternal ID': paternal_id or "0",
-                'Maternal ID': maternal_id or "0",
-                'Sex': row['dem_sex'],
-                'Affected Status': "2",
-                'Notes': "",
-                })
+            ped_writer.writerow(
+                {
+                    'Family ID': family_id,
+                    'Individual ID': proband_id,
+                    'Paternal ID': paternal_id or '0',
+                    'Maternal ID': maternal_id or '0',
+                    'Sex': row['dem_sex'],
+                    'Affected Status': '2',
+                    'Notes': '',
+                }
+            )
 
             # Write maternal pedfile line
             if maternal_id and proband_id.endswith('-A'):
-                ped_writer.writerow({
-                    'Family ID': family_id,
-                    'Individual ID': maternal_id,
-                    'Paternal ID': "0",
-                    'Maternal ID': "0",
-                    'Sex': "2",
-                    'Affected Status': "1",
-                    'Notes': "",
-                    })
+                ped_writer.writerow(
+                    {
+                        'Family ID': family_id,
+                        'Individual ID': maternal_id,
+                        'Paternal ID': '0',
+                        'Maternal ID': '0',
+                        'Sex': '2',
+                        'Affected Status': '1',
+                        'Notes': '',
+                    }
+                )
 
             # Write paternal pedfile line
             if paternal_id and proband_id.endswith('-A'):
-                ped_writer.writerow({
-                    'Family ID': family_id,
-                    'Individual ID': paternal_id,
-                    'Paternal ID': "0",
-                    'Maternal ID': "0",
-                    'Sex': "1",
-                    'Affected Status': "1",
-                    'Notes': "",
-                    })
+                ped_writer.writerow(
+                    {
+                        'Family ID': family_id,
+                        'Individual ID': paternal_id,
+                        'Paternal ID': '0',
+                        'Maternal ID': '0',
+                        'Sex': '1',
+                        'Affected Status': '1',
+                        'Notes': '',
+                    }
+                )
 
             # Write individual metadata line (proband only)
-            ind_writer.writerow({
-                'Family ID': family_id,
-                'Individual ID': proband_id,
-                'Individual Notes': row['pt_comments'] + '\n\n' + row['dx_comments'],
-            })
+            ind_writer.writerow(
+                {
+                    'Family ID': family_id,
+                    'Individual ID': proband_id,
+                    'Individual Notes': row['pt_comments']
+                    + '\n\n'
+                    + row['dx_comments'],
+                }
+            )
 
     # Save ped and individual files to disk then write to api
-    print("Saving pedfile:")
+    print('Saving pedfile:')
     pedfile.flush()
     with open(pedfile.name) as p:
         print(p.read())
@@ -166,7 +200,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
             )
         print('API response:', response)
 
-    print("\nSaving Individual metadatafile:")
+    print('\nSaving Individual metadatafile:')
     ind_file.flush()
     with open(ind_file.name) as f:
         print(f.read())
@@ -183,7 +217,7 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
 
     # Find fastqs in upload bucket
     if not search_path:
-        print("Search_path not provided so skipping file mapping")
+        print('Search_path not provided so skipping file mapping')
     else:
         # Find all fastqs in search path
         found_files = False
@@ -200,14 +234,14 @@ async def main(redcap_csv: str, search_path: str, facility: str, dry_run: bool):
                         ),
                         'Type': fastq_pair[0].seq_type.value,
                     }
-                    ## temporarily skip RNA
+                    # temporarily skip RNA
                     if 'RNA' in fastq_pair[0].seq_type.value:
                         continue
                     filemap_writer.writerow(row)
                     found_files = True
 
         if found_files:
-            print("\nSaving filemap")
+            print('\nSaving filemap')
             filemap_file.flush()
             with open(filemap_file.name) as f:
                 print(f.read())

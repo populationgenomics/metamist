@@ -1,3 +1,4 @@
+# pylint: disable=unused-variable
 from enum import Enum
 from collections import defaultdict
 from cloudpathlib import CloudPath
@@ -26,23 +27,25 @@ FAMILY_METADATA_HEADERS = [
     'Description',
     'Coded Phenotype',
 ]
-FILEMAP_HEADERS = ["Individual ID", "Sample ID", "Filenames", "Type"]
+FILEMAP_HEADERS = ['Individual ID', 'Sample ID', 'Filenames', 'Type']
 
 
 class Facility(str, Enum):
-    GARVAN = "Garvan"
-    VCGS = "VCGS"
-    NSWPath = "NSWPath"
-    QPath = "QPath"
+    """Sequencing facilities"""
+
+    GARVAN = 'Garvan'
+    VCGS = 'VCGS'
+    NSWPath = 'NSWPath'
+    QPath = 'QPath'
 
 
 class SeqType(Enum):
     """Sequence types"""
 
-    GENOME = "genome"
-    EXOME = "exome"
-    TRNA = "totalRNA"
-    MRNA = "mRNA"
+    GENOME = 'genome'
+    EXOME = 'exome'
+    TRNA = 'totalRNA'
+    MRNA = 'mRNA'
 
 
 # VCGS library types that appear in fastq names mapped to metamist
@@ -64,7 +67,7 @@ VCGS_SEQTYPE_BY_LIBRARY_TYPE = {
 }
 
 
-class FacilityFastq:
+class FacilityFastq:  # pylint: disable=too-many-instance-attributes
     """
     Object for parsing filenames of fastqs prepared by known sequence providers
     """
@@ -83,7 +86,7 @@ class FacilityFastq:
         elif facility == Facility.QPath:
             self.parse_qpath_fastq_name()
         else:
-            assert False, f"Facility {facility} not supported"
+            raise AssertionError(f'Facility {facility} not supported')
 
     def parse_vcgs_fastq_name(self):
         """
@@ -104,20 +107,37 @@ class FacilityFastq:
         """
         # Sanity checks
         assert self.path.match('*.fastq.gz')
-        assert len(self.path.name.split('_')) == 9
 
         base = self.path.name.rsplit('.', 2)[0]
-        (
-            date,
-            a,
-            b,
-            library_id,
-            sample_id,
-            library_prep_id,
-            library_type,
-            lane,
-            read,
-        ) = base.split('_')
+        if len(self.path.name.split('_')) == 8:
+            # pre ~2018 format
+            (
+                a,
+                b,
+                library_id,
+                sample_id,
+                library_prep_id,
+                library_type,
+                lane,
+                read,
+            ) = base.split('_')
+        elif len(self.path.name.split('_')) == 9:
+            # modern VCGS format
+            (
+                date,
+                a,
+                b,
+                library_id,
+                sample_id,
+                library_prep_id,
+                library_type,
+                lane,
+                read,
+            ) = base.split('_')
+        else:
+            raise AssertionError(
+                f'Unexpected number of fields in filename {self.path.name}'
+            )
 
         self.sample_id = sample_id.rsplit('-', 1)[0]
         self.read_pair_prefix = base.rsplit('_', 1)[0]
@@ -154,7 +174,9 @@ class FacilityFastq:
             # logic: Garvan do not provide exome seq service
             self.seq_type = SeqType.GENOME
         else:
-            assert False, f"Sample type {self.sample_type} not supported for GARVAN."
+            raise AssertionError(
+                f'Sample type {self.sample_type} not supported for GARVAN.'
+            )
 
     def parse_nswpath_fastq_name(self):
         """
@@ -229,14 +251,14 @@ def find_fastq_pairs(
     read_pairs = defaultdict(list)
 
     if recursive:
-        assert False, "rglob not supported by CloudPathLib?"
+        raise AssertionError('rglob not supported by CloudPathLib?')
         # glob/rglob not supported by CloudPathLib?
         # AttributeError: type object '_CloudPathSelectable' has no attribute '_scandir'. Did you mean: 'scandir'?
         # falling back to non-recursive implementation using iterdir
 
-    #     fastq_iter = search_dir.rglob("*.fastq.gz")
+    #     fastq_iter = search_dir.rglob('*.fastq.gz')
     # else:
-    #     fastq_iter = search_dir.glob("*.fastq.gz")
+    #     fastq_iter = search_dir.glob('*.fastq.gz')
 
     # for f in fastq_iter:
     for f in search_dir.iterdir():
