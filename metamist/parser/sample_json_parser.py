@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
-from typing import List
 import logging
 
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser
 )
-from metamist.parser.generic_parser import SingleRow
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -31,12 +29,12 @@ class SampleJsonColumns:
     MEASUREMENT = 'measurement'
     OBSERVATION = 'observation'
     RECEIPT_DATE = 'receipt_date'
-    
+
     @staticmethod
     def participant_meta_map():
         """Participant meta map"""
         return {}
-    
+
     @staticmethod
     def sequence_meta_map():
         """Columns that will be put into sequence.meta"""

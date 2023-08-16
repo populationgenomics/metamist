@@ -14,9 +14,9 @@ etl_load function expects "request_id" in the payload. It is setup as push subsc
 
 ## How to test locally
 
-### 1. Create BQ table "<YOUR-PROJECT-NAME>.metamist.etl-data"
-  
-### 2. Create TOPIC "projects/<YOUR-PROJECT-NAME>/topics/etl-topic"
+### 1. Create BQ table "$PROJECT_NAME.metamist.etl-data"
+
+### 2. Create TOPIC "projects/$PROJECT_NAME/topics/etl-topic"
 
 ### 3. Setup your environment
 
@@ -25,8 +25,10 @@ etl_load function expects "request_id" in the payload. It is setup as push subsc
 gcloud auth application-default login
 export GOOGLE_APPLICATION_CREDENTIALS='/Users/<USERNAME>/.config/gcloud/application_default_credentials.json'
 
-export BIGQUERY_TABLE=<YOUR-PROJECT-NAME>.metamist.etl-data
-export PUBSUB_TOPIC='projects/<YOUR-PROJECT-NAME>/topics/etl-topic'
+export PROJECT_NAME='some_name'
+export BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
+export PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/etl-topic'
+
 ```
 
 ### 4. Setup python env
@@ -64,13 +66,14 @@ Should return something like this:
 ```
 
 ### 7. Start LOAD Fun locally
+
 Repeat Step 4 inside folder load
 
 ```bash
 functions-framework-python --target etl_load --debug
 ```
 
-### 7. Call etl_load
+### 8. Call etl_load
 
 Replace request_id with the id returned in Step 6
 
@@ -91,7 +94,7 @@ Should return something like this:
 ```
 
 
-### 8. Deploy functions for testing on the cloud
+### 9. Deploy functions for testing on the cloud
 
 ```bash
 cd ../load
@@ -99,12 +102,12 @@ cd ../load
 gcloud functions deploy etl_load \
     --gen2 \
     --runtime=python311 \
-    --project=<YOUR-PROJECT-NAME> \
+    --project='$PROJECT_NAME' \
     --region=australia-southeast1 \
     --source=. \
     --entry-point=etl_load \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE='<YOUR-PROJECT-NAME>.metamist.etl-data'
+    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
 ```
 
 ```bash
@@ -113,13 +116,11 @@ cd ../post
 gcloud functions deploy etl_post \
     --gen2 \
     --runtime=python311 \
-    --project=<YOUR-PROJECT-NAME> \
+    --project='$PROJECT_NAME' \
     --region=australia-southeast1 \
     --source=. \
     --entry-point=etl_post \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE=<YOUR-PROJECT-NAME>.metamist.etl-data' \
-    --set-env-vars PUBSUB_TOPIC='projects/<YOUR-PROJECT-NAME>/topics/my-topic'
+    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data' \
+    --set-env-vars PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/my-topic'
 ```
-
-
