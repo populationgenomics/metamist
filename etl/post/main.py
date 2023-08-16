@@ -10,6 +10,7 @@ from google.cloud import pubsub_v1
 
 from cpg_utils.cloud import email_from_id_token
 
+
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
 
@@ -72,8 +73,10 @@ def etl_post(request: flask.Request):
         }, 500
 
     # publish to pubsub
+    # message contains all the attributes except body which can be large and already stored in BQ table
+    pb_obj = {x: bq_obj[x] for x in bq_obj if x not in ['body']}
     try:
-        _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
+        _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(pb_obj).encode(), content_type='application/json')
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to publish to pubsub: {e}')
 

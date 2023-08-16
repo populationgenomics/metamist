@@ -1,0 +1,4 @@
+flask
+functions_framework
+google-cloud-bigquery
+google-cloud-logging
