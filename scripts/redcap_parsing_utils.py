@@ -1,4 +1,5 @@
 # pylint: disable=unused-variable
+import sys
 from enum import Enum
 from collections import defaultdict
 from cloudpathlib import CloudPath
@@ -271,6 +272,9 @@ def find_fastq_pairs(
     # Group by sample
     read_pairs_by_sample_id = defaultdict(list)
     for pair in read_pairs.values():
+        if len(pair) != 2:
+            print(f"Warning: skipping incomplete pair: {[fq.path for fq in pair]}", file=sys.stderr)
+            continue
         read_pairs_by_sample_id[pair[0].sample_id].append(pair)
 
     return read_pairs_by_sample_id
