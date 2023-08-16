@@ -57,9 +57,15 @@ class SampleJsonParser(GenericMetadataParser):
     ):
         super().__init__(
             project=project,
+            search_locations=[],
             participant_meta_map=SampleJsonColumns.participant_meta_map(),
             sample_meta_map=SampleJsonColumns.sample_meta_map(),
-            assay_meta_map=SampleJsonColumns.sequence_meta_map()
+            assay_meta_map=SampleJsonColumns.sequence_meta_map(),
+            sample_name_column=SampleJsonColumns.IDENTIFIER,
+            qc_meta_map={}
         )
 
-
+    async def parse(
+        self, record: str, confirm=False, dry_run=False
+    ):
+        raise NotImplementedError('TO BE IMPLEMENTED')
