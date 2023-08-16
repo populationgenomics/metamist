@@ -66,4 +66,5 @@ class SampleJsonParser(GenericMetadataParser):
     async def parse(
         self, record: str, confirm=False, dry_run=False
     ):
+        """Parse passed record """
         raise NotImplementedError('TO BE IMPLEMENTED')

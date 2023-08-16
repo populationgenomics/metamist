@@ -74,7 +74,7 @@ def etl_post(request: flask.Request):
 
     # publish to pubsub
     # message contains all the attributes except body which can be large and already stored in BQ table
-    pb_obj = {x: bq_obj[x] for x in bq_obj if x not in ['body']}
+    pb_obj = {k: v for k, v in bq_obj.items() if k not in ['body']}
     try:
         _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(pb_obj).encode(), content_type='application/json')
     except Exception as e:  # pylint: disable=broad-exception-caught
