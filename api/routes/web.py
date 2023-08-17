@@ -90,7 +90,9 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post(
+    '/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject'
+)
 async def sync_seqr_project(
     sequencing_type: str,
     sync_families: bool = True,
@@ -121,3 +123,13 @@ async def sync_seqr_project(
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
         # return {'success': False, 'message': str(e)}
+
+
+@router.post('/projects-summary', operation_id='getProjectsSummary')
+async def get_projects_summary(sequencing_types: list[str] = None):
+    """
+    Get the summary of all projects
+    """
+    return await WebLayer(get_projectless_db_connection).get_projects_summary(
+        sequencing_types=sequencing_types
+    )

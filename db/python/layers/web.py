@@ -22,6 +22,7 @@ from models.models import (
     AssayInternal,
     SearchItem,
     FamilySimpleInternal,
+    ProjectsSummaryInternal,
 )
 from models.models.web import ProjectSummaryInternal, WebProject
 
@@ -44,6 +45,70 @@ class WebLayer(BaseLayer):
             grid_filter=grid_filter, token=token, limit=limit
         )
 
+    async def get_projects_summary(
+        self,
+        projects: list[ProjectId],
+        sequencing_types: list[str],
+    ) -> list[ProjectsSummaryInternal]:
+        _total_families_by_project_id = """
+SELECT f.project, COUNT(DISTINCT f.id) as num_families FROM family f WHERE f.project IN :projects GROUP BY f.project
+        """
+        _total_participants_by_project_id = """
+SELECT p.project, COUNT(DISTINCT p.id) as num_participants FROM participant p WHERE p.project IN :projects GROUP BY p.project
+        """
+        _total_samples_by_project_id = """
+SELECT s.project, COUNT(DISTINCT s.id) as num_samples FROM samples s WHERE s.project IN :projects GROUP BY s.project
+        """
+        _total_sequencing_groups_by_project_id = """
+SELECT sg.project, COUNT(DISTINCT sg.id) as num_sgs FROM sequencing_group sg WHERE sg.project IN :projects GROUP BY sg.project
+        """
+        _total_crams_by_project_id = """
+SELECT a.project, COUNT(DISTINCT asg.id) as num_crams FROM analysis a LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id WHERE a.project IN :projects AND a.type='CRAM' and a.status='COMPLETED' GROUP BY a.project
+        """
+        _latest_es_index_by_project_id = """
+SELECT a.project, a.id, a.output, a.timestamp_completed FROM analysis a WHERE a.project IN :projects AND a.status='COMPLETED' AND a.type='ES-INDEX' ORDER BY a.timestamp_completed DESC LIMIT 1
+        """
+        _latest_joint_call_by_project_id = """
+SELECT a.project, a.id, a.output, a.timestamp_completed FROM analysis a WHERE a.project IN :projects AND a.status='COMPLETED' AND a.type='CUSTOM' AND a.meta LIKE '%AnnotateDataset%' ORDER BY a.timestamp_completed DESC LIMIT 1
+        """
+
+        response = []
+        for project in projects:
+            response.append(
+                ProjectsSummaryInternal(
+                    project=project,
+                    total_families=_total_families_by_project_id.get(project, 0),
+                    total_participants=_total_participants_by_project_id.get(
+                        project, 0
+                    ),
+                    total_samples=_total_samples_by_project_id.get(project, 0),
+                    total_sequencing_groups=_total_sequencing_groups_by_project_id.get(
+                        project, 0
+                    ),
+                    total_crams=_total_crams_by_project_id.get(project, 0),
+                    latest_es_index_output=_latest_es_index_by_project_id.get(
+                        project, None
+                    ),
+                    latest_es_index_timestamp=_latest_es_index_by_project_id.get(
+                        project, None
+                    ),
+                    total_sgs_in_latest_es_index=_total_sgs_in_latest_es_index_by_project_id.get(
+                        project, 0
+                    ),
+                    latest_joint_call_output=_latest_joint_call_by_project_id.get(
+                        project, None
+                    ),
+                    latest_joint_call_timestamp=_latest_joint_call_by_project_id.get(
+                        project, None
+                    ),
+                    total_sgs_in_latest_joint_call=_total_sgs_in_latest_joint_call_by_project_id.get(
+                        project, 0
+                    ),
+                )
+            )
+
+        return response
+
 
 class WebDb(DbBase):
     """Db layer for web related routes,"""
@@ -52,7 +117,7 @@ class WebDb(DbBase):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project', 's.active', 'NOT sg.archived']
+        wheres = ['s.project = :project', 'NOT sg.archived']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:

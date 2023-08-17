@@ -57,4 +57,5 @@ from models.models.web import (
     WebProject,
     ProjectSummary,
     PagingLinks,
+    ProjectsSummaryInternal,
 )
