@@ -7,6 +7,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
     ProjectSummaryInternal,
+    ProjectsSummaryInternal,
     AssayInternal,
     Assay,
 )
@@ -71,20 +72,20 @@ def get_test_participant():
                                 type='sequencing',
                                 meta={
                                     'reads': [
-                                            {
-                                                'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                'size': 111,
-                                            },
-                                            {
-                                                'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                'size': 111,
-                                            },
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
@@ -189,6 +190,8 @@ SINGLE_PARTICIPANT_RESULT = ProjectSummaryInternal(
 class TestWeb(DbIsolatedTest):
     """Test web class containing web endpoints"""
 
+    maxDiff = None
+
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
@@ -196,6 +199,39 @@ class TestWeb(DbIsolatedTest):
         self.partl = ParticipantLayer(self.connection)
         self.sampl = SampleLayer(self.connection)
         self.seql = AssayLayer(self.connection)
+
+    @run_as_sync
+    async def test_projects_summary(self):
+        """Test getting the summaries for all available projects"""
+
+        await self.partl.upsert_participant(get_test_participant())
+
+        result = await self.webl.get_projects_summary(
+            projects=[self.project_id], sequencing_types=['genome', 'exome']
+        )
+
+        expected = [
+            ProjectsSummaryInternal(
+                project=self.project_id,
+                sequencing_type='genome',
+                total_families=None,
+                total_participants=1,
+                total_samples=1,
+                total_sequencing_groups=1,
+                total_crams=None,
+            ),
+            ProjectsSummaryInternal(
+                project=self.project_id,
+                sequencing_type='exome',
+                total_families=None,
+                total_participants=None,
+                total_samples=None,
+                total_sequencing_groups=None,
+                total_crams=None,
+            ),
+        ]
+
+        self.assertEqual(result, expected)
 
     @run_as_sync
     async def test_project_summary_empty(self):

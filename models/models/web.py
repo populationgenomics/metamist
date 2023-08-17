@@ -26,19 +26,20 @@ class PagingLinks(SMBase):
 class ProjectsSummaryInternal:
     """Return class for the projects summary endpoint"""
 
-    project_name: str
+    project: int
+    # project_name: str
     sequencing_type: str
     total_families: int
     total_participants: int
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
-    latest_es_index_output: str
-    latest_es_index_timestamp: str
-    total_sgs_in_latest_es_index: int
-    latest_joint_call_output: str
-    latest_joint_call_timestamp: str
-    total_sgs_in_latest_joint_call: int
+    # latest_es_index_output: str
+    # latest_es_index_timestamp: str
+    # total_sgs_in_latest_es_index: int
+    # latest_joint_call_output: str
+    # latest_joint_call_timestamp: str
+    # total_sgs_in_latest_joint_call: int
 
 
 @dataclasses.dataclass

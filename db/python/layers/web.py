@@ -40,77 +40,293 @@ class WebLayer(BaseLayer):
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
         """
-        webdb = WebDb(self.connection)
+        webdb = WebProjectSummaryDb(self.connection)
         return await webdb.get_project_summary(
             grid_filter=grid_filter, token=token, limit=limit
         )
 
     async def get_projects_summary(
         self,
-        projects: list[ProjectId],
+        projects: list[int],
         sequencing_types: list[str],
     ) -> list[ProjectsSummaryInternal]:
-        _total_families_by_project_id = """
-SELECT f.project, COUNT(DISTINCT f.id) as num_families FROM family f WHERE f.project IN :projects GROUP BY f.project
+        webprojectsdb = WebProjectsSummaryDb(self.connection)
+        return await webprojectsdb.get_projects_summary(
+            projects=projects, sequencing_types=sequencing_types
+        )
+
+
+class WebProjectsSummaryDb(DbBase):
+    """Db layer for web related routes,"""
+
+    def _projects_summary_families_query(self):
+        _total_families_by_project_id_and_seq_type = """
+SELECT
+    f.project,
+    sg.type 'sequencing_type',
+    COUNT(DISTINCT f.id) 'num_families'
+FROM
+    family f
+    LEFT JOIN family_participant fp ON f.id = fp.family_id
+    LEFT JOIN sample s ON fp.participant_id = s.participant_id
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    f.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    f.project,
+    sg.type
         """
-        _total_participants_by_project_id = """
-SELECT p.project, COUNT(DISTINCT p.id) as num_participants FROM participant p WHERE p.project IN :projects GROUP BY p.project
+        return _total_families_by_project_id_and_seq_type
+
+    def _projects_summary_participants_query(self):
+        _total_participants_by_project_id_and_seq_type = """
+SELECT
+    p.project,
+    sg.type 'sequencing_type',
+    COUNT(DISTINCT p.id) 'num_participants'
+FROM
+    participant p
+    LEFT JOIN sample s ON p.id = s.participant_id
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    p.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    p.project,
+    sg.type
         """
-        _total_samples_by_project_id = """
-SELECT s.project, COUNT(DISTINCT s.id) as num_samples FROM samples s WHERE s.project IN :projects GROUP BY s.project
+        return _total_participants_by_project_id_and_seq_type
+
+    def _projects_summary_samples_query(self):
+        _total_samples_by_project_id_and_seq_type = """
+SELECT
+    s.project,
+    sg.type 'sequencing_type',
+    COUNT(DISTINCT s.id) 'num_samples'
+FROM
+    sample s
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    s.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    s.project,
+    sg.type;
         """
-        _total_sequencing_groups_by_project_id = """
-SELECT sg.project, COUNT(DISTINCT sg.id) as num_sgs FROM sequencing_group sg WHERE sg.project IN :projects GROUP BY sg.project
+        return _total_samples_by_project_id_and_seq_type
+
+    def _projects_summary_sequencing_groups_query(self):
+        _total_sequencing_groups_by_project_id_and_seq_type = """
+SELECT
+    s.project,
+    sg.type 'sequencing_type',
+    COUNT(DISTINCT sg.id) 'num_sgs'
+FROM
+    sequencing_group sg
+    LEFT JOIN sample s on s.id = sg.sample_id
+WHERE
+    s.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    s.project,
+    sg.type;
         """
-        _total_crams_by_project_id = """
-SELECT a.project, COUNT(DISTINCT asg.id) as num_crams FROM analysis a LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id WHERE a.project IN :projects AND a.type='CRAM' and a.status='COMPLETED' GROUP BY a.project
+        return _total_sequencing_groups_by_project_id_and_seq_type
+
+    def _projects_summary_crams_query(self):
+        _total_crams_by_project_id_and_seq_type = """
+SELECT
+    a.project,
+    sg.type 'sequencing_type',
+    COUNT(DISTINCT asg.sequencing_group_id) 'num_crams'
+FROM
+    analysis a
+    LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+WHERE
+    a.project IN :projects
+    AND sg.type IN :sequencing_types
+    AND a.type = 'CRAM'
+    and a.status = 'COMPLETED'
+GROUP BY
+    a.project,
+    sg.type
         """
-        _latest_es_index_by_project_id = """
-SELECT a.project, a.id, a.output, a.timestamp_completed FROM analysis a WHERE a.project IN :projects AND a.status='COMPLETED' AND a.type='ES-INDEX' ORDER BY a.timestamp_completed DESC LIMIT 1
-        """
-        _latest_joint_call_by_project_id = """
-SELECT a.project, a.id, a.output, a.timestamp_completed FROM analysis a WHERE a.project IN :projects AND a.status='COMPLETED' AND a.type='CUSTOM' AND a.meta LIKE '%AnnotateDataset%' ORDER BY a.timestamp_completed DESC LIMIT 1
-        """
+        return _total_crams_by_project_id_and_seq_type
+
+    #     def _projects_summary_es_indices_query(self, projects: list[int], sequencing_types: list[str]):
+    #         _latest_es_index_by_project_id_and_seq_type = """
+    # SELECT
+    #     a.project,
+    #     a.sequencing_type,
+    #     a.id,
+    #     a.output,
+    #     a.timestamp_completed
+    # FROM
+    #     ( -- nested query returns the latest es-index for each project and sequencing type combination at rn=1
+    #         SELECT
+    #             a.project,
+    #             a.id,
+    #             a.output,
+    #             a.timestamp_completed,
+    #             sg.type 'sequencing_type',
+    #             ROW_NUMBER() OVER (
+    #                 PARTITION BY a.project,
+    #                 sg.type
+    #                 ORDER BY
+    #                     a.timestamp_completed DESC
+    #             ) AS rn
+    #         FROM
+    #             analysis a
+    #             LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    #             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+    #         WHERE
+    #             a.status = 'COMPLETED'
+    #             AND a.type = 'ES-INDEX'
+    #             AND sg.type IN :sequencing_types
+    #     ) AS a
+    # WHERE
+    #     a.rn = 1
+    # AND
+    #     a.project in :projects
+    #         """
+    #         return _latest_es_index_by_project_id_and_seq_type
+
+    #     def _projects_summary_joint_calls_query(self, projects: list[int], sequencing_types: list[str]):
+    #         _latest_joint_call_by_project_id_and_seq_type = """
+    # SELECT
+    #     a.project,
+    #     a.sequencing_type,
+    #     a.id,
+    #     a.output,
+    #     a.timestamp_completed
+    # FROM
+    #     (
+    #         SELECT
+    #             a.project,
+    #             a.id,
+    #             a.output,
+    #             a.timestamp_completed,
+    #             sg.type 'sequencing_type',
+    #             ROW_NUMBER() OVER (
+    #                 PARTITION BY a.project,
+    #                 sg.type
+    #                 ORDER BY
+    #                     a.timestamp_completed DESC
+    #             ) AS rn
+    #         FROM
+    #             analysis a
+    #             LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    #             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+    #         WHERE
+    #             a.status = 'COMPLETED'
+    #             AND a.type = 'CUSTOM'
+    #             AND a.meta LIKE '%AnnotateDataset%'
+    #             AND sg.type IN :sequencing_types
+    #     ) AS a
+    # WHERE
+    #     a.rn = 1
+    # AND
+    #     a.project IN :projects
+    #         """
+    #         return _latest_joint_call_by_project_id_and_seq_type
+
+    async def get_projects_summary(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        """ """
+        ptable = ProjectPermissionsTable(self.connection)
+        ptable.check_access_to_project_ids(
+            user=self.author, project_ids=projects, readonly=True
+        )
+
+        total_families_query = self._projects_summary_families_query()
+        total_participants_query = self._projects_summary_participants_query()
+        total_samples_query = self._projects_summary_samples_query()
+        total_sequencing_groups_query = self._projects_summary_sequencing_groups_query()
+        total_crams_query = self._projects_summary_crams_query()
+
+        # latest_es_index_output=self._projects_summary_es_indices_query(
+        #     projects, sequencing_types
+        # )
+        # latest_es_index_timestamp=self._projects_summary_es_indices_query(
+        #     projects, sequencing_types
+        # )
+        # latest_joint_call_output=self._projects_summary_joint_calls_query(
+        #     projects, sequencing_types
+        # )
+        # latest_joint_call_timestamp=self._projects_summary_joint_calls_query(
+        #     projects, sequencing_types
+        # )
 
         response = []
         for project in projects:
-            response.append(
-                ProjectsSummaryInternal(
-                    project=project,
-                    total_families=_total_families_by_project_id.get(project, 0),
-                    total_participants=_total_participants_by_project_id.get(
-                        project, 0
-                    ),
-                    total_samples=_total_samples_by_project_id.get(project, 0),
-                    total_sequencing_groups=_total_sequencing_groups_by_project_id.get(
-                        project, 0
-                    ),
-                    total_crams=_total_crams_by_project_id.get(project, 0),
-                    latest_es_index_output=_latest_es_index_by_project_id.get(
-                        project, None
-                    ),
-                    latest_es_index_timestamp=_latest_es_index_by_project_id.get(
-                        project, None
-                    ),
-                    total_sgs_in_latest_es_index=_total_sgs_in_latest_es_index_by_project_id.get(
-                        project, 0
-                    ),
-                    latest_joint_call_output=_latest_joint_call_by_project_id.get(
-                        project, None
-                    ),
-                    latest_joint_call_timestamp=_latest_joint_call_by_project_id.get(
-                        project, None
-                    ),
-                    total_sgs_in_latest_joint_call=_total_sgs_in_latest_joint_call_by_project_id.get(
-                        project, 0
-                    ),
+            for sequencing_type in sequencing_types:
+                response.append(
+                    ProjectsSummaryInternal(
+                        project=project,
+                        sequencing_type=sequencing_type,
+                        total_families=await self.connection.fetch_val(
+                            total_families_query,
+                            {
+                                'projects': [project],
+                                'sequencing_types': [sequencing_type],
+                            },
+                        ),
+                        total_participants=await self.connection.fetch_val(
+                            total_participants_query,
+                            {
+                                'projects': [project],
+                                'sequencing_types': [sequencing_type],
+                            },
+                        ),
+                        total_samples=await self.connection.fetch_val(
+                            total_samples_query,
+                            {
+                                'projects': [project],
+                                'sequencing_types': [sequencing_type],
+                            },
+                        ),
+                        total_sequencing_groups=await self.connection.fetch_val(
+                            total_sequencing_groups_query,
+                            {
+                                'projects': [project],
+                                'sequencing_types': [sequencing_type],
+                            },
+                        ),
+                        total_crams=await self.connection.fetch_val(
+                            total_crams_query,
+                            {
+                                'projects': [project],
+                                'sequencing_types': [sequencing_type],
+                            },
+                        ),
+                        # latest_es_index_output=self._projects_summary_es_indices_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # latest_es_index_timestamp=self._projects_summary_es_indices_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # # total_sgs_in_latest_es_index=_total_sgs_in_latest_es_index_by_project_id_and_seq_type(
+                        # #     project, 0
+                        # # ),
+                        # latest_joint_call_output=self._projects_summary_joint_calls_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # latest_joint_call_timestamp=self._projects_summary_joint_calls_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # total_sgs_in_latest_joint_call=_total_sgs_in_latest_joint_call_by_project_id_and_seq_type(
+                        #     project, 0
+                        # ),
+                    )
                 )
-            )
 
         return response
 
 
-class WebDb(DbBase):
+class WebProjectSummaryDb(DbBase):
     """Db layer for web related routes,"""
 
     def _project_summary_sample_query(self, grid_filter: list[SearchItem]):
