@@ -24,21 +24,26 @@ setup(
     packages=[
         'metamist_infrastructure',
         'metamist_infrastructure.etl',
-        'metamist_infrastructure.etl.endpoint',
+        'metamist_infrastructure.etl.post',
+        'metamist_infrastructure.etl.load',
     ],
     package_dir={
         # files in THIS directory are included as metamist_infrastructure
         'metamist_infrastructure': '.',
         # files in ../etl are included as metamist_infrastructure.etl
         'metamist_infrastructure.etl': '../etl',
-        # files in ../etl/endpoint are included as metamist_infrastructure.etl.endpoint
-        'metamist_infrastructure.etl.endpoint': '../etl/endpoint',
+        # files in ../etl/post are included as metamist_infrastructure.etl.post
+        'metamist_infrastructure.etl.post': '../etl/post',
+        # files in ../etl/load are included as metamist_infrastructure.etl.load
+        'metamist_infrastructure.etl.load': '../etl/load',
     },
     package_data={
         # ensure bq_schema.json is included in etl
         'metamist_infrastructure.etl': ['*.json'],
-        # ensure requirements.txt is included in etl.endpoint
-        'metamist_infrastructure.etl.endpoint': ['*.txt'],
+        # ensure requirements.txt is included in etl.post
+        'metamist_infrastructure.etl.post': ['*.txt'],
+        # ensure requirements.txt is included in etl.load
+        'metamist_infrastructure.etl.load': ['*.txt'],
     },
     install_requires=[],
     entry_points={
