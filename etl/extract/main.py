@@ -19,7 +19,7 @@ _PUBSUB_CLIENT = pubsub_v1.PublisherClient()
 
 
 @functions_framework.http
-def etl_post(request: flask.Request):
+def etl_extract(request: flask.Request):
     """HTTP Cloud Function.
     Args:
         request (flask.Request): The request object.
@@ -59,12 +59,13 @@ def etl_post(request: flask.Request):
         'request_id': request_id,
         'timestamp': datetime.datetime.utcnow().isoformat(),
         'type': request.path,
-        'submitting_user': email_from_id_token(auth.token),
-        'body': jbody_str,
+        'submitting_user': email_from_id_token(auth.token)
     }
 
     # throw an exception if one occurs
-    errors = _BQ_CLIENT.insert_rows_json(BIGQUERY_TABLE, [bq_obj])
+    errors = _BQ_CLIENT.insert_rows_json(
+        BIGQUERY_TABLE, [bq_obj | {'body': jbody_str}]
+    )
     if errors:
         return {
             'success': False,
@@ -73,10 +74,13 @@ def etl_post(request: flask.Request):
         }, 500
 
     # publish to pubsub
-    # message contains all the attributes except body which can be large and already stored in BQ table
-    pb_obj = {k: v for k, v in bq_obj.items() if k not in ['body']}
+    # message contains all the attributes except body which can be large
+    # and already stored in BQ table
     try:
-        _PUBSUB_CLIENT.publish(PUBSUB_TOPIC, json.dumps(pb_obj).encode(), content_type='application/json')
+        _PUBSUB_CLIENT.publish(
+            PUBSUB_TOPIC,
+            json.dumps(bq_obj).encode()
+        )
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to publish to pubsub: {e}')
 

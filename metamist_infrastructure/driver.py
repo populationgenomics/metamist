@@ -14,9 +14,11 @@ from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
 
 # this gets moved around during the pip install
-ETL_FOLDER = Path(__file__).parent / 'etl'
+# ETL_FOLDER = Path(__file__).parent / 'etl'
+ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
-PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'endpoint'
+# PATH_TO_ETL_EXTRACT = ETL_FOLDER / 'extract'
+# PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'load'
 
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
@@ -103,7 +105,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         in a Google Cloud Storage bucket.
         """
         return gcp.storage.Bucket(
-            f'metamist-source-bucket',
+            'metamist-source-bucket',
             name=f'{self.config.gcp.dataset_storage_prefix}metamist-source-bucket',
             location=self.config.gcp.region,
             project=self.config.sample_metadata.gcp.project,
@@ -143,9 +145,95 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         Pubsub topic to trigger the etl function
         """
         return gcp.pubsub.Topic(
-            f'metamist-etl-topic',
+            'metamist-etl-topic',
             project=self.config.sample_metadata.gcp.project,
             opts=pulumi.ResourceOptions(depends_on=[self._svc_pubsub]),
+        )
+
+    @cached_property
+    def etl_pubsub_dead_letters_topic(self):
+        """
+        Pubsub dead_letters topic to capture failed jobs
+        """
+        topic = gcp.pubsub.Topic(
+            'metamist-etl-dead-letters-topic',
+            project=self.config.sample_metadata.gcp.project,
+            opts=pulumi.ResourceOptions(depends_on=[self._svc_pubsub]),
+        )
+
+        # give publisher permission to service account
+        gcp.pubsub.TopicIAMPolicy(
+            'metamist-etl-dead-letters-topic-iam-policy',
+            project=self.config.sample_metadata.gcp.project,
+            topic=topic.name,
+            policy_data=self.prepare_service_account_policy_data(
+                'roles/pubsub.publisher'
+            )
+        )
+
+        return topic
+
+    @cached_property
+    def etl_pubsub_push_subscription(self):
+        """
+        Pubsub push_subscription to topic, new messages to topic triggeres load process
+        """
+        subscription = gcp.pubsub.Subscription(
+            'metamist-etl-subscription',
+            topic=self.etl_pubsub_topic.name,
+            ack_deadline_seconds=20,
+            dead_letter_policy=gcp.pubsub.SubscriptionDeadLetterPolicyArgs(
+                dead_letter_topic=self.etl_pubsub_dead_letters_topic.id,
+                max_delivery_attempts=5,
+            ),
+            push_config=gcp.pubsub.SubscriptionPushConfigArgs(
+                push_endpoint=self.etl_load_function.service_config.uri,
+                oidc_token=gcp.pubsub.SubscriptionPushConfigOidcTokenArgs(
+                    service_account_email=self.etl_service_account.email,
+                ),
+                attributes={
+                    'x-goog-version': 'v1',
+                },
+            ),
+            project=self.config.sample_metadata.gcp.project,
+            opts=pulumi.ResourceOptions(
+                depends_on=[
+                    self._svc_pubsub,
+                    self.etl_pubsub_topic,
+                    self.etl_load_function,
+                    self.etl_pubsub_dead_letters_topic,
+                    self.etl_pubsub_dead_letter_subscription
+                ]
+            ),
+        )
+
+        # give subscriber permission to service account
+        gcp.pubsub.SubscriptionIAMPolicy(
+            'metamist-etl-pubsub-topic-subscription-policy',
+            project=self.config.sample_metadata.gcp.project,
+            subscription=subscription.name,
+            policy_data=self.prepare_service_account_policy_data(
+                'roles/pubsub.subscriber'
+            )
+        )
+
+        return subscription
+
+    @cached_property
+    def etl_pubsub_dead_letter_subscription(self):
+        """
+        Dead letter subscription
+        """
+        return gcp.pubsub.Subscription(
+            'metamist-etl-dead-letter-subscription',
+            topic=self.etl_pubsub_dead_letters_topic.name,
+            project=self.config.sample_metadata.gcp.project,
+            ack_deadline_seconds=20,
+            opts=pulumi.ResourceOptions(
+                depends_on=[
+                    self.etl_pubsub_dead_letters_topic
+                ]
+            ),
         )
 
     @cached_property
@@ -219,7 +307,38 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             project=self.config.sample_metadata.gcp.project,
         )
 
+    def prepare_service_account_policy_data(self, role):
+        """
+        prepare_service_account_policy_data
+
+        Args:
+            role (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # get project
+        project = gcp.organizations.get_project()
+
+        return gcp.organizations.get_iam_policy(
+            bindings=[
+                gcp.organizations.GetIAMPolicyBindingArgs(
+                    role=role,
+                    members=[
+                        pulumi.Output.concat(
+                            'serviceAccount:service-',
+                            project.number,
+                            '@gcp-sa-pubsub.iam.gserviceaccount.com'
+                        )
+                    ],
+                )
+            ]
+        ).policy_data
+
     def setup_etl(self):
+        """
+        setup_etl
+        """
         # give the etl_service_account ability to write to bigquery
         gcp.bigquery.DatasetAccess(
             'metamist-etl-bq-dataset-access',
@@ -229,21 +348,80 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             user_by_email=self.etl_service_account.email,
         )
 
+        # give the etl_service_account ability to execute bigquery jobs
+        gcp.projects.IAMMember(
+            'metamist-etl-bq-job-user-role',
+            project=self.config.sample_metadata.gcp.project,
+            role='roles/bigquery.jobUser',
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_service_account.email
+            ),
+        )
+
+        # pubsub_v1.PublisherClient.publish User not authorized to perform this action
+        gcp.projects.IAMMember(
+            'metamist-etl-editor-role',
+            project=self.config.sample_metadata.gcp.project,
+            role='roles/editor',
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_service_account.email
+            ),
+        )
+
+        self.setup_etl_functions()
+        self.setup_etl_pubsub()
+
         self.setup_metamist_etl_accessors()
         self.setup_slack_notification()
 
+    def setup_etl_functions(self):
+        """
+        setup_etl_functions
+        """
+        self.etl_extract_function
+        self.etl_load_function
+
+    def setup_etl_pubsub(self):
+        """
+        setup_etl_pubsub
+        """
+        self.etl_pubsub_dead_letter_subscription
+        self.etl_pubsub_push_subscription
+
     @cached_property
-    def etl_function(self):
+    def etl_extract_function(self):
         """
-        Driver function to setup the etl infrastructure
+        etl_extract_function
+
+        Returns:
+            _type_: _description_
         """
+        return self.etl_function('extract')
+
+    @cached_property
+    def etl_load_function(self):
+        """
+        etl_load_function
+
+        Returns:
+            _type_: _description_
+        """
+        return self.etl_function('load')
+
+    def etl_function(self, f_name: str):
+        """
+        Driver function to setup the etl cloud function
+        """
+
+        path_to_func_folder = ETL_FOLDER / f_name
+
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
-        archive = archive_folder(str(PATH_TO_ETL_ENDPOINT.absolute()))
+        archive = archive_folder(str(path_to_func_folder.absolute()))
 
         # Create the single Cloud Storage object, which contains the source code
         source_archive_object = gcp.storage.BucketObject(
-            'metamist-etl-endpoint-source-code',
+            f'metamist-etl-{f_name}-source-code',
             # updating the source archive object does not trigger the cloud function
             # to actually updating the source because it's based on the name,
             # allow Pulumi to create a new name each time it gets updated
@@ -253,11 +431,11 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
         fxn = gcp.cloudfunctionsv2.Function(
-            'metamist-etl-endpoint-source-code',
-            name='metamist-etl',
+            f'metamist-etl-{f_name}-source-code',
+            name=f'metamist-etl-{f_name}',
             build_config=gcp.cloudfunctionsv2.FunctionBuildConfigArgs(
                 runtime='python311',
-                entry_point='etl_post',
+                entry_point=f'etl_{f_name}',
                 environment_variables={},
                 source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceArgs(
                     storage_source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceStorageSourceArgs(
@@ -282,7 +460,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
+                    # 'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
+                    'ALLOWED_USERS': 'miloslav.hyben@populationgenomics.org.au',
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,

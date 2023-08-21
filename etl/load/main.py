@@ -31,15 +31,23 @@ def etl_load(request: flask.Request):
         "request_id": "70eb6292-6311-44cf-9c9b-2b38bb076699"
     }
 
+    At the moment pulumi does not support unwrapping of push messages:
+    https://github.com/pulumi/pulumi-gcp/issues/1142
+
+    We need to support both
     """
 
     auth = request.authorization
     if not auth or not auth.token:
         return {'success': False, 'message': 'No auth token provided'}, 401
 
+    logging.info(f'auth {auth}')
+
     # if mimetype might not be set esp. when PubSub pushing from another topic,
     # try to force conversion and if fails just return None
     jbody = request.get_json(force=True, silent=True)
+
+    logging.info(f'jbody: {jbody}')
 
     if callable(jbody):
         # request.json is it in reality, but the type checker is saying it's callable
