@@ -358,7 +358,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-        # pubsub_v1.PublisherClient.publish User not authorized to perform this action
+        # give the etl_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-editor-role',
             project=self.config.sample_metadata.gcp.project,
@@ -378,15 +378,24 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl_functions
         """
-        self.etl_extract_function
-        self.etl_load_function
+        # TODO
+        return pulumi.ResourceOptions(
+            depends_on=[
+                self.etl_extract_function,
+                self.etl_load_function
+            ],
+        )
 
     def setup_etl_pubsub(self):
         """
         setup_etl_pubsub
         """
-        self.etl_pubsub_dead_letter_subscription
-        self.etl_pubsub_push_subscription
+        return pulumi.ResourceOptions(
+            depends_on=[
+                self.etl_pubsub_dead_letter_subscription,
+                self.etl_pubsub_push_subscription
+            ],
+        )
 
     @cached_property
     def etl_extract_function(self):
@@ -461,7 +470,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
                     # 'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
-                    'ALLOWED_USERS': 'miloslav.hyben@populationgenomics.org.au',
+                    # 'ALLOWED_USERS': 'miloslav.hyben@populationgenomics.org.au',
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
@@ -480,18 +489,18 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         for name, sa in self.etl_accessors.items():
             gcp.cloudfunctionsv2.FunctionIamMember(
                 f'metamist-etl-accessor-{name}',
-                location=self.etl_function.location,
-                project=self.etl_function.project,
-                cloud_function=self.etl_function.name,
+                location=self.etl_extract_function.location,
+                project=self.etl_extract_function.project,
+                cloud_function=self.etl_extract_function.name,
                 role='roles/cloudfunctions.invoker',
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
             gcp.cloudrun.IamMember(
                 f'metamist-etl-run-accessor-{name}',
-                location=self.etl_function.location,
-                project=self.etl_function.project,
-                service=self.etl_function.name,  # it shared the name
+                location=self.etl_extract_function.location,
+                project=self.etl_extract_function.project,
+                service=self.etl_extract_function.name,  # it shared the name
                 role='roles/run.invoker',
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
@@ -501,7 +510,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             return
 
         # Slack notifications
-        filter_string = self.etl_function.name.apply(
+        filter_string = self.etl_extract_function.name.apply(
             lambda fxn_name: f"""
                         resource.type="cloud_function"
                         AND resource.labels.function_name="{fxn_name}"
