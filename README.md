@@ -119,13 +119,18 @@ brew install liquibase
 Add the following to your `.zshrc` file:
 
 ```shell
+
+# homebrew should export this on an M1 Mac
+# the intel default is /usr/local
+export HB_PREFIX=${HOMEBREW_PREFIX-/usr/local}
+
 # installing Java through brew recommendation
-export CPPFLAGS="-I/usr/local/opt/openjdk/include"
+export CPPFLAGS="-I$HB_PREFIX/opt/openjdk/include/opt"
 
 # installing liquibase through brew recommendation
 export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
 
-export PATH="/usr/local/bin:$PATH:/usr/local/opt/openjdk/bin"
+export PATH="$HB_PREFIX/bin:$PATH:$HB_PREFIX/opt/openjdk/bin"
 ```
 
 #### Node through node-version manager (nvm)
@@ -138,8 +143,8 @@ brew install nvm
 
 # you may need to add the the following to your .zshrc
 # export NVM_DIR="$HOME/.nvm"
-# [ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"  # This loads nvm
-# [ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+# [ -s "$HB_PREFIX/opt/nvm/nvm.sh" ] && \. "$HB_PREFIX/opt/nvm/nvm.sh"  # This loads nvm
+# [ -s "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 # install latest version of node + npm
 nvm install --lts
@@ -169,29 +174,36 @@ brew install mariadb@10.8
 brew services start mariadb@10.8
 
 # make mariadb command available on path
-export PATH="/usr/local/opt/mariadb@10.8/bin:$PATH"
+export PATH="$HB_PREFIX/opt/mariadb@10.8/bin:$PATH"
 ```
 
 #### Your .zshrc file
 
+If you installed all the software through brew and npm
+like this guide suggests, your `.zshrc` may look like this:
+
 
 ```shell
 alias openapi-generator="npx @openapitools/openapi-generator-cli"
+
+# homebrew should export this on an M1 Mac
+# the intel default is /usr/local
+export HB_PREFIX=${HOMEBREW_PREFIX-/usr/local}
 
 # metamist
 export SM_ENVIRONMENT=LOCAL # good default to have
 export SM_DEV_DB_USER=sm_api # makes it easier to copy liquibase update command
 export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
 
-export PATH="/usr/local/bin:/usr/local/opt/mariadb@10.8/bin:$PATH:/usr/local/opt/openjdk/bin"
+export PATH="$HB_PREFIX/bin:$HB_PREFIX/opt/mariadb@10.8/bin:$PATH:$HB_PREFIX/opt/openjdk/bin"
 
-export CPPFLAGS="-I/usr/local/opt/openjdk/include"
+export CPPFLAGS="-I$HB_PREFIX/opt/openjdk/include"
 export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
 
 # node
 export NVM_DIR="$HOME/.nvm"
-[ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+[ -s "$HB_PREFIX/opt/nvm/nvm.sh" ] && \. "$HB_PREFIX/opt/nvm/nvm.sh"  # This loads nvm
+[ -s "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 ```
 
 ### Database setup
@@ -336,8 +348,8 @@ The following `launch.json` is a good base to debug the web server in VSCode:
             "module": "api.server",
             "justMyCode": false,
             "env": {
-                "SM_LOCALONLY_DEFAULTUSER": "<yourname>-local",
                 "SM_ALLOWALLACCESS": "true",
+                "SM_LOCALONLY_DEFAULTUSER": "<user>-local",
                 "SM_ENVIRONMENT": "local",
                 "SM_DEV_DB_USER": "sm_api",
             }

@@ -1,12 +1,11 @@
 black>=22.3.0
+bump2version
 click==8.0.4
+coverage
 flake8
 flake8-bugbear
+nest-asyncio
 pre-commit
 pylint
-bump2version
 testcontainers[mariadb]
-nest-asyncio
-coverage
 types-PyMySQL
-nest-asyncio
