@@ -125,7 +125,7 @@ Add the following to your `.zshrc` file:
 export HB_PREFIX=${HOMEBREW_PREFIX-/usr/local}
 
 # installing Java through brew recommendation
-export CPPFLAGS="-I$HB_PREFIX/opt/openjdk/include/opt"
+export CPPFLAGS="-I$HB_PREFIX/opt/openjdk/include"
 
 # installing liquibase through brew recommendation
 export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
