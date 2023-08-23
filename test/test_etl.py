@@ -5,10 +5,6 @@ from unittest.mock import patch, MagicMock
 import etl.extract.main
 import etl.load.main
 
-"""" execute only this test
-python -m unittest discover -s test -k test_etl
-"""
-
 ETL_SAMPLE_RECORD = """
 {"identifier": "AB0002", "name": "j smith", "age": 50, "measurement": "98.7", "observation": "B++", "receipt_date": "1/02/2023"}
 """
@@ -24,6 +20,7 @@ class TestEtl(unittest.TestCase):
     def test_etl_extract_valid_payload(
         self, pubsub_client, bq_client, uuid4_fun, email_from_id_token_fun
     ):
+        """Test etl extract valid payload"""
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization'])
         request.json = json.loads(ETL_SAMPLE_RECORD)
         request.path = ''
@@ -45,6 +42,7 @@ class TestEtl(unittest.TestCase):
     def test_etl_load_not_found_record(
         self, bq_client
     ):
+        """Test etl load not found"""
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json'])
         request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
@@ -64,6 +62,7 @@ class TestEtl(unittest.TestCase):
     def test_etl_load_found_record_simple_payload(
         self, bq_client
     ):
+        """Test etl load simple payload"""
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json'])
         request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
@@ -92,6 +91,7 @@ class TestEtl(unittest.TestCase):
     def test_etl_load_found_record_pubsub_payload(
         self, bq_client
     ):
+        """Test etl load pubsub payload"""
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json'])
 
         pubsub_payload_example = {

@@ -24,7 +24,7 @@ setup(
     packages=[
         'metamist_infrastructure',
         'metamist_infrastructure.etl',
-        'metamist_infrastructure.etl.post',
+        'metamist_infrastructure.etl.extract',
         'metamist_infrastructure.etl.load',
     ],
     package_dir={
@@ -32,16 +32,16 @@ setup(
         'metamist_infrastructure': '.',
         # files in ../etl are included as metamist_infrastructure.etl
         'metamist_infrastructure.etl': '../etl',
-        # files in ../etl/post are included as metamist_infrastructure.etl.post
-        'metamist_infrastructure.etl.post': '../etl/post',
+        # files in ../etl/extract are included as metamist_infrastructure.etl.extract
+        'metamist_infrastructure.etl.extract': '../etl/extract',
         # files in ../etl/load are included as metamist_infrastructure.etl.load
         'metamist_infrastructure.etl.load': '../etl/load',
     },
     package_data={
         # ensure bq_schema.json is included in etl
         'metamist_infrastructure.etl': ['*.json'],
-        # ensure requirements.txt is included in etl.post
-        'metamist_infrastructure.etl.post': ['*.txt'],
+        # ensure requirements.txt is included in etl.extract
+        'metamist_infrastructure.etl.extract': ['*.txt'],
         # ensure requirements.txt is included in etl.load
         'metamist_infrastructure.etl.load': ['*.txt'],
     },
