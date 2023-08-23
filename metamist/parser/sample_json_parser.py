@@ -67,4 +67,4 @@ class SampleJsonParser(GenericMetadataParser):
         self, record: str, confirm=False, dry_run=False
     ):
         """Parse passed record """
-        raise NotImplementedError('TO BE IMPLEMENTED')
+        raise NotImplementedError()

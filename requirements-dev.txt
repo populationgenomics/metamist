@@ -9,4 +9,6 @@ testcontainers[mariadb]
 nest-asyncio
 coverage
 types-PyMySQL
-pytest
+functions_framework
+google-cloud-bigquery
+google-cloud-pubsub

@@ -11,8 +11,6 @@ import google.cloud.bigquery as bq
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 
-_BQ_CLIENT = bq.Client()
-
 
 @functions_framework.http
 def etl_load(request: flask.Request):
@@ -77,9 +75,10 @@ def etl_load(request: flask.Request):
         bq.ScalarQueryParameter('request_id', 'STRING', request_id),
     ]
 
+    bq_client = bq.Client()
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
-    query_job_result = _BQ_CLIENT.query(query, job_config=job_config).result()
+    query_job_result = bq_client.query(query, job_config=job_config).result()
 
     if query_job_result.total_rows == 0:
         return {

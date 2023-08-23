@@ -14,9 +14,6 @@ from cpg_utils.cloud import email_from_id_token
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
 
-_BQ_CLIENT = bq.Client()
-_PUBSUB_CLIENT = pubsub_v1.PublisherClient()
-
 
 @functions_framework.http
 def etl_extract(request: flask.Request):
@@ -41,6 +38,7 @@ def etl_extract(request: flask.Request):
     request_id = str(uuid.uuid4())
 
     jbody = request.json
+
     if callable(jbody):
         # request.json is it in reality, but the type checker is saying it's callable
         jbody = jbody()
@@ -63,9 +61,13 @@ def etl_extract(request: flask.Request):
     }
 
     # throw an exception if one occurs
-    errors = _BQ_CLIENT.insert_rows_json(
+    bq_client = bq.Client()
+    pubsub_client = pubsub_v1.PublisherClient()
+
+    errors = bq_client.insert_rows_json(
         BIGQUERY_TABLE, [bq_obj | {'body': jbody_str}]
     )
+
     if errors:
         return {
             'success': False,
@@ -77,7 +79,7 @@ def etl_extract(request: flask.Request):
     # message contains all the attributes except body which can be large
     # and already stored in BQ table
     try:
-        _PUBSUB_CLIENT.publish(
+        pubsub_client.publish(
             PUBSUB_TOPIC,
             json.dumps(bq_obj).encode()
         )

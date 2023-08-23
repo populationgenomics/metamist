@@ -1,6 +1,4 @@
 from test.testbase import DbIsolatedTest, run_as_sync
-import pytest
-
 from metamist.parser.sample_json_parser import SampleJsonParser
 
 
@@ -8,7 +6,7 @@ class TestSampleJsonParser(DbIsolatedTest):
     """Test the SampleJsonParser"""
 
     @run_as_sync
-    async def test_empty_json(self):
+    async def test_sample_parser_empty_json(self):
         """
         Test empty json
         """
@@ -21,9 +19,13 @@ class TestSampleJsonParser(DbIsolatedTest):
 
         # TODO
         # check the output of parse fun
-        # for time being check for Exception
-
-        with pytest.raises(NotImplementedError):
+        # for time being check for NotImplementedError Exception
+        try:
             await parser.parse(
                 empty_record, dry_run=True
             )
+            result = False
+        except NotImplementedError:
+            result = True
+
+        self.assertTrue(result, msg='Parse did not cause the wanted error.')
