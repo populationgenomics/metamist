@@ -1,8 +1,7 @@
 import json
+import base64
 import unittest
 from unittest.mock import patch, MagicMock
-
-import etl.extract.main
 import etl.load.main
 
 ETL_SAMPLE_RECORD = """
@@ -10,33 +9,8 @@ ETL_SAMPLE_RECORD = """
 """
 
 
-class TestEtl(unittest.TestCase):
+class TestEtlLoad(unittest.TestCase):
     """Test etl cloud functions"""
-
-    @patch('etl.extract.main.email_from_id_token')
-    @patch('etl.extract.main.uuid.uuid4')
-    @patch('etl.extract.main.bq.Client', autospec=True)
-    @patch('etl.extract.main.pubsub_v1.PublisherClient', autospec=True)
-    def test_etl_extract_valid_payload(
-        self, pubsub_client, bq_client, uuid4_fun, email_from_id_token_fun
-    ):
-        """Test etl extract valid payload"""
-        request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization'])
-        request.json = json.loads(ETL_SAMPLE_RECORD)
-        request.path = ''
-
-        bq_client_instance = bq_client.return_value
-        bq_client_instance.insert_rows_json.return_value = None
-
-        pubsub_client_instance = pubsub_client.return_value
-        pubsub_client_instance.publish.return_value = None
-
-        email_from_id_token_fun.return_value = 'test@email.com'
-        uuid4_fun.return_value = '1234567890'
-
-        response = etl.extract.main.etl_extract(request)
-
-        assert response == {'id': uuid4_fun.return_value, 'success': True}
 
     @patch('etl.load.main.bq.Client', autospec=True)
     def test_etl_load_not_found_record(
@@ -94,10 +68,17 @@ class TestEtl(unittest.TestCase):
         """Test etl load pubsub payload"""
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json'])
 
+        data = {
+            "request_id": "6dc4b9ae-74ee-42ee-9298-b0a51d5c6836",
+            "timestamp": "2023-08-22T00:59:43.485926",
+            "type": "/",
+            "submitting_user": "user@mail.com"
+        }
+        data_base64 = base64.b64encode(json.dumps(data).encode())
         pubsub_payload_example = {
             'deliveryAttempt': 1,
             'message': {
-                'data': 'eyJyZXF1ZXN0X2lkIjogIjZkYzRiOWFlLTc0ZWUtNDJlZS05Mjk4LWIwYTUxZDVjNjgzNiIsICJ0aW1lc3RhbXAiOiAiMjAyMy0wOC0yMlQwMDo1OTo0My40ODU5MjYiLCAidHlwZSI6ICIvIiwgInN1Ym1pdHRpbmdfdXNlciI6ICJtaWxvc2xhdi5oeWJlbkBwb3B1bGF0aW9uZ2Vub21pY3Mub3JnLmF1In0=',
+                'data': data_base64,
                 'messageId': '8130738175803139',
                 'message_id': '8130738175803139',
                 'publishTime': '2023-08-22T00:59:44.062Z',
