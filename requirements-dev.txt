@@ -13,5 +13,3 @@ types-PyMySQL
 functions_framework
 google-cloud-bigquery
 google-cloud-pubsub
-# following required as dependency for unitest
-cpg-infra @ git+https://github.com/populationgenomics/cpg-infrastructure@06b6680e89e0e26ccc2b4dfdf46056da3e92d16a

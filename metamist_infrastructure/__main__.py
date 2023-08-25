@@ -21,7 +21,7 @@ conf_dict = {
         'config_bucket_name': '',
         'dataset_storage_prefix': ''
     },
-    'sample_metadata': { 
+    'sample_metadata': {
         'gcp': {
             'project': f'{GCP_PROJECT}',
             'service_name': '',
@@ -30,8 +30,8 @@ conf_dict = {
         'etl_accessors': ['bbv', 'kccg', 'sonic', 'sano']
     }
 }
-if __name__ == "__main__":
-    # construnct cpg-infra config 
+if __name__ == '__main__':
+    # construct cpg-infra config
     conf = CPGInfrastructureConfig.from_dict(conf_dict)
 
     # deploy metamist_infrastructure driver
