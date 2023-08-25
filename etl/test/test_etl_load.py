@@ -69,10 +69,10 @@ class TestEtlLoad(unittest.TestCase):
         request = MagicMock(args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json'])
 
         data = {
-            "request_id": "6dc4b9ae-74ee-42ee-9298-b0a51d5c6836",
-            "timestamp": "2023-08-22T00:59:43.485926",
-            "type": "/",
-            "submitting_user": "user@mail.com"
+            'request_id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
+            'timestamp': '2023-08-22T00:59:43.485926',
+            'type': '/',
+            'submitting_user': 'user@mail.com'
         }
         data_base64 = base64.b64encode(json.dumps(data).encode())
         pubsub_payload_example = {
