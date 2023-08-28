@@ -1,6 +1,7 @@
 # pylint: disable=global-statement
 import os
 from functools import lru_cache
+
 from cpg_utils.cloud import read_secret
 
 TRUTH_SET = ('1', 'y', 't', 'true')
@@ -10,6 +11,7 @@ LOG_DATABASE_QUERIES = (
 )
 _ALLOW_ALL_ACCESS: bool = os.getenv('SM_ALLOWALLACCESS', 'n').lower() in TRUTH_SET
 _DEFAULT_USER = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+SM_ENVIRONMENT = os.getenv('SM_ENVIRONMENT', 'local').lower()
 SKIP_DATABASE_CONNECTION = bool(os.getenv('SM_SKIP_DATABASE_CONNECTION'))
 PROFILE_REQUESTS = os.getenv('SM_PROFILE_REQUESTS', 'false').lower() in TRUTH_SET
 IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in TRUTH_SET
