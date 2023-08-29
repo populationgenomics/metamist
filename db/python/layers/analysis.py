@@ -1,17 +1,21 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.analysis import AnalysisTable, AnalysisFilter
+from db.python.tables.analysis import AnalysisFilter, AnalysisTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import get_logger, GenericFilter
+from db.python.utils import GenericFilter, get_logger
 from models.enums import AnalysisStatus
-from models.models.analysis import AnalysisInternal
+from models.models import (
+    AnalysisInternal,
+    ProportionalDateModel,
+    ProportionalDateProjectModel,
+)
 
 logger = get_logger()
 
@@ -125,6 +129,7 @@ class AnalysisLayer(BaseLayer):
         project_ids: list[int] = None,
         start_date: date = None,
         end_date: date = None,
+        sequencing_type: str = None,
     ) -> list[dict]:
         """
         Get the file sizes from all the given projects group by sample filtered
@@ -133,14 +138,19 @@ class AnalysisLayer(BaseLayer):
 
         # Get samples from pids
         sglayer = SequencingGroupLayer(self.connection)
-        sequencing_groups = await sglayer.query(
-            SequencingGroupFilter(project=GenericFilter(in_=project_ids))
+        sgfilter = SequencingGroupFilter(
+            project=GenericFilter(in_=project_ids),
+            type=GenericFilter(eq=sequencing_type),
         )
+
+        sequencing_groups = await sglayer.query(sgfilter)
 
         sequencing_group_ids = [sg.id for sg in sequencing_groups]
 
-        # Get sample history
-        history = await sglayer.get_sequencing_groups_create_date(sequencing_group_ids)
+        # Get sample history for sequencing-group IDs
+        history = await sglayer.get_samples_create_date_from_sgs(sequencing_group_ids)
+
+        filtered_sequencing_group_ids = sequencing_group_ids
 
         def keep_sequencing_group(sid):
             d = history[sid]
@@ -190,7 +200,8 @@ class AnalysisLayer(BaseLayer):
                 # even though for now we only support 1
                 crams_by_project[sg.project][sgid] = [
                     {
-                        'start': history[sgid],
+                        'start': history[sgid]
+                        or datetime.fromisoformat(cram.timestamp_completed).date(),
                         'end': None,  # TODO: add functionality for deleted samples
                         'size': size,
                     }
@@ -201,6 +212,106 @@ class AnalysisLayer(BaseLayer):
             for p in crams_by_project
         ]
         return formated
+
+    async def get_cram_size_proportionate_map(
+        self,
+        projects: list[ProjectId],
+        sequencing_type: str,
+        start_date: date = None,
+        end_date: date = None,
+    ):
+        """
+        This is a bit more complex, but for hail we want to proportion any downstream
+        costs as soon as there CRAMs available. This kind of means we build up a
+        continuous map of costs (but fragmented by days).
+
+        We'll do this in three steps:
+
+        1. First alssign the cram a {dataset: total_size} map on the day cram was
+            aligned. This generates a diff of each dataset by day.
+
+        2. Iterate over the days, and progressively sum up the sizes in the map.
+
+        3. Iterate over the days, and proportion each day by total size in the day.
+        """
+
+        project_objs = await self.ptable.get_projects_by_ids(projects)
+        project_name_map = {p.id: p.name for p in project_objs}
+
+        sequencing_group_sizes_by_project = await self.get_sequencing_group_file_sizes(
+            projects,
+            start_date=start_date,
+            end_date=end_date,
+            sequencing_type=sequencing_type,
+        )
+
+        end_date_date = None
+        if end_date:
+            if isinstance(end_date, date):
+                end_date_date = end_date
+            elif isinstance(end_date, datetime):
+                end_date_date = end_date.date()
+            else:
+                raise ValueError('end_date must be a date or datetime')
+
+        # 1.
+        by_date_diff: dict[date, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        for obj in sequencing_group_sizes_by_project:
+            project_name = project_name_map.get(obj['project'])
+            for sg_dates in obj['sequencing_groups'].values():
+                sizes_dates: list[tuple[date, int]] = []
+                for obj in sg_dates:
+                    obj_date = obj['start']
+                    size = obj['size']
+                    if end_date_date and start_date > end_date_date:
+                        continue
+                    if len(sizes_dates) > 0:
+                        # subtract last size to get the difference
+                        # if the crams got smaller, this number will be negative
+                        size -= sizes_dates[-1][1]
+
+                    adjusted_start_date = obj_date
+                    if start_date and obj_date < start_date:
+                        adjusted_start_date = start_date
+                    by_date_diff[adjusted_start_date][project_name] += size
+                    sizes_dates.append((adjusted_start_date, size))
+
+        # 2: progressively sum up the sizes, prepping for step 3
+
+        by_date_totals: list[tuple[date, dict[str, int]]] = []
+        sorted_days = list(sorted(by_date_diff.items(), key=lambda el: el[0]))
+        for idx, (dt, project_map) in enumerate(sorted_days):
+            if idx == 0:
+                by_date_totals.append((dt, project_map))
+                continue
+
+            new_project_map = {**by_date_totals[idx - 1][1]}
+
+            for pn, cram_size in project_map.items():
+                if pn not in new_project_map:
+                    new_project_map[pn] = cram_size
+                else:
+                    new_project_map[pn] += cram_size
+
+            by_date_totals.append((dt, new_project_map))
+
+        # 3: proportion each day
+        prop_map: list[ProportionalDateModel] = []
+        for dt, project_map in by_date_totals:
+            total_size = sum(project_map.values())
+            for_date = ProportionalDateModel(date=dt, projects=[])
+            for project_name, size in project_map.items():
+                for_date.projects.append(
+                    ProportionalDateProjectModel(
+                        project=project_name,
+                        percentage=float(size) / total_size,
+                        size=size,
+                    )
+                )
+
+            prop_map.append(for_date)
+
+        return prop_map
 
     # CREATE / UPDATE
 

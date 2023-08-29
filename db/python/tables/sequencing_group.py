@@ -6,11 +6,11 @@ from typing import Any
 
 from db.python.connect import DbBase, NoOpAenter, NotFoundError
 from db.python.utils import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
     ProjectId,
     to_db_json,
-    GenericFilterModel,
-    GenericFilter,
-    GenericMetaFilter,
 )
 from models.models.sequencing_group import SequencingGroupInternal
 
@@ -210,6 +210,20 @@ class SequencingGroupTable(DbBase):
         FROM sequencing_group FOR SYSTEM_TIME ALL
         WHERE id in :sgids
         GROUP BY id"""
+        rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
+        return {r[0]: r[1].date() for r in rows}
+
+    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+        if len(sequencing_group_ids) == 0:
+            return {}
+
+        _query = """
+        SELECT sg.id, min(s.row_start)
+        FROM sequencing_group sg
+        INNER JOIN sample s ON s.id = sg.sample_id
+        WHERE sg.id in :sgids
+        GROUP BY sg.id
+        """
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
 

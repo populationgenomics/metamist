@@ -6,13 +6,13 @@ from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
-    SequencingGroupTable,
     SequencingGroupFilter,
+    SequencingGroupTable,
 )
 from db.python.utils import ProjectId
 from models.models.sequencing_group import (
-    SequencingGroupUpsertInternal,
     SequencingGroupInternal,
+    SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
@@ -109,11 +109,20 @@ class SequencingGroupLayer(BaseLayer):
     async def get_sequencing_groups_create_date(
         self, sequencing_group_ids: list[int]
     ) -> dict[int, date]:
-        """Get a map of {internal_sample_id: date_created} for list of sample_ids"""
+        """
+        Get a map of {internal_sample_id: date_created} for list of sequencing_groups
+        """
         if len(sequencing_group_ids) == 0:
             return {}
 
         return await self.seqgt.get_sequencing_groups_create_date(sequencing_group_ids)
+
+    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+        """
+        Get a map of {internal_sg_id: sample_date_created}
+        for a list of sequencing_groups
+        """
+        return await self.seqgt.get_samples_create_date_from_sgs(sequencing_group_ids)
 
     async def get_all_sequencing_group_ids_by_sample_ids_by_type(
         self,

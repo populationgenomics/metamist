@@ -10,10 +10,10 @@ from starlette.responses import StreamingResponse
 
 from api.utils.dates import parse_date_only_string
 from api.utils.db import (
-    get_projectless_db_connection,
+    Connection,
     get_project_readonly_connection,
     get_project_write_connection,
-    Connection,
+    get_projectless_db_connection,
 )
 from api.utils.export import ExportType
 from db.python.layers.analysis import AnalysisLayer
@@ -21,21 +21,12 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models.analysis import (
-    AnalysisInternal,
-    ProjectSizeModel,
-    SequencingGroupSizeModel,
-    DateSizeModel,
-    Analysis,
-)
-from models.utils.sample_id_format import (
-    sample_id_transform_to_raw_list,
-    sample_id_format,
-)
+from models.models.analysis import Analysis, AnalysisInternal, ProjectSizeModel
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format,
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
-    sequencing_group_id_format,
 )
 
 router = APIRouter(prefix='/analysis', tags=['analysis'])
@@ -316,7 +307,7 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sample-file-sizes', operation_id='getSequencingGroupFileSizes')
+@router.get('/sg-file-sizes', operation_id='getSequencingGroupFileSizes')
 async def get_sequencing_group_file_sizes(
     project_names: list[str] = Query(None),  # type: ignore
     start_date: str = None,
@@ -336,30 +327,53 @@ async def get_sequencing_group_file_sizes(
     )
 
     # Map from internal pids to project name
-    prj_name_map = dict(zip(project_ids, project_names))
+    dict(zip(project_ids, project_names))
 
     # Convert dates
     start = parse_date_only_string(start_date)
     end = parse_date_only_string(end_date)
 
     # Get results with internal ids as keys
-    results = await atable.get_sequencing_group_file_sizes(
+    results: list[dict] = await atable.get_sequencing_group_file_sizes(
         project_ids=project_ids, start_date=start, end_date=end
     )
 
     # Convert to the correct output type, converting internal ids to external
-    fixed_pids: list[Any] = [
-        ProjectSizeModel(
-            project=prj_name_map[project_data['project']],
-            samples=[
-                SequencingGroupSizeModel(
-                    sample=sample_id_format(s['sample']),
-                    dates=[DateSizeModel(**d) for d in s['dates']],
-                )
-                for s in project_data['samples']
-            ],
-        )
-        for project_data in results
-    ]
+    for r in results:
+        sgobj: dict[int, dict] = r['sequencing_groups']
+        r['sequencing_groups'] = {
+            sequencing_group_id_format(k): v for k, v in sgobj.items()
+        }
 
-    return fixed_pids
+    return results
+
+
+@router.post(
+    '/cram-proportionate-map/{sequencing_type}',
+    operation_id='getProportionateMap',
+    # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
+)
+async def get_proportionate_map(
+    sequencing_type: str,
+    projects: list[str],
+    start: str = None,
+    end: str = None,
+    connection: Connection = get_projectless_db_connection,
+):
+    pt = ProjectPermissionsTable(connection=connection.connection)
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, projects, readonly=True
+    )
+
+    start_date = parse_date_only_string(start) if start else None
+    end_date = parse_date_only_string(end) if end else None
+
+    at = AnalysisLayer(connection)
+    results = await at.get_cram_size_proportionate_map(
+        projects=project_ids,
+        sequencing_type=sequencing_type,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    return results

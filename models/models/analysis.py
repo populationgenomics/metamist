@@ -133,3 +133,20 @@ class ProjectSizeModel(BaseModel):
 
     project: str
     sequencing_groups: list[SequencingGroupSizeModel]
+
+
+class ProportionalDateProjectModel(BaseModel):
+    """Stores the percentage / total size of a project on a date"""
+
+    project: str
+    percentage: float | int
+    size: int
+
+
+class ProportionalDateModel(BaseModel):
+    """
+    Stores the percentage / total size of all projects for a date
+    """
+
+    date: date
+    projects: list[ProportionalDateProjectModel]
