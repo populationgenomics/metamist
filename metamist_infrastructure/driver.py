@@ -17,8 +17,6 @@ from cpg_infra.utils import archive_folder
 # ETL_FOLDER = Path(__file__).parent / 'etl'
 ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
-# PATH_TO_ETL_EXTRACT = ETL_FOLDER / 'extract'
-# PATH_TO_ETL_ENDPOINT = ETL_FOLDER / 'load'
 
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
@@ -124,6 +122,29 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
+    def etl_function_account(self, f_name: str):
+        """
+        Service account for cloud function
+        """
+        return gcp.serviceaccount.Account(
+            f'metamist-etl-{f_name}-service-account',
+            account_id=f'metamist-etl-{f_name}-sa',
+            project=self.config.sample_metadata.gcp.project,
+            opts=pulumi.ResourceOptions(
+                depends_on=[self._svc_iam],
+            ),
+        )
+
+    @cached_property
+    def etl_load_service_account(self):
+        """Service account to run load/transform functionality"""
+        return self.etl_function_account('load')
+
+    @cached_property
+    def etl_extract_service_account(self):
+        """Service account to run extract functionality"""
+        return self.etl_function_account('extract')
+
     @cached_property
     def etl_accessors(self):
         """Service account to run endpoint + ingestion as"""
@@ -168,7 +189,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             topic=topic.name,
             policy_data=self.prepare_service_account_policy_data(
                 'roles/pubsub.publisher'
-            )
+            ),
         )
 
         return topic
@@ -176,7 +197,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_pubsub_push_subscription(self):
         """
-        Pubsub push_subscription to topic, new messages to topic triggeres load process
+        Pubsub push_subscription to topic,
+        new messages to topic triggeres load process
         """
         subscription = gcp.pubsub.Subscription(
             'metamist-etl-subscription',
@@ -189,7 +211,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             push_config=gcp.pubsub.SubscriptionPushConfigArgs(
                 push_endpoint=self.etl_load_function.service_config.uri,
                 oidc_token=gcp.pubsub.SubscriptionPushConfigOidcTokenArgs(
-                    service_account_email=self.etl_service_account.email,
+                    service_account_email=self.etl_extract_service_account.email,
                 ),
                 attributes={
                     'x-goog-version': 'v1',
@@ -202,7 +224,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     self.etl_pubsub_topic,
                     self.etl_load_function,
                     self.etl_pubsub_dead_letters_topic,
-                    self.etl_pubsub_dead_letter_subscription
+                    self.etl_pubsub_dead_letter_subscription,
                 ]
             ),
         )
@@ -214,7 +236,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             subscription=subscription.name,
             policy_data=self.prepare_service_account_policy_data(
                 'roles/pubsub.subscriber'
-            )
+            ),
         )
 
         return subscription
@@ -230,9 +252,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             project=self.config.sample_metadata.gcp.project,
             ack_deadline_seconds=20,
             opts=pulumi.ResourceOptions(
-                depends_on=[
-                    self.etl_pubsub_dead_letters_topic
-                ]
+                depends_on=[self.etl_pubsub_dead_letters_topic]
             ),
         )
 
@@ -309,13 +329,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     def prepare_service_account_policy_data(self, role):
         """
-        prepare_service_account_policy_data
-
-        Args:
-            role (_type_): _description_
-
-        Returns:
-            _type_: _description_
+        Prepare gcp service account policy
         """
         # get project
         project = gcp.organizations.get_project()
@@ -328,7 +342,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         pulumi.Output.concat(
                             'serviceAccount:service-',
                             project.number,
-                            '@gcp-sa-pubsub.iam.gserviceaccount.com'
+                            '@gcp-sa-pubsub.iam.gserviceaccount.com',
                         )
                     ],
                 )
@@ -339,32 +353,37 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl
         """
-        # give the etl_service_account ability to write to bigquery
+        # give the etl_load/extracr_service_accounts ability to read/write to bq table
         gcp.bigquery.DatasetAccess(
-            'metamist-etl-bq-dataset-access',
+            'metamist-etl-bq-dataset-write-access',
             project=self.config.sample_metadata.gcp.project,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
-            role='OWNER',
-            user_by_email=self.etl_service_account.email,
+            role='WRITER',
+            user_by_email=self.etl_extract_service_account.email,
         )
-
-        # give the etl_service_account ability to execute bigquery jobs
+        gcp.bigquery.DatasetAccess(
+            'metamist-etl-bq-dataset-read-access',
+            project=self.config.sample_metadata.gcp.project,
+            dataset_id=self.etl_bigquery_dataset.dataset_id,
+            role='READER',
+            user_by_email=self.etl_load_service_account.email,
+        )
+        # give the etl_load_service_account ability to execute bigquery jobs
         gcp.projects.IAMMember(
             'metamist-etl-bq-job-user-role',
             project=self.config.sample_metadata.gcp.project,
             role='roles/bigquery.jobUser',
             member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_service_account.email
+                'serviceAccount:', self.etl_load_service_account.email
             ),
         )
-
-        # give the etl_service_account ability to push to pub/sub
+        # give the etl_extract_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-editor-role',
             project=self.config.sample_metadata.gcp.project,
             role='roles/editor',
             member=pulumi.Output.concat(
-                'serviceAccount:', self.etl_service_account.email
+                'serviceAccount:', self.etl_extract_service_account.email
             ),
         )
 
@@ -380,10 +399,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         # TODO
         return pulumi.ResourceOptions(
-            depends_on=[
-                self.etl_extract_function,
-                self.etl_load_function
-            ],
+            depends_on=[self.etl_extract_function, self.etl_load_function],
         )
 
     def setup_etl_pubsub(self):
@@ -393,31 +409,21 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         return pulumi.ResourceOptions(
             depends_on=[
                 self.etl_pubsub_dead_letter_subscription,
-                self.etl_pubsub_push_subscription
+                self.etl_pubsub_push_subscription,
             ],
         )
 
     @cached_property
     def etl_extract_function(self):
-        """
-        etl_extract_function
-
-        Returns:
-            _type_: _description_
-        """
-        return self.etl_function('extract')
+        """etl_extract_function"""
+        return self.etl_function('extract', self.etl_extract_service_account.email)
 
     @cached_property
     def etl_load_function(self):
-        """
-        etl_load_function
+        """etl_load_function"""
+        return self.etl_function('load', self.etl_load_service_account.email)
 
-        Returns:
-            _type_: _description_
-        """
-        return self.etl_function('load')
-
-    def etl_function(self, f_name: str):
+    def etl_function(self, f_name: str, sa_email: str):
         """
         Driver function to setup the etl cloud function
         """
@@ -460,7 +466,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 available_cpu=1,
                 timeout_seconds=540,
                 environment_variables={
-                    # format: "project.dataset.table_id
+                    # format: 'project.dataset.table_id
                     'BIGQUERY_TABLE': pulumi.Output.concat(
                         self.etl_bigquery_table.project,
                         '.',
@@ -469,12 +475,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    # 'ALLOWED_USERS': 'michael.franklin@populationgenomics.org.au',
-                    # 'ALLOWED_USERS': 'miloslav.hyben@populationgenomics.org.au',
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
-                service_account_email=self.etl_service_account.email,
+                service_account_email=sa_email,
             ),
             project=self.config.sample_metadata.gcp.project,
             location=self.config.gcp.region,
@@ -505,17 +509,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
-    def setup_slack_notification(self):
-        if self.slack_channel is None:
-            return
+    def setup_function_slack_notification(self, etl_fun_name: str):
+        """
+        setup slack notification for etl_fun cloud function
+        """
+        etl_fun = getattr(self, f'etl_{etl_fun_name}_function')
 
         # Slack notifications
-        filter_string = self.etl_extract_function.name.apply(
+        filter_string = etl_fun.name.apply(
             lambda fxn_name: f"""
-                        resource.type="cloud_function"
-                        AND resource.labels.function_name="{fxn_name}"
-                        AND severity >= WARNING
-                    """  # noqa: B028
+                resource.type="cloud_run_revision"
+                AND resource.labels.service_name="{fxn_name}"
+                AND severity>=WARNING
+            """  # noqa: B028
         )
 
         # Create the Cloud Function's event alert
@@ -528,17 +534,27 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             display_name='Function warning/error',
         )
         gcp.monitoring.AlertPolicy(
-            f'metamist-etl-alert-policy',
-            display_name=f'Metamist ETL Function Error Alert',
+            resource_name=f'metamist-etl-{etl_fun_name}-alert-policy',
+            display_name=f'Metamist ETL {etl_fun_name.capitalize()} Function Error Alert',
             combiner='OR',
             notification_channels=[self.slack_channel.id],
             conditions=[alert_condition],
             alert_strategy=gcp.monitoring.AlertPolicyAlertStrategyArgs(
                 notification_rate_limit=(
                     gcp.monitoring.AlertPolicyAlertStrategyNotificationRateLimitArgs(
+                        # One notification per 5 minutes
                         period='300s'
                     )
                 ),
+                # Autoclose Incident after 30 minutes
+                auto_close='1800s',
             ),
-            opts=pulumi.ResourceOptions(depends_on=[self.etl_function]),
+            opts=pulumi.ResourceOptions(depends_on=[etl_fun]),
         )
+
+    def setup_slack_notification(self):
+        if self.slack_channel is None:
+            return
+
+        self.setup_function_slack_notification('extract')
+        self.setup_function_slack_notification('load')

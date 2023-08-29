@@ -30,12 +30,10 @@ metamist-infrastructure @ git+https://github.com/populationgenomics/sample-metad
 ```
 
 
-## Local Development
+## Local Development & Testing
 
-To test standalone driver, setup pulumi and pulumi-gcp
+To test standalone driver, follow the steps:
 
-- setup [Pulumi](https://www.pulumi.com/docs/install/)
-- create free Individual Pulumi account
 - create python environment:
 
 ```bash
@@ -46,11 +44,29 @@ pip install -r requirements-dev.txt
 cd metamist_infrastructure
 ```
 
+### Pulumi
+
+- setup pulumi and pulumi-gcp
+- setup [Pulumi](https://www.pulumi.com/docs/install/)
+- create free Individual Pulumi account
 - setup [Pulumi & Google Cloud](https://www.pulumi.com/docs/clouds/gcp/get-started/)
 - copy Pulumi.yaml & Pulumi.dev.yaml to metamist_infrastracture folder
-- set environment variable GCP_PROJECT
+
+### Slack
+
+- create private slack channel for testing, call it e.g. "dev-channel"
+- create test [Slack App](https://api.slack.com/start/quickstart) in your Slack workspace
+- add created app to private channel Integrations
+- copy Bot User OAuth Token from created Slack App OAuth Tokens for Your Workspace and create new secret under gc Secret Manager, call it e.g. "dev-slack-secret"
+- you can test the Oauth Token if you can see private channel [here](https://api.slack.com/tutorials/tracks)
+
+### Env variables
+
+- set environment variable METAMIST_INFRA_SLACK_CHANNEL, METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME and METAMIST_INFRA_GCP_PROJECT, e.g.:
 
 ```bash
+export METAMIST_INFRA_SLACK_CHANNEL='dev-channel'
+export METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME='dev-slack-secret'
 export METAMIST_INFRA_GCP_PROJECT='gcp-project-name'
 ```
 
@@ -59,6 +75,36 @@ export METAMIST_INFRA_GCP_PROJECT='gcp-project-name'
 ```bash
 pulumi up
 ```
+
+### Test Cloud functions
+
+Test extract function:
+
+```bash
+curl -X 'PUT' \
+  'https://metamist-etl-extract-xyz-run.app' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"version": "1.0", "method":"test","id":111}'
+
+
+{"id":"5242fc79-a018-432f-80a5-58a43222e000","success":true}
+```bash
+
+Test load function:
+
+```bash
+curl -X 'PUT' \
+  'https://metamist-etl-load-xyz-run.app' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"request_id": 5242fc79-a018-432f-80a5-58a43222e000"}'
+
+
+{"id":"5242fc79-a018-432f-80a5-58a43222e000","record":{"id":111,"method":"test","version":"1.0"},"success":true}
+```bash
 
 ### Destroy stack
 
