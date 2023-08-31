@@ -228,11 +228,13 @@ We'll setup a user called `sm_api`, and setup permissions
 ```shell
 sudo mysql -u root --execute "
   CREATE DATABASE sm_dev;
-  CREATE USER sm_api@'%'
+  CREATE USER sm_api@'%';
   CREATE USER sm_api@localhost;
   CREATE ROLE sm_api_role;
-  GRANT sm_api_role TO sm_api@'%'
+  GRANT sm_api_role TO sm_api@'%';
   GRANT sm_api_role TO sm_api@localhost;
+  SET DEFAULT ROLE sm_api_role FOR sm_api@'%';
+  SET DEFAULT ROLE sm_api_role FOR sm_api@localhost;
   GRANT ALL PRIVILEGES ON sm_dev.* TO sm_api_role;
 "
 ```
