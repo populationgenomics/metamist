@@ -105,7 +105,7 @@ def _get_openapi_version():
     for version_cmd in version_cmds:
         command = [*OPENAPI_COMMAND, version_cmd]
         try:
-            return subprocess.check_output(command, stderr=subprocess.PIPE)
+            return subprocess.check_output(command, stderr=subprocess.PIPE, timeout=5)
         except subprocess.CalledProcessError:
             continue
 
@@ -317,7 +317,7 @@ def main():
         while (not check_if_server_is_accessible()) and startup_tries > 0:
             startup_tries -= 1
             logger.info(
-                f'Dockerised API server is not ready yet. '
+                'Dockerised API server is not ready yet. '
                 + f'Retrying in {wait_time_in_seconds} seconds. '
                 + f'Remaining tries: {startup_tries}'
             )
