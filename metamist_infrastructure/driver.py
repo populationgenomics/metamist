@@ -8,10 +8,9 @@ from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
-from cpg_utils.cloud import read_secret
-
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
+from cpg_utils.cloud import read_secret
 
 # this gets moved around during the pip install
 # ETL_FOLDER = Path(__file__).parent / 'etl'
@@ -292,7 +291,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             labels={'project': 'metamist'},
             schema=schema,
             project=self.config.sample_metadata.gcp.project,
-            # docs say: Note: On newer versions of the provider, you must explicitly set
+            # docs say: Note: On newer versions of the provider,
+            # you must explicitly set
             deletion_protection=False,
             opts=pulumi.ResourceOptions(
                 depends_on=[self.etl_bigquery_dataset],
@@ -416,7 +416,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        return self.etl_function('extract', self.etl_extract_service_account.email)
+        return self.etl_function(
+            'extract', self.etl_extract_service_account.email
+        )
 
     @cached_property
     def etl_load_function(self):
@@ -434,11 +436,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # archive, which we create using the pulumi.AssetArchive primitive.
         archive = archive_folder(str(path_to_func_folder.absolute()))
 
-        # Create the single Cloud Storage object, which contains the source code
+        # Create the single Cloud Storage object,
+        # which contains the source code
         source_archive_object = gcp.storage.BucketObject(
             f'metamist-etl-{f_name}-source-code',
-            # updating the source archive object does not trigger the cloud function
-            # to actually updating the source because it's based on the name,
+            # updating the source archive object does not trigger the cloud
+            # function to actually updating the source because
+            # it's based on the name,
             # allow Pulumi to create a new name each time it gets updated
             bucket=self.source_bucket.name,
             source=archive,

@@ -21,7 +21,7 @@ conf_dict = {
         'groups_domain': '',
         'budget_notification_pubsub': '',
         'config_bucket_name': '',
-        'dataset_storage_prefix': ''
+        'dataset_storage_prefix': '',
     },
     'sample_metadata': {
         'gcp': {
@@ -43,9 +43,9 @@ conf_dict = {
             'source_bq_table': '',
             'destination_bq_table': '',
             'slack_channel': '',
-            'functions': []
-        }
-    }
+            'functions': [],
+        },
+    },
 }
 if __name__ == '__main__':
     # construct cpg-infra config

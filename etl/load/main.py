@@ -1,15 +1,30 @@
+import asyncio
+import base64
 import json
 import logging
 import os
-import base64
-from typing import Dict, Any
+from typing import Any, Dict
 
-import functions_framework
 import flask
+import functions_framework
 import google.cloud.bigquery as bq
-
+from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
+
+PARTICIPANT_COL_NAME = 'individual_id'
+SAMPLE_ID_COL_NAME = 'sample_id'
+SEQ_TYPE_COL_NAME = 'sequencing_type'
+SAMPLE_META_MAP = {
+    'collection_centre': 'centre',
+    'collection_date': 'collection_date',
+    'collection_specimen': 'specimen',
+}
+
+DEFAULT_SEQUENCING_TYPE = 'genome'
+DEFAULT_SEQUENCING_TECHNOLOGY = 'short-read'
+METAMIST_PROJECT = 'greek-myth'
+DEFAULT_SAMPLE_TYPE = 'blood'
 
 
 @functions_framework.http
@@ -88,12 +103,51 @@ def etl_load(request: flask.Request):
 
     # should be only one record, look into loading multiple objects in one call?
     row_json = None
+    result = None
     for row in query_job_result:
+        """example of json record:
+        row_json = {
+            'sample_id': '123456',
+            'external_id': 'GRK100311',
+            'individual_id': '608',
+            'sequencing_type': 'exome',
+            'collection_centre': 'KCCG',
+            'collection_date': '2023-08-05T01:39:28.611476',
+            'collection_specimen': 'blood'
+        }
+        """
         # TODO
         # Parse row.body -> Model and upload to metamist database
         row_json = json.loads(row.body)
 
-    return {'id': request_id, 'record': row_json, 'success': True}
+        parser = GenericMetadataParser(
+            search_locations=[],
+            project=METAMIST_PROJECT,
+            participant_column=PARTICIPANT_COL_NAME,
+            sample_name_column=SAMPLE_ID_COL_NAME,
+            reads_column=None,
+            checksum_column=None,
+            seq_type_column=SEQ_TYPE_COL_NAME,
+            default_sequencing_type=DEFAULT_SEQUENCING_TYPE,
+            default_sample_type=DEFAULT_SAMPLE_TYPE,
+            default_sequencing_technology=DEFAULT_SEQUENCING_TECHNOLOGY,
+            default_reference_assembly_location=None,
+            participant_meta_map={},
+            sample_meta_map=SAMPLE_META_MAP,
+            assay_meta_map={},
+            qc_meta_map={},
+            allow_extra_files_in_search_path=None,
+            key_map=None,
+        )
+        result = parser.from_json([row_json], confirm=False, dry_run=True)
+        asyncio.run(result)
+
+    return {
+        'id': request_id,
+        'record': row_json,
+        'result': f"'{result}'",
+        'success': True,
+    }
 
 
 def extract_request_id(jbody: Dict[str, Any]) -> str | None:

@@ -2,3 +2,5 @@ flask
 functions_framework
 google-cloud-bigquery
 google-cloud-logging
+# will be replaced with metamist once it cotains the parser changes
+./metamist-6.2.0.tar.gz

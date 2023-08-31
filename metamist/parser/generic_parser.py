@@ -1,47 +1,44 @@
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,assignment-from-none,invalid-name,ungrouped-imports
-import json
-import sys
 import asyncio
 import csv
+import json
 import logging
 import os
 import re
+import sys
 from abc import abstractmethod
 from collections import defaultdict
+from functools import wraps
 from io import StringIO
 from typing import (
-    List,
-    Dict,
-    Union,
-    Optional,
-    Tuple,
-    Match,
     Any,
-    Sequence,
-    TypeVar,
-    Iterator,
     Coroutine,
-    Set,
-    Iterable,
+    Dict,
     Hashable,
+    Iterable,
+    Iterator,
+    List,
+    Match,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
 )
-from functools import wraps
 
 from cloudpathlib import AnyPath
-
-from metamist.graphql import query_async, gql
-from metamist.parser.cloudhelper import CloudHelper, group_by
-
-from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
+from metamist.apis import AnalysisApi, AssayApi, ParticipantApi, SampleApi
+from metamist.graphql import gql, query_async
 from metamist.models import (
     Analysis,
     AnalysisStatus,
+    AssayUpsert,
     ParticipantUpsert,
     SampleUpsert,
     SequencingGroupUpsert,
-    AssayUpsert,
 )
-
+from metamist.parser.cloudhelper import CloudHelper, group_by
 
 # https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-new-additions-to-the-typing-module
 if sys.version_info >= (3, 8):
@@ -161,10 +158,14 @@ class CustomDictReader(csv.DictReader):
     def fieldnames(self):
         if not self._custom_cached_fieldnames:
             fs = super().fieldnames
-            self._custom_cached_fieldnames = list(map(self.process_fieldname, fs))
+            self._custom_cached_fieldnames = list(
+                map(self.process_fieldname, fs)
+            )
 
             if self.required_keys:
-                missing_keys = self.required_keys - set(self._custom_cached_fieldnames)
+                missing_keys = self.required_keys - set(
+                    self._custom_cached_fieldnames
+                )
                 if missing_keys:
                     raise ValueError('Missing keys: ' + ','.join(missing_keys))
         return self._custom_cached_fieldnames
@@ -434,7 +435,9 @@ class GenericParser(
 
         self.default_sequencing_type: str = default_sequencing_type
         self.default_sequencing_technology: str = default_sequencing_technology
-        self.default_sequencing_platform: Optional[str] = default_sequencing_platform
+        self.default_sequencing_platform: Optional[
+            str
+        ] = default_sequencing_platform
         self.default_sample_type: Optional[str] = default_sample_type
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
@@ -453,7 +456,9 @@ class GenericParser(
 
     # region generic utils
 
-    def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
+    def file_path(
+        self, filename: str, raise_exception: bool = True
+    ) -> str | None:
         """
         Get complete filepath of filename:
         - Includes gs://{bucket} if relevant
@@ -508,6 +513,11 @@ class GenericParser(
         rows = await self.file_pointer_to_rows(
             file_pointer=file_pointer, delimiter=delimiter
         )
+        return await self.from_json(rows, confirm, dry_run)
+
+    async def from_json(self, rows, confirm=False, dry_run=False):
+        """Parse passed rows"""
+
         await self.validate_rows(rows)
 
         # one participant with no value
@@ -534,7 +544,9 @@ class GenericParser(
 
         sequencing_groups: list[ParsedSequencingGroup] = []
         for schunk in chunk(samples):
-            seq_groups_for_chunk = await asyncio.gather(*map(self.group_assays, schunk))
+            seq_groups_for_chunk = await asyncio.gather(
+                *map(self.group_assays, schunk)
+            )
 
             for sample, seqgroups in zip(schunk, seq_groups_for_chunk):
                 sample.sequencing_groups = seqgroups
@@ -567,13 +579,17 @@ class GenericParser(
         # match sequencing group ids after assays
         await self.match_sequencing_group_ids(sequencing_groups)
 
-        summary = self.prepare_summary(participants, samples, sequencing_groups, assays)
+        summary = self.prepare_summary(
+            participants, samples, sequencing_groups, assays
+        )
         message = self.prepare_message(
             summary, participants, samples, sequencing_groups, assays
         )
 
         if dry_run:
-            logger.info('Dry run, so returning without inserting / updating metadata')
+            logger.info(
+                'Dry run, so returning without inserting / updating metadata'
+            )
             return summary, (participants if participants else samples)
 
         if confirm:
@@ -611,7 +627,9 @@ class GenericParser(
         )
         return reader
 
-    async def file_pointer_to_rows(self, file_pointer, delimiter) -> list[SingleRow]:
+    async def file_pointer_to_rows(
+        self, file_pointer, delimiter
+    ) -> list[SingleRow]:
         """Given some file pointer + a delimiter, get a list of rows (dictionary)"""
         reader = self._get_dict_reader(file_pointer, delimiter=delimiter)
         return list(reader)
@@ -626,13 +644,17 @@ class GenericParser(
         """
         From the parsed objects, prepare a summary of what will be inserted / updated
         """
-        participants_to_insert = sum(1 for p in participants if not p.internal_pid)
+        participants_to_insert = sum(
+            1 for p in participants if not p.internal_pid
+        )
         samples_to_insert = sum(1 for s in samples if not s.internal_sid)
         sgs_to_insert = sum(
             1 for sg in sequencing_groups if not sg.internal_seqgroup_id
         )
         assays_to_insert = sum(1 for sq in assays if not sq.internal_id)
-        analyses_to_insert = sum(len(sg.analyses or []) for sg in sequencing_groups)
+        analyses_to_insert = sum(
+            len(sg.analyses or []) for sg in sequencing_groups
+        )
         summary: dict[str, dict[Literal['insert', 'update'], int]] = {
             'participants': {
                 'insert': participants_to_insert,
@@ -670,7 +692,9 @@ class GenericParser(
             )
             header = f'Processing participants: {external_participant_ids}'
         else:
-            external_sample_ids = ', '.join(set(s.external_sid for s in samples))
+            external_sample_ids = ', '.join(
+                set(s.external_sid for s in samples)
+            )
             header = f'Processing samples: {external_sample_ids}'
 
         assays_count: dict[str, int] = defaultdict(int)
@@ -706,7 +730,9 @@ class GenericParser(
 
     # region MATCHING
 
-    async def match_participant_ids(self, participants: list[ParsedParticipant]):
+    async def match_participant_ids(
+        self, participants: list[ParsedParticipant]
+    ):
         """
         Determine if a participant is NEW or UPDATE, and match the ID if so.
         Participants only match on external_id
@@ -715,7 +741,9 @@ class GenericParser(
         values = await query_async(
             QUERY_MATCH_PARTICIPANTS, variables={'project': self.project}
         )
-        pid_map = {p['externalId']: p['id'] for p in values['project']['participants']}
+        pid_map = {
+            p['externalId']: p['id'] for p in values['project']['participants']
+        }
 
         for participant in participants:
             participant.internal_pid = pid_map.get(participant.external_pid)
@@ -729,7 +757,9 @@ class GenericParser(
         values = await query_async(
             QUERY_MATCH_SAMPLES, variables={'project': self.project}
         )
-        sid_map = {p['externalId']: p['id'] for p in values['project']['samples']}
+        sid_map = {
+            p['externalId']: p['id'] for p in values['project']['samples']
+        }
 
         for sample in samples:
             sample.internal_sid = sid_map.get(sample.external_sid)
@@ -791,7 +821,9 @@ class GenericParser(
             if isinstance(reads, dict):
                 return reads['location']
             if isinstance(reads, str):
-                raise TypeError(f'Unformmatted reads (expected file object): {reads}')
+                raise TypeError(
+                    f'Unformmatted reads (expected file object): {reads}'
+                )
             raise ValueError(f'Unknown type {reads}')
 
         filename_meta_map = {
@@ -938,13 +970,17 @@ class GenericParser(
 
         return tuple(v for _, v in keys)
 
-    async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+    async def group_assays(
+        self, sample: ParsedSample
+    ) -> list[ParsedSequencingGroup]:
         """
         From a set of rows, group (by calling self.get_sequencing_group_key)
         and parse sequencing group other sequencing group values.
         """
         sequencing_groups = []
-        for seq_rows in group_by(sample.rows, self.get_sequencing_group_key).values():
+        for seq_rows in group_by(
+            sample.rows, self.get_sequencing_group_key
+        ).values():
             seq_type = self.get_sequencing_type(seq_rows[0])
             seq_tech = self.get_sequencing_technology(seq_rows[0])
             seq_platform = self.get_sequencing_platform(seq_rows[0])
@@ -1021,7 +1057,9 @@ class GenericParser(
         """Get analysis type from row"""
         return str(self.default_analysis_type)
 
-    def get_analysis_status(self, sample_id: str, row: GroupedRow) -> AnalysisStatus:
+    def get_analysis_status(
+        self, sample_id: str, row: GroupedRow
+    ) -> AnalysisStatus:
         """Get analysis status from row"""
         return AnalysisStatus(self.default_analysis_status)
 
@@ -1080,7 +1118,9 @@ class GenericParser(
             for external_id, analysis in chunked_analysis:
                 # TODO: resolve this external_to_internal_id_map
                 # this one is going to be slightly harder :
-                analysis.sequence_group_ids = [external_to_internal_id_map[external_id]]
+                analysis.sequence_group_ids = [
+                    external_to_internal_id_map[external_id]
+                ]
                 promises.append(
                     analysisapi.create_analysis_async(
                         project=proj, analysis_model=analysis
@@ -1091,7 +1131,10 @@ class GenericParser(
         return results
 
     async def parse_files(
-        self, sample_id: str, reads: list[str] | str, checksums: List[str] = None
+        self,
+        sample_id: str,
+        reads: list[str] | str,
+        checksums: List[str] = None,
     ) -> Dict[SUPPORTED_FILE_TYPE, Dict[str, List]]:
         """
         Returns a tuple of:
@@ -1137,7 +1180,9 @@ class GenericParser(
             file_by_type['reads']['fastq'].extend(grouped_fastqs)
 
         crams = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
+            r
+            for r in _reads
+            if any(r.lower().endswith(ext) for ext in CRAM_EXTENSIONS)
         ]
         file_promises: List[Coroutine]
 
@@ -1145,10 +1190,8 @@ class GenericParser(
             file_promises = []
             sec_format = ['.crai', '^.crai']
             for r in crams:
-                secondaries = (
-                    await self.create_secondary_file_objects_by_potential_pattern(
-                        r, sec_format
-                    )
+                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
+                    r, sec_format
                 )
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
@@ -1156,16 +1199,16 @@ class GenericParser(
             file_by_type['reads']['cram'] = await asyncio.gather(*file_promises)  # type: ignore
 
         bams = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
+            r
+            for r in _reads
+            if any(r.lower().endswith(ext) for ext in BAM_EXTENSIONS)
         ]
         if bams:
             file_promises = []
             sec_format = ['.bai', '^.bai']
             for r in bams:
-                secondaries = (
-                    await self.create_secondary_file_objects_by_potential_pattern(
-                        r, sec_format
-                    )
+                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
+                    r, sec_format
                 )
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
@@ -1174,22 +1217,23 @@ class GenericParser(
             file_by_type['reads']['bam'] = await asyncio.gather(*file_promises)  # type: ignore
 
         gvcfs = [
-            r for r in _reads if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
+            r
+            for r in _reads
+            if any(r.lower().endswith(ext) for ext in GVCF_EXTENSIONS)
         ]
         vcfs = [
             r
             for r in _reads
-            if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS) and r not in gvcfs
+            if any(r.lower().endswith(ext) for ext in VCF_EXTENSIONS)
+            and r not in gvcfs
         ]
 
         if gvcfs:
             file_promises = []
             sec_format = ['.tbi']
             for r in gvcfs:
-                secondaries = (
-                    await self.create_secondary_file_objects_by_potential_pattern(
-                        r, sec_format
-                    )
+                secondaries = await self.create_secondary_file_objects_by_potential_pattern(
+                    r, sec_format
                 )
                 file_promises.append(
                     self.create_file_object(r, secondary_files=secondaries)
@@ -1261,7 +1305,9 @@ class GenericParser(
             r: (os.path.basename(r), rmatch.search(os.path.basename(r)))
             for r in sorted_fastqs
         }
-        no_r_match = [r for r, (_, matched) in r_matches.items() if matched is None]
+        no_r_match = [
+            r for r, (_, matched) in r_matches.items() if matched is None
+        ]
         if no_r_match:
             no_r_match_str = ', '.join(no_r_match)
             raise ValueError(
@@ -1282,7 +1328,9 @@ class GenericParser(
 
             fastq_groups[tuple(bits_to_group_on)].append(full_filename)
 
-        invalid_fastq_groups = [grp for grp in fastq_groups.values() if len(grp) != 2]
+        invalid_fastq_groups = [
+            grp for grp in fastq_groups.values() if len(grp) != 2
+        ]
         if invalid_fastq_groups:
             raise ValueError(f'Invalid fastq group {invalid_fastq_groups}')
 
@@ -1322,7 +1370,9 @@ class GenericParser(
             'class': 'File',
             'checksum': _checksum,
             'size': file_size,
-            'datetime_added': datetime_added.isoformat() if datetime_added else None,
+            'datetime_added': datetime_added.isoformat()
+            if datetime_added
+            else None,
         }
 
         if secondary_files:
@@ -1342,7 +1392,9 @@ class GenericParser(
         secondaries = []
         for sec in potential_secondary_patterns:
             sec_file = _apply_secondary_file_format_to_filename(filename, sec)
-            if self.skip_checking_gcs_objects or await self.file_exists(sec_file):
+            if self.skip_checking_gcs_objects or await self.file_exists(
+                sec_file
+            ):
                 secondaries.append(self.create_file_object(sec_file))
 
         return await asyncio.gather(*secondaries)

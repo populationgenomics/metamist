@@ -40,13 +40,13 @@ source env/bin/activate
 pip install -r requirements.txt
 ```
 
-### 5. Start POST Fun locally
+### 5. Start EXTRACT Fun locally
 
 ```bash
-functions-framework-python --target etl_post --debug
+functions-framework-python --target etl_extract --debug
 ```
 
-### 6. Call etl_post
+### 6. Call etl_extract
 
 ```bash
 curl -X 'POST' \

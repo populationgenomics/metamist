@@ -3,13 +3,12 @@ import json
 import logging
 import os
 import uuid
-import functions_framework
+
 import flask
+import functions_framework
 import google.cloud.bigquery as bq
-from google.cloud import pubsub_v1
-
 from cpg_utils.cloud import email_from_id_token
-
+from google.cloud import pubsub_v1
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
@@ -29,6 +28,20 @@ def etl_extract(request: flask.Request):
         For more information on how Flask integrates with Cloud
         Functions, see the `Writing HTTP functions` page.
         <https://cloud.google.com/functions/docs/writing/http#http_frameworks>
+
+
+    Example of payload:
+
+    json_data = {
+        'sample_id': '123456',
+        'external_id': 'GRK100311',
+        'individual_id': '608',
+        'sequencing_type': 'exome',
+        'collection_centre': 'KCCG',
+        'collection_date': '2023-08-05T01:39:28.611476',
+        'collection_specimen': 'blood'
+    }
+
     """
 
     auth = request.authorization
@@ -57,7 +70,7 @@ def etl_extract(request: flask.Request):
         'request_id': request_id,
         'timestamp': datetime.datetime.utcnow().isoformat(),
         'type': request.path,
-        'submitting_user': email_from_id_token(auth.token)
+        'submitting_user': email_from_id_token(auth.token),
     }
 
     # throw an exception if one occurs
@@ -79,10 +92,7 @@ def etl_extract(request: flask.Request):
     # message contains all the attributes except body which can be large
     # and already stored in BQ table
     try:
-        pubsub_client.publish(
-            PUBSUB_TOPIC,
-            json.dumps(bq_obj).encode()
-        )
+        pubsub_client.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to publish to pubsub: {e}')
 
