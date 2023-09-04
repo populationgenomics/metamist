@@ -8,7 +8,7 @@ from typing import Any, Dict
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
-from metamist.parser.generic_metadata_parser import GenericMetadataParser
+import metamist.parser.generic_metadata_parser as gmp
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 
@@ -105,42 +105,51 @@ def etl_load(request: flask.Request):
     row_json = None
     result = None
     for row in query_job_result:
-        """example of json record:
-        row_json = {
-            'sample_id': '123456',
-            'external_id': 'GRK100311',
-            'individual_id': '608',
-            'sequencing_type': 'exome',
-            'collection_centre': 'KCCG',
-            'collection_date': '2023-08-05T01:39:28.611476',
-            'collection_specimen': 'blood'
-        }
-        """
+        # example of json record:
+        # row_json = {
+        #     'sample_id': '123456',
+        #     'external_id': 'GRK100311',
+        #     'individual_id': '608',
+        #     'sequencing_type': 'exome',
+        #     'collection_centre': 'KCCG',
+        #     'collection_date': '2023-08-05T01:39:28.611476',
+        #     'collection_specimen': 'blood'
+        # }
         # TODO
         # Parse row.body -> Model and upload to metamist database
         row_json = json.loads(row.body)
 
-        parser = GenericMetadataParser(
-            search_locations=[],
-            project=METAMIST_PROJECT,
-            participant_column=PARTICIPANT_COL_NAME,
-            sample_name_column=SAMPLE_ID_COL_NAME,
-            reads_column=None,
-            checksum_column=None,
-            seq_type_column=SEQ_TYPE_COL_NAME,
-            default_sequencing_type=DEFAULT_SEQUENCING_TYPE,
-            default_sample_type=DEFAULT_SAMPLE_TYPE,
-            default_sequencing_technology=DEFAULT_SEQUENCING_TECHNOLOGY,
-            default_reference_assembly_location=None,
-            participant_meta_map={},
-            sample_meta_map=SAMPLE_META_MAP,
-            assay_meta_map={},
-            qc_meta_map={},
-            allow_extra_files_in_search_path=None,
-            key_map=None,
-        )
-        result = parser.from_json([row_json], confirm=False, dry_run=True)
-        asyncio.run(result)
+        tmp_res = []
+
+        # GenericMetadataParser from_json is async
+        # we call it from sync, so we need to wrap it in coroutine
+        async def run_parser_capture_result(res, row_data):
+            parser = gmp.GenericMetadataParser(
+                search_locations=[],
+                project=METAMIST_PROJECT,
+                participant_column=PARTICIPANT_COL_NAME,
+                sample_name_column=SAMPLE_ID_COL_NAME,
+                reads_column=None,
+                checksum_column=None,
+                seq_type_column=SEQ_TYPE_COL_NAME,
+                default_sequencing_type=DEFAULT_SEQUENCING_TYPE,
+                default_sample_type=DEFAULT_SAMPLE_TYPE,
+                default_sequencing_technology=DEFAULT_SEQUENCING_TECHNOLOGY,
+                default_reference_assembly_location=None,
+                participant_meta_map={},
+                sample_meta_map=SAMPLE_META_MAP,
+                assay_meta_map={},
+                qc_meta_map={},
+                allow_extra_files_in_search_path=None,
+                key_map=None,
+            )
+            r = await parser.from_json([row_data], confirm=False, dry_run=True)
+            res.append(r)
+
+        loop = asyncio.get_event_loop()
+        coroutine = run_parser_capture_result(tmp_res, row_json)
+        loop.run_until_complete(coroutine)
+        result = tmp_res[0]
 
     return {
         'id': request_id,

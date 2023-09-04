@@ -1,7 +1,7 @@
 import base64
 import json
 from test.testbase import DbIsolatedTest, run_as_sync
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 
 import etl.load.main
 from db.python.layers.family import FamilyLayer
@@ -75,19 +75,19 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        # TODO mockup GenericMetadataParser before uncommenting
-        # response = etl.load.main.etl_load(request)
-        # assert response == (
-        #     {
-        #         'success': False,
-        #         'message': 'Record with id: 1234567890 not found',
-        #     },
-        #     404,
-        # )
+        response = etl.load.main.etl_load(request)
+        assert response == (
+            {
+                'success': False,
+                'message': 'Record with id: 1234567890 not found',
+            },
+            404,
+        )
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
-    async def test_etl_load_found_record_simple_payload(self, bq_client):
+    @patch('etl.load.main.gmp.GenericMetadataParser', autospec=True)
+    async def test_etl_load_found_record_simple_payload(self, gm_parser, bq_client):
         """Test etl load simple payload"""
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
@@ -109,17 +109,23 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        # TODO mockup GenericMetadataParser before uncommenting
-        # response = etl.load.main.etl_load(request)
-        # assert response == {
-        #     'id': '1234567890',
-        #     'record': json.loads(ETL_SAMPLE_RECORD),
-        #     'success': True,
-        # }
+        # TODO mockup GenericMetadataParser from_json with the right output
+        gm_parser_instance = gm_parser.return_value
+        # mock from_json return value, keep empty atm
+        gm_parser_instance.from_json = AsyncMock(return_value='')
+
+        response = etl.load.main.etl_load(request)
+        assert response == {
+            'id': '1234567890',
+            'record': json.loads(ETL_SAMPLE_RECORD),
+            'result': "''",
+            'success': True,
+        }
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
-    async def test_etl_load_found_record_pubsub_payload(self, bq_client):
+    @patch('etl.load.main.gmp.GenericMetadataParser', autospec=True)
+    async def test_etl_load_found_record_pubsub_payload(self, gm_parser, bq_client):
         """Test etl load pubsub payload"""
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
@@ -159,18 +165,26 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        # response = etl.load.main.etl_load(request)
-        # assert response == {
-        #     'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
-        #     'record': json.loads(ETL_SAMPLE_RECORD),
-        #     'success': True,
-        # }
+        # TODO mockup GenericMetadataParser from_json with the right output
+        gm_parser_instance = gm_parser.return_value
+        # mock from_json return value, keep empty atm
+        gm_parser_instance.from_json = AsyncMock(return_value='')
+
+        response = etl.load.main.etl_load(request)
+        assert response == {
+            'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
+            'record': json.loads(ETL_SAMPLE_RECORD),
+            'result': "''",
+            'success': True,
+        }
 
     @run_as_sync
     async def test_etl_load_parser(
         self,
     ):
-        """Test etl load parser"""
+        """Test simple parsing of json data
+        Comment out if you want to test using LOCAL environment,
+        """
 
         PARTICIPANT_COL_NAME = 'individual_id'
         SAMPLE_ID_COL_NAME = 'sample_id'
@@ -182,23 +196,13 @@ class TestEtlLoad(DbIsolatedTest):
             'collection_specimen': 'specimen',
         }
 
-        json_data = [
-            {
-                'sample_id': '123456',
-                'external_id': 'GRK100311',
-                'individual_id': '608',
-                'sequencing_type': 'exome',
-                'collection_centre': 'KCCG',
-                'collection_date': '2023-08-05T01:39:28.611476',
-                'collection_specimen': 'blood',
-            }
-        ]
         default_sequencing_type = 'genome'
         default_sequencing_technology = 'short-read'
 
-        parser = GenericMetadataParser(
+        # parser =
+        GenericMetadataParser(
             search_locations=[],
-            project=self.project_name,  # 'greek-myth',  #
+            project=self.project_name,
             participant_column=PARTICIPANT_COL_NAME,
             sample_name_column=SAMPLE_ID_COL_NAME,
             reads_column=None,
@@ -216,6 +220,18 @@ class TestEtlLoad(DbIsolatedTest):
             key_map=None,
         )
 
-        # TODO mockup GenericMetadataParser before uncommenting
+        # json_data = [
+        #     {
+        #         'sample_id': '123456',
+        #         'external_id': 'GRK100311',
+        #         'individual_id': '608',
+        #         'sequencing_type': 'exome',
+        #         'collection_centre': 'KCCG',
+        #         'collection_date': '2023-08-05T01:39:28.611476',
+        #         'collection_specimen': 'blood',
+        #     }
+        # ]
         # res = await parser.from_json(json_data, confirm=False, dry_run=True)
         # print(res)
+
+        assert True

@@ -387,13 +387,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-        self.setup_etl_functions()
-        self.setup_etl_pubsub()
+        self._setup_etl_functions()
+        self._setup_etl_pubsub()
 
-        self.setup_metamist_etl_accessors()
-        self.setup_slack_notification()
+        self._setup_metamist_etl_accessors()
+        self._setup_slack_notification()
 
-    def setup_etl_functions(self):
+    def _setup_etl_functions(self):
         """
         setup_etl_functions
         """
@@ -402,7 +402,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             depends_on=[self.etl_extract_function, self.etl_load_function],
         )
 
-    def setup_etl_pubsub(self):
+    def _setup_etl_pubsub(self):
         """
         setup_etl_pubsub
         """
@@ -416,16 +416,16 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        return self.etl_function(
+        return self._etl_function(
             'extract', self.etl_extract_service_account.email
         )
 
     @cached_property
     def etl_load_function(self):
         """etl_load_function"""
-        return self.etl_function('load', self.etl_load_service_account.email)
+        return self._etl_function('load', self.etl_load_service_account.email)
 
-    def etl_function(self, f_name: str, sa_email: str):
+    def _etl_function(self, f_name: str, sa_email: str):
         """
         Driver function to setup the etl cloud function
         """
@@ -493,7 +493,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         return fxn
 
-    def setup_metamist_etl_accessors(self):
+    def _setup_metamist_etl_accessors(self):
         for name, sa in self.etl_accessors.items():
             gcp.cloudfunctionsv2.FunctionIamMember(
                 f'metamist-etl-accessor-{name}',
@@ -513,7 +513,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
-    def setup_function_slack_notification(self, etl_fun_name: str):
+    def _setup_function_slack_notification(self, etl_fun_name: str):
         """
         setup slack notification for etl_fun cloud function
         """
@@ -556,9 +556,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             opts=pulumi.ResourceOptions(depends_on=[etl_fun]),
         )
 
-    def setup_slack_notification(self):
+    def _setup_slack_notification(self):
         if self.slack_channel is None:
             return
 
-        self.setup_function_slack_notification('extract')
-        self.setup_function_slack_notification('load')
+        self._setup_function_slack_notification('extract')
+        self._setup_function_slack_notification('load')
