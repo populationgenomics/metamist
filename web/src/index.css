@@ -124,9 +124,9 @@ blockquote {
     padding: 80px;
 }
 
-@media screen and (min-width: 1200px) {
+@media screen and (min-width: 2200px) {
     .dataStyle {
-        max-width: 1200px;
+        max-width: 2200px;
         margin-left: auto;
         margin-right: auto;
     }

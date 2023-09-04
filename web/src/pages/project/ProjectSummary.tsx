@@ -11,6 +11,7 @@ import MultiQCReports from './MultiQCReports'
 import SummaryStatistics from './SummaryStatistics'
 import BatchStatistics from './BatchStatistics'
 import ProjectGrid from './ProjectGrid'
+import FamilyGrid from './FamilyGrid'
 import TotalsStats from './TotalsStats'
 import MuckError from '../../shared/components/MuckError'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -212,7 +213,7 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                             />
                         </div>
                         <div style={{ position: 'absolute', paddingBottom: '80px' }}>
-                            <ProjectGrid
+                            {/* <ProjectGrid
                                 summary={summary}
                                 projectName={projectName}
                                 updateFilters={updateFilters}
@@ -224,7 +225,8 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                                 totalSamples={summary?.total_samples_in_query}
                                 pageNumber={pageNumber}
                                 handleOnClick={handleOnClick}
-                            />
+                            /> */}
+                            <FamilyGrid projectName={projectName} />
                         </div>
                     </>
                 )}

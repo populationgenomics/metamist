@@ -1,23 +1,15 @@
 import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
-import { Accordion, AccordionTitleProps } from 'semantic-ui-react'
-
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
-import BloodtypeRoundedIcon from '@mui/icons-material/BloodtypeRounded'
-
+import { Table as SUITable } from 'semantic-ui-react'
 import { useQuery } from '@apollo/client'
+import Table from '../../shared/components/Table'
+
 import Pedigree from '../../shared/components/pedigree/Pedigree'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 
 import { gql } from '../../__generated__/gql'
 import FamilyViewTitle from './FamilyViewTitle'
-
-import iconStyle from '../../shared/iconStyle'
-import SeqPanel from '../../shared/components/SeqPanel'
-import SampleInfo from '../../shared/components/SampleInfo'
-
-const sampleFieldsToDisplay = ['active', 'type']
 
 const GET_FAMILY_INFO = gql(`
 query FamilyInfo($family_id: Int!) {
@@ -61,12 +53,27 @@ query FamilyInfo($family_id: Int!) {
   }
 }`)
 
+const HEADINGS = [
+    'Individual ID',
+    'External ID',
+    'Maternal ID',
+    'Paternal ID',
+    'Sex',
+    'Affected',
+    'SG ID(s)',
+    'Samples',
+    'Individuals with SG Type Genome',
+    'Individuals with SG Type Exome',
+    'Individuals with SG type Transcriptome',
+    'Individuals with SG type Mtseq',
+    'Report Links',
+]
+
 const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
     const { familyID } = useParams()
     const family_ID = familyID ? +familyID : -1
 
     const [activeIndices, setActiveIndices] = React.useState<number[]>([-1])
-    const [mostRecent, setMostRecent] = React.useState<string>('')
 
     const { loading, error, data } = useQuery(GET_FAMILY_INFO, {
         variables: { family_id: family_ID },
@@ -81,7 +88,6 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
             if (!activeIndices.includes(indexToSet)) {
                 setActiveIndices([...activeIndices, indexToSet])
             }
-            setMostRecent(e)
             const element = document.getElementById(e)
             if (element) {
                 const y = element.getBoundingClientRect().top + window.pageYOffset - 100
@@ -91,19 +97,37 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
         [data, activeIndices]
     )
 
-    const handleTitleClick = (e: React.MouseEvent, itemProps: AccordionTitleProps) => {
-        setMostRecent('')
-        const index = itemProps.index ?? -1
-        if (index === -1) return
-        if (activeIndices.indexOf(+index) > -1) {
-            setActiveIndices(activeIndices.filter((i) => i !== index))
-        } else {
-            setActiveIndices([...activeIndices, +index])
-        }
-    }
-
     if (loading) return <LoadingDucks />
     if (error) return <>Error! {error.message}</>
+
+    const tableData = data?.family.participants.map((participant) => {
+        const types = [
+            ...new Set(
+                participant.samples.map((s) => s.sequencingGroups.map((sg) => sg.type)).flat()
+            ),
+        ]
+            .flat()
+            .reduce((acc, color) => ((acc[color] = (acc[color] || 0) + 1), acc), {})
+        const pedEntry = data?.family.project.pedigree.find(
+            (p) => p.individual_id === participant.externalId
+        )
+        return {
+            individualID: participant.id,
+            externaldID: participant.externalId,
+            maternalID: pedEntry?.maternal_id,
+            paternalID: pedEntry?.paternal_id,
+            sex: pedEntry?.sex,
+            affected: pedEntry?.affected,
+            SG_ids: participant.samples
+                .map((sample) => sample.sequencingGroups.map((sg) => sg.id).join(', '))
+                .join(', '),
+            samples: participant.samples.map((sample) => sample.id).join(', '),
+            individuals_SG_genome: types.genome ?? 0,
+            individuals_SG_exome: types.exome ?? 0,
+            individuals_SG_transcriptome: types.transcriptome ?? 0,
+            individuals_SG_mtseq: types.mtseq ?? 0,
+        }
+    })
 
     return data ? (
         <div className="dataStyle" style={{ width: '100%' }}>
@@ -116,111 +140,33 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
                     externalId={data?.family.externalId}
                 />
                 <Pedigree familyID={family_ID} onClick={onPedigreeClick} />
-                <Accordion
-                    onTitleClick={handleTitleClick}
-                    activeIndex={activeIndices}
-                    styled
-                    className="accordionStyle"
-                    exclusive={false}
-                    panels={data?.family.participants.map((item) => ({
-                        key: item.id,
-                        title: {
-                            content: (
-                                <h2
+                <Table celled compact sortable>
+                    <SUITable.Header>
+                        <SUITable.Row>
+                            {HEADINGS.map((title) => (
+                                <SUITable.HeaderCell
+                                    key={title}
                                     style={{
-                                        display: 'inline',
-                                    }}
-                                    className={
-                                        mostRecent === item.externalId
-                                            ? 'selectedParticipant'
-                                            : undefined
-                                    }
-                                    id={item.externalId}
-                                >
-                                    {item.externalId}
-                                </h2>
-                            ),
-                            icon: (
-                                <PersonRoundedIcon
-                                    className={
-                                        mostRecent === item.externalId
-                                            ? 'selectedParticipant'
-                                            : undefined
-                                    }
-                                    sx={iconStyle}
-                                />
-                            ),
-                        },
-                        content: {
-                            content: (
-                                <div
-                                    style={{
-                                        marginLeft: '30px',
+                                        borderBottom: 'none',
+                                        position: 'sticky',
+                                        resize: 'horizontal',
                                     }}
                                 >
-                                    <Accordion
-                                        styled
-                                        className="accordionStyle"
-                                        panels={item.samples.map((s) => ({
-                                            key: s.id,
-                                            title: {
-                                                content: (
-                                                    <>
-                                                        <h2
-                                                            style={{
-                                                                display: 'inline',
-                                                            }}
-                                                        >
-                                                            {`${s.id}\t`}
-                                                        </h2>
-
-                                                        <h3
-                                                            style={{
-                                                                display: 'inline',
-                                                            }}
-                                                        >
-                                                            {s.externalId}
-                                                        </h3>
-                                                    </>
-                                                ),
-                                                icon: <BloodtypeRoundedIcon sx={iconStyle} />,
-                                            },
-                                            content: {
-                                                content: (
-                                                    <>
-                                                        <div
-                                                            style={{
-                                                                marginLeft: '30px',
-                                                            }}
-                                                        >
-                                                            <SampleInfo
-                                                                sample={Object.fromEntries(
-                                                                    Object.entries(s).filter(
-                                                                        ([key]) =>
-                                                                            sampleFieldsToDisplay.includes(
-                                                                                key
-                                                                            )
-                                                                    )
-                                                                )}
-                                                            />
-
-                                                            <SeqPanel
-                                                                sequencingGroups={
-                                                                    s.sequencingGroups
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </>
-                                                ),
-                                            },
-                                        }))}
-                                        exclusive={false}
-                                    />
-                                </div>
-                            ),
-                        },
-                    }))}
-                />
+                                    {title}
+                                </SUITable.HeaderCell>
+                            ))}
+                        </SUITable.Row>
+                    </SUITable.Header>
+                    <SUITable.Body>
+                        {tableData?.map((row, i) => (
+                            <SUITable.Row key={i}>
+                                {Object.values(row).map((cell, j) => (
+                                    <SUITable.Cell key={`${i}-${j}`}>{cell}</SUITable.Cell>
+                                ))}
+                            </SUITable.Row>
+                        ))}
+                    </SUITable.Body>
+                </Table>
             </>
         </div>
     ) : (
