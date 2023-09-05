@@ -127,8 +127,3 @@ curl -X 'PUT' \
 ```bash
 pulumi destroy
 ```
-
-
-
-
-

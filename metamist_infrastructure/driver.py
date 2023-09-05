@@ -507,7 +507,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    'SM_ENVIRONMENT': 'DEVELOPMENT', # TODO: make it configurable
+                    'SM_ENVIRONMENT': 'DEVELOPMENT',  # TODO: make it configurable
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
