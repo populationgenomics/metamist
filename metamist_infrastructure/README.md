@@ -96,6 +96,16 @@ curl -X 'PUT' \
 
 
 {"id":"5242fc79-a018-432f-80a5-58a43222e000","success":true}
+
+# other example
+curl -X 'PUT' \
+  'https://metamist-etl-extract-xyz-run.app' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  -d '{"sample_id": "123456", "external_id": "GRK100311", "individual_id": "608", "sequencing_type": "exome", "collection_centre": "KCCG", "collection_date": "2023-08-05T01:39:28.611476", "collection_specimen": "blood"}'
+
+
 ```bash
 
 Test load function:
@@ -106,7 +116,7 @@ curl -X 'PUT' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-  -d '{"request_id": 5242fc79-a018-432f-80a5-58a43222e000"}'
+  -d '{"request_id": "5242fc79-a018-432f-80a5-58a43222e000"}'
 
 
 {"id":"5242fc79-a018-432f-80a5-58a43222e000","record":{"id":111,"method":"test","version":"1.0"},"success":true}
@@ -117,3 +127,8 @@ curl -X 'PUT' \
 ```bash
 pulumi destroy
 ```
+
+
+
+
+

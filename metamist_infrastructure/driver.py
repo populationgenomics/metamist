@@ -478,7 +478,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
         fxn = gcp.cloudfunctionsv2.Function(
-            f'metamist-etl-{f_name}-function',
+            f'metamist-etl-{f_name}',
             name=f'metamist-etl-{f_name}',
             build_config=gcp.cloudfunctionsv2.FunctionBuildConfigArgs(
                 runtime='python311',
@@ -507,6 +507,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
+                    'SM_ENVIRONMENT': 'DEVELOPMENT', # TODO: make it configurable
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
