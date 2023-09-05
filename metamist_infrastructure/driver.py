@@ -3,19 +3,47 @@
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
 """
+import os
+import contextlib
 from functools import cached_property
 from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
-from cpg_infra.utils import archive_folder
+# from cpg_infra.utils import archive_folder
 from cpg_utils.cloud import read_secret
 
 # this gets moved around during the pip install
 # ETL_FOLDER = Path(__file__).parent / 'etl'
 ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
+
+
+# TODO: update implementation in cpg_infra project to enable binary files
+def archive_folder(
+    path: str, allowed_extensions: frozenset[str]
+) -> pulumi.AssetArchive:
+    """Archive a folder into a pulumi asset archive"""
+    assets = {}
+
+    # python 3.11 thing, but allows you to temporarily change directory
+    # into the path we're archiving, so we're not archiving the directory,
+    # but just the code files. Otherwise the deploy fails.
+    with contextlib.chdir(path):
+        for filename in os.listdir('.'):
+            if not any(filename.endswith(ext) for ext in allowed_extensions):
+                # print(f'Skipping {filename} for invalid extension')
+                continue
+
+            if filename.endswith('.gz'):
+                # tarfile/zipped files need to be read as binary
+                assets[filename] = pulumi.FileAsset(f'{path}/{filename}')
+            else:
+                with open(filename, encoding='utf-8') as file:
+                    # do it this way to stop any issues with changing paths
+                    assets[filename] = pulumi.StringAsset(file.read())
+        return pulumi.AssetArchive(assets)
 
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
@@ -397,7 +425,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl_functions
         """
-        # TODO
+        # TODO is this the best way to do this?
         return pulumi.ResourceOptions(
             depends_on=[self.etl_extract_function, self.etl_load_function],
         )
@@ -434,7 +462,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
-        archive = archive_folder(str(path_to_func_folder.absolute()))
+        archive = archive_folder(str(path_to_func_folder.absolute()), allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}))
 
         # Create the single Cloud Storage object,
         # which contains the source code
@@ -450,7 +478,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
         fxn = gcp.cloudfunctionsv2.Function(
-            f'metamist-etl-{f_name}-source-code',
+            f'metamist-etl-{f_name}-function',
             name=f'metamist-etl-{f_name}',
             build_config=gcp.cloudfunctionsv2.FunctionBuildConfigArgs(
                 runtime='python311',

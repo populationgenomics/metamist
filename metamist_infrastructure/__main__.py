@@ -26,8 +26,8 @@ conf_dict = {
     'sample_metadata': {
         'gcp': {
             'project': f'{GCP_PROJECT}',
-            'service_name': '',
-            'machine_account': '',
+            'service_name': 'sample-metadata-api',
+            'machine_account': 'sample-metadata-api@sample-metadata.iam.gserviceaccount.com',
         },
         'etl_accessors': ['bbv', 'kccg', 'sonic', 'sano'],
         'slack_channel': f'{SLACK_CHANNEL}',

@@ -41,7 +41,13 @@ virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
+
+# to test locally you would need cpg_infra project, when deployed, cpg_infra is already installed
+pip install git+https://github.com/populationgenomics/cpg-infrastructure.git
+
 cd metamist_infrastructure
+pip install --editable .
+
 ```
 
 ### Pulumi
