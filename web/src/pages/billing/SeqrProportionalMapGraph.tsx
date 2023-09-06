@@ -32,6 +32,12 @@ interface ISeqrProportionalMapGraphProps {
     start: string
     end: string
 }
+
+interface IPropMapData {
+    date: string
+    [project: string]: number
+}
+
 const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGraphProps> = ({
     start,
     end,
@@ -43,57 +49,57 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     const [projectSelections, setProjectSelections] = React.useState<
         { [key: string]: boolean } | undefined
     >()
-    const [data, setData] = React.useState<any>()
+    const [data, setData] = React.useState<IPropMapData[]>()
     // const [propMap, setPropMap] = React.useState<>()
 
-    // function updateProjects(projects: { [key: string]: boolean }) {
-    //     const updatedProjects = { ...(projectSelections || {}), ...projects }
-    //     setProjectSelections(updatedProjects)
-    //     loadPropMap(updatedProjects)
-    // }
+    function updateProjects(projects: { [key: string]: boolean }) {
+        const updatedProjects = { ...(projectSelections || {}), ...projects }
+        setProjectSelections(updatedProjects)
+        loadPropMap(updatedProjects)
+    }
 
-    // function loadPropMap(projects: { [key: string]: boolean } = {}) {
-    //     const projectsToSearch = Object.keys(projects).filter((project) => projects[project])
+    function loadPropMap(projects: { [key: string]: boolean } = {}) {
+        const projectsToSearch = Object.keys(projects).filter((project) => projects[project])
 
-    //     const api = new AnalysisApi()
-    //     const defaultPropMap = projectsToSearch.reduce((prev, p) => ({ ...prev, [p]: 0 }), {})
-    // api.getProportionateMap(sequencingType, projectsToSearch, start, end)
-    //     .then((summary) => {
-    //         setIsLoading(false)
+        const api = new AnalysisApi()
+        const defaultPropMap = projectsToSearch.reduce((prev, p) => ({ ...prev, [p]: 0 }), {})
+        api.getProportionateMap(sequencingType, projectsToSearch, start, end)
+            .then((summary) => {
+                setIsLoading(false)
 
-    //         const graphData = summary.data.map((obj: IProportionalDateModel) => ({
-    //             date: obj.date,
-    //             // ...defaultPropMap,
-    //             ...obj.projects.reduce(
-    //                 (prev: { [project: string]: number }, projectObj) => ({
-    //                     ...prev,
-    //                     // in percentage, rounded to 2 decimal places
-    //                     [projectObj.project]: _.round(projectObj.percentage * 100, 2),
-    //                 }),
-    //                 {}
-    //             ),
-    //         }))
-    //         const projectsToSee = new Set(projectsToSearch)
-    //         for (let index = 1; index < graphData.length; index++) {
-    //             const graphObj = graphData[index]
-    //             if (projectsToSearch.length == 0) continue
-    //             // make sure the entry BEFORE a project is visible,
-    //             // it's set to 0 to make the graph prettier
-    //             for (const project of projectsToSee) {
-    //                 if (project in graphObj) {
-    //                     projectsToSee.delete(project)
-    //                     graphData[index - 1][project] = 0
-    //                 }
-    //                 if (projectsToSee.size == 0) break
-    //             }
-    //         }
-    //         setPropMap(graphData)
-    //     })
-    //     .catch((er) => {
-    //         setError(er.message)
-    //         setIsLoading(false)
-    //     })
-    // }
+                const graphData: IPropMapData[] = summary.data.map((obj: IProportionalDateModel) => ({
+                    date: obj.date,
+                    ...defaultPropMap,
+                    ...obj.projects.reduce(
+                        (prev: { [project: string]: number }, projectObj) => ({
+                            ...prev,
+                            // in percentage, rounded to 2 decimal places
+                            [projectObj.project]: projectObj.percentage,
+                        }),
+                        {}
+                    ),
+                }))
+                const projectsToSee = new Set(projectsToSearch)
+                for (let index = 1; index < graphData.length; index++) {
+                    const graphObj = graphData[index]
+                    if (projectsToSearch.length == 0) continue
+                    // make sure the entry BEFORE a project is visible,
+                    // it's set to 0 to make the graph prettier
+                    for (const project of projectsToSee) {
+                        if (project in graphObj) {
+                            projectsToSee.delete(project)
+                            graphData[index - 1][project] = 0
+                        }
+                        if (projectsToSee.size == 0) break
+                    }
+                }
+                setData(graphData)
+            })
+            .catch((er) => {
+                setError(er.message)
+                setIsLoading(false)
+            })
+    }
 
     function getSeqrProjects() {
         const api = new ProjectApi()
@@ -114,20 +120,36 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             })
     }
 
-    React.useEffect(() => {
-        getSeqrProjects()
-    }, [])
+    // TODO, uncomment later
+    // React.useEffect(() => {
+    //     getSeqrProjects()
+    // }, [])
 
-    // This is where I'm getting the mock data - delete this and replace it with whatever you had above to pull in the real data
-    // You can check the link to see the data format but basically each data point is a date and the values for all the different categories at that timepoint
+
     React.useEffect(() => {
-        const getData = async () => {
-            const d = await csv(
-                'https://raw.githubusercontent.com/holtzy/data_to_viz/master/Example_dataset/5_OneCatSevNumOrdered_wide.csv'
-            )
-            setData(d)
-        }
-        getData()
+        setProjectSelections(['project1', 'project2', 'project3'].reduce(
+            (prev: { [project: string]: boolean }, project: string) => ({
+                ...prev,
+                [project]: true,
+            }), {}
+        ))
+
+        setData([{
+            date: "2021-01-01",
+            project1: 0.1,
+            project2: 0.2,
+            project3: 0.7,
+        }, {
+            date: "2021-01-02",
+            project1: 0.2,
+            project2: 0.3,
+            project3: 0.5,
+        }, {
+            date: "2021-01-03",
+            project1: 0.3,
+            project2: 0.4,
+            project3: 0.3,
+        }])
     }, [])
 
     if (!data) {
@@ -138,24 +160,22 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
+
     // svg sizing info
     const margin = { top: 10, right: 30, bottom: 50, left: 60 }
     const width = 1000 - margin.left - margin.right
     const height = 1000 - margin.top - margin.bottom
     const id = '1'
 
-    // get heading of data (column names)
-    const sumstat = data.columns.slice(1)
-
     // d3 function that turns the data into stacked proportions
-    const stackedData = stack().offset(stackOffsetExpand).keys(sumstat)(data)
+    const stackedData = stack().offset(stackOffsetExpand).keys(selectedProjects)(data)
 
     // function for generating the x Axis
     // domain refers to the min and max of the data (in this case earliest and latest dates)
     // range refers to the min and max pixel positions on the screen
     // basically it is a mapping of pixel positions to data values
     const xScale = scaleLinear()
-        .domain(extent(data, (d) => d.year))
+        .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object?
         .range([0, width - margin.left - margin.right])
 
     // function for generating the y Axis
@@ -164,11 +184,11 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
 
     // function that assigns each category a colour
     // can fiddle with the schemeAccent parameter for different colour scales - see https://d3js.org/d3-scale-chromatic/categorical#schemeAccent
-    const color = scaleOrdinal(schemeAccent).domain(sumstat)
+    const color = scaleOrdinal(schemeAccent).domain(selectedProjects)
 
     // function that takes the various stacked data info and generates an svg path element (magically)
     const areaGenerator = area()
-        .x((d) => xScale(d.data.year))
+        .x((d) => xScale(d.data.date))
         .y0((d) => yScale(d[0]))
         .y1((d) => yScale(d[1]))
 
@@ -196,9 +216,8 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                         {xScale.ticks().map((tick) => (
                             <g
                                 key={tick}
-                                transform={`translate(${xScale(tick)}, ${
-                                    height - margin.top - margin.bottom
-                                })`}
+                                transform={`translate(${xScale(tick)}, ${height - margin.top - margin.bottom
+                                    })`}
                             >
                                 <text
                                     y={8}
@@ -248,7 +267,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                             <path
                                 key={i}
                                 d={areaGenerator(area)}
-                                style={{ fill: color(sumstat[i]) }}
+                                style={{ fill: color(selectedProjects[i]) }}
                             />
                         ))}
                     </g>
