@@ -14,6 +14,7 @@ import {
     schemeAccent,
     scaleTime,
     utcDay,
+    utcMonth,
     timeFormat,
 } from 'd3'
 
@@ -72,7 +73,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
 
                 const graphData: IPropMapData[] = summary.data.map(
                     (obj: IProportionalDateModel) => ({
-                        date: obj.date,
+                        date: new Date(obj.date),
                         ...defaultPropMap,
                         ...obj.projects.reduce(
                             (prev: { [project: string]: number }, projectObj) => ({
@@ -215,6 +216,12 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         .y0((d) => yScale(d[0]))
         .y1((d) => yScale(d[1]))
 
+    let interval = utcDay.every(10)
+    // more than 3 months
+    if ((new Date(end).valueOf() - new Date(start).valueOf()) > 1000 * 60 * 60 * 24 * 90) {
+        interval = utcMonth.every(1)
+    }
+
     return (
         data && (
             <svg id={id} width={width} height={height}>
@@ -236,15 +243,12 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                             Calling xScale(tick) turns a tick value into a pixel position to be drawn 
                             eg in the domain [2000, 2010] and range[0, 200] passing 2005 would be 50% of the way across the domain so 50% of the way between min and max specified pixel positions so it would draw at 100
                             */}
-                        {xScale.ticks(utcDay.every(1)).map(
-                            (
-                                tick // can change this to set how many ticks you want
-                            ) => (
+                        {xScale.ticks(interval).map(
+                            tick => (
                                 <g
-                                    key={tick}
-                                    transform={`translate(${xScale(tick)}, ${
-                                        height - margin.top - margin.bottom
-                                    })`}
+                                    key={`x-tick-${tick.toString()}`}
+                                    transform={`translate(${xScale(tick)}, ${height - margin.top - margin.bottom
+                                        })`}
                                 >
                                     <text
                                         y={8}

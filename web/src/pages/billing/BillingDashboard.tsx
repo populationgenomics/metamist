@@ -4,7 +4,7 @@ import SeqrProportionalMapGraph from './SeqrProportionalMapGraph'
 
 const BillingDashboard: React.FunctionComponent = () => {
     const [start, setStart] = React.useState<string>('2021-01-01')
-    const [end, setEnd] = React.useState<string>('2021-12-31')
+    const [end, setEnd] = React.useState<string>('2022-10-31')
 
     return (
         <Card fluid>
