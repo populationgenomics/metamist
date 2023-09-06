@@ -14,9 +14,9 @@ etl_load function expects "request_id" in the payload. It is setup as push subsc
 
 ## How to test locally
 
-### 1. Create BQ table "$PROJECT_NAME.metamist.etl-data"
+### 1. Create BQ table "$METAMIST_INFRA_GCP_PROJECT.metamist.etl-data"
 
-### 2. Create TOPIC "projects/$PROJECT_NAME/topics/etl-topic"
+### 2. Create TOPIC "projects/$METAMIST_INFRA_GCP_PROJECT/topics/etl-topic"
 
 ### 3. Setup your environment
 
@@ -25,10 +25,10 @@ etl_load function expects "request_id" in the payload. It is setup as push subsc
 gcloud auth application-default login
 export GOOGLE_APPLICATION_CREDENTIALS='/Users/<USERNAME>/.config/gcloud/application_default_credentials.json'
 
-export PROJECT_NAME='some_name'
-export BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
-export PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/etl-topic'
+export METAMIST_INFRA_GCP_PROJECT='gcp-project-name'
 
+export BIGQUERY_TABLE='$METAMIST_INFRA_GCP_PROJECT.metamist.etl-data'
+export PUBSUB_TOPIC='projects/$METAMIST_INFRA_GCP_PROJECT/topics/etl-topic'
 ```
 
 ### 4. Setup python env
@@ -102,25 +102,25 @@ cd ../load
 gcloud functions deploy etl_load \
     --gen2 \
     --runtime=python311 \
-    --project='$PROJECT_NAME' \
+    --project=$METAMIST_INFRA_GCP_PROJECT \
     --region=australia-southeast1 \
     --source=. \
     --entry-point=etl_load \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
+    --set-env-vars BIGQUERY_TABLE='$METAMIST_INFRA_GCP_PROJECT.metamist.etl-data'
 ```
 
 ```bash
-cd ../post
+cd ../extract
 
-gcloud functions deploy etl_post \
+gcloud functions deploy etl_extract \
     --gen2 \
     --runtime=python311 \
-    --project='$PROJECT_NAME' \
+    --project=$METAMIST_INFRA_GCP_PROJECT \
     --region=australia-southeast1 \
     --source=. \
     --entry-point=etl_post \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data' \
-    --set-env-vars PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/my-topic'
+    --set-env-vars BIGQUERY_TABLE='$METAMIST_INFRA_GCP_PROJECT.metamist.etl-data' \
+    --set-env-vars PUBSUB_TOPIC='projects/$METAMIST_INFRA_GCP_PROJECT/topics/my-topic'
 ```

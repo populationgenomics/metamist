@@ -12,6 +12,7 @@ import metamist.parser.generic_metadata_parser as gmp
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 
+# TODO: The following constants are going to change
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
 SEQ_TYPE_COL_NAME = 'sequencing_type'
@@ -23,7 +24,7 @@ SAMPLE_META_MAP = {
 
 DEFAULT_SEQUENCING_TYPE = 'genome'
 DEFAULT_SEQUENCING_TECHNOLOGY = 'short-read'
-METAMIST_PROJECT = 'greek-myth'
+METAMIST_PROJECT = 'milo-dev'
 DEFAULT_SAMPLE_TYPE = 'blood'
 
 
@@ -124,31 +125,37 @@ def etl_load(request: flask.Request):
         # GenericMetadataParser from_json is async
         # we call it from sync, so we need to wrap it in coroutine
         async def run_parser_capture_result(res, row_data):
-            parser = gmp.GenericMetadataParser(
-                search_locations=[],
-                project=METAMIST_PROJECT,
-                participant_column=PARTICIPANT_COL_NAME,
-                sample_name_column=SAMPLE_ID_COL_NAME,
-                reads_column=None,
-                checksum_column=None,
-                seq_type_column=SEQ_TYPE_COL_NAME,
-                default_sequencing_type=DEFAULT_SEQUENCING_TYPE,
-                default_sample_type=DEFAULT_SAMPLE_TYPE,
-                default_sequencing_technology=DEFAULT_SEQUENCING_TECHNOLOGY,
-                default_reference_assembly_location=None,
-                participant_meta_map={},
-                sample_meta_map=SAMPLE_META_MAP,
-                assay_meta_map={},
-                qc_meta_map={},
-                allow_extra_files_in_search_path=None,
-                key_map=None,
-            )
-            r = await parser.from_json([row_data], confirm=False, dry_run=True)
-            res.append(r)
+            try:
+                # TODO better error handling
+                parser = gmp.GenericMetadataParser(
+                    search_locations=[],
+                    project=METAMIST_PROJECT,
+                    participant_column=PARTICIPANT_COL_NAME,
+                    sample_name_column=SAMPLE_ID_COL_NAME,
+                    reads_column=None,
+                    checksum_column=None,
+                    seq_type_column=SEQ_TYPE_COL_NAME,
+                    default_sequencing_type=DEFAULT_SEQUENCING_TYPE,
+                    default_sample_type=DEFAULT_SAMPLE_TYPE,
+                    default_sequencing_technology=DEFAULT_SEQUENCING_TECHNOLOGY,
+                    default_reference_assembly_location=None,
+                    participant_meta_map={},
+                    sample_meta_map=SAMPLE_META_MAP,
+                    assay_meta_map={},
+                    qc_meta_map={},
+                    allow_extra_files_in_search_path=None,
+                    key_map=None,
+                )
+                r = await parser.from_json(
+                    [row_data], confirm=False, dry_run=True
+                )
+                res.append(r)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logging.error(f'Failed to parse the row {e}')
+                # add to the output
+                res.append(e)
 
-        loop = asyncio.get_event_loop()
-        coroutine = run_parser_capture_result(tmp_res, row_json)
-        loop.run_until_complete(coroutine)
+        asyncio.run(run_parser_capture_result(tmp_res, row_json))
         result = tmp_res[0]
 
     return {
