@@ -12,6 +12,9 @@ import {
     area,
     stackOffsetExpand,
     schemeAccent,
+    scaleTime,
+    utcDay,
+    timeFormat,
 } from 'd3'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -34,7 +37,7 @@ interface ISeqrProportionalMapGraphProps {
 }
 
 interface IPropMapData {
-    date: string
+    date: Date
     [project: string]: number
 }
 
@@ -67,18 +70,20 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             .then((summary) => {
                 setIsLoading(false)
 
-                const graphData: IPropMapData[] = summary.data.map((obj: IProportionalDateModel) => ({
-                    date: obj.date,
-                    ...defaultPropMap,
-                    ...obj.projects.reduce(
-                        (prev: { [project: string]: number }, projectObj) => ({
-                            ...prev,
-                            // in percentage, rounded to 2 decimal places
-                            [projectObj.project]: projectObj.percentage,
-                        }),
-                        {}
-                    ),
-                }))
+                const graphData: IPropMapData[] = summary.data.map(
+                    (obj: IProportionalDateModel) => ({
+                        date: obj.date,
+                        ...defaultPropMap,
+                        ...obj.projects.reduce(
+                            (prev: { [project: string]: number }, projectObj) => ({
+                                ...prev,
+                                // in percentage, rounded to 2 decimal places
+                                [projectObj.project]: projectObj.percentage,
+                            }),
+                            {}
+                        ),
+                    })
+                )
                 const projectsToSee = new Set(projectsToSearch)
                 for (let index = 1; index < graphData.length; index++) {
                     const graphObj = graphData[index]
@@ -125,31 +130,49 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     //     getSeqrProjects()
     // }, [])
 
-
     React.useEffect(() => {
-        setProjectSelections(['project1', 'project2', 'project3'].reduce(
-            (prev: { [project: string]: boolean }, project: string) => ({
-                ...prev,
-                [project]: true,
-            }), {}
-        ))
+        setProjectSelections(
+            ['project1', 'project2', 'project3'].reduce(
+                (prev: { [project: string]: boolean }, project: string) => ({
+                    ...prev,
+                    [project]: true,
+                }),
+                {}
+            )
+        )
 
-        setData([{
-            date: "2021-01-01",
-            project1: 0.1,
-            project2: 0.2,
-            project3: 0.7,
-        }, {
-            date: "2021-01-02",
-            project1: 0.2,
-            project2: 0.3,
-            project3: 0.5,
-        }, {
-            date: "2021-01-03",
-            project1: 0.3,
-            project2: 0.4,
-            project3: 0.3,
-        }])
+        setData([
+            {
+                date: new Date('2021-01-01'), // need to be date objects
+                project1: 0.1,
+                project2: 0.2,
+                project3: 0.7,
+            },
+            {
+                date: new Date('2021-01-02'),
+                project1: 0.2,
+                project2: 0.3,
+                project3: 0.5,
+            },
+            {
+                date: new Date('2021-01-03'),
+                project1: 0.3,
+                project2: 0.4,
+                project3: 0.3,
+            },
+            {
+                date: new Date('2021-01-04'),
+                project1: 0, // 0 works fine :)
+                project2: 0.8,
+                project3: 0.2,
+            },
+            {
+                date: new Date('2021-01-05'),
+                project1: 10, // proportions don't need to be precomputed if that's easier, the stackedData call below can do  it
+                project2: 5, // can just use regular values
+                project3: 20,
+            },
+        ])
     }, [])
 
     if (!data) {
@@ -160,10 +183,9 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
-
     // svg sizing info
-    const margin = { top: 10, right: 30, bottom: 50, left: 60 }
-    const width = 1000 - margin.left - margin.right
+    const margin = { top: 10, right: 30, bottom: 100, left: 80 }
+    const width = 1500 - margin.left - margin.right
     const height = 1000 - margin.top - margin.bottom
     const id = '1'
 
@@ -174,9 +196,10 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     // domain refers to the min and max of the data (in this case earliest and latest dates)
     // range refers to the min and max pixel positions on the screen
     // basically it is a mapping of pixel positions to data values
-    const xScale = scaleLinear()
-        .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object?
+    const xScale = scaleTime()
+        .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object? Yes :)
         .range([0, width - margin.left - margin.right])
+    // .tickFormat(timeFormat('%B %d, %Y'))
 
     // function for generating the y Axis
     // no domain needed as it defaults to [0, 1] which is appropriate for proportions
@@ -213,26 +236,32 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                             Calling xScale(tick) turns a tick value into a pixel position to be drawn 
                             eg in the domain [2000, 2010] and range[0, 200] passing 2005 would be 50% of the way across the domain so 50% of the way between min and max specified pixel positions so it would draw at 100
                             */}
-                        {xScale.ticks().map((tick) => (
-                            <g
-                                key={tick}
-                                transform={`translate(${xScale(tick)}, ${height - margin.top - margin.bottom
+                        {xScale.ticks(utcDay.every(1)).map(
+                            (
+                                tick // can change this to set how many ticks you want
+                            ) => (
+                                <g
+                                    key={tick}
+                                    transform={`translate(${xScale(tick)}, ${
+                                        height - margin.top - margin.bottom
                                     })`}
-                            >
-                                <text
-                                    y={8}
-                                    transform="translate(0, 10)rotate(-45)"
-                                    textAnchor="end"
-                                    alignmentBaseline="middle"
-                                    fontSize={14}
-                                    cursor="help"
                                 >
-                                    {tick}
-                                </text>
-                                <line y2={6} stroke="black" />{' '}
-                                {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
-                            </g>
-                        ))}
+                                    <text
+                                        y={8}
+                                        transform="translate(0, 10)rotate(-45)"
+                                        textAnchor="end"
+                                        alignmentBaseline="middle"
+                                        fontSize={14}
+                                        cursor="help"
+                                    >
+                                        {tick.toDateString()}
+                                        {/* change this for different date formats */}
+                                    </text>
+                                    <line y2={6} stroke="black" />{' '}
+                                    {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
+                                </g>
+                            )
+                        )}
                     </g>
 
                     {/* y-axis (same as above) */}
