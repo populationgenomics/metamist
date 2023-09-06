@@ -3,14 +3,15 @@
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
 """
-import os
 import contextlib
+import os
 from functools import cached_property
 from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
+
 # from cpg_infra.utils import archive_folder
 from cpg_utils.cloud import read_secret
 
@@ -250,7 +251,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     self._svc_pubsub,
                     self.etl_pubsub_topic,
                     self.etl_load_function,
-                    self.etl_pubsub_dead_letters_topic,
                     self.etl_pubsub_dead_letter_subscription,
                 ]
             ),
@@ -357,7 +357,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     def prepare_service_account_policy_data(self, role):
         """
-        Prepare gcp service account policy
+        Prepare gcp service account policy, to be used in the pubsub subscription
+
+        serviceAccount:service-<project_number>@gcp-sa-pubsub.iam.gserviceaccount.com
+        is the service account that is used to publish messages to the topic
+
+        We need to give this account the ability to publish and read the topic
         """
         # get project
         project = gcp.organizations.get_project()
@@ -444,9 +449,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        return self._etl_function(
-            'extract', self.etl_extract_service_account.email
-        )
+        return self._etl_function('extract', self.etl_extract_service_account.email)
 
     @cached_property
     def etl_load_function(self):
@@ -462,7 +465,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
-        archive = archive_folder(str(path_to_func_folder.absolute()), allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}))
+        archive = archive_folder(
+            str(path_to_func_folder.absolute()),
+            allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}),
+        )
 
         # Create the single Cloud Storage object,
         # which contains the source code

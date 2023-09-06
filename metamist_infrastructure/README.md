@@ -60,7 +60,7 @@ pip install --editable .
 
 ### Slack
 
-- create private slack channel for testing, call it e.g. "dev-channel"
+- create private slack channel for testing, call it e.g. "YOURNAME-dev"
 - create test [Slack App](https://api.slack.com/start/quickstart) in your Slack workspace
 - add created app to private channel Integrations
 - copy Bot User OAuth Token from created Slack App OAuth Tokens for Your Workspace and create new secret under gc Secret Manager, call it e.g. "dev-slack-secret"

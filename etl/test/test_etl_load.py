@@ -1,7 +1,7 @@
 import base64
 import json
 from test.testbase import DbIsolatedTest, run_as_sync
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import etl.load.main
 from db.python.layers.family import FamilyLayer
@@ -34,16 +34,12 @@ class TestEtlLoad(DbIsolatedTest):
         ).id
         self.pat_pid = (
             await pl.upsert_participant(
-                ParticipantUpsertInternal(
-                    external_id='EX01_pat', reported_sex=1
-                )
+                ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
             )
         ).id
         self.mat_pid = (
             await pl.upsert_participant(
-                ParticipantUpsertInternal(
-                    external_id='EX01_mat', reported_sex=2
-                )
+                ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
             )
         ).id
 
@@ -62,9 +58,7 @@ class TestEtlLoad(DbIsolatedTest):
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
         )
-        request.get_json.return_value = json.loads(
-            '{"request_id": "1234567890"}'
-        )
+        request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
         query_job_result = MagicMock(items=[], args={}, spec=[])
         query_job_result.total_rows = 0
@@ -76,12 +70,15 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance.query.return_value = query_result
 
         response = etl.load.main.etl_load(request)
-        assert response == (
-            {
-                'success': False,
-                'message': 'Record with id: 1234567890 not found',
-            },
-            404,
+        self.assertEqual(
+            response,
+            (
+                {
+                    'success': False,
+                    'message': 'Record with id: 1234567890 not found',
+                },
+                412,
+            ),
         )
 
     @run_as_sync
@@ -92,9 +89,7 @@ class TestEtlLoad(DbIsolatedTest):
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
         )
-        request.get_json.return_value = json.loads(
-            '{"request_id": "1234567890"}'
-        )
+        request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
         query_row = MagicMock(args={}, spec=['body'])
         query_row.body = ETL_SAMPLE_RECORD
@@ -115,12 +110,15 @@ class TestEtlLoad(DbIsolatedTest):
         gm_parser_instance.from_json = AsyncMock(return_value='')
 
         response = etl.load.main.etl_load(request)
-        assert response == {
-            'id': '1234567890',
-            'record': json.loads(ETL_SAMPLE_RECORD),
-            'result': "''",
-            'success': True,
-        }
+        self.assertDictEqual(
+            response,
+            {
+                'id': '1234567890',
+                'record': json.loads(ETL_SAMPLE_RECORD),
+                'result': "''",
+                'success': True,
+            },
+        )
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
@@ -171,12 +169,15 @@ class TestEtlLoad(DbIsolatedTest):
         gm_parser_instance.from_json = AsyncMock(return_value='')
 
         response = etl.load.main.etl_load(request)
-        assert response == {
-            'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
-            'record': json.loads(ETL_SAMPLE_RECORD),
-            'result': "''",
-            'success': True,
-        }
+        self.assertDictEqual(
+            response,
+            {
+                'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
+                'record': json.loads(ETL_SAMPLE_RECORD),
+                'result': "''",
+                'success': True,
+            },
+        )
 
     @run_as_sync
     async def test_etl_load_parser(

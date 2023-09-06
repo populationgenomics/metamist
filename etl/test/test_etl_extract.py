@@ -1,6 +1,7 @@
 import json
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import etl.extract.main
 
 ETL_SAMPLE_RECORD = """
@@ -34,4 +35,4 @@ class TestEtlExtract(unittest.TestCase):
 
         response = etl.extract.main.etl_extract(request)
 
-        assert response == {'id': uuid4_fun.return_value, 'success': True}
+        self.assertDictEqual(response, {'id': uuid4_fun.return_value, 'success': True})

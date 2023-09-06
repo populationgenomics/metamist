@@ -1,5 +1,6 @@
 """Metamist Test Python Pulumi program"""
 import os
+
 from cpg_infra.config import CPGInfrastructureConfig
 from metamist_infrastructure import MetamistInfrastructure
 
@@ -25,21 +26,21 @@ conf_dict = {
     },
     'sample_metadata': {
         'gcp': {
-            'project': f'{GCP_PROJECT}',
+            'project': GCP_PROJECT,
             'service_name': 'sample-metadata-api',
             'machine_account': 'sample-metadata-api@sample-metadata.iam.gserviceaccount.com',
         },
-        'etl_accessors': ['bbv', 'kccg', 'sonic', 'sano'],
-        'slack_channel': f'{SLACK_CHANNEL}',
+        'etl_accessors': ['bbv'],
+        'slack_channel': SLACK_CHANNEL,
     },
     'billing': {
         'coordinator_machine_account': '',
         'gcp': {
-            'project_id': f'{GCP_PROJECT}',
+            'project_id': GCP_PROJECT,
             'account_id': '',
         },
         'aggregator': {
-            'slack_token_secret_name': f'{SLACK_TOKEN_SECRET_NAME}',
+            'slack_token_secret_name': SLACK_TOKEN_SECRET_NAME,
             'source_bq_table': '',
             'destination_bq_table': '',
             'slack_channel': '',

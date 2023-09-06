@@ -71,10 +71,6 @@ def etl_load(request: flask.Request):
     # try to force conversion and if fails just return None
     jbody = request.get_json(force=True, silent=True)
 
-    if callable(jbody):
-        # request.json is it in reality, but the type checker is saying it's callable
-        jbody = jbody()
-
     request_id = extract_request_id(jbody)
     if not request_id:
         jbody_str = json.dumps(jbody)
@@ -100,7 +96,7 @@ def etl_load(request: flask.Request):
         return {
             'success': False,
             'message': f'Record with id: {request_id} not found',
-        }, 404
+        }, 412  # Precondition Failed
 
     # should be only one record, look into loading multiple objects in one call?
     row_json = None
@@ -146,9 +142,7 @@ def etl_load(request: flask.Request):
                     allow_extra_files_in_search_path=None,
                     key_map=None,
                 )
-                r = await parser.from_json(
-                    [row_data], confirm=False, dry_run=True
-                )
+                r = await parser.from_json([row_data], confirm=False, dry_run=True)
                 res.append(r)
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logging.error(f'Failed to parse the row {e}')
