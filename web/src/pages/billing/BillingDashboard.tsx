@@ -7,8 +7,38 @@ const BillingDashboard: React.FunctionComponent = () => {
     const [end, setEnd] = React.useState<string>('2022-10-31')
 
     return (
-        <Card fluid>
-            <h3>Billing dashboard</h3>
+        <Card fluid style={{ backgroundColor: '#EFECEA' }}>
+            <div
+                style={{
+                    backgroundColor: '#F5F3F2',
+                    marginTop: 20,
+                    paddingTop: 20,
+                    marginBottom: 20,
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: 50,
+                        marginLeft: 20,
+                        color: '#635F5D',
+                    }}
+                >
+                    Billing Dashboard
+                </div>
+                <br />
+                <div
+                    style={{
+                        fontSize: 24,
+                        marginBottom: 10,
+                        marginLeft: 20,
+                        marginTop: 5,
+                        color: '#8E8883',
+                        fontStyle: 'italic',
+                    }}
+                >
+                    Breakdown of proportional allocation of costs per project over time
+                </div>
+            </div>
             <SeqrProportionalMapGraph start={start} end={end} />
         </Card>
     )
