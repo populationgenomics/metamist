@@ -19,6 +19,7 @@ from cpg_utils.cloud import read_secret
 # ETL_FOLDER = Path(__file__).parent / 'etl'
 ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
+PATH_TO_ETL_BQ_LOG_SCHEMA = ETL_FOLDER / 'bq_log_schema.json'
 
 
 # TODO: update implementation in cpg_infra project to enable binary files
@@ -304,17 +305,14 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-    @cached_property
-    def etl_bigquery_table(self):
-        """
-        Bigquery table to contain the etl data
-        """
-        with open(PATH_TO_ETL_BQ_SCHEMA) as f:
+    def _setup_bq_table(self, schema_file_name: str, table_name: str):
+        """Setup Bigquery table"""
+        with open(schema_file_name) as f:
             schema = f.read()
 
         etl_table = gcp.bigquery.Table(
-            'metamist-etl-bigquery-table',
-            table_id='etl-data',
+            f'metamist-etl-bigquery-table-{table_name}',
+            table_id=f'etl-{table_name}',
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
@@ -326,8 +324,21 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 depends_on=[self.etl_bigquery_dataset],
             ),
         )
-
         return etl_table
+
+    @cached_property
+    def etl_bigquery_table(self):
+        """
+        Bigquery table to contain the etl data
+        """
+        return self._setup_bq_table(PATH_TO_ETL_BQ_SCHEMA, 'data')
+
+    @cached_property
+    def etl_bigquery_log_table(self):
+        """
+        Bigquery table to contain the etl logs
+        """
+        return self._setup_bq_table(PATH_TO_ETL_BQ_LOG_SCHEMA, 'logs')
 
     @cached_property
     def slack_channel(self):
@@ -386,19 +397,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl
         """
-        # give the etl_load/extracr_service_accounts ability to read/write to bq table
+        # give the etl_load/extract service_accounts ability to read/write to bq table
         gcp.bigquery.DatasetAccess(
-            'metamist-etl-bq-dataset-write-access',
+            'metamist-etl-bq-dataset-extract-service-access',
             project=self.config.sample_metadata.gcp.project,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             role='WRITER',
             user_by_email=self.etl_extract_service_account.email,
         )
         gcp.bigquery.DatasetAccess(
-            'metamist-etl-bq-dataset-read-access',
+            'metamist-etl-bq-dataset-load-service-access',
             project=self.config.sample_metadata.gcp.project,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
-            role='READER',
+            role='WRITER',
             user_by_email=self.etl_load_service_account.email,
         )
         # give the etl_load_service_account ability to execute bigquery jobs
@@ -511,6 +522,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_table.dataset_id,
                         '.',
                         self.etl_bigquery_table.table_id,
+                    ),
+                    'BIGQUERY_LOG_TABLE': pulumi.Output.concat(
+                        self.etl_bigquery_log_table.project,
+                        '.',
+                        self.etl_bigquery_log_table.dataset_id,
+                        '.',
+                        self.etl_bigquery_log_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
                     'SM_ENVIRONMENT': 'DEVELOPMENT',  # TODO: make it configurable

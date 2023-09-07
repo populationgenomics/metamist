@@ -24,6 +24,7 @@ gcloud auth application-default login
 
 export PROJECT_NAME='gcp-project-name'
 export BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
+export BIGQUERY_LOG_TABLE='$PROJECT_NAME.metamist.etl-logs'
 export PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/etl-topic'
 
 # setup to run local version of sample-metadata

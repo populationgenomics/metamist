@@ -1,16 +1,17 @@
 import base64
 import json
 from test.testbase import DbIsolatedTest, run_as_sync
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import etl.load.main
-from db.python.layers.family import FamilyLayer
-from db.python.layers.participant import ParticipantLayer
-from metamist.parser.generic_metadata_parser import GenericMetadataParser
-from models.models import ParticipantUpsertInternal
+import metamist.parser as mp
 
-ETL_SAMPLE_RECORD = """
+ETL_SAMPLE_RECORD_1 = """
 {"identifier": "AB0002", "name": "j smith", "age": 50, "measurement": "98.7", "observation": "B++", "receipt_date": "1/02/2023"}
+"""
+
+ETL_SAMPLE_RECORD_2 = """
+{"sample_id": "123456", "external_id": "GRK100311", "individual_id": "608", "sequencing_type": "exome", "collection_centre": "KCCG", "collection_date": "2023-08-05T01:39:28.611476", "collection_specimen": "blood"}
 """
 
 
@@ -20,36 +21,6 @@ class TestEtlLoad(DbIsolatedTest):
     @run_as_sync
     async def setUp(self) -> None:
         super().setUp()
-
-        fl = FamilyLayer(self.connection)
-
-        self.fid_1 = await fl.create_family(external_id='FAM01')
-        self.fid_2 = await fl.create_family(external_id='FAM02')
-
-        pl = ParticipantLayer(self.connection)
-        self.pid = (
-            await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01', reported_sex=2)
-            )
-        ).id
-        self.pat_pid = (
-            await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01_pat', reported_sex=1)
-            )
-        ).id
-        self.mat_pid = (
-            await pl.upsert_participant(
-                ParticipantUpsertInternal(external_id='EX01_mat', reported_sex=2)
-            )
-        ).id
-
-        await pl.add_participant_to_family(
-            family_id=self.fid_1,
-            participant_id=self.pid,
-            paternal_id=self.pat_pid,
-            maternal_id=self.mat_pid,
-            affected=2,
-        )
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
@@ -83,16 +54,17 @@ class TestEtlLoad(DbIsolatedTest):
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
-    @patch('etl.load.main.gmp.GenericMetadataParser', autospec=True)
-    async def test_etl_load_found_record_simple_payload(self, gm_parser, bq_client):
+    @patch('etl.load.main.call_parser')
+    async def test_etl_load_found_record_simple_payload(self, call_parser, bq_client):
         """Test etl load simple payload"""
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
         )
         request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
-        query_row = MagicMock(args={}, spec=['body'])
-        query_row.body = ETL_SAMPLE_RECORD
+        query_row = MagicMock(args={}, spec=['body', 'type'])
+        query_row.body = ETL_SAMPLE_RECORD_2
+        query_row.type = '/gmp/v1'
 
         query_job_result = MagicMock(args={}, spec=['__iter__', '__next__'])
         query_job_result.total_rows = 1
@@ -104,17 +76,14 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        # TODO mockup GenericMetadataParser from_json with the right output
-        gm_parser_instance = gm_parser.return_value
-        # mock from_json return value, keep empty atm
-        gm_parser_instance.from_json = AsyncMock(return_value='')
+        call_parser.return_value = ('SUCCESS', '')
 
         response = etl.load.main.etl_load(request)
         self.assertDictEqual(
             response,
             {
                 'id': '1234567890',
-                'record': json.loads(ETL_SAMPLE_RECORD),
+                'record': json.loads(ETL_SAMPLE_RECORD_2),
                 'result': "''",
                 'success': True,
             },
@@ -122,8 +91,8 @@ class TestEtlLoad(DbIsolatedTest):
 
     @run_as_sync
     @patch('etl.load.main.bq.Client', autospec=True)
-    @patch('etl.load.main.gmp.GenericMetadataParser', autospec=True)
-    async def test_etl_load_found_record_pubsub_payload(self, gm_parser, bq_client):
+    @patch('etl.load.main.call_parser')
+    async def test_etl_load_found_record_pubsub_payload(self, call_parser, bq_client):
         """Test etl load pubsub payload"""
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
@@ -150,8 +119,9 @@ class TestEtlLoad(DbIsolatedTest):
 
         request.get_json.return_value = pubsub_payload_example
 
-        query_row = MagicMock(args={}, spec=['body'])
-        query_row.body = ETL_SAMPLE_RECORD
+        query_row = MagicMock(args={}, spec=['body', 'type'])
+        query_row.body = ETL_SAMPLE_RECORD_2
+        query_row.type = '/gmp/v1'
 
         query_job_result = MagicMock(args={}, spec=['__iter__', '__next__'])
         query_job_result.total_rows = 1
@@ -163,17 +133,14 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        # TODO mockup GenericMetadataParser from_json with the right output
-        gm_parser_instance = gm_parser.return_value
-        # mock from_json return value, keep empty atm
-        gm_parser_instance.from_json = AsyncMock(return_value='')
+        call_parser.return_value = ('SUCCESS', '')
 
         response = etl.load.main.etl_load(request)
         self.assertDictEqual(
             response,
             {
                 'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
-                'record': json.loads(ETL_SAMPLE_RECORD),
+                'record': json.loads(ETL_SAMPLE_RECORD_2),
                 'result': "''",
                 'success': True,
             },
@@ -201,7 +168,7 @@ class TestEtlLoad(DbIsolatedTest):
         default_sequencing_technology = 'short-read'
 
         # parser =
-        GenericMetadataParser(
+        mp.GenericMetadataParser(
             search_locations=[],
             project=self.project_name,
             participant_column=PARTICIPANT_COL_NAME,
@@ -235,4 +202,4 @@ class TestEtlLoad(DbIsolatedTest):
         # res = await parser.from_json(json_data, confirm=False, dry_run=True)
         # print(res)
 
-        assert True
+        # assert False
