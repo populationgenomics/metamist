@@ -262,14 +262,10 @@ class GenericAuditor(AuditHelper):
             if analysis_type == 'CRAM':
                 continue
             sg_analyses.extend(
-                [
-                    list(
-                        query(  # pylint: disable=unsubscriptable-object
-                            QUERY_SG_ANALYSES,
-                            {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisType': analysis_type},
-                        )['sequencingGroups']
-                    )
-                ]
+                query(  # pylint: disable=unsubscriptable-object
+                    QUERY_SG_ANALYSES,
+                    {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisType': analysis_type},
+                )['sequencingGroups']
             )
 
         for sg_analysis in sg_analyses:
@@ -320,7 +316,7 @@ class GenericAuditor(AuditHelper):
         )
 
         # Completed SGs have a CRAM file in the bucket that matches the path in Metamist
-        completed_sgs = defaultdict(list)
+        completed_sgs = {}
         for sg_id, analysis in sg_cram_paths.items():
             for analysis_id, cram_path in analysis.items():
                 if cram_path in crams_in_bucket:
