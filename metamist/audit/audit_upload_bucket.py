@@ -200,8 +200,10 @@ async def audit_upload_bucket(
         default_analysis_status=default_analysis_status,
     )
 
-    # Get all the participants in the dataset and their
     participant_data = auditor.get_participant_data_for_dataset()
+    sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
+        participant_data
+    )
     (
         sg_sample_id_map,
         assay_sg_id_map,
@@ -216,10 +218,6 @@ async def audit_upload_bucket(
         assay_sg_id_map, sg_cram_paths
     )
 
-    # Find sequencing groups without completed crams
-    sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
-        participant_data
-    )
     unaligned_sgs = [
         (
             sg_id,
@@ -228,8 +226,6 @@ async def audit_upload_bucket(
         )
         for sg_id in sg_completion.get('incomplete')
     ]
-
-    # Samples with completed crams can have their sequences deleted - these are the obvious ones
 
     (
         reads_to_delete,
@@ -247,6 +243,7 @@ async def audit_upload_bucket(
         reads_to_ingest, sg_cram_paths
     )
 
+    # Write the reads to delete, reads to ingest, and unaligned SGs reports
     auditor.write_upload_bucket_audit_reports(
         bucket,
         sequencing_types=sequencing_types,
