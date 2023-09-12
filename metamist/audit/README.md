@@ -144,3 +144,7 @@ gs://cpg-test-dataset-main/cram/CPG123456.cram
 For the first two fastq files, we know they are associated with assay 1092, and that the cram for sequencing group CPG123456 has been completed and matches a file in the /cram folder of the main bucket. Therefore, we should delete these files.
 
 For the second two fastq files, we know they are associated with assay 1093, and that the cram for sequencing group CPG123467 has not been completed. Therefore, we should ingest these files.
+
+### Flowchart of code execution
+
+![Upload Bucket Auditor Flowchart](resources/upload_bucket_auditor_diagram.png)
