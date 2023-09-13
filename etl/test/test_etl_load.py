@@ -7,11 +7,61 @@ import etl.load.main
 import metamist.parser as mp
 
 ETL_SAMPLE_RECORD_1 = """
-{"identifier": "AB0002", "name": "j smith", "age": 50, "measurement": "98.7", "observation": "B++", "receipt_date": "1/02/2023"}
+{
+    "identifier": "AB0002",
+    "name": "j smith",
+    "age": 50,
+    "measurement": "98.7",
+    "observation": "B++",
+    "receipt_date": "1/02/2023"
+}
 """
 
 ETL_SAMPLE_RECORD_2 = """
-{"sample_id": "123456", "external_id": "GRK100311", "individual_id": "608", "sequencing_type": "exome", "collection_centre": "KCCG", "collection_date": "2023-08-05T01:39:28.611476", "collection_specimen": "blood"}
+{
+    "sample_id": "123456",
+    "external_id": "GRK100311",
+    "individual_id": "608",
+    "sequencing_type": "exome",
+    "collection_centre": "KCCG",
+    "collection_date": "2023-08-05T01:39:28.611476",
+    "collection_specimen": "blood"
+}
+"""
+
+ETL_SAMPLE_RECORD_3 = """
+{
+    "config":
+    {
+        "search_locations": [],
+        "project": "milo-dev",
+        "participant_column": "individual_id",
+        "sample_name_column": "sample_id",
+        "seq_type_column": "sequencing_type",
+        "default_sequencing_type": "sequencing_type",
+        "default_sample_type": "blood",
+        "default_sequencing_technology": "short-read",
+        "sample_meta_map":
+        {
+            "collection_centre": "centre",
+            "collection_date": "collection_date",
+            "collection_specimen": "specimen"
+        },
+        "participant_meta_map": {},
+        "assay_meta_map": {},
+        "qc_meta_map": {}
+    },
+    "data":
+    {
+        "sample_id": "123456",
+        "external_id": "GRK100311",
+        "individual_id": "608",
+        "sequencing_type": "exome",
+        "collection_centre": "KCCG",
+        "collection_date": "2023-08-05T01:39:28.611476",
+        "collection_specimen": "blood"
+    }
+}
 """
 
 
@@ -62,9 +112,10 @@ class TestEtlLoad(DbIsolatedTest):
         )
         request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
 
-        query_row = MagicMock(args={}, spec=['body', 'type'])
+        query_row = MagicMock(args={}, spec=['body', 'type', 'submitting_user'])
         query_row.body = ETL_SAMPLE_RECORD_2
-        query_row.type = '/gmp/v1'
+        query_row.type = '/bbv/v1'
+        query_row.submitting_user = 'user@mail.com'
 
         query_job_result = MagicMock(args={}, spec=['__iter__', '__next__'])
         query_job_result.total_rows = 1
@@ -78,14 +129,19 @@ class TestEtlLoad(DbIsolatedTest):
 
         call_parser.return_value = ('SUCCESS', '')
 
-        response = etl.load.main.etl_load(request)
+        response, status = etl.load.main.etl_load(request)
+
+        # etl_load will fail as bbv/v1 is invalid parser
+        self.assertEqual(status, 500)
         self.assertDictEqual(
             response,
             {
                 'id': '1234567890',
                 'record': json.loads(ETL_SAMPLE_RECORD_2),
-                'result': "''",
-                'success': True,
+                'result': ''
+                "'Missing or invalid sample_type: /bbv/v1 in the record with id: 1234567890'"
+                '',
+                'success': False,
             },
         )
 
@@ -119,9 +175,10 @@ class TestEtlLoad(DbIsolatedTest):
 
         request.get_json.return_value = pubsub_payload_example
 
-        query_row = MagicMock(args={}, spec=['body', 'type'])
-        query_row.body = ETL_SAMPLE_RECORD_2
+        query_row = MagicMock(args={}, spec=['body', 'type', 'submitting_user'])
+        query_row.body = ETL_SAMPLE_RECORD_3
         query_row.type = '/gmp/v1'
+        query_row.submitting_user = 'user@mail.com'
 
         query_job_result = MagicMock(args={}, spec=['__iter__', '__next__'])
         query_job_result.total_rows = 1
@@ -136,11 +193,13 @@ class TestEtlLoad(DbIsolatedTest):
         call_parser.return_value = ('SUCCESS', '')
 
         response = etl.load.main.etl_load(request)
+        # etl_load will fail as bbv/v1 is invalid parser
+
         self.assertDictEqual(
             response,
             {
                 'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
-                'record': json.loads(ETL_SAMPLE_RECORD_2),
+                'record': json.loads(ETL_SAMPLE_RECORD_3),
                 'result': "''",
                 'success': True,
             },

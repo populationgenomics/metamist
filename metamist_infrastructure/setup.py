@@ -26,6 +26,7 @@ setup(
         'metamist_infrastructure.etl',
         'metamist_infrastructure.etl.extract',
         'metamist_infrastructure.etl.load',
+        'metamist_infrastructure.etl.notification',
     ],
     package_dir={
         # files in THIS directory are included as metamist_infrastructure
@@ -36,6 +37,8 @@ setup(
         'metamist_infrastructure.etl.extract': '../etl/extract',
         # files in ../etl/load are included as metamist_infrastructure.etl.load
         'metamist_infrastructure.etl.load': '../etl/load',
+        # files in ../etl/notification are included as metamist_infrastructure.etl.notification
+        'metamist_infrastructure.etl.notification': '../etl/notification',
     },
     package_data={
         # ensure bq_schema.json is included in etl
@@ -43,7 +46,9 @@ setup(
         # ensure requirements.txt is included in etl.extract
         'metamist_infrastructure.etl.extract': ['*.txt'],
         # ensure requirements.txt is included in etl.load
-        'metamist_infrastructure.etl.load': ['*.txt'],
+        'metamist_infrastructure.etl.load': ['*.txt', '*.tar.gz'],
+        # ensure requirements.txt is included in etl.notification
+        'metamist_infrastructure.etl.notification': ['*.txt'],
     },
     install_requires=[],
     entry_points={

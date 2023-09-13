@@ -9,29 +9,21 @@ from typing import Any, Dict
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
+
+# import all public parsers
 import metamist.parser as mp
+from google.cloud import pubsub_v1
+
+# try to import private parsers
+# try:
+#     import metamist_private.parser as mpp
+# except ImportError:
+#     pass
+
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 BIGQUERY_LOG_TABLE = os.getenv('BIGQUERY_LOG_TABLE')
-
-DEFAULT_PARSER_PARAMS = {
-    'search_locations': [],
-    'project': 'milo-dev',
-    'participant_column': 'individual_id',
-    'sample_name_column': 'sample_id',
-    'seq_type_column': 'sequencing_type',
-    'default_sequencing_type': 'sequencing_type',
-    'default_sample_type': 'blood',
-    'default_sequencing_technology': 'short-read',
-    'sample_meta_map': {
-        'collection_centre': 'centre',
-        'collection_date': 'collection_date',
-        'collection_specimen': 'specimen',
-    },
-    'participant_meta_map': {},
-    'assay_meta_map': {},
-    'qc_meta_map': {},
-}
+NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
 
 
 def call_parser(parser_obj, row_json):
@@ -108,7 +100,9 @@ def etl_load(request: flask.Request):
     # try to force conversion and if fails just return None
     jbody = request.get_json(force=True, silent=True)
 
-    request_id = extract_request_id(jbody)
+    # use delivery_attempt to only log error once, min number of attempts for pub/sub is 5
+    # so we want to avoid 5 records / slack messages to be passed around per one error
+    delivery_attempt, request_id = extract_request_id(jbody)
     if not request_id:
         jbody_str = json.dumps(jbody)
         return {
@@ -147,39 +141,56 @@ def etl_load(request: flask.Request):
     row_json = None
     result = None
     status = None
+    log_record = None
     for row in query_job_result:
         sample_type = row.type
         # sample_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
         row_json = json.loads(row.body)
         # get config from payload or use default
-        config_data = row_json.get('config', DEFAULT_PARSER_PARAMS)
+        config_data = row_json.get('config')
         # get data from payload or use payload as data
         record_data = row_json.get('data', row_json)
 
         parser_obj = get_parser_instance(parser_map, sample_type, config_data)
-        if not parser_obj:
-            return {
-                'success': False,
-                'message': f'Missing or invalid sample_type: {sample_type} in the record with id: {request_id}',
-            }, 412  # Precondition Failed
+        if parser_obj:
+            # Parse row.body -> Model and upload to metamist database
+            status, result = call_parser(parser_obj, record_data)
+        else:
+            status = 'FAILED'
+            result = f'Missing or invalid sample_type: {sample_type} in the record with id: {request_id}'
 
-        # Parse row.body -> Model and upload to metamist database
-        status, result = call_parser(parser_obj, record_data)
-
-        # log results to BIGQUERY_LOG_TABLE
-        bq_client.insert_rows_json(
-            BIGQUERY_LOG_TABLE,
-            [
-                {
-                    'request_id': request_id,
-                    'timestamp': datetime.datetime.utcnow().isoformat(),
-                    'status': status,
-                    'details': json.dumps({'result': f"'{result}'"}),
+        if delivery_attempt == 1:
+            # log results to BIGQUERY_LOG_TABLE
+            log_record = {
+                'request_id': request_id,
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'status': status,
+                'details': {
+                    'type': sample_type,
+                    'submitting_user': row.submitting_user,
+                    'result': f"'{result}'",  # convert to string
                 }
-            ],
-        )
+                # json.dumps({'result': f"'{result}'"}),
+            }
+            bq_client.insert_rows_json(
+                BIGQUERY_LOG_TABLE,
+                [log_record],
+            )
 
+            if status == 'FAILED':
+                # publish to notification pubsub
+                msg_title = 'Metamist ETL Load Failed'
+                try:
+                    pubsub_client = pubsub_v1.PublisherClient()
+                    pubsub_client.publish(
+                        NOTIFICATION_PUBSUB_TOPIC,
+                        json.dumps({'title': msg_title} | log_record).encode(),
+                    )
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logging.error(f'Failed to publish to pubsub: {e}')
+
+    # return success
     if status and status == 'SUCCESS':
         return {
             'id': request_id,
@@ -188,7 +199,7 @@ def etl_load(request: flask.Request):
             'success': True,
         }
 
-    # some error happened
+    # return error
     return {
         'id': request_id,
         'record': row_json,
@@ -207,20 +218,22 @@ def extract_request_id(jbody: Dict[str, Any]) -> str | None:
         str | None: ID of object to be loaded
     """
     if not jbody:
-        return None
+        return None, None
 
     request_id = jbody.get('request_id')
+    # set default delivery_attempt as 1
+    delivery_attempt = jbody.get('deliveryAttempt', 1)
     if request_id:
-        return request_id
+        return delivery_attempt, request_id
 
     # try if payload is from pub/sub function
     message = jbody.get('message')
     if not message:
-        return None
+        return delivery_attempt, None
 
     data = message.get('data')
     if not data:
-        return None
+        return delivery_attempt, None
 
     # data is not empty, decode and extract request_id
     request_id = None
@@ -231,7 +244,7 @@ def extract_request_id(jbody: Dict[str, Any]) -> str | None:
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to extract request_id from the payload {e}')
 
-    return request_id
+    return delivery_attempt, request_id
 
 
 def get_parser_instance(

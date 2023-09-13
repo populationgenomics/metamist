@@ -13,11 +13,11 @@ import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
 
 # from cpg_infra.utils import archive_folder
-from cpg_utils.cloud import read_secret
+from slack_notification import SlackNotification, SlackNotificationType
 
 # this gets moved around during the pip install
-# ETL_FOLDER = Path(__file__).parent / 'etl'
-ETL_FOLDER = Path(__file__).parent.parent / 'etl'
+ETL_FOLDER = Path(__file__).parent / 'etl'
+# ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_BQ_LOG_SCHEMA = ETL_FOLDER / 'bq_log_schema.json'
 
@@ -253,6 +253,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     self.etl_pubsub_topic,
                     self.etl_load_function,
                     self.etl_pubsub_dead_letter_subscription,
+                    self.etl_extract_service_account,
                 ]
             ),
         )
@@ -340,32 +341,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         return self._setup_bq_table(PATH_TO_ETL_BQ_LOG_SCHEMA, 'logs')
 
-    @cached_property
-    def slack_channel(self):
-        """
-        Create a Slack notification channel for all functions
-        Use cli command below to retrieve the required 'labels'
-        $ gcloud beta monitoring channel-descriptors describe slack
-        """
-        if not self.config.sample_metadata.slack_channel:
-            return None
-        return gcp.monitoring.NotificationChannel(
-            'metamist-etl-slack-notification-channel',
-            display_name='Metamist ETL Slack Notification Channel',
-            type='slack',
-            labels={'channel_name': self.config.sample_metadata.slack_channel},
-            sensitive_labels=gcp.monitoring.NotificationChannelSensitiveLabelsArgs(
-                auth_token=read_secret(
-                    # reuse this secret :)
-                    project_id=self.config.billing.gcp.project_id,
-                    secret_name=self.config.billing.aggregator.slack_token_secret_name,
-                    fail_gracefully=False,
-                ),
-            ),
-            description='Slack notification channel for all cost aggregator functions',
-            project=self.config.sample_metadata.gcp.project,
-        )
-
     def prepare_service_account_policy_data(self, role):
         """
         Prepare gcp service account policy, to be used in the pubsub subscription
@@ -423,19 +398,41 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
         # give the etl_extract_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
-            'metamist-etl-editor-role',
+            'metamist-etl-extract-editor-role',
             project=self.config.sample_metadata.gcp.project,
             role='roles/editor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_extract_service_account.email
             ),
         )
+        # give the etl_load_service_account ability to push to pub/sub
+        gcp.projects.IAMMember(
+            'metamist-etl-load-editor-role',
+            project=self.config.sample_metadata.gcp.project,
+            role='roles/editor',
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_load_service_account.email
+            ),
+        )
+
+        # give account serverless-robot-prod.iam.gserviceaccount.com ability to setup cloud service
+        project = gcp.organizations.get_project()
+        robot_account = pulumi.Output.concat(
+            'serviceAccount:service-',
+            project.number,
+            '@serverless-robot-prod.iam.gserviceaccount.com',
+        )
+        gcp.projects.IAMMember(
+            'metamist-etl-robot-service-agent-role',
+            project=self.config.sample_metadata.gcp.project,
+            role='roles/run.serviceAgent',
+            member=robot_account,
+        )
 
         self._setup_etl_functions()
         self._setup_etl_pubsub()
 
         self._setup_metamist_etl_accessors()
-        self._setup_slack_notification()
 
     def _setup_etl_functions(self):
         """
@@ -460,14 +457,14 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        return self._etl_function('extract', self.etl_extract_service_account.email)
+        return self._etl_function('extract', self.etl_extract_service_account)
 
     @cached_property
     def etl_load_function(self):
         """etl_load_function"""
-        return self._etl_function('load', self.etl_load_service_account.email)
+        return self._etl_function('load', self.etl_load_service_account)
 
-    def _etl_function(self, f_name: str, sa_email: str):
+    def _etl_function(self, f_name: str, sa: object):
         """
         Driver function to setup the etl cloud function
         """
@@ -509,7 +506,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 ),
             ),
             service_config=gcp.cloudfunctionsv2.FunctionServiceConfigArgs(
-                max_instance_count=1,
+                max_instance_count=1,  # Keep max instances to 1 to avoid racing conditions
                 min_instance_count=0,
                 available_memory='2Gi',
                 available_cpu=1,
@@ -531,16 +528,24 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_log_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
+                    'NOTIFICATION_PUBSUB_TOPIC': self.etl_slack_notification_topic.id
+                    if self.etl_slack_notification_topic
+                    else '',
                     'SM_ENVIRONMENT': 'DEVELOPMENT',  # TODO: make it configurable
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
-                service_account_email=sa_email,
+                service_account_email=sa.email,
             ),
             project=self.config.sample_metadata.gcp.project,
             location=self.config.gcp.region,
             opts=pulumi.ResourceOptions(
-                depends_on=[self._svc_functions, self._svc_build]
+                depends_on=[
+                    self._svc_functions,
+                    self._svc_build,
+                    sa,
+                    self.etl_slack_notification_topic,
+                ]
             ),
         )
 
@@ -566,52 +571,50 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 member=pulumi.Output.concat('serviceAccount:', sa.email),
             )
 
-    def _setup_function_slack_notification(self, etl_fun_name: str):
+    @cached_property
+    def etl_slack_notification(self):
         """
-        setup slack notification for etl_fun cloud function
+        Setup Slack notification
         """
-        etl_fun = getattr(self, f'etl_{etl_fun_name}_function')
 
-        # Slack notifications
-        filter_string = etl_fun.name.apply(
-            lambda fxn_name: f"""
-                resource.type="cloud_run_revision"
-                AND resource.labels.service_name="{fxn_name}"
-                AND severity>=WARNING
-            """  # noqa: B028
+        project = gcp.organizations.get_project()
+
+        notification = SlackNotification(
+            project_name=self.config.sample_metadata.gcp.project,
+            project_number=project.number,
+            location=self.config.gcp.region,
+            service_account=self.etl_service_account,  # can be some other account
+            source_bucket=self.source_bucket,
+            topic_name='metamist-etl-notification',
+            slack_secret_project_id=self.config.billing.gcp.project_id,
+            slack_token_secret_name=self.config.billing.aggregator.slack_token_secret_name,
+            slack_channel_name=self.config.sample_metadata.slack_channel,
+            func_to_monitor=[
+                'metamist-etl-notification-func',
+                'metamist-etl-extract',
+                'metamist-etl-load',
+            ],
+            notification_type=SlackNotificationType.NOTIFICATION,
+            depends_on=[
+                self._svc_iam,
+                self._svc_functions,
+                self._svc_build,
+                self._svc_pubsub,
+                self.etl_service_account,
+            ],
         )
 
-        # Create the Cloud Function's event alert
-        alert_condition = gcp.monitoring.AlertPolicyConditionArgs(
-            condition_matched_log=(
-                gcp.monitoring.AlertPolicyConditionConditionMatchedLogArgs(
-                    filter=filter_string,
-                )
-            ),
-            display_name='Function warning/error',
-        )
-        gcp.monitoring.AlertPolicy(
-            resource_name=f'metamist-etl-{etl_fun_name}-alert-policy',
-            display_name=f'Metamist ETL {etl_fun_name.capitalize()} Function Error Alert',
-            combiner='OR',
-            notification_channels=[self.slack_channel.id],
-            conditions=[alert_condition],
-            alert_strategy=gcp.monitoring.AlertPolicyAlertStrategyArgs(
-                notification_rate_limit=(
-                    gcp.monitoring.AlertPolicyAlertStrategyNotificationRateLimitArgs(
-                        # One notification per 5 minutes
-                        period='300s'
-                    )
-                ),
-                # Autoclose Incident after 30 minutes
-                auto_close='1800s',
-            ),
-            opts=pulumi.ResourceOptions(depends_on=[etl_fun]),
-        )
+        # setup notification
+        return notification.main()
 
-    def _setup_slack_notification(self):
-        if self.slack_channel is None:
-            return
+    @cached_property
+    def etl_slack_notification_channel(self):
+        """etl_slack_notification_channel"""
+        (alerts_channel, _) = self.etl_slack_notification
+        return alerts_channel
 
-        self._setup_function_slack_notification('extract')
-        self._setup_function_slack_notification('load')
+    @cached_property
+    def etl_slack_notification_topic(self):
+        """etl_slack_notification_topic"""
+        (_, pubsub_topic) = self.etl_slack_notification
+        return pubsub_topic
