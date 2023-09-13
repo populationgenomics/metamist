@@ -49,6 +49,29 @@ class SlackNotificationType(Enum):
     BOTH = 3
 
 
+class SlackNotificationConfig:
+    """Slack token, channel and project id wrapped in the config class"""
+
+    def __init__(
+        self,
+        project_name: str,
+        location: str,  # e.g. self.config.gcp.region
+        service_account: object,
+        source_bucket: object,
+        slack_secret_project_id: str,
+        slack_token_secret_name: str,
+        slack_channel_name: str,
+    ):
+        """Slack notification config constructor"""
+        self.project_name = project_name
+        self.location = location
+        self.service_account = service_account
+        self.source_bucket = source_bucket
+        self.slack_secret_project_id = slack_secret_project_id
+        self.slack_token_secret_name = slack_token_secret_name
+        self.slack_channel_name = slack_channel_name
+
+
 class SlackNotification:
     """
     Metamist Infrastructure Notification Slack Plugin
@@ -56,31 +79,15 @@ class SlackNotification:
 
     def __init__(
         self,
-        project_name: str,
-        project_number: str,
-        location: str,  # e.g. self.config.gcp.region
-        service_account: object,
-        source_bucket: object,
+        slack_config: SlackNotificationConfig,
         topic_name: str,  # e.g. 'metamist-etl-notification'
-        slack_secret_project_id: str,
-        slack_token_secret_name: str,
-        slack_channel_name: str,
         func_to_monitor: list | None,
         notification_type: SlackNotificationType,
         depends_on: list | None,
     ):
         """Slack notification constructor"""
-        self.project_name = project_name
-        self.project_number = project_number
-        self.location = location
-        self.service_account = service_account
-        self.source_bucket = source_bucket
+        self.config = slack_config
         self.topic_name = topic_name
-
-        self.slack_secret_project_id = slack_secret_project_id
-        self.slack_token_secret_name = slack_token_secret_name
-        self.slack_channel_name = slack_channel_name
-
         self.func_to_monitor = func_to_monitor
         self.notification_type = notification_type
         self.depends_on = depends_on
@@ -89,9 +96,11 @@ class SlackNotification:
         """Setup permissions for the service account"""
         gcp.projects.IAMMember(
             f'{self.topic_name}-sa-run-invoker-role',
-            project=self.project_name,
+            project=self.config.project_name,
             role='roles/run.invoker',
-            member=pulumi.Output.concat('serviceAccount:', self.service_account.email),
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.config.service_account.email
+            ),
         )
 
     def _incident_setup_alerts_slack_notification(self):
@@ -155,7 +164,7 @@ class SlackNotification:
             # function to actually updating the source because
             # it's based on the name,
             # allow Pulumi to create a new name each time it gets updated
-            bucket=self.source_bucket.name,
+            bucket=self.config.source_bucket.name,
             source=archive,
             opts=pulumi.ResourceOptions(replace_on_changes=['*']),
         )
@@ -169,7 +178,7 @@ class SlackNotification:
                 environment_variables={},
                 source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceArgs(
                     storage_source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceStorageSourceArgs(
-                        bucket=self.source_bucket.name,
+                        bucket=self.config.source_bucket.name,
                         object=source_archive_object.name,
                     ),
                 ),
@@ -183,18 +192,18 @@ class SlackNotification:
                 environment_variables={
                     'SLACK_BOT_TOKEN': read_secret(
                         # reuse this secret :)
-                        project_id=self.slack_secret_project_id,
-                        secret_name=self.slack_token_secret_name,
+                        project_id=self.config.slack_secret_project_id,
+                        secret_name=self.config.slack_token_secret_name,
                         fail_gracefully=False,
                     ),
-                    'SLACK_CHANNEL': self.slack_channel_name,
+                    'SLACK_CHANNEL': self.config.slack_channel_name,
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
-                service_account_email=self.service_account.email,
+                service_account_email=self.config.service_account.email,
             ),
-            project=self.project_name,
-            location=self.location,
+            project=self.config.project_name,
+            location=self.config.location,
             opts=pulumi.ResourceOptions(depends_on=self.depends_on),
         )
         return fxn
@@ -210,17 +219,17 @@ class SlackNotification:
             f'{self.topic_name}-incidents-channel',
             display_name=f'{self.topic_name} incidents slack notification channel',
             type='slack',
-            labels={'channel_name': self.slack_channel_name},
+            labels={'channel_name': self.config.slack_channel_name},
             sensitive_labels=gcp.monitoring.NotificationChannelSensitiveLabelsArgs(
                 auth_token=read_secret(
                     # reuse this secret :)
-                    project_id=self.slack_secret_project_id,
-                    secret_name=self.slack_token_secret_name,
+                    project_id=self.config.slack_secret_project_id,
+                    secret_name=self.config.slack_token_secret_name,
                     fail_gracefully=False,
                 ),
             ),
             description=f'Slack notification channel for {self.topic_name}',
-            project=self.project_name,
+            project=self.config.project_name,
         )
 
     @cached_property
@@ -228,7 +237,7 @@ class SlackNotification:
         """
         Pubsub topic to trigger send notification message to slack
         """
-        return gcp.pubsub.Topic(self.topic_name, project=self.project_name)
+        return gcp.pubsub.Topic(self.topic_name, project=self.config.project_name)
 
     @cached_property
     def notification_pubsub_push_subscription(self):
@@ -247,13 +256,13 @@ class SlackNotification:
             push_config=gcp.pubsub.SubscriptionPushConfigArgs(
                 push_endpoint=self.notification_cloudfun.service_config.uri,
                 oidc_token=gcp.pubsub.SubscriptionPushConfigOidcTokenArgs(
-                    service_account_email=self.service_account.email,
+                    service_account_email=self.config.service_account.email,
                 ),
                 attributes={
                     'x-goog-version': 'v1',
                 },
             ),
-            project=self.project_name,
+            project=self.config.project_name,
             opts=pulumi.ResourceOptions(
                 depends_on=[
                     self.notification_pubsub_topic,
@@ -264,10 +273,11 @@ class SlackNotification:
         )
 
         # give subscriber permission to service account
+        project = gcp.organizations.get_project()
         members = [
             pulumi.Output.concat(
                 'serviceAccount:service-',
-                self.project_number,
+                project.number,
                 '@gcp-sa-pubsub.iam.gserviceaccount.com',
             )
         ]
@@ -275,7 +285,7 @@ class SlackNotification:
         # give publisher permission to service account
         gcp.pubsub.SubscriptionIAMPolicy(
             f'{self.topic_name}-subscription-iam-policy',
-            project=self.project_name,
+            project=self.config.project_name,
             subscription=subscription.name,
             policy_data=prepare_policy_data('roles/pubsub.subscriber', members),
         )
@@ -288,13 +298,14 @@ class SlackNotification:
         Dead letters pubsub topic to capture failed jobs
         """
         topic = gcp.pubsub.Topic(
-            f'{self.topic_name}-dead-letters-topic', project=self.project_name
+            f'{self.topic_name}-dead-letters-topic', project=self.config.project_name
         )
 
+        project = gcp.organizations.get_project()
         members = [
             pulumi.Output.concat(
                 'serviceAccount:service-',
-                self.project_number,
+                project.number,
                 '@gcp-sa-pubsub.iam.gserviceaccount.com',
             )
         ]
@@ -302,7 +313,7 @@ class SlackNotification:
         # give publisher permission to service account
         gcp.pubsub.TopicIAMPolicy(
             f'{self.topic_name}-dead-letters-topic-iam-policy',
-            project=self.project_name,
+            project=self.config.project_name,
             topic=topic.name,
             policy_data=prepare_policy_data('roles/pubsub.publisher', members),
         )
@@ -316,8 +327,8 @@ class SlackNotification:
         """
         return gcp.pubsub.Subscription(
             f'{self.topic_name}-dead-letters-subscription',
-            topic=self.dead_letters_pubsub_topic.name,
-            project=self.project_name,
+            topic=self.notification_dead_letters_pubsub_topic.name,
+            project=self.config.project_name,
             ack_deadline_seconds=20,
             opts=pulumi.ResourceOptions(
                 depends_on=[self.notification_dead_letters_pubsub_topic]
@@ -344,15 +355,15 @@ class SlackNotification:
         """Main function to setup notification infrastructure"""
         alerts_channel = None
         pubsub_topic = None
-        if (
-            self.notification_type == SlackNotificationType.INCIDENT_ALERT
-            or self.notification_type == SlackNotificationType.BOTH
+        if self.notification_type in (
+            SlackNotificationType.INCIDENT_ALERT,
+            self.notification_type == SlackNotificationType.BOTH,
         ):
             alerts_channel = self.setup_incident_alerts_channel()
 
-        if (
-            self.notification_type == SlackNotificationType.NOTIFICATION
-            or self.notification_type == SlackNotificationType.BOTH
+        if self.notification_type in (
+            SlackNotificationType.NOTIFICATION,
+            self.notification_type == SlackNotificationType.BOTH,
         ):
             self.setup_notification()
             pubsub_topic = self.notification_pubsub_topic

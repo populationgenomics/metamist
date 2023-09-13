@@ -10,9 +10,10 @@ import flask
 import functions_framework
 import google.cloud.bigquery as bq
 
+from google.cloud import pubsub_v1
+
 # import all public parsers
 import metamist.parser as mp
-from google.cloud import pubsub_v1
 
 # try to import private parsers
 # try:
@@ -27,14 +28,8 @@ NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
 
 
 def call_parser(parser_obj, row_json):
-    """_summary_
-
-    Args:
-        parser_obj (_type_): _description_
-        row_json (_type_): _description_
-
-    Returns:
-        _type_: _description_
+    """
+    This function calls parser_obj.from_json and returns status and result
     """
     tmp_res = []
     tmp_status = []
@@ -48,13 +43,77 @@ def call_parser(parser_obj, row_json):
             res.append(r)
             status.append('SUCCESS')
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logging.error(f'Failed to parse the row {e}')
+            logging.error(f'Failed to parse: {e}')
             # add to the output
             res.append(e)
             status.append('FAILED')
 
     asyncio.run(run_parser_capture_result(parser_obj, row_json, tmp_res, tmp_status))
     return tmp_status[0], tmp_res[0]
+
+
+def process_rows(query_job_result, delivery_attempt, request_id, parser_map, bq_client):
+    """
+    Process BQ results rows, should be only one row
+    """
+    status = None
+    parsing_result = None
+    row_json = None
+
+    for row in query_job_result:
+        sample_type = row.type
+        # sample_type should be in the format /ParserName/Version e.g.: /bbv/v1
+
+        row_json = json.loads(row.body)
+        # get config from payload or use default
+        config_data = row_json.get('config')
+        # get data from payload or use payload as data
+        record_data = row_json.get('data', row_json)
+
+        parser_obj = get_parser_instance(parser_map, sample_type, config_data)
+        if parser_obj:
+            # Parse row.body -> Model and upload to metamist database
+            status, parsing_result = call_parser(parser_obj, record_data)
+        else:
+            status = 'FAILED'
+            parsing_result = f'Missing or invalid sample_type: {sample_type} in the record with id: {request_id}'
+
+        if delivery_attempt == 1:
+            # log only at the first attempt
+            log_details = {
+                'type': sample_type,
+                'submitting_user': row.submitting_user,
+                'result': f'{parsing_result}',
+            }
+
+            # log results to BIGQUERY_LOG_TABLE
+            log_record = {
+                'request_id': request_id,
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'status': status,
+                'details': json.dumps(log_details),
+            }
+
+            errors = bq_client.insert_rows_json(
+                BIGQUERY_LOG_TABLE,
+                [log_record],
+            )
+            if errors:
+                logging.error(f'Failed to log to BQ: {errors}')
+
+            if status == 'FAILED':
+                # publish to notification pubsub
+                msg_title = 'Metamist ETL Load Failed'
+                try:
+                    pubsub_client = pubsub_v1.PublisherClient()
+                    pubsub_client.publish(
+                        NOTIFICATION_PUBSUB_TOPIC,
+                        json.dumps({'title': msg_title} | log_record).encode(),
+                    )
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    logging.error(f'Failed to publish to pubsub: {e}')
+
+    return status, parsing_result, row_json
 
 
 @functions_framework.http
@@ -138,72 +197,24 @@ def etl_load(request: flask.Request):
         }, 412  # Precondition Failed
 
     # should be only one record, look into loading multiple objects in one call?
-    row_json = None
-    result = None
-    status = None
-    log_record = None
-    for row in query_job_result:
-        sample_type = row.type
-        # sample_type should be in the format /ParserName/Version e.g.: /bbv/v1
-
-        row_json = json.loads(row.body)
-        # get config from payload or use default
-        config_data = row_json.get('config')
-        # get data from payload or use payload as data
-        record_data = row_json.get('data', row_json)
-
-        parser_obj = get_parser_instance(parser_map, sample_type, config_data)
-        if parser_obj:
-            # Parse row.body -> Model and upload to metamist database
-            status, result = call_parser(parser_obj, record_data)
-        else:
-            status = 'FAILED'
-            result = f'Missing or invalid sample_type: {sample_type} in the record with id: {request_id}'
-
-        if delivery_attempt == 1:
-            # log results to BIGQUERY_LOG_TABLE
-            log_record = {
-                'request_id': request_id,
-                'timestamp': datetime.datetime.utcnow().isoformat(),
-                'status': status,
-                'details': {
-                    'type': sample_type,
-                    'submitting_user': row.submitting_user,
-                    'result': f"'{result}'",  # convert to string
-                }
-                # json.dumps({'result': f"'{result}'"}),
-            }
-            bq_client.insert_rows_json(
-                BIGQUERY_LOG_TABLE,
-                [log_record],
-            )
-
-            if status == 'FAILED':
-                # publish to notification pubsub
-                msg_title = 'Metamist ETL Load Failed'
-                try:
-                    pubsub_client = pubsub_v1.PublisherClient()
-                    pubsub_client.publish(
-                        NOTIFICATION_PUBSUB_TOPIC,
-                        json.dumps({'title': msg_title} | log_record).encode(),
-                    )
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    logging.error(f'Failed to publish to pubsub: {e}')
+    (status, parsing_result, last_record) = process_rows(
+        query_job_result, delivery_attempt, request_id, parser_map, bq_client
+    )
 
     # return success
     if status and status == 'SUCCESS':
         return {
             'id': request_id,
-            'record': row_json,
-            'result': f"'{result}'",
+            'record': last_record,
+            'result': f'{parsing_result}',
             'success': True,
         }
 
-    # return error
+    # otherwise return error
     return {
         'id': request_id,
-        'record': row_json,
-        'result': f"'{result}'",
+        'record': last_record,
+        'result': f'{parsing_result}',
         'success': False,
     }, 500
 

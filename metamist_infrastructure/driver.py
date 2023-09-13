@@ -13,7 +13,11 @@ import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
 
 # from cpg_infra.utils import archive_folder
-from slack_notification import SlackNotification, SlackNotificationType
+from slack_notification import (
+    SlackNotification,
+    SlackNotificationType,
+    SlackNotificationConfig,
+)
 
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
@@ -57,7 +61,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """Driver for the metamist infrastructure as code plugin"""
         # todo, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
-        self.setup_etl()
+        self._setup_etl()
 
     @cached_property
     def _svc_cloudresourcemanager(self):
@@ -151,7 +155,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-    def etl_function_account(self, f_name: str):
+    def _etl_function_account(self, f_name: str):
         """
         Service account for cloud function
         """
@@ -167,12 +171,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_load_service_account(self):
         """Service account to run load/transform functionality"""
-        return self.etl_function_account('load')
+        return self._etl_function_account('load')
 
     @cached_property
     def etl_extract_service_account(self):
         """Service account to run extract functionality"""
-        return self.etl_function_account('extract')
+        return self._etl_function_account('extract')
 
     @cached_property
     def etl_accessors(self):
@@ -368,7 +372,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ]
         ).policy_data
 
-    def setup_etl(self):
+    def _setup_etl(self):
         """
         setup_etl
         """
@@ -577,18 +581,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         Setup Slack notification
         """
 
-        project = gcp.organizations.get_project()
-
-        notification = SlackNotification(
+        slack_config = SlackNotificationConfig(
             project_name=self.config.sample_metadata.gcp.project,
-            project_number=project.number,
             location=self.config.gcp.region,
             service_account=self.etl_service_account,  # can be some other account
             source_bucket=self.source_bucket,
-            topic_name='metamist-etl-notification',
             slack_secret_project_id=self.config.billing.gcp.project_id,
             slack_token_secret_name=self.config.billing.aggregator.slack_token_secret_name,
             slack_channel_name=self.config.sample_metadata.slack_channel,
+        )
+
+        notification = SlackNotification(
+            slack_config=slack_config,
+            topic_name='metamist-etl-notification',
             func_to_monitor=[
                 'metamist-etl-notification-func',
                 'metamist-etl-extract',

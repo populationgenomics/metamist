@@ -52,14 +52,12 @@ def etl_notify(request: flask.Request):
         }, 400
 
     # TODO: format message to slack message
-    print(type(message), message)
     message_blocks = format_slack(message)
-    print("message_blocks", message_blocks)
     success = None
     try:
         client = WebClient(token=SLACK_BOT_TOKEN)
         response = client.chat_postMessage(channel=SLACK_CHANNEL, blocks=message_blocks)
-        success = response.get('ok') == True
+        success = response.get('ok') is True
     except SlackApiError as e:
         return {
             'success': False,
@@ -93,7 +91,7 @@ def format_slack(message: Dict[str, Any]) -> Any | None:
         if key in ['title', 'status']:
             continue
         message_sections.append(
-            {"type": "section", "text": {"type": "mrkdwn", "text": f"*{key}*: {value}"}}
+            {'type': 'section', 'text': {'type': 'mrkdwn', 'text': f'*{key}*: {value}'}}
         )
 
     return message_sections

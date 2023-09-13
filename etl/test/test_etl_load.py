@@ -138,9 +138,7 @@ class TestEtlLoad(DbIsolatedTest):
             {
                 'id': '1234567890',
                 'record': json.loads(ETL_SAMPLE_RECORD_2),
-                'result': ''
-                "'Missing or invalid sample_type: /bbv/v1 in the record with id: 1234567890'"
-                '',
+                'result': 'Missing or invalid sample_type: /bbv/v1 in the record with id: 1234567890',
                 'success': False,
             },
         )
@@ -200,7 +198,7 @@ class TestEtlLoad(DbIsolatedTest):
             {
                 'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
                 'record': json.loads(ETL_SAMPLE_RECORD_3),
-                'result': "''",
+                'result': '',
                 'success': True,
             },
         )
