@@ -318,28 +318,31 @@ GROUP BY
         )
 
         response = []
-        for project_id in projects:
-            project = await ptable.get_project_by_id(project_id)
+        for pid in projects:
+            project = await ptable.get_project_by_id(pid)
             for sequencing_type in sequencing_types:
                 response.append(
                     ProjectsSummaryInternal(
-                        project=project_id,
+                        project=project.id,
                         dataset=project.name,
                         sequencing_type=sequencing_type,
                         total_families=get_val_for_project_and_sequencing_type(
-                            project, sequencing_type, 'num_families', families
+                            project.id, sequencing_type, 'num_families', families
                         ),
                         total_participants=get_val_for_project_and_sequencing_type(
-                            project, sequencing_type, 'num_participants', participants
+                            project.id,
+                            sequencing_type,
+                            'num_participants',
+                            participants,
                         ),
                         total_samples=get_val_for_project_and_sequencing_type(
-                            project, sequencing_type, 'num_samples', samples
+                            project.id, sequencing_type, 'num_samples', samples
                         ),
                         total_sequencing_groups=get_val_for_project_and_sequencing_type(
-                            project, sequencing_type, 'num_sgs', sequencing_groups
+                            project.id, sequencing_type, 'num_sgs', sequencing_groups
                         ),
                         total_crams=get_val_for_project_and_sequencing_type(
-                            project, sequencing_type, 'num_crams', crams
+                            project.id, sequencing_type, 'num_crams', crams
                         ),
                         # latest_es_index_output=self._projects_summary_es_indices_query(
                         #     [project], sequencing_types

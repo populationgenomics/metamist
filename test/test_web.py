@@ -216,9 +216,9 @@ class TestWeb(DbIsolatedTest):
                 dataset='test',
                 sequencing_type='genome',
                 total_families=0,
-                total_participants=0,
-                total_samples=0,
-                total_sequencing_groups=0,
+                total_participants=1,
+                total_samples=1,
+                total_sequencing_groups=1,
                 total_crams=0,
             ),
             ProjectsSummaryInternal(
