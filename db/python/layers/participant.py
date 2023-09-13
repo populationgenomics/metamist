@@ -2,9 +2,9 @@
 import re
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-from db.python.connect import NotFoundError, NoOpAenter
+from db.python.connect import NoOpAenter, NotFoundError
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
@@ -335,6 +335,21 @@ class ParticipantLayer(BaseLayer):
 
         return f'Updated {len(sample_ids_to_update)} records'
 
+    async def insert_participant_phenotypes(
+        self, participant_phenotypes: dict[int, dict]
+    ):
+        """
+        Insert participant phenotypes, with format: {pid: {key: value}}
+        """
+        ppttable = ParticipantPhenotypeTable(self.connection)
+        return await ppttable.add_key_value_rows(
+            [
+                (pid, pk, pv)
+                for pid, phenotypes in participant_phenotypes.items()
+                for pk, pv in phenotypes.items()
+            ]
+        )
+
     async def generic_individual_metadata_importer(
         self,
         headers: List[str],
@@ -652,6 +667,17 @@ class ParticipantLayer(BaseLayer):
         )
 
     # region PHENOTYPES / SEQR
+
+    async def get_phenotypes_for_participants(
+        self, participant_ids: list[int]
+    ) -> dict[int, dict[str, Any]]:
+        """
+        Get phenotypes for participants keyed by by pid
+        """
+        ppttable = ParticipantPhenotypeTable(self.connection)
+        return await ppttable.get_key_value_rows_for_participant_ids(
+            participant_ids=participant_ids
+        )
 
     async def get_seqr_individual_template(
         self,

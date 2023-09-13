@@ -13,26 +13,26 @@ from api.utils import get_projectless_db_connection, group_by
 from db.python.connect import NotFoundError
 from db.python.layers import (
     AnalysisLayer,
-    SampleLayer,
     AssayLayer,
-    ParticipantLayer,
-    SequencingGroupLayer,
     FamilyLayer,
+    ParticipantLayer,
+    SampleLayer,
+    SequencingGroupLayer,
 )
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import ProjectId, GenericFilter
+from db.python.utils import GenericFilter, ProjectId
 from models.models import (
+    AnalysisInternal,
     AssayInternal,
+    FamilyInternal,
+    ParticipantInternal,
+    Project,
     SampleInternal,
     SequencingGroupInternal,
-    AnalysisInternal,
-    ParticipantInternal,
-    FamilyInternal,
-    Project,
 )
 
 
@@ -52,6 +52,8 @@ class LoaderKeys(enum.Enum):
     SAMPLES_FOR_IDS = 'samples_for_ids'
     SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
     SAMPLES_FOR_PROJECTS = 'samples_for_projects'
+
+    PHENOTYPES_FOR_PARTICIPANTS = 'phenotypes_for_participants'
 
     PARTICIPANTS_FOR_IDS = 'participants_for_ids'
     PARTICIPANTS_FOR_FAMILIES = 'participants_for_families'
@@ -291,9 +293,7 @@ async def load_participants_for_ids(
     p_by_id = {p.id: p for p in persons}
     missing_pids = set(participant_ids) - set(p_by_id.keys())
     if missing_pids:
-        raise NotFoundError(
-            f'Could not find participants with ids {missing_pids}'
-        )
+        raise NotFoundError(f'Could not find participants with ids {missing_pids}')
     return [p_by_id.get(p) for p in participant_ids]
 
 
@@ -400,7 +400,23 @@ async def load_analyses_for_sequencing_groups(
     return by_sg_id
 
 
-async def get_context(request: Request, connection=get_projectless_db_connection):  # pylint: disable=unused-argument
+@connected_data_loader(LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS)
+async def load_phenotypes_for_participants(
+    participant_ids: list[int], connection
+) -> list[list[dict]]:
+    """
+    Data loader for phenotypes for participants
+    """
+    player = ParticipantLayer(connection)
+    participant_phenotypes = await player.get_phenotypes_for_participants(
+        participant_ids=participant_ids
+    )
+    return [participant_phenotypes.get(pid, {}) for pid in participant_ids]
+
+
+async def get_context(
+    request: Request, connection=get_projectless_db_connection
+):  # pylint: disable=unused-argument
     """Get loaders / cache context for strawberyy GraphQL"""
     mapped_loaders = {k: fn(connection) for k, fn in loaders.items()}
     return {
