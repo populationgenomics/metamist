@@ -50,6 +50,9 @@ class WebLayer(BaseLayer):
         projects: list[int],
         sequencing_types: list[str],
     ) -> list[ProjectsSummaryInternal]:
+        """
+        Get summary and analysis stats for a list of projects
+        """
         webprojectsdb = WebProjectsSummaryDb(self.connection)
         return await webprojectsdb.get_projects_summary(
             projects=projects, sequencing_types=sequencing_types
@@ -59,12 +62,14 @@ class WebLayer(BaseLayer):
 class WebProjectsSummaryDb(DbBase):
     """Db layer for web related routes,"""
 
-    def _projects_summary_families_query(self):
-        _total_families_by_project_id_and_seq_type = """
+    async def _projects_summary_families_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
 SELECT
     f.project,
-    sg.type 'sequencing_type',
-    COUNT(DISTINCT f.id) 'num_families'
+    sg.type as sequencing_type,
+    COUNT(DISTINCT f.id) as num_families
 FROM
     family f
     LEFT JOIN family_participant fp ON f.id = fp.family_id
@@ -77,14 +82,23 @@ GROUP BY
     f.project,
     sg.type
         """
-        return _total_families_by_project_id_and_seq_type
+        total_families_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_families_by_project_id_and_seq_type
 
-    def _projects_summary_participants_query(self):
-        _total_participants_by_project_id_and_seq_type = """
+    async def _projects_summary_participants_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
 SELECT
     p.project,
-    sg.type 'sequencing_type',
-    COUNT(DISTINCT p.id) 'num_participants'
+    sg.type as sequencing_type,
+    COUNT(DISTINCT p.id) as num_participants
 FROM
     participant p
     LEFT JOIN sample s ON p.id = s.participant_id
@@ -96,14 +110,23 @@ GROUP BY
     p.project,
     sg.type
         """
-        return _total_participants_by_project_id_and_seq_type
+        total_participants_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_participants_by_project_id_and_seq_type
 
-    def _projects_summary_samples_query(self):
-        _total_samples_by_project_id_and_seq_type = """
+    async def _projects_summary_samples_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
 SELECT
     s.project,
-    sg.type 'sequencing_type',
-    COUNT(DISTINCT s.id) 'num_samples'
+    sg.type as sequencing_type,
+    COUNT(DISTINCT s.id) as num_samples
 FROM
     sample s
     LEFT JOIN sequencing_group sg on sg.sample_id = s.id
@@ -114,14 +137,23 @@ GROUP BY
     s.project,
     sg.type;
         """
-        return _total_samples_by_project_id_and_seq_type
+        total_samples_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_samples_by_project_id_and_seq_type
 
-    def _projects_summary_sequencing_groups_query(self):
-        _total_sequencing_groups_by_project_id_and_seq_type = """
+    async def _projects_summary_sequencing_groups_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
 SELECT
     s.project,
-    sg.type 'sequencing_type',
-    COUNT(DISTINCT sg.id) 'num_sgs'
+    sg.type as sequencing_type,
+    COUNT(DISTINCT sg.id) as num_sgs
 FROM
     sequencing_group sg
     LEFT JOIN sample s on s.id = sg.sample_id
@@ -132,14 +164,25 @@ GROUP BY
     s.project,
     sg.type;
         """
-        return _total_sequencing_groups_by_project_id_and_seq_type
+        total_sequencing_groups_by_project_id_and_seq_type = (
+            await self.connection.fetch_all(
+                _query,
+                {
+                    'projects': projects,
+                    'sequencing_types': sequencing_types,
+                },
+            )
+        )
+        return total_sequencing_groups_by_project_id_and_seq_type
 
-    def _projects_summary_crams_query(self):
-        _total_crams_by_project_id_and_seq_type = """
+    async def _projects_summary_crams_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
 SELECT
     a.project,
-    sg.type 'sequencing_type',
-    COUNT(DISTINCT asg.sequencing_group_id) 'num_crams'
+    sg.type as sequencing_type,
+    COUNT(DISTINCT asg.sequencing_group_id) as num_crams
 FROM
     analysis a
     LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
@@ -153,7 +196,14 @@ GROUP BY
     a.project,
     sg.type
         """
-        return _total_crams_by_project_id_and_seq_type
+        total_crams_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_crams_by_project_id_and_seq_type
 
     #     def _projects_summary_es_indices_query(self, projects: list[int], sequencing_types: list[str]):
     #         _latest_es_index_by_project_id_and_seq_type = """
@@ -170,7 +220,7 @@ GROUP BY
     #             a.id,
     #             a.output,
     #             a.timestamp_completed,
-    #             sg.type 'sequencing_type',
+    #             sg.type as sequencing_type,
     #             ROW_NUMBER() OVER (
     #                 PARTITION BY a.project,
     #                 sg.type
@@ -208,7 +258,7 @@ GROUP BY
     #             a.id,
     #             a.output,
     #             a.timestamp_completed,
-    #             sg.type 'sequencing_type',
+    #             sg.type as sequencing_type,
     #             ROW_NUMBER() OVER (
     #                 PARTITION BY a.project,
     #                 sg.type
@@ -236,71 +286,60 @@ GROUP BY
         self, projects: list[int], sequencing_types: list[str]
     ):
         """ """
+
+        def get_val_for_project_and_sequencing_type(
+            project, sequencing_type, field, rows
+        ):
+            for row in rows:
+                if (
+                    row['project'] == project
+                    and row['sequencing_type'] == sequencing_type
+                ):
+                    return row[field]
+            return 0
+
         ptable = ProjectPermissionsTable(self.connection)
         ptable.check_access_to_project_ids(
             user=self.author, project_ids=projects, readonly=True
         )
 
-        total_families_query = self._projects_summary_families_query()
-        total_participants_query = self._projects_summary_participants_query()
-        total_samples_query = self._projects_summary_samples_query()
-        total_sequencing_groups_query = self._projects_summary_sequencing_groups_query()
-        total_crams_query = self._projects_summary_crams_query()
-
-        # latest_es_index_output=self._projects_summary_es_indices_query(
-        #     projects, sequencing_types
-        # )
-        # latest_es_index_timestamp=self._projects_summary_es_indices_query(
-        #     projects, sequencing_types
-        # )
-        # latest_joint_call_output=self._projects_summary_joint_calls_query(
-        #     projects, sequencing_types
-        # )
-        # latest_joint_call_timestamp=self._projects_summary_joint_calls_query(
-        #     projects, sequencing_types
-        # )
+        (
+            families,
+            participants,
+            samples,
+            sequencing_groups,
+            crams,
+        ) = await asyncio.gather(
+            self._projects_summary_families_query(projects, sequencing_types),
+            self._projects_summary_participants_query(projects, sequencing_types),
+            self._projects_summary_samples_query(projects, sequencing_types),
+            self._projects_summary_sequencing_groups_query(projects, sequencing_types),
+            self._projects_summary_crams_query(projects, sequencing_types),
+        )
 
         response = []
-        for project in projects:
+        for project_id in projects:
+            project = await ptable.get_project_by_id(project_id)
             for sequencing_type in sequencing_types:
                 response.append(
                     ProjectsSummaryInternal(
-                        project=project,
+                        project=project_id,
+                        dataset=project.name,
                         sequencing_type=sequencing_type,
-                        total_families=await self.connection.fetch_val(
-                            total_families_query,
-                            {
-                                'projects': [project],
-                                'sequencing_types': [sequencing_type],
-                            },
+                        total_families=get_val_for_project_and_sequencing_type(
+                            project, sequencing_type, 'num_families', families
                         ),
-                        total_participants=await self.connection.fetch_val(
-                            total_participants_query,
-                            {
-                                'projects': [project],
-                                'sequencing_types': [sequencing_type],
-                            },
+                        total_participants=get_val_for_project_and_sequencing_type(
+                            project, sequencing_type, 'num_participants', participants
                         ),
-                        total_samples=await self.connection.fetch_val(
-                            total_samples_query,
-                            {
-                                'projects': [project],
-                                'sequencing_types': [sequencing_type],
-                            },
+                        total_samples=get_val_for_project_and_sequencing_type(
+                            project, sequencing_type, 'num_samples', samples
                         ),
-                        total_sequencing_groups=await self.connection.fetch_val(
-                            total_sequencing_groups_query,
-                            {
-                                'projects': [project],
-                                'sequencing_types': [sequencing_type],
-                            },
+                        total_sequencing_groups=get_val_for_project_and_sequencing_type(
+                            project, sequencing_type, 'num_sgs', sequencing_groups
                         ),
-                        total_crams=await self.connection.fetch_val(
-                            total_crams_query,
-                            {
-                                'projects': [project],
-                                'sequencing_types': [sequencing_type],
-                            },
+                        total_crams=get_val_for_project_and_sequencing_type(
+                            project, sequencing_type, 'num_crams', crams
                         ),
                         # latest_es_index_output=self._projects_summary_es_indices_query(
                         #     [project], sequencing_types

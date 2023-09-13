@@ -213,21 +213,23 @@ class TestWeb(DbIsolatedTest):
         expected = [
             ProjectsSummaryInternal(
                 project=self.project_id,
+                dataset='test',
                 sequencing_type='genome',
-                total_families=None,
-                total_participants=1,
-                total_samples=1,
-                total_sequencing_groups=1,
-                total_crams=None,
+                total_families=0,
+                total_participants=0,
+                total_samples=0,
+                total_sequencing_groups=0,
+                total_crams=0,
             ),
             ProjectsSummaryInternal(
                 project=self.project_id,
+                dataset='test',
                 sequencing_type='exome',
-                total_families=None,
-                total_participants=None,
-                total_samples=None,
-                total_sequencing_groups=None,
-                total_crams=None,
+                total_families=0,
+                total_participants=0,
+                total_samples=0,
+                total_sequencing_groups=0,
+                total_crams=0,
             ),
         ]
 

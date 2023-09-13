@@ -27,7 +27,7 @@ class ProjectsSummaryInternal:
     """Return class for the projects summary endpoint"""
 
     project: int
-    # project_name: str
+    dataset: str
     sequencing_type: str
     total_families: int
     total_participants: int
