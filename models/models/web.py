@@ -36,10 +36,10 @@ class ProjectsSummaryInternal:
     total_crams: int
     # latest_es_index_output: str
     # latest_es_index_timestamp: str
-    # total_sgs_in_latest_es_index: int
-    # latest_joint_call_output: str
-    # latest_joint_call_timestamp: str
-    # total_sgs_in_latest_joint_call: int
+    total_sgs_in_latest_es_index: int
+    # latest_annotate_dataset_output: str
+    # latest_annotate_dataset_timestamp: str
+    total_sgs_in_latest_annotate_dataset: int
 
 
 @dataclasses.dataclass
