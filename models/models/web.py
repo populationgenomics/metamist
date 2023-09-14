@@ -34,9 +34,11 @@ class ProjectsSummaryInternal:
     total_samples: int
     total_sequencing_groups: int
     total_crams: int
+    latest_es_index_id: int
     # latest_es_index_output: str
     # latest_es_index_timestamp: str
     total_sgs_in_latest_es_index: int
+    latest_annotate_dataset_id: int
     # latest_annotate_dataset_output: str
     # latest_annotate_dataset_timestamp: str
     total_sgs_in_latest_annotate_dataset: int

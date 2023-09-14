@@ -142,7 +142,9 @@ async def get_projects_summary(
             total_samples=3,
             total_sequencing_groups=3,
             total_crams=3,
+            latest_es_index_id=1,
             total_sgs_in_latest_es_index=3,
+            latest_annotate_dataset_id=2,
             total_sgs_in_latest_annotate_dataset=3,
         ),
         ProjectsSummaryInternal(
@@ -154,7 +156,9 @@ async def get_projects_summary(
             total_samples=1,
             total_sequencing_groups=1,
             total_crams=1,
+            latest_es_index_id=3,
             total_sgs_in_latest_es_index=1,
+            latest_annotate_dataset_id=4,
             total_sgs_in_latest_annotate_dataset=1,
         ),
         ProjectsSummaryInternal(
@@ -166,7 +170,9 @@ async def get_projects_summary(
             total_samples=5,
             total_sequencing_groups=5,
             total_crams=4,
+            latest_es_index_id=3,
             total_sgs_in_latest_es_index=4,
+            latest_annotate_dataset_id=6,
             total_sgs_in_latest_annotate_dataset=4,
         ),
     ]
