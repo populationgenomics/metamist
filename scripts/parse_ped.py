@@ -1,8 +1,7 @@
 """ A really simple script to import a pedigree file """
 
 import click
-
-from cloudpathlib import CloudPath
+from cloudpathlib import AnyPath
 
 from metamist.apis import (
     FamilyApi,
@@ -17,7 +16,7 @@ def main(ped_file_path: str, project: str):
 
     fapi = FamilyApi()
 
-    with CloudPath(ped_file_path).open() as ped_file:
+    with AnyPath(ped_file_path).open() as ped_file:  # type: ignore
         fapi.import_pedigree(
             file=ped_file,
             has_header=True,

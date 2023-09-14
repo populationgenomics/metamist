@@ -1,11 +1,11 @@
 import json
 
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.assay import AssayUpsert, AssayUpsertInternal, Assay, AssayInternal
-from models.utils.sample_id_format import sample_id_transform_to_raw, sample_id_format
+from models.base import SMBase
+from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_transform_to_raw,
     sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
 )
 
 
@@ -60,6 +60,7 @@ class SequencingGroupInternal(SMBase):
             type=self.type,
             technology=self.technology,
             platform=self.platform,
+            external_ids=self.external_ids,
             meta=self.meta,
             sample_id=sample_id_format(self.sample_id),
             assays=[a.to_external() for a in self.assays or []],
@@ -141,6 +142,7 @@ class SequencingGroup(SMBase):
     sample_id: str
     external_ids: dict[str, str]
     archived: bool
+    assays: list[Assay]
 
 
 class NestedSequencingGroup(SMBase):
@@ -161,13 +163,13 @@ class SequencingGroupUpsert(SMBase):
     Upsert model for sequence group
     """
 
-    id: int | str | OpenApiGenNoneType = None
-    type: str | OpenApiGenNoneType = None
-    technology: str | OpenApiGenNoneType = None
-    platform: str | OpenApiGenNoneType = None
-    meta: dict[str, str] | OpenApiGenNoneType = None
-    sample_id: str | OpenApiGenNoneType = None
-    external_ids: dict[str, str] | OpenApiGenNoneType = None
+    id: int | str | None = None
+    type: str | None = None
+    technology: str | None = None
+    platform: str | None = None
+    meta: dict[str, str] | None = None
+    sample_id: str | None = None
+    external_ids: dict[str, str] | None = None
 
     assays: list[AssayUpsert] | None = None
 

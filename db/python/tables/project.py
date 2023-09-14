@@ -1,22 +1,21 @@
 # pylint: disable=global-statement
 import asyncio
-from typing import Dict, List, Set, Iterable, Optional, Tuple, Any
-
 import json
 from datetime import datetime, timedelta
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
+from cpg_utils.cloud import get_cached_group_members
 from databases import Database
 from google.cloud import secretmanager
-from cpg_utils.cloud import get_cached_group_members
 
 from api.settings import MEMBERS_CACHE_LOCATION, is_all_access
 from db.python.utils import (
-    ProjectId,
     Forbidden,
+    InternalError,
     NoProjectAccess,
+    ProjectId,
     get_logger,
     to_db_json,
-    InternalError,
 )
 from models.models.project import Project
 
@@ -440,9 +439,9 @@ RETURNING ID"""
 
         projects = []
         for r in await self.connection.fetch_all(_query):
-            r = dict(r)
-            r['meta'] = json.loads(r['meta'] or '{}')
-            projects.append(r)
+            row = dict(r)
+            row['meta'] = json.loads(row['meta'] or '{}')
+            projects.append(row)
 
         return projects
 

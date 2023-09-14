@@ -1,17 +1,14 @@
 import json
 
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.assay import AssayUpsertInternal, AssayUpsert, AssayInternal, Assay
+from models.base import SMBase
+from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
-    SequencingGroupUpsert,
     NestedSequencingGroup,
-    SequencingGroupUpsertInternal,
     NestedSequencingGroupInternal,
+    SequencingGroupUpsert,
+    SequencingGroupUpsertInternal,
 )
-from models.utils.sample_id_format import (
-    sample_id_format,
-    sample_id_transform_to_raw,
-)
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
 
 class SampleInternal(SMBase):
@@ -143,6 +140,7 @@ class Sample(SMBase):
             type=self.type,
             participant_id=self.participant_id,
             active=self.active,
+            author='<EXT-TO-INT-CONVERSION>',
         )
 
 
@@ -161,13 +159,13 @@ class NestedSample(SMBase):
 class SampleUpsert(SMBase):
     """Upsert model for a Sample"""
 
-    id: str | OpenApiGenNoneType = None
-    external_id: str | OpenApiGenNoneType = None
-    meta: dict | OpenApiGenNoneType = None
-    project: int | OpenApiGenNoneType = None
-    type: str | OpenApiGenNoneType = None
-    participant_id: int | OpenApiGenNoneType = None
-    active: bool | OpenApiGenNoneType = None
+    id: str | None = None
+    external_id: str | None = None
+    meta: dict | None = None
+    project: int | None = None
+    type: str | None = None
+    participant_id: int | None = None
+    active: bool | None = None
 
     sequencing_groups: list[SequencingGroupUpsert] | None = None
     non_sequencing_assays: list[AssayUpsert] | None = None

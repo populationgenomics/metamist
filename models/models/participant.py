@@ -1,14 +1,14 @@
 import json
 
 from db.python.utils import ProjectId
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.sample import (
-    SampleUpsertInternal,
-    SampleUpsert,
-    NestedSampleInternal,
-    NestedSample,
-)
+from models.base import SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
+from models.models.sample import (
+    NestedSample,
+    NestedSampleInternal,
+    SampleUpsert,
+    SampleUpsertInternal,
+)
 
 
 class ParticipantInternal(SMBase):
@@ -123,12 +123,12 @@ class NestedParticipant(SMBase):
 class ParticipantUpsert(SMBase):
     """External upsert model for participant"""
 
-    id: int | OpenApiGenNoneType = None
-    external_id: str | OpenApiGenNoneType = None
-    reported_sex: int | OpenApiGenNoneType = None
-    reported_gender: str | OpenApiGenNoneType = None
-    karyotype: str | OpenApiGenNoneType = None
-    meta: dict | OpenApiGenNoneType = None
+    id: int | None = None
+    external_id: str | None = None
+    reported_sex: int | None = None
+    reported_gender: str | None = None
+    karyotype: str | None = None
+    meta: dict | None = None
 
     samples: list[SampleUpsert] | None = None
 

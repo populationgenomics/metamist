@@ -1,32 +1,30 @@
 import unittest
 from datetime import datetime
 from io import StringIO
+from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
-
-from test.testbase import run_as_sync, DbIsolatedTest
 
 import api.graphql.schema
 from db.python.layers import ParticipantLayer
-from models.models import (
-    ParticipantUpsertInternal,
-    SampleUpsertInternal,
-    SequencingGroupUpsertInternal,
-    AssayUpsertInternal,
-)
-from models.utils.sample_id_format import sample_id_format
-from models.utils.sequencing_group_id_format import sequencing_group_id_format
-
-from metamist.graphql import validate, configure_sync_client
+from metamist.graphql import configure_sync_client, validate
+from metamist.parser.generic_metadata_parser import GenericMetadataParser
 from metamist.parser.generic_parser import (
-    ParsedParticipant,
-    ParsedSample,
+    QUERY_MATCH_ASSAYS,
     QUERY_MATCH_PARTICIPANTS,
     QUERY_MATCH_SAMPLES,
     QUERY_MATCH_SEQUENCING_GROUPS,
-    QUERY_MATCH_ASSAYS,
+    ParsedParticipant,
+    ParsedSample,
     ParsedSequencingGroup,
 )
-from metamist.parser.generic_metadata_parser import GenericMetadataParser
+from models.models import (
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
+from models.utils.sample_id_format import sample_id_format
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
 def _get_basic_participant_to_upsert():
@@ -96,7 +94,7 @@ class TestValidateParserQueries(unittest.TestCase):
 
         # only need to apply schema to the first client to create, then it gets cached
         client = configure_sync_client(
-            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'  # type: ignore
         )
         validate(QUERY_MATCH_PARTICIPANTS)
         validate(QUERY_MATCH_SAMPLES, client=client)
@@ -332,11 +330,11 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        summary, participants = await parser.parse_manifest(
+        summary, prows = await parser.parse_manifest(
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        participants: list[ParsedParticipant] = participants
+        participants: list[ParsedParticipant] = prows
 
         self.assertEqual(3, summary['participants']['insert'])
         self.assertEqual(0, summary['participants']['update'])
@@ -749,7 +747,9 @@ class TestParseGenericMetadata(DbIsolatedTest):
         mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
 
         player = ParticipantLayer(self.connection)
-        participant = await player.upsert_participant(_get_basic_participant_to_upsert())
+        participant = await player.upsert_participant(
+            _get_basic_participant_to_upsert()
+        )
 
         filenames = [
             'sample_id001.filename-R1.fastq.gz',
