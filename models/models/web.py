@@ -35,13 +35,51 @@ class ProjectsSummaryInternal:
     total_sequencing_groups: int
     total_crams: int
     latest_es_index_id: int
-    # latest_es_index_output: str
-    # latest_es_index_timestamp: str
     total_sgs_in_latest_es_index: int
     latest_annotate_dataset_id: int
-    # latest_annotate_dataset_output: str
-    # latest_annotate_dataset_timestamp: str
     total_sgs_in_latest_annotate_dataset: int
+
+    def to_external(self, links):
+        """Convert to transport model"""
+        return ProjectsSummary(
+            project=self.project,
+            dataset=self.dataset,
+            sequencing_type=self.sequencing_type,
+            total_families=self.total_families,
+            total_participants=self.total_participants,
+            total_samples=self.total_samples,
+            total_sequencing_groups=self.total_sequencing_groups,
+            total_crams=self.total_crams,
+            latest_es_index_id=self.latest_es_index_id,
+            total_sgs_in_latest_es_index=self.total_sgs_in_latest_es_index,
+            latest_annotate_dataset_id=self.latest_annotate_dataset_id,
+            total_sgs_in_latest_annotate_dataset=self.total_sgs_in_latest_annotate_dataset,
+            links=links,
+        )
+
+
+class ProjectsSummary:
+    """Return class for the projects summary endpoint"""
+
+    project: int
+    dataset: str
+    sequencing_type: str
+    total_families: int
+    total_participants: int
+    total_samples: int
+    total_sequencing_groups: int
+    total_crams: int
+    latest_es_index_id: int
+    total_sgs_in_latest_es_index: int
+    latest_annotate_dataset_id: int
+    total_sgs_in_latest_annotate_dataset: int
+
+    links: PagingLinks | None
+
+    class Config:
+        """Config for ProjectsSummaryResponse"""
+
+        fields = {'links': '_links'}
 
 
 @dataclasses.dataclass

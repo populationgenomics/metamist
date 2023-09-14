@@ -132,7 +132,7 @@ async def get_projects_summary(
     """
     Get the project summaries
     """
-    return [
+    summaries = [
         ProjectsSummaryInternal(
             project=1,
             dataset='test-dataset-1',
@@ -176,6 +176,8 @@ async def get_projects_summary(
             total_sgs_in_latest_annotate_dataset=4,
         ),
     ]
+
+    return [s.to_external() for s in summaries]
     return await WebLayer(get_projectless_db_connection).get_projects_summary(
         sequencing_types=sequencing_types
     )
