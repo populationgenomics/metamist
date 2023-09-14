@@ -20,6 +20,8 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           pip install .
+          # test to see if this is happier
+          mkdir .mypy_cache
 
       - name: pre-commit
         run: pre-commit run --all-files

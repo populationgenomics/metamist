@@ -57,6 +57,7 @@ repos:
             --install-types,
             --non-interactive,
             --show-error-context,
+            --check-untyped-defs,
             --disable-error-code,
             operator,
           ]

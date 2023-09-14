@@ -3,9 +3,7 @@
 import click
 from cloudpathlib import AnyPath
 
-from metamist.apis import (
-    FamilyApi,
-)
+from metamist.apis import FamilyApi
 
 
 @click.command()
@@ -16,6 +14,7 @@ def main(ped_file_path: str, project: str):
 
     fapi = FamilyApi()
 
+    # pylint: disable=no-member
     with AnyPath(ped_file_path).open() as ped_file:  # type: ignore
         fapi.import_pedigree(
             file=ped_file,

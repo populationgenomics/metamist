@@ -217,7 +217,6 @@ class SequencingGroupLayer(BaseLayer):
             type=next(iter(sequencing_types)),
             technology=next(iter(sequencing_technologies)),
             platform=next(iter(sequencing_platforms)),
-            # sequence_ids=assay_ids,
             sample_id=next(iter(sample_ids)),
             meta=meta,
             assays=assays,
