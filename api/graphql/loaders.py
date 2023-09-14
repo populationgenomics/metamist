@@ -403,7 +403,7 @@ async def load_analyses_for_sequencing_groups(
 @connected_data_loader(LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS)
 async def load_phenotypes_for_participants(
     participant_ids: list[int], connection
-) -> list[list[dict]]:
+) -> list[dict]:
     """
     Data loader for phenotypes for participants
     """
