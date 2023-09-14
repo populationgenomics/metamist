@@ -1,6 +1,7 @@
-from collections import namedtuple
 import unittest
+from collections import namedtuple
 from unittest.mock import MagicMock, patch
+
 from metamist.audit.generic_auditor import GenericAuditor
 
 # pylint: disable=dangerous-default-value
@@ -569,7 +570,9 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertLogs(level='WARNING') as log:
-            _ = auditor.analyses_for_sgs_without_crams(sgs_without_crams)
+            # catch the warning logs from here and check below
+            auditor.analyses_for_sgs_without_crams(sgs_without_crams)
+
             self.assertEqual(len(log.output), 8)  # 8 analysis types checked
             self.assertEqual(len(log.records), 8)
             self.assertIn(
