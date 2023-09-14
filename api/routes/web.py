@@ -17,7 +17,7 @@ from db.python.layers.seqr import SeqrLayer
 from db.python.layers.web import WebLayer, SearchItem
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.search import SearchResponse
-from models.models.web import ProjectSummary, PagingLinks
+from models.models.web import ProjectsSummaryInternal, ProjectSummary, PagingLinks
 
 
 class SearchResponseModel(BaseModel):
@@ -90,7 +90,9 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post(
+    '/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject'
+)
 async def sync_seqr_project(
     sequencing_type: str,
     sync_families: bool = True,
@@ -121,3 +123,61 @@ async def sync_seqr_project(
     except Exception as e:
         raise ConnectionError(f'Failed to synchronise seqr project: {str(e)}') from e
         # return {'success': False, 'message': str(e)}
+
+
+@router.post('/projects-summary', operation_id='getProjectsSummary')
+async def get_projects_summary(
+    projects: list[int] = None, sequencing_types: list[str] = None
+):
+    """
+    Get the project summaries
+    """
+    summaries = [
+        ProjectsSummaryInternal(
+            project=1,
+            dataset='test-dataset-1',
+            sequencing_type='genome',
+            total_families=1,
+            total_participants=3,
+            total_samples=3,
+            total_sequencing_groups=3,
+            total_crams=3,
+            latest_es_index_id=1,
+            total_sgs_in_latest_es_index=3,
+            latest_annotate_dataset_id=2,
+            total_sgs_in_latest_annotate_dataset=3,
+        ),
+        ProjectsSummaryInternal(
+            project=1,
+            dataset='test-dataset-1',
+            sequencing_type='exome',
+            total_families=1,
+            total_participants=1,
+            total_samples=1,
+            total_sequencing_groups=1,
+            total_crams=1,
+            latest_es_index_id=3,
+            total_sgs_in_latest_es_index=1,
+            latest_annotate_dataset_id=4,
+            total_sgs_in_latest_annotate_dataset=1,
+        ),
+        ProjectsSummaryInternal(
+            project=2,
+            dataset='test-dataset-2',
+            sequencing_type='genome',
+            total_families=5,
+            total_participants=5,
+            total_samples=5,
+            total_sequencing_groups=5,
+            total_crams=4,
+            latest_es_index_id=3,
+            total_sgs_in_latest_es_index=4,
+            latest_annotate_dataset_id=6,
+            total_sgs_in_latest_annotate_dataset=4,
+        ),
+    ]
+
+    return [s.to_external() for s in summaries]
+    return await WebLayer(get_projectless_db_connection).get_projects_summary(
+        sequencing_types=sequencing_types
+    )

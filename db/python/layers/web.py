@@ -22,6 +22,7 @@ from models.models import (
     AssayInternal,
     SearchItem,
     FamilySimpleInternal,
+    ProjectsSummaryInternal,
 )
 from models.models.web import ProjectSummaryInternal, WebProject
 
@@ -39,20 +40,342 @@ class WebLayer(BaseLayer):
         Get a summary of a project, allowing some "after" token,
         and limit to the number of results.
         """
-        webdb = WebDb(self.connection)
+        webdb = WebProjectSummaryDb(self.connection)
         return await webdb.get_project_summary(
             grid_filter=grid_filter, token=token, limit=limit
         )
 
+    async def get_projects_summary(
+        self,
+        projects: list[int],
+        sequencing_types: list[str],
+    ) -> list[ProjectsSummaryInternal]:
+        """
+        Get summary and analysis stats for a list of projects
+        """
+        webprojectsdb = WebProjectsSummaryDb(self.connection)
+        return await webprojectsdb.get_projects_summary(
+            projects=projects, sequencing_types=sequencing_types
+        )
 
-class WebDb(DbBase):
+
+class WebProjectsSummaryDb(DbBase):
+    """Db layer for web related routes,"""
+
+    async def _projects_summary_families_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    f.project,
+    sg.type as sequencing_type,
+    COUNT(DISTINCT f.id) as num_families
+FROM
+    family f
+    LEFT JOIN family_participant fp ON f.id = fp.family_id
+    LEFT JOIN sample s ON fp.participant_id = s.participant_id
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    f.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    f.project,
+    sg.type
+        """
+        total_families_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_families_by_project_id_and_seq_type
+
+    async def _projects_summary_participants_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    p.project,
+    sg.type as sequencing_type,
+    COUNT(DISTINCT p.id) as num_participants
+FROM
+    participant p
+    LEFT JOIN sample s ON p.id = s.participant_id
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    p.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    p.project,
+    sg.type
+        """
+        total_participants_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_participants_by_project_id_and_seq_type
+
+    async def _projects_summary_samples_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    s.project,
+    sg.type as sequencing_type,
+    COUNT(DISTINCT s.id) as num_samples
+FROM
+    sample s
+    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+WHERE
+    s.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    s.project,
+    sg.type;
+        """
+        total_samples_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_samples_by_project_id_and_seq_type
+
+    async def _projects_summary_sequencing_groups_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    s.project,
+    sg.type as sequencing_type,
+    COUNT(DISTINCT sg.id) as num_sgs
+FROM
+    sequencing_group sg
+    LEFT JOIN sample s on s.id = sg.sample_id
+WHERE
+    s.project IN :projects
+    AND sg.type IN :sequencing_types
+GROUP BY
+    s.project,
+    sg.type;
+        """
+        total_sequencing_groups_by_project_id_and_seq_type = (
+            await self.connection.fetch_all(
+                _query,
+                {
+                    'projects': projects,
+                    'sequencing_types': sequencing_types,
+                },
+            )
+        )
+        return total_sequencing_groups_by_project_id_and_seq_type
+
+    async def _projects_summary_crams_query(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        _query = """
+SELECT
+    a.project,
+    sg.type as sequencing_type,
+    COUNT(DISTINCT asg.sequencing_group_id) as num_crams
+FROM
+    analysis a
+    LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+WHERE
+    a.project IN :projects
+    AND sg.type IN :sequencing_types
+    AND a.type = 'CRAM'
+    and a.status = 'COMPLETED'
+GROUP BY
+    a.project,
+    sg.type
+        """
+        total_crams_by_project_id_and_seq_type = await self.connection.fetch_all(
+            _query,
+            {
+                'projects': projects,
+                'sequencing_types': sequencing_types,
+            },
+        )
+        return total_crams_by_project_id_and_seq_type
+
+    #     def _projects_summary_es_indices_query(self, projects: list[int], sequencing_types: list[str]):
+    #         _latest_es_index_by_project_id_and_seq_type = """
+    # SELECT
+    #     a.project,
+    #     a.sequencing_type,
+    #     a.id,
+    #     a.output,
+    #     a.timestamp_completed
+    # FROM
+    #     ( -- nested query returns the latest es-index for each project and sequencing type combination at rn=1
+    #         SELECT
+    #             a.project,
+    #             a.id,
+    #             a.output,
+    #             a.timestamp_completed,
+    #             sg.type as sequencing_type,
+    #             ROW_NUMBER() OVER (
+    #                 PARTITION BY a.project,
+    #                 sg.type
+    #                 ORDER BY
+    #                     a.timestamp_completed DESC
+    #             ) AS rn
+    #         FROM
+    #             analysis a
+    #             LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    #             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+    #         WHERE
+    #             a.status = 'COMPLETED'
+    #             AND a.type = 'ES-INDEX'
+    #             AND sg.type IN :sequencing_types
+    #     ) AS a
+    # WHERE
+    #     a.rn = 1
+    # AND
+    #     a.project in :projects
+    #         """
+    #         return _latest_es_index_by_project_id_and_seq_type
+
+    #     def _projects_summary_joint_calls_query(self, projects: list[int], sequencing_types: list[str]):
+    #         _latest_joint_call_by_project_id_and_seq_type = """
+    # SELECT
+    #     a.project,
+    #     a.sequencing_type,
+    #     a.id,
+    #     a.output,
+    #     a.timestamp_completed
+    # FROM
+    #     (
+    #         SELECT
+    #             a.project,
+    #             a.id,
+    #             a.output,
+    #             a.timestamp_completed,
+    #             sg.type as sequencing_type,
+    #             ROW_NUMBER() OVER (
+    #                 PARTITION BY a.project,
+    #                 sg.type
+    #                 ORDER BY
+    #                     a.timestamp_completed DESC
+    #             ) AS rn
+    #         FROM
+    #             analysis a
+    #             LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+    #             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+    #         WHERE
+    #             a.status = 'COMPLETED'
+    #             AND a.type = 'CUSTOM'
+    #             AND a.meta LIKE '%AnnotateDataset%'
+    #             AND sg.type IN :sequencing_types
+    #     ) AS a
+    # WHERE
+    #     a.rn = 1
+    # AND
+    #     a.project IN :projects
+    #         """
+    #         return _latest_joint_call_by_project_id_and_seq_type
+
+    async def get_projects_summary(
+        self, projects: list[int], sequencing_types: list[str]
+    ):
+        """ """
+
+        def get_val_for_project_and_sequencing_type(
+            project, sequencing_type, field, rows
+        ):
+            for row in rows:
+                if (
+                    row['project'] == project
+                    and row['sequencing_type'] == sequencing_type
+                ):
+                    return row[field]
+            return 0
+
+        ptable = ProjectPermissionsTable(self.connection)
+        ptable.check_access_to_project_ids(
+            user=self.author, project_ids=projects, readonly=True
+        )
+
+        (
+            families,
+            participants,
+            samples,
+            sequencing_groups,
+            crams,
+        ) = await asyncio.gather(
+            self._projects_summary_families_query(projects, sequencing_types),
+            self._projects_summary_participants_query(projects, sequencing_types),
+            self._projects_summary_samples_query(projects, sequencing_types),
+            self._projects_summary_sequencing_groups_query(projects, sequencing_types),
+            self._projects_summary_crams_query(projects, sequencing_types),
+        )
+
+        response = []
+        for pid in projects:
+            project = await ptable.get_project_by_id(pid)
+            for sequencing_type in sequencing_types:
+                response.append(
+                    ProjectsSummaryInternal(
+                        project=project.id,
+                        dataset=project.name,
+                        sequencing_type=sequencing_type,
+                        total_families=get_val_for_project_and_sequencing_type(
+                            project.id, sequencing_type, 'num_families', families
+                        ),
+                        total_participants=get_val_for_project_and_sequencing_type(
+                            project.id,
+                            sequencing_type,
+                            'num_participants',
+                            participants,
+                        ),
+                        total_samples=get_val_for_project_and_sequencing_type(
+                            project.id, sequencing_type, 'num_samples', samples
+                        ),
+                        total_sequencing_groups=get_val_for_project_and_sequencing_type(
+                            project.id, sequencing_type, 'num_sgs', sequencing_groups
+                        ),
+                        total_crams=get_val_for_project_and_sequencing_type(
+                            project.id, sequencing_type, 'num_crams', crams
+                        ),
+                        # latest_es_index_output=self._projects_summary_es_indices_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # latest_es_index_timestamp=self._projects_summary_es_indices_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # # total_sgs_in_latest_es_index=_total_sgs_in_latest_es_index_by_project_id_and_seq_type(
+                        # #     project, 0
+                        # # ),
+                        # latest_joint_call_output=self._projects_summary_joint_calls_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # latest_joint_call_timestamp=self._projects_summary_joint_calls_query(
+                        #     [project], sequencing_types
+                        # ),
+                        # total_sgs_in_latest_joint_call=_total_sgs_in_latest_joint_call_by_project_id_and_seq_type(
+                        #     project, 0
+                        # ),
+                    )
+                )
+
+        return response
+
+
+class WebProjectSummaryDb(DbBase):
     """Db layer for web related routes,"""
 
     def _project_summary_sample_query(self, grid_filter: list[SearchItem]):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project', 's.active', 'NOT sg.archived']
+        wheres = ['s.project = :project', 'NOT sg.archived']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:
