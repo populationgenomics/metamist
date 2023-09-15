@@ -403,7 +403,7 @@ def main(
                     sample_id=new_s_id,
                     meta=new_meta,
                     type=sg_assay['type'],
-                    external_ids=sg_assay['externalIds'],
+                    # external_ids=sg_assay['externalIds'],  ## issue raised
                 ),
             )
 
@@ -770,7 +770,6 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
                 sequencingGroups(id: {in_: $samples}) {
                     id
                     assays {
-                            externalIds
                             id
                             meta
                             type
@@ -781,9 +780,7 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
         """,
         variables={'samples': list(sg_ids), 'project': project},
     )
-    return {
-        sg['id']: sg['assays'][0] for sg in assays['project']['sequencingGroups'][0]
-    }
+    return {sg['id']: sg['assays'][0] for sg in assays['project']['sequencingGroups']}
 
 
 def process_existing_test_samples(
