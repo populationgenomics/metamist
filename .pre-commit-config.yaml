@@ -58,6 +58,7 @@ repos:
             --non-interactive,
             --show-error-context,
             --check-untyped-defs,
+            --explicit-package-bases,
             --disable-error-code,
             operator,
           ]
