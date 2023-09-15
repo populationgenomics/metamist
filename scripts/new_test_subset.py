@@ -63,6 +63,31 @@ logging.basicConfig(
 )
 
 
+def dont_log_queries(
+    query_string: str, log_response: bool = False, variables: dict | None = None
+):
+    """
+    Don't log the queries
+
+    Args:
+        query_string ():
+        log_response (bool): Override the logging silencer
+        variables ():
+
+    Returns:
+        dict, the query result
+    """
+    current_level = (
+        logging.root.level
+    )  # even if not set this defaults to WARN(30) on logging import
+    if current_level >= logging.INFO and not log_response:
+        logging.getLogger().setLevel(logging.WARN)
+    result = query(gql(query_string), variables=variables)
+    # reset logger to baseline
+    logging.getLogger().setLevel(current_level)
+    return result
+
+
 def get_prod_samples(project: str) -> PROJECT_DATA:
     """
     Get all prod SG IDs for a project using gql
@@ -75,12 +100,12 @@ def get_prod_samples(project: str) -> PROJECT_DATA:
     }
 
     Args:
-        project (str):
+        project (str): the project to query
 
     Returns:
-        dict
+        {SG_ID: {various metadata},}
     """
-    sample_query = gql(
+    result = dont_log_queries(
         """
     query ProjectSampleQuery($project: String!) {
         project(name: $project) {
@@ -98,9 +123,9 @@ def get_prod_samples(project: str) -> PROJECT_DATA:
                 }
             }
         }
-    }"""
+    }""",
+        variables={'project': project},
     )
-    result = query(sample_query, variables={'project': project})
     return {
         sam['id']: {
             'sample': sam['sample']['externalId'],
@@ -115,16 +140,15 @@ def get_fams_for_sgs(project: str, sg_ids: set[str]) -> set[str]:
     """
     Find the families that a list of samples belong to (Samples or SGID?)
     Args:
-        project ():
+        project (str):
         sg_ids (set[str]): a list of SequencingGroup IDs
 
     Returns:
         set of family IDs (str)
     """
 
-    family_full = query(
-        gql(
-            """query MyQuery($project: String!, $samples: [String!]!) {
+    family_full = dont_log_queries(
+        """query MyQuery($project: String!, $samples: [String!]!) {
                 project(name: $project) {
                 sequencingGroups(id: {in_: $samples}, activeOnly: {eq: true}) {
                     id
@@ -140,8 +164,7 @@ def get_fams_for_sgs(project: str, sg_ids: set[str]) -> set[str]:
                         }
                     }
                 }
-            }"""
-        ),
+            }""",
         variables={'samples': list(sg_ids), 'project': project},
     )
 
@@ -176,9 +199,8 @@ def get_random_families(
     """
 
     # query for families in this project
-    ped = query(
-        gql(
-            """
+    ped = dont_log_queries(
+        """
     query MyQuery($project: String!) {
         project(name: $project) {
             families {
@@ -189,8 +211,7 @@ def get_random_families(
                 }
             }
         }
-    """
-        ),
+    """,
         variables={'project': project},
     )
 
@@ -226,7 +247,7 @@ def get_random_families(
     )
     return_families = set()
     for k, v in family_size_choices.items():
-        return_families.add(random.sample(family_counter[k], v))
+        return_families.update(random.sample(family_counter[k], v))
 
     return return_families
 
@@ -471,18 +492,16 @@ def get_ext_sam_id_to_int_participant_map(
     """
 
     # in test project, find participant ext.& internal IDs
-    test_ep_ip_map = query(
-        gql(
-            """
-            query MyQuery($project: String!) {
-                project(name: $project) {
-                    participants {
-                        externalId
-                        id
-                    }
+    test_ep_ip_map = dont_log_queries(
+        """
+        query MyQuery($project: String!) {
+            project(name: $project) {
+                participants {
+                    externalId
+                    id
                 }
-            }"""
-        ),
+            }
+        }""",
         variables={'project': target_project},
     )
     test_ext_to_int_pid = {
@@ -490,21 +509,19 @@ def get_ext_sam_id_to_int_participant_map(
         for party in test_ep_ip_map['project']['participants']
         if party['externalId'] in external_ids
     }
-    prod_map = query(
-        gql(
-            """
-            query MyQuery($project: String!) {
-                project(name: $project) {
-                    participants {
+    prod_map = dont_log_queries(
+        """
+        query MyQuery($project: String!) {
+            project(name: $project) {
+                participants {
+                    externalId
+                    id
+                    samples {
                         externalId
-                        id
-                        samples {
-                            externalId
-                        }
                     }
                 }
-            }"""
-        ),
+            }
+        }""",
         variables={'project': project},
     )
 
@@ -531,15 +548,13 @@ def transfer_pedigree(initial_project, target_project, family_ids):
         a list of all relevant family IDs
     """
 
-    pedigree = query(
-        gql(
-            """
-            query MyQuery($project: String!, $families: [String!]!) {
-                project(name: $project) {
-                   pedigree(internalFamilyIds: $families)
-                }
-            }"""
-        ),
+    pedigree = dont_log_queries(
+        """
+        query MyQuery($project: String!, $families: [String!]!) {
+            project(name: $project) {
+               pedigree(internalFamilyIds: $families)
+            }
+        }""",
         variables={'families': list(family_ids), 'project': initial_project},
     )
     ext_ids = []
@@ -588,26 +603,24 @@ def transfer_families(
 
     """
 
-    families = query(
-        gql(
-            """
-            query MyQuery($project: String!, $samples: [String!]!) {
-                project(name: $project) {
-                    sequencingGroups(id: {in_: $samples}) {
-                        sample {
-                            participant {
-                                families {
-                                    codedPhenotype
-                                    description
-                                    externalId
-                                    id
-                                }
+    families = dont_log_queries(
+        """
+        query MyQuery($project: String!, $samples: [String!]!) {
+            project(name: $project) {
+                sequencingGroups(id: {in_: $samples}) {
+                    sample {
+                        participant {
+                            families {
+                                codedPhenotype
+                                description
+                                externalId
+                                id
                             }
                         }
                     }
                 }
-            }"""
-        ),
+            }
+        }""",
         variables={'samples': list(participant_ids), 'project': initial_project},
     )
 
@@ -653,27 +666,25 @@ def transfer_participants(
     Returns:
         list of all upserted participant IDs
     """
-    participants = query(
-        gql(
-            """
-            query MyQuery($project: String!, $samples: [String!]!) {
-                project(name: $project) {
-                    sequencingGroups(id: {in_: $samples}) {
-                        sample {
-                            participant {
-                                id
-                                externalId
-                                karyotype
-                                meta
-                                reportedGender
-                                reportedSex
-                            }
+    participants = dont_log_queries(
+        """
+        query MyQuery($project: String!, $samples: [String!]!) {
+            project(name: $project) {
+                sequencingGroups(id: {in_: $samples}) {
+                    sample {
+                        participant {
+                            id
+                            externalId
+                            karyotype
+                            meta
+                            reportedGender
+                            reportedSex
                         }
                     }
                 }
             }
-            """
-        ),
+        }
+        """,
         variables={'samples': list(sg_ids), 'project': initial_project},
     )
 
@@ -700,29 +711,27 @@ def get_latest_analyses(project: str, sg_ids: set[str]) -> dict:
         a dictionary of latest analyses, keyed by type & SG ID
     """
 
-    results = query(
-        gql(
-            """
-                query MyQuery($project: String!, $samples: [String!]!) {
-                    project(name: $project) {
-                        sequencingGroups(id: {in_: $samples}) {
+    results = dont_log_queries(
+        """
+            query MyQuery($project: String!, $samples: [String!]!) {
+                project(name: $project) {
+                    sequencingGroups(id: {in_: $samples}) {
+                        id
+                        analyses(
+                            type: {in_: ["cram", "gvcf"]}
+                            active: {eq: true}
+                            status: {eq: COMPLETED}
+                        ) {
                             id
-                            analyses(
-                                type: {in_: ["cram", "gvcf"]}
-                                active: {eq: true}
-                                status: {eq: COMPLETED}
-                            ) {
-                                id
-                                meta
-                                output
-                                type
-                                timestampCompleted
-                            }
+                            meta
+                            output
+                            type
+                            timestampCompleted
                         }
                     }
                 }
-            """
-        ),
+            }
+        """,
         variables={'samples': list(sg_ids), 'project': project},
     )
     # flip through the results and find the latest analysis for each SG ID
@@ -754,24 +763,22 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
     Returns:
         {SG_ID: [assay1]}
     """
-    assays = query(
-        gql(
-            """
-            query SGAssayQuery($samples: [String!]!, $project: String!) {
-                project(name: $project) {
-                    sequencingGroups(id: {in_: $samples}) {
-                        id
-                        assays {
-                                externalIds
-                                id
-                                meta
-                                type
-                            }
+    assays = dont_log_queries(
+        """
+        query SGAssayQuery($samples: [String!]!, $project: String!) {
+            project(name: $project) {
+                sequencingGroups(id: {in_: $samples}) {
+                    id
+                    assays {
+                            externalIds
+                            id
+                            meta
+                            type
                         }
                     }
                 }
-            """
-        ),
+            }
+        """,
         variables={'samples': list(sg_ids), 'project': project},
     )
     return {
@@ -801,8 +808,7 @@ def process_existing_test_samples(
     test_ext_ids = {v['sample'] for v in test_project_data.values()}
     keep, remove = set(), set()
     for sg_id in sg_ids:
-        main_entity = main_project_data[sg_id]
-        if main_entity['sample'] in test_ext_ids:
+        if main_project_data[sg_id]['sample'] in test_ext_ids:
             keep.add(sg_id)
 
     if clear_out_test:
