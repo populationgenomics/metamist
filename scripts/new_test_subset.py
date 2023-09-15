@@ -814,25 +814,6 @@ def process_existing_test_samples(
 
     return keep, remove
 
-    # external_ids = [s['external_id'] for s in samples]
-    # test_samples_to_remove = [
-    #     s for s in test_samples if s['external_id'] not in external_ids
-    # ]
-    # test_samples_to_keep = [s for s in test_samples if s['external_id'] in external_ids]
-    # if test_samples_to_remove:
-    #     logger.info(
-    #         f'Removing test samples: {_pretty_format_samples(test_samples_to_remove)}'
-    #     )
-    #     for s in test_samples_to_remove:
-    #         sapi.update_sample(s['id'], SampleUpsert(active=False))
-    #
-    # if test_samples_to_keep:
-    #     logger.info(
-    #         f'Test samples already exist: {_pretty_format_samples(test_samples_to_keep)}'
-    #     )
-    #
-    # return {s['external_id']: s for s in test_samples_to_keep}
-
 
 def pull_samples_from_families(
     families: set[str], all_samples: dict[str, dict[str, str]]
