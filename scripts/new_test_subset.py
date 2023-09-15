@@ -8,9 +8,15 @@ metamist project.
 Example Invocation
 
 analysis-runner \
---dataset acute-care --description "populate acute care test subset" --output-dir "acute-care-test" \
---access-level full \
-scripts/new_test_subset.py --project acute-care --families 4
+    --dataset validation \
+    --description "populate validation test subset" \
+    --output-dir "validation-test-copy" \
+    --access-level full \
+    scripts/new_test_subset.py \
+        --project acute-care \
+        -n 6 \
+        --families Family1 Family2 \
+        --samples SG-1 SG-2 SG-3
 
 This example will populate acute-care-test with the metamist data for 4 families.
 """
@@ -67,7 +73,7 @@ def dont_log_queries(
     query_string: str, log_response: bool = False, variables: dict | None = None
 ):
     """
-    Don't log the queries
+    Don't log the queries - switch off the logging for duration of a query
 
     Args:
         query_string ():
@@ -252,196 +258,29 @@ def get_random_families(
     return return_families
 
 
-def main(
-    project: str,
-    samples_n: int | None = None,
-    families_n: int | None = None,
-    skip_ped: bool = True,
-    additional_families: list[str] = None,
-    additional_samples: list[str] = None,
-    noninteractive: bool = False,
-    clear_out_test: bool = False,
-):
+def copy_files_in_dict(to_copy, project: str, sid_replacement: tuple[str, str] = None):
     """
-    Who runs the world? MAIN()
-
-    Args:
-        project (str): name of prod project
-        samples_n (int): number of samples to include
-        families_n (int): number of families to include
-        skip_ped (bool): skip pedigree/family information during transfer
-        additional_families (list[set]): specific families to include
-        additional_samples (list[set]): specific samples to include
-        noninteractive (bool): skip interactive confirmation
-        clear_out_test (bool): inactivate all samples in the test project
-    """
-
-    # get all prod samples for the project
-    # object in form [{externalId: 'sample1', id: 'X-id'}, ...]
-    sample_set = set(additional_samples) if additional_samples else set()
-    family_set = set(additional_families) if additional_families else set()
-
-    # get all prod samples for the project
-    # {CPG_id: {'sample': externalID, 'family': familyID}}
-    metamist_main_content = get_prod_samples(project)
-
-    logging.info(f'Found {len(metamist_main_content)} samples')
-    if (samples_n and samples_n >= len(metamist_main_content)) and not noninteractive:
-        if (
-            input(
-                f'Requesting {samples_n} samples which is >= '
-                f'than the number of available samples ({len(metamist_main_content)}). '
-                f'The test project will be a copy of the production project. '
-                f'Please confirm (y): '
-            )
-            != 'y'
-        ):
-            raise SystemExit()
-
-    random.seed(42)  # for reproducibility
-    if families_n:
-        # if there are additional samples specified, find the corresponding families
-        # these specifically requested families & samples are copied over in addition
-        # to the random selection families_n number of families
-        if sample_set:
-            family_set |= get_fams_for_sgs(project, sample_set)
-
-        # family_set is ones we definitely want to include
-        # we need to make sure we don't include them in the random selection
-        family_set |= get_random_families(project, family_set, families_n)
-
-        # now go get the corresponding participant/SG IDs
-        sample_set = pull_samples_from_families(family_set, metamist_main_content)
-
-    elif samples_n:
-        # if there are additional samples specified, find the corresponding families
-        # these specifically requested families & samples are copied over in addition
-        # to the random selection families_n number of families
-        if family_set:
-            # we already have this data in query result
-            sample_set |= pull_samples_from_families(family_set, metamist_main_content)
-
-        all_sgids = set(metamist_main_content.keys())
-
-        # top up the selected SGIDs with random selections
-        # resulting SG IDs we want to copy into the test project
-        sample_set |= set(
-            random.sample(all_sgids - sample_set, samples_n - len(sample_set))
-        )
-
-    # maybe we only want to copy specific samples or families...
-    else:
-        if sample_set:
-            sample_set |= pull_samples_from_families(family_set, metamist_main_content)
-
-    logging.info(f'Subset to {len(sample_set)} samples')
-
-    # Populating test project
-    target_project = project + '-test'
-    logging.info('Checking any existing test samples in the target test project')
-    metamist_test_content = get_prod_samples(target_project)
-    keep, remove = process_existing_test_samples(
-        metamist_test_content, sample_set, metamist_main_content, clear_out_test
-    )
-
-    if remove and clear_out_test:
-        logging.info(f'Removing test samples: {remove}')
-        # TODO do removal
-
-    # don't bother actioning these guys
-    new_sample_map = {}
-    for s in keep:
-        prod_ext = metamist_main_content[s]['sample']
-        test_s = [
-            k for k, v in metamist_test_content.items() if v['sample'] == prod_ext
-        ]
-        if test_s:
-            new_sample_map[s] = test_s
-        else:
-            logging.error(f'Could not find test sample for {prod_ext}')
-
-    # now ignore them forever
-    sample_set -= set(keep)
-
-    assays_by_sg = get_assays_for_sgs(project, sample_set)
-    analysis_sid_type = get_latest_analyses(project, sample_set)
-
-    # get participant objects for all SG IDs
-    if skip_ped:
-        logging.info('Skipping pedigree/family information')
-        external_ids = transfer_participants(project, target_project, sample_set)
-
-    else:
-        logging.info('Transferring pedigree/family information')
-        family_ids = transfer_families(project, target_project, sample_set)
-        external_ids = transfer_pedigree(project, target_project, family_ids)
-
-    ext_sam_int_participant_map = get_ext_sam_id_to_int_participant_map(
-        project, target_project, external_ids
-    )
-    sapi = SampleApi()
-    for sgid in sample_set:
-        logging.info(f'Processing Sample {sgid}')
-        full_sample = metamist_main_content[sgid]
-        new_s_id = sapi.create_sample(
-            project=target_project,
-            sample_upsert=SampleUpsert(
-                external_id=full_sample['sample'],
-                type=full_sample['type'],
-                meta=(copy_files_in_dict(full_sample['meta'], project) or {}),
-                participant_id=ext_sam_int_participant_map[full_sample['sample']],
-            ),
-        )
-        new_sample_map[sgid] = new_s_id
-
-        if sg_assay := assays_by_sg.get(sgid):
-            logging.info('Processing sequence entry')
-            new_meta = copy_files_in_dict(sg_assay.get('meta'), project)
-            logging.info('Creating sequence entry in test')
-            assayapi.create_assay(
-                assay_upsert=AssayUpsert(
-                    sample_id=new_s_id,
-                    meta=new_meta,
-                    type=sg_assay['type'],
-                    # external_ids=sg_assay['externalIds'],  ## issue raised
-                ),
-            )
-
-        for a_type in ['cram', 'gvcf']:
-            if analysis := analysis_sid_type[a_type].get(sgid):
-                logging.info(f'Processing {a_type} analysis entry')
-                am = Analysis(
-                    type=str(a_type),
-                    output=copy_files_in_dict(
-                        analysis['output'],
-                        project,
-                        (str(sgid), new_sample_map[sgid]),
-                    ),
-                    status=AnalysisStatus(analysis['status']),
-                    sample_ids=[new_sample_map[sgid]],
-                    meta=analysis['meta'],
-                )
-                logging.info(f'Creating {a_type} analysis entry in test')
-                analapi.create_analysis(project=target_project, analysis=am)
-
-
-def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None):
-    """
+    Copied from prev script --
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
-    If `d` is dict or list, recursively calls this function on every element
-    If `d` is str, replaces the path
+    If `to_copy` is dict or list, recursively calls this function on every element
+    If `to_copy` is str, replaces the path
+
+    Args:
+        to_copy (Any): a file or collection of files to copy to test
+        project (str):
+        sid_replacement (tuple[str, str]): a mapping of Prod -> Test SG IDs
     """
-    if not d:
-        return d
-    if isinstance(d, str) and d.startswith(f'gs://cpg-{dataset}-main'):
-        logging.info(f'Looking for analysis file {d}')
-        old_path = d
+    if not to_copy:
+        return to_copy
+    if isinstance(to_copy, str) and to_copy.startswith(f'gs://cpg-{project}-main'):
+        logging.info(f'Looking for analysis file {to_copy}')
+        old_path = to_copy
         if not to_path(old_path).exists():
             logging.warning(f'File {old_path} does not exist')
-            return d
+            return to_copy
         new_path = old_path.replace(
-            f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
+            f'gs://cpg-{project}-main', f'gs://cpg-{project}-test'
         )
         # Replace the internal sample ID from the original project
         # With the new internal sample ID from the test project
@@ -466,11 +305,11 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
                 logging.info(f'Copying extra file in metadata: {cmd}')
                 subprocess.run(cmd, check=False, shell=True)
         return new_path
-    if isinstance(d, list):
-        return [copy_files_in_dict(x, dataset) for x in d]
-    if isinstance(d, dict):
-        return {k: copy_files_in_dict(v, dataset) for k, v in d.items()}
-    return d
+    if isinstance(to_copy, list):
+        return [copy_files_in_dict(x, project) for x in to_copy]
+    if isinstance(to_copy, dict):
+        return {k: copy_files_in_dict(v, project) for k, v in to_copy.items()}
+    return to_copy
 
 
 def get_ext_sam_id_to_int_participant_map(
@@ -540,8 +379,8 @@ def transfer_pedigree(initial_project, target_project, family_ids):
     """
     Pull relevant pedigree information from the input project, and copy to target_project
     Args:
-        initial_project ():
-        target_project ():
+        initial_project (str): prod project name
+        target_project (str): test project name
         family_ids ():
 
     Returns:
@@ -595,9 +434,9 @@ def transfer_families(
     Pull relevant families from the input project, and copy to target_project
 
     Args:
-        initial_project ():
-        target_project ():
-        participant_ids ():
+        initial_project (str): prod project name
+        target_project (str): test project name
+        participant_ids (set[int]):
 
     Returns:
 
@@ -624,6 +463,7 @@ def transfer_families(
         variables={'samples': list(participant_ids), 'project': initial_project},
     )
 
+    # collect all the TSV lines into a set of Strings, then write all at once
     family_lines = set()
     family_ids = []
     for sg in families['project']['sequencingGroups']:
@@ -640,14 +480,13 @@ def transfer_families(
                 )
             )
 
-    tmp_family_tsv = 'tmp_families.tsv'
     family_headers = '\t'.join(FAMILY_HEADINGS)
-    with open(tmp_family_tsv, 'wt') as tmp_families:
+    with open('tmp_families.tsv', 'wt') as tmp_families:
         tmp_families.write(family_headers + '\n')
         for family_line in family_lines:
             tmp_families.write(family_line + '\n')
 
-    with open(tmp_family_tsv) as family_file:
+    with open('tmp_families.tsv') as family_file:
         fapi.import_families(file=family_file, project=target_project)
 
     return family_ids
@@ -757,8 +596,8 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
 
     Issue here is that GQL returns many results - is it important which we use?
     Args:
-        project ():
-        sg_ids ():
+        project (str):
+        sg_ids (list[str]):
 
     Returns:
         {SG_ID: [assay1]}
@@ -783,7 +622,7 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
     return {sg['id']: sg['assays'][0] for sg in assays['project']['sequencingGroups']}
 
 
-def process_existing_test_samples(
+def process_existing_test_sgidss(
     test_project_data: PROJECT_DATA,
     sg_ids: set[str],
     main_project_data: PROJECT_DATA,
@@ -795,9 +634,9 @@ def process_existing_test_samples(
 
     Args:
         test_project_data (PROJECT_DATA):
-        sg_ids ():
-        main_project_data ():
-        clear_out_test ():
+        sg_ids (set[str]):
+        main_project_data (PROJECT_DATA):
+        clear_out_test (bool):
 
     Returns:
          two lists - test samples to keep, test samples to remove
@@ -818,9 +657,7 @@ def process_existing_test_samples(
     return keep, remove
 
 
-def pull_samples_from_families(
-    families: set[str], all_samples: dict[str, dict[str, str]]
-) -> set[str]:
+def pull_sgids_from_families(families: set[str], all_samples: PROJECT_DATA) -> set[str]:
     """
     Pull all samples from a list of families
     all_samples:
@@ -834,11 +671,182 @@ def pull_samples_from_families(
         set[str]: set of sample IDs
     """
 
-    sg_ids = set()
-    for sg_id, details in all_samples.items():
-        if details['family'] in families:
-            sg_ids.add(sg_id)
-    return sg_ids
+    return {
+        sg_id for sg_id, details in all_samples.items() if details['family'] in families
+    }
+
+
+def main(
+    project: str,
+    samples_n: int | None = None,
+    families_n: int | None = None,
+    skip_ped: bool = True,
+    additional_families: list[str] = None,
+    additional_samples: list[str] = None,
+    noninteractive: bool = False,
+    clear_out_test: bool = False,
+):
+    """
+    Who runs the world? MAIN()
+
+    Args:
+        project (str): name of prod project
+        samples_n (int): number of samples to include
+        families_n (int): number of families to include
+        skip_ped (bool): skip pedigree/family information during transfer
+        additional_families (list[set]): specific families to include
+        additional_samples (list[set]): specific samples to include
+        noninteractive (bool): skip interactive confirmation
+        clear_out_test (bool): inactivate all samples in the test project
+    """
+
+    # get all prod samples for the project
+    # object in form [{externalId: 'sample1', id: 'X-id'}, ...]
+    sample_set = set(additional_samples) if additional_samples else set()
+    family_set = set(additional_families) if additional_families else set()
+
+    # get all prod samples for the project
+    # {CPG_id: {'sample': externalID, 'family': familyID}}
+    metamist_main_content = get_prod_samples(project)
+
+    logging.info(f'Found {len(metamist_main_content)} samples')
+    if (samples_n and samples_n >= len(metamist_main_content)) and not noninteractive:
+        if (
+            input(
+                f'Requesting {samples_n} samples which is >= '
+                f'than the number of available samples ({len(metamist_main_content)}). '
+                f'The test project will be a copy of the production project. '
+                f'Please confirm (y): '
+            )
+            != 'y'
+        ):
+            raise SystemExit()
+
+    random.seed(42)  # for reproducibility
+    if families_n:
+        # if there are additional samples specified, find the corresponding families
+        # these specifically requested families & samples are copied over in addition
+        # to the random selection families_n number of families
+        if sample_set:
+            family_set |= get_fams_for_sgs(project, sample_set)
+
+        # family_set is ones we definitely want to include
+        # we need to make sure we don't include them in the random selection
+        family_set |= get_random_families(project, family_set, families_n)
+
+        # now go get the corresponding participant/SG IDs
+        sample_set = pull_sgids_from_families(family_set, metamist_main_content)
+
+    elif samples_n:
+        # if there are additional samples specified, find the corresponding families
+        # these specifically requested families & samples are copied over in addition
+        # to the random selection families_n number of families
+        if family_set:
+            # we already have this data in query result
+            sample_set |= pull_sgids_from_families(family_set, metamist_main_content)
+
+        all_sgids = set(metamist_main_content.keys())
+
+        # top up the selected SGIDs with random selections
+        # resulting SG IDs we want to copy into the test project
+        sample_set |= set(
+            random.sample(all_sgids - sample_set, samples_n - len(sample_set))
+        )
+
+    # maybe we only want to copy specific samples or families...
+    else:
+        if sample_set:
+            sample_set |= pull_sgids_from_families(family_set, metamist_main_content)
+
+    logging.info(f'Subset to {len(sample_set)} samples')
+
+    # Populating test project
+    target_project = project + '-test'
+    logging.info('Checking any existing test samples in the target test project')
+    metamist_test_content = get_prod_samples(target_project)
+    keep, remove = process_existing_test_sgidss(
+        metamist_test_content, sample_set, metamist_main_content, clear_out_test
+    )
+
+    if remove and clear_out_test:
+        logging.info(f'Removing test samples: {remove}')
+        # TODO do removal
+
+    # don't bother actioning these guys
+    new_sample_map = {}
+    for s in keep:
+        prod_ext = metamist_main_content[s]['sample']
+        test_s = [
+            k for k, v in metamist_test_content.items() if v['sample'] == prod_ext
+        ]
+        if test_s:
+            new_sample_map[s] = test_s
+        else:
+            logging.error(f'Could not find test sample for {prod_ext}')
+
+    # now ignore them forever
+    sample_set -= set(keep)
+
+    assays_by_sg = get_assays_for_sgs(project, sample_set)
+    analysis_sid_type = get_latest_analyses(project, sample_set)
+
+    # get participant objects for all SG IDs
+    if skip_ped:
+        logging.info('Skipping pedigree/family information')
+        external_ids = transfer_participants(project, target_project, sample_set)
+
+    else:
+        logging.info('Transferring pedigree/family information')
+        family_ids = transfer_families(project, target_project, sample_set)
+        external_ids = transfer_pedigree(project, target_project, family_ids)
+
+    ext_sam_int_participant_map = get_ext_sam_id_to_int_participant_map(
+        project, target_project, external_ids
+    )
+    sapi = SampleApi()
+    for sgid in sample_set:
+        logging.info(f'Processing Sample {sgid}')
+        full_sample = metamist_main_content[sgid]
+        new_s_id = sapi.create_sample(
+            project=target_project,
+            sample_upsert=SampleUpsert(
+                external_id=full_sample['sample'],
+                type=full_sample['type'],
+                meta=(copy_files_in_dict(full_sample['meta'], project) or {}),
+                participant_id=ext_sam_int_participant_map[full_sample['sample']],
+            ),
+        )
+        new_sample_map[sgid] = new_s_id
+
+        if sg_assay := assays_by_sg.get(sgid):
+            logging.info('Processing sequence entry')
+            new_meta = copy_files_in_dict(sg_assay.get('meta'), project)
+            logging.info('Creating sequence entry in test')
+            assayapi.create_assay(
+                assay_upsert=AssayUpsert(
+                    sample_id=new_s_id,
+                    meta=new_meta,
+                    type=sg_assay['type'],
+                    # external_ids=sg_assay['externalIds'],  ## issue raised
+                ),
+            )
+
+        for a_type in ['cram', 'gvcf']:
+            if analysis := analysis_sid_type[a_type].get(sgid):
+                logging.info(f'Processing {a_type} analysis entry')
+                am = Analysis(
+                    type=str(a_type),
+                    output=copy_files_in_dict(
+                        analysis['output'],
+                        project,
+                        (str(sgid), new_sample_map[sgid]),
+                    ),
+                    status=AnalysisStatus(analysis['status']),
+                    sample_ids=[new_sample_map[sgid]],
+                    meta=analysis['meta'],
+                )
+                logging.info(f'Creating {a_type} analysis entry in test')
+                analapi.create_analysis(project=target_project, analysis=am)
 
 
 if __name__ == '__main__':
