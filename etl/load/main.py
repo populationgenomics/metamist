@@ -12,14 +12,7 @@ import google.cloud.bigquery as bq
 
 from google.cloud import pubsub_v1
 
-# import all public parsers
-import metamist.parser as mp
-
-# try to import private parsers
-# try:
-#     import metamist_private.parser as mpp
-# except ImportError:
-#     pass
+import pkg_resources
 
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
@@ -70,13 +63,17 @@ def process_rows(query_job_result, delivery_attempt, request_id, parser_map, bq_
         # get data from payload or use payload as data
         record_data = row_json.get('data', row_json)
 
-        parser_obj = get_parser_instance(parser_map, sample_type, config_data)
+        (parser_obj, err_msg) = get_parser_instance(
+            parser_map, sample_type, config_data
+        )
         if parser_obj:
             # Parse row.body -> Model and upload to metamist database
             status, parsing_result = call_parser(parser_obj, record_data)
         else:
             status = 'FAILED'
-            parsing_result = f'Missing or invalid sample_type: {sample_type} in the record with id: {request_id}'
+            parsing_result = (
+                f'Error: {err_msg} when parsing record with id: {request_id}'
+            )
 
         if delivery_attempt == 1:
             # log only at the first attempt
@@ -175,7 +172,7 @@ def etl_load(request: flask.Request):
     #     'sfmp/v1': <class 'metamist.parser.sample_file_map_parser.SampleFileMapParser'>,
     #     'bbv/v1': bbv.BbvV1Parser, TODO: add bbv parser
     # }
-    parser_map = prepare_parser_map(mp.GenericParser, default_version='v1')
+    parser_map = prepare_parser_map()
 
     # locate the request_id in bq
     query = f"""
@@ -270,12 +267,12 @@ def get_parser_instance(
         object | None: _description_
     """
     if not sample_type:
-        return None
+        return None, 'Empty sample_type'
 
     parser_class_ = parser_map.get(sample_type, None)
     if not parser_class_:
         # class not found
-        return None
+        return None, f'Parser for {sample_type} not found'
 
     # TODO: in case of generic metadata parser, we need to create instance
     try:
@@ -285,32 +282,19 @@ def get_parser_instance(
             parser_obj = parser_class_()
     except Exception as e:  # pylint: disable=broad-exception-caught
         logging.error(f'Failed to create parser instance {e}')
-        return None
+        return None, f'Failed to create parser instance {e}'
 
-    return parser_obj
-
-
-def all_subclasses(cls: object) -> set:
-    """Recursively find all subclasses of cls"""
-    return set(cls.__subclasses__()).union(
-        [s for c in cls.__subclasses__() for s in all_subclasses(c)]
-    )
+    return parser_obj, None
 
 
-def prepare_parser_map(cls, default_version='v1'):
-    """Prepare parser map for the given class
-
-    Args:
-        cls: class to find subclasses of
-        version: version of the parser
-    Returns:
-        parser map
+def prepare_parser_map():
+    """Prepare parser map
+    loop through metamist_parser entry points and create map of parsers
     """
     parser_map = {}
-    for parser_cls in all_subclasses(cls):
-        parser_code = ''.join(
-            [ch for ch in str(parser_cls).rsplit('.', maxsplit=1)[-1] if ch.isupper()]
-        )
-        parser_map[f'/{parser_code.lower()}/{default_version}'] = parser_cls
+    for entry_point in pkg_resources.iter_entry_points('metamist_parser'):
+        parser_cls = entry_point.load()
+        parser_short_name, parser_version = parser_cls.get_info()
+        parser_map[f'/{parser_short_name}/{parser_version}'] = parser_cls
 
     return parser_map

@@ -39,6 +39,12 @@ setup(
         'cpg-utils >= 4.9.4',
         'gql[aiohttp,requests]',
     ],
+    entry_points={
+        'metamist_parser': [
+            'GenericMetadataParser = metamist.parser.generic_metadata_parser:GenericMetadataParser',
+            'SampleFileMapParser = metamist.parser.sample_file_map_parser:SampleFileMapParser',
+        ],
+    },
     include_package_data=True,
     zip_safe=False,
     keywords='bioinformatics',

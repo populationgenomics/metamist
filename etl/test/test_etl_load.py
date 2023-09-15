@@ -4,7 +4,7 @@ from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import MagicMock, patch
 
 import etl.load.main
-import metamist.parser as mp
+
 
 ETL_SAMPLE_RECORD_1 = """
 {
@@ -138,7 +138,7 @@ class TestEtlLoad(DbIsolatedTest):
             {
                 'id': '1234567890',
                 'record': json.loads(ETL_SAMPLE_RECORD_2),
-                'result': 'Missing or invalid sample_type: /bbv/v1 in the record with id: 1234567890',
+                'result': 'Error: Parser for /bbv/v1 not found when parsing record with id: 1234567890',
                 'success': False,
             },
         )
@@ -202,61 +202,3 @@ class TestEtlLoad(DbIsolatedTest):
                 'success': True,
             },
         )
-
-    @run_as_sync
-    async def test_etl_load_parser(
-        self,
-    ):
-        """Test simple parsing of json data
-        Comment out if you want to test using LOCAL environment,
-        """
-
-        PARTICIPANT_COL_NAME = 'individual_id'
-        SAMPLE_ID_COL_NAME = 'sample_id'
-        SEQ_TYPE_COL_NAME = 'sequencing_type'
-
-        sample_meta_map = {
-            'collection_centre': 'centre',
-            'collection_date': 'collection_date',
-            'collection_specimen': 'specimen',
-        }
-
-        default_sequencing_type = 'genome'
-        default_sequencing_technology = 'short-read'
-
-        # parser =
-        mp.GenericMetadataParser(
-            search_locations=[],
-            project=self.project_name,
-            participant_column=PARTICIPANT_COL_NAME,
-            sample_name_column=SAMPLE_ID_COL_NAME,
-            reads_column=None,
-            checksum_column=None,
-            seq_type_column=SEQ_TYPE_COL_NAME,
-            default_sequencing_type=default_sequencing_type,
-            default_sample_type='blood',
-            default_sequencing_technology=default_sequencing_technology,
-            default_reference_assembly_location=None,
-            participant_meta_map={},
-            sample_meta_map=sample_meta_map,
-            assay_meta_map={},
-            qc_meta_map={},
-            allow_extra_files_in_search_path=None,
-            key_map=None,
-        )
-
-        # json_data = [
-        #     {
-        #         'sample_id': '123456',
-        #         'external_id': 'GRK100311',
-        #         'individual_id': '608',
-        #         'sequencing_type': 'exome',
-        #         'collection_centre': 'KCCG',
-        #         'collection_date': '2023-08-05T01:39:28.611476',
-        #         'collection_specimen': 'blood',
-        #     }
-        # ]
-        # res = await parser.from_json(json_data, confirm=False, dry_run=True)
-        # print(res)
-
-        # assert False

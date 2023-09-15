@@ -26,9 +26,25 @@ PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_BQ_LOG_SCHEMA = ETL_FOLDER / 'bq_log_schema.json'
 
 
-# TODO: update implementation in cpg_infra project to enable binary files
+# TODO: update implementation in cpg_infra project to enable binary files & private repos?
+def append_private_repositories_to_requirements(
+    file_content: str, private_repo_url: str, private_repos: str
+) -> str:
+    """
+    Append private repositories to requirements.txt
+    """
+    file_content += f"""
+    --extra-index-url {private_repo_url}
+    {private_repos}
+    """
+    return file_content
+
+
 def archive_folder(
-    path: str, allowed_extensions: frozenset[str]
+    path: str,
+    allowed_extensions: frozenset[str],
+    private_repo_url: str,
+    private_repos: str,
 ) -> pulumi.AssetArchive:
     """Archive a folder into a pulumi asset archive"""
     assets = {}
@@ -48,7 +64,12 @@ def archive_folder(
             else:
                 with open(filename, encoding='utf-8') as file:
                     # do it this way to stop any issues with changing paths
-                    assets[filename] = pulumi.StringAsset(file.read())
+                    file_content = file.read()
+                    if filename == 'requirements.txt' and private_repo_url:
+                        file_content = append_private_repositories_to_requirements(
+                            file_content, private_repo_url, private_repos
+                        )
+                    assets[filename] = pulumi.StringAsset(file_content)
         return pulumi.AssetArchive(assets)
 
 
@@ -61,6 +82,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """Driver for the metamist infrastructure as code plugin"""
         # todo, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
+
+        # TODO: the following should be added to SampleMetadataConfig
+        self.extra_sample_metadata_config = {
+            'private_repo_url': 'https://australia-southeast1-python.pkg.dev/milo-dev-396001/python-repo/simple',
+            'private_repos': 'metamist_private',
+            'environment': 'DEVELOPMENT',
+        }
         self._setup_etl()
 
     @cached_property
@@ -480,6 +508,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         archive = archive_folder(
             str(path_to_func_folder.absolute()),
             allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}),
+            # TODO replace with metamist config, once it's available
+            private_repo_url=self.extra_sample_metadata_config['private_repo_url'],
+            private_repos=self.extra_sample_metadata_config['private_repos'],
         )
 
         # Create the single Cloud Storage object,
@@ -535,7 +566,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     'NOTIFICATION_PUBSUB_TOPIC': self.etl_slack_notification_topic.id
                     if self.etl_slack_notification_topic
                     else '',
-                    'SM_ENVIRONMENT': 'DEVELOPMENT',  # TODO: make it configurable
+                    # TODO replace with metamist config, once it's available
+                    'SM_ENVIRONMENT': self.extra_sample_metadata_config['environment'],
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
