@@ -9,3 +9,5 @@ pre-commit
 pylint
 testcontainers[mariadb]
 types-PyMySQL
+# some strawberry dependency
+rich
