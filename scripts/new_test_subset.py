@@ -18,7 +18,10 @@ analysis-runner \
         --families Family1 Family2 \
         --samples SG-1 SG-2 SG-3
 
-This example will populate acute-care-test with the metamist data for 4 families.
+This example will populate validation-test with the metamist data for:
+    - All members of Family1 & Family 2
+    - SGs 1, 2, and 3
+    - 6 additional SG IDs randomly selected
 """
 import logging
 import subprocess
