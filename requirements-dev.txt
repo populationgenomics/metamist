@@ -10,4 +10,4 @@ pylint
 testcontainers[mariadb]
 types-PyMySQL
 # some strawberry dependency
-rich
+strawberry-graphql[debug-server]==0.206.0
