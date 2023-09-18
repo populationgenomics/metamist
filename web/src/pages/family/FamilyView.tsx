@@ -69,6 +69,22 @@ const HEADINGS = [
     'Report Links',
 ]
 
+const SG_HEADINGS = ['SG ID', 'Individual ID', 'Sequence Type', 'SampleID']
+
+interface SGTableType {
+    sgID: string
+    individualID: number
+    sequenceType: string
+    sampleID: string
+}
+
+interface sequenceTypes {
+    genome: number
+    exome: number
+    mtseq: number
+    transcriptome: number
+}
+
 const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
     const { familyID } = useParams()
     const family_ID = familyID ? +familyID : -1
@@ -107,7 +123,10 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
             ),
         ]
             .flat()
-            .reduce((acc, color) => ((acc[color] = (acc[color] || 0) + 1), acc), {})
+            .reduce((acc: sequenceTypes, type) => {
+                acc[type as keyof sequenceTypes] = (acc[type as keyof sequenceTypes] || 0) + 1
+                return acc
+            }, {} as sequenceTypes)
         const pedEntry = data?.family.project.pedigree.find(
             (p) => p.individual_id === participant.externalId
         )
@@ -128,6 +147,20 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
             individuals_SG_mtseq: types.mtseq ?? 0,
         }
     })
+
+    const sgTableData: SGTableType[] = []
+    data?.family.participants.forEach((participant) =>
+        participant.samples.forEach((sample) =>
+            sample.sequencingGroups.forEach((sg) =>
+                sgTableData.push({
+                    sgID: sg.id,
+                    individualID: participant.id,
+                    sequenceType: sg.type,
+                    sampleID: sample.id,
+                })
+            )
+        )
+    )
 
     return data ? (
         <div className="dataStyle" style={{ width: '100%' }}>
@@ -159,6 +192,33 @@ const FamilyView: React.FunctionComponent<Record<string, unknown>> = () => {
                     </SUITable.Header>
                     <SUITable.Body>
                         {tableData?.map((row, i) => (
+                            <SUITable.Row key={i}>
+                                {Object.values(row).map((cell, j) => (
+                                    <SUITable.Cell key={`${i}-${j}`}>{cell}</SUITable.Cell>
+                                ))}
+                            </SUITable.Row>
+                        ))}
+                    </SUITable.Body>
+                </Table>
+                <Table celled compact sortable>
+                    <SUITable.Header>
+                        <SUITable.Row>
+                            {SG_HEADINGS.map((title) => (
+                                <SUITable.HeaderCell
+                                    key={title}
+                                    style={{
+                                        borderBottom: 'none',
+                                        position: 'sticky',
+                                        resize: 'horizontal',
+                                    }}
+                                >
+                                    {title}
+                                </SUITable.HeaderCell>
+                            ))}
+                        </SUITable.Row>
+                    </SUITable.Header>
+                    <SUITable.Body>
+                        {sgTableData.map((row, i) => (
                             <SUITable.Row key={i}>
                                 {Object.values(row).map((cell, j) => (
                                     <SUITable.Cell key={`${i}-${j}`}>{cell}</SUITable.Cell>

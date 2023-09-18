@@ -9,6 +9,7 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import DatasetView from './pages/project/DatasetView'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -21,6 +22,15 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <AnalysisRunnerSummary />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/dataset-summary"
+            element={
+                <ErrorBoundary>
+                    <DatasetView />
                 </ErrorBoundary>
             }
         />
