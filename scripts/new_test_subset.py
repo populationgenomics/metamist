@@ -94,14 +94,16 @@ def dont_log_queries(
     return result
 
 
-def get_prod_samples(project: str) -> PROJECT_DATA:
+def get_project_samples(project: str) -> PROJECT_DATA:
     """
     Get all prod SG IDs for a project using gql
     Return in form
     {
         CPG_id: {
            'sample': externalID,
-           'family': familyID
+           'family': familyID,
+           'meta': sequencing group meta,
+           'type': type
         }
     }
 
@@ -133,58 +135,18 @@ def get_prod_samples(project: str) -> PROJECT_DATA:
         variables={'project': project},
     )
     return {
-        sam['id']: {
-            'sample': sam['sample']['externalId'],
-            'family': sam['sample']['participant']['families'][0]['externalId'],
-            'meta': sam['meta'],
+        sg['id']: {
+            'sample': sg['sample']['externalId'],
+            'family': sg['sample']['participant']['families'][0]['externalId'],
+            'meta': sg['meta'],
+            'type': sg['type'],
         }
-        for sam in result['project']['sequencingGroups']
+        for sg in result['project']['sequencingGroups']
     }
 
 
-def get_fams_for_sgs(project: str, sg_ids: set[str]) -> set[str]:
-    """
-    Find the families that a list of samples belong to (Samples or SGID?)
-    Args:
-        project (str):
-        sg_ids (set[str]): a list of SequencingGroup IDs
-
-    Returns:
-        set of family IDs (str)
-    """
-
-    family_full = dont_log_queries(
-        """query MyQuery($project: String!, $samples: [String!]!) {
-                project(name: $project) {
-                sequencingGroups(id: {in_: $samples}, activeOnly: {eq: true}) {
-                    id
-                    sample {
-                        participant {
-                            families {
-                                    externalId
-                                    participants {
-                                        externalId
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }""",
-        variables={'samples': list(sg_ids), 'project': project},
-    )
-
-    # extract the family IDs
-    fams = set()
-    for sg in family_full['project']['sequencingGroups']:
-        for fam in sg['sample']['participant']['families']:
-            fams.add(fam['externalId'])
-
-    return fams
-
-
-def get_random_families(
-    project: str, dodge_families: set[str], families_n: int, min_fam_size: int = 0
+def get_random_families_from_fam_sg_dict(
+    sgd_by_family_id, dodge_families: set[str], families_n: int, min_fam_size: int = 0
 ) -> set[str]:
     """
     Get a random subset of families
@@ -195,7 +157,7 @@ def get_random_families(
     the remaining families
 
     Args:
-        project (str): project to query for
+        sgd_by_family_id (dict[str, set[str]]): a lookup of SGID sets by family ID
         dodge_families (set[str]): we already want these fams, don't include in random selection
         families_n (int): number of new families to include
         min_fam_size (int): currently unused
@@ -204,34 +166,16 @@ def get_random_families(
         set[str] - additional families to select
     """
 
-    # query for families in this project
-    ped = dont_log_queries(
-        """
-    query MyQuery($project: String!) {
-        project(name: $project) {
-            families {
-                externalId
-                participants {
-                    externalId
-                }
-                }
-            }
-        }
-    """,
-        variables={'project': project},
-    )
-
     total_counter = 0
     family_counter = defaultdict(list)
-    for family in ped['project']['families']:
-        if (
-            family['externalId'] in dodge_families
-            or len(family['participants']) < min_fam_size
-        ):
+    for fam_id, sgid_set in sgd_by_family_id.items():
+        # skip over fams we already want, or who are undersized
+        if fam_id in dodge_families or len(sgid_set) < min_fam_size:
             continue
         total_counter += 1
-        family_counter[len(family['participants'])].append(family['externalId'])
+        family_counter[len(sgid_set)].append(fam_id)
 
+    # unable to select anough additional families
     if total_counter < families_n:
         raise ValueError(
             f'Not enough families to choose from. You explicitly requested '
@@ -240,17 +184,23 @@ def get_random_families(
             f'{families_n} additional random families were requested.'
         )
 
-    # return every other family
+    # exactly the right number - return every remaining family
     if total_counter == families_n:
         return set(chain.from_iterable(family_counter.values()))
 
     # weighted random selection from remaining families
+    # families are sorted by size {1: {fam1, fam2}, 2: {fam3}}
+    # length of each list represents the weighting across all family groups
     weights = [len(family_counter[k]) for k in sorted(family_counter.keys())]
+
+    # Counter records how many selections should be made from each family size group
     family_size_choices = dict(
         Counter(
             random.choices(sorted(family_counter.keys()), weights=weights, k=families_n)
         )
     )
+
+    # build 1 set from all the randomly selected families, weighted by size
     return_families = set()
     for k, v in family_size_choices.items():
         return_families.update(random.sample(family_counter[k], v))
@@ -622,58 +572,40 @@ def get_assays_for_sgs(project: str, sg_ids: set[str]) -> dict[str, dict]:
     return {sg['id']: sg['assays'][0] for sg in assays['project']['sequencingGroups']}
 
 
-def process_existing_test_sgidss(
-    test_project_data: PROJECT_DATA,
+def process_existing_test_sgids(
+    test_data: PROJECT_DATA,
     sg_ids: set[str],
-    main_project_data: PROJECT_DATA,
-    clear_out_test: bool = False,
+    main_data: PROJECT_DATA,
+    clear_test: bool = False,
 ) -> tuple[set[str], set[str]]:
     """
     Find transfer targets which already exist in the test project
     Optionally also find test entities to delete
 
     Args:
-        test_project_data (PROJECT_DATA):
+        test_data (PROJECT_DATA):
         sg_ids (set[str]):
-        main_project_data (PROJECT_DATA):
-        clear_out_test (bool):
+        main_data (PROJECT_DATA):
+        clear_test (bool):
 
     Returns:
          two lists - test samples to keep, test samples to remove
     """
-    test_ext_ids = {v['sample'] for v in test_project_data.values()}
+    test_ext_ids = {v['sample'] for v in test_data.values()}
     keep, remove = set(), set()
     for sg_id in sg_ids:
-        if main_project_data[sg_id]['sample'] in test_ext_ids:
+        if main_data[sg_id]['sample'] in test_ext_ids:
             keep.add(sg_id)
 
-    if clear_out_test:
+    if clear_test:
+        # remove action is not currently done
         # find all test SG IDs which are not in the SGIDs to copy in
-        main_ext_ids = {v['sample'] for v in main_project_data.values()}
-        for sg_id, test_entity in test_project_data.items():
+        main_ext_ids = {v['sample'] for v in main_data.values()}
+        for sg_id, test_entity in test_data.items():
             if test_entity['sample'] not in main_ext_ids:
                 remove.add(sg_id)
 
     return keep, remove
-
-
-def pull_sgids_from_families(families: set[str], all_samples: PROJECT_DATA) -> set[str]:
-    """
-    Pull all samples from a list of families
-    all_samples:
-    {CPG_id: {'sample': externalID, 'family': familyID}}
-
-    Args:
-        families (list[str]): list of family IDs
-        all_samples (dict[str, dict[str, str]]): all samples in the project
-
-    Returns:
-        set[str]: set of sample IDs
-    """
-
-    return {
-        sg_id for sg_id, details in all_samples.items() if details['family'] in families
-    }
 
 
 def main(
@@ -707,7 +639,10 @@ def main(
 
     # get all prod samples for the project
     # {CPG_id: {'sample': externalID, 'family': familyID}}
-    metamist_main_content = get_prod_samples(project)
+    metamist_main_content = get_project_samples(project)
+    main_sgs_by_family = defaultdict(set)
+    for sg_id, data in metamist_main_content.items():
+        main_sgs_by_family[data['family']].add(sg_id)
 
     logging.info(f'Found {len(metamist_main_content)} samples')
     if (samples_n and samples_n >= len(metamist_main_content)) and not noninteractive:
@@ -728,14 +663,23 @@ def main(
         # these specifically requested families & samples are copied over in addition
         # to the random selection families_n number of families
         if sample_set:
-            family_set |= get_fams_for_sgs(project, sample_set)
+            family_set |= {metamist_main_content[sgid]['family'] for sgid in sample_set}
 
         # family_set is ones we definitely want to include
         # we need to make sure we don't include them in the random selection
-        family_set |= get_random_families(project, family_set, families_n)
+        family_set |= get_random_families_from_fam_sg_dict(
+            main_sgs_by_family, family_set, families_n
+        )
 
-        # now go get the corresponding participant/SG IDs
-        sample_set = pull_sgids_from_families(family_set, metamist_main_content)
+        # update the set of chosen samples (which can be empty)
+        # with all the SGIDs from the selected families
+        # chain.from_iterable flattens a generator of all SG ID sets
+        # across all families into a single set
+        sample_set |= set(
+            chain.from_iterable(
+                v for k, v in main_sgs_by_family.items() if k in family_set
+            )
+        )
 
     elif samples_n:
         # if there are additional samples specified, find the corresponding families
@@ -743,28 +687,34 @@ def main(
         # to the random selection families_n number of families
         if family_set:
             # we already have this data in query result
-            sample_set |= pull_sgids_from_families(family_set, metamist_main_content)
-
-        all_sgids = set(metamist_main_content.keys())
+            sample_set |= set(
+                chain.from_iterable(
+                    v for k, v in main_sgs_by_family.items() if k in family_set
+                )
+            )
 
         # top up the selected SGIDs with random selections
         # resulting SG IDs we want to copy into the test project
         sample_set |= set(
-            random.sample(all_sgids - sample_set, samples_n - len(sample_set))
+            random.sample(set(metamist_main_content.keys()) - sample_set, samples_n)
         )
 
     # maybe we only want to copy specific samples or families...
     else:
         if sample_set:
-            sample_set |= pull_sgids_from_families(family_set, metamist_main_content)
+            sample_set |= set(
+                chain.from_iterable(
+                    v for k, v in main_sgs_by_family.items() if k in family_set
+                )
+            )
 
     logging.info(f'Subset to {len(sample_set)} samples')
 
     # Populating test project
     target_project = project + '-test'
     logging.info('Checking any existing test samples in the target test project')
-    metamist_test_content = get_prod_samples(target_project)
-    keep, remove = process_existing_test_sgidss(
+    metamist_test_content = get_project_samples(target_project)
+    keep, remove = process_existing_test_sgids(
         metamist_test_content, sample_set, metamist_main_content, clear_out_test
     )
 
@@ -772,7 +722,7 @@ def main(
         logging.info(f'Removing test samples: {remove}')
         # TODO do removal
 
-    # don't bother actioning these guys
+    # don't bother actioning these guys - already exist in target
     new_sample_map = {}
     for s in keep:
         prod_ext = metamist_main_content[s]['sample']
@@ -784,7 +734,7 @@ def main(
         else:
             logging.error(f'Could not find test sample for {prod_ext}')
 
-    # now ignore them forever
+    # now ignore them forever - don't try to transfer again
     sample_set -= set(keep)
 
     assays_by_sg = get_assays_for_sgs(project, sample_set)
