@@ -9,6 +9,8 @@ pre-commit
 pylint
 testcontainers[mariadb]
 types-PyMySQL
+# some strawberry dependency
+strawberry-graphql[debug-server]==0.206.0
 # following required to unit test etl functions
 functions_framework
 google-cloud-bigquery

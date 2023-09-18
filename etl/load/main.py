@@ -10,7 +10,7 @@ import flask
 import functions_framework
 import google.cloud.bigquery as bq
 
-from google.cloud import pubsub_v1
+from google.cloud import pubsub_v1  # type: ignore
 
 import pkg_resources
 
