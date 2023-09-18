@@ -320,8 +320,8 @@ class ParsedAssay:
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
         return AssayUpsert(
-            type=self.assay_type,
             id=self.internal_id,
+            type=self.assay_type,
             external_ids=self.external_ids,
             # sample_id=self.s,
             meta=self.meta,

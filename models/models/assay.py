@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from models.base import SMBase
+from models.base import OpenApiGenNoneType, SMBase
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
 
@@ -88,11 +88,11 @@ class Assay(SMBase):
 class AssayUpsert(SMBase):
     """Assay upsert model for external use"""
 
-    id: int | None = None
-    type: str | None = None
-    external_ids: dict[str, str] | None = None
-    sample_id: str | None = None
-    meta: dict[str, Any] | None = None
+    id: int | OpenApiGenNoneType = None
+    type: str | OpenApiGenNoneType = None
+    external_ids: dict[str, str] | OpenApiGenNoneType = None
+    sample_id: str | OpenApiGenNoneType = None
+    meta: dict[str, Any] | OpenApiGenNoneType = None
 
     def to_internal(self):
         """Convert to internal model"""
@@ -101,12 +101,12 @@ class AssayUpsert(SMBase):
         _sample_id = None
         if self.sample_id:
             # but may be provided directly when inserting directly
-            _sample_id = sample_id_transform_to_raw(self.sample_id)
+            _sample_id = sample_id_transform_to_raw(self.sample_id)  # type: ignore
 
         return AssayUpsertInternal(
-            id=self.id,
-            type=self.type,
-            external_ids=self.external_ids,
-            sample_id=_sample_id,
-            meta=self.meta,
+            id=self.id,  # type: ignore
+            type=self.type,  # type: ignore
+            external_ids=self.external_ids,  # type: ignore
+            sample_id=_sample_id,  # type: ignore
+            meta=self.meta,  # type: ignore
         )
