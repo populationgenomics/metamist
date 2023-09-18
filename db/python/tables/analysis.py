@@ -2,15 +2,15 @@
 import dataclasses
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Optional, Set, Tuple, Dict, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.connect import DbBase, NotFoundError
 from db.python.tables.project import ProjectId
 from db.python.utils import (
-    to_db_json,
-    GenericFilterModel,
     GenericFilter,
+    GenericFilterModel,
     GenericMetaFilter,
+    to_db_json,
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
@@ -285,7 +285,7 @@ WHERE s.project = :project AND
         """
         Gets details of analysis with status queued or in-progress
         """
-        _query = f"""
+        _query = """
 SELECT a.id as id, a.type as type, a.status as status,
         a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.meta as meta
@@ -339,7 +339,7 @@ ORDER BY a.timestamp_completed DESC
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
             seen_sequencing_group_ids.add(row['sequencing_group_id'])
-            analyses.append(AnalysisInternal.from_db(**row))
+            analyses.append(AnalysisInternal.from_db(**dict(row)))
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -439,7 +439,7 @@ WHERE a.id = :analysis_id
                 seq_check = 'IN :seq_types'
                 values['seq_types'] = sequencing_types
 
-            filters.append(f'JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
+            filters.append('JSON_VALUE(a.meta, "$.sequencing_type") ' + seq_check)
 
         if participant_ids:
             filters.append('p.id IN :pids')

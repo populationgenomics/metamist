@@ -1,16 +1,16 @@
-from collections import namedtuple
 import unittest
-from unittest.mock import MagicMock, patch
+import unittest.mock
+from collections import namedtuple
+
 from metamist.audit.generic_auditor import GenericAuditor
 
-# pylint: disable=dangerous-default-value
 # noqa: B006
 
 
 class TestGenericAuditor(unittest.TestCase):
     """Test the audit helper functions"""
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_get_participant_data_for_dataset(self, mock_query):
         """Only participants with a non-empty samples field should be returned"""
         auditor = GenericAuditor(
@@ -360,7 +360,7 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -412,7 +412,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -472,7 +472,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_query_broken_analyses_crams(self, mock_query):
         """
         All analysis crams must have 'sequencing_type' meta field,
@@ -506,7 +506,7 @@ class TestGenericAuditor(unittest.TestCase):
                 assay_sg_id_map={1: 'CPG123'}
             )
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_query_analyses_crams_warning(self, mock_query):
         """Warn if the sample_ids field is absent and the sample meta field is used instead"""
         auditor = GenericAuditor(
@@ -541,7 +541,7 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    @patch('metamist.audit.generic_auditor.query')
+    @unittest.mock.patch('metamist.audit.generic_auditor.query')
     def test_analyses_for_sgs_without_crams(self, mock_query):
         """Log any analyses found for samples without completed CRAMs"""
         auditor = GenericAuditor(
@@ -569,7 +569,9 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertLogs(level='WARNING') as log:
-            _ = auditor.analyses_for_sgs_without_crams(sgs_without_crams)
+            # catch the warning logs from here and check below
+            auditor.analyses_for_sgs_without_crams(sgs_without_crams)
+
             self.assertEqual(len(log.output), 8)  # 8 analysis types checked
             self.assertEqual(len(log.records), 8)
             self.assertIn(
@@ -577,7 +579,21 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    def test_get_complete_and_incomplete_sgs(self):
+    @unittest.mock.patch(
+        'metamist.audit.generic_auditor.GenericAuditor.get_gcs_bucket_subdirs_to_search'
+    )
+    @unittest.mock.patch(
+        'metamist.audit.generic_auditor.GenericAuditor.find_files_in_gcs_buckets_subdirs'
+    )
+    @unittest.mock.patch(
+        'metamist.audit.generic_auditor.GenericAuditor.analyses_for_sgs_without_crams'
+    )
+    def test_get_complete_and_incomplete_sgs(
+        self,
+        mock_analyses_for_sgs_without_crams,
+        mock_find_files_in_gcs_buckets_subdirs,
+        mock_get_gcs_bucket_subdirs,
+    ):
         """Report on samples that have completed CRAMs and those that dont"""
         assay_sg_id_map = {  # noqa: B006
             1: 'CPG123',
@@ -591,17 +607,15 @@ class TestGenericAuditor(unittest.TestCase):
         auditor = GenericAuditor(
             dataset='dev', sequencing_type=['genome', 'exome'], file_types=('fastq',)
         )
-        auditor.get_gcs_bucket_subdirs_to_search = MagicMock()
-        auditor.find_files_in_gcs_buckets_subdirs = MagicMock()
-        auditor.analyses_for_sgs_without_crams = MagicMock()
 
-        auditor.get_gcs_bucket_subdirs_to_search.return_value = {
+        mock_get_gcs_bucket_subdirs.return_value = {
             'cpg-dataset-main': ['cram', 'exome/cram']
         }
-        auditor.find_files_in_gcs_buckets_subdirs.return_value = [
+        mock_find_files_in_gcs_buckets_subdirs.return_value = [
             'gs://cpg-dataset-main/cram/CPG123.cram',
             'gs://cpg-dataset-main/exome/cram/CPG456.cram',
         ]
+        mock_analyses_for_sgs_without_crams.return_value = None
 
         result = auditor.get_complete_and_incomplete_sgs(
             assay_sg_id_map=assay_sg_id_map,
@@ -615,8 +629,16 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(result, expected_result)
 
-    async def test_check_for_uningested_or_moved_assays(self):
-        """Test 2 ingested reads, one ingested and moved read, and one uningested read"""
+    @unittest.mock.patch('metamist.audit.generic_auditor.GenericAuditor.file_size')
+    @unittest.mock.patch(
+        'metamist.audit.generic_auditor.GenericAuditor.find_sequence_files_in_gcs_bucket'
+    )
+    async def test_check_for_uningested_or_moved_assays(
+        self, mock_find_sequence_files_in_gcs_bucket, mock_file_size
+    ):
+        """
+        Test 2 ingested reads, one ingested and moved read, and one uningested read
+        """
         auditor = GenericAuditor(
             dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
         )
@@ -627,16 +649,14 @@ class TestGenericAuditor(unittest.TestCase):
         sg_sample_id_map = {'CPG123': 'EXT123'}
         assay_sg_id_map = {1: 'CPG123'}
         sample_internal_external_id_map = {'CPG123': 'EXT123'}
-        auditor.find_sequence_files_in_gcs_bucket = MagicMock()
-        auditor.find_sequence_files_in_gcs_bucket.return_value = [
+        mock_find_sequence_files_in_gcs_bucket.return_value = [
             'read1.fq',
             'read2.fq',
             'dir2/read3.fq',
             'read4.fq',
         ]
 
-        auditor.file_size = MagicMock()
-        auditor.file_size.return_value = 12
+        mock_file_size.return_value = 12
 
         (
             uningested_sequence_paths,

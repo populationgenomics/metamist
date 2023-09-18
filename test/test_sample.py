@@ -1,7 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.models.sample import SampleUpsertInternal
 from db.python.layers.sample import SampleLayer
+from models.models.sample import SampleUpsertInternal
 
 
 class TestSample(DbIsolatedTest):
@@ -17,7 +17,7 @@ class TestSample(DbIsolatedTest):
     @run_as_sync
     async def test_add_sample(self):
         """Test inserting a sample"""
-        s = await self.slayer.upsert_sample(
+        sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='Test01',
                 type='blood',
@@ -30,8 +30,7 @@ class TestSample(DbIsolatedTest):
             'SELECT id, type, meta, project FROM sample'
         )
         self.assertEqual(1, len(samples))
-        s = samples[0]
-        self.assertEqual(1, s['id'])
+        self.assertEqual(sample.id, samples[0]['id'])
 
     @run_as_sync
     async def test_get_sample(self):

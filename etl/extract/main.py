@@ -8,7 +8,8 @@ import flask
 import functions_framework
 import google.cloud.bigquery as bq
 from cpg_utils.cloud import email_from_id_token
-from google.cloud import pubsub_v1
+
+from google.cloud import pubsub_v1  # type: ignore
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
@@ -77,9 +78,7 @@ def etl_extract(request: flask.Request):
     bq_client = bq.Client()
     pubsub_client = pubsub_v1.PublisherClient()
 
-    errors = bq_client.insert_rows_json(
-        BIGQUERY_TABLE, [bq_obj | {'body': jbody_str}]
-    )
+    errors = bq_client.insert_rows_json(BIGQUERY_TABLE, [bq_obj | {'body': jbody_str}])
 
     if errors:
         return {

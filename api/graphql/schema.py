@@ -14,16 +14,10 @@ from strawberry.extensions import QueryDepthLimiter
 from strawberry.fastapi import GraphQLRouter
 from strawberry.types import Info
 
-from api.graphql.filters import (
-    GraphQLFilter,
-    GraphQLMetaFilter,
-)
-from api.graphql.loaders import (
-    get_context,
-    LoaderKeys,
-)
+from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
+from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import AnalysisLayer, SequencingGroupLayer, SampleLayer
+from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.layers.assay import AssayLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.analysis import AnalysisFilter
@@ -34,21 +28,19 @@ from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
-    SampleInternal,
+    AnalysisInternal,
+    AssayInternal,
+    FamilyInternal,
     ParticipantInternal,
     Project,
-    AnalysisInternal,
-    FamilyInternal,
+    SampleInternal,
     SequencingGroupInternal,
-    AssayInternal,
 )
 from models.models.sample import sample_id_transform_to_raw
-from models.utils.sample_id_format import (
-    sample_id_format,
-)
+from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_transform_to_raw,
     sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
 )
 
 enum_methods = {}
@@ -335,6 +327,13 @@ class GraphQLParticipant:
 
         samples = await info.context[LoaderKeys.SAMPLES_FOR_PARTICIPANTS].load(q)
         return [GraphQLSample.from_internal(s) for s in samples]
+
+    @strawberry.field
+    async def phenotypes(
+        self, info: Info, root: 'GraphQLParticipant'
+    ) -> strawberry.scalars.JSON:
+        loader = info.context[LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS]
+        return await loader.load(root.id)
 
     @strawberry.field
     async def families(

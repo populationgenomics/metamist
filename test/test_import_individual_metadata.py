@@ -1,5 +1,7 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from databases.interfaces import Record
+
 from db.python.layers.participant import ParticipantLayer
 from models.models.participant import ParticipantUpsertInternal
 
@@ -21,20 +23,22 @@ class TestImportIndividualMetadata(DbIsolatedTest):
             'HPO Term 3',
             'HPO Term 20',
         ]
-        rows = [['TP01', 'HP:0000001', 'HP:0000002', 'HP:0000003', 'HP:0000004']]
+        rows_to_insert = [
+            ['TP01', 'HP:0000001', 'HP:0000002', 'HP:0000003', 'HP:0000004']
+        ]
 
-        await pl.generic_individual_metadata_importer(headers, rows)
+        await pl.generic_individual_metadata_importer(headers, rows_to_insert)
 
-        rows = list(
+        db_rows: list[Record] = list(
             await self.connection.connection.fetch_all(
                 'SELECT participant_id, description, value FROM participant_phenotypes'
             )
         )
 
-        self.assertEqual(1, len(rows))
-        self.assertEqual('HPO Terms (present)', rows[0]['description'])
+        self.assertEqual(1, len(db_rows))
+        self.assertEqual('HPO Terms (present)', db_rows[0]['description'])
         self.assertEqual(
-            '"HP:0000001,HP:0000002,HP:0000003,HP:0000004"', rows[0]['value']
+            '"HP:0000001,HP:0000002,HP:0000003,HP:0000004"', db_rows[0]['value']
         )
 
     @run_as_sync
@@ -50,12 +54,12 @@ class TestImportIndividualMetadata(DbIsolatedTest):
         )
 
         headers = ['Individual ID', 'HPO Term 20', 'Age of Onset']
-        rows = [
+        rows_to_insert = [
             ['TP01', 'HP:0000020', 'Congenital'],
             ['TP02', 'HP:00000021; HP:023', 'Infantile'],
         ]
 
-        await pl.generic_individual_metadata_importer(headers, rows)
+        await pl.generic_individual_metadata_importer(headers, rows_to_insert)
 
         rows = list(
             await self.connection.connection.fetch_all(

@@ -184,7 +184,7 @@ def generate_schema_file():
     Generate schema file and place in the metamist/graphql/ directory
     """
     command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
-    schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
+    schema = subprocess.check_output(command).decode()
 
     with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
         f.write(schema)
@@ -317,7 +317,7 @@ def main():
         while (not check_if_server_is_accessible()) and startup_tries > 0:
             startup_tries -= 1
             logger.info(
-                f'Dockerised API server is not ready yet. '
+                'Dockerised API server is not ready yet. '
                 + f'Retrying in {wait_time_in_seconds} seconds. '
                 + f'Remaining tries: {startup_tries}'
             )
