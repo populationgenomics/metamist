@@ -1,9 +1,8 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.models.participant import ParticipantUpsertInternal
-
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
+from models.models.participant import ParticipantUpsertInternal
 
 
 class TestPedigree(DbIsolatedTest):
@@ -14,10 +13,10 @@ class TestPedigree(DbIsolatedTest):
         """Test import + get pedigree"""
         fl = FamilyLayer(self.connection)
 
-        rows = [
-            ['FAM01', 'EX01_father', '', '', 1, 1],
-            ['FAM01', 'EX01_mother', '', '', 2, 1],
-            ['FAM01', 'EX01_subject', 'EX01_father', 'EX01_mother', 1, 2],
+        rows: list[list[str]] = [
+            ['FAM01', 'EX01_father', '', '', '1', '1'],
+            ['FAM01', 'EX01_mother', '', '', '2', '1'],
+            ['FAM01', 'EX01_subject', 'EX01_father', 'EX01_mother', '1', '2'],
         ]
 
         await fl.import_pedigree(

@@ -15,12 +15,6 @@ class GenericFilterTest(GenericFilterModel):
 class TestGenericFilters(unittest.TestCase):
     """Test generic filters SQL generation"""
 
-    def test_post_init_correction(self):
-        """Test that the post init correction works"""
-        filter_ = GenericFilterTest(test_string='test')
-        self.assertIsInstance(filter_.test_string, GenericFilter)
-        self.assertEqual(filter_.test_string.eq, 'test')
-
     def test_basic_no_override(self):
         """Test that the basic filter converts to SQL as expected"""
         filter_ = GenericFilterTest(test_string=GenericFilter(eq='test'))

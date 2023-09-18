@@ -1,11 +1,11 @@
 import json
 
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.assay import AssayUpsert, AssayUpsertInternal, Assay, AssayInternal
-from models.utils.sample_id_format import sample_id_transform_to_raw, sample_id_format
+from models.base import OpenApiGenNoneType, SMBase
+from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_transform_to_raw,
     sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
 )
 
 
@@ -60,6 +60,7 @@ class SequencingGroupInternal(SMBase):
             type=self.type,
             technology=self.technology,
             platform=self.platform,
+            external_ids=self.external_ids,
             meta=self.meta,
             sample_id=sample_id_format(self.sample_id),
             assays=[a.to_external() for a in self.assays or []],
@@ -141,6 +142,7 @@ class SequencingGroup(SMBase):
     sample_id: str
     external_ids: dict[str, str]
     archived: bool
+    assays: list[Assay]
 
 
 class NestedSequencingGroup(SMBase):
@@ -169,7 +171,7 @@ class SequencingGroupUpsert(SMBase):
     sample_id: str | OpenApiGenNoneType = None
     external_ids: dict[str, str] | OpenApiGenNoneType = None
 
-    assays: list[AssayUpsert] | None = None
+    assays: list[AssayUpsert] | OpenApiGenNoneType = None
 
     def to_internal(self) -> SequencingGroupUpsertInternal:
         """
@@ -185,15 +187,15 @@ class SequencingGroupUpsert(SMBase):
 
         sg_internal = SequencingGroupUpsertInternal(
             id=_id,
-            type=self.type,
-            technology=self.technology,
-            platform=self.platform.lower() if self.platform else None,
-            meta=self.meta,
+            type=self.type,  # type: ignore
+            technology=self.technology,  # type: ignore
+            platform=self.platform.lower() if self.platform else None,  # type: ignore
+            meta=self.meta,  # type: ignore
             sample_id=_sample_id,
-            external_ids=self.external_ids or {},
+            external_ids=self.external_ids or {},  # type: ignore
         )
 
         if self.assays is not None:
-            sg_internal.assays = [a.to_internal() for a in self.assays]
+            sg_internal.assays = [a.to_internal() for a in self.assays]  # type: ignore
 
         return sg_internal

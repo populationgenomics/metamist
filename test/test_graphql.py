@@ -1,20 +1,19 @@
 from test.testbase import DbIsolatedTest, run_as_sync
+
 from graphql.error import GraphQLError, GraphQLSyntaxError
 
 import api.graphql.schema
-from db.python.layers import ParticipantLayer, AnalysisLayer
+from db.python.layers import AnalysisLayer, ParticipantLayer
+from metamist.graphql import configure_sync_client, gql, validate
+from models.enums import AnalysisStatus
 from models.models import (
-    SampleUpsertInternal,
-    ParticipantUpsertInternal,
-    SequencingGroupUpsertInternal,
-    AssayUpsertInternal,
     AnalysisInternal,
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from models.enums import AnalysisStatus
-
-from metamist.graphql import gql, validate, configure_sync_client
-
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -24,7 +23,6 @@ default_assay_meta = {
 
 
 def _get_single_participant_upsert():
-
     return ParticipantUpsertInternal(
         external_id='Demeter',
         meta={},
@@ -43,20 +41,20 @@ def _get_single_participant_upsert():
                                 type='sequencing',
                                 meta={
                                     'reads': [
-                                            {
-                                                'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                'size': 111,
-                                            },
-                                            {
-                                                'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                'size': 111,
-                                            },
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
@@ -114,7 +112,7 @@ class TestGraphQL(DbIsolatedTest):
         (strawberry has an as_str() method)
         """
         client = configure_sync_client(
-            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'  # type: ignore
         )
         validate(TEST_QUERY, client=client)
 
@@ -231,3 +229,30 @@ query MyQuery($sg_id: String!) {
         self.assertIn('id', analyses[0])
         self.assertIn('meta', analyses[0])
         self.assertIn('output', analyses[0])
+
+    @run_as_sync
+    async def test_participant_phenotypes(self):
+        """
+        Test getting participant phentypes in graphql
+        """
+        # insert participant
+        p = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='Demeter', meta={}, samples=[])
+        )
+
+        phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}
+        # insert participant_phenotypes
+        await self.player.insert_participant_phenotypes({p.id: phenotypes})
+
+        q = """
+query MyQuery($pid: Int!) {
+  participant(id: $pid) {
+    phenotypes
+  }
+}"""
+
+        resp = await self.run_graphql_query_async(q, {'pid': p.id})
+
+        self.assertIn('participant', resp)
+        self.assertIn('phenotypes', resp['participant'])
+        self.assertDictEqual(phenotypes, resp['participant']['phenotypes'])
