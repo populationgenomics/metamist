@@ -15,7 +15,7 @@ from models.utils.sequencing_group_id_format import (
 class AnalysisInternal(SMBase):
     """Model for Analysis"""
 
-    id: int | None
+    id: int | None = None
     type: str
     status: AnalysisStatus
     output: str = None

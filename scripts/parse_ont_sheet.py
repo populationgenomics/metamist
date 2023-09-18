@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
-from typing import List
 import logging
+from typing import List
 
 import click
 
-from metamist.parser.generic_parser import ParsedSample, ParsedSequencingGroup
 from metamist.parser.generic_metadata_parser import (
-    run_as_sync,
     GenericMetadataParser,
+    run_as_sync,
 )
+from metamist.parser.generic_parser import ParsedSample, ParsedSequencingGroup
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -97,14 +97,14 @@ class OntParser(GenericMetadataParser):
         return [fastqs]
 
     async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
-        sequence_groups = await super().group_assays(sample)
+        sequencing_groups = await super().group_assays(sample)
 
-        for sequence_group in sequence_groups:
+        for sequencing_group in sequencing_groups:
             failed_fastqs: list[str] = []
 
-            for r in sequence_group.rows:
+            for r in sequencing_group.rows:
                 parsed_failed_fastqs = await self.parse_files(
-                    sequence_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
+                    sequencing_group.sample.external_sid, r[Columns.FAIL_FASTQ_FILENAME]
                 )
                 if 'reads' not in parsed_failed_fastqs:
                     raise ValueError(
@@ -120,9 +120,9 @@ class OntParser(GenericMetadataParser):
                     )
                 failed_fastqs.extend(parsed_failed_fastq_reads['fastq'])
 
-            sequence_group.meta['failed_reads'] = failed_fastqs
+            sequencing_group.meta['failed_reads'] = failed_fastqs
 
-        return sequence_groups
+        return sequencing_groups
 
 
 @click.command()

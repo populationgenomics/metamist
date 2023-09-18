@@ -1,17 +1,14 @@
 import json
 
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.assay import AssayUpsertInternal, AssayUpsert, AssayInternal, Assay
+from models.base import OpenApiGenNoneType, SMBase
+from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
-    SequencingGroupUpsert,
     NestedSequencingGroup,
-    SequencingGroupUpsertInternal,
     NestedSequencingGroupInternal,
+    SequencingGroupUpsert,
+    SequencingGroupUpsertInternal,
 )
-from models.utils.sample_id_format import (
-    sample_id_format,
-    sample_id_transform_to_raw,
-)
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
 
 class SampleInternal(SMBase):
@@ -143,6 +140,7 @@ class Sample(SMBase):
             type=self.type,
             participant_id=self.participant_id,
             active=self.active,
+            author='<EXT-TO-INT-CONVERSION>',
         )
 
 
@@ -180,12 +178,12 @@ class SampleUpsert(SMBase):
 
         sample_upsert = SampleUpsertInternal(
             id=_id,
-            external_id=self.external_id,
-            meta=self.meta,
-            project=self.project,
-            type=self.type,
-            participant_id=self.participant_id,
-            active=self.active,
+            external_id=self.external_id,  # type: ignore
+            meta=self.meta,  # type: ignore
+            project=self.project,  # type: ignore
+            type=self.type,  # type: ignore
+            participant_id=self.participant_id,  # type: ignore
+            active=self.active,  # type: ignore
         )
 
         if self.sequencing_groups:

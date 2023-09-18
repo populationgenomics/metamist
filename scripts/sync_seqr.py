@@ -1,27 +1,28 @@
 # pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel,too-many-locals
 import asyncio
+import datetime
+import json
+import logging
 import os
 import re
-import json
-import datetime
-import logging
 import traceback
 from collections import defaultdict
-from typing import Any
 from io import StringIO
+from typing import Any
 
 import aiohttp
 import yaml
 from cloudpathlib import AnyPath
+
+from metamist.apis import (
+    AnalysisApi,
+    ProjectApi,
+    SeqrApi,
+)
 from metamist.graphql import query_async
+from metamist.model.analysis_query_model import AnalysisQueryModel
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.model.export_type import ExportType
-from metamist.model.analysis_query_model import AnalysisQueryModel
-from metamist.apis import (
-    SeqrApi,
-    ProjectApi,
-    AnalysisApi,
-)
 from metamist.parser.generic_parser import chunk
 
 loggers_to_silence = [
@@ -410,7 +411,7 @@ async def update_es_index(
 
     fn_path = os.path.join(MAP_LOCATION, filename)
     # pylint: disable=no-member
-    with AnyPath(fn_path).open('w+') as f:
+    with AnyPath(fn_path).open('w+') as f:  # type: ignore
         f.write('\n'.join(rows_to_write))
 
     if check_metamist:  # len(es_index_analyses) > 0:
@@ -678,7 +679,9 @@ def sync_all_datasets(sequencing_type: str, ignore: set[str] = None):
             continue
         try:
             el.run_until_complete(
-                sync_dataset_async(project_name, seqr_guid, sequencing_type=sequencing_type)
+                sync_dataset_async(
+                    project_name, seqr_guid, sequencing_type=sequencing_type
+                )
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             print(
