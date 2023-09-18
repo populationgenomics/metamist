@@ -4,22 +4,52 @@ on: push
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      # used for generating API
+      SM_DOCKER: samplemetadata:dev
     defaults:
       run:
         shell: bash -eo pipefail -l {0}
-
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@main
 
       - uses: actions/setup-python@v2
         with:
           python-version: "3.10"
-          cache: "pip"
 
-      - name: Install packages
+      - uses: actions/setup-java@v2
+        with:
+          distribution: "temurin" # See 'Supported distributions' for available options
+          java-version: "17"
+
+      - name: Setup build env
         run: |
+          set -euxo pipefail
+
+          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
+
+          # openapi-generator
+          wget https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/5.3.0/openapi-generator-cli-5.3.0.jar -O openapi-generator-cli.jar
+
+      - name: "build image"
+        run: |
+          docker build \
+            --build-arg SM_ENVIRONMENT=local \
+            --tag $SM_DOCKER \
+            -f deploy/api/Dockerfile \
+            .
+
+      - name: Build + install packages
+        run: |
+          export OPENAPI_COMMAND="java -jar openapi-generator-cli.jar"
+          python regenerate_api.py
           pip install -r requirements-dev.txt
           pip install .
+          mkdir .mypy_cache
 
       - name: pre-commit
         run: pre-commit run --all-files

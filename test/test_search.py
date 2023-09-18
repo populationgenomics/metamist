@@ -1,18 +1,25 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.search import SearchLayer
-from db.python.layers.family import FamilyLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.family_participant import FamilyParticipantTable
-
 from models.enums import SearchResponseType
-from models.models.family import PedRowInternal
-from models.models.sample import sample_id_format, SampleUpsertInternal
-from models.models.participant import ParticipantUpsertInternal
-from models.models.sequencing_group import SequencingGroupUpsertInternal, sequencing_group_id_format
-from models.models.assay import AssayUpsertInternal
+from models.models import (
+    AssayUpsertInternal,
+    FamilySearchResponseData,
+    ParticipantSearchResponseData,
+    ParticipantUpsertInternal,
+    PedRowInternal,
+    SampleSearchResponseData,
+    SampleUpsertInternal,
+    SequencingGroupSearchResponseData,
+    SequencingGroupUpsertInternal,
+)
+from models.models.sample import sample_id_format
+from models.models.sequencing_group import sequencing_group_id_format
 
 
 class TestSample(DbIsolatedTest):
@@ -68,7 +75,11 @@ class TestSample(DbIsolatedTest):
         self.assertEqual(1, len(results))
         self.assertEqual(cpg_id, results[0].title)
         self.assertEqual(cpg_id, results[0].data.id)
-        self.assertListEqual(['EX001'], results[0].data.sample_external_ids)
+
+        result_data = results[0].data
+        self.assertIsInstance(result_data, SampleSearchResponseData)
+        assert isinstance(result_data, SampleSearchResponseData)
+        self.assertListEqual(['EX001'], result_data.sample_external_ids)
 
     @run_as_sync
     async def test_search_isolated_sequencing_group_by_id(self):
@@ -97,19 +108,24 @@ class TestSample(DbIsolatedTest):
                                 'sequencing_type': 'transcriptome',
                                 'sequencing_technology': 'long-read',
                                 'sequencing_platform': 'illumina',
-                            }
+                            },
                         )
-                    ]
+                    ],
                 )
             ]
         )
         cpg_sg_id = sequencing_group_id_format(sg[0].id)
-        results = await self.schlay.search(query=cpg_sg_id, project_ids=[self.project_id])
+        results = await self.schlay.search(
+            query=cpg_sg_id, project_ids=[self.project_id]
+        )
 
         self.assertEqual(1, len(results))
         self.assertEqual(cpg_sg_id, results[0].title)
-        self.assertEqual(cpg_sg_id, results[0].data.id)
-        self.assertEqual(cpg_sg_id, results[0].data.sg_external_id)
+        result_data = results[0].data
+        assert isinstance(result_data, SequencingGroupSearchResponseData)
+        self.assertIsInstance(result_data, SequencingGroupSearchResponseData)
+        self.assertEqual(cpg_sg_id, result_data.id)
+        self.assertEqual(cpg_sg_id, result_data.sg_external_id)
 
     @run_as_sync
     async def test_search_isolated_sample_by_external_id(self):
@@ -125,12 +141,16 @@ class TestSample(DbIsolatedTest):
         cpg_id = sample_id_format(sample.id)
 
         self.assertEqual(1, len(results))
-        result = results[0]
-        self.assertEqual(cpg_id, result.title)
-        self.assertEqual(cpg_id, result.data.id)
-        self.assertListEqual(['EX001'], result.data.sample_external_ids)
-        self.assertListEqual([], result.data.participant_external_ids)
-        self.assertListEqual([], result.data.family_external_ids)
+
+        self.assertEqual(cpg_id, results[0].title)
+        result_data = results[0].data
+
+        self.assertIsInstance(result_data, SampleSearchResponseData)
+        assert isinstance(result_data, SampleSearchResponseData)
+        self.assertEqual(cpg_id, result_data.id)
+        self.assertListEqual(['EX001'], result_data.sample_external_ids)
+        self.assertListEqual([], result_data.participant_external_ids)
+        self.assertListEqual([], result_data.family_external_ids)
 
     @run_as_sync
     async def test_search_participant_isolated(self):
@@ -145,12 +165,13 @@ class TestSample(DbIsolatedTest):
             query='PART01', project_ids=[self.project_id]
         )
         self.assertEqual(1, len(results))
-        result = results[0]
-        self.assertEqual(p.id, result.data.id)
-        self.assertEqual('PART01', result.title)
-        self.assertListEqual(['PART01'], result.data.participant_external_ids)
-        self.assertListEqual([], result.data.family_external_ids)
-        self.assertRaises(AttributeError, lambda: result.data.sample_external_ids)
+
+        self.assertEqual('PART01', results[0].title)
+        result_data = results[0].data
+        assert isinstance(result_data, ParticipantSearchResponseData)
+        self.assertEqual(p.id, result_data.id)
+        self.assertListEqual(['PART01'], result_data.participant_external_ids)
+        self.assertListEqual([], result_data.family_external_ids)
 
     @run_as_sync
     async def test_search_family(self):
@@ -164,11 +185,11 @@ class TestSample(DbIsolatedTest):
         )
         self.assertEqual(1, len(results))
         result = results[0]
-        self.assertEqual(f_id, result.data.id)
         self.assertEqual('FAMXX01', result.title)
-        self.assertListEqual(['FAMXX01'], result.data.family_external_ids)
-        self.assertRaises(AttributeError, lambda: result.data.participant_external_ids)
-        self.assertRaises(AttributeError, lambda: result.data.sample_external_ids)
+        result_data = result.data
+        assert isinstance(result_data, FamilySearchResponseData)
+        self.assertEqual(f_id, result_data.id)
+        self.assertListEqual(['FAMXX01'], result_data.family_external_ids)
 
     @run_as_sync
     async def test_search_mixed(self):
@@ -195,7 +216,7 @@ class TestSample(DbIsolatedTest):
         sample = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_id='X:SAM001',
-                sample_type='blood',
+                type='blood',
                 participant_id=p.id,
             )
         )
@@ -214,19 +235,26 @@ class TestSample(DbIsolatedTest):
         sample_result = next(
             r for r in all_results if r.type == SearchResponseType.SAMPLE
         )
+        family_result_data = family_result.data
+        participant_result_data = participant_result.data
+        sample_result_data = sample_result.data
+
+        assert isinstance(family_result_data, FamilySearchResponseData)
+        assert isinstance(participant_result_data, ParticipantSearchResponseData)
+        assert isinstance(sample_result_data, SampleSearchResponseData)
 
         # linked family matches
         self.assertEqual('X:FAM01', family_result.title)
 
         # linked participant matches
         self.assertEqual('X:PART01', participant_result.title)
-        self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)
+        self.assertListEqual(['X:FAM01'], participant_result_data.family_external_ids)
 
         # linked sample matches
         cpg_id = sample_id_format(sample.id)
-        self.assertEqual(cpg_id, sample_result.data.id)
-        self.assertListEqual(['X:SAM001'], sample_result.data.sample_external_ids)
-        self.assertListEqual(['X:FAM01'], participant_result.data.family_external_ids)
+        self.assertEqual(cpg_id, sample_result_data.id)
+        self.assertListEqual(['X:SAM001'], sample_result_data.sample_external_ids)
+        self.assertListEqual(['X:FAM01'], participant_result_data.family_external_ids)
         self.assertListEqual(
-            ['X:PART01'], participant_result.data.participant_external_ids
+            ['X:PART01'], participant_result_data.participant_external_ids
         )

@@ -27,7 +27,7 @@ import asyncio
 import json
 from collections import defaultdict
 from textwrap import dedent
-from typing import Any, List, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import click
 from databases import Database
@@ -338,7 +338,7 @@ INNER JOIN analysis_sample a_s ON a.id = a_s.analysis_id
     )
     analysis_samples = await connection.fetch_all(analyses_query)
 
-    sequence_group_ids_of_duplicate_samples_query = dedent(
+    sequencing_group_ids_of_duplicate_samples_query = dedent(
         """
 SELECT sg.sample_id, sg.id, sg.type
 FROM sequencing_group sg
@@ -352,13 +352,13 @@ ON sg.sample_id = duplicates.sample_id
 ORDER BY sg.sample_id DESC;
     """
     )
-    sequence_group_ids_of_duplicate_samples = await connection.fetch_all(
-        sequence_group_ids_of_duplicate_samples_query
+    sequencing_group_ids_of_duplicate_samples = await connection.fetch_all(
+        sequencing_group_ids_of_duplicate_samples_query
     )
     duplicate_sg_id_map: Dict[
         SampleId, Dict[SequenceType, SequenceGroupId]
     ] = defaultdict(dict)
-    for row in sequence_group_ids_of_duplicate_samples:
+    for row in sequencing_group_ids_of_duplicate_samples:
         duplicate_sg_id_map[row['sample_id']][row['type']] = row['id']
 
     values_to_insert: List[Tuple[int, SequenceGroupId]] = []
