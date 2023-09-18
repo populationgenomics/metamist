@@ -14,9 +14,9 @@ jobs:
       run:
         shell: bash -eo pipefail -l {0}
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
