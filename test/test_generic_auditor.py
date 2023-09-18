@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 from collections import namedtuple
 
 from metamist.audit.generic_auditor import GenericAuditor
