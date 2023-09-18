@@ -23,11 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: "gcloud auth"
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: '${{ secrets.GCP_SERVER_DEPLOY_KEY }}'
+
       - name: "gcloud setup"
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: sample-metadata
-          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
 
       - name: "gcloud docker auth"
         run: |
