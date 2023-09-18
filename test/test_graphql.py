@@ -229,3 +229,30 @@ query MyQuery($sg_id: String!) {
         self.assertIn('id', analyses[0])
         self.assertIn('meta', analyses[0])
         self.assertIn('output', analyses[0])
+
+    @run_as_sync
+    async def test_participant_phenotypes(self):
+        """
+        Test getting participant phentypes in graphql
+        """
+        # insert participant
+        p = await self.player.upsert_participant(
+            ParticipantUpsertInternal(external_id='Demeter', meta={}, samples=[])
+        )
+
+        phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}
+        # insert participant_phenotypes
+        await self.player.insert_participant_phenotypes({p.id: phenotypes})
+
+        q = """
+query MyQuery($pid: Int!) {
+  participant(id: $pid) {
+    phenotypes
+  }
+}"""
+
+        resp = await self.run_graphql_query_async(q, {'pid': p.id})
+
+        self.assertIn('participant', resp)
+        self.assertIn('phenotypes', resp['participant'])
+        self.assertDictEqual(phenotypes, resp['participant']['phenotypes'])

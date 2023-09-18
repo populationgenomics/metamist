@@ -15,7 +15,7 @@ def main(ped_file_path: str, project: str):
     fapi = FamilyApi()
 
     # pylint: disable=no-member
-    with AnyPath(ped_file_path).open() as ped_file:  # type: ignore
+    with AnyPath(ped_file_path).open() as ped_file:
         fapi.import_pedigree(
             file=ped_file,
             has_header=True,
