@@ -174,7 +174,7 @@ class SlackNotification:
             name=f'{self.topic_name}-func',
             build_config=gcp.cloudfunctionsv2.FunctionBuildConfigArgs(
                 runtime='python311',
-                entry_point=f'etl_notify',
+                entry_point='etl_notify',
                 environment_variables={},
                 source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceArgs(
                     storage_source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceStorageSourceArgs(
@@ -263,13 +263,13 @@ class SlackNotification:
                 },
             ),
             project=self.config.project_name,
-            opts=pulumi.ResourceOptions(
-                depends_on=[
-                    self.notification_pubsub_topic,
-                    self.notification_cloudfun,
-                    self.notification_dead_letters_pubsub_topic,
-                ]
-            ),
+            # opts=pulumi.ResourceOptions(
+            #     depends_on=[
+            #         self.notification_pubsub_topic,
+            #         self.notification_cloudfun,
+            #         self.notification_dead_letters_pubsub_topic,
+            #     ]
+            # ),
         )
 
         # give subscriber permission to service account
@@ -330,9 +330,9 @@ class SlackNotification:
             topic=self.notification_dead_letters_pubsub_topic.name,
             project=self.config.project_name,
             ack_deadline_seconds=20,
-            opts=pulumi.ResourceOptions(
-                depends_on=[self.notification_dead_letters_pubsub_topic]
-            ),
+            # opts=pulumi.ResourceOptions(
+            #     depends_on=[self.notification_dead_letters_pubsub_topic]
+            # ),
         )
 
     def setup_notification(self):

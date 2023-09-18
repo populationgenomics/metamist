@@ -5,6 +5,7 @@ so it can be centrally deployed. Do this through a plugin, and submodule.
 """
 import contextlib
 import os
+import json
 from functools import cached_property
 from pathlib import Path
 
@@ -26,7 +27,7 @@ PATH_TO_ETL_BQ_SCHEMA = ETL_FOLDER / 'bq_schema.json'
 PATH_TO_ETL_BQ_LOG_SCHEMA = ETL_FOLDER / 'bq_log_schema.json'
 
 
-# TODO: update implementation in cpg_infra project to enable binary files & private repos?
+# TODO: update implementation in cpg_infra to enable binary files & private repos?
 def append_private_repositories_to_requirements(
     file_content: str, private_repo_url: str, private_repos: str
 ) -> str:
@@ -83,11 +84,21 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # todo, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
 
-        # TODO: the following should be added to SampleMetadataConfig
-        self.extra_sample_metadata_config = {
+        # TODO: the following should be added to SampleMetadataConfig in cpg_infra
+        self.extra_sample_metadata_config = {  # pylint: disable=attribute-defined-outside-init
             'private_repo_url': 'https://australia-southeast1-python.pkg.dev/milo-dev-396001/python-repo/simple',
             'private_repos': 'metamist_private',
             'environment': 'DEVELOPMENT',
+            'etl_load_default_config': {
+                # Order of config overides:
+                # 1. parser default config values
+                # 2. etl_load_default_config
+                # 3. config from payload
+                'project': 'milo-dev',
+                'default_sequencing_type': 'genome',
+                'default_sequencing_technology': 'long-read',
+                'default_sample_type': 'blood',
+            },
         }
         self._setup_etl()
 
@@ -282,10 +293,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             opts=pulumi.ResourceOptions(
                 depends_on=[
                     self._svc_pubsub,
-                    self.etl_pubsub_topic,
-                    self.etl_load_function,
                     self.etl_pubsub_dead_letter_subscription,
-                    self.etl_extract_service_account,
                 ]
             ),
         )
@@ -312,9 +320,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             topic=self.etl_pubsub_dead_letters_topic.name,
             project=self.config.sample_metadata.gcp.project,
             ack_deadline_seconds=20,
-            opts=pulumi.ResourceOptions(
-                depends_on=[self.etl_pubsub_dead_letters_topic]
-            ),
         )
 
     @cached_property
@@ -353,9 +358,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             # docs say: Note: On newer versions of the provider,
             # you must explicitly set
             deletion_protection=False,
-            opts=pulumi.ResourceOptions(
-                depends_on=[self.etl_bigquery_dataset],
-            ),
         )
         return etl_table
 
@@ -568,6 +570,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     else '',
                     # TODO replace with metamist config, once it's available
                     'SM_ENVIRONMENT': self.extra_sample_metadata_config['environment'],
+                    # TODO replace with etl_load_default_config config, once it's available
+                    'DEFAULT_LOAD_CONFIG': json.dumps(
+                        self.extra_sample_metadata_config['etl_load_default_config']
+                    ),
                 },
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
@@ -580,7 +586,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     self._svc_functions,
                     self._svc_build,
                     sa,
-                    self.etl_slack_notification_topic,
                 ]
             ),
         )

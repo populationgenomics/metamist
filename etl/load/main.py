@@ -18,6 +18,7 @@ import pkg_resources
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 BIGQUERY_LOG_TABLE = os.getenv('BIGQUERY_LOG_TABLE')
 NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
+DEFAULT_LOAD_CONFIG = os.getenv('DEFAULT_LOAD_CONFIG', '{}')
 
 
 def call_parser(parser_obj, row_json):
@@ -38,7 +39,7 @@ def call_parser(parser_obj, row_json):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logging.error(f'Failed to parse: {e}')
             # add to the output
-            res.append(e)
+            res.append(f'Failed to parse: {e}')
             status.append('FAILED')
 
     asyncio.run(run_parser_capture_result(parser_obj, row_json, tmp_res, tmp_status))
@@ -58,8 +59,13 @@ def process_rows(query_job_result, delivery_attempt, request_id, parser_map, bq_
         # sample_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
         row_json = json.loads(row.body)
-        # get config from payload or use default
-        config_data = row_json.get('config')
+
+        # get config from payload and merge with the default
+        config_data = json.loads(DEFAULT_LOAD_CONFIG)
+        payload_config_data = row_json.get('config')
+        if payload_config_data:
+            config_data.update(payload_config_data)
+
         # get data from payload or use payload as data
         record_data = row_json.get('data', row_json)
 
