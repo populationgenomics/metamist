@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring,import-error
+# pylint: disable=missing-function-docstring,import-error,no-member
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -56,8 +56,8 @@ class SlackNotificationConfig:
         self,
         project_name: str,
         location: str,  # e.g. self.config.gcp.region
-        service_account: object,
-        source_bucket: object,
+        service_account: gcp.serviceaccount.Account,
+        source_bucket: gcp.storage.Bucket,
         slack_secret_project_id: str,
         slack_token_secret_name: str,
         slack_channel_name: str,

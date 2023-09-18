@@ -4,7 +4,7 @@ import datetime
 import json
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import flask
 import functions_framework
@@ -21,12 +21,12 @@ NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
 DEFAULT_LOAD_CONFIG = os.getenv('DEFAULT_LOAD_CONFIG', '{}')
 
 
-def call_parser(parser_obj, row_json):
+def call_parser(parser_obj, row_json) -> tuple[str, str]:
     """
     This function calls parser_obj.from_json and returns status and result
     """
-    tmp_res = []
-    tmp_status = []
+    tmp_res: List[str] = []
+    tmp_status: List[str] = []
 
     # GenericMetadataParser from_json is async
     # we call it from sync, so we need to wrap it in coroutine
@@ -222,7 +222,7 @@ def etl_load(request: flask.Request):
     }, 500
 
 
-def extract_request_id(jbody: Dict[str, Any]) -> str | None:
+def extract_request_id(jbody: Dict[str, Any]) -> tuple[str | None, str | None]:
     """Unwrapp request id from the payload
 
     Args:
@@ -263,7 +263,7 @@ def extract_request_id(jbody: Dict[str, Any]) -> str | None:
 
 def get_parser_instance(
     parser_map: dict, sample_type: str | None, init_params: dict | None
-) -> object | None:
+) -> tuple[object | None, str | None]:
     """Extract parser name from sample_type
 
     Args:

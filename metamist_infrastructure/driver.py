@@ -1,4 +1,3 @@
-# pylint: disable=missing-function-docstring,import-error
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -343,7 +342,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-    def _setup_bq_table(self, schema_file_name: str, table_name: str):
+    def _setup_bq_table(self, schema_file_name: Path, table_name: str):
         """Setup Bigquery table"""
         with open(schema_file_name) as f:
             schema = f.read()
@@ -498,7 +497,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """etl_load_function"""
         return self._etl_function('load', self.etl_load_service_account)
 
-    def _etl_function(self, f_name: str, sa: object):
+    def _etl_function(self, f_name: str, sa: gcp.serviceaccount.Account):
         """
         Driver function to setup the etl cloud function
         """
@@ -511,8 +510,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             str(path_to_func_folder.absolute()),
             allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}),
             # TODO replace with metamist config, once it's available
-            private_repo_url=self.extra_sample_metadata_config['private_repo_url'],
-            private_repos=self.extra_sample_metadata_config['private_repos'],
+            private_repo_url=str(self.extra_sample_metadata_config['private_repo_url']),
+            private_repos=str(self.extra_sample_metadata_config['private_repos']),
         )
 
         # Create the single Cloud Storage object,
