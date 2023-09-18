@@ -10,7 +10,7 @@ google-cloud-logging==2.7.0
 google-cloud-storage==1.43.0
 uvicorn==0.18.3
 fastapi[all]==0.85.1
-strawberry-graphql[fastapi]==0.177.1
+strawberry-graphql[fastapi]==0.206.0
 python-multipart==0.0.5
 databases[mysql]==0.6.1
 SQLAlchemy==1.4.41

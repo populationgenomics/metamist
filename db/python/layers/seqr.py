@@ -1,8 +1,8 @@
 # pylint: disable=unnecessary-lambda-assignment,too-many-locals,broad-exception-caught
 
+import asyncio
 import os
 import re
-import asyncio
 import traceback
 from collections import defaultdict
 from datetime import datetime
@@ -15,13 +15,14 @@ from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (
-    SEQR_URL,
     SEQR_AUDIENCE,
     SEQR_MAP_LOCATION,
     SEQR_SLACK_NOTIFICATION_CHANNEL,
+    SEQR_URL,
     get_slack_token,
 )
 from db.python.connect import Connection
+from db.python.enum_tables import SequencingTypeTable
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.family import FamilyLayer
@@ -29,15 +30,14 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.enum_tables import SequencingTypeTable
-from db.python.utils import ProjectId, GenericFilter
+from db.python.utils import GenericFilter, ProjectId
 from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
 # automation need to have sample inclusion / exclusion
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_format_list,
     sequencing_group_id_format,
+    sequencing_group_id_format_list,
 )
 
 SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
@@ -421,9 +421,9 @@ class SeqrLayer(BaseLayer):
         )
 
         if len(es_index_analyses) == 0:
-            return [f'No ES index to synchronise']
+            return ['No ES index to synchronise']
 
-        with AnyPath(fn_path).open('w+') as f:
+        with AnyPath(fn_path).open('w+') as f:  # type: ignore
             f.write('\n'.join(rows_to_write))
 
         es_index = es_index_analyses[-1].output

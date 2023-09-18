@@ -112,7 +112,7 @@ class TestGraphQL(DbIsolatedTest):
         (strawberry has an as_str() method)
         """
         client = configure_sync_client(
-            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'
+            schema=api.graphql.schema.schema.as_str(), auth_token='FAKE'  # type: ignore
         )
         validate(TEST_QUERY, client=client)
 
