@@ -10,6 +10,7 @@ HTJMHDSX3_4_220817_FD123456_Homo-sapiens_AGATCCATTA-TGGTAGAGAT_R_220208_BATCH_M0
 The assay ID would be HTJMHDSX3_4_220817_FD123456
 """
 import logging
+
 import click
 
 from metamist.apis import AssayApi
@@ -24,7 +25,7 @@ logger.setLevel(logging.INFO)
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET)',
+    help='The metamist project ($DATASET)',
 )
 def main(project: str):
     """Back populate external_ids for existing assays"""

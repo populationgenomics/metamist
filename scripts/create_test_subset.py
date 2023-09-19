@@ -55,7 +55,7 @@ DEFAULT_SAMPLES_N = 10
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET)',
+    help='The metamist project ($DATASET)',
 )
 @click.option(
     '-n',

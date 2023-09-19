@@ -5,12 +5,12 @@ Setup script for the Python package. Dependencies for server are listed separate
 in requirements.txt, dev dependencies are listed in requirements-dev.txt.
 """
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 PKG = 'metamist'
 
 all_packages = ['metamist']
-all_packages.extend('metamist.' + p for p in sorted(find_packages(f'./metamist')))
+all_packages.extend('metamist.' + p for p in sorted(find_packages('./metamist')))
 
 with open('README.md', encoding='utf-8') as f:
     readme = f.read()
@@ -23,7 +23,7 @@ setup(
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
-    url=f'https://github.com/populationgenomics/sample-metadata',
+    url='https://github.com/populationgenomics/metamist',
     license='MIT',
     packages=all_packages,
     install_requires=[

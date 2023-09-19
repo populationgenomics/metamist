@@ -5,10 +5,7 @@ from typing import List
 
 import click
 
-from metamist.parser.generic_metadata_parser import (
-    GenericMetadataParser,
-    run_as_sync,
-)
+from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
 from metamist.parser.generic_parser import ParsedSample, ParsedSequencingGroup
 
 logger = logging.getLogger(__file__)
@@ -128,7 +125,7 @@ class OntParser(GenericMetadataParser):
 @click.command()
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into',
+    help='The metamist project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='genome')
