@@ -8,6 +8,9 @@ on:
       - dev
       - workload-identity-federation
 
+permissions:
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
