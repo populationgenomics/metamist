@@ -1,7 +1,5 @@
 name: Unittests
-on:
-  workflow_dispatch: {}
-  # push
+on: push
 
 jobs:
   run-unittests:
