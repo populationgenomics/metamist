@@ -222,25 +222,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             uniform_bucket_level_access=True,
         )
 
-    @cached_property
-    def etl_service_account(self):
-        """Service account to run endpoint + ingestion as"""
-        return gcp.serviceaccount.Account(
-            'metamist-etl-service-account',
-            account_id='metamist-etl-sa',
-            project=self.config.sample_metadata.gcp.project,
-            opts=pulumi.ResourceOptions(
-                depends_on=[self._svc_iam],
-            ),
-        )
-
     def _etl_function_account(self, f_name: str):
         """
         Service account for cloud function
         """
         return gcp.serviceaccount.Account(
-            f'metamist-etl-{f_name}-service-account',
-            account_id=f'metamist-etl-{f_name}-sa',
+            f'metamist-etl-{f_name}service-account',
+            account_id=f'metamist-etl-{f_name}sa',
             project=self.config.sample_metadata.gcp.project,
             opts=pulumi.ResourceOptions(
                 depends_on=[self._svc_iam],
@@ -248,14 +236,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
 
     @cached_property
+    def etl_service_account(self):
+        """Service account to run notification functionality and other services"""
+        return self._etl_function_account('')
+
+    @cached_property
     def etl_load_service_account(self):
         """Service account to run load/transform functionality"""
-        return self._etl_function_account('load')
+        return self._etl_function_account('load-')
 
     @cached_property
     def etl_extract_service_account(self):
         """Service account to run extract functionality"""
-        return self._etl_function_account('extract')
+        return self._etl_function_account('extract-')
 
     @cached_property
     def etl_accessors(self):
@@ -489,7 +482,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-        # give account serverless-robot-prod.iam.gserviceaccount.com ability to setup cloud service
+        # serverless-robot-prod.iam.gserviceaccount.com is used
+        # by gcloud to setup cloud run service
+        # if not present functions could not be deployed
         project = gcp.organizations.get_project()
         robot_account = pulumi.Output.concat(
             'serviceAccount:service-',
