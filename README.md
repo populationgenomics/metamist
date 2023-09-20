@@ -1,6 +1,6 @@
 # Sample Metadata
 
-[![codecov](https://codecov.io/gh/populationgenomics/sample-metadata/branch/dev/graph/badge.svg?token=OI3XZYR9HK)](https://codecov.io/gh/populationgenomics/sample-metadata)
+[![codecov](https://codecov.io/gh/populationgenomics/metamist/branch/dev/graph/badge.svg?token=OI3XZYR9HK)](https://codecov.io/gh/populationgenomics/metamist)
 
 Metamist is database that stores **de-identified** -omics metadata.
 
@@ -390,7 +390,7 @@ will build the docker container and supply it to regenerate_api.py.
 
 ```bash
 # SM_DOCKER is a known env variable to regenerate_api.py
-export SM_DOCKER="cpg/sample-metadata-server:dev"
+export SM_DOCKER="cpg/metamist-server:dev"
 docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Dockerfile .
 python regenerate_api.py
 ```

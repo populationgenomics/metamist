@@ -33,7 +33,7 @@ The full recovery process is detailed below. Follow the recovery stages that are
 3. Clone this repo
 
    > ```bash
-   > git clone https://github.com/populationgenomics/sample-metadata.git
+   > git clone https://github.com/populationgenomics/metamist.git
    > ```
 
 4. Navigate to the appropriate directory
@@ -85,7 +85,7 @@ The full recovery process is detailed below. Follow the recovery stages that are
 
 ### Daily Backup
 
-A cron job runs a [backup script](https://github.com/populationgenomics/sample-metadata/blob/dev/db/backup/backup.py) daily. The script outputs a folder that is uploaded to GCS in the [cpg-sm-backups](https://console.cloud.google.com/storage/browser/cpg-sm-backups;tab=objects?forceOnBucketsSortingFiltering=false&project=sample-metadata&prefix=&forceOnObjectsSortingFiltering=false) bucket.
+A cron job runs a [backup script](https://github.com/populationgenomics/metamist/blob/dev/db/backup/backup.py) daily. The script outputs a folder that is uploaded to GCS in the [cpg-sm-backups](https://console.cloud.google.com/storage/browser/cpg-sm-backups;tab=objects?forceOnBucketsSortingFiltering=false&project=sample-metadata&prefix=&forceOnObjectsSortingFiltering=false) bucket.
 
 All backups will be retained for 30 days in the event that they are deleted.
 Setting up
@@ -141,7 +141,7 @@ IMPORTANT: Do not run the validation script in a production environment. In orde
 2. Clone this repo
 
    > ```bash
-   > git clone https://github.com/populationgenomics/sample-metadata.git
+   > git clone https://github.com/populationgenomics/metamist.git
    > ```
 
 3. Navigate to the directory
@@ -196,4 +196,4 @@ To test our monitoring and alerting policy, once a year our database backups wil
 Further, alongside the procedure to validate the [database restoration](#running-the-validation-script), the SM API will be validated.
 
 1. Update the configuration to point to the new VM as the production VM.
-2. Run the test script, currently under construction [#35](https://github.com/populationgenomics/sample-metadata/pull/35)
+2. Run the test script, currently under construction [#35](https://github.com/populationgenomics/metamist/pull/35)
