@@ -79,7 +79,7 @@ class TestEtlLoad(DbIsolatedTest):
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
         )
-        request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
+        request.get_json.return_value = {'request_id': '1234567890'}
 
         query_job_result = MagicMock(items=[], args={}, spec=[])
         query_job_result.total_rows = 0
@@ -90,16 +90,14 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        response = etl.load.main.etl_load(request)
+        response, status = etl.load.main.etl_load(request)
+        self.assertEqual(status, 412)
         self.assertEqual(
             response,
-            (
-                {
-                    'success': False,
-                    'message': 'Record with id: 1234567890 not found',
-                },
-                412,
-            ),
+            {
+                'success': False,
+                'message': 'Record with id: 1234567890 not found',
+            },
         )
 
     @run_as_sync
@@ -110,7 +108,7 @@ class TestEtlLoad(DbIsolatedTest):
         request = MagicMock(
             args={}, spec=['__len__', 'toJSON', 'authorization', 'get_json']
         )
-        request.get_json.return_value = json.loads('{"request_id": "1234567890"}')
+        request.get_json.return_value = {'request_id': '1234567890'}
 
         query_row = MagicMock(args={}, spec=['body', 'type', 'submitting_user'])
         query_row.body = ETL_SAMPLE_RECORD_2
@@ -127,12 +125,12 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        call_parser.return_value = ('SUCCESS', '')
+        call_parser.return_value = (etl.load.main.ParsingStatus.SUCCESS, '')
 
         response, status = etl.load.main.etl_load(request)
 
         # etl_load will fail as bbv/v1 is invalid parser
-        self.assertEqual(status, 500)
+        self.assertEqual(status, 400)
         self.assertDictEqual(
             response,
             {
@@ -188,11 +186,11 @@ class TestEtlLoad(DbIsolatedTest):
         bq_client_instance = bq_client.return_value
         bq_client_instance.query.return_value = query_result
 
-        call_parser.return_value = ('SUCCESS', '')
+        call_parser.return_value = (etl.load.main.ParsingStatus.SUCCESS, '')
 
-        response = etl.load.main.etl_load(request)
-        # etl_load will fail as bbv/v1 is invalid parser
+        response, status = etl.load.main.etl_load(request)
 
+        self.assertEqual(status, 200)
         self.assertDictEqual(
             response,
             {

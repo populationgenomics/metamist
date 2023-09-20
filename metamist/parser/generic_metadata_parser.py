@@ -693,7 +693,7 @@ class GenericMetadataParser(GenericParser):
         ]
 
     @staticmethod
-    def get_info():
+    def get_info() -> tuple[str, str]:
         """
         Information about parser, including short name and version
         """

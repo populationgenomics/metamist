@@ -22,10 +22,10 @@ Please use your personal dev project as `$PROJECT_NAME`.
 # setup gcloud authentication
 gcloud auth application-default login
 
-export PROJECT_NAME='gcp-project-name'
-export BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
-export BIGQUERY_LOG_TABLE='$PROJECT_NAME.metamist.etl-logs'
-export PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/etl-topic'
+export PROJECT_NAME="gcp-project-name"
+export BIGQUERY_TABLE="$PROJECT_NAME.metamist.etl-data"
+export BIGQUERY_LOG_TABLE="$PROJECT_NAME.metamist.etl-logs"
+export PUBSUB_TOPIC="projects/$PROJECT_NAME/topics/etl-topic"
 
 # setup to run local version of sample-metadata
 export SM_ENVIRONMENT=local
@@ -111,7 +111,9 @@ gcloud functions deploy etl_load \
     --source=. \
     --entry-point=etl_load \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data'
+    --no-allow-unauthenticated \
+    --set-env-vars BIGQUERY_TABLE=$BIGQUERY_TABLE \
+    --set-env-vars PUBSUB_TOPIC=$PUBSUB_TOPIC
 ```
 
 ```bash
@@ -125,6 +127,7 @@ gcloud functions deploy etl_extract \
     --source=. \
     --entry-point=etl_post \
     --trigger-http \
-    --set-env-vars BIGQUERY_TABLE='$PROJECT_NAME.metamist.etl-data' \
-    --set-env-vars PUBSUB_TOPIC='projects/$PROJECT_NAME/topics/my-topic'
+    --no-allow-unauthenticated \
+    --set-env-vars BIGQUERY_TABLE=$BIGQUERY_TABLE \
+    --set-env-vars PUBSUB_TOPIC=$PUBSUB_TOPIC
 ```
