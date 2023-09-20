@@ -2,15 +2,15 @@
 import logging
 import os
 import re
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 import click
-from metamist.model.sequencing_type import SequenceType
 
+from metamist.model.sequencing_type import SequenceType
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    run_as_sync,
     SingleRow,
+    run_as_sync,
 )
 
 rmatch = re.compile(r'_[Rr]\d')
@@ -142,7 +142,7 @@ class VcgsManifestParser(GenericMetadataParser):
 @click.command(help='GCS path to manifest file')
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into (probably "seqr")',
+    help='The metamist project to import manifest into (probably "seqr")',
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')

@@ -4,20 +4,20 @@ import logging
 import re
 import shlex
 from functools import reduce
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import click
 
 from metamist.parser.generic_parser import (
     GenericParser,
     GroupedRow,
-    ParsedSequencingGroup,
+    ParsedAnalysis,
     ParsedAssay,
+    ParsedSequencingGroup,
     # noqa
     SingleRow,
     run_as_sync,
-    ParsedAnalysis,
-)  # noqa
+)
 
 __DOC = """
 Parse CSV / TSV manifest of arbitrary format.
@@ -704,7 +704,7 @@ class GenericMetadataParser(GenericParser):
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET) to import manifest into',
+    help='The metamist project ($DATASET) to import manifest into',
 )
 @click.option('--sample-name-column', required=True)
 @click.option(

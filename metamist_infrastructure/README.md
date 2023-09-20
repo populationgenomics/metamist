@@ -19,14 +19,14 @@ The `setup.py` in this directory does some directory magic, it adds:
 You can install from git using:
 
 ```bash
-pip install git+https://github.com/populationgenomics/sample-metadata.git@main#subdirectory=metamist_infrastructure
+pip install git+https://github.com/populationgenomics/metamist.git@main#subdirectory=metamist_infrastructure
 ```
 
 Or add the following to your `requirements.txt`:
 
 ```text
 # other requirements here
-metamist-infrastructure @ git+https://github.com/populationgenomics/sample-metadata.git@main#subdirectory=metamist_infrastructure
+metamist-infrastructure @ git+https://github.com/populationgenomics/metamist.git@main#subdirectory=metamist_infrastructure
 ```
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
-from typing import List
 import logging
+from typing import List
 
 import click
 
@@ -127,7 +127,7 @@ class SampleFileMapParser(GenericMetadataParser):
 @click.command(help=__DOC)
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into',
+    help='The metamist project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')

@@ -426,7 +426,7 @@ class GenericParser(
         self.ignore_extra_keys = ignore_extra_keys
 
         if not project:
-            raise ValueError('sample-metadata project is required')
+            raise ValueError('A metamist project is required')
 
         self.project = project
 

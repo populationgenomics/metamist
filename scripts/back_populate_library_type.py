@@ -6,6 +6,7 @@ updates the sequence.meta field with `facility` and `library_type` annotations.
 """
 import logging
 import re
+
 import click
 
 from metamist.apis import AssayApi
@@ -45,7 +46,7 @@ garvan_fastq_regex = (
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET)',
+    help='The metamist project ($DATASET)',
 )
 @click.option(
     '-d',
