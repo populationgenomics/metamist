@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-arguments
+# type: ignore
+# pylint: skip-file
+
+
+# # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments
 
 """ Example Invocation
 
@@ -11,32 +15,26 @@ scripts/create_test_subset.py --project acute-care --families 4
 This example will populate acute-care-test with the metamist data for 4 families.
 """
 
-from typing import Optional, Counter as CounterType
+import csv
 import logging
 import os
 import random
 import subprocess
 import traceback
 from collections import Counter
-import csv
+from typing import Optional
 
 import click
 from google.cloud import storage
 
 from metamist import exceptions
-from metamist.apis import (
-    AnalysisApi,
-    AssayApi,
-    SampleApi,
-    FamilyApi,
-    ParticipantApi,
-)
+from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.models import (
-    BodyGetAssaysByCriteria,
-    AssayUpsert,
-    SampleUpsert,
     Analysis,
     AnalysisStatus,
+    AssayUpsert,
+    BodyGetAssaysByCriteria,
+    SampleUpsert,
 )
 
 logger = logging.getLogger(__file__)
@@ -320,7 +318,7 @@ def main(
                 )
                 logger.info(f'Creating {a_type} analysis entry in test')
                 aapi.create_analysis(project=target_project, analysis=am)
-        logger.info(f'-')
+        logger.info('-')
 
 
 def transfer_families(
@@ -569,7 +567,7 @@ def _validate_opts(
 
 def _print_fam_stats(families: list[dict[str, str]]):
     family_sizes = Counter([fam['family_id'] for fam in families])
-    fam_by_size: CounterType[int] = Counter()
+    fam_by_size: Counter[int] = Counter()
     # determine number of singles, duos, trios, etc
     for fam in family_sizes:
         fam_by_size[family_sizes[fam]] += 1

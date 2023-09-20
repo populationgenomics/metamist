@@ -372,7 +372,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                                 : '1px solid var(--color-border-default)',
                                                         backgroundColor,
                                                     }}
-                                                    key={`${s.id}sequence_group.${k}`}
+                                                    key={`${s.id}sequencing_group.${k}`}
                                                     rowSpan={(seq.assays ?? []).length}
                                                 >
                                                     {k === 'id' ? (

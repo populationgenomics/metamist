@@ -1,11 +1,8 @@
 import json
 from typing import Any
 
-from models.base import SMBase, OpenApiGenNoneType
-from models.utils.sample_id_format import (
-    sample_id_format,
-    sample_id_transform_to_raw,
-)
+from models.base import OpenApiGenNoneType, SMBase
+from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
 
 
 class AssayInternal(SMBase):
@@ -104,12 +101,12 @@ class AssayUpsert(SMBase):
         _sample_id = None
         if self.sample_id:
             # but may be provided directly when inserting directly
-            _sample_id = sample_id_transform_to_raw(self.sample_id)
+            _sample_id = sample_id_transform_to_raw(self.sample_id)  # type: ignore
 
         return AssayUpsertInternal(
-            id=self.id,
-            type=self.type,
-            external_ids=self.external_ids,
-            sample_id=_sample_id,
-            meta=self.meta,
+            id=self.id,  # type: ignore
+            type=self.type,  # type: ignore
+            external_ids=self.external_ids,  # type: ignore
+            sample_id=_sample_id,  # type: ignore
+            meta=self.meta,  # type: ignore
         )
