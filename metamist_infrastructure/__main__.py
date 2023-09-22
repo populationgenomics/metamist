@@ -32,6 +32,20 @@ conf_dict = {
         },
         'etl_accessors': ['bbv'],
         'slack_channel': SLACK_CHANNEL,
+        # TODO: comment out below once CPG_INFRA is updated
+        # 'etl_environment': 'DEVELOPMENT',
+        # 'etl_parser_default_config': {
+        #     # Order of config overides:
+        #     # 1. parser default config values
+        #     # 2. etl_load_default_config
+        #     # 3. config from payload
+        #     'project': 'milo-dev',
+        #     'default_sequencing_type': 'genome',
+        #     'default_sequencing_technology': 'long-read',
+        #     'default_sample_type': 'blood',
+        # },
+        # 'etl_private_repo_url': 'https://australia-southeast1-python.pkg.dev/milo-dev-396001/python-repo/simple',
+        # 'etl_private_repo_packages': ['metamist_private'],
     },
     'billing': {
         'coordinator_machine_account': '',

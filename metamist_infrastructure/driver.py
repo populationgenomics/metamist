@@ -3,8 +3,8 @@ Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
 """
 import contextlib
-import os
 import json
+import os
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable
@@ -16,8 +16,8 @@ from cpg_infra.plugin import CpgInfrastructurePlugin
 # from cpg_infra.utils import archive_folder
 from slack_notification import (
     SlackNotification,
-    SlackNotificationType,
     SlackNotificationConfig,
+    SlackNotificationType,
 )
 
 # this gets moved around during the pip install
@@ -125,20 +125,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # to be deployed here, but for now it's manually deployed
 
         # TODO: the following should be added to SampleMetadataConfig in cpg_infra
-        self.extra_sample_metadata_config = {  # pylint: disable=attribute-defined-outside-init
-            'private_repo_url': 'https://australia-southeast1-python.pkg.dev/milo-dev-396001/python-repo/simple',
-            'private_repos': ['metamist_private'],
-            'environment': 'DEVELOPMENT',
-            'etl_load_default_config': {
-                # Order of config overides:
-                # 1. parser default config values
-                # 2. etl_load_default_config
-                # 3. config from payload
-                'project': 'milo-dev',
-                'default_sequencing_type': 'genome',
-                'default_sequencing_technology': 'long-read',
-                'default_sample_type': 'blood',
-            },
+        # pylint: disable=attribute-defined-outside-init
+        self.extra_sample_metadata_config = {
+            'etl_private_repo_url': None,
+            'etl_private_repo_packages': None,
+            'etl_environment': 'DEVELOPMENT',
+            'etl_parser_default_config': None,
         }
         self._setup_etl()
 
@@ -551,17 +543,16 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     update_requirements,
                     {
                         'private_repo_url': str(
-                            self.extra_sample_metadata_config['private_repo_url']
+                            # TODO replace with metamist config, once it's available
+                            self.extra_sample_metadata_config['etl_private_repo_url']
                         ),
+                        # TODO replace with metamist config, once it's available
                         'private_repos': self.extra_sample_metadata_config[
-                            'private_repos'
+                            'etl_private_repo_packages'
                         ],
                     },
                 ),
-            }
-            # TODO replace with metamist config, once it's available
-            # private_repo_url=str(self.extra_sample_metadata_config['private_repo_url']),
-            # private_repos=str(self.extra_sample_metadata_config['private_repos']),
+            },
         )
 
         # Create the single Cloud Storage object,
@@ -618,10 +609,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     if self.etl_slack_notification_topic
                     else '',
                     # TODO replace with metamist config, once it's available
-                    'SM_ENVIRONMENT': self.extra_sample_metadata_config['environment'],
-                    # TODO replace with etl_load_default_config config, once it's available
+                    'SM_ENVIRONMENT': self.extra_sample_metadata_config[
+                        'etl_environment'
+                    ],
+                    # TODO replace with metamist config, once it's available
                     'DEFAULT_LOAD_CONFIG': json.dumps(
-                        self.extra_sample_metadata_config['etl_load_default_config']
+                        self.extra_sample_metadata_config['etl_parser_default_config']
                     ),
                 },
                 ingress_settings='ALLOW_ALL',
