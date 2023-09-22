@@ -15,7 +15,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # not super important as we don't deploy this plugin
-    version='1.0.0',
+    version='1.0.1',
     description='Metamist infrastructure plugin for cpg-infrastructure',
     long_description=readme,
     long_description_content_type='text/markdown',
