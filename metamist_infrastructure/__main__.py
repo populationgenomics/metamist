@@ -7,6 +7,7 @@ from metamist_infrastructure import MetamistInfrastructure
 GCP_PROJECT = os.getenv('METAMIST_INFRA_GCP_PROJECT')
 SLACK_CHANNEL = os.getenv('METAMIST_INFRA_SLACK_CHANNEL')
 SLACK_TOKEN_SECRET_NAME = os.getenv('METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME')
+ETL_PRIVATE_REPO_URL = os.getenv('METAMIST_INFRA_ETL_PRIVATE_REPO_URL')
 
 # simple cpg-infra configuration
 conf_dict = {
@@ -44,7 +45,7 @@ conf_dict = {
         #     'default_sequencing_technology': 'long-read',
         #     'default_sample_type': 'blood',
         # },
-        # 'etl_private_repo_url': 'https://australia-southeast1-python.pkg.dev/milo-dev-396001/python-repo/simple',
+        # 'etl_private_repo_url': ETL_PRIVATE_REPO_URL,
         # 'etl_private_repo_packages': ['metamist_private'],
     },
     'billing': {
