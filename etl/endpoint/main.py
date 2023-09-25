@@ -3,12 +3,12 @@ import json
 import logging
 import os
 import uuid
-import functions_framework
-import flask
-import google.cloud.bigquery as bq
-from google.cloud import pubsub_v1
 
+import flask
+import functions_framework
+import google.cloud.bigquery as bq
 from cpg_utils.cloud import email_from_id_token
+from google.cloud import pubsub_v1  # type: ignore
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')

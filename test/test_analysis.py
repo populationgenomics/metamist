@@ -1,21 +1,20 @@
 # pylint: disable=invalid-overridden-method
-from datetime import timedelta, datetime
-
+from datetime import datetime, timedelta
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.tables.analysis import AnalysisFilter
-from db.python.utils import GenericFilter
-from db.python.layers.assay import AssayLayer
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.analysis import AnalysisFilter
+from db.python.utils import GenericFilter
+from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
     AssayUpsertInternal,
-    SequencingGroupUpsertInternal,
     SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
 )
-from models.enums import AnalysisStatus
 
 
 class TestAnalysis(DbIsolatedTest):
@@ -132,7 +131,7 @@ class TestAnalysis(DbIsolatedTest):
             AnalysisInternal(
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
-                sequence_group_ids=[],
+                sequencing_group_ids=[],
                 meta={},
             )
         )
@@ -148,7 +147,7 @@ class TestAnalysis(DbIsolatedTest):
                 id=a_id,
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
-                sequence_group_ids=[],
+                sequencing_group_ids=[],
                 output=None,
                 timestamp_completed=None,
                 project=1,

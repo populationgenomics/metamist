@@ -7,6 +7,7 @@ import { Popup } from 'semantic-ui-react'
 import ExploreIcon from '@mui/icons-material/Explore'
 import DescriptionIcon from '@mui/icons-material/Description'
 import InsightsIcon from '@mui/icons-material/Insights'
+import BuildIcon from '@mui/icons-material/Build'
 import Searchbar from './Search'
 import MuckTheDuck from '../MuckTheDuck'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
@@ -60,6 +61,14 @@ const NavBar: React.FunctionComponent = () => (
                     </Popup>
                 </span>
             </Link>
+            <a href="/graphql">
+                <span className="d-none d-lg-block navbarLink">GraphQL</span>
+                <span className="d-lg-none navbarIcon">
+                    <Popup trigger={<BuildIcon />} hoverable position="bottom center">
+                        <h5>GraphQL</h5>
+                    </Popup>
+                </span>
+            </a>
             <div style={{ marginLeft: 'auto' }}>
                 <DarkModeTriButton />
             </div>

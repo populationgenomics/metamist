@@ -1,14 +1,14 @@
 import json
 
 from db.python.utils import ProjectId
-from models.base import SMBase, OpenApiGenNoneType
-from models.models.sample import (
-    SampleUpsertInternal,
-    SampleUpsert,
-    NestedSampleInternal,
-    NestedSample,
-)
+from models.base import OpenApiGenNoneType, SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
+from models.models.sample import (
+    NestedSample,
+    NestedSampleInternal,
+    SampleUpsert,
+    SampleUpsertInternal,
+)
 
 
 class ParticipantInternal(SMBase):
@@ -135,12 +135,12 @@ class ParticipantUpsert(SMBase):
     def to_internal(self):
         """Convert to internal model, doesn't really do much"""
         p = ParticipantUpsertInternal(
-            id=self.id,
-            external_id=self.external_id,
-            reported_sex=self.reported_sex,
-            reported_gender=self.reported_gender,
-            karyotype=self.karyotype,
-            meta=self.meta,
+            id=self.id,  # type: ignore
+            external_id=self.external_id,  # type: ignore
+            reported_sex=self.reported_sex,  # type: ignore
+            reported_gender=self.reported_gender,  # type: ignore
+            karyotype=self.karyotype,  # type: ignore
+            meta=self.meta,  # type: ignore
         )
 
         if self.samples:
