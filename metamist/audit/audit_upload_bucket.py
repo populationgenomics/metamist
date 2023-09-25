@@ -59,9 +59,11 @@ def get_sequencing_types():
 
 async def _get_sequencing_types():
     """Return the list of sequencing types from the enum table."""
+    logging.getLogger().setLevel(logging.WARN)
     sequencing_types = await query_async(  # pylint: disable=unsubscriptable-object
         SEQUENCING_TYPES_QUERY
     )
+    logging.getLogger().setLevel(logging.INFO)
     return sequencing_types['enum']['sequencingType']
 
 
@@ -70,12 +72,15 @@ def audit_upload_bucket(
 ):
     """Entrypoint for running upload bucket auditor asynchronously."""
     asyncio.get_event_loop().run_until_complete(
-        audit_upload_bucket_async(
-            dataset,
-            sequencing_types,
-            file_types,
-            default_analysis_type,
-            default_analysis_status,
+        asyncio.wait_for(
+            audit_upload_bucket_async(
+                dataset,
+                sequencing_types,
+                file_types,
+                default_analysis_type,
+                default_analysis_status,
+            ),
+            timeout=60
         )
     )
 

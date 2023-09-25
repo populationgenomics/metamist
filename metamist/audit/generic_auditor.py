@@ -55,6 +55,7 @@ QUERY_SG_ANALYSES = gql(
               id
               meta
               output
+              type
               timestampCompleted
             }
           }
@@ -105,9 +106,12 @@ class GenericAuditor(AuditHelper):
         Returned list includes all samples and assays associated with the participants.
         """
 
+        logging.getLogger().setLevel(logging.WARN)
         participant_query_results = await query_async(
             QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS, {'datasetName': self.dataset}
         )
+        logging.getLogger().setLevel(logging.INFO)
+
         participant_data = participant_query_results['project']['participants']
 
         filtered_participants = []
@@ -132,6 +136,8 @@ class GenericAuditor(AuditHelper):
         for sg_analyses in analyses_list:
             sg_id = sg_analyses['id']
             analyses = sg_analyses['analyses']
+            if not analyses:
+                continue
             if len(analyses) == 1:
                 most_recent_analysis_by_sg[sg_id] = analyses[0]
                 continue
@@ -229,7 +235,11 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
+
+        logging.getLogger().setLevel(logging.WARN)
         analyses_query_result = await query_async(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})
+        logging.getLogger().setLevel(logging.INFO)
+
         analyses = analyses_query_result['sequencingGroups']
         analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
 
@@ -263,15 +273,21 @@ class GenericAuditor(AuditHelper):
 
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
-        sg_analyses = await query_async(  # pylint: disable=unsubscriptable-object
+        logging.getLogger().setLevel(logging.WARN)
+        sg_analyse_query_result = await query_async(
             QUERY_SG_ANALYSES,
             {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM']},
-        )['sequencingGroups']
+        )
+        logging.getLogger().setLevel(logging.INFO)
+
+        sg_analyses = sg_analyse_query_result['sequencingGroups']
 
         for sg_analysis in sg_analyses:
             sg_id = sg_analysis['id']
 
             for analysis in sg_analysis['analyses']:
+                if not analysis.get('type'):
+                    print(sg_id, analysis)
                 analysis_entry = {
                     'analysis_id': analysis['id'],
                     'analysis_type': analysis['type'],
