@@ -153,7 +153,7 @@ SG_ID_QUERY = gql(
 PARTICIPANT_QUERY = gql(
     """
     query ($project: String!) {
-        project (externalId: $project) {
+        project (name: $project) {
             participants {
                 id
                 externalId
@@ -204,12 +204,12 @@ def main(
 
     # Pull Participant Data
     participant_data = []
-    participant_ids: list = []
+    internal_participant_ids: list = []
     for sg in original_project_subset_data.get('project').get('samples'):
         participant = sg.get('participant')
         if participant:
             participant_data.append(participant)
-            participant_ids.append(participant.get('externalId'))
+            internal_participant_ids.append(participant.get('id'))
 
     # Populating test project
     target_project = project + '-test'
@@ -223,7 +223,9 @@ def main(
         )
 
     else:
-        family_ids = transfer_families(project, target_project, participant_ids)
+        family_ids = transfer_families(
+            project, target_project, internal_participant_ids
+        )
         upserted_participant_map = transfer_ped(project, target_project, family_ids)
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
@@ -484,12 +486,12 @@ def get_sids_for_families(
 
 
 def transfer_families(
-    initial_project: str, target_project: str, participant_ids: list[int]
+    initial_project: str, target_project: str, internal_participant_ids: list[int]
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     families = fapi.get_families(
         project=initial_project,
-        participant_ids=participant_ids,
+        participant_ids=internal_participant_ids,
     )
 
     family_ids = [family['id'] for family in families]
