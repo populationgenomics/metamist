@@ -14,8 +14,11 @@ from metamist.parser.cloudhelper import CloudHelper
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
-    #
-    EXCLUDED_SGS = os.getenv('SM_AUDIT_HELPER_EXCLUDED_SGS', '').split(',')
+    EXCLUDED_SGS: set[str] = set(
+        sg for sg in
+        os.getenv('SM_AUDIT_EXCLUDED_SGS', '').split(',')
+        if sg
+    )
 
     @staticmethod
     def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:

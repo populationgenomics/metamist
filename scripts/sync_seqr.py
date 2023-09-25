@@ -55,7 +55,7 @@ ENVS = {
     ),
 }
 
-SGS_TO_IGNORE = {}
+SGS_TO_IGNORE: set[str] = set()
 BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
 
 url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'

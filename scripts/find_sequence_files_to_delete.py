@@ -34,7 +34,9 @@ client = storage.Client()
 projapi = ProjectApi()
 
 # TODO: fetch this from metamist
-CPG_SEQUENCING_GROUP_IDS_TO_SKIP = {}
+CPG_SEQUENCING_GROUP_IDS_TO_SKIP: set[str] = set(
+    sg for sg in os.getenv('CPG_SEQUENCING_GROUP_IDS_TO_SKIP', '').split(',') if sg
+)
 
 
 def get_bucket_name_from_path(path_input):
