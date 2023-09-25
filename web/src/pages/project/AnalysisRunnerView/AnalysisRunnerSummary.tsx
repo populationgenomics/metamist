@@ -20,7 +20,7 @@ const PAGE_SIZES = [20, 40, 100, 1000]
 const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
-        analyses(type: { eq: "analysis-runner" }) {
+        analyses(type: { eq: "analysis-runner" }, status: {eq: UNKNOWN}) {
           author
           id
           meta

@@ -1,6 +1,7 @@
-import re
 import abc
+import re
 from functools import lru_cache
+
 from async_lru import alru_cache
 
 from db.python.connect import DbBase
@@ -36,7 +37,8 @@ class EnumTable(DbBase):
         matcher = table_name_matcher.match(tn)
         if not matcher:
             raise ValueError(
-                f'The tablename {tn} is not valid (must match {table_name_matcher.pattern})'
+                f'The tablename {tn} is not valid (must match '
+                f'{table_name_matcher.pattern})'
             )
         return tn
 
@@ -47,9 +49,9 @@ class EnumTable(DbBase):
         """
         _query = f'SELECT DISTINCT name FROM {self._get_table_name()}'
         rows = await self.connection.fetch_all(_query)
-        rows = [r['name'] for r in rows]
+        nrows = [r['name'] for r in rows]
 
-        return rows
+        return nrows
 
     async def insert(self, value: str):
         """
@@ -64,3 +66,4 @@ class EnumTable(DbBase):
         await self.connection.execute(_query, {'name': value.lower()})
         # clear the cache so results are up-to-date
         self.get.cache_clear()  # pylint: disable=no-member
+        return value

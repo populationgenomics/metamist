@@ -121,7 +121,9 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
         if self.port:
             _host += f':{self.port}'
 
-        options = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
+        options: dict[
+            str, str | int
+        ] = {}  # {'min_size': self.min_pool_size, 'max_size': self.max_pool_size}
         _options = '&'.join(f'{k}={v}' for k, v in options.items())
 
         url = f'mysql://{u_p}@{_host}/{self.dbname}?{_options}'

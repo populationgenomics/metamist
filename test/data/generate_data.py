@@ -4,26 +4,19 @@ import argparse
 import asyncio
 import datetime
 import random
+from pathlib import Path
 from pprint import pprint
 
-from metamist.apis import (
-    ProjectApi,
-    ParticipantApi,
-    FamilyApi,
-    SampleApi,
-    AnalysisApi,
-)
+from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
-from metamist.models import (
-    SampleUpsert,
-    AssayUpsert,
-    SequencingGroupUpsert,
-)
+from metamist.models import AssayUpsert, SampleUpsert, SequencingGroupUpsert
 from metamist.parser.generic_parser import chunk
 
 EMOJIS = [':)', ':(', ':/', ':\'(']
+
+default_ped_location = str(Path(__file__).parent / 'greek-myth-forgeneration.ped')
 
 QUERY_SG_ID = gql(
     """
@@ -51,7 +44,7 @@ query EnumsQuery {
 )
 
 
-async def main(ped_path='greek-myth-forgeneration.ped', project='greek-myth'):
+async def main(ped_path=default_ped_location, project='greek-myth'):
     """Doing the generation for you"""
 
     papi = ProjectApi()
@@ -234,7 +227,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--ped-path',
         type=str,
-        default='greek-myth-forgeneration.ped',
+        default=default_ped_location,
         help='Path to the pedigree file',
     )
     parser.add_argument('--project', type=str, default='greek-myth')

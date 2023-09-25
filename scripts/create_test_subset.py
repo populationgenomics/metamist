@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,too-many-arguments
+# type: ignore
+# pylint: skip-file
+
+
+# # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument,too-many-arguments
 
 """ Example Invocation
 
@@ -12,23 +16,17 @@ This example will populate acute-care-test with the metamist data for 4 families
 """
 
 from typing import Optional, Counter as CounterType
+import csv
 import logging
 import os
 import random
 import subprocess
 from collections import Counter
-import csv
 
 import click
 from google.cloud import storage
 
-from metamist.apis import (
-    AnalysisApi,
-    AssayApi,
-    SampleApi,
-    FamilyApi,
-    ParticipantApi,
-)
+from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.models import (
     AssayUpsert,
     SampleUpsert,
@@ -173,7 +171,7 @@ PARTICIPANT_QUERY = """
 @click.option(
     '--project',
     required=True,
-    help='The sample-metadata project ($DATASET)',
+    help='The metamist project ($DATASET)',
 )
 @click.option(
     '-n',
@@ -215,6 +213,13 @@ PARTICIPANT_QUERY = """
     This is in addition to the number of families specified in
     --families and the number of samples specified in -n""",
 )
+@click.option(
+    '--noninteractive',
+    'noninteractive',
+    is_flag=True,
+    default=False,
+    help='Skip interactive confirmation',
+)
 def main(
     project: str,
     samples_n: Optional[int],
@@ -222,13 +227,14 @@ def main(
     skip_ped: Optional[bool] = True,
     additional_families: Optional[tuple[str]] = None,
     additional_samples: Optional[tuple[str]] = None,
+    noninteractive: Optional[bool] = False,
 ):
     """
     Script creates a test subset for a given project.
     A new project with a prefix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
-    samples_n, families_n = _validate_opts(samples_n, families_n)
+    samples_n, families_n = _validate_opts(samples_n, families_n, noninteractive)
     _additional_families: list[str] = list(additional_families)
     _additional_samples: list[str] = list(additional_samples)
 
@@ -722,7 +728,7 @@ def _normalise_map(unformatted_map: list[list[str]]) -> dict[str, str]:
 
 
 def _validate_opts(
-    samples_n: int, families_n: int
+    samples_n: int, families_n: int, noninteractive: bool
 ) -> tuple[Optional[int], Optional[int]]:
     """Validates the options passed to the script"""
     if samples_n is None and families_n is None:

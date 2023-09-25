@@ -20,6 +20,12 @@ def _create_route(e: Type[EnumTable]):
     async def get(connection=get_projectless_db_connection) -> list[str]:
         return await e(connection).get()
 
+    @router.post('/' + hyphenated_name, operation_id='post' + camel_case_name + 's')
+    async def post(
+        new_type: str, connection=get_projectless_db_connection
+    ) -> list[str]:
+        return await e(connection).insert(new_type)
+
 
 for enum in enum_tables.__dict__.values():
     if not isclass(enum):
