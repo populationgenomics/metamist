@@ -48,10 +48,10 @@ QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
 
 QUERY_SG_ANALYSES = gql(
     """
-        query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisType: String!) {
+        query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
           sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
             id
-            analyses(status: {eq: COMPLETED}, type: {eq: $analysisType}) {
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}) {
               id
               meta
               output
@@ -188,6 +188,10 @@ class GenericAuditor(AuditHelper):
                         )
                         continue
 
+                    if assay_sg_id_map[assay['id']]: 
+                        raise ValueError(
+                            f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
+                        )
                     assay_sg_id_map[assay['id']] = sg['id']
 
                     if isinstance(reads, dict):
@@ -224,13 +228,13 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
-        analyses = query(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisType': 'CRAM'})['sequencingGroups']  # pylint: disable=unsubscriptable-object
+        analyses = query(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})['sequencingGroups']  # pylint: disable=unsubscriptable-object
         analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
 
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
             analysis['id']
-            for analysis in list(analyses.values())
+            for analysis in analyses.values()
             if 'sequencing_type' not in analysis['meta']
         ]
         if crams_with_missing_seq_type:
@@ -242,13 +246,13 @@ class GenericAuditor(AuditHelper):
         sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
         for sg_id, analysis in analyses.items():
             cram_path = analysis['output']
-            if not cram_path.startswith('gs://') and cram_path.endswith('cram'):
+            if not cram_path.startswith('gs://') and cram_path.endswith('.cram'):
                 logging.warning(
                     f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
                 )
                 continue
 
-            sg_cram_paths[sg_id].update([(analysis['id'], analysis['output'])])
+            sg_cram_paths[sg_id][analysis['id']] = analysis['output']
 
         return sg_cram_paths
 
@@ -257,16 +261,10 @@ class GenericAuditor(AuditHelper):
 
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
-        sg_analyses = []
-        for analysis_type in ANALYSIS_TYPES:
-            if analysis_type == 'CRAM':
-                continue
-            sg_analyses.extend(
-                query(  # pylint: disable=unsubscriptable-object
-                    QUERY_SG_ANALYSES,
-                    {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisType': analysis_type},
-                )['sequencingGroups']
-            )
+        sg_analyses = query(  # pylint: disable=unsubscriptable-object
+            QUERY_SG_ANALYSES,
+            {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM']},
+        )['sequencingGroups']
 
         for sg_analysis in sg_analyses:
             sg_id = sg_analysis['id']

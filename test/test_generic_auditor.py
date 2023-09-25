@@ -395,8 +395,6 @@ class TestGenericAuditor(unittest.TestCase):
         expected_result = {
             'CPG123': {1: 'gs://cpg-dataset-main/cram/CPG123.cram'},
         }
-        print(test_result)
-        print(expected_result)
         self.assertDictEqual(test_result, expected_result)
 
     @unittest.mock.patch('metamist.audit.generic_auditor.query')

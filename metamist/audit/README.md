@@ -10,11 +10,11 @@ as well as samples that have no completed cram.
 
 ### Procedure
 
-1. Input a Metamist dataset, sequence types to audit, and file types to search for in the bucket
+1. Input a Metamist dataset, sequencing types to audit, and file types to search for in the bucket
 2. Get all the participants, samples, sequencing groups, and assays for this dataset
 3. Search the upload bucket for all assay files, and compare to the files in the metamist assay reads
     - If there are discrepencies, check if the file name and size is the same in the bucket as it is in metamist
-      - If the name and file size are the same, assume this file has just been moved around in the bucket
+    - If the name and file size are the same, assume this file has just been moved around in the bucket
 4. Check if a sequencing group has a completed cram - if so, its assay read files can be deleted
 5. Any remaining assay data in the bucket might require ingestion
 6. Create reports in the audit_results folder of the upload bucket, containing assay read files to delete,
