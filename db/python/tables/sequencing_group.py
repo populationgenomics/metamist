@@ -125,10 +125,10 @@ class SequencingGroupTable(DbBase):
                 f'Couldn\'t find sequencing groups with internal id {ids})'
             )
 
-        rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
-        projects = set(r.project for r in rows)
+        sg_rows = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
+        projects = set(r.project for r in sg_rows)
 
-        return projects, rows
+        return projects, sg_rows
 
     async def get_assay_ids_by_sequencing_group_ids(
         self, ids: list[int]
@@ -172,7 +172,7 @@ class SequencingGroupTable(DbBase):
 
         return sequencing_group_ids_by_sample_ids_by_type
 
-    async def get_participant_ids_and_sequence_group_ids_for_sequencing_type(
+    async def get_participant_ids_and_sequencing_group_ids_for_sequencing_type(
         self, sequencing_type: str
     ) -> tuple[set[ProjectId], dict[int, list[int]]]:
         """
@@ -266,7 +266,7 @@ class SequencingGroupTable(DbBase):
         type_: str,
         technology: str,
         platform: str,
-        sequence_ids: list[int],
+        assay_ids: list[int],
         meta: dict = None,
         author: str = None,
         open_transaction=True,
@@ -333,16 +333,16 @@ class SequencingGroupTable(DbBase):
                 _query,
                 {**values, 'author': author or self.author},
             )
-            sequence_insert_values = [
+            assay_id_insert_values = [
                 {
                     'seqgroup': id_of_seq_group,
                     'assayid': s,
                     'author': author or self.author,
                 }
-                for s in sequence_ids
+                for s in assay_ids
             ]
             await self.connection.execute_many(
-                _seqg_linker_query, sequence_insert_values
+                _seqg_linker_query, assay_id_insert_values
             )
 
             return id_of_seq_group

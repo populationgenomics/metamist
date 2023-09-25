@@ -184,7 +184,7 @@ def generate_schema_file():
     Generate schema file and place in the metamist/graphql/ directory
     """
     command = ['strawberry', 'export-schema', 'api.graphql.schema:schema']
-    schema = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
+    schema = subprocess.check_output(command).decode()
 
     with open(os.path.join(MODULE_DIR, 'graphql/schema.graphql'), 'w+') as f:
         f.write(schema)

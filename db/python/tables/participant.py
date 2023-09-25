@@ -298,11 +298,11 @@ RETURNING id
         self, project: ProjectId, sequencing_type: str | None = None
     ) -> list[tuple[str, int]]:
         """
-        Get a map of {external_participant_id} -> {internal_sample_id}
-        useful to matching joint-called samples in the matrix table to the participant
+        Get a map of {external_participant_id} -> {internal_sequencing_group_id}
+        useful to match joint-called sequencing groups in the matrix table to the participant
 
         Return a list not dictionary, because dict could lose
-        participants with multiple samples.
+        participants with multiple sequencing groups.
         """
         wheres = ['p.project = :project']
         values: dict[str, Any] = {'project': project}
@@ -311,7 +311,7 @@ RETURNING id
             values['sequencing_type'] = sequencing_type
 
         _query = f"""
-SELECT p.external_id, s.id
+SELECT p.external_id, sg.id
 FROM participant p
 INNER JOIN sample s ON p.id = s.participant_id
 INNER JOIN sequencing_group sg ON sg.sample_id = s.id

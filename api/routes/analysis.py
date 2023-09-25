@@ -8,7 +8,6 @@ from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
-from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     Connection,
     get_project_readonly_connection,
@@ -317,21 +316,15 @@ async def get_sequencing_group_file_sizes(
     """
     Get the per sample file size by type over the given projects and date range
     """
-    atable = AnalysisLayer(connection)
 
-    # Check access to projects
-    project_ids = None
-    pt = ProjectPermissionsTable(connection=connection.connection)
-    project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, project_names, readonly=True
-    )
+    raise NotImplementedError('This route is broken, and not properly implemented yet')
+    # atable = AnalysisLayer(connection)
 
     # Map from internal pids to project name
     dict(zip(project_ids, project_names))
 
-    # Convert dates
-    start = parse_date_only_string(start_date)
-    end = parse_date_only_string(end_date)
+    # # Map from internal pids to project name
+    # prj_name_map = dict(zip(project_ids, project_names))
 
     # Get results with internal ids as keys
     results: list[dict] = await atable.get_sequencing_group_file_sizes(

@@ -45,6 +45,7 @@ from models.models.search import (
     SearchItem,
     SearchResponse,
     SearchResponseData,
+    SequencingGroupSearchResponseData,
 )
 from models.models.sequencing_group import (
     NestedSequencingGroup,

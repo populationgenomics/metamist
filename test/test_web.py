@@ -1,26 +1,26 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from models.enums import MetaSearchEntityPrefix
-from models.models import (
-    ParticipantUpsertInternal,
-    SampleUpsertInternal,
-    SequencingGroupUpsertInternal,
-    AssayUpsertInternal,
-    ProjectSummaryInternal,
-    AssayInternal,
-    Assay,
-)
-from models.models import WebProject, SearchItem
-from models.utils.sample_id_format import sample_id_transform_to_raw
-from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
-
 from db.python.layers import (
     AssayLayer,
-    SequencingGroupLayer,
-    SampleLayer,
     ParticipantLayer,
+    SampleLayer,
+    SequencingGroupLayer,
     WebLayer,
 )
+from models.enums import MetaSearchEntityPrefix
+from models.models import (
+    Assay,
+    AssayInternal,
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    ProjectSummaryInternal,
+    SampleUpsertInternal,
+    SearchItem,
+    SequencingGroupUpsertInternal,
+    WebProject,
+)
+from models.utils.sample_id_format import sample_id_transform_to_raw
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -71,20 +71,20 @@ def get_test_participant():
                                 type='sequencing',
                                 meta={
                                     'reads': [
-                                            {
-                                                'basename': 'sample_id001.filename-R1.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R1.fastq.gz',
-                                                'size': 111,
-                                            },
-                                            {
-                                                'basename': 'sample_id001.filename-R2.fastq.gz',
-                                                'checksum': None,
-                                                'class': 'File',
-                                                'location': '/path/to/sample_id001.filename-R2.fastq.gz',
-                                                'size': 111,
-                                            },
+                                        {
+                                            'basename': 'sample_id001.filename-R1.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                                            'size': 111,
+                                        },
+                                        {
+                                            'basename': 'sample_id001.filename-R2.fastq.gz',
+                                            'checksum': None,
+                                            'class': 'File',
+                                            'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                                            'size': 111,
+                                        },
                                     ],
                                     'reads_type': 'fastq',
                                     'batch': 'M001',
@@ -204,9 +204,7 @@ class TestWeb(DbIsolatedTest):
 
         # Expect an empty project
         expected = ProjectSummaryInternal(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
@@ -308,9 +306,7 @@ class TestWeb(DbIsolatedTest):
             ],
         )
         empty_result = ProjectSummaryInternal(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
@@ -455,12 +451,10 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    **{
-                        'model_type': MetaSearchEntityPrefix.ASSAY,
-                        'query': 'field wi',
-                        'field': 'field with spaces',
-                        'is_meta': True,
-                    }
+                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    query='field wi',
+                    field='field with spaces',
+                    is_meta=True,
                 )
             ],
         )

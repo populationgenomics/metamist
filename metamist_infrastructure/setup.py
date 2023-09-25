@@ -19,7 +19,7 @@ setup(
     description='Metamist infrastructure plugin for cpg-infrastructure',
     long_description=readme,
     long_description_content_type='text/markdown',
-    url=f'https://github.com/populationgenomics/sample-metadata',
+    url='https://github.com/populationgenomics/metamist',
     license='MIT',
     packages=[
         'metamist_infrastructure',
