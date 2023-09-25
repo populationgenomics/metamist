@@ -6,7 +6,7 @@ from datetime import datetime
 
 from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
-from metamist.graphql import query, gql
+from metamist.graphql import query_async, gql
 
 
 ANALYSIS_TYPES = [
@@ -99,13 +99,13 @@ class GenericAuditor(AuditHelper):
 
         requests_logger.setLevel(logging.WARNING)
 
-    def get_participant_data_for_dataset(self) -> list[dict]:
+    async def get_participant_data_for_dataset(self) -> list[dict]:
         """
         Uses a graphQL query to return all participants in a Metamist dataset.
         Returned list includes all samples and assays associated with the participants.
         """
 
-        participant_data = query(  # pylint: disable=unsubscriptable-object
+        participant_data = await query_async(  # pylint: disable=unsubscriptable-object
             QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS, {'datasetName': self.dataset}
         )['project']['participants']
 
@@ -219,7 +219,7 @@ class GenericAuditor(AuditHelper):
 
         return sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes
 
-    def get_analysis_cram_paths_for_dataset_sgs(
+    async def get_analysis_cram_paths_for_dataset_sgs(
         self,
         assay_sg_id_map: dict[int, str],
     ) -> dict[str, dict[int, str]]:
@@ -228,7 +228,7 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
-        analyses = query(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})['sequencingGroups']  # pylint: disable=unsubscriptable-object
+        analyses = await query_async(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})['sequencingGroups']  # pylint: disable=unsubscriptable-object
         analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
 
         # Report any crams missing the sequencing type
@@ -256,12 +256,12 @@ class GenericAuditor(AuditHelper):
 
         return sg_cram_paths
 
-    def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
+    async def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
 
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
-        sg_analyses = query(  # pylint: disable=unsubscriptable-object
+        sg_analyses = await query_async(  # pylint: disable=unsubscriptable-object
             QUERY_SG_ANALYSES,
             {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM']},
         )['sequencingGroups']
