@@ -51,11 +51,18 @@ SEQUENCING_TYPES_QUERY = gql(
     """
 )
 
+
+def get_sequencing_types():
+    """Entrypoint for getting sequencing types asynchronously."""
+    return asyncio.get_event_loop().run_until_complete(_get_sequencing_types())
+
+
 async def _get_sequencing_types():
     """Return the list of sequencing types from the enum table."""
-    return await query_async(  # pylint: disable=unsubscriptable-object
+    sequencing_types = await query_async(  # pylint: disable=unsubscriptable-object
         SEQUENCING_TYPES_QUERY
-    )['enum']['sequencingType']
+    )
+    return sequencing_types['enum']['sequencingType']
 
 
 def audit_upload_bucket(
@@ -63,7 +70,7 @@ def audit_upload_bucket(
 ):
     """Entrypoint for running upload bucket auditor asynchronously."""
     asyncio.get_event_loop().run_until_complete(
-        audit_upload_bucket(
+        audit_upload_bucket_async(
             dataset,
             sequencing_types,
             file_types,
@@ -92,7 +99,7 @@ class UploadBucketAuditor(GenericAuditor):
             default_analysis_status=default_analysis_status,
         )
 
-    def write_upload_bucket_audit_reports(
+    async def write_upload_bucket_audit_reports(
         self,
         bucket_name: str,
         sequencing_types: list[str],
@@ -112,7 +119,7 @@ class UploadBucketAuditor(GenericAuditor):
 
         report_path = f'gs://{bucket_name}/audit_results/{today}/'
 
-        if set(sequencing_types) == set(_get_sequencing_types()):
+        if set(sequencing_types) == set(await _get_sequencing_types()):
             sequencing_types_str = 'all'
         else:
             sequencing_types_str = ('_').join(sequencing_types)
@@ -123,7 +130,7 @@ class UploadBucketAuditor(GenericAuditor):
             file_types_str = 'all_reads'
         else:
             file_types_str = ('_').join(file_types)
-            
+
         report_prefix = f'{self.dataset}_{file_types_str}_{sequencing_types_str}'
 
         if not assay_files_to_delete:
@@ -192,9 +199,9 @@ async def audit_upload_bucket_async(
 
     # Validate user inputs
     if sequencing_types == ('all',):
-        sequencing_types = _get_sequencing_types()
+        sequencing_types = await _get_sequencing_types()
     else:
-        if any(st not in (allowed_sequencing_types := _get_sequencing_types()) for st in sequencing_types):
+        if any(st not in (allowed_sequencing_types := await _get_sequencing_types()) for st in sequencing_types):
             raise ValueError(
                 f'Input sequencing types "{sequencing_types}" must be in the allowed types: {allowed_sequencing_types}'
             )
@@ -209,7 +216,7 @@ async def audit_upload_bucket_async(
     if not dataset:
         dataset = config['workflow']['dataset']
     bucket = config['storage'][dataset]['upload']
-    
+
     # Initialise the auditor
     auditor = UploadBucketAuditor(
         dataset=dataset,
@@ -219,7 +226,7 @@ async def audit_upload_bucket_async(
         default_analysis_status=default_analysis_status,
     )
 
-    participant_data = auditor.get_participant_data_for_dataset()
+    participant_data = await auditor.get_participant_data_for_dataset()
     sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
         participant_data
     )
@@ -230,7 +237,7 @@ async def audit_upload_bucket_async(
     ) = auditor.get_assay_map_from_participants(participant_data)
 
     # Get all completed cram output paths for the samples in the dataset and validate them
-    sg_cram_paths = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
+    sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
 
     # Identify sgs with and without completed crams
     sg_completion = auditor.get_complete_and_incomplete_sgs(
@@ -263,7 +270,7 @@ async def audit_upload_bucket_async(
     )
 
     # Write the reads to delete, reads to ingest, and unaligned SGs reports
-    auditor.write_upload_bucket_audit_reports(
+    await auditor.write_upload_bucket_audit_reports(
         bucket,
         sequencing_types=sequencing_types,
         file_types=file_types,
@@ -284,7 +291,7 @@ async def audit_upload_bucket_async(
     '-s',
     multiple=True,
     required=True,
-    help='Sequencing types to filter on, use all to include all sequencing types',
+    help=f'"all", or any of {", ".join(get_sequencing_types())}',
 )
 @click.option(
     '--file-types',

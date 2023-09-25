@@ -105,9 +105,10 @@ class GenericAuditor(AuditHelper):
         Returned list includes all samples and assays associated with the participants.
         """
 
-        participant_data = await query_async(  # pylint: disable=unsubscriptable-object
+        participant_query_results = await query_async(
             QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS, {'datasetName': self.dataset}
-        )['project']['participants']
+        )
+        participant_data = participant_query_results['project']['participants']
 
         filtered_participants = []
         for participant in participant_data:
@@ -188,7 +189,7 @@ class GenericAuditor(AuditHelper):
                         )
                         continue
 
-                    if assay_sg_id_map[assay['id']]: 
+                    if assay_sg_id_map.get(assay['id']):
                         raise ValueError(
                             f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
                         )
@@ -228,7 +229,8 @@ class GenericAuditor(AuditHelper):
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
-        analyses = await query_async(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})['sequencingGroups']  # pylint: disable=unsubscriptable-object
+        analyses_query_result = await query_async(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})
+        analyses = analyses_query_result['sequencingGroups']
         analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
 
         # Report any crams missing the sequencing type
