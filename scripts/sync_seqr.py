@@ -14,11 +14,7 @@ import aiohttp
 import yaml
 from cloudpathlib import AnyPath
 
-from metamist.apis import (
-    AnalysisApi,
-    ProjectApi,
-    SeqrApi,
-)
+from metamist.apis import AnalysisApi, ProjectApi, SeqrApi
 from metamist.graphql import query_async
 from metamist.model.analysis_query_model import AnalysisQueryModel
 from metamist.model.analysis_status import AnalysisStatus
@@ -59,7 +55,7 @@ ENVS = {
     ),
 }
 
-SGS_TO_IGNORE = {'CPG227355', 'CPG227397'}
+SGS_TO_IGNORE = {}
 BASE, SEQR_AUDIENCE = ENVS[ENVIRONMENT]
 
 url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
