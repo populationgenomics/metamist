@@ -715,14 +715,14 @@ if __name__ == '__main__':
         '--families',
         nargs='+',
         help='Additional families to include.',
-        type=set,
+        type=str,
         default={},
     )
     parser.add_argument(
         '--samples',
         nargs='+',
         help='Additional samples to include.',
-        type=set,
+        type=str,
         default={},
     )
     parser.add_argument(
@@ -737,7 +737,7 @@ if __name__ == '__main__':
         project=args.project,
         samples_n=args.n,
         families_n=args.f,
-        additional_samples=args.samples,
-        additional_families=args.families,
+        additional_samples=set(args.samples),
+        additional_families=set(args.families),
         skip_ped=args.skip_ped,
     )

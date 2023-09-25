@@ -1,6 +1,6 @@
 {
-    "name": "sample-metadata",
-    "version": "0.1.0",
+    "name": "metamist",
+    "version": "6.2.1",
     "private": true,
     "dependencies": {
         "@apollo/client": "^3.7.3",

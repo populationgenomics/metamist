@@ -1,18 +1,17 @@
 # pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 import click
 
 from metamist.models import AnalysisStatus
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    run_as_sync,
-    ParsedSequencingGroup,
     ParsedAnalysis,
     ParsedAssay,
+    ParsedSequencingGroup,
+    run_as_sync,
 )
-
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -169,7 +168,7 @@ class TobWgsParser(GenericMetadataParser):
 @click.command(help='GCS path to manifest file')
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into (probably "seqr")',
+    help='The metamist project to import manifest into (probably "seqr")',
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequence-type', default='wgs')
