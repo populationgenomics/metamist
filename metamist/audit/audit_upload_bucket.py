@@ -240,7 +240,7 @@ async def audit_upload_bucket_async(
     sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
 
     # Identify sgs with and without completed crams
-    sg_completion = auditor.get_complete_and_incomplete_sgs(
+    sg_completion = await auditor.get_complete_and_incomplete_sgs(
         assay_sg_id_map, sg_cram_paths
     )
 

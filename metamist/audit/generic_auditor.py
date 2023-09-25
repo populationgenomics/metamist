@@ -287,7 +287,7 @@ class GenericAuditor(AuditHelper):
                         f'{self.dataset} :: SG {sg_without_cram} missing CRAM but has analysis {completed_analysis}'
                     )
 
-    def get_complete_and_incomplete_sgs(
+    async def get_complete_and_incomplete_sgs(
         self,
         assay_sg_id_map: dict[int, str],
         sg_cram_paths: dict[str, dict[int, str]],
@@ -328,7 +328,7 @@ class GenericAuditor(AuditHelper):
             logging.warning(
                 f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {list(incomplete_sgs)}'
             )
-            self.analyses_for_sgs_without_crams(list(incomplete_sgs))
+            await self.analyses_for_sgs_without_crams(list(incomplete_sgs))
 
         return {'complete': completed_sgs, 'incomplete': list(incomplete_sgs)}
 
