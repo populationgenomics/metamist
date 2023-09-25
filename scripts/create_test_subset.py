@@ -246,6 +246,7 @@ def transfer_samples_sgs_assays(
     Transfer samples, sequencing groups, and assays from the original project to the
     test project.
     """
+    logging.info('Transferring samples, sequencing groups, and assays')
     for s in samples:
         sample_sgs: list[SequencingGroupUpsert] = []
         for sg in s.get('sequencingGroups'):
@@ -562,7 +563,6 @@ def transfer_participants(
         if participant['externalId'] not in target_project_epids:
             # Participants with id field will be updated & those without will be inserted
             del participant['id']
-        # transfer_participant = {k: v for k, v in participant.items() if v is not None}
         transfer_participant = {
             'external_id': participant['externalId'],
             'meta': participant.get('meta') or {},
