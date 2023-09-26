@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import etl.load.main
 
-
 ETL_SAMPLE_RECORD_1 = """
 {
     "identifier": "AB0002",
@@ -20,10 +19,10 @@ ETL_SAMPLE_RECORD_1 = """
 ETL_SAMPLE_RECORD_2 = """
 {
     "sample_id": "123456",
-    "external_id": "GRK100311",
-    "individual_id": "608",
+    "external_id": "AAA000000",
+    "individual_id": "678",
     "sequencing_type": "exome",
-    "collection_centre": "KCCG",
+    "collection_centre": "ABCDEF",
     "collection_date": "2023-08-05T01:39:28.611476",
     "collection_specimen": "blood"
 }
@@ -54,10 +53,10 @@ ETL_SAMPLE_RECORD_3 = """
     "data":
     {
         "sample_id": "123456",
-        "external_id": "GRK100311",
-        "individual_id": "608",
+        "external_id": "AAA000000",
+        "individual_id": "678",
         "sequencing_type": "exome",
-        "collection_centre": "KCCG",
+        "collection_centre": "ABCDEF",
         "collection_date": "2023-08-05T01:39:28.611476",
         "collection_specimen": "blood"
     }

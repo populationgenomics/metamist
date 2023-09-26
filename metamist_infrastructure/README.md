@@ -68,12 +68,14 @@ pip install --editable .
 
 ### Env variables
 
-- set environment variable METAMIST_INFRA_SLACK_CHANNEL, METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME and METAMIST_INFRA_GCP_PROJECT, e.g.:
+- set environment variable METAMIST_INFRA_SLACK_CHANNEL, METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME, METAMIST_INFRA_GCP_PROJECT and METAMIST_INFRA_ETL_PRIVATE_REPO_NAME, e.g.:
 
 ```bash
 export METAMIST_INFRA_SLACK_CHANNEL='dev-channel'
 export METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME='dev-slack-secret'
 export METAMIST_INFRA_GCP_PROJECT='gcp-project-name'
+export METAMIST_INFRA_ETL_PRIVATE_REPO_NAME='python-registry'
+
 ```
 
 ### Deploy stack

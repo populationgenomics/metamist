@@ -11,7 +11,6 @@ import pulumi
 import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
-
 from metamist_infrastructure.slack_notification import (
     SlackNotification,
     SlackNotificationConfig,
@@ -31,6 +30,7 @@ def append_private_repositories_to_requirements(
     """
     Append private repositories to requirements.txt
     """
+
     with open(filename, encoding='utf-8') as file:
         file_content = file.read()
         if private_repo_url and private_repos:
@@ -43,6 +43,80 @@ def append_private_repositories_to_requirements(
     return pulumi.StringAsset(file_content)
 
 
+# def append_private_repositories_to_requirements(
+#     filename: str,
+#     private_repo_url: str | None,
+#     private_repos: list[str] | None,
+# ) -> pulumi.Asset:
+#     """
+#     Append private repositories to requirements.txt
+#     """
+#     with open(filename, encoding='utf-8') as file:
+#         file_content = file.read()
+
+#     if not (private_repo_url and private_repos):
+#         # there is no provate repo to be added
+#         return pulumi.StringAsset(file_content)
+
+#     # # we need to use pulumi outputs to combine the content
+#     file_content_output = pulumi.Output.from_input(file_content)
+
+#     # If private_repo_url and private_repos are not Outputs, we make them Outputs
+#     private_repo_url_output = pulumi.Output.from_input(private_repo_url)
+#     private_repos_output = pulumi.Output.from_input(private_repos)
+
+#     # You can convert Outputs to strings like this
+#     file_content_output_str = file_content_output.apply(str)
+#     private_repo_url_str = private_repo_url_output.apply(str)
+#     private_repos_str = pulumi.Output.all(private_repos_output).apply(
+#         lambda private_repos: '\n'.join(map(str, private_repos))
+#     )
+
+#     comb = f'{file_content_output_str}\n--extra-index-url {private_repo_url_str}\n{private_repos_str}'
+
+#     print("comb:", comb)
+
+#     # private_repo_url_output.apply(
+#     #     lambda x: print("\n\n ==== \n private_repo_url_output:", x)
+#     # )
+
+#     res = private_repo_url_output.apply(
+#         lambda x, file_content=file_content: file_content + "\n--extra-index-url " + x
+#     )
+
+#     print("res:", res)
+
+#     return pulumi.StringAsset(
+#         f'{file_content_output_str}\n--extra-index-url {private_repo_url_str}\n{private_repos_str}'
+#     )
+
+
+# # we need to use pulumi outputs to combine the content
+# file_content_output = pulumi.Output.from_input(file_content)
+
+# # If private_repo_url and private_repos are not Outputs, we make them Outputs
+# private_repo_url_output = pulumi.Output.from_input(private_repo_url)
+# private_repos_output = pulumi.Output.from_input('\n'.join(private_repos))
+
+# final_content = pulumi.Output.all(
+#     file_content_output, private_repo_url_output, private_repos_output
+# ).apply(lambda args: args[0] + '\n--extra-index-url ' + args[1] + '\n' + args[2])
+
+# return pulumi.StringAsset(final_content.apply(lambda x: x))
+
+# asset = file_content_output.apply(
+#     lambda file_content: private_repo_url_output.apply(
+#         lambda private_repo_url: private_repos_output.apply(
+#             lambda private_repos: pulumi.StringAsset(
+#                 f'{file_content}\n--extra-index-url {private_repo_url}\n{private_repos}'
+#             )
+#         )
+#     )
+# )
+
+# return asset
+
+
 class MetamistInfrastructure(CpgInfrastructurePlugin):
     """
     Metamist Infrastructure (as code) for Pulumi
@@ -53,14 +127,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # todo, eventually configure metamist cloud run server
         # to be deployed here, but for now it's manually deployed
 
-        # TODO: the following should be added to SampleMetadataConfig in cpg_infra
-        # pylint: disable=attribute-defined-outside-init
-        self.extra_sample_metadata_config = {
-            'etl_private_repo_url': None,
-            'etl_private_repo_packages': None,
-            'etl_environment': 'DEVELOPMENT',
-            'etl_parser_default_config': None,
-        }
         self._setup_etl()
 
     @cached_property
@@ -297,14 +363,14 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             ),
         )
 
-    def _setup_bq_table(self, schema_file_name: Path, table_name: str):
+    def _setup_bq_table(self, schema_file_name: Path, table_id: str, name_suffix: str):
         """Setup Bigquery table"""
         with open(schema_file_name) as f:
             schema = f.read()
 
         etl_table = gcp.bigquery.Table(
-            f'metamist-etl-bigquery-table-{table_name}',
-            table_id=f'etl-{table_name}',
+            f'metamist-etl-bigquery-table{name_suffix}',
+            table_id=table_id,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
@@ -318,16 +384,17 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_bigquery_table(self):
         """
-        Bigquery table to contain the etl data
+        Bigquery table to contain the etl data,
+        for compatibility with the old etl, we do not suffix table name
         """
-        return self._setup_bq_table(PATH_TO_ETL_BQ_SCHEMA, 'data')
+        return self._setup_bq_table(PATH_TO_ETL_BQ_SCHEMA, 'etl-data', '')
 
     @cached_property
     def etl_bigquery_log_table(self):
         """
-        Bigquery table to contain the etl logs
+        Bigquery table to contain the etl logs, append '-logs' as resource name
         """
-        return self._setup_bq_table(PATH_TO_ETL_BQ_LOG_SCHEMA, 'logs')
+        return self._setup_bq_table(PATH_TO_ETL_BQ_LOG_SCHEMA, 'etl-logs', '-logs')
 
     def prepare_service_account_policy_data(self, role):
         """
@@ -451,14 +518,56 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     @cached_property
     def etl_load_function(self):
-        """etl_load_function"""
-        return self._etl_function('load', self.etl_load_service_account, True)
+        """
+        Setup etl_load_function
+        It requires private repository to be included,
+        we would need to wrapp it around with apply funciton as private repo url is Pulumi Output
+        """
+        return self._private_repo_url().apply(
+            lambda url: self._etl_function('load', self.etl_load_service_account, url)
+        )
+
+    def _private_repo_url(self):
+        """
+        Pulumi does not support config for pip (esp. [global]),
+        e.g. gcloud command like this:
+
+        gcloud artifacts print-settings python \
+            --project=cpg-common \
+            --repository=python-registry \
+            --location=australia-southeast1
+
+        output:
+            # Insert the following snippet into your .pypirc
+
+            [distutils]
+            index-servers =
+                python-registry
+
+            [python-registry]
+            repository: https://australia-southeast1-python.pkg.dev/cpg-common/python-registry/
+
+            # Insert the following snippet into your pip.conf
+
+            [global]
+            extra-index-url = https://australia-southeast1-python.pkg.dev/cpg-common/python-registry/simple/
+
+        So we need to manually construct the extra-index-url
+        """
+
+        return pulumi.Output.all(
+            self.infrastructure.gcp_python_registry.location,
+            self.infrastructure.gcp_python_registry.project,
+            self.infrastructure.gcp_python_registry.name,
+        ).apply(
+            lambda args: f'https://{args[0]}-python.pkg.dev/{args[1]}/{args[2]}/simple/'
+        )
 
     def _etl_function(
         self,
         f_name: str,
         sa: gcp.serviceaccount.Account,
-        include_private_repo: bool = False,
+        private_repo_url: str | None = None,
     ):
         """
         Driver function to setup the etl cloud function
@@ -468,7 +577,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         # The Cloud Function source code itself needs to be zipped up into an
         # archive, which we create using the pulumi.AssetArchive primitive.
-        if include_private_repo:
+        if private_repo_url:
             # include private repos and metamist package
             # metamist package is only temprary ones to avoid circular dependencies
             extra_assets = {
@@ -477,13 +586,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 ),
                 'requirements.txt': append_private_repositories_to_requirements(
                     filename=f'{str(path_to_func_folder.absolute())}/requirements.txt',
-                    # TODO replace with metamist config, once it's available
-                    private_repo_url=str(
-                        self.extra_sample_metadata_config['etl_private_repo_url'],
-                    ),
-                    private_repos=self.extra_sample_metadata_config[  # type: ignore  # noqa
-                        'etl_private_repo_packages'
-                    ],
+                    private_repo_url=private_repo_url,
+                    private_repos=self.config.sample_metadata.etl_private_repo_packages,
                 ),
             }
             archive = archive_folder(
@@ -547,13 +651,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     'NOTIFICATION_PUBSUB_TOPIC': self.etl_slack_notification_topic.id
                     if self.etl_slack_notification_topic
                     else '',
-                    # TODO replace with metamist config, once it's available
-                    'SM_ENVIRONMENT': self.extra_sample_metadata_config[
-                        'etl_environment'
-                    ],
-                    # TODO replace with metamist config, once it's available
+                    'SM_ENVIRONMENT': self.config.sample_metadata.etl_environment,
                     'DEFAULT_LOAD_CONFIG': json.dumps(
-                        self.extra_sample_metadata_config['etl_parser_default_config']
+                        self.config.sample_metadata.etl_parser_default_config
                     ),
                 },
                 ingress_settings='ALLOW_ALL',
