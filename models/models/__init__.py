@@ -59,3 +59,6 @@ from models.models.web import (
     ProjectSummaryInternal,
     WebProject,
 )
+from models.models.etl import (
+    EtlSummary,
+)
