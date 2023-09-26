@@ -7,6 +7,10 @@ on:
       - main
       - dev
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -23,11 +27,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: "gcloud setup"
-        uses: google-github-actions/setup-gcloud@v1
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         with:
-          project_id: sample-metadata
-          service_account_key: ${{ secrets.GCP_SERVER_DEPLOY_KEY }}
+          workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/gh-deploy-pool/providers/gh-provider"
+          service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
+
+      - id: "google-cloud-sdk-setup"
+        name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v1
 
       - name: "gcloud docker auth"
         run: |
