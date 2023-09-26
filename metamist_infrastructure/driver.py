@@ -11,6 +11,7 @@ import pulumi
 import pulumi_gcp as gcp
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
+
 from metamist_infrastructure.slack_notification import (
     SlackNotification,
     SlackNotificationConfig,
@@ -41,80 +42,6 @@ def append_private_repositories_to_requirements(
             )
 
     return pulumi.StringAsset(file_content)
-
-
-# def append_private_repositories_to_requirements(
-#     filename: str,
-#     private_repo_url: str | None,
-#     private_repos: list[str] | None,
-# ) -> pulumi.Asset:
-#     """
-#     Append private repositories to requirements.txt
-#     """
-#     with open(filename, encoding='utf-8') as file:
-#         file_content = file.read()
-
-#     if not (private_repo_url and private_repos):
-#         # there is no provate repo to be added
-#         return pulumi.StringAsset(file_content)
-
-#     # # we need to use pulumi outputs to combine the content
-#     file_content_output = pulumi.Output.from_input(file_content)
-
-#     # If private_repo_url and private_repos are not Outputs, we make them Outputs
-#     private_repo_url_output = pulumi.Output.from_input(private_repo_url)
-#     private_repos_output = pulumi.Output.from_input(private_repos)
-
-#     # You can convert Outputs to strings like this
-#     file_content_output_str = file_content_output.apply(str)
-#     private_repo_url_str = private_repo_url_output.apply(str)
-#     private_repos_str = pulumi.Output.all(private_repos_output).apply(
-#         lambda private_repos: '\n'.join(map(str, private_repos))
-#     )
-
-#     comb = f'{file_content_output_str}\n--extra-index-url {private_repo_url_str}\n{private_repos_str}'
-
-#     print("comb:", comb)
-
-#     # private_repo_url_output.apply(
-#     #     lambda x: print("\n\n ==== \n private_repo_url_output:", x)
-#     # )
-
-#     res = private_repo_url_output.apply(
-#         lambda x, file_content=file_content: file_content + "\n--extra-index-url " + x
-#     )
-
-#     print("res:", res)
-
-#     return pulumi.StringAsset(
-#         f'{file_content_output_str}\n--extra-index-url {private_repo_url_str}\n{private_repos_str}'
-#     )
-
-
-# # we need to use pulumi outputs to combine the content
-# file_content_output = pulumi.Output.from_input(file_content)
-
-# # If private_repo_url and private_repos are not Outputs, we make them Outputs
-# private_repo_url_output = pulumi.Output.from_input(private_repo_url)
-# private_repos_output = pulumi.Output.from_input('\n'.join(private_repos))
-
-# final_content = pulumi.Output.all(
-#     file_content_output, private_repo_url_output, private_repos_output
-# ).apply(lambda args: args[0] + '\n--extra-index-url ' + args[1] + '\n' + args[2])
-
-# return pulumi.StringAsset(final_content.apply(lambda x: x))
-
-# asset = file_content_output.apply(
-#     lambda file_content: private_repo_url_output.apply(
-#         lambda private_repo_url: private_repos_output.apply(
-#             lambda private_repos: pulumi.StringAsset(
-#                 f'{file_content}\n--extra-index-url {private_repo_url}\n{private_repos}'
-#             )
-#         )
-#     )
-# )
-
-# return asset
 
 
 class MetamistInfrastructure(CpgInfrastructurePlugin):
