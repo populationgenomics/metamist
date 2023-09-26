@@ -102,12 +102,27 @@ def _get_openapi_version():
     # require two different ways to get the version
     version_cmds = ['--version', 'version']
 
+    has_timeout = False
     for version_cmd in version_cmds:
         command = [*OPENAPI_COMMAND, version_cmd]
         try:
-            return subprocess.check_output(command, stderr=subprocess.PIPE, timeout=5)
+            return subprocess.check_output(command, stderr=subprocess.PIPE, timeout=10)
+        
+        except subprocess.TimeoutExpired:
+            has_timeout = True
+            # sometimes a timeout means that it's waiting for stdin because openapi
+            # is misconfigured, so try the next command and then tell the user
+            continue
+
         except subprocess.CalledProcessError:
             continue
+
+    if has_timeout:
+        command = ' '.join(*OPENAPI_COMMAND, version_cmds[-1])
+        raise ValueError(
+            'Could not get version of openapi as the command timed out, this might '
+            f'mean openapi is misconfigured. Try running "{command}" in your terminal.'
+        )
 
     raise ValueError('Could not get version of openapi')
 
