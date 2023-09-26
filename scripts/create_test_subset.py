@@ -182,6 +182,7 @@ def main(
         raise ValueError('Come on, what exactly are you asking for?')
 
     # for reproducibility
+    logger.info('Setting random seed to 42')
     random.seed(42)
 
     # 1. Find and SG IDs to be moved by Family ID -test.
@@ -191,13 +192,16 @@ def main(
         )
 
     # 2. Get all sids in project.
+    logger.info(f'Querying all sids in {project}')
     sid_output = query(SG_ID_QUERY, variables={'project': project})
     all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')}
+    logger.info(f'Found {len(all_sids)} sids in {project}')
 
     # 3. Randomly select from the remaining sgs
     additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
 
     # 4. Query all the samples from the selected sgs
+    logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
     original_project_subset_data = query(
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
     )
@@ -217,12 +221,17 @@ def main(
     # Parse Families & Participants
     if skip_ped:
         # If no family data is available, only the participants should be transferred.
+        logger.info(
+            'Skipping pedigree/family information. Transferring participants only.'
+        )
+        logger.info(f'Transferring {len(participant_data)} participants. ')
         upserted_participant_map = transfer_participants(
             target_project=target_project,
             participant_data=participant_data,
         )
 
     else:
+        logger.info(f'Transferring {len(participant_data)} participants. ')
         family_ids = transfer_families(
             project, target_project, internal_participant_ids
         )
@@ -230,11 +239,14 @@ def main(
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
 
+    logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
     transfer_samples_sgs_assays(
         samples, existing_data, upserted_participant_map, target_project, project
     )
+    logger.info('Transferring analyses')
     transfer_analyses(samples, existing_data, target_project, project)
+    logger.info('Subset generation complete!')
 
 
 def transfer_samples_sgs_assays(
@@ -248,7 +260,7 @@ def transfer_samples_sgs_assays(
     Transfer samples, sequencing groups, and assays from the original project to the
     test project.
     """
-    logging.info('Transferring samples, sequencing groups, and assays')
+    logger.info(f'Transferring {len(samples)} samples')
     for s in samples:
         sample_type = None if s['type'] == 'None' else s['type']
         existing_sid: str | None = None
