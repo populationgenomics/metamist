@@ -205,7 +205,7 @@ def main(
     # Pull Participant Data
     participant_data = []
     internal_participant_ids: list = []
-    for sg in original_project_subset_data.get('project').get('samples'):
+    for sg in original_project_subset_data.get('project').get('samples', []):
         participant = sg.get('participant')
         if participant:
             participant_data.append(participant)
@@ -466,7 +466,7 @@ def get_existing_analysis(
 def get_sids_for_families(
     project: str, families_n: int, additional_families: set[str]
 ) -> set[str]:
-    """Returns specific sequencing groups to be included in the test project."""
+    """Returns specific samples to be included in the test project."""
 
     family_sgid_output = query(QUERY_FAMILY_SGID, {'project': project})
 
