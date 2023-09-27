@@ -60,5 +60,5 @@ from models.models.web import (
     WebProject,
 )
 from models.models.etl import (
-    EtlSummary,
+    EtlRecord,
 )
