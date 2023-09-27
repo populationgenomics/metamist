@@ -2,29 +2,28 @@
 // Project ETL specific page
 
 import * as React from 'react'
-import { Message, Button, Checkbox, Input, InputProps } from 'semantic-ui-react'
-import { Link } from 'react-router-dom'
-import { EtlApi, EtlSummary } from '../../sm-api/api'
+import { Button } from 'semantic-ui-react'
+import { EtlApi, EtlRecord } from '../../sm-api/api'
 
 const EtlAdmin = () => {
     // requests by sample type?
     // requests by loading status?
-    const [records, setRecords] = React.useState<EtlSummary[] | null>(null)
+    const [records, setRecords] = React.useState<EtlRecord[] | null>(null)
     const [text, setText] = React.useState<string | null>(null)
 
     const getEtlSummary = React.useCallback(async () => {
         try {
-            const response = await new EtlApi().getEtlSummary([], undefined, undefined, undefined)
+            const response = await new EtlApi().getEtlSummary(undefined, undefined, undefined)
             setRecords(response.data)
         } catch (er: any) {
             setText(`Failed with error: ${er.message}`)
         }
     }, [])
 
-    const reloadRequest = (request_id) => {
-        console.log('reloadRequest: ', request_id)
+    const resubmitRequest = (request_id: any) => {
+        console.log('resubmitRequest: ', request_id)
         new EtlApi()
-            .etlReload(request_id)
+            .etlResubmit(request_id)
             .then(() => getEtlSummary())
             .catch((er) => setText(er.message))
     }
@@ -50,8 +49,11 @@ const EtlAdmin = () => {
                             <td style={{ padding: '15px' }}>{item.status}</td>
                             <td style={{ padding: '15px' }}>{item.parser_result}</td>
                             <td style={{ padding: '15px' }}>
-                                <Button color="red" onClick={() => reloadRequest(item.request_id)}>
-                                    Reload
+                                <Button
+                                    color="red"
+                                    onClick={() => resubmitRequest(item.request_id)}
+                                >
+                                    Resubmit
                                 </Button>
                             </td>
                         </tr>
