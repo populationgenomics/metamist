@@ -27,8 +27,8 @@ class ParsingStatus(Enum):
     Enum type to distinguish between sucess and failure of parsing
     """
 
-    SUCCESS = 1
-    FAILED = 2
+    SUCCESS = 'SUCCESS'
+    FAILED = 'FAILED'
 
 
 def call_parser(parser_obj, row_json) -> tuple[ParsingStatus, str]:
