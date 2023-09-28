@@ -129,7 +129,7 @@ class AnalysisLayer(BaseLayer):
         project_ids: list[int] = None,
         start_date: date = None,
         end_date: date = None,
-        sequencing_type: str = None,
+        sequencing_types: list[str] = None,
     ) -> list[dict]:
         """
         Get the file sizes from all the given projects group by sample filtered
@@ -140,7 +140,7 @@ class AnalysisLayer(BaseLayer):
         sglayer = SequencingGroupLayer(self.connection)
         sgfilter = SequencingGroupFilter(
             project=GenericFilter(in_=project_ids),
-            type=GenericFilter(eq=sequencing_type),
+            type=GenericFilter(in_=sequencing_types) if sequencing_types else None,
         )
 
         sequencing_groups = await sglayer.query(sgfilter)
@@ -216,7 +216,7 @@ class AnalysisLayer(BaseLayer):
     async def get_cram_size_proportionate_map(
         self,
         projects: list[ProjectId],
-        sequencing_type: str,
+        sequencing_types: str,
         start_date: date = None,
         end_date: date = None,
     ):
@@ -242,7 +242,7 @@ class AnalysisLayer(BaseLayer):
             projects,
             start_date=start_date,
             end_date=end_date,
-            sequencing_type=sequencing_type,
+            sequencing_types=sequencing_types,
         )
 
         end_date_date = None

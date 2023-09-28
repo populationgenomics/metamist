@@ -343,12 +343,12 @@ async def get_sequencing_group_file_sizes(
 
 
 @router.post(
-    '/cram-proportionate-map/{sequencing_type}',
+    '/cram-proportionate-map',
     operation_id='getProportionateMap',
     # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
 )
 async def get_proportionate_map(
-    sequencing_type: str,
+    sequencing_types: list[str],
     projects: list[str],
     start: str = None,
     end: str = None,
@@ -365,7 +365,7 @@ async def get_proportionate_map(
     at = AnalysisLayer(connection)
     results = await at.get_cram_size_proportionate_map(
         projects=project_ids,
-        sequencing_type=sequencing_type,
+        sequencingsequencing_types_type=sequencing_types,
         start_date=start_date,
         end_date=end_date,
     )
