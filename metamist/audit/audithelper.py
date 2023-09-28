@@ -1,36 +1,24 @@
 # pylint: disable=no-member
 import csv
-from collections import defaultdict
 import logging
+import os
+from collections import defaultdict
 from typing import Any
 
 from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_path_components_from_gcp_path
+
 from metamist.parser.cloudhelper import CloudHelper
 
 
 class AuditHelper(CloudHelper):
     """General helper class for bucket auditing"""
 
-    EXCLUDED_SGS = [
-        'CPG11783',  # acute-care, no FASTQ data
-        'CPG13409',  # perth-neuro, coverage ~0x
-        'CPG243717',  # validation, NA12878_KCCG low coverage https://main-web.populationgenomics.org.au/validation/qc/cram/multiqc.html,
-        'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
-        'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
-        'CPG261792',  # rdp-kidney misformated fastq - https://batch.hail.populationgenomics.org.au/batches/378736/jobs/43
-        # acute care fasq parsing errors https://batch.hail.populationgenomics.org.au/batches/379303/jobs/24
-        'CPG259150',
-        'CPG258814',
-        'CPG258137',
-        'CPG258111',
-        'CPG258012',
-        # ohmr4 cram parsing in align issues
-        'CPG261339',
-        'CPG261347',
-        # IBMDX truncated sample? https://batch.hail.populationgenomics.org.au/batches/422181/jobs/99
-        'CPG265876',
-    ]
+    EXCLUDED_SGS: set[str] = set(
+        sg for sg in
+        os.getenv('SM_AUDIT_EXCLUDED_SGS', '').split(',')
+        if sg
+    )
 
     @staticmethod
     def get_gcs_bucket_subdirs_to_search(paths: list[str]) -> defaultdict[str, list]:
