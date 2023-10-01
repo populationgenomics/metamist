@@ -487,7 +487,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             self.infrastructure.gcp_python_registry.project,
             self.infrastructure.gcp_python_registry.name,
         ).apply(
-            lambda args: f'https://{args[0]}-python.pkg.dev/{args[1]}/{args[2]}/simple/'
+            lambda location, project, name: f'https://{location}-python.pkg.dev/{project}/{name}/simple/'
         )
 
     def _etl_function(
@@ -508,9 +508,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             # include private repos and metamist package
             # metamist package is only temprary ones to avoid circular dependencies
             extra_assets = {
-                'metamist-6.2.0.tar.gz': pulumi.FileAsset(
-                    f'{str(path_to_func_folder.absolute())}/metamist-6.2.0.tar.gz'
-                ),
                 'requirements.txt': append_private_repositories_to_requirements(
                     filename=f'{str(path_to_func_folder.absolute())}/requirements.txt',
                     private_repo_url=private_repo_url,

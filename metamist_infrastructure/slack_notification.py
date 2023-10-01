@@ -14,7 +14,6 @@ from cpg_utils.cloud import read_secret
 
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
-# ETL_FOLDER = Path(__file__).parent.parent / 'etl'
 PATH_TO_ETL_NOTIFICATION = ETL_FOLDER / 'notification'
 
 

@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import datetime
-from enum import Enum
 import json
 import logging
 import os
@@ -22,7 +21,7 @@ NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
 DEFAULT_LOAD_CONFIG = os.getenv('DEFAULT_LOAD_CONFIG', '{}')
 
 
-class ParsingStatus(Enum):
+class ParsingStatus:
     """
     Enum type to distinguish between sucess and failure of parsing
     """
@@ -31,12 +30,12 @@ class ParsingStatus(Enum):
     FAILED = 'FAILED'
 
 
-def call_parser(parser_obj, row_json) -> tuple[ParsingStatus, str]:
+def call_parser(parser_obj, row_json) -> tuple[str, str]:
     """
     This function calls parser_obj.from_json and returns status and result
     """
     tmp_res: list[str] = []
-    tmp_status: list[ParsingStatus] = []
+    tmp_status: list[str] = []
 
     # GenericMetadataParser from_json is async
     # we call it from sync, so we need to wrap it in coroutine
@@ -62,7 +61,7 @@ def process_rows(
     request_id: str,
     parser_map: dict,
     bq_client: bq.Client,
-) -> tuple[ParsingStatus, Any, Any]:
+) -> tuple[str, Any, Any]:
     """
     Process BQ results rows, should be only one row
     """
@@ -102,7 +101,7 @@ def process_rows(
         log_record = {
             'request_id': request_id,
             'timestamp': datetime.datetime.utcnow().isoformat(),
-            'status': status.name,
+            'status': status,
             'details': json.dumps(log_details),
         }
 
