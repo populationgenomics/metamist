@@ -4,5 +4,4 @@ functions_framework
 google-cloud-bigquery
 google-cloud-logging
 google-cloud-pubsub
-# will be replaced with metamist once it contains the parser changes
-./metamist-6.2.0.tar.gz
+metamist
