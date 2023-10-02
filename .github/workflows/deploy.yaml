@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - dev
+      - improve-build-cache
 
 jobs:
   deploy:
@@ -94,30 +95,30 @@ jobs:
         run: |
           docker build --tag $SM_DOCKER -f deploy/api/Dockerfile .
 
-      - name: Build python package
-        run: python setup.py sdist
+      # - name: Build python package
+      #   run: python setup.py sdist
 
-      - name: "push server image"
-        run: |
-          docker push $SM_DOCKER
+      # - name: "push server image"
+      #   run: |
+      #     docker push $SM_DOCKER
 
-      - name: "deploy to Cloud Run"
-        run: |
-          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-            gcloud_deploy_name=sample-metadata-api
-          else
-            gcloud_deploy_name=sample-metadata-api-dev
-          fi
-          gcloud run deploy \
-            $gcloud_deploy_name --image $SM_DOCKER \
-            --region australia-southeast1 --no-allow-unauthenticated \
-            --platform managed
+      # - name: "deploy to Cloud Run"
+      #   run: |
+      #     if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+      #       gcloud_deploy_name=sample-metadata-api
+      #     else
+      #       gcloud_deploy_name=sample-metadata-api-dev
+      #     fi
+      #     gcloud run deploy \
+      #       $gcloud_deploy_name --image $SM_DOCKER \
+      #       --region australia-southeast1 --no-allow-unauthenticated \
+      #       --platform managed
 
-      - name: Publish package
-        if: github.ref == 'refs/heads/main'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          packages-dir: dist/
-          skip-existing: true
+      # - name: Publish package
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     user: __token__
+      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      #     packages-dir: dist/
+      #     skip-existing: true

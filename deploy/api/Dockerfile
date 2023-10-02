@@ -12,7 +12,6 @@ ENV PYTHONUNBUFFERED 1
 EXPOSE $PORT
 
 WORKDIR /app/sample_metadata/
-COPY requirements.txt requirements.txt
 
 RUN apt-get update && \
     apt-get install -y wget bash bzip2 zip build-essential && \
@@ -20,8 +19,10 @@ RUN apt-get update && \
     wget -qO- https://api.anaconda.org/download/conda-forge/micromamba/0.8.2/linux-64/micromamba-0.8.2-he9b6cbd_0.tar.bz2 | tar -xvj -C /usr/local bin/micromamba && \
     mkdir $MAMBA_ROOT_PREFIX && \
     micromamba install -y --prefix $MAMBA_ROOT_PREFIX -c conda-forge \
-        python=3.10 pip && \
-    pip install -r requirements.txt && \
+    python=3.10 pip
+
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt && \
     rm -r /root/micromamba/pkgs
 
 COPY api api
