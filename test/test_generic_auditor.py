@@ -1,6 +1,7 @@
 import unittest
 import unittest.mock
 from collections import namedtuple
+from test.testbase import run_as_sync
 
 from metamist.audit.generic_auditor import GenericAuditor
 
@@ -10,11 +11,12 @@ from metamist.audit.generic_auditor import GenericAuditor
 class TestGenericAuditor(unittest.TestCase):
     """Test the audit helper functions"""
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_get_participant_data_for_dataset(self, mock_query):
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_get_participant_data_for_dataset(self, mock_query):
         """Only participants with a non-empty samples field should be returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         mock_query.return_value = {
             'project': {
@@ -74,14 +76,14 @@ class TestGenericAuditor(unittest.TestCase):
             },
         ]
 
-        participant_data = auditor.get_participant_data_for_dataset()
+        participant_data = await auditor.get_participant_data_for_dataset()
 
         self.assertListEqual(expected_participants, participant_data)
 
     def test_get_assay_map_from_participants_genome(self):
         """Only genome sequences should be mapped to the sample ID"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         participants = [
             {
@@ -181,7 +183,7 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_assay_map_from_participants_all(self):
         """Both genome and exome sequences should be mapped to the sample IDs"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome', 'exome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome', 'exome'], file_types=('fastq',)
         )
         participants = [
             {
@@ -283,7 +285,7 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_sequence_mapping_error_logging(self):
         """If the sequence reads meta field maps to a raw string, logging.error triggers"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         participants = [
             {
@@ -325,7 +327,7 @@ class TestGenericAuditor(unittest.TestCase):
     def test_get_sequence_mapping_warning_logging(self):
         """If the sequence reads meta field is missing, logging.warning triggers"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         participants = [
             {
@@ -360,11 +362,12 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_query_genome_analyses_crams(self, mock_query):
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         mock_query.side_effect = [
             {
@@ -382,22 +385,6 @@ class TestGenericAuditor(unittest.TestCase):
                                     ],
                                 },
                                 'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
-                            },
-                        ],
-                    },
-                    {
-                        'id': 'CPGbbb',
-                        'type': 'exome',
-                        'analyses': [
-                            {
-                                'id': 2,
-                                'meta': {
-                                    'sequencing_type': 'exome',
-                                    'sample_ids': [
-                                        'CPGbbb',
-                                    ],
-                                },
-                                'output': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram',
                             },
                         ],
                     },
@@ -405,18 +392,19 @@ class TestGenericAuditor(unittest.TestCase):
             }
         ]
 
-        test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
+        test_result = await auditor.get_analysis_cram_paths_for_dataset_sgs(
             assay_sg_id_map={1: 'CPGaaa'}
         )
         expected_result = {'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'}}
 
         self.assertDictEqual(test_result, expected_result)
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_query_genome_and_exome_analyses_crams(self, mock_query):
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome', 'exome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome', 'exome'], file_types=('fastq',)
         )
         mock_query.side_effect = [
             {
@@ -436,11 +424,7 @@ class TestGenericAuditor(unittest.TestCase):
                                 'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
                             },
                         ],
-                    }
-                ]
-            },
-            {
-                'sequencingGroups': [
+                    },
                     {
                         'id': 'CPGbbb',
                         'type': 'exome',
@@ -461,7 +445,7 @@ class TestGenericAuditor(unittest.TestCase):
             },
         ]
 
-        test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
+        test_result = await auditor.get_analysis_cram_paths_for_dataset_sgs(
             assay_sg_id_map={1: 'CPGaaa', 2: 'CPGbbb'}
         )
 
@@ -472,14 +456,15 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_query_broken_analyses_crams(self, mock_query):
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_query_broken_analyses_crams(self, mock_query):
         """
         All analysis crams must have 'sequencing_type' meta field,
         ValueError raised if not
         """
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         mock_query.return_value = {
             'sequencingGroups': [
@@ -502,15 +487,16 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            auditor.get_analysis_cram_paths_for_dataset_sgs(
+            await auditor.get_analysis_cram_paths_for_dataset_sgs(
                 assay_sg_id_map={1: 'CPGaaa'}
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_query_analyses_crams_warning(self, mock_query):
-        """Warn if the sample_ids field is absent and the sample meta field is used instead"""
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_query_analyses_crams_warning(self, mock_query):
+        """Warn if the analysis CRAM output URI is not a CRAM file"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         mock_query.return_value = {
             'sequencingGroups': [
@@ -521,9 +507,8 @@ class TestGenericAuditor(unittest.TestCase):
                             'id': 1,
                             'meta': {
                                 'sequencing_type': 'genome',
-                                'sampling_id': 'CPGaaa',
                             },
-                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
+                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.notcram',
                         },
                     ],
                 }
@@ -531,21 +516,22 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertLogs(level='WARNING') as log:
-            _ = auditor.get_analysis_cram_paths_for_dataset_sgs(
+            _ = await auditor.get_analysis_cram_paths_for_dataset_sgs(
                 assay_sg_id_map={1: 'CPGaaa'}
             )
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                'WARNING:root:Analysis 1 missing sample or sequencing group field.',
+                'WARNING:root:Analysis 1 invalid output path: gs://cpg-dataset-main/cram/CPGaaa.notcram',
                 log.output[0],
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
-    def test_analyses_for_sgs_without_crams(self, mock_query):
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
+    async def test_analyses_for_sgs_without_crams(self, mock_query):
         """Log any analyses found for samples without completed CRAMs"""
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         sgs_without_crams = [  # noqa: B006
             'CPGaaa',
@@ -570,15 +556,16 @@ class TestGenericAuditor(unittest.TestCase):
 
         with self.assertLogs(level='WARNING') as log:
             # catch the warning logs from here and check below
-            auditor.analyses_for_sgs_without_crams(sgs_without_crams)
+            await auditor.analyses_for_sgs_without_crams(sgs_without_crams)
 
-            self.assertEqual(len(log.output), 8)  # 8 analysis types checked
-            self.assertEqual(len(log.records), 8)
+            self.assertEqual(len(log.output), 1)
+            self.assertEqual(len(log.records), 1)
             self.assertIn(
                 "WARNING:root:dev :: SG CPGaaa missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
                 log.output[0],
             )
 
+    @run_as_sync
     @unittest.mock.patch(
         'metamist.audit.generic_auditor.GenericAuditor.get_gcs_bucket_subdirs_to_search'
     )
@@ -588,7 +575,7 @@ class TestGenericAuditor(unittest.TestCase):
     @unittest.mock.patch(
         'metamist.audit.generic_auditor.GenericAuditor.analyses_for_sgs_without_crams'
     )
-    def test_get_complete_and_incomplete_sgs(
+    async def test_get_complete_and_incomplete_sgs(
         self,
         mock_analyses_for_sgs_without_crams,
         mock_find_files_in_gcs_buckets_subdirs,
@@ -605,7 +592,7 @@ class TestGenericAuditor(unittest.TestCase):
             'CPGbbb': {2: 'gs://cpg-dataset-main/exome/cram/CPGbbb.cram'},
         }
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome', 'exome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome', 'exome'], file_types=('fastq',)
         )
 
         mock_get_gcs_bucket_subdirs.return_value = {
@@ -617,21 +604,22 @@ class TestGenericAuditor(unittest.TestCase):
         ]
         mock_analyses_for_sgs_without_crams.return_value = None
 
-        result = auditor.get_complete_and_incomplete_sgs(
+        result = await auditor.get_complete_and_incomplete_sgs(
             assay_sg_id_map=assay_sg_id_map,
             sg_cram_paths=sg_cram_paths,
         )
 
         expected_result = {
-            'complete': {'CPGaaa': [1], 'CPGbbb': [2]},
+            'complete': {'CPGaaa': 1, 'CPGbbb': 2},
             'incomplete': ['CPGccc'],
         }
 
         self.assertDictEqual(result, expected_result)
 
+    @run_as_sync
     @unittest.mock.patch('metamist.audit.generic_auditor.GenericAuditor.file_size')
     @unittest.mock.patch(
-        'metamist.audit.generic_auditor.GenericAuditor.find_sequence_files_in_gcs_bucket'
+        'metamist.audit.generic_auditor.GenericAuditor.find_assay_files_in_gcs_bucket'
     )
     async def test_check_for_uningested_or_moved_assays(
         self, mock_find_sequence_files_in_gcs_bucket, mock_file_size
@@ -640,7 +628,7 @@ class TestGenericAuditor(unittest.TestCase):
         Test 2 ingested reads, one ingested and moved read, and one uningested read
         """
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         assay_reads_sizes = {  # noqa: B006
             1: [('read1.fq', 10), ('read2.fq', 11), ('dir1/read3.fq', 12)]
@@ -675,7 +663,7 @@ class TestGenericAuditor(unittest.TestCase):
             'AssayReportEntry',
             'sg_id assay_id assay_file_path analysis_ids filesize',
         )
-        self.assertEqual(uningested_sequence_paths, {'read4.fq'})
+        self.assertEqual(uningested_sequence_paths, {'read4.fq': []})
         self.assertEqual(
             sequences_moved_paths,
             [
@@ -702,7 +690,7 @@ class TestGenericAuditor(unittest.TestCase):
             'gs://cpg-dataset-main-upload/data5.cram',
         ]
         auditor = GenericAuditor(
-            dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
+            dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
         buckets_subdirs = auditor.get_gcs_bucket_subdirs_to_search(paths)
 
