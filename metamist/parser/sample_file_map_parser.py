@@ -116,6 +116,13 @@ class SampleFileMapParser(GenericMetadataParser):
 
         return self.get_participant_id(row)
 
+    @staticmethod
+    def get_info() -> tuple[str, str]:
+        """
+        Information about parser, including short name and version
+        """
+        return ('sfmp', 'v1')
+
 
 @click.command(help=__DOC)
 @click.option(

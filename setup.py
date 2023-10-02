@@ -19,7 +19,7 @@ with open('README.md', encoding='utf-8') as f:
 setup(
     name=PKG,
     # This tag is automatically updated by bump2version
-    version='6.2.1',
+    version='6.3.0',
     description='Python API for interacting with the Sample API system',
     long_description=readme,
     long_description_content_type='text/markdown',
@@ -39,6 +39,12 @@ setup(
         'cpg-utils >= 4.9.4',
         'gql[aiohttp,requests]',
     ],
+    entry_points={
+        'metamist_parser': [
+            'GenericMetadataParser = metamist.parser.generic_metadata_parser:GenericMetadataParser',
+            'SampleFileMapParser = metamist.parser.sample_file_map_parser:SampleFileMapParser',
+        ],
+    },
     include_package_data=True,
     zip_safe=False,
     keywords='bioinformatics',

@@ -506,6 +506,10 @@ class GenericParser(
         rows = await self.file_pointer_to_rows(
             file_pointer=file_pointer, delimiter=delimiter
         )
+        return await self.from_json(rows, confirm, dry_run)
+
+    async def from_json(self, rows, confirm=False, dry_run=False):
+        """Parse passed rows"""
         await self.validate_rows(rows)
 
         # one participant with no value

@@ -19,7 +19,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
         """
         Test processing one row with all files existing
         """
-        mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
+        mock_get_sample_id.return_value = {'Sample01': 'CPGaaa'}
         mock_filesize.return_value = 111
         mock_fileexists.return_value = True
 
