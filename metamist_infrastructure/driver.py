@@ -487,7 +487,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             self.infrastructure.gcp_python_registry.project,
             self.infrastructure.gcp_python_registry.name,
         ).apply(
-            lambda location, project, name: f'https://{location}-python.pkg.dev/{project}/{name}/simple/'
+            lambda args: f'https://{args[0]}-python.pkg.dev/{args[1]}/{args[2]}/simple/'
         )
 
     def _etl_function(
@@ -516,7 +516,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             }
             archive = archive_folder(
                 str(path_to_func_folder.absolute()),
-                allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}),
                 extra_assets=extra_assets,
             )
         else:
