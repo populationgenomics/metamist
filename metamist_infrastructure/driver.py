@@ -516,7 +516,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             }
             archive = archive_folder(
                 str(path_to_func_folder.absolute()),
-                allowed_extensions=frozenset({'.gz', '.py', '.txt', '.json'}),
                 extra_assets=extra_assets,
             )
         else:
