@@ -32,18 +32,19 @@ This information is derived from the fluidX id pulled from the filename.
 
 """
 
-import logging
 import csv
+import logging
 from typing import List, Optional
+
 import click
 
-from metamist.parser.generic_parser import READS_EXTENSIONS
 from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
-    SingleRow,
     GroupedRow,
+    SingleRow,
     run_as_sync,
 )
+from metamist.parser.generic_parser import READS_EXTENSIONS
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -89,8 +90,8 @@ class Columns:
 
 def fastq_file_name_to_sample_id(filename: str) -> str:
     """
-    HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
-    -> 220208_FD02700641
+    SOMEID1_2_220101_SAMPLEID_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220101_FIRLAS1_PROJECT_M002_R1.
+    -> 220101_SAMPLEID
     """
     return '_'.join(filename.split('_')[2:4])
 
@@ -193,7 +194,7 @@ class ExistingCohortParser(GenericMetadataParser):
 @click.command(help='GCS path to manifest file')
 @click.option(
     '--project',
-    help='The sample-metadata project to import manifest into',
+    help='The metamist project to import manifest into',
 )
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(

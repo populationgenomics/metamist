@@ -1,0 +1,6 @@
+flask
+functions_framework
+google-cloud-bigquery
+google-cloud-logging
+google-cloud-pubsub
+slack_sdk

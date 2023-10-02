@@ -426,7 +426,7 @@ class GenericParser(
         self.ignore_extra_keys = ignore_extra_keys
 
         if not project:
-            raise ValueError('sample-metadata project is required')
+            raise ValueError('A metamist project is required')
 
         self.project = project
 
@@ -506,6 +506,10 @@ class GenericParser(
         rows = await self.file_pointer_to_rows(
             file_pointer=file_pointer, delimiter=delimiter
         )
+        return await self.from_json(rows, confirm, dry_run)
+
+    async def from_json(self, rows, confirm=False, dry_run=False):
+        """Parse passed rows"""
         await self.validate_rows(rows)
 
         # one participant with no value

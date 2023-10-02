@@ -1,13 +1,13 @@
 # pylint: disable=too-many-instance-attributes
-import os
 import asyncio
 import logging
-from io import StringIO
+import os
 from collections import namedtuple
+from io import StringIO
 
 import click
 
-from metamist.apis import SampleApi, AnalysisApi, SequencingGroupApi
+from metamist.apis import AnalysisApi, SampleApi, SequencingGroupApi
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.parser.cloudhelper import CloudHelper
@@ -15,7 +15,7 @@ from metamist.parser.generic_metadata_parser import (
     GenericMetadataParser,
     run_as_sync,
 )
-from metamist.parser.generic_parser import chunk, CustomDictReader
+from metamist.parser.generic_parser import CustomDictReader, chunk
 
 OntAnalysesPreparer = namedtuple(
     'OntAnalysesPreparer',
@@ -265,7 +265,7 @@ class OntProductParser(CloudHelper):
 @click.option(
     '--dataset',
     required=True,
-    help='The sample-metadata project ($DATASET) to import manifest into',
+    help='The metamist project ($DATASET) to import manifest into',
 )
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'

@@ -27,7 +27,7 @@ class TestGenericAuditor(unittest.TestCase):
                             {
                                 'id': 'XPG123',
                                 'sequencingGroups': [
-                                    {'id': 'CPG123', 'assays': [{'id': 1}]}
+                                    {'id': 'CPGaaa', 'assays': [{'id': 1}]}
                                 ],
                             }
                         ],
@@ -39,7 +39,7 @@ class TestGenericAuditor(unittest.TestCase):
                             {
                                 'id': 'XPG456',
                                 'sequencingGroups': [
-                                    {'id': 'CPG456', 'assays': [{'id': 2}, {'id': 3}]}
+                                    {'id': 'CPGbbb', 'assays': [{'id': 2}, {'id': 3}]}
                                 ],
                             }
                         ],
@@ -56,7 +56,7 @@ class TestGenericAuditor(unittest.TestCase):
                 'samples': [
                     {
                         'id': 'XPG123',
-                        'sequencingGroups': [{'id': 'CPG123', 'assays': [{'id': 1}]}],
+                        'sequencingGroups': [{'id': 'CPGaaa', 'assays': [{'id': 1}]}],
                     }
                 ],
             },
@@ -67,7 +67,7 @@ class TestGenericAuditor(unittest.TestCase):
                     {
                         'id': 'XPG456',
                         'sequencingGroups': [
-                            {'id': 'CPG456', 'assays': [{'id': 2}, {'id': 3}]}
+                            {'id': 'CPGbbb', 'assays': [{'id': 2}, {'id': 3}]}
                         ],
                     }
                 ],
@@ -93,7 +93,7 @@ class TestGenericAuditor(unittest.TestCase):
                         'externalId': 'EX01',
                         'sequencingGroups': [
                             {
-                                'id': 'CPG123',
+                                'id': 'CPGaaa',
                                 'type': 'genome',
                                 'assays': [
                                     {
@@ -131,7 +131,7 @@ class TestGenericAuditor(unittest.TestCase):
                                 ],
                             },
                             {
-                                'id': 'CPG456',
+                                'id': 'CPGbbb',
                                 'type': 'exome',
                                 'assays': [
                                     {
@@ -159,8 +159,8 @@ class TestGenericAuditor(unittest.TestCase):
             assay_paths_sizes,
         ) = auditor.get_assay_map_from_participants(participants)
 
-        expected_sg_sample_mapping = {'CPG123': 'XPG123'}
-        expected_assay_sg_mapping = {1: 'CPG123', 2: 'CPG123', 3: 'CPG123'}
+        expected_sg_sample_mapping = {'CPGaaa': 'XPG123'}
+        expected_assay_sg_mapping = {1: 'CPGaaa', 2: 'CPGaaa', 3: 'CPGaaa'}
         expected_read_sizes = {
             1: [
                 ('gs://cpg-dataset-main-upload/read.fq', 11),
@@ -193,7 +193,7 @@ class TestGenericAuditor(unittest.TestCase):
                         'externalId': 'EX01',
                         'sequencingGroups': [
                             {
-                                'id': 'CPG123',
+                                'id': 'CPGaaa',
                                 'type': 'genome',
                                 'assays': [
                                     {
@@ -231,7 +231,7 @@ class TestGenericAuditor(unittest.TestCase):
                                 ],
                             },
                             {
-                                'id': 'CPG456',
+                                'id': 'CPGbbb',
                                 'type': 'exome',
                                 'assays': [
                                     {
@@ -258,8 +258,8 @@ class TestGenericAuditor(unittest.TestCase):
             assay_paths_sizes,
         ) = auditor.get_assay_map_from_participants(participants)
 
-        expected_sg_sample_mapping = {'CPG123': 'XPG123', 'CPG456': 'XPG123'}
-        expected_assay_sg_mapping = {1: 'CPG123', 2: 'CPG123', 3: 'CPG123', 4: 'CPG456'}
+        expected_sg_sample_mapping = {'CPGaaa': 'XPG123', 'CPGbbb': 'XPG123'}
+        expected_assay_sg_mapping = {1: 'CPGaaa', 2: 'CPGaaa', 3: 'CPGaaa', 4: 'CPGbbb'}
         expected_read_sizes = {
             1: [
                 ('gs://cpg-dataset-main-upload/read.fq', 11),
@@ -295,7 +295,7 @@ class TestGenericAuditor(unittest.TestCase):
                         'externalId': 'EX01',
                         'sequencingGroups': [
                             {
-                                'id': 'CPG123',
+                                'id': 'CPGaaa',
                                 'type': 'genome',
                                 'assays': [
                                     {
@@ -318,7 +318,7 @@ class TestGenericAuditor(unittest.TestCase):
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                "ERROR:root:dev :: Got <class 'str'> read for SG CPG123, expected dict: gs://cpg-dataset-main-upload/read.fq",
+                "ERROR:root:dev :: Got <class 'str'> read for SG CPGaaa, expected dict: gs://cpg-dataset-main-upload/read.fq",
                 log.output[0],
             )
 
@@ -337,7 +337,7 @@ class TestGenericAuditor(unittest.TestCase):
                         'externalId': 'EX01',
                         'sequencingGroups': [
                             {
-                                'id': 'CPG123',
+                                'id': 'CPGaaa',
                                 'type': 'genome',
                                 'assays': [
                                     {
@@ -356,7 +356,7 @@ class TestGenericAuditor(unittest.TestCase):
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                'WARNING:root:dev :: SG CPG123 assay 1 has no reads field',
+                'WARNING:root:dev :: SG CPGaaa assay 1 has no reads field',
                 log.output[0],
             )
 
@@ -370,7 +370,7 @@ class TestGenericAuditor(unittest.TestCase):
             {
                 'sequencingGroups': [
                     {
-                        'id': 'CPG123',
+                        'id': 'CPGaaa',
                         'type': 'genome',
                         'analyses': [
                             {
@@ -378,15 +378,15 @@ class TestGenericAuditor(unittest.TestCase):
                                 'meta': {
                                     'sequencing_type': 'genome',
                                     'sample_ids': [
-                                        'CPG123',
+                                        'CPGaaa',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                                'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
                             },
                         ],
                     },
                     {
-                        'id': 'CPG456',
+                        'id': 'CPGbbb',
                         'type': 'exome',
                         'analyses': [
                             {
@@ -394,10 +394,10 @@ class TestGenericAuditor(unittest.TestCase):
                                 'meta': {
                                     'sequencing_type': 'exome',
                                     'sample_ids': [
-                                        'CPG456',
+                                        'CPGbbb',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
+                                'output': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram',
                             },
                         ],
                     },
@@ -406,9 +406,9 @@ class TestGenericAuditor(unittest.TestCase):
         ]
 
         test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
-            assay_sg_id_map={1: 'CPG123'}
+            assay_sg_id_map={1: 'CPGaaa'}
         )
-        expected_result = {'CPG123': {1: 'gs://cpg-dataset-main/cram/CPG123.cram'}}
+        expected_result = {'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'}}
 
         self.assertDictEqual(test_result, expected_result)
 
@@ -422,7 +422,7 @@ class TestGenericAuditor(unittest.TestCase):
             {
                 'sequencingGroups': [
                     {
-                        'id': 'CPG123',
+                        'id': 'CPGaaa',
                         'type': 'genome',
                         'analyses': [
                             {
@@ -430,10 +430,10 @@ class TestGenericAuditor(unittest.TestCase):
                                 'meta': {
                                     'sequencing_type': 'genome',
                                     'sample_ids': [
-                                        'CPG123',
+                                        'CPGaaa',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                                'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
                             },
                         ],
                     }
@@ -442,7 +442,7 @@ class TestGenericAuditor(unittest.TestCase):
             {
                 'sequencingGroups': [
                     {
-                        'id': 'CPG456',
+                        'id': 'CPGbbb',
                         'type': 'exome',
                         'analyses': [
                             {
@@ -450,10 +450,10 @@ class TestGenericAuditor(unittest.TestCase):
                                 'meta': {
                                     'sequencing_type': 'exome',
                                     'sample_ids': [
-                                        'CPG456',
+                                        'CPGbbb',
                                     ],
                                 },
-                                'output': 'gs://cpg-dataset-main/exome/cram/CPG123.cram',
+                                'output': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram',
                             },
                         ],
                     },
@@ -462,12 +462,12 @@ class TestGenericAuditor(unittest.TestCase):
         ]
 
         test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
-            assay_sg_id_map={1: 'CPG123', 2: 'CPG456'}
+            assay_sg_id_map={1: 'CPGaaa', 2: 'CPGbbb'}
         )
 
         expected_result = {
-            'CPG123': {1: 'gs://cpg-dataset-main/cram/CPG123.cram'},
-            'CPG456': {2: 'gs://cpg-dataset-main/exome/cram/CPG123.cram'},
+            'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'},
+            'CPGbbb': {2: 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram'},
         }
 
         self.assertDictEqual(test_result, expected_result)
@@ -484,7 +484,7 @@ class TestGenericAuditor(unittest.TestCase):
         mock_query.return_value = {
             'sequencingGroups': [
                 {
-                    'id': 'CPG123',
+                    'id': 'CPGaaa',
                     'analyses': [
                         {
                             'id': 1,
@@ -492,7 +492,7 @@ class TestGenericAuditor(unittest.TestCase):
                                 'sequence_type': 'genome',
                             },
                             'sample_ids': [
-                                'CPG123',
+                                'CPGaaa',
                             ],
                             'output': '',
                         },
@@ -503,7 +503,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             auditor.get_analysis_cram_paths_for_dataset_sgs(
-                assay_sg_id_map={1: 'CPG123'}
+                assay_sg_id_map={1: 'CPGaaa'}
             )
 
     @unittest.mock.patch('metamist.audit.generic_auditor.query')
@@ -515,15 +515,15 @@ class TestGenericAuditor(unittest.TestCase):
         mock_query.return_value = {
             'sequencingGroups': [
                 {
-                    'id': 'CPG123',
+                    'id': 'CPGaaa',
                     'analyses': [
                         {
                             'id': 1,
                             'meta': {
                                 'sequencing_type': 'genome',
-                                'sampling_id': 'CPG123',
+                                'sampling_id': 'CPGaaa',
                             },
-                            'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
                         },
                     ],
                 }
@@ -532,7 +532,7 @@ class TestGenericAuditor(unittest.TestCase):
 
         with self.assertLogs(level='WARNING') as log:
             _ = auditor.get_analysis_cram_paths_for_dataset_sgs(
-                assay_sg_id_map={1: 'CPG123'}
+                assay_sg_id_map={1: 'CPGaaa'}
             )
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
@@ -548,18 +548,18 @@ class TestGenericAuditor(unittest.TestCase):
             dataset='dev', sequencing_type=['genome'], file_types=('fastq',)
         )
         sgs_without_crams = [  # noqa: B006
-            'CPG123',
+            'CPGaaa',
         ]
 
         mock_query.return_value = {
             'sequencingGroups': [
                 {
-                    'id': 'CPG123',
+                    'id': 'CPGaaa',
                     'analyses': [
                         {
                             'id': 1,
-                            'meta': {'sequencing_type': 'genome', 'sample': 'CPG123'},
-                            'output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz',
+                            'meta': {'sequencing_type': 'genome', 'sample': 'CPGaaa'},
+                            'output': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz',
                             'type': 'gvcf',
                             'timestampCompleted': '2023-05-11T16:33:00',
                         }
@@ -575,7 +575,7 @@ class TestGenericAuditor(unittest.TestCase):
             self.assertEqual(len(log.output), 8)  # 8 analysis types checked
             self.assertEqual(len(log.records), 8)
             self.assertIn(
-                "WARNING:root:dev :: SG CPG123 missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
+                "WARNING:root:dev :: SG CPGaaa missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPGaaa.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
                 log.output[0],
             )
 
@@ -596,13 +596,13 @@ class TestGenericAuditor(unittest.TestCase):
     ):
         """Report on samples that have completed CRAMs and those that dont"""
         assay_sg_id_map = {  # noqa: B006
-            1: 'CPG123',
-            2: 'CPG456',
-            3: 'CPG789',
+            1: 'CPGaaa',
+            2: 'CPGbbb',
+            3: 'CPGccc',
         }
         sg_cram_paths = {  # noqa: B006
-            'CPG123': {1: 'gs://cpg-dataset-main/cram/CPG123.cram'},
-            'CPG456': {2: 'gs://cpg-dataset-main/exome/cram/CPG456.cram'},
+            'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'},
+            'CPGbbb': {2: 'gs://cpg-dataset-main/exome/cram/CPGbbb.cram'},
         }
         auditor = GenericAuditor(
             dataset='dev', sequencing_type=['genome', 'exome'], file_types=('fastq',)
@@ -612,8 +612,8 @@ class TestGenericAuditor(unittest.TestCase):
             'cpg-dataset-main': ['cram', 'exome/cram']
         }
         mock_find_files_in_gcs_buckets_subdirs.return_value = [
-            'gs://cpg-dataset-main/cram/CPG123.cram',
-            'gs://cpg-dataset-main/exome/cram/CPG456.cram',
+            'gs://cpg-dataset-main/cram/CPGaaa.cram',
+            'gs://cpg-dataset-main/exome/cram/CPGbbb.cram',
         ]
         mock_analyses_for_sgs_without_crams.return_value = None
 
@@ -623,8 +623,8 @@ class TestGenericAuditor(unittest.TestCase):
         )
 
         expected_result = {
-            'complete': {'CPG123': [1], 'CPG456': [2]},
-            'incomplete': ['CPG789'],
+            'complete': {'CPGaaa': [1], 'CPGbbb': [2]},
+            'incomplete': ['CPGccc'],
         }
 
         self.assertDictEqual(result, expected_result)
@@ -645,10 +645,10 @@ class TestGenericAuditor(unittest.TestCase):
         assay_reads_sizes = {  # noqa: B006
             1: [('read1.fq', 10), ('read2.fq', 11), ('dir1/read3.fq', 12)]
         }
-        completed_sgs = {'CPG123': [1]}
-        sg_sample_id_map = {'CPG123': 'EXT123'}
-        assay_sg_id_map = {1: 'CPG123'}
-        sample_internal_external_id_map = {'CPG123': 'EXT123'}
+        completed_sgs = {'CPGaaa': [1]}
+        sg_sample_id_map = {'CPGaaa': 'EXT123'}
+        assay_sg_id_map = {1: 'CPGaaa'}
+        sample_internal_external_id_map = {'CPGaaa': 'EXT123'}
         mock_find_sequence_files_in_gcs_bucket.return_value = [
             'read1.fq',
             'read2.fq',
@@ -680,7 +680,7 @@ class TestGenericAuditor(unittest.TestCase):
             sequences_moved_paths,
             [
                 AssayReportEntry(
-                    sg_id='CPG123',
+                    sg_id='CPGaaa',
                     assay_id=1,
                     assay_file_path='dir2/read3.fq',
                     analysis_ids=[1],

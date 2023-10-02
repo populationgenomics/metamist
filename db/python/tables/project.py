@@ -409,7 +409,7 @@ RETURNING ID"""
         return project_id
 
     async def update_project(self, project_name: str, update: dict, author: str):
-        """Update a sample-metadata project"""
+        """Update a metamist project"""
         await self.check_project_creator_permissions(author)
 
         meta = update.get('meta')
