@@ -58,11 +58,11 @@ SEQUENCING_TYPES_QUERY = gql(
 def get_sequencing_types():
     """Return the list of sequencing types from the enum table."""
     logging.getLogger().setLevel(logging.WARN)
-    sequencing_types = query(
-        SEQUENCING_TYPES_QUERY
-    )
+    sequencing_types = query(SEQUENCING_TYPES_QUERY)
     logging.getLogger().setLevel(logging.INFO)
-    return sequencing_types['enum']['sequencingType']  # pylint: disable=unsubscriptable-object
+    return sequencing_types['enum'][  # pylint: disable=unsubscriptable-object
+        'sequencingType'
+    ]
 
 
 def audit_upload_bucket(
@@ -214,6 +214,8 @@ async def audit_upload_bucket_async(
         raise ValueError(
             f'Input sequencing types "{sequencing_types}" must be in the allowed types: {allowed_sequencing_types}'
         )
+    if sequencing_types == ('all',):
+        sequencing_types = allowed_sequencing_types
 
     if file_types not in (('all',), ('all_reads',)):
         if any(ft not in FILE_TYPES_MAP for ft in file_types):

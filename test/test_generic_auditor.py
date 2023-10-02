@@ -388,27 +388,11 @@ class TestGenericAuditor(unittest.TestCase):
                             },
                         ],
                     },
-                    {
-                        'id': 'CPGbbb',
-                        'type': 'exome',
-                        'analyses': [
-                            {
-                                'id': 2,
-                                'meta': {
-                                    'sequencing_type': 'exome',
-                                    'sample_ids': [
-                                        'CPGbbb',
-                                    ],
-                                },
-                                'output': 'gs://cpg-dataset-main/exome/cram/CPGaaa.cram',
-                            },
-                        ],
-                    },
                 ]
             }
         ]
 
-        test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
+        test_result = await auditor.get_analysis_cram_paths_for_dataset_sgs(
             assay_sg_id_map={1: 'CPGaaa'}
         )
         expected_result = {'CPGaaa': {1: 'gs://cpg-dataset-main/cram/CPGaaa.cram'}}
@@ -440,11 +424,7 @@ class TestGenericAuditor(unittest.TestCase):
                                 'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
                             },
                         ],
-                    }
-                ]
-            },
-            {
-                'sequencingGroups': [
+                    },
                     {
                         'id': 'CPGbbb',
                         'type': 'exome',
@@ -465,7 +445,7 @@ class TestGenericAuditor(unittest.TestCase):
             },
         ]
 
-        test_result = auditor.get_analysis_cram_paths_for_dataset_sgs(
+        test_result = await auditor.get_analysis_cram_paths_for_dataset_sgs(
             assay_sg_id_map={1: 'CPGaaa', 2: 'CPGbbb'}
         )
 
@@ -507,7 +487,7 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
-            auditor.get_analysis_cram_paths_for_dataset_sgs(
+            await auditor.get_analysis_cram_paths_for_dataset_sgs(
                 assay_sg_id_map={1: 'CPGaaa'}
             )
 
@@ -527,9 +507,8 @@ class TestGenericAuditor(unittest.TestCase):
                             'id': 1,
                             'meta': {
                                 'sequencing_type': 'genome',
-                                'sampling_id': 'CPGaaa',
                             },
-                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.cram',
+                            'output': 'gs://cpg-dataset-main/cram/CPGaaa.notcram',
                         },
                     ],
                 }
@@ -537,13 +516,13 @@ class TestGenericAuditor(unittest.TestCase):
         }
 
         with self.assertLogs(level='WARNING') as log:
-            _ = auditor.get_analysis_cram_paths_for_dataset_sgs(
+            _ = await auditor.get_analysis_cram_paths_for_dataset_sgs(
                 assay_sg_id_map={1: 'CPGaaa'}
             )
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                'WARNING:root:Analysis 1 invalid output path: gs://cpg-dataset-main/cram/CPG123.notcram',
+                'WARNING:root:Analysis 1 invalid output path: gs://cpg-dataset-main/cram/CPGaaa.notcram',
                 log.output[0],
             )
 
@@ -631,7 +610,7 @@ class TestGenericAuditor(unittest.TestCase):
         )
 
         expected_result = {
-            'complete': {'CPGaaa': [1], 'CPGbbb': [2]},
+            'complete': {'CPGaaa': 1, 'CPGbbb': 2},
             'incomplete': ['CPGccc'],
         }
 
