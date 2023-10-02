@@ -1,6 +1,7 @@
 import unittest
 import unittest.mock
 from collections import namedtuple
+from test.testbase import run_as_sync
 
 from metamist.audit.generic_auditor import GenericAuditor
 
@@ -10,7 +11,8 @@ from metamist.audit.generic_auditor import GenericAuditor
 class TestGenericAuditor(unittest.TestCase):
     """Test the audit helper functions"""
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_get_participant_data_for_dataset(self, mock_query):
         """Only participants with a non-empty samples field should be returned"""
         auditor = GenericAuditor(
@@ -360,7 +362,8 @@ class TestGenericAuditor(unittest.TestCase):
                 log.output[0],
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_query_genome_analyses_crams(self, mock_query):
         """Test that only the genome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -397,7 +400,8 @@ class TestGenericAuditor(unittest.TestCase):
         }
         self.assertDictEqual(test_result, expected_result)
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_query_genome_and_exome_analyses_crams(self, mock_query):
         """Test that both the genome and exome analysis crams for a sample map dictionary are returned"""
         auditor = GenericAuditor(
@@ -447,7 +451,8 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(test_result, expected_result)
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_query_broken_analyses_crams(self, mock_query):
         """
         All analysis crams must have 'sequencing_type' meta field,
@@ -481,9 +486,10 @@ class TestGenericAuditor(unittest.TestCase):
                 assay_sg_id_map={1: 'CPG123'}
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_query_analyses_crams_warning(self, mock_query):
-        """Warn if the sample_ids field is absent and the sample meta field is used instead"""
+        """Warn if the analysis CRAM output URI is not a CRAM file"""
         auditor = GenericAuditor(
             dataset='dev', sequencing_types=['genome'], file_types=('fastq',)
         )
@@ -496,9 +502,9 @@ class TestGenericAuditor(unittest.TestCase):
                             'id': 1,
                             'meta': {
                                 'sequencing_type': 'genome',
-                                'sampling_id': 'CPG123',
+                                'sequencing_group': 'CPG123',
                             },
-                            'output': 'gs://cpg-dataset-main/cram/CPG123.cram',
+                            'output': 'gs://cpg-dataset-main/cram/CPG123.notcram',
                         },
                     ],
                 }
@@ -512,11 +518,12 @@ class TestGenericAuditor(unittest.TestCase):
             self.assertEqual(len(log.output), 1)
             self.assertEqual(len(log.records), 1)
             self.assertIn(
-                'WARNING:root:Analysis 1 missing sample or sequencing group field.',
+                'WARNING:root:Analysis 1 invalid output path: gs://cpg-dataset-main/cram/CPG123.notcram',
                 log.output[0],
             )
 
-    @unittest.mock.patch('metamist.audit.generic_auditor.query')
+    @run_as_sync
+    @unittest.mock.patch('metamist.audit.generic_auditor.query_async')
     async def test_analyses_for_sgs_without_crams(self, mock_query):
         """Log any analyses found for samples without completed CRAMs"""
         auditor = GenericAuditor(
@@ -547,13 +554,14 @@ class TestGenericAuditor(unittest.TestCase):
             # catch the warning logs from here and check below
             await auditor.analyses_for_sgs_without_crams(sgs_without_crams)
 
-            self.assertEqual(len(log.output), 8)  # 8 analysis types checked
-            self.assertEqual(len(log.records), 8)
+            self.assertEqual(len(log.output), 1)
+            self.assertEqual(len(log.records), 1)
             self.assertIn(
                 "WARNING:root:dev :: SG CPG123 missing CRAM but has analysis {'analysis_id': 1, 'analysis_type': 'gvcf', 'analysis_output': 'gs://cpg-dataset-main/gvcf/CPG123.g.vcf.gz', 'timestamp_completed': '2023-05-11T16:33:00'}",
                 log.output[0],
             )
 
+    @run_as_sync
     @unittest.mock.patch(
         'metamist.audit.generic_auditor.GenericAuditor.get_gcs_bucket_subdirs_to_search'
     )
@@ -604,9 +612,10 @@ class TestGenericAuditor(unittest.TestCase):
 
         self.assertDictEqual(result, expected_result)
 
+    @run_as_sync
     @unittest.mock.patch('metamist.audit.generic_auditor.GenericAuditor.file_size')
     @unittest.mock.patch(
-        'metamist.audit.generic_auditor.GenericAuditor.find_sequence_files_in_gcs_bucket'
+        'metamist.audit.generic_auditor.GenericAuditor.find_assay_files_in_gcs_bucket'
     )
     async def test_check_for_uningested_or_moved_assays(
         self, mock_find_sequence_files_in_gcs_bucket, mock_file_size
@@ -650,7 +659,7 @@ class TestGenericAuditor(unittest.TestCase):
             'AssayReportEntry',
             'sg_id assay_id assay_file_path analysis_ids filesize',
         )
-        self.assertEqual(uningested_sequence_paths, {'read4.fq'})
+        self.assertEqual(uningested_sequence_paths, {'read4.fq': []})
         self.assertEqual(
             sequences_moved_paths,
             [

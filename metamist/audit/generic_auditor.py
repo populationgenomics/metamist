@@ -126,7 +126,9 @@ class GenericAuditor(AuditHelper):
         return filtered_participants
 
     @staticmethod
-    def get_most_recent_analyses_by_sg(analyses_list: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    def get_most_recent_analyses_by_sg(
+        analyses_list: list[dict[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
         """
         Takes a list of completed analyses for a number of sequencing groups and returns the latest
         completed analysis for each sequencing group, creating a 1:1 mapping of SG to analysis.
@@ -142,7 +144,12 @@ class GenericAuditor(AuditHelper):
                 most_recent_analysis_by_sg[sg_id] = analyses[0]
                 continue
 
-            sorted_analyses = sorted(analyses, key=lambda x: datetime.strptime(x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'))
+            sorted_analyses = sorted(
+                analyses,
+                key=lambda x: datetime.strptime(
+                    x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
+                ),
+            )
             most_recent_analysis_by_sg[sg_id] = sorted_analyses[-1]
 
         return most_recent_analysis_by_sg
@@ -231,13 +238,16 @@ class GenericAuditor(AuditHelper):
         assay_sg_id_map: dict[int, str],
     ) -> dict[str, dict[int, str]]:
         """
-        Fetches all CRAMs for the list of sgs in the given dataset AND the seqr dataset.
+        Fetches all CRAMs for the list of sgs in the given dataset.
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
 
         logging.getLogger().setLevel(logging.WARN)
-        analyses_query_result = await query_async(QUERY_SG_ANALYSES, {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']})
+        analyses_query_result = await query_async(
+            QUERY_SG_ANALYSES,
+            {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']},
+        )
         logging.getLogger().setLevel(logging.INFO)
 
         analyses = analyses_query_result['sequencingGroups']
@@ -258,7 +268,7 @@ class GenericAuditor(AuditHelper):
         sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
         for sg_id, analysis in analyses.items():
             cram_path = analysis['output']
-            if not cram_path.startswith('gs://') and cram_path.endswith('.cram'):
+            if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
                 logging.warning(
                     f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
                 )
@@ -276,7 +286,11 @@ class GenericAuditor(AuditHelper):
         logging.getLogger().setLevel(logging.WARN)
         sg_analyse_query_result = await query_async(
             QUERY_SG_ANALYSES,
-            {'dataset': self.dataset, 'sgIds': sgs_without_crams, 'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM']},
+            {
+                'dataset': self.dataset,
+                'sgIds': sgs_without_crams,
+                'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM'],
+            },
         )
         logging.getLogger().setLevel(logging.INFO)
 
@@ -286,8 +300,6 @@ class GenericAuditor(AuditHelper):
             sg_id = sg_analysis['id']
 
             for analysis in sg_analysis['analyses']:
-                if not analysis.get('type'):
-                    print(sg_id, analysis)
                 analysis_entry = {
                     'analysis_id': analysis['id'],
                     'analysis_type': analysis['type'],

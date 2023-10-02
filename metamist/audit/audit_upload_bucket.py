@@ -9,12 +9,14 @@ import sys
 import logging
 import os
 import asyncio
+from functools import cache
 import click
 
 from cpg_utils.config import get_config
 
+
 from metamist.audit.generic_auditor import GenericAuditor
-from metamist.graphql import gql, query_async
+from metamist.graphql import gql, query
 
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
@@ -52,15 +54,11 @@ SEQUENCING_TYPES_QUERY = gql(
 )
 
 
+@cache
 def get_sequencing_types():
-    """Entrypoint for getting sequencing types asynchronously."""
-    return asyncio.get_event_loop().run_until_complete(_get_sequencing_types())
-
-
-async def _get_sequencing_types():
     """Return the list of sequencing types from the enum table."""
     logging.getLogger().setLevel(logging.WARN)
-    sequencing_types = await query_async(  # pylint: disable=unsubscriptable-object
+    sequencing_types = query(  # pylint: disable=unsubscriptable-object
         SEQUENCING_TYPES_QUERY
     )
     logging.getLogger().setLevel(logging.INFO)
@@ -68,7 +66,11 @@ async def _get_sequencing_types():
 
 
 def audit_upload_bucket(
-    dataset: str, sequencing_types: list[str], file_types: list[str], default_analysis_type: str, default_analysis_status: str,
+    dataset: str,
+    sequencing_types: list[str],
+    file_types: list[str],
+    default_analysis_type: str,
+    default_analysis_status: str,
 ):
     """Entrypoint for running upload bucket auditor asynchronously."""
     asyncio.get_event_loop().run_until_complete(
@@ -80,7 +82,7 @@ def audit_upload_bucket(
                 default_analysis_type,
                 default_analysis_status,
             ),
-            timeout=60
+            timeout=60,
         )
     )
 
@@ -124,7 +126,7 @@ class UploadBucketAuditor(GenericAuditor):
 
         report_path = f'gs://{bucket_name}/audit_results/{today}/'
 
-        if set(sequencing_types) == set(await _get_sequencing_types()):
+        if set(sequencing_types) == set(get_sequencing_types()):
             sequencing_types_str = 'all'
         else:
             sequencing_types_str = ('_').join(sequencing_types)
@@ -174,9 +176,7 @@ class UploadBucketAuditor(GenericAuditor):
 
         # Write the sequencing groups without any completed cram to a csv
         if not unaligned_sgs:
-            logging.info(
-                'No sequencing groups without crams found. Skipping report...'
-            )
+            logging.info('No sequencing groups without crams found. Skipping report...')
         else:
             unaligned_sgs_file = f'{report_prefix}_unaligned_sgs_{today}.csv'
             self.write_csv_report_to_cloud(
@@ -187,7 +187,11 @@ class UploadBucketAuditor(GenericAuditor):
 
 
 async def audit_upload_bucket_async(
-    dataset: str, sequencing_types: list[str], file_types: list[str], default_analysis_type: str, default_analysis_status: str,
+    dataset: str,
+    sequencing_types: list[str],
+    file_types: list[str],
+    default_analysis_type: str,
+    default_analysis_status: str,
 ):
     """
     Finds sequence files for samples with completed CRAMs and adds these to a csv for deletion.
@@ -203,17 +207,19 @@ async def audit_upload_bucket_async(
     """
 
     # Validate user inputs
-    if sequencing_types == ('all',):
-        sequencing_types = await _get_sequencing_types()
-    else:
-        if any(st not in (allowed_sequencing_types := await _get_sequencing_types()) for st in sequencing_types):
-            raise ValueError(
-                f'Input sequencing types "{sequencing_types}" must be in the allowed types: {allowed_sequencing_types}'
-            )
+    allowed_sequencing_types = get_sequencing_types()
+    if sequencing_types != ('all',) and any(
+        st not in allowed_sequencing_types for st in sequencing_types
+    ):
+        raise ValueError(
+            f'Input sequencing types "{sequencing_types}" must be in the allowed types: {allowed_sequencing_types}'
+        )
 
     if file_types not in (('all',), ('all_reads',)):
         if any(ft not in FILE_TYPES_MAP for ft in file_types):
-            raise ValueError(f'Input file types "{file_types}" must be in the allowed types {(", ").join(list(FILE_TYPES_MAP.keys()))}')
+            raise ValueError(
+                f'Input file types "{file_types}" must be in the allowed types {(", ").join(list(FILE_TYPES_MAP.keys()))}'
+            )
     else:
         file_types = FILE_TYPES_MAP[file_types[0]]
 
@@ -242,7 +248,9 @@ async def audit_upload_bucket_async(
     ) = auditor.get_assay_map_from_participants(participant_data)
 
     # Get all completed cram output paths for the samples in the dataset and validate them
-    sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
+    sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(
+        assay_sg_id_map
+    )
 
     # Identify sgs with and without completed crams
     sg_completion = await auditor.get_complete_and_incomplete_sgs(
