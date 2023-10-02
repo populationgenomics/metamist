@@ -58,11 +58,11 @@ SEQUENCING_TYPES_QUERY = gql(
 def get_sequencing_types():
     """Return the list of sequencing types from the enum table."""
     logging.getLogger().setLevel(logging.WARN)
-    sequencing_types = query(  # pylint: disable=unsubscriptable-object
+    sequencing_types = query(
         SEQUENCING_TYPES_QUERY
     )
     logging.getLogger().setLevel(logging.INFO)
-    return sequencing_types['enum']['sequencingType']
+    return sequencing_types['enum']['sequencingType']  # pylint: disable=unsubscriptable-object
 
 
 def audit_upload_bucket(
