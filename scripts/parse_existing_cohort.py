@@ -90,8 +90,8 @@ class Columns:
 
 def fastq_file_name_to_sample_id(filename: str) -> str:
     """
-    HG3FMDSX3_2_220208_FD02700641_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_PROPHECY_M002_R1.
-    -> 220208_FD02700641
+    SOMEID1_2_220101_SAMPLEID_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220101_FIRLAS1_PROJECT_M002_R1.
+    -> 220101_SAMPLEID
     """
     return '_'.join(filename.split('_')[2:4])
 

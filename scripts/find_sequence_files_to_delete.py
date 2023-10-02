@@ -11,14 +11,15 @@ Requirements:
 
 # pylint: disable=W0703
 
-import os
 import asyncio
 import logging
+import os
 from collections import defaultdict
 from typing import Any
 
 import click
 from google.cloud import storage
+
 from metamist.apis import ProjectApi
 from metamist.graphql import query_async
 
@@ -33,17 +34,9 @@ client = storage.Client()
 projapi = ProjectApi()
 
 # TODO: fetch this from metamist
-CPG_SEQUENCING_GROUP_IDS_TO_SKIP = {
-    'CPG11783',  # acute-care, no FASTQ data
-    'CPG255232',  # perth-neuro: new
-    'CPG255240',  # perth-neuro: new
-    'CPG253328',  # perth-neuro, contamination rate 32%
-    'CPG13409',  # perth-neuro, coverage ~0x
-    'CPG243717',
-    'CPG246645',  # ag-hidden, eof issue  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/440
-    'CPG246678',  # ag-hidden, diff fastq size  https://batch.hail.populationgenomics.org.au/batches/97645/jobs/446
-    'CPG246561',  # ag-hidden, coverage ~0x https://main-web.populationgenomics.org.au/ag-hidden/qc/cram/multiqc.html
-}
+CPG_SEQUENCING_GROUP_IDS_TO_SKIP: set[str] = set(
+    sg for sg in os.getenv('CPG_SEQUENCING_GROUP_IDS_TO_SKIP', '').split(',') if sg
+)
 
 
 def get_bucket_name_from_path(path_input):
@@ -183,7 +176,9 @@ def find_existing_files_in_bucket(
 
 
 async def find_files_to_delete(
-    sequencing_types_to_remove: list[str], projects_to_ignore: list[str], output_path: str
+    sequencing_types_to_remove: list[str],
+    projects_to_ignore: list[str],
+    output_path: str,
 ):
     """
     Get all the sequences across all the projects from metamist

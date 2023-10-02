@@ -56,3 +56,6 @@ web/src/__generated__
 
 # mypy
 .mypy_cache/
+
+# pulumi config files
+Pulumi*.yaml

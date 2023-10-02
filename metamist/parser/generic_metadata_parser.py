@@ -692,6 +692,13 @@ class GenericMetadataParser(GenericParser):
             )
         ]
 
+    @staticmethod
+    def get_info() -> tuple[str, str]:
+        """
+        Information about parser, including short name and version
+        """
+        return ('gmp', 'v1')
+
 
 @click.command(help=__DOC)
 @click.option(

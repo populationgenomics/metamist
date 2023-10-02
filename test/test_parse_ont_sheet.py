@@ -38,10 +38,6 @@ class TestOntSampleSheetParser(DbIsolatedTest):
 
         mock_graphql_query.side_effect = self.run_graphql_query_async
 
-        # mock_get_participant_id.return_value = {'Sample01': 1}
-        # mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
-        # mock_get_sequence_ids.return_value = {}
-
         rows = [
             'Sequencing_date,Experiment name,Sample ID,Protocol,Flow cell,Barcoding,Device,Flowcell ID,MUX total,Basecalling,Fail FASTQ filename,Pass FASTQ filename',
             '10/12/2034,PBXP_Awesome,Sample01,LSK1,PRO002,None,PromethION,XYZ1,7107,4.0.11+f1071ce,Sample01_fail.fastq.gz,Sample01_pass.fastq.gz',
