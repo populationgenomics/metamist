@@ -2,10 +2,11 @@ from collections import defaultdict, namedtuple
 import logging
 import os
 from typing import Any
+from datetime import datetime
 
 from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
-from metamist.graphql import query, gql
+from metamist.graphql import query_async, gql
 
 
 ANALYSIS_TYPES = [
@@ -25,8 +26,8 @@ QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
         query DatasetData($datasetName: String!) {
             project(name: $datasetName) {
                 participants {
-                    externalId
                     id
+                    externalId
                     samples {
                         id
                         externalId
@@ -42,22 +43,24 @@ QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
                 }
             }
         }
-        """
+    """
 )
 
 QUERY_SG_ANALYSES = gql(
     """
-        query sgAnalyses($sgId: String!, $analysisType: String!) {
-          sequencingGroups(id: {eq: $sgId}) {
-            analyses(status: {eq: COMPLETED}, type: {eq: $analysisType}) {
+        query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
+          sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
+            id
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}) {
               id
               meta
               output
+              type
               timestampCompleted
             }
           }
         }
-"""
+    """
 )
 
 # Variable type definitions
@@ -68,7 +71,7 @@ ParticipantExternalId = str
 
 AssayReportEntry = namedtuple(
     'AssayReportEntry',
-    'sg_id assay_id assay_file_path analysis_ids filesize',
+    'sg_id assay_id assay_file_path analysis_id filesize',
 )
 
 
@@ -79,7 +82,7 @@ class GenericAuditor(AuditHelper):
     def __init__(
         self,
         dataset: str,
-        sequencing_type: list[str],
+        sequencing_types: list[str],
         file_types: tuple[str],
         default_analysis_type='cram',
         default_analysis_status='completed',
@@ -90,23 +93,26 @@ class GenericAuditor(AuditHelper):
         super().__init__(search_paths=None)
 
         self.dataset = dataset
-        self.sequencing_type = sequencing_type
+        self.sequencing_types = sequencing_types
         self.file_types = file_types
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
 
         requests_logger.setLevel(logging.WARNING)
 
-    def get_participant_data_for_dataset(self) -> list[dict]:
+    async def get_participant_data_for_dataset(self) -> list[dict]:
         """
         Uses a graphQL query to return all participants in a Metamist dataset.
-        Nested in the return are all samples associated with the participants,
-        and then all the assays associated with those samples.
+        Returned list includes all samples and assays associated with the participants.
         """
 
-        participant_data = query(  # pylint: disable=unsubscriptable-object
+        logging.getLogger().setLevel(logging.WARN)
+        participant_query_results = await query_async(
             QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS, {'datasetName': self.dataset}
-        )['project']['participants']
+        )
+        logging.getLogger().setLevel(logging.INFO)
+
+        participant_data = participant_query_results['project']['participants']
 
         filtered_participants = []
         for participant in participant_data:
@@ -119,41 +125,34 @@ class GenericAuditor(AuditHelper):
 
         return filtered_participants
 
-    # TODO
-    # Remove this method?
     @staticmethod
-    def map_participants_to_samples(
-        participants: list[dict],
-    ) -> dict[ParticipantExternalId, list[SampleId]]:
+    def get_most_recent_analyses_by_sg(
+        analyses_list: list[dict[str, Any]]
+    ) -> dict[str, dict[str, Any]]:
         """
-        Returns the {external_participant_id : sample_internal_id}
-            mapping for a Metamist dataset
-        - Also reports if any participants have more than one sample
+        Takes a list of completed analyses for a number of sequencing groups and returns the latest
+        completed analysis for each sequencing group, creating a 1:1 mapping of SG to analysis.
         """
+        most_recent_analysis_by_sg = {}
 
-        # Create mapping of participant external id to sample id
-        participant_eid_sample_id_map = {
-            participant['externalId']: [
-                sample['id'] for sample in participant['samples']
-            ]
-            for participant in participants
-        }
+        for sg_analyses in analyses_list:
+            sg_id = sg_analyses['id']
+            analyses = sg_analyses['analyses']
+            if not analyses:
+                continue
+            if len(analyses) == 1:
+                most_recent_analysis_by_sg[sg_id] = analyses[0]
+                continue
 
-        # Create mapping of participant external id to internal id
-        participant_eid_to_iid = {
-            participant['externalId']: participant['id'] for participant in participants
-        }
+            sorted_analyses = sorted(
+                analyses,
+                key=lambda x: datetime.strptime(
+                    x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
+                ),
+            )
+            most_recent_analysis_by_sg[sg_id] = sorted_analyses[-1]
 
-        # Report if any participants have more than one sample id
-        for participant_eid, sample_ids in participant_eid_sample_id_map.items():
-            if len(sample_ids) > 1:
-                logging.info(
-                    f'Participant {participant_eid_to_iid[participant_eid]} '
-                    f'(external id: {participant_eid}) associated with more than '
-                    f'one sample id: {sample_ids}'
-                )
-
-        return participant_eid_sample_id_map
+        return most_recent_analysis_by_sg
 
     @staticmethod
     def map_internal_to_external_sample_ids(
@@ -176,7 +175,7 @@ class GenericAuditor(AuditHelper):
 
         Returns the mappings:
         1. { sg_id       : sample_id }
-        2. { assay_id       : sg_id }
+        2. { assay_id    : sg_id }
         3. { assay_id    : (read_filepath, read_filesize,) }
         """
 
@@ -191,7 +190,7 @@ class GenericAuditor(AuditHelper):
         }
         for sample_id, sgs in sample_sgs.items():
             for sg in sgs:
-                if not sg['type'].lower() in self.sequencing_type:
+                if sg['type'].lower() not in self.sequencing_types:
                     continue
 
                 sg_sample_id_map[sg['id']] = sample_id
@@ -203,7 +202,21 @@ class GenericAuditor(AuditHelper):
                         )
                         continue
 
+                    if assay_sg_id_map.get(assay['id']):
+                        raise ValueError(
+                            f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
+                        )
                     assay_sg_id_map[assay['id']] = sg['id']
+
+                    if isinstance(reads, dict):
+                        assay_filepaths_filesizes[assay['id']].append(
+                            (
+                                reads.get('location'),
+                                reads.get('size'),
+                            )
+                        )
+                        continue
+
                     for read in reads:
                         if not isinstance(read, dict):
                             logging.error(
@@ -220,33 +233,30 @@ class GenericAuditor(AuditHelper):
 
         return sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes
 
-    def get_analysis_cram_paths_for_dataset_sgs(
+    async def get_analysis_cram_paths_for_dataset_sgs(
         self,
         assay_sg_id_map: dict[int, str],
     ) -> dict[str, dict[int, str]]:
         """
-        Fetches all CRAMs for the list of sgs in the given dataset AND the seqr dataset.
+        Fetches all CRAMs for the list of sgs in the given dataset.
         Returns a dict mapping {sg_id : (analysis_id, cram_path) }
         """
         sg_ids = list(assay_sg_id_map.values())
 
-        analyses = []
-        for sg_id in sg_ids:
-            analyses.extend(
-                [
-                    sg['analyses']
-                    for sg in query(  # pylint: disable=unsubscriptable-object
-                        QUERY_SG_ANALYSES, {'sgId': sg_id, 'analysisType': 'CRAM'}
-                    )['sequencingGroups']
-                ]
-            )
-        analyses = [
-            analysis for analyses_list in analyses for analysis in analyses_list
-        ]
+        logging.getLogger().setLevel(logging.WARN)
+        analyses_query_result = await query_async(
+            QUERY_SG_ANALYSES,
+            {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']},
+        )
+        logging.getLogger().setLevel(logging.INFO)
+
+        analyses = analyses_query_result['sequencingGroups']
+        analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
+
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
             analysis['id']
-            for analysis in analyses
+            for analysis in analyses.values()
             if 'sequencing_type' not in analysis['meta']
         ]
         if crams_with_missing_seq_type:
@@ -254,72 +264,42 @@ class GenericAuditor(AuditHelper):
                 f'{self.dataset} :: CRAM analyses are missing sequencing_type field: {crams_with_missing_seq_type}'
             )
 
-        # Filter the analyses based on input sequencing type
-        analyses = [
-            analysis
-            for analysis in analyses
-            if analysis['meta'].get('sequencing_type') in self.sequencing_type
-        ]
-
-        # For each sg id, collect the analysis ids and cram paths
+        # For each sg id, collect the analysis id and cram paths
         sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
-        for analysis in analyses:
-            # Check the analysis output path is a valid gs path to a .cram file
-            if not analysis['output'].startswith('gs://') and analysis[
-                'output'
-            ].endswith('cram'):
+        for sg_id, analysis in analyses.items():
+            cram_path = analysis['output']
+            if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
                 logging.warning(
                     f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
                 )
                 continue
 
-            try:
-                sg_id = self.get_sequencing_group_ids_from_analysis(analysis)[0]
-                sg_cram_paths[sg_id].update(
-                    [(analysis.get('id'), analysis.get('output'))]
-                )
-            except ValueError:
-                logging.warning(
-                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
-                )
-                continue
+            sg_cram_paths[sg_id][analysis['id']] = analysis['output']
 
         return sg_cram_paths
 
-    def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
+    async def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""
 
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
-        analyses = []
-        for analysis_type in ANALYSIS_TYPES:
-            if analysis_type == 'CRAM':
-                continue
-            for sg in sgs_without_crams:
-                analyses.extend(
-                    [
-                        sg['analyses']
-                        for sg in query(  # pylint: disable=unsubscriptable-object
-                            QUERY_SG_ANALYSES,
-                            {'sgId': sg, 'analysisType': analysis_type},
-                        )['sequencingGroups']
-                    ]
-                )
-        analyses = [
-            analysis for analyses_list in analyses for analysis in analyses_list
-        ]
-        for analysis in analyses:
-            try:
-                sg_ids = self.get_sequencing_group_ids_from_analysis(analysis)
-            except ValueError:
-                logging.warning(
-                    f'Analysis {analysis["id"]} missing sample or sequencing group field.'
-                )
-                continue
+        logging.getLogger().setLevel(logging.WARN)
+        sg_analyse_query_result = await query_async(
+            QUERY_SG_ANALYSES,
+            {
+                'dataset': self.dataset,
+                'sgIds': sgs_without_crams,
+                'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM'],
+            },
+        )
+        logging.getLogger().setLevel(logging.INFO)
 
-            for sg_id in sg_ids:
-                if sg_id not in sgs_without_crams:
-                    continue
+        sg_analyses = sg_analyse_query_result['sequencingGroups']
+
+        for sg_analysis in sg_analyses:
+            sg_id = sg_analysis['id']
+
+            for analysis in sg_analysis['analyses']:
                 analysis_entry = {
                     'analysis_id': analysis['id'],
                     'analysis_type': analysis['type'],
@@ -335,7 +315,7 @@ class GenericAuditor(AuditHelper):
                         f'{self.dataset} :: SG {sg_without_cram} missing CRAM but has analysis {completed_analysis}'
                     )
 
-    def get_complete_and_incomplete_sgs(
+    async def get_complete_and_incomplete_sgs(
         self,
         assay_sg_id_map: dict[int, str],
         sg_cram_paths: dict[str, dict[int, str]],
@@ -351,24 +331,24 @@ class GenericAuditor(AuditHelper):
         for analyses in sg_cram_paths.values():
             cram_paths.update(list(analyses.values()))
 
-        # Check the analysis paths actually point to crams that exist in the bucket
+        # Check the analysis CRAM paths actually exist in the bucket
         buckets_subdirs = self.get_gcs_bucket_subdirs_to_search(list(cram_paths))
         crams_in_bucket = self.find_files_in_gcs_buckets_subdirs(
             buckets_subdirs,
             ('cram',),
         )
 
-        # Incomplete samples initialised as the list of samples without a valid analysis cram output path
+        # Incomplete SGs initialised as the SGs without a completed CRAM
         incomplete_sgs = set(assay_sg_id_map.values()).difference(
             set(sg_cram_paths.keys())
         )
 
-        # Completed sgs are those whose completed cram output path exists in the bucket at the same path
-        completed_sgs = defaultdict(list)
-        for sg_id, analyses in sg_cram_paths.items():
-            for analysis_id, cram_path in analyses.items():
+        # Completed SGs have a CRAM file in the bucket that matches the path in Metamist
+        completed_sgs = {}
+        for sg_id, analysis in sg_cram_paths.items():
+            for analysis_id, cram_path in analysis.items():
                 if cram_path in crams_in_bucket:
-                    completed_sgs[sg_id].append(analysis_id)
+                    completed_sgs[sg_id] = analysis_id
                     continue
                 incomplete_sgs.update(sg_id)
 
@@ -376,7 +356,7 @@ class GenericAuditor(AuditHelper):
             logging.warning(
                 f'{self.dataset} :: {len(incomplete_sgs)} SGs without CRAMs found: {list(incomplete_sgs)}'
             )
-            self.analyses_for_sgs_without_crams(list(incomplete_sgs))
+            await self.analyses_for_sgs_without_crams(list(incomplete_sgs))
 
         return {'complete': completed_sgs, 'incomplete': list(incomplete_sgs)}
 
@@ -390,10 +370,13 @@ class GenericAuditor(AuditHelper):
         sample_internal_external_id_map: dict[str, str],
     ):
         """
-        Compares the assays in a Metamist dataset to the assays in the main-upload bucket
+        Compares the assays read files in a Metamist dataset to the read files found in the
+        main-upload bucket.
 
-        Input: The dataset name, the {assay_id : read_paths} mapping, the assay file types,
-               and the sample internal -> external id mapping.
+        Input:  The upload bucket name, the {assay_id : (read_path, read_size)} mapping,
+                the completed SGs, the { SG_ID : sample_ID } mapping, the { assay_id : SG_ID } mapping,
+                and the { sample_id : sample_external_id } mapping.
+
         Returns: 1. Paths to assays that have not yet been ingested - checks if any completed
                     sample external IDs are in the filename and includes this in output.
                  2. A dict mapping assay IDs to GS filepaths that have been ingested,
@@ -401,7 +384,7 @@ class GenericAuditor(AuditHelper):
                     assay in Metamist. If the filenames and file sizes match,
                     these are identified as assay files that have been moved from
                     their original location to a new location.
-                 3. The paths saved in metamist for the read data that has been moved. These paths go nowhere.
+                 3. The assay read files that have been deleted/moved.
         """
         # Get all the paths to assay data anywhere in the main-upload bucket
         assay_paths_in_bucket = self.find_assay_files_in_gcs_bucket(
@@ -491,15 +474,15 @@ class GenericAuditor(AuditHelper):
         for bucket_path, metamist_path in ingested_and_moved_filepaths:
             assay_id = reads_assays.get(metamist_path)
             sg_id = assay_sg_id_map.get(assay_id)
-            analysis_ids = completed_sgs.get(sg_id)
-            if sg_id not in AuditHelper.EXCLUDED_SGS and analysis_ids:
+            analysis_id = completed_sgs.get(sg_id)
+            if sg_id not in AuditHelper.EXCLUDED_SGS and analysis_id:
                 filesize = new_assay_path_sizes[bucket_path]
                 assays_moved_paths.append(
                     AssayReportEntry(
                         sg_id=sg_id,
                         assay_id=assay_id,
                         assay_file_path=bucket_path,
-                        analysis_ids=analysis_ids,
+                        analysis_id=analysis_id,
                         filesize=filesize,
                     )
                 )
@@ -544,7 +527,7 @@ class GenericAuditor(AuditHelper):
             sg_assays_id_map[sg_id].append(assay_id)
 
         assay_reads_to_delete = []
-        for sg_id, analysis_ids in completed_sgs.items():
+        for sg_id, analysis_id in completed_sgs.items():
             if sg_id in AuditHelper.EXCLUDED_SGS:
                 continue
             assay_ids = sg_assays_id_map[sg_id]
@@ -559,7 +542,7 @@ class GenericAuditor(AuditHelper):
                             sg_id=sg_id,
                             assay_id=assay_id,
                             assay_file_path=path,
-                            analysis_ids=analysis_ids,
+                            analysis_id=analysis_id,
                             filesize=filesize,
                         )
                     )
