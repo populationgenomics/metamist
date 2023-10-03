@@ -5,6 +5,7 @@ from models.models.analysis import (
     ProjectSizeModel,
     ProportionalDateModel,
     ProportionalDateProjectModel,
+    ProportionalDateTemporalMethod,
     SequencingGroupSizeModel,
 )
 from models.models.assay import (

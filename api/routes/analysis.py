@@ -21,7 +21,11 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models.analysis import Analysis, AnalysisInternal, ProjectSizeModel
+from models.models.analysis import (
+    Analysis,
+    AnalysisInternal,
+    ProportionalDateTemporalMethod,
+)
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -307,41 +311,6 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sg-file-sizes', operation_id='getSequencingGroupFileSizes')
-async def get_sequencing_group_file_sizes(
-    project_names: list[str] = Query(None),  # type: ignore
-    start_date: str = None,
-    end_date: str = None,
-    connection: Connection = get_projectless_db_connection,
-) -> list[ProjectSizeModel]:
-    """
-    Get the per sample file size by type over the given projects and date range
-    """
-
-    raise NotImplementedError('This route is broken, and not properly implemented yet')
-    # atable = AnalysisLayer(connection)
-
-    # Map from internal pids to project name
-    dict(zip(project_ids, project_names))
-
-    # # Map from internal pids to project name
-    # prj_name_map = dict(zip(project_ids, project_names))
-
-    # Get results with internal ids as keys
-    results: list[dict] = await atable.get_sequencing_group_file_sizes(
-        project_ids=project_ids, start_date=start, end_date=end
-    )
-
-    # Convert to the correct output type, converting internal ids to external
-    for r in results:
-        sgobj: dict[int, dict] = r['sequencing_groups']
-        r['sequencing_groups'] = {
-            sequencing_group_id_format(k): v for k, v in sgobj.items()
-        }
-
-    return results
-
-
 @router.post(
     '/cram-proportionate-map',
     operation_id='getProportionateMap',
@@ -352,6 +321,7 @@ async def get_proportionate_map(
     projects: list[str],
     start: str = None,
     end: str = None,
+    temporal_method: ProportionalDateTemporalMethod = ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE,
     connection: Connection = get_projectless_db_connection,
 ):
     pt = ProjectPermissionsTable(connection=connection.connection)
@@ -368,6 +338,7 @@ async def get_proportionate_map(
         sequencingsequencing_types_type=sequencing_types,
         start_date=start_date,
         end_date=end_date,
+        temporal_method=temporal_method,
     )
 
     return results

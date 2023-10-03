@@ -7,7 +7,7 @@ const BillingDashboard: React.FunctionComponent = () => {
     const [end, setEnd] = React.useState<string>('2022-10-31')
 
     return (
-        <Card fluid style={{ padding: "20px" }}>
+        <Card fluid style={{ padding: '20px' }}>
             <div
                 style={{
                     marginTop: 20,

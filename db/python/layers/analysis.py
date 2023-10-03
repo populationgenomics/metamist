@@ -15,6 +15,7 @@ from models.models import (
     AnalysisInternal,
     ProportionalDateModel,
     ProportionalDateProjectModel,
+    ProportionalDateTemporalMethod,
 )
 
 logger = get_logger()
@@ -124,8 +125,24 @@ class AnalysisLayer(BaseLayer):
 
         return analyses
 
+    async def get_sg_history_for_temporal_method(
+        self,
+        sequencing_group_ids: list[int],
+        temporal_method: ProportionalDateTemporalMethod,
+    ) -> dict[int, date]:
+        """Get the history of samples for the given temporal method"""
+        sglayer = SequencingGroupLayer(self.connection)
+
+        if temporal_method == ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE:
+            return await sglayer.get_samples_create_date_from_sgs(sequencing_group_ids)
+
+        raise NotImplementedError(
+            f'Have not implemented {temporal_method.value} temporal method yet'
+        )
+
     async def get_sequencing_group_file_sizes(
         self,
+        temporal_method: ProportionalDateTemporalMethod,
         project_ids: list[int] = None,
         start_date: date = None,
         end_date: date = None,
@@ -147,8 +164,10 @@ class AnalysisLayer(BaseLayer):
 
         sequencing_group_ids = [sg.id for sg in sequencing_groups]
 
-        # Get sample history for sequencing-group IDs
-        history = await sglayer.get_samples_create_date_from_sgs(sequencing_group_ids)
+        # Get start date for sequencing-group IDs
+        history = await self.get_sg_history_for_temporal_method(
+            sequencing_group_ids=sequencing_group_ids, temporal_method=temporal_method
+        )
 
         filtered_sequencing_group_ids = sequencing_group_ids
 
@@ -217,18 +236,19 @@ class AnalysisLayer(BaseLayer):
         self,
         projects: list[ProjectId],
         sequencing_types: str,
+        temporal_method: ProportionalDateTemporalMethod,
         start_date: date = None,
         end_date: date = None,
-    ):
+    ) -> list[ProportionalDateModel]:
         """
-        This is a bit more complex, but for hail we want to proportion any downstream
-        costs as soon as there CRAMs available. This kind of means we build up a
-        continuous map of costs (but fragmented by days).
+        This is a bit more complex, but we want to generate a map of cram size by day,
+        based on the temporal_method (sample create date, joint call date).
+            NB: Can't use the align date because the data is not good enough
 
         We'll do this in three steps:
 
-        1. First alssign the cram a {dataset: total_size} map on the day cram was
-            aligned. This generates a diff of each dataset by day.
+        1. First assign the cram a {dataset: total_size} map on the relevant day.
+            This generates a diff of each dataset by day.
 
         2. Iterate over the days, and progressively sum up the sizes in the map.
 
@@ -243,6 +263,7 @@ class AnalysisLayer(BaseLayer):
             start_date=start_date,
             end_date=end_date,
             sequencing_types=sequencing_types,
+            temporal_method=temporal_method,
         )
 
         end_date_date = None

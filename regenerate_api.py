@@ -107,7 +107,7 @@ def _get_openapi_version():
         command = [*OPENAPI_COMMAND, version_cmd]
         try:
             return subprocess.check_output(command, stderr=subprocess.PIPE, timeout=10)
-        
+
         except subprocess.TimeoutExpired:
             has_timeout = True
             # sometimes a timeout means that it's waiting for stdin because openapi
@@ -118,10 +118,10 @@ def _get_openapi_version():
             continue
 
     if has_timeout:
-        command = ' '.join(*OPENAPI_COMMAND, version_cmds[-1])
+        _command = ' '.join([*OPENAPI_COMMAND, version_cmds[-1]])
         raise ValueError(
             'Could not get version of openapi as the command timed out, this might '
-            f'mean openapi is misconfigured. Try running "{command}" in your terminal.'
+            f'mean openapi is misconfigured. Try running "{_command}" in your terminal.'
         )
 
     raise ValueError('Could not get version of openapi')
@@ -320,6 +320,9 @@ def main():
         - Stop the server (if applicable)
 
     """
+    # check openapi version first, because it seems to be fairly sketchy
+    check_openapi_version()
+
     if check_if_server_is_accessible():
         logger.info(f'Using already existing server {SCHEMA_URL}')
         process = None
@@ -340,7 +343,6 @@ def main():
 
     try:
         assert_server_is_accessible()
-        check_openapi_version()
 
         # Generate the installable Python API
         generate_api_and_copy(

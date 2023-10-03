@@ -1,3 +1,4 @@
+import enum
 import json
 from datetime import date
 from typing import Any
@@ -150,3 +151,8 @@ class ProportionalDateModel(BaseModel):
 
     date: date
     projects: list[ProportionalDateProjectModel]
+
+
+class ProportionalDateTemporalMethod(enum.Enum):
+    SAMPLE_CREATE_DATE = 'SAMPLE_CREATE_DATE'
+    SG_JOINT_CALL_DATE = 'SG_JOINT_CALL_DATE'
