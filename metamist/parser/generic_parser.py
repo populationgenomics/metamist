@@ -564,6 +564,11 @@ class GenericParser(
 
         # remove sequencing groups with no assays
         sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
+        for sample in samples:
+            sample.sequencing_groups = [
+                sg for sg in sample.sequencing_groups if sg.assays
+            ]
+
         # match assay ids after sequencing groups
         await self.match_assay_ids(assays)
         # match sequencing group ids after assays
