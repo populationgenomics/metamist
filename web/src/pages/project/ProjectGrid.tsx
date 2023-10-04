@@ -271,9 +271,12 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             .map((s_) =>
                                 // do 1 here, because we want to show at least 1 row, even if there are
                                 // no sequencing groups OR assays
-                                Math.max(1, (s_.sequencing_groups ?? [])
-                                    .map((a_) => (a_.assays ?? []).length)
-                                    .reduce((a, b) => a + b, 0))
+                                Math.max(
+                                    1,
+                                    (s_.sequencing_groups ?? [])
+                                        .map((a_) => (a_.assays ?? []).length)
+                                        .reduce((a, b) => a + b, 0)
+                                )
                             )
                             .reduce((a, b) => a + b, 0)
 
@@ -281,13 +284,15 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                             .map((a_) => (a_.assays ?? []).length)
                             .reduce((a, b) => a + b, 0)
 
-                        const participantRowSpan = lengthOfParticipant > 0 ? lengthOfParticipant : undefined
+                        const participantRowSpan =
+                            lengthOfParticipant > 0 ? lengthOfParticipant : undefined
                         const samplesRowSpan = lengthOfSamples > 0 ? lengthOfSamples : undefined
-
 
                         let sgs = s.sequencing_groups || []
                         // @ts-ignore
-                        if (!sgs || sgs.length === 0) { sgs = [{}] }
+                        if (!sgs || sgs.length === 0) {
+                            sgs = [{}]
+                        }
                         return sgs.map((sg, sgidx) =>
                             (sg.assays?.length > 0 ? sg.assays : [{}]).map((assay, assayidx) => {
                                 const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
@@ -385,7 +390,11 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         backgroundColor,
                                                     }}
                                                     key={`${s.id}sequencing_group.${k}`}
-                                                    rowSpan={(sg.assays ?? []).length > 0 ? (sg.assays ?? []).length : undefined}
+                                                    rowSpan={
+                                                        (sg.assays ?? []).length > 0
+                                                            ? (sg.assays ?? []).length
+                                                            : undefined
+                                                    }
                                                 >
                                                     {k === 'id' ? (
                                                         <SequencingGroupLink
