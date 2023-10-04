@@ -90,7 +90,9 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post(
+    '/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject'
+)
 async def sync_seqr_project(
     sequencing_type: str,
     sync_families: bool = True,
@@ -99,6 +101,7 @@ async def sync_seqr_project(
     sync_es_index: bool = True,
     sync_saved_variants: bool = True,
     sync_cram_map: bool = True,
+    sync_sv_es_index: bool = True,
     post_slack_notification: bool = True,
     connection=get_project_write_connection,
 ):
@@ -115,6 +118,7 @@ async def sync_seqr_project(
             sync_es_index=sync_es_index,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
+            sync_sv_es_index=sync_sv_es_index,
             post_slack_notification=post_slack_notification,
         )
         return {'success': 'errors' not in data, **data}

@@ -16,6 +16,7 @@ interface SeqrSyncFormOptions {
     syncEsIndex?: boolean
     syncSavedVariants?: boolean
     syncCramMap?: boolean
+    syncSvEsIndex?: boolean
     postSlackNotification?: boolean
 }
 
@@ -32,6 +33,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncEsIndex: true,
         syncSavedVariants: true,
         syncCramMap: true,
+        syncSvEsIndex: true,
         postSlackNotification: true,
     })
 
@@ -51,6 +53,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                 syncOptions.syncEsIndex,
                 syncOptions.syncEsIndex, // tie syncSavedVariants, to syncing es-index
                 syncOptions.syncCramMap,
+                syncOptions.syncSvEsIndex,
                 syncOptions.postSlackNotification
             )
             .then((resp) => {
@@ -127,6 +130,12 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                             checked={syncOptions.syncCramMap}
                             onChange={updateStateFromForm}
                             label="Sync CRAMs"
+                        />
+                        <Form.Checkbox
+                            id="syncSvEsIndex"
+                            checked={syncOptions.syncSvEsIndex}
+                            onChange={updateStateFromForm}
+                            label="Sync SV elastic-search index"
                         />
                         <br />
                         <Form.Checkbox

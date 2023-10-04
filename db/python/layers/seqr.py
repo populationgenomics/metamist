@@ -6,6 +6,7 @@ import re
 import traceback
 from collections import defaultdict
 from datetime import datetime
+from functools import cache
 from typing import Iterable, Iterator, TypeVar
 
 import aiohttp
@@ -123,6 +124,42 @@ class SeqrLayer(BaseLayer):
         ]
         return sts
 
+    @cache
+    async def get_sequencing_group_to_participant_external_id_map(
+        self, sequencing_type: str, project_guid: str
+    ):
+        """Get map of sequencing group ID to participant EID for seqr"""
+        eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
+            self.connection.project, sequencing_type=sequencing_type
+        )
+
+        # Convert integer sequencing group IDs to string IDs
+        participant_sg_id_map_rows: list[tuple[str, str]] = [
+            (p[0], sequencing_group_id_format(p[1]))
+            for p in eid_to_sgid_rows
+            if p[1] not in SEQUENCING_GROUPS_TO_IGNORE
+        ]
+
+        # Creating the mapping seqr requires
+        #   Col 1: Sample IDs (sequencing group ID in our case)
+        #   Col 2: Individual IDs (participant external ID).
+        rows_to_write = [
+            '\t'.join(sg[::-1])
+            for sg in participant_sg_id_map_rows
+            if not any(sgid in sg for sgid in SEQUENCING_GROUPS_TO_IGNORE)
+        ]
+
+        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
+        # remove any non-filename compliant filenames
+        filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
+
+        fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
+        # pylint: disable=no-member
+        with AnyPath(fn_path).open('w+') as f:  # type: ignore
+            f.write('\n'.join(rows_to_write))
+
+        return fn_path
+
     async def sync_dataset(
         self,
         sequencing_type: str,
@@ -132,6 +169,7 @@ class SeqrLayer(BaseLayer):
         sync_es_index: bool = True,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
+        sync_sv_es_index: bool = True,
         post_slack_notification: bool = True,
     ) -> dict[str, list[str]]:
         """Sync a specific dataset for seqr"""
@@ -229,6 +267,15 @@ class SeqrLayer(BaseLayer):
                     self.sync_cram_map(
                         sequencing_type=sequencing_type,
                         participant_ids=participant_ids,
+                        **params,
+                    )
+                )
+            if sync_sv_es_index:
+                promises.append(
+                    self.update_es_index(
+                        sequencing_type=sequencing_type,
+                        sequencing_group_ids=sequencing_group_ids,
+                        es_index_meta_stage='MtToEsSv',
                         **params,
                     )
                 )
@@ -376,42 +423,22 @@ class SeqrLayer(BaseLayer):
         project_guid,
         headers,
         sequencing_group_ids: set[int],
+        es_index_meta_stage: str = 'MtToEs',
     ) -> list[str]:
-        """Update seqr samples for latest elastic-search index"""
-        eid_to_sgid_rows = await self.player.get_external_participant_id_to_internal_sequencing_group_id_map(
-            self.connection.project, sequencing_type=sequencing_type
-        )
-
-        # format sample ID for transport
-        person_sample_map_rows: list[tuple[str, str]] = [
-            (p[0], sequencing_group_id_format(p[1]))
-            for p in eid_to_sgid_rows
-            if p[1] not in SEQUENCING_GROUPS_TO_IGNORE
-        ]
-
-        # highlighting that seqr wants:
-        #   Col 1: Sample Ids (sequencing group ID in our case)
-        #   Col 2: Seqr Individual Ids (column 2).
-        rows_to_write = [
-            '\t'.join(s[::-1])
-            for s in person_sample_map_rows
-            if not any(sid in s for sid in SEQUENCING_GROUPS_TO_IGNORE)
-        ]
-
-        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
-        # remove any non-filename compliant filenames
-        filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
-
-        fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
-        # pylint: disable=no-member
-
+        """
+        Update seqr samples for latest elastic-search index.
+        Filter results by meta stage to find standard or SV indexes.
+        """
         alayer = AnalysisLayer(connection=self.connection)
         es_index_analyses = await alayer.query(
             AnalysisFilter(
                 project=GenericFilter(eq=self.connection.project),
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
+                meta={
+                    'sequencing_type': GenericFilter(eq=sequencing_type),
+                    'stage': GenericFilter(eq=es_index_meta_stage),
+                },
             )
         )
 
@@ -421,10 +448,11 @@ class SeqrLayer(BaseLayer):
         )
 
         if len(es_index_analyses) == 0:
-            return ['No ES index to synchronise']
+            return [f'No {es_index_meta_stage} ES index to synchronise']
 
-        with AnyPath(fn_path).open('w+') as f:  # type: ignore
-            f.write('\n'.join(rows_to_write))
+        fn_path = await self.get_sequencing_group_to_participant_external_id_map(
+            sequencing_type=sequencing_type, project_guid=project_guid
+        )
 
         es_index = es_index_analyses[-1].output
 
@@ -444,7 +472,8 @@ class SeqrLayer(BaseLayer):
                 )
                 if sequencing_groups_diff:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
+                        'Sequencing groups added to index: '
+                        + ', '.join(sequencing_groups_diff),
                     )
 
             sg_ids_missing_from_index = sequencing_group_id_format_list(
@@ -456,12 +485,17 @@ class SeqrLayer(BaseLayer):
                     + ', '.join(sg_ids_missing_from_index),
                 )
 
+        # Set the dataset type based on the es-index meta 'stage' field
+        dataset_type = 'VARIANTS'
+        if es_index_meta_stage == 'MtToEsSv':
+            dataset_type = 'SV'
+
         req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
         resp_1 = await session.post(
             req1_url,
             json={
                 'elasticsearchIndex': es_index,
-                'datasetType': 'VARIANTS',
+                'datasetType': dataset_type,
                 'mappingFilePath': fn_path,
                 'ignoreExtraSamplesInCallset': True,
             },
