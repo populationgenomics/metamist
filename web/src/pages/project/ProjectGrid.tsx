@@ -267,22 +267,41 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                         const backgroundColor =
                             pidx % 2 === 0 ? 'var(--color-bg)' : 'var(--color-bg-disabled)'
                         // const border = '1px solid #dee2e6'
-                        const lengthOfParticipant =
-                            p.samples
-                                .map((s_) =>
+                        const lengthOfParticipant = p.samples
+                            .map((s_) =>
+                                // do 1 here, because we want to show at least 1 row, even if there are
+                                // no sequencing groups OR assays
+                                Math.max(
+                                    1,
                                     (s_.sequencing_groups ?? [])
                                         .map((a_) => (a_.assays ?? []).length)
                                         .reduce((a, b) => a + b, 0)
                                 )
-                                .reduce((a, b) => a + b, 0) ?? 0
-                        return (s.sequencing_groups ?? []).map((seq, seqidx) =>
-                            (seq.assays ?? []).map((assay, assayidx) => {
-                                const isFirstOfGroup = sidx === 0 && seqidx === 0 && assayidx === 0
+                            )
+                            .reduce((a, b) => a + b, 0)
+
+                        const lengthOfSamples = (s.sequencing_groups ?? [])
+                            .map((a_) => (a_.assays ?? []).length)
+                            .reduce((a, b) => a + b, 0)
+
+                        const participantRowSpan =
+                            lengthOfParticipant > 0 ? lengthOfParticipant : undefined
+                        const samplesRowSpan = lengthOfSamples > 0 ? lengthOfSamples : undefined
+
+                        let sgs = s.sequencing_groups || []
+                        // @ts-ignore
+                        if (!sgs || sgs.length === 0) {
+                            sgs = [{}]
+                        }
+                        return sgs.map((sg, sgidx) =>
+                            (sg.assays?.length > 0 ? sg.assays : [{}]).map((assay, assayidx) => {
+                                const isFirstOfGroup = sidx === 0 && sgidx === 0 && assayidx === 0
                                 const border = '1px solid #dee2e6'
                                 // const border = '1px solid'
+                                // debugger
                                 return (
                                     <SUITable.Row
-                                        key={`${p.external_id}-${s.id}-${seq.id}-${assay.id}`}
+                                        key={`${p.external_id}-${s.id}-${sg.id}-${assay.id}`}
                                     >
                                         {isFirstOfGroup && (
                                             <SUITable.Cell
@@ -294,7 +313,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                     borderLeft:
                                                         '2px solid var(--color-border-color)',
                                                 }}
-                                                rowSpan={lengthOfParticipant}
+                                                rowSpan={participantRowSpan}
                                             >
                                                 {
                                                     <FamilyLink
@@ -322,12 +341,12 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                                 : '1px solid var(--color-border-default)',
                                                     }}
                                                     key={`${p.id}participant.${k}`}
-                                                    rowSpan={lengthOfParticipant}
+                                                    rowSpan={participantRowSpan}
                                                 >
                                                     {sanitiseValue(_.get(p, k))}
                                                 </SUITable.Cell>
                                             ))}
-                                        {seqidx === 0 &&
+                                        {sgidx === 0 &&
                                             assayidx === 0 &&
                                             summary.sample_keys.map(([k], i) => (
                                                 <SUITable.Cell
@@ -343,9 +362,7 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         // border,
                                                     }}
                                                     key={`${s.id}sample.${k}`}
-                                                    rowSpan={(s.sequencing_groups ?? [])
-                                                        .map((a_) => (a_.assays ?? []).length)
-                                                        .reduce((a, b) => a + b, 0)}
+                                                    rowSpan={samplesRowSpan}
                                                 >
                                                     {k === 'external_id' || k === 'id' ? (
                                                         <SampleLink
@@ -373,40 +390,43 @@ const ProjectGrid: React.FunctionComponent<ProjectGridProps> = ({
                                                         backgroundColor,
                                                     }}
                                                     key={`${s.id}sequencing_group.${k}`}
-                                                    rowSpan={(seq.assays ?? []).length}
+                                                    rowSpan={
+                                                        (sg.assays ?? []).length > 0
+                                                            ? (sg.assays ?? []).length
+                                                            : undefined
+                                                    }
                                                 >
                                                     {k === 'id' ? (
                                                         <SequencingGroupLink
                                                             projectName={projectName}
                                                             id={s.id}
-                                                            sg_id={_.get(seq, 'id').toString()}
+                                                            sg_id={_.get(sg, 'id')?.toString()}
                                                         >
-                                                            {sanitiseValue(_.get(seq, k))}
+                                                            {sanitiseValue(_.get(sg, k))}
                                                         </SequencingGroupLink>
                                                     ) : (
-                                                        sanitiseValue(_.get(seq, k))
+                                                        sanitiseValue(_.get(sg, k))
                                                     )}
                                                 </SUITable.Cell>
                                             ))}
-                                        {assay &&
-                                            summary.assay_keys.map(([k], i) => (
-                                                <SUITable.Cell
-                                                    style={{
-                                                        backgroundColor,
-                                                        borderRight: border,
-                                                        borderBottom: border,
-                                                        borderTop: border,
-                                                        borderLeft:
-                                                            i === 0
-                                                                ? '2px solid var(--color-border-color)'
-                                                                : '1px solid var(--color-border-default)',
-                                                        // border,
-                                                    }}
-                                                    key={`${s.id}assay.${k}`}
-                                                >
-                                                    {sanitiseValue(_.get(assay, k))}
-                                                </SUITable.Cell>
-                                            ))}
+                                        {summary.assay_keys.map(([k], i) => (
+                                            <SUITable.Cell
+                                                style={{
+                                                    backgroundColor,
+                                                    borderRight: border,
+                                                    borderBottom: border,
+                                                    borderTop: border,
+                                                    borderLeft:
+                                                        i === 0
+                                                            ? '2px solid var(--color-border-color)'
+                                                            : '1px solid var(--color-border-default)',
+                                                    // border,
+                                                }}
+                                                key={`${s.id}assay.${k}`}
+                                            >
+                                                {sanitiseValue(_.get(assay, k))}
+                                            </SUITable.Cell>
+                                        ))}
                                     </SUITable.Row>
                                 )
                             })
