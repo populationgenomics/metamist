@@ -82,9 +82,11 @@ async def dependable_get_bq_connection(author: str = Depends(authenticate)):
     return await BqConnection.get_connection_no_project(author)
 
 
-async def dependable_get_pubsub_connection(author: str = Depends(authenticate)):
+async def dependable_get_pubsub_connection(
+    author: str = Depends(authenticate), topic: str = None
+):
     """FastAPI handler for getting connection withOUT project"""
-    return await PubSubConnection.get_connection_no_project(author)
+    return await PubSubConnection.get_connection_no_project(author, topic)
 
 
 def validate_iap_jwt_and_get_email(iap_jwt, audience):

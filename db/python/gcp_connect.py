@@ -65,7 +65,7 @@ class PubSubConnection:
         self.topic: str = os.getenv('METAMIST_GCP_PROJECT') + topic
 
     @staticmethod
-    async def get_connection_no_project(author: str):
+    async def get_connection_no_project(author: str, topic: str):
         """Get a pubsub connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
@@ -73,4 +73,4 @@ class PubSubConnection:
         # we don't authenticate project-less connection, but rely on the
         # the endpoint to validate the resources
 
-        return PubSubConnection(author=author)
+        return PubSubConnection(author=author, topic=topic)
