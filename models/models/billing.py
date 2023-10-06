@@ -1,7 +1,6 @@
 import datetime
 from decimal import Decimal
 
-from pydantic.tools import parse_obj_as
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
 
@@ -28,21 +27,6 @@ class BillingQueryModel(SMBase):
             if self.cost_category
             else None,
         )
-
-
-class BillingTopicCostCategoryRecord(SMBase):
-    """Return class for the Billing record"""
-
-    day: datetime.date
-    topic: str
-    cost_category: str | None
-    cost: Decimal
-    currency: str
-
-    @staticmethod
-    def from_json(record):
-        """Create BillingTopicCostCategoryRecord from json"""
-        return parse_obj_as(BillingTopicCostCategoryRecord, record)
 
 
 class BillingRowRecord(SMBase):

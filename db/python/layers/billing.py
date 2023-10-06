@@ -1,5 +1,4 @@
 from models.models import (
-    BillingTopicCostCategoryRecord,
     BillingRowRecord,
     BillingTotalCostRecord,
 )
@@ -34,22 +33,16 @@ class BillingLayer(BqBaseLayer):
         billing_db = BillingDb(self.connection)
         return await billing_db.get_cost_category()
 
-    async def get_cost_by_topic(
+    async def get_sku(
         self,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        topic: str | None = None,
-        cost_category: str | None = None,
-        order_by: str | None = None,
-        limit: int = 10,
-    ) -> list[BillingTopicCostCategoryRecord] | None:
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[str] | None:
         """
-        Get Billing record for the given time interval, topic and cost category
+        Get All SKUs in database
         """
         billing_db = BillingDb(self.connection)
-        return await billing_db.get_cost_by_topic(
-            start_date, end_date, topic, cost_category, order_by, limit
-        )
+        return await billing_db.get_sku(limit, offset)
 
     async def query(
         self,
@@ -126,49 +119,29 @@ class BillingDb(BqDbBase):
 
         raise ValueError('No record found')
 
-    async def get_cost_by_topic(
+    async def get_sku(
         self,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        topic: str | None = None,
-        cost_category: str | None = None,
-        order_by: str | None = None,
-        limit: int = 10,
-    ) -> list[BillingTopicCostCategoryRecord] | None:
-        """Get Billing record from BQ"""
-        # ORDER BY day ASC, topic ASC, cost_category ASC;
-        filters = []
+        limit: int | None = None,
+        offset: int | None = None,
+    ):
+        """Get all SKUs in database"""
 
-        if start_date:
-            filters.append(f'day >= TIMESTAMP("{start_date}")')
-        if end_date:
-            filters.append(f'day <= TIMESTAMP("{end_date}")')
-        if topic:
-            filters.append(f'topic = "{topic}"')
-        if cost_category:
-            filters.append(f'cost_category = "{cost_category}"')
-
-        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
-        order_by_str = f'ORDER BY {order_by}' if order_by else ''
-
+        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
         _query = f"""
-        SELECT * FROM
-        (
-            SELECT day, topic, cost_category, currency, cost
-            FROM `{BQ_AGGREG_VIEW}`
-            {filter_str}
-        )
-        WHERE cost > 0.01
-        {order_by_str}
-        LIMIT {limit}
+        SELECT DISTINCT sku
+        FROM `{BQ_AGGREG_VIEW}`
+        ORDER BY sku ASC
         """
-        query_job_result = list(self._connection.connection.query(_query).result())
 
+        # append LIMIT and OFFSET if present
+        if limit:
+            _query += f' LIMIT {limit}'
+        if offset:
+            _query += f' OFFSET {offset}'
+
+        query_job_result = list(self._connection.connection.query(_query).result())
         if query_job_result:
-            return [
-                BillingTopicCostCategoryRecord.from_json(dict(row))
-                for row in query_job_result
-            ]
+            return [str(dict(row)['sku']) for row in query_job_result]
 
         raise ValueError('No record found')
 

@@ -10,7 +10,6 @@ from api.utils.db import (
 from db.python.layers.billing import BillingLayer
 from models.models.billing import (
     BillingQueryModel,
-    BillingTopicCostCategoryRecord,
     BillingRowRecord,
     BillingTotalCostRecord,
 )
@@ -41,7 +40,7 @@ async def get_topic(
 async def get_cost_category(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
-    """Get list of all topics in database"""
+    """Get list of all service description / cost categories in database"""
 
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_cost_category()
@@ -49,25 +48,23 @@ async def get_cost_category(
 
 
 @router.get(
-    '/cost-by-topic',
-    response_model=list[BillingTopicCostCategoryRecord],
-    operation_id='getCostByTopic',
+    '/sku',
+    response_model=list[str],
+    operation_id='getSku',
 )
-async def get_cost_by_topic(
-    start_date: str | None = '2023-03-01',
-    end_date: str | None = '2023-03-01',
-    topic: str | None = 'hail',
-    cost_category: str | None = None,
-    order_by: str | None = 'day ASC, cost_category ASC',
+async def get_sku(
     limit: int = 10,
+    offset: int | None = None,
     connection: BqConnection = get_projectless_bq_connection,
-) -> list[BillingTopicCostCategoryRecord]:
-    """Get Billing cost by topic, cost category and time interval"""
+) -> list[str]:
+    """
+    Get list of all SKUs in database
+    There is over 400 Skus so limit is required
+    Results are sorted ASC
+    """
 
     billing_layer = BillingLayer(connection)
-    records = await billing_layer.get_cost_by_topic(
-        start_date, end_date, topic, cost_category, order_by, limit
-    )
+    records = await billing_layer.get_sku(limit, offset)
     return records
 
 
