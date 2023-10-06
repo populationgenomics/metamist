@@ -128,3 +128,26 @@ class BillingRowRecord(SMBase):
             invoice_month=record['invoice'].get('month', ''),
             cost_type=record['cost_type'],
         )
+
+
+class BillingTotalCostRecord(SMBase):
+    """Return class for the Billing Total Cost record"""
+
+    day: datetime.date | None
+    topic: str | None
+    cost_category: str | None
+    sku: str | None
+    cost: Decimal
+    currency: str | None
+
+    @staticmethod
+    def from_json(record):
+        """Create BillingTopicCostCategoryRecord from json"""
+        return BillingTotalCostRecord(
+            day=record.get('day'),
+            topic=record.get('topic'),
+            cost_category=record.get('cost_category'),
+            sku=record.get('sku'),
+            cost=record.get('cost'),
+            currency=record.get('currency'),
+        )

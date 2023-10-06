@@ -1,13 +1,15 @@
-from models.models import BillingTopicCostCategoryRecord, BillingRowRecord
+from models.models import (
+    BillingTopicCostCategoryRecord,
+    BillingRowRecord,
+    BillingTotalCostRecord,
+)
 
 from db.python.gcp_connect import BqDbBase
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.billing import BillingFilter
 
 # TODO setup as ENV or config
-BQ_AGGREG_VIEW = (
-    'billing-admin-290403.billing_aggregate.aggregate_daily_cost_by_topic-dev'
-)
+BQ_AGGREG_VIEW = 'billing-admin-290403.billing_aggregate.aggregate_daily_cost-dev'
 BQ_AGGREG_RAW = 'billing-admin-290403.billing_aggregate.aggregate-dev'
 
 
@@ -59,6 +61,34 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.query(_filter, limit)
+
+    async def get_total_cost(
+        self,
+        fields: str,
+        start_date: str,
+        end_date: str,
+        topic: str | None = None,
+        cost_category: str | None = None,
+        sku: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[BillingTotalCostRecord] | None:
+        """
+        Get Total cost of selected fields for requested time interval
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_total_cost(
+            fields,
+            start_date,
+            end_date,
+            topic,
+            cost_category,
+            sku,
+            order_by,
+            limit,
+            offset,
+        )
 
 
 class BillingDb(BqDbBase):
@@ -186,5 +216,99 @@ class BillingDb(BqDbBase):
 
         if query_job_result:
             return [BillingRowRecord.from_json(dict(row)) for row in query_job_result]
+
+        raise ValueError('No record found')
+
+    async def get_total_cost(
+        self,
+        fields: str,
+        start_date: str,
+        end_date: str,
+        topic: str | None = None,
+        cost_category: str | None = None,
+        sku: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[BillingTotalCostRecord] | None:
+        """
+        Get Total cost of selected fields for requested time interval from BQ view
+        """
+        if not start_date or not end_date or not fields:
+            raise ValueError('Date and Fields are required')
+
+        allow_fields = ['day', 'topic', 'cost_category', 'currency', 'cost', 'sku']
+
+        columns = []
+        for field in fields.split(','):
+            col_name = field.strip()
+            if col_name not in allow_fields:
+                raise ValueError(f'Invalid field: {field}')
+
+            if col_name == 'cost':
+                # skip the cost field as it will be always present
+                continue
+
+            columns.append(col_name)
+
+        fields_selected = ','.join(columns)
+
+        filters = []
+        filters.append(f'day >= TIMESTAMP("{start_date}")')
+        filters.append(f'day <= TIMESTAMP("{end_date}")')
+        if topic:
+            filters.append(f'topic = "{topic}"')
+        if cost_category:
+            filters.append(f'cost_category = "{cost_category}"')
+        if sku:
+            filters.append(f'sku = "{sku}"')
+
+        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
+
+        # construct order by
+        order_by_cols = []
+        if order_by:
+            for field in order_by.split(','):
+                col_name = field.strip()
+                col_sign = col_name[0]
+                if col_sign not in ['+', '-']:
+                    # default is ASC
+                    col_order = 'ASC'
+                else:
+                    col_order = 'DESC' if col_sign == '-' else 'ASC'
+                    col_name = col_name[1:]
+
+                if col_name not in allow_fields:
+                    raise ValueError(f'Invalid field: {field}')
+
+                order_by_cols.append(f'{col_name} {col_order}')
+
+        order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
+
+        _query = f"""
+        SELECT * FROM
+        (
+            SELECT {fields_selected}, SUM(cost) as cost
+            FROM `{BQ_AGGREG_VIEW}`
+            {filter_str}
+            GROUP BY {fields_selected}
+
+        )
+        WHERE cost > 0.01
+        {order_by_str}
+        """
+
+        # append LIMIT and OFFSET if present
+        if limit:
+            _query += f' LIMIT {limit}'
+        if offset:
+            _query += f' OFFSET {offset}'
+
+        query_job_result = list(self._connection.connection.query(_query).result())
+
+        if query_job_result:
+            return [
+                BillingTotalCostRecord.from_json(dict(row)) for row in query_job_result
+            ]
 
         raise ValueError('No record found')

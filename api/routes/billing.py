@@ -12,6 +12,7 @@ from models.models.billing import (
     BillingQueryModel,
     BillingTopicCostCategoryRecord,
     BillingRowRecord,
+    BillingTotalCostRecord,
 )
 
 router = APIRouter(prefix='/billing', tags=['billing'])
@@ -93,4 +94,59 @@ async def query_billing(
 
     billing_layer = BillingLayer(connection)
     records = await billing_layer.query(query.to_filter(), limit)
+    return records
+
+
+@router.get(
+    '/total-cost',
+    response_model=list[BillingTotalCostRecord],
+    operation_id='getTotalCost',
+)
+async def get_total_cost(
+    fields: str = 'day,topic',
+    start_date: str = '2023-03-01',
+    end_date: str = '2023-03-05',
+    topic: str | None = None,
+    cost_category: str | None = None,
+    sku: str | None = None,
+    order_by: str | None = '+day,-topic',
+    limit: int | None = None,
+    offset: int | None = None,
+    connection: BqConnection = get_projectless_bq_connection,
+) -> list[BillingTotalCostRecord]:
+    """Get Total cost of selected fields for requested time interval
+
+    Here are few examples:
+
+    1. Get total topic for month of March 2023, ordered by cost DESC:
+
+            fields: topic
+            start_date: 2023-03-01
+            end_date: 2023-03-31
+            order_by: -cost
+
+    2. Get total cost by day and topic for March 2023, order by day ASC and topic DESC:
+
+            fields: day,topic
+            start_date: 2023-03-01
+            end_date: 2023-03-31
+            order_by: +day,-topic
+
+    3. Get total cost of sku and cost_category for topic 'hail', March 2023,
+       order by cost DESC with Limit and Offset:
+
+            fields: sku,cost_category
+            start_date: 2023-03-01
+            end_date: 2023-03-31
+            order_by: -cost
+            topic: hail
+            limit: 5
+            offset: 10
+
+    """
+
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_total_cost(
+        fields, start_date, end_date, topic, cost_category, sku, order_by, limit, offset
+    )
     return records

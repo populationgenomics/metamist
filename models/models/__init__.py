@@ -59,4 +59,8 @@ from models.models.web import (
     ProjectSummaryInternal,
     WebProject,
 )
-from models.models.billing import BillingTopicCostCategoryRecord, BillingRowRecord
+from models.models.billing import (
+    BillingTopicCostCategoryRecord,
+    BillingRowRecord,
+    BillingTotalCostRecord,
+)
