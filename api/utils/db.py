@@ -10,6 +10,7 @@ from google.oauth2 import id_token
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
 from db.python.connect import SMConnections, Connection
+from db.python.gcp_connect import BqConnection, PubSubConnection
 
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
@@ -76,6 +77,18 @@ async def dependable_get_connection(author: str = Depends(authenticate)):
     return await SMConnections.get_connection_no_project(author)
 
 
+async def dependable_get_bq_connection(author: str = Depends(authenticate)):
+    """FastAPI handler for getting connection withOUT project"""
+    return await BqConnection.get_connection_no_project(author)
+
+
+async def dependable_get_pubsub_connection(
+    author: str = Depends(authenticate), topic: str = None
+):
+    """FastAPI handler for getting connection withOUT project"""
+    return await PubSubConnection.get_connection_no_project(author, topic)
+
+
 def validate_iap_jwt_and_get_email(iap_jwt, audience):
     """
     Validate an IAP JWT and return email
@@ -102,3 +115,5 @@ get_author = Depends(authenticate)
 get_project_readonly_connection = Depends(dependable_get_readonly_project_connection)
 get_project_write_connection = Depends(dependable_get_write_project_connection)
 get_projectless_db_connection = Depends(dependable_get_connection)
+get_projectless_bq_connection = Depends(dependable_get_bq_connection)
+get_projectless_pubsub_connection = Depends(dependable_get_pubsub_connection)
