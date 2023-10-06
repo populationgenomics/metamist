@@ -7,7 +7,6 @@ import socket
 import subprocess
 import unittest
 from functools import wraps
-
 from typing import Dict
 
 import nest_asyncio
@@ -18,10 +17,10 @@ from api.graphql.loaders import get_context  # type: ignore
 from api.graphql.schema import schema  # type: ignore
 from api.settings import set_all_access
 from db.python.connect import (
-    ConnectionStringDatabaseConfiguration,
-    Connection,
-    SMConnections,
     TABLES_ORDERED_BY_FK_DEPS,
+    Connection,
+    ConnectionStringDatabaseConfiguration,
+    SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
 
@@ -140,10 +139,7 @@ class DbTest(unittest.TestCase):
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
-                    create_test_project=False,
                     author='testuser',
-                    read_group_name='None',
-                    write_group_name='None',
                     check_permissions=False,
                 )
 
@@ -198,7 +194,7 @@ class DbTest(unittest.TestCase):
             variable_values=variables,
             context_value=await get_context(
                 connection=self.connection,
-                request=None,   # pylint: disable
+                request=None,  # pylint: disable
             ),
         )
         if value.errors:

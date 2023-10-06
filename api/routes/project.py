@@ -49,11 +49,15 @@ async def create_project(
     pid = await ptable.create_project(
         project_name=name,
         dataset_name=dataset,
-        read_group_name=read_group_name,
-        write_group_name=write_group_name,
-        create_test_project=create_test_project,
         author=connection.author,
     )
+
+    if create_test_project:
+        await ptable.create_project(
+            project_name=name + '-test',
+            dataset_name=dataset,
+            author=connection.author,
+        )
 
     return pid
 
@@ -98,3 +102,24 @@ async def delete_project_data(
     )
 
     return {'success': success}
+
+
+@router.patch('/{project}/members', operation_id='updateProjectMembers')
+async def update_project_members(
+    project: str,
+    members: list[str],
+    readonly: bool,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Update project members for specific read / write group.
+    Not that this is protected by access to a specific access group
+    """
+    ptable = ProjectPermissionsTable(connection.connection)
+    await ptable.set_group_members(
+        group_name=ptable.get_project_group_name(project, readonly=readonly),
+        members=members,
+        author=connection.author,
+    )
+
+    return {'success': True}

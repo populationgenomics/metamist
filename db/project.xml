@@ -1,5 +1,11 @@
 <?xml version="1.1" encoding="UTF-8" standalone="no"?>
-<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-4.1.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
+						http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-4.1.xsd
+						http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
 	<changeSet author="michael.franklin" id="2021-08-12-dbrefactor">
 
 		<!-- Project settings -->
@@ -25,7 +31,8 @@
 				<constraints nullable="false" />
 			</column>
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_project_participant" references="project(id)" />
+				<constraints nullable="false" foreignKeyName="fk_project_participant"
+					references="project(id)" />
 			</column>
 			<!-- Record keeping -->
 			<column name="author" type="VARCHAR(255)">
@@ -47,10 +54,12 @@
 				<constraints nullable="false" />
 			</column>
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_project_sample" references="project(id)" />
+				<constraints nullable="false" foreignKeyName="fk_project_sample"
+					references="project(id)" />
 			</column>
 			<column name="participant_id" type="INT">
-				<constraints nullable="true" foreignKeyName="fk_participant_sample" references="participant(id)"/>
+				<constraints nullable="true" foreignKeyName="fk_participant_sample"
+					references="participant(id)" />
 			</column>
 			<column name="active" type="BOOLEAN" />
 			<column name="meta" type="JSON" />
@@ -74,12 +83,14 @@
 				<constraints primaryKey="true" nullable="false" />
 			</column>
 			<column name="sample_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sample_sequencing" references="sample(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_sample_sequencing"
+					references="sample(id)" />
 			</column>
 			<column name="type" type="ENUM('wgs', 'single-cell')">
 				<constraints nullable="true" />
 			</column>
-			<column name="status" type="ENUM('unknown', 'received', 'sent-to-sequencing', 'completed-sequencing', 'completed-qc', 'failed-qc', 'uploaded')">
+			<column name="status"
+				type="ENUM('unknown', 'received', 'sent-to-sequencing', 'completed-sequencing', 'completed-qc', 'failed-qc', 'uploaded')">
 				<constraints nullable="false" />
 			</column>
 			<column name="meta" type="json" />
@@ -91,7 +102,8 @@
 		<!-- Participant Phenotype -->
 		<createTable tableName="participant_phenotypes">
 			<column name="participant_id" type="INT" autoIncrement="true">
-				<constraints nullable="false" foreignKeyName="fk_participant_phenotype" references="participant(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_participant_phenotype"
+					references="participant(id)" />
 			</column>
 			<column name="hpo_term" type="VARCHAR(255)">
 				<constraints nullable="true" />
@@ -105,7 +117,8 @@
 				<constraints nullable="false" />
 			</column>
 		</createTable>
-		<!-- <sql>ALTER TABLE participant_phenotypes ADD CONSTRAINT check_description_or_hpo CHECK (hpo_term IS NOT NULL or description IS NOT NULL)</sql> -->
+		<!-- <sql>ALTER TABLE participant_phenotypes ADD CONSTRAINT check_description_or_hpo CHECK
+		(hpo_term IS NOT NULL or description IS NOT NULL)</sql> -->
 
 		<!-- Analysis -->
 		<createTable tableName="analysis">
@@ -124,7 +137,8 @@
 			<column name="timestamp_completed" type="timestamp" />
 
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_project_analysis" references="project(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_project_analysis"
+					references="project(id)" />
 			</column>
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
@@ -134,10 +148,12 @@
 
 		<createTable tableName="analysis_sample">
 			<column name="analysis_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_analysis_sample" references="analysis(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_analysis_sample"
+					references="analysis(id)" />
 			</column>
 			<column name="sample_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_analysis_sample_sample" references="sample(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_analysis_sample_sample"
+					references="sample(id)" />
 			</column>
 
 		</createTable>
@@ -151,7 +167,8 @@
 				<constraints nullable="false" />
 			</column>
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_project_family" references="project(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_project_family"
+					references="project(id)" />
 			</column>
 			<column name="description" type="TEXT">
 				<constraints nullable="true" />
@@ -171,16 +188,20 @@
 		/>
 		<createTable tableName="family_participant">
 			<column name="family_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_family_participant" references="family(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_family_participant"
+					references="family(id)" />
 			</column>
 			<column name="participant_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_family_participant_participant" references="participant(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_family_participant_participant"
+					references="participant(id)" />
 			</column>
 			<column name="paternal_participant_id" type="INT">
-				<constraints nullable="true" foreignKeyName="fk_family_participant_paternal" references="participant(id)"/>
+				<constraints nullable="true" foreignKeyName="fk_family_participant_paternal"
+					references="participant(id)" />
 			</column>
 			<column name="maternal_participant_id" type="INT">
-				<constraints nullable="true" foreignKeyName="fk_family_participant_maternal" references="participant(id)"/>
+				<constraints nullable="true" foreignKeyName="fk_family_participant_maternal"
+					references="participant(id)" />
 			</column>
 			<column name="sex" type="INT">
 				<constraints nullable="true" />
@@ -209,7 +230,8 @@
 	</changeSet>
 	<changeSet author="michael.franklin" id="2021-08-24_add-participant-key-value">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<dropForeignKeyConstraint baseTableName="participant_phenotypes" constraintName="fk_participant_phenotype" />
+		<dropForeignKeyConstraint baseTableName="participant_phenotypes"
+			constraintName="fk_participant_phenotype" />
 		<sql>ALTER TABLE participant_phenotypes CHANGE participant_id participant_id INT NOT NULL;</sql>
 		<sql>ALTER TABLE participant_phenotypes CHANGE description description VARCHAR(255);</sql>
 
@@ -217,11 +239,9 @@
 			tableName="family_participant"
 			columnNames="participant_id"
 		/>
-		<sql>
-			ALTER TABLE participant_phenotypes
-			ADD CONSTRAINT uk_participant_phenotypes_pid_hpo_description
-			UNIQUE (`participant_id`,`hpo_term`,`description`)
-		</sql>
+		<sql> ALTER TABLE participant_phenotypes ADD CONSTRAINT
+			uk_participant_phenotypes_pid_hpo_description UNIQUE
+			(`participant_id`,`hpo_term`,`description`) </sql>
 		<addForeignKeyConstraint
 			constraintName="fk_participant_phenotype"
 			baseTableName="participant_phenotypes"
@@ -279,7 +299,8 @@
 				type="VARCHAR(255)"
 			/>
 		</addColumn>
-		<sql>ALTER TABLE analysis MODIFY COLUMN status ENUM('queued', 'in-progress', 'failed', 'completed', 'unknown');</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN status ENUM('queued', 'in-progress', 'failed',
+			'completed', 'unknown');</sql>
 
 	</changeSet>
 	<changeSet author="michael.franklin" id="2021-09-14_add-exome-sequence-type">
@@ -308,40 +329,41 @@
 				defaultValue="{}"
 			/>
 		</addColumn>
-		<sql>
-			UPDATE participant p, family_participant fp
-			SET p.reported_sex = fp.sex, p.author="michael.franklin@populationgenomics.org.au"
-			WHERE p.id = fp.participant_id;
-		</sql>
+		<sql> UPDATE participant p, family_participant fp SET p.reported_sex = fp.sex,
+			p.author="michael.franklin@populationgenomics.org.au" WHERE p.id = fp.participant_id; </sql>
 		<dropColumn
 			tableName="family_participant"
 			columnName="sex"
 		/>
 	</changeSet>
-		<changeSet author="michael.franklin" id="2022-01-19_expand-family-coded-phenotype-column">
+	<changeSet author="michael.franklin" id="2022-01-19_expand-family-coded-phenotype-column">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<sql>ALTER TABLE family MODIFY COLUMN coded_phenotype TEXT;</sql>
 	</changeSet>
 	<changeSet author="sabrina.yan" id="2022-03-07_standardise-sequence-type">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<!-- True values 'genome', 'exome', 'single-cell' but maintaining old 'wgs' for system version tables -->
-		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'wgs');</sql>
-		<sql>
-			UPDATE sample_sequencing seq
-			SET seq.type = 'genome', seq.author="sabrina.yan@populationgenomics.org.au"
-			WHERE seq.type = 'wgs';
-		</sql>
+		<!-- True values 'genome', 'exome', 'single-cell' but maintaining old 'wgs' for system
+		version tables -->
+		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell',
+			'wgs');</sql>
+		<sql> UPDATE sample_sequencing seq SET seq.type = 'genome',
+			seq.author="sabrina.yan@populationgenomics.org.au" WHERE seq.type = 'wgs'; </sql>
 	</changeSet>
 	<changeSet author="sabrina.yan" id="2022-05-03_add-mtseq-sequence-type">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<!-- True values 'genome', 'exome', 'single-cell' and now 'mtseq' but maintaining old 'wgs' for system version tables -->
-		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'wgs');</sql>
+		<!-- True values 'genome', 'exome', 'single-cell' and now 'mtseq' but maintaining old 'wgs'
+		for system version tables -->
+		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell',
+			'mtseq', 'wgs');</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-05-18_add-es-index-ont-project.meta">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<!-- True values 'genome', 'exome', 'single-cell', 'mtseq' and 'ont' but maintaining old 'wgs' for system version tables -->
-		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'ont', 'wgs');</sql>
-		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index');</sql>
+		<!-- True values 'genome', 'exome', 'single-cell', 'mtseq' and 'ont' but maintaining old
+		'wgs' for system version tables -->
+		<sql>ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell',
+			'mtseq', 'ont', 'wgs');</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf',
+			'cram', 'es-index');</sql>
 		<addColumn
 			tableName="project">
 			<column
@@ -352,16 +374,19 @@
 	</changeSet>
 	<changeSet author="vivian.bakiris" id="2022-08-22_add-sv-analysis-type">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv');</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf',
+			'cram', 'es-index', 'sv');</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-10-04_sequence-external-ids">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<createTable tableName="sample_sequencing_eid">
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_project" references="project(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_project"
+					references="project(id)" />
 			</column>
 			<column name="sequencing_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_sequence_id" references="sample_sequencing(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sample_sequencing_eid_sequence_id"
+					references="sample_sequencing(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">
 				<constraints unique="true" nullable="false" />
@@ -375,10 +400,10 @@
 
 		</createTable>
 		<addPrimaryKey
-				columnNames="sequencing_id,name"
-				constraintName="PK_sample_sequencing_eid"
-				tableName="sample_sequencing_eid"
-				validate="true"
+			columnNames="sequencing_id,name"
+			constraintName="PK_sample_sequencing_eid"
+			tableName="sample_sequencing_eid"
+			validate="true"
 		/>
 		<addUniqueConstraint
 			columnNames="project,external_id"
@@ -397,7 +422,7 @@
 			tableName="sample_sequencing_eid"
 			constraintName="external_id"
 		/>
-<!--		This was incorrect named, so delete and create on correct table -->
+		<!--		This was incorrect named, so delete and create on correct table -->
 		<dropUniqueConstraint
 			tableName="participant"
 			constraintName="UK_SAMPLE_SEQUENCING_EXTERNALID"
@@ -411,8 +436,10 @@
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-12-12_more-analysis-types">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf', 'cram', 'es-index', 'sv', 'web', 'analysis-runner');</sql>
-		<sql>UPDATE analysis SET type = 'analysis-runner' WHERE type='custom' AND json_extract(meta, '$.source') = 'analysis-runner';</sql>
+		<sql>ALTER TABLE analysis MODIFY COLUMN type ENUM('qc', 'joint-calling', 'custom', 'gvcf',
+			'cram', 'es-index', 'sv', 'web', 'analysis-runner');</sql>
+		<sql>UPDATE analysis SET type = 'analysis-runner' WHERE type='custom' AND json_extract(meta,
+			'$.source') = 'analysis-runner';</sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2022-11-23_sequencing-technology">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
@@ -424,12 +451,13 @@
 				type="ENUM('short-read', 'long-read', 'single-cell-rna-seq', 'bulk-rna-seq')"
 			/>
 		</addColumn>
-		<sql>
-			ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome', 'single-cell', 'mtseq', 'ont', 'wgs', 'transcriptome', 'chip');
-			UPDATE sample_sequencing SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
-			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read', meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont';
-			UPDATE sample_sequencing SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type = 'single-cell';
-		</sql>
+		<sql> ALTER TABLE sample_sequencing MODIFY COLUMN type ENUM('genome', 'exome',
+			'single-cell', 'mtseq', 'ont', 'wgs', 'transcriptome', 'chip'); UPDATE sample_sequencing
+			SET technology = 'short-read' WHERE type = 'genome' or type = 'exome' or type = 'mtseq';
+			UPDATE sample_sequencing SET type = 'genome', technology = 'long-read',
+			meta=JSON_MERGE(meta, '{"source": "ont"}') WHERE type = 'ont'; UPDATE sample_sequencing
+			SET type = 'transcriptome', technology = 'single-cell-rna-seq' WHERE type =
+			'single-cell'; </sql>
 	</changeSet>
 	<changeSet author="michael.franklin" id="2023-01-25_">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
@@ -441,27 +469,25 @@
 			tableName="project"
 		/>
 		<renameColumn
-				columnDataType="VARCHAR(255)"
-				newColumnName="write_group_name"
-				oldColumnName="write_secret_name"
-				remarks="Migration of groups membership cache to blobs"
-				tableName="project"
+			columnDataType="VARCHAR(255)"
+			newColumnName="write_group_name"
+			oldColumnName="write_secret_name"
+			remarks="Migration of groups membership cache to blobs"
+			tableName="project"
 		/>
 		<dropColumn
 			tableName="project"
 			columnName="gcp_id"
 		/>
-		<sql>
-			UPDATE project SET
-			read_group_name=SUBSTRING(read_group_name, 1, LENGTH(read_group_name) - 14),
-			write_group_name=SUBSTRING(write_group_name, 1, LENGTH(write_group_name) - 14)
-		</sql>
+		<sql> UPDATE project SET read_group_name=SUBSTRING(read_group_name, 1,
+			LENGTH(read_group_name) - 14), write_group_name=SUBSTRING(write_group_name, 1,
+			LENGTH(write_group_name) - 14) </sql>
 	</changeSet>
 
 	<changeSet author="michael.franklin" id="2022-12-13_sequence-groups">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 
-<!--		Instead of ENUMs, make some fields FKs -->
+		<!--		Instead of ENUMs, make some fields FKs -->
 		<createTable tableName="assay_type">
 			<column name="id" type="VARCHAR(255)">
 				<constraints primaryKey="true" nullable="false" />
@@ -516,16 +542,18 @@
 			</column>
 		</createTable>
 
-<!--		Create assay table linking to assay_type FK-->
+		<!--		Create assay table linking to assay_type FK-->
 		<createTable tableName="assay">
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
 			<column name="sample_id" type="INT">
-				<constraints nullable="false" foreignKeyName="FK_SAMPLE_ASSAY" references="sample(id)"/>
+				<constraints nullable="false" foreignKeyName="FK_SAMPLE_ASSAY"
+					references="sample(id)" />
 			</column>
 			<column name="type" type="VARCHAR(255)">
-				<constraints nullable="false" foreignKeyName="FK_ASSAY_TYPE" references="assay_type(id)"/>
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_TYPE"
+					references="assay_type(id)" />
 			</column>
 			<column name="meta" type="json" />
 			<column name="author" type="VARCHAR(255)">
@@ -535,10 +563,12 @@
 
 		<createTable tableName="assay_external_id">
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_PROJECT" references="project(id)" />
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_PROJECT"
+					references="project(id)" />
 			</column>
 			<column name="assay_id" type="INT">
-				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY" references="assay(id)" />
+				<constraints nullable="false" foreignKeyName="FK_ASSAY_EXTERNAL_ID_ASSAY"
+					references="assay(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">
 				<constraints unique="true" nullable="false" />
@@ -552,10 +582,10 @@
 
 		</createTable>
 		<addPrimaryKey
-				columnNames="assay_id,name"
-				constraintName="PK_ASSAY_EXTERNAL_ID"
-				tableName="assay_external_id"
-				validate="true"
+			columnNames="assay_id,name"
+			constraintName="PK_ASSAY_EXTERNAL_ID"
+			tableName="assay_external_id"
+			validate="true"
 		/>
 		<addUniqueConstraint
 			columnNames="project,external_id"
@@ -564,25 +594,30 @@
 			validate="true"
 		/>
 
-<!--		Create sequencing_group tables -->
+		<!--		Create sequencing_group tables -->
 		<createTable tableName="sequencing_group">
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
-<!--			<column name="project" type="INT">-->
-<!--				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project" references="project(id)" />-->
-<!--			</column>-->
+			<!--			<column name="project" type="INT">-->
+			<!--				<constraints nullable="false" foreignKeyName="fk_sequencing_group_project"
+			references="project(id)" />-->
+			<!--			</column>-->
 			<column name="sample_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample" references="sample(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_sample"
+					references="sample(id)" />
 			</column>
 			<column name="type" type="VARCHAR(255)">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_type" references="sequencing_type(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_type"
+					references="sequencing_type(id)" />
 			</column>
 			<column name="technology" type="VARCHAR(255)">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_technology" references="sequencing_technology(id)"/>
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_technology"
+					references="sequencing_technology(id)" />
 			</column>
 			<column name="platform" type="VARCHAR(255)">
-<!--				<constraints nullable="true" foreignKeyName="fk_sqg_sequencing_platform" references="sequencing_platform(id)"/>-->
+				<!--				<constraints nullable="true" foreignKeyName="fk_sqg_sequencing_platform"
+				references="sequencing_platform(id)"/>-->
 			</column>
 			<column name="meta" type="JSON" />
 			<column name="archived" type="BOOLEAN" />
@@ -593,29 +628,36 @@
 
 		<createTable tableName="sequencing_group_assay">
 			<column name="sequencing_group_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id" references="sequencing_group(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_id"
+					references="sequencing_group(id)" />
 			</column>
 			<column name="assay_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id" references="assay(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sqg_sequencing_group_sequence_id"
+					references="assay(id)" />
 			</column>
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
 		</createTable>
 
-<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
-			You make a combined key, with one of the fields only NOT NULL when the row should participant in the check.
-			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow multiple
+		<!--		In MariaDB, you can do _conditional_ unique values in a sort of hacky way.
+			You make a combined key, with one of the fields only NOT NULL when the row should participant in
+		the check.
+			IE: if you archive a sequencing group, marking the "nullIfInactitve field to NULL will allow
+		multiple
 			copies - allowing for us to reuse the same external_ids for multiple sequencing groups. 	-->
 		<createTable tableName="sequencing_group_external_id">
 			<column name="project" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project" references="project(id)" />
+				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_project"
+					references="project(id)" />
 			</column>
 			<column name="sequencing_group_id" type="INT">
-				<constraints nullable="false" foreignKeyName="fk_sequencing_group_eid_sequencing_group_id" references="sequencing_group(id)" />
+				<constraints nullable="false"
+					foreignKeyName="fk_sequencing_group_eid_sequencing_group_id"
+					references="sequencing_group(id)" />
 			</column>
 			<column name="external_id" type="VARCHAR(255)">
-					<constraints nullable="false" />
+				<constraints nullable="false" />
 			</column>
 			<column name="name" type="VARCHAR(255)">
 				<constraints nullable="false" />
@@ -634,108 +676,98 @@
 			validate="true"
 		/>
 
-<!-- 		Replaces the analysis_sample table.
+		<!-- 		Replaces the analysis_sample table.
 			We cannot delete the old table, so it's around for legacy purposes. -->
 		<createTable tableName="analysis_sequencing_group">
 			<column name="analysis_id" type="INT">
 				<constraints
-						nullable="false"
-						foreignKeyName="FK_ANALYSIS_SQG_ANALYSIS"
-						references="analysis(id)"/>
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_SQG_ANALYSIS"
+					references="analysis(id)" />
 			</column>
 			<column name="sequencing_group_id" type="INT">
 				<constraints
-						nullable="false"
-						foreignKeyName="FK_ANALYSIS_SQG_SEQUENCING_GROUP"
-						references="sequencing_group(id)"
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_SQG_SEQUENCING_GROUP"
+					references="sequencing_group(id)"
 				/>
 			</column>
 		</createTable>
 
 
-<!--		Default data -->
+		<!--		Default data -->
 
-		<sql>
-
-			ALTER TABLE assay ADD SYSTEM VERSIONING;
-			ALTER TABLE assay_external_id ADD SYSTEM VERSIONING;
-			ALTER TABLE sequencing_group ADD SYSTEM VERSIONING;
-			ALTER TABLE sequencing_group_assay ADD SYSTEM VERSIONING;
-			ALTER TABLE sequencing_group_external_id ADD SYSTEM VERSIONING;
-			ALTER TABLE analysis_sequencing_group ADD SYSTEM VERSIONING;
-
-			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
-
-			INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
-			INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva');
-
-			INSERT INTO sequencing_type (id, name) VALUES ('genome', 'genome');
-			INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome');
-			INSERT INTO sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome');
-			INSERT INTO sequencing_type (id, name) VALUES ('mtseq', 'mtseq');
-			INSERT INTO sequencing_type (id, name) VALUES ('chip', 'chip');
-
-			INSERT INTO sequencing_technology (id, name) VALUES ('short-read', 'short-read');
-			INSERT INTO sequencing_technology (id, name) VALUES ('long-read', 'long-read');
-			INSERT INTO sequencing_technology (id, name) VALUES ('single-cell-rna-seq', 'single-cell-rna-seq');
-			INSERT INTO sequencing_technology (id, name) VALUES ('bulk-rna-seq', 'bulk-rna-seq');
-
-			INSERT INTO sequencing_platform (id, name) VALUES ('illumina', 'illumina');
-			INSERT INTO sequencing_platform (id, name) VALUES ('pacbio', 'pacbio');
-			INSERT INTO sequencing_platform (id, name) VALUES ('oxford-nanopore', 'oxford-nanopore');
-
-			INSERT INTO analysis_type (id, name) VALUES ('qc', 'qc');
-			INSERT INTO analysis_type (id, name) VALUES ('joint-calling', 'joint-calling');
-			INSERT INTO analysis_type (id, name) VALUES ('gvcf', 'gvcf');
-			INSERT INTO analysis_type (id, name) VALUES ('cram', 'cram');
-			INSERT INTO analysis_type (id, name) VALUES ('custom', 'custom');
-			INSERT INTO analysis_type (id, name) VALUES ('es-index', 'es-index');
-			INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv');
-			INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
-			INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
-		</sql>
+		<sql> ALTER TABLE assay ADD SYSTEM VERSIONING; ALTER TABLE assay_external_id ADD SYSTEM
+			VERSIONING; ALTER TABLE sequencing_group ADD SYSTEM VERSIONING; ALTER TABLE
+			sequencing_group_assay ADD SYSTEM VERSIONING; ALTER TABLE sequencing_group_external_id
+			ADD SYSTEM VERSIONING; ALTER TABLE analysis_sequencing_group ADD SYSTEM VERSIONING;
+			INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing'); INSERT INTO
+			sample_type (id, name) VALUES ('blood', 'blood'); INSERT INTO sample_type (id, name)
+			VALUES ('saliva', 'saliva'); INSERT INTO sequencing_type (id, name) VALUES ('genome',
+			'genome'); INSERT INTO sequencing_type (id, name) VALUES ('exome', 'exome'); INSERT INTO
+			sequencing_type (id, name) VALUES ('transcriptome', 'transcriptome'); INSERT INTO
+			sequencing_type (id, name) VALUES ('mtseq', 'mtseq'); INSERT INTO sequencing_type (id,
+			name) VALUES ('chip', 'chip'); INSERT INTO sequencing_technology (id, name) VALUES
+			('short-read', 'short-read'); INSERT INTO sequencing_technology (id, name) VALUES
+			('long-read', 'long-read'); INSERT INTO sequencing_technology (id, name) VALUES
+			('single-cell-rna-seq', 'single-cell-rna-seq'); INSERT INTO sequencing_technology (id,
+			name) VALUES ('bulk-rna-seq', 'bulk-rna-seq'); INSERT INTO sequencing_platform (id,
+			name) VALUES ('illumina', 'illumina'); INSERT INTO sequencing_platform (id, name) VALUES
+			('pacbio', 'pacbio'); INSERT INTO sequencing_platform (id, name) VALUES
+			('oxford-nanopore', 'oxford-nanopore'); INSERT INTO analysis_type (id, name) VALUES
+			('qc', 'qc'); INSERT INTO analysis_type (id, name) VALUES ('joint-calling',
+			'joint-calling'); INSERT INTO analysis_type (id, name) VALUES ('gvcf', 'gvcf'); INSERT
+			INTO analysis_type (id, name) VALUES ('cram', 'cram'); INSERT INTO analysis_type (id,
+			name) VALUES ('custom', 'custom'); INSERT INTO analysis_type (id, name) VALUES
+			('es-index', 'es-index'); INSERT INTO analysis_type (id, name) VALUES ('sv', 'sv');
+			INSERT INTO analysis_type (id, name) VALUES ('web', 'web'); INSERT INTO analysis_type
+			(id, name) VALUES ('analysis-runner', 'analysis-runner'); </sql>
 	</changeSet>
-    <changeSet id="2023-06-20_cohort-builder" author="michael.franklin">
-        <createTable tableName="cohort">
-            <column name="id" type="INT" autoIncrement="true">
-                <constraints primaryKey="true" nullable="false" />
-            </column>
-            <column name="derived_from" type="INT">
-                <constraints
+	<changeSet id="2023-06-20_cohort-builder" author="michael.franklin">
+		<createTable tableName="cohort">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="derived_from" type="INT">
+				<constraints
 					nullable="false"
 					foreignKeyName="FK_COHORT_DERIVED_FROM_ID_COHORT"
 					references="cohort(id)"
 				/>
-            </column>
-            <column name="description" type="VARCHAR(255)">
+			</column>
+			<column name="description" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
-            <column name="author" type="VARCHAR(255)">
+			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>
-            <column name="timestamp" type="TIMESTAMP">
+			<column name="timestamp" type="TIMESTAMP">
 				<constraints nullable="false" />
 			</column>
-        </createTable>
-        <!--		How SGs belong to a cohort -->
-        <createTable tableName="cohort_sequencing_group">
-            <column name="cohort_id" type="INT">
-                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_COHORT_ID" references="cohort(id)" />
-            </column>
-            <column name="sequencing_group_id" type="INT">
-                <constraints nullable="false" foreignKeyName="FK_COHORT_SQG_SQG_ID" references="sequencing_group(id)" />
-            </column>
-        </createTable>
-        <!--		Linking cohort to an analysis -->
-        <createTable tableName="analysis_cohort">
-            <column name="cohort_id" type="INT">
-                <constraints nullable="false" foreignKeyName="FK_COHORT_ANALYSIS_COHORT_ID" references="cohort(id)" />
-            </column>
-            <column name="analysis_id" type="INT">
-                <constraints nullable="false" foreignKeyName="FK_COHORT_ANALYSIS_SQG_ID" references="analysis(id)" />
-            </column>
-        </createTable>
-    </changeSet>
+		</createTable>
+		<!--		How SGs belong to a cohort -->
+		<createTable tableName="cohort_sequencing_group">
+			<column name="cohort_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_COHORT_SQG_COHORT_ID"
+					references="cohort(id)" />
+			</column>
+			<column name="sequencing_group_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_COHORT_SQG_SQG_ID"
+					references="sequencing_group(id)" />
+			</column>
+		</createTable>
+		<!--		Linking cohort to an analysis -->
+		<createTable tableName="analysis_cohort">
+			<column name="cohort_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_COHORT_ANALYSIS_COHORT_ID"
+					references="cohort(id)" />
+			</column>
+			<column name="analysis_id" type="INT">
+				<constraints nullable="false" foreignKeyName="FK_COHORT_ANALYSIS_SQG_ID"
+					references="analysis(id)" />
+			</column>
+		</createTable>
+	</changeSet>
 	<changeSet id="2023-10-04_sample-type" author="michael.franklin">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
 		<!-- change the sample.type field from an enum, to reference sample_type.id -->
@@ -746,6 +778,48 @@
 			baseColumnNames="type"
 			referencedTableName="sample_type"
 			referencedColumnNames="id"
-			/>
-		</changeSet>
+		/>
+	</changeSet>
+
+	<changeSet id="2023-10-06_inbuilt-permissions" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="group">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints unique="true" nullable="false" />
+			</column>
+		</createTable>
+		<createTable tableName="group_member">
+			<column name="group_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_GROUP_MEMBER_GROUP_ID"
+					references="group(id)" />
+			</column>
+			<column name="member" type="VARCHAR(255)" />
+		</createTable>
+		<addColumn
+			tableName="project">
+			<column
+				name="read_group_id"
+				type="INT"
+			>
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_READ_GROUP_GROUP_ID"
+					references="group(id)" />
+			</column>
+			<column
+				name="write_group_id"
+				type="INT"
+			>
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_READ_GROUP_GROUP_ID"
+					references="group(id)" />
+			</column>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>
