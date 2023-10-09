@@ -121,6 +121,14 @@ class BillingTotalCostRecord(SMBase):
     topic: str | None
     cost_category: str | None
     sku: str | None
+    ar_guid: str | None
+    # extended columns
+    dataset: str | None
+    batch_id: str | None
+    sequencing_type: str | None
+    stage: str | None
+    sequencing_group: str | None
+
     cost: Decimal
     currency: str | None
 
@@ -132,6 +140,12 @@ class BillingTotalCostRecord(SMBase):
             topic=record.get('topic'),
             cost_category=record.get('cost_category'),
             sku=record.get('sku'),
+            ar_guid=record.get('ar_guid'),
+            dataset=record.get('dataset'),
+            batch_id=record.get('batch_id'),
+            sequencing_type=record.get('sequencing_type'),
+            stage=record.get('stage'),
+            sequencing_group=record.get('sequencing_group'),
             cost=record.get('cost'),
             currency=record.get('currency'),
         )
