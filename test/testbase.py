@@ -75,6 +75,7 @@ class DbTest(unittest.TestCase):
     # and don't get recreated per test.
     dbs: Dict[str, MySqlContainer] = {}
     connections: Dict[str, Connection] = {}
+    author: str
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -125,10 +126,11 @@ class DbTest(unittest.TestCase):
                     ConnectionStringDatabaseConfiguration(con_string)
                 )
                 await sm_db.connect()
+                cls.author = 'testuser'
                 connection = Connection(
                     connection=sm_db,
                     project=1,
-                    author='testuser',
+                    author=cls.author,
                 )
                 cls.connections[cls.__name__] = connection
 
@@ -211,14 +213,16 @@ class DbIsolatedTest(DbTest):
     async def setUp(self) -> None:
         super().setUp()
 
-        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project'}
+        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
             try:
                 await self.connection.connection.execute(
-                    f'DELETE FROM {table} WHERE 1;'
+                    f'DELETE FROM `{table}` WHERE 1;'
                 )
-                await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
+                await self.connection.connection.execute(
+                    f'DELETE HISTORY FROM `{table}`'
+                )
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e

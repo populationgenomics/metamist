@@ -7,17 +7,17 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from api.utils.db import (
-    get_project_readonly_connection,
-    get_projectless_db_connection,
-    get_project_write_connection,
     Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
+    get_projectless_db_connection,
 )
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
-from db.python.layers.web import WebLayer, SearchItem
+from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.search import SearchResponse
-from models.models.web import ProjectSummary, PagingLinks
+from models.models.web import PagingLinks, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -81,7 +81,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )
-    project_ids = list(projects.keys())
+    project_ids = [p.id for p in projects]
     responses = await SearchLayer(connection).search(keyword, project_ids=project_ids)
 
     for res in responses:
@@ -90,7 +90,9 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     return SearchResponseModel(responses=responses)
 
 
-@router.post('/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject')
+@router.post(
+    '/{project}/{sequencing_type}/sync-dataset', operation_id='syncSeqrProject'
+)
 async def sync_seqr_project(
     sequencing_type: str,
     sync_families: bool = True,

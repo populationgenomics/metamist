@@ -29,8 +29,8 @@ from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
-from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import GenericFilter, ProjectId
+from db.python.tables.project import Project, ProjectPermissionsTable
+from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 
 # literally the most temporary thing ever, but for complete
@@ -94,27 +94,10 @@ class SeqrLayer(BaseLayer):
         """
         return f'seqr-project-{sequencing_type}'
 
-    async def get_synchronisable_types(
-        self, project_id: ProjectId | None = None
-    ) -> list[str]:
+    async def get_synchronisable_types(self, project: Project) -> list[str]:
         """
         Check the project meta to find out which sequencing_types are synchronisable
         """
-        if not await self.is_seqr_sync_setup():
-            return []
-
-        pptable = ProjectPermissionsTable(connection=self.connection.connection)
-        project = await pptable.get_project_by_id(project_id or self.connection.project)
-
-        has_access = pptable.check_access_to_project_id(
-            user=self.author,
-            project_id=project.id,
-            readonly=False,
-            raise_exception=False,
-        )
-        if not has_access:
-            return []
-
         sequencing_types = await SequencingTypeTable(connection=self.connection).get()
         sts = [
             st
@@ -140,7 +123,11 @@ class SeqrLayer(BaseLayer):
 
         token = self.generate_seqr_auth_token()
         pptable = ProjectPermissionsTable(connection=self.connection.connection)
-        project = await pptable.get_project_by_id(self.connection.project)
+        project = await pptable.get_and_check_access_to_project_for_id(
+            self.connection.author,
+            project_id=self.connection.project,
+            readonly=True,
+        )
 
         seqr_guid = project.meta.get(
             self.get_meta_key_from_sequencing_type(sequencing_type)

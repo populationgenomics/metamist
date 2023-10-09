@@ -1,11 +1,10 @@
+import dataclasses
+import json
 import logging
 import os
 import re
-import json
-import dataclasses
 from enum import Enum
-from typing import Sequence, TypeVar, Generic, Any
-
+from typing import Any, Generic, Sequence, TypeVar
 
 T = TypeVar('T')
 ProjectId = int
@@ -38,6 +37,10 @@ class NoOpAenter:
 
 class Forbidden(Exception):
     """Forbidden action"""
+
+
+class NotFoundError(Exception):
+    """Custom error when you can't find something"""
 
 
 class InternalError(Exception):

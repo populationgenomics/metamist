@@ -20,14 +20,8 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models.analysis import (
-    Analysis,
-    AnalysisInternal,
-    ProjectSizeModel,
-)
-from models.utils.sample_id_format import (
-    sample_id_transform_to_raw_list,
-)
+from models.models.analysis import Analysis, AnalysisInternal, ProjectSizeModel
+from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_format_list,
@@ -228,9 +222,10 @@ async def query_analyses(
         raise ValueError('Must specify "projects"')
 
     pt = ProjectPermissionsTable(connection=connection.connection)
-    project_name_map = await pt.get_project_id_map_for_names(
-        author=connection.author, project_names=query.projects, readonly=True
+    projects = await pt.get_and_check_access_to_projects_for_names(
+        user=connection.author, project_names=query.projects, readonly=True
     )
+    project_name_map = {p.name: p.id for p in projects}
     atable = AnalysisLayer(connection)
     analyses = await atable.query(query.to_filter(project_name_map))
     return [a.to_external() for a in analyses]

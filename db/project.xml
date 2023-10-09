@@ -798,7 +798,12 @@
 					foreignKeyName="FK_GROUP_MEMBER_GROUP_ID"
 					references="group(id)" />
 			</column>
-			<column name="member" type="VARCHAR(255)" />
+			<column name="member" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="author" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
 		</createTable>
 		<addColumn
 			tableName="project">
@@ -807,7 +812,7 @@
 				type="INT"
 			>
 				<constraints
-					nullable="false"
+					nullable="true"
 					foreignKeyName="FK_PROJECT_READ_GROUP_GROUP_ID"
 					references="group(id)" />
 			</column>
@@ -817,9 +822,13 @@
 			>
 				<constraints
 					nullable="false"
-					foreignKeyName="FK_PROJECT_READ_GROUP_GROUP_ID"
+					foreignKeyName="FK_PROJECT_WRITE_GROUP_GROUP_ID"
 					references="group(id)" />
 			</column>
 		</addColumn>
+		<sql>ALTER TABLE `group` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE group_member ADD SYSTEM VERSIONING;</sql>
+		<sql>INSERT INTO `group` (name) VALUES ('project-creators');</sql>
+		<sql>INSERT INTO `group` (name) VALUES ('members-admin');</sql>
 	</changeSet>
 </databaseChangeLog>
