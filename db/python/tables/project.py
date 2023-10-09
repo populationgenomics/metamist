@@ -501,12 +501,10 @@ class GroupTable:
             return True
 
         _query = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM group_member gm
-                WHERE gm.group_id = :group_id
-                AND gm.member = :member
-            )
+            SELECT COUNT(*) > 0
+            FROM group_member gm
+            WHERE gm.group_id = :group_id
+            AND gm.member = :member
         """
         value = await self.connection.fetch_val(
             _query, {'group_id': group_id, 'member': member}
@@ -519,7 +517,7 @@ class GroupTable:
             return True
 
         _query = """
-            SELECT COUNT(*) > 1
+            SELECT COUNT(*) > 0
             FROM group_member gm
             INNER JOIN `group` g ON g.id = gm.group_id
             WHERE g.name = :group_name

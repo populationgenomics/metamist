@@ -10,7 +10,7 @@ from db.python.tables.project import (
 from db.python.utils import NotFoundError
 
 
-class TestProjectAccess(DbIsolatedTest):
+class TestGroupAccess(DbIsolatedTest):
     """
     Test project access permissions + newish internal group implementation
     """
@@ -110,9 +110,9 @@ class TestProjectAccess(DbIsolatedTest):
         and that read/write groups are created
         """
         await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
-        project_id = await self.pttable.create_project(
-            'another-test-project', 'another-test-project', self.author
-        )
+        g = str(uuid.uuid4())
+
+        project_id = await self.pttable.create_project(g, g, self.author)
 
         # pylint: disable=protected-access
         project = await self.pttable._get_project_by_id(project_id)
@@ -120,3 +120,81 @@ class TestProjectAccess(DbIsolatedTest):
         # test that the group names make sense
         self.assertIsNotNone(project.read_group_id)
         self.assertIsNotNone(project.write_group_id)
+
+
+class TestProjectAccess(DbIsolatedTest):
+    """Test project access methods directly"""
+
+    @run_as_sync
+    async def setUp(self):
+        """Setup tests"""
+        super().setUp()
+
+        # specifically required to test permissions
+        self.pttable = ProjectPermissionsTable(self.connection.connection, False)
+
+    async def _add_group_member_direct(self, group_name):
+        """
+        Helper method to directly add members to group with name
+        """
+        members_admin_group = await self.connection.connection.fetch_val(
+            'SELECT id FROM `group` WHERE name = :name',
+            {'name': group_name},
+        )
+        await self.connection.connection.execute(
+            """
+            INSERT INTO group_member (group_id, member, author)
+            VALUES (:group_id, :member, :author);
+            """,
+            {
+                'group_id': members_admin_group,
+                'member': self.author,
+                'author': self.author,
+            },
+        )
+
+    @run_as_sync
+    async def test_no_project_access(self):
+        """
+        Test that a user without permission cannot access a project
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        g = str(uuid.uuid4())
+
+        project_id = await self.pttable.create_project(g, g, self.author)
+        with self.assertRaises(Forbidden):
+            await self.pttable.get_and_check_access_to_project_for_id(
+                user=self.author, project_id=project_id, readonly=True
+            )
+
+        with self.assertRaises(Forbidden):
+            await self.pttable.get_and_check_access_to_project_for_name(
+                user=self.author, project_name=g, readonly=True
+            )
+
+    @run_as_sync
+    async def test_project_access_success(self):
+        """
+        Test that a user without permission cannot access a project
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
+
+        g = str(uuid.uuid4())
+
+        pid = await self.pttable.create_project(g, g, self.author)
+        await self.pttable.set_group_members(
+            group_name=self.pttable.get_project_group_name(g, readonly=True),
+            members=[self.author],
+            author=self.author,
+        )
+
+        project_for_id = await self.pttable.get_and_check_access_to_project_for_id(
+            user=self.author, project_id=pid, readonly=True
+        )
+        self.assertEqual(pid, project_for_id.id)
+
+        project_for_name = await self.pttable.get_and_check_access_to_project_for_name(
+            user=self.author, project_name=g, readonly=True
+        )
+        self.assertEqual(pid, project_for_name.id)
