@@ -36,7 +36,7 @@ logger.setLevel(logging.INFO)
 )
 @click.option('--default-sample-type', default='blood')
 @click.option('--default-sequencing-type', default='wgs')
-@click.option('--default-sequence-technology', default='short-read')
+@click.option('--default-sequencing-technology', default='short-read')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )
@@ -67,7 +67,7 @@ async def main(
     project,
     default_sample_type='blood',
     default_sequencing_type='wgs',
-    default_sequence_technology='short-read',
+    default_sequencing_technology='short-read',
     confirm=False,
     dry_run=False,
     allow_extra_files_in_search_path=False,
@@ -85,7 +85,7 @@ async def main(
         project=project,
         default_sample_type=default_sample_type,
         default_sequencing_type=default_sequencing_type,
-        default_sequencing_technology=default_sequence_technology,
+        default_sequencing_technology=default_sequencing_technology,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
         default_reference_assembly_location=ref,
