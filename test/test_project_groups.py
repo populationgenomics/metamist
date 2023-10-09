@@ -175,7 +175,7 @@ class TestProjectAccess(DbIsolatedTest):
     @run_as_sync
     async def test_project_access_success(self):
         """
-        Test that a user without permission cannot access a project
+        Test that a user with permission CAN access a project
         """
         await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)

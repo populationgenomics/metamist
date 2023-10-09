@@ -509,7 +509,12 @@ class GroupTable:
         value = await self.connection.fetch_val(
             _query, {'group_id': group_id, 'member': member}
         )
-        return bool(ord(value))
+        if value not in (0, 1):
+            raise ValueError(
+                f'Unexpected value {value!r} when determining access to group with ID '
+                f'{group_id} for {member}'
+            )
+        return bool(value)
 
     async def check_if_member_in_group_name(self, group_name: str, member: str) -> bool:
         """Check if a member is in a group"""
@@ -526,8 +531,13 @@ class GroupTable:
         value = await self.connection.fetch_val(
             _query, {'group_name': group_name, 'member': member}
         )
-        # return len(value) > 0
-        return bool(ord(value))
+        if value not in (0, 1):
+            raise ValueError(
+                f'Unexpected value {value!r} when determining access to {group_name} '
+                f'for {member}'
+            )
+
+        return bool(value)
 
     async def check_which_groups_member_is_missing(
         self, group_ids: set[int], member: str
