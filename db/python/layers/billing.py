@@ -1,5 +1,5 @@
 # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
-
+from google.cloud import bigquery
 from models.models import (
     BillingRowRecord,
     BillingTotalCostRecord,
@@ -150,12 +150,22 @@ class BillingDb(BqDbBase):
         SELECT DISTINCT topic
         FROM `{BQ_AGGREG_VIEW}`
         WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL -{BQ_DAYS_BACK_OPTIMAL} DAY
+            CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
         ORDER BY topic ASC;
         """
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
         if query_job_result:
             return [str(dict(row)['topic']) for row in query_job_result]
 
@@ -170,12 +180,22 @@ class BillingDb(BqDbBase):
         SELECT DISTINCT cost_category
         FROM `{BQ_AGGREG_VIEW}`
         WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL -{BQ_DAYS_BACK_OPTIMAL} DAY
+            CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
         ORDER BY cost_category ASC;
         """
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
         if query_job_result:
             return [str(dict(row)['cost_category']) for row in query_job_result]
 
@@ -194,18 +214,30 @@ class BillingDb(BqDbBase):
         SELECT DISTINCT sku
         FROM `{BQ_AGGREG_VIEW}`
         WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL -{BQ_DAYS_BACK_OPTIMAL} DAY
+            CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
         ORDER BY sku ASC
         """
 
         # append LIMIT and OFFSET if present
         if limit:
-            _query += f' LIMIT {limit}'
+            _query += ' LIMIT @limit_val'
         if offset:
-            _query += f' OFFSET {offset}'
+            _query += ' OFFSET @offset_val'
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit),
+                bigquery.ScalarQueryParameter('offset_val', 'INT64', offset),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
         if query_job_result:
             return [str(dict(row)['sku']) for row in query_job_result]
 
@@ -224,12 +256,22 @@ class BillingDb(BqDbBase):
         FROM `{BQ_AGGREG_EXT_VIEW}`
         WHERE {field} IS NOT NULL
         AND day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL -{BQ_DAYS_BACK_OPTIMAL} DAY
+            CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
         ORDER BY 1 ASC;
         """
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
         if query_job_result:
             return [str(dict(row)[field]) for row in query_job_result]
 
@@ -307,6 +349,8 @@ class BillingDb(BqDbBase):
         if not start_date or not end_date or not fields:
             raise ValueError('Date and Fields are required')
 
+        query_parameters = []
+
         allow_fields = [
             'day',
             'topic',
@@ -355,26 +399,64 @@ class BillingDb(BqDbBase):
         fields_selected = ','.join(columns)
 
         filters = []
-        filters.append(f'day >= TIMESTAMP("{start_date}")')
-        filters.append(f'day <= TIMESTAMP("{end_date}")')
+
+        filters.append('day >= TIMESTAMP(@start_date)')
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('start_date', 'STRING', start_date)
+        )
+
+        filters.append('day <= TIMESTAMP(@end_date)')
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('end_date', 'STRING', end_date)
+        )
+
         if topic:
-            filters.append(f'topic = "{topic}"')
+            filters.append('topic = @topic')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('topic', 'STRING', topic)
+            )
         if cost_category:
-            filters.append(f'cost_category = "{cost_category}"')
+            filters.append('cost_category = @cost_category')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('cost_category', 'STRING', cost_category)
+            )
         if sku:
-            filters.append(f'sku = "{sku}"')
+            filters.append('sku = @sku')
+            query_parameters.append(bigquery.ScalarQueryParameter('sku', 'STRING', sku))
         if ar_guid:
-            filters.append(f'ar_guid = "{ar_guid}"')
+            filters.append('ar_guid = @ar_guid')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('ar_guid', 'STRING', ar_guid)
+            )
         if dataset:
-            filters.append(f'dataset = "{dataset}"')
+            filters.append('dataset = @dataset')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('dataset', 'STRING', dataset)
+            )
         if batch_id:
-            filters.append(f'batch_id = "{batch_id}"')
+            filters.append('batch_id = @batch_id')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('batch_id', 'STRING', batch_id)
+            )
         if sequencing_type:
-            filters.append(f'sequencing_type = "{sequencing_type}"')
+            filters.append('sequencing_type = @sequencing_type')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter(
+                    'sequencing_type', 'STRING', sequencing_type
+                )
+            )
         if stage:
-            filters.append(f'stage = "{stage}"')
+            filters.append('stage = @stage')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('stage', 'STRING', stage)
+            )
         if sequencing_group:
-            filters.append(f'sequencing_group = "{sequencing_group}"')
+            filters.append('sequencing_group = @sequencing_group')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter(
+                    'sequencing_group', 'STRING', sequencing_group
+                )
+            )
 
         filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
 
@@ -413,11 +495,20 @@ class BillingDb(BqDbBase):
 
         # append LIMIT and OFFSET if present
         if limit:
-            _query += f' LIMIT {limit}'
+            _query += ' LIMIT @limit_val'
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
+            )
         if offset:
-            _query += f' OFFSET {offset}'
+            _query += ' OFFSET @offset_val'
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('offset_val', 'INT64', offset)
+            )
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
 
         if query_job_result:
             return [
