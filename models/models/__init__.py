@@ -62,4 +62,6 @@ from models.models.web import (
 from models.models.billing import (
     BillingRowRecord,
     BillingTotalCostRecord,
+    BillingTotalCostQueryModel,
+    BillingColumn,
 )

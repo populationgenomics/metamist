@@ -1,8 +1,10 @@
-# pylint: disable=too-many-arguments,too-many-locals,too-many-branches
 from google.cloud import bigquery
+
 from models.models import (
     BillingRowRecord,
     BillingTotalCostRecord,
+    BillingTotalCostQueryModel,
+    BillingColumn,
 )
 
 from db.python.gcp_connect import BqDbBase
@@ -100,43 +102,13 @@ class BillingLayer(BqBaseLayer):
 
     async def get_total_cost(
         self,
-        fields: str,
-        start_date: str,
-        end_date: str,
-        topic: str | None = None,
-        cost_category: str | None = None,
-        sku: str | None = None,
-        ar_guid: str | None = None,
-        dataset: str | None = None,
-        batch_id: str | None = None,
-        sequencing_type: str | None = None,
-        stage: str | None = None,
-        sequencing_group: str | None = None,
-        order_by: str | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
+        query: BillingTotalCostQueryModel,
     ) -> list[BillingTotalCostRecord] | None:
         """
         Get Total cost of selected fields for requested time interval
         """
         billing_db = BillingDb(self.connection)
-        return await billing_db.get_total_cost(
-            fields,
-            start_date,
-            end_date,
-            topic,
-            cost_category,
-            sku,
-            ar_guid,
-            dataset,
-            batch_id,
-            sequencing_type,
-            stage,
-            sequencing_group,
-            order_by,
-            limit,
-            offset,
-        )
+        return await billing_db.get_total_cost(query)
 
 
 class BillingDb(BqDbBase):
@@ -327,64 +299,28 @@ class BillingDb(BqDbBase):
 
     async def get_total_cost(
         self,
-        fields: str,
-        start_date: str,
-        end_date: str,
-        topic: str | None = None,
-        cost_category: str | None = None,
-        sku: str | None = None,
-        ar_guid: str | None = None,
-        dataset: str | None = None,
-        batch_id: str | None = None,
-        sequencing_type: str | None = None,
-        stage: str | None = None,
-        sequencing_group: str | None = None,
-        order_by: str | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
+        query: BillingTotalCostQueryModel,
     ) -> list[BillingTotalCostRecord] | None:
         """
         Get Total cost of selected fields for requested time interval from BQ view
         """
-        if not start_date or not end_date or not fields:
+        if not query.start_date or not query.end_date or not query.fields:
             raise ValueError('Date and Fields are required')
 
-        query_parameters = []
+        allow_fields = BillingColumn.list()
+        extended_cols = BillingColumn.extended_cols()
 
-        allow_fields = [
-            'day',
-            'topic',
-            'cost_category',
-            'currency',
-            'cost',
-            'sku',
-            'ar_guid',
-            'dataset',
-            'batch_id',
-            'sequencing_type',
-            'stage',
-            'sequencing_group',
-        ]
+        print(type(allow_fields), allow_fields)
+        print(type(extended_cols), extended_cols)
 
-        extended_cols = [
-            'dataset',
-            'batch_id',
-            'sequencing_type',
-            'stage',
-            'sequencing_group',
-        ]
-
-        if dataset or batch_id or sequencing_type or stage or sequencing_group:
-            # extended fields are only present in extended views
-            view_to_use = BQ_AGGREG_EXT_VIEW
-        else:
-            view_to_use = BQ_AGGREG_VIEW
+        # by default look at the normal view
+        view_to_use = BQ_AGGREG_VIEW
 
         columns = []
-        for field in fields.split(','):
-            col_name = field.strip()
+        for field in query.fields:
+            col_name = field.value
             if col_name not in allow_fields:
-                raise ValueError(f'Invalid field: {field}')
+                raise ValueError(f'Invalid field: {col_name}')
 
             if col_name == 'cost':
                 # skip the cost field as it will be always present
@@ -398,73 +334,41 @@ class BillingDb(BqDbBase):
 
         fields_selected = ','.join(columns)
 
+        # construct filters
         filters = []
+        query_parameters = []
 
         filters.append('day >= TIMESTAMP(@start_date)')
         query_parameters.append(
-            bigquery.ScalarQueryParameter('start_date', 'STRING', start_date)
+            bigquery.ScalarQueryParameter('start_date', 'STRING', query.start_date)
         )
 
         filters.append('day <= TIMESTAMP(@end_date)')
         query_parameters.append(
-            bigquery.ScalarQueryParameter('end_date', 'STRING', end_date)
+            bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date)
         )
 
-        if topic:
-            filters.append('topic = @topic')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('topic', 'STRING', topic)
-            )
-        if cost_category:
-            filters.append('cost_category = @cost_category')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('cost_category', 'STRING', cost_category)
-            )
-        if sku:
-            filters.append('sku = @sku')
-            query_parameters.append(bigquery.ScalarQueryParameter('sku', 'STRING', sku))
-        if ar_guid:
-            filters.append('ar_guid = @ar_guid')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('ar_guid', 'STRING', ar_guid)
-            )
-        if dataset:
-            filters.append('dataset = @dataset')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('dataset', 'STRING', dataset)
-            )
-        if batch_id:
-            filters.append('batch_id = @batch_id')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('batch_id', 'STRING', batch_id)
-            )
-        if sequencing_type:
-            filters.append('sequencing_type = @sequencing_type')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter(
-                    'sequencing_type', 'STRING', sequencing_type
+        if query.filters:
+            for filter_key, filter_value in query.filters.items():
+                if filter_key not in allow_fields:
+                    raise ValueError(f'Invalid filter: {filter_key}')
+
+                filters.append(f'{filter_key} = @{filter_key}')
+                query_parameters.append(
+                    bigquery.ScalarQueryParameter(filter_key, 'STRING', filter_value)
                 )
-            )
-        if stage:
-            filters.append('stage = @stage')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('stage', 'STRING', stage)
-            )
-        if sequencing_group:
-            filters.append('sequencing_group = @sequencing_group')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter(
-                    'sequencing_group', 'STRING', sequencing_group
-                )
-            )
+                if filter_key in extended_cols:
+                    # if one of the extended columns is needed,
+                    # the view has to be extended
+                    view_to_use = BQ_AGGREG_EXT_VIEW
 
         filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
 
         # construct order by
         order_by_cols = []
-        if order_by:
-            for field in order_by.split(','):
-                col_name = field.strip()
+        if query.order_by:
+            for order_field in query.order_by:
+                col_name = str(order_field)
                 col_sign = col_name[0]
                 if col_sign not in ['+', '-']:
                     # default is ASC
@@ -474,7 +378,7 @@ class BillingDb(BqDbBase):
                     col_name = col_name[1:]
 
                 if col_name not in allow_fields:
-                    raise ValueError(f'Invalid field: {field}')
+                    raise ValueError(f'Invalid field: {col_name}')
 
                 order_by_cols.append(f'{col_name} {col_order}')
 
@@ -494,15 +398,15 @@ class BillingDb(BqDbBase):
         """
 
         # append LIMIT and OFFSET if present
-        if limit:
+        if query.limit:
             _query += ' LIMIT @limit_val'
             query_parameters.append(
-                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
+                bigquery.ScalarQueryParameter('limit_val', 'INT64', query.limit)
             )
-        if offset:
+        if query.offset:
             _query += ' OFFSET @offset_val'
             query_parameters.append(
-                bigquery.ScalarQueryParameter('offset_val', 'INT64', offset)
+                bigquery.ScalarQueryParameter('offset_val', 'INT64', query.offset)
             )
 
         job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)

@@ -1,7 +1,6 @@
 """
 Billing routes
 """
-# pylint: disable=too-many-arguments
 
 from fastapi import APIRouter
 from api.utils.db import (
@@ -13,6 +12,7 @@ from models.models.billing import (
     BillingQueryModel,
     BillingRowRecord,
     BillingTotalCostRecord,
+    BillingTotalCostQueryModel,
 )
 
 router = APIRouter(prefix='/billing', tags=['billing'])
@@ -167,122 +167,112 @@ async def query_billing(
     return records
 
 
-@router.get(
+@router.post(
     '/total-cost',
     response_model=list[BillingTotalCostRecord],
     operation_id='getTotalCost',
 )
 async def get_total_cost(
-    fields: str = 'day,topic',
-    start_date: str = '2023-03-01',
-    end_date: str = '2023-03-05',
-    topic: str | None = None,
-    cost_category: str | None = None,
-    sku: str | None = None,
-    ar_guid: str | None = None,
-    dataset: str | None = None,
-    batch_id: str | None = None,
-    sequencing_type: str | None = None,
-    stage: str | None = None,
-    sequencing_group: str | None = None,
-    order_by: str | None = '+day,-topic',
-    limit: int | None = None,
-    offset: int | None = None,
+    query: BillingTotalCostQueryModel,
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[BillingTotalCostRecord]:
     """Get Total cost of selected fields for requested time interval
 
-    Here are few examples:
+    Here are few examples of :
 
     1. Get total topic for month of March 2023, ordered by cost DESC:
 
-            fields: topic
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
+        {
+            "fields": ["topic"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": ["-cost"]
+        }
 
     2. Get total cost by day and topic for March 2023, order by day ASC and topic DESC:
 
-            fields: day,topic
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: +day,-topic
+        {
+            "fields": ["day", "topic"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-05",
+            "order_by": ["+day", "-topic"],
+            "limit": 10
+        }
 
     3. Get total cost of sku and cost_category for topic 'hail', March 2023,
        order by cost DESC with Limit and Offset:
 
-            fields: sku,cost_category
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
-            topic: hail
-            limit: 5
-            offset: 10
+        {
+            "fields": ["sku", "cost_category"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "filter": { "topic": "hail"},
+            "order_by": ["-cost"],
+            "limit": 5,
+            "offset": 10
+        }
 
     4. Get total cost per dataset for month of March, order by cost DESC:
 
-            fields: dataset
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
+        {
+            "fields": ["dataset"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": ["-cost"]
+        }
 
     5. Get total cost of daily cost for dataset 'acute-care', March 2023,
        order by cost DESC:
 
-            fields: day,dataset
-            dataset: acute-care
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: +day
+        {
+            "fields": ["day", "dataset"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "filter": { "dataset": "acute-care"},
+            "order_by": ["+day"]
+        }
 
     6. Get total cost for given batch_id and category for month of March,
        order by cost DESC:
 
-            fields: cost_category,batch_id,sku
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
-            batch_id: 423094
+        {
+            "fields": ["cost_category", "batch_id", "sku"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "filter": { "batch_id": "423094"},
+            "order_by": ["-cost"],
+            "limit": 5
+        }
 
     7. Get total sequencing_type for month of March 2023, ordered by cost DESC:
 
-            fields: sequencing_type
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
+        {
+            "fields": ["sequencing_type"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": ["-cost"]
+        }
 
     8. Get total stage for month of March 2023, ordered by cost DESC:
 
-            fields: stage
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
+        {
+            "fields": ["stage"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": ["-cost"]
+        }
 
     9. Get total sequencing_group for month of March 2023, ordered by cost DESC:
 
-            fields: sequencing_group
-            start_date: 2023-03-01
-            end_date: 2023-03-31
-            order_by: -cost
+        {
+            "fields": ["sequencing_group"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": ["-cost"]
+        }
 
     """
 
     billing_layer = BillingLayer(connection)
-    records = await billing_layer.get_total_cost(
-        fields,
-        start_date,
-        end_date,
-        topic,
-        cost_category,
-        sku,
-        ar_guid,
-        dataset,
-        batch_id,
-        sequencing_type,
-        stage,
-        sequencing_group,
-        order_by,
-        limit,
-        offset,
-    )
+    records = await billing_layer.get_total_cost(query)
     return records

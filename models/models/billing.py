@@ -1,5 +1,7 @@
 import datetime
 from decimal import Decimal
+from enum import Enum
+from typing import List
 
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
@@ -112,6 +114,60 @@ class BillingRowRecord(SMBase):
             invoice_month=record['invoice'].get('month', ''),
             cost_type=record['cost_type'],
         )
+
+
+class BillingColumn(Enum):
+    """List of billing columns"""
+
+    # base view columns
+    TOPIC = 'topic'
+    DAY = 'day'
+    COST_CATEGORY = 'cost_category'
+    SKU = 'sku'
+    AR_GUID = 'ar_guid'
+    CURRENCY = 'currency'
+    COST = 'cost'
+
+    # extended, filtered view columns
+    DATASET = 'dataset'
+    BATCH_ID = 'batch_id'
+    SEQUENCING_TYPE = 'sequencing_type'
+    STAGE = 'stage'
+    SEQUENCING_GROUP = 'sequencing_group'
+
+    @classmethod
+    def list(cls) -> List[str]:
+        """Return list of column names"""
+        return list(map(lambda c: str(c.value), cls))
+
+    @classmethod
+    def extended_cols(cls) -> List[str]:
+        """Return list of extended column names"""
+        return [
+            'dataset',
+            'batch_id',
+            'sequencing_type',
+            'stage',
+            'sequencing_group',
+        ]
+
+
+class BillingTotalCostQueryModel(SMBase):
+    """
+    Used to query for billing total cost
+    TODO: needs to be fully implemented, esp. to_filter
+    """
+
+    # required
+    fields: list[BillingColumn]
+    start_date: str
+    end_date: str
+
+    # optional
+    filters: dict[BillingColumn, str] | None = None
+    order_by: list[str] | None = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class BillingTotalCostRecord(SMBase):
