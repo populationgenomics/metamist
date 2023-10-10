@@ -178,7 +178,7 @@ async def get_total_cost(
 ) -> list[BillingTotalCostRecord]:
     """Get Total cost of selected fields for requested time interval
 
-    Here are few examples of :
+    Here are few examples of requests:
 
     1. Get total topic for month of March 2023, ordered by cost DESC:
 
@@ -186,7 +186,7 @@ async def get_total_cost(
             "fields": ["topic"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": ["-cost"]
+            "order_by": {"cost": true}
         }
 
     2. Get total cost by day and topic for March 2023, order by day ASC and topic DESC:
@@ -195,7 +195,7 @@ async def get_total_cost(
             "fields": ["day", "topic"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-05",
-            "order_by": ["+day", "-topic"],
+            "order_by": {"day": false, "topic": true},
             "limit": 10
         }
 
@@ -206,8 +206,8 @@ async def get_total_cost(
             "fields": ["sku", "cost_category"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "filter": { "topic": "hail"},
-            "order_by": ["-cost"],
+            "filters": { "topic": "hail"},
+            "order_by": {"cost": true},
             "limit": 5,
             "offset": 10
         }
@@ -218,18 +218,18 @@ async def get_total_cost(
             "fields": ["dataset"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": ["-cost"]
+            "order_by": {"cost": true}
         }
 
     5. Get total cost of daily cost for dataset 'acute-care', March 2023,
-       order by cost DESC:
+       order by day ASC and dataset DESC:
 
         {
             "fields": ["day", "dataset"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "filter": { "dataset": "acute-care"},
-            "order_by": ["+day"]
+            "filters": { "dataset": "acute-care"},
+            "order_by": {"day": false, "dataset": true}
         }
 
     6. Get total cost for given batch_id and category for month of March,
@@ -239,8 +239,8 @@ async def get_total_cost(
             "fields": ["cost_category", "batch_id", "sku"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "filter": { "batch_id": "423094"},
-            "order_by": ["-cost"],
+            "filters": { "batch_id": "423094"},
+            "order_by": {"cost": true},
             "limit": 5
         }
 
@@ -250,7 +250,7 @@ async def get_total_cost(
             "fields": ["sequencing_type"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": ["-cost"]
+            "order_by": {"cost": true}
         }
 
     8. Get total stage for month of March 2023, ordered by cost DESC:
@@ -259,7 +259,7 @@ async def get_total_cost(
             "fields": ["stage"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": ["-cost"]
+            "order_by": {"cost": true}
         }
 
     9. Get total sequencing_group for month of March 2023, ordered by cost DESC:
@@ -268,7 +268,7 @@ async def get_total_cost(
             "fields": ["sequencing_group"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": ["-cost"]
+            "order_by": {"cost": true}
         }
 
     """

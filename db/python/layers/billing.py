@@ -307,21 +307,14 @@ class BillingDb(BqDbBase):
         if not query.start_date or not query.end_date or not query.fields:
             raise ValueError('Date and Fields are required')
 
-        allow_fields = BillingColumn.list()
         extended_cols = BillingColumn.extended_cols()
-
-        print(type(allow_fields), allow_fields)
-        print(type(extended_cols), extended_cols)
 
         # by default look at the normal view
         view_to_use = BQ_AGGREG_VIEW
 
         columns = []
         for field in query.fields:
-            col_name = field.value
-            if col_name not in allow_fields:
-                raise ValueError(f'Invalid field: {col_name}')
-
+            col_name = str(field.value)
             if col_name == 'cost':
                 # skip the cost field as it will be always present
                 continue
@@ -350,14 +343,12 @@ class BillingDb(BqDbBase):
 
         if query.filters:
             for filter_key, filter_value in query.filters.items():
-                if filter_key not in allow_fields:
-                    raise ValueError(f'Invalid filter: {filter_key}')
-
-                filters.append(f'{filter_key} = @{filter_key}')
+                col_name = str(filter_key.value)
+                filters.append(f'{col_name} = @{col_name}')
                 query_parameters.append(
-                    bigquery.ScalarQueryParameter(filter_key, 'STRING', filter_value)
+                    bigquery.ScalarQueryParameter(col_name, 'STRING', filter_value)
                 )
-                if filter_key in extended_cols:
+                if col_name in extended_cols:
                     # if one of the extended columns is needed,
                     # the view has to be extended
                     view_to_use = BQ_AGGREG_EXT_VIEW
@@ -367,19 +358,9 @@ class BillingDb(BqDbBase):
         # construct order by
         order_by_cols = []
         if query.order_by:
-            for order_field in query.order_by:
-                col_name = str(order_field)
-                col_sign = col_name[0]
-                if col_sign not in ['+', '-']:
-                    # default is ASC
-                    col_order = 'ASC'
-                else:
-                    col_order = 'DESC' if col_sign == '-' else 'ASC'
-                    col_name = col_name[1:]
-
-                if col_name not in allow_fields:
-                    raise ValueError(f'Invalid field: {col_name}')
-
+            for order_field, reverse in query.order_by.items():
+                col_name = str(order_field.value)
+                col_order = 'DESC' if reverse else 'ASC'
                 order_by_cols.append(f'{col_name} {col_order}')
 
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''

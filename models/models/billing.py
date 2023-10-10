@@ -1,7 +1,6 @@
 import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import List
 
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
@@ -136,12 +135,7 @@ class BillingColumn(Enum):
     SEQUENCING_GROUP = 'sequencing_group'
 
     @classmethod
-    def list(cls) -> List[str]:
-        """Return list of column names"""
-        return list(map(lambda c: str(c.value), cls))
-
-    @classmethod
-    def extended_cols(cls) -> List[str]:
+    def extended_cols(cls) -> list[str]:
         """Return list of extended column names"""
         return [
             'dataset',
@@ -165,7 +159,8 @@ class BillingTotalCostQueryModel(SMBase):
 
     # optional
     filters: dict[BillingColumn, str] | None = None
-    order_by: list[str] | None = None
+    # order by, reverse= TRUE for DESC, FALSE for ASC
+    order_by: dict[BillingColumn, bool] | None = None
     limit: int | None = None
     offset: int | None = None
 
