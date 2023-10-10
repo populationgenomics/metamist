@@ -573,11 +573,13 @@ class Query:
         if external_id and not project:
             raise ValueError('Must provide project when using external_id filter')
 
+        project_name_map: dict[str, int] = {}
         if project:
             project_ids = project.all_values()
-            project_id_map = await ptable.get_and_check_access_to_projects_for_ids(
+            projects = await ptable.get_and_check_access_to_projects_for_ids(
                 user=connection.author, project_ids=project_ids, readonly=True
             )
+            project_name_map = {p.name: p.id for p in projects}
 
         filter_ = SampleFilter(
             id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
@@ -587,7 +589,7 @@ class Query:
             participant_id=participant_id.to_internal_filter()
             if participant_id
             else None,
-            project=project.to_internal_filter(lambda pname: project_id_map[pname])
+            project=project.to_internal_filter(lambda pname: project_name_map[pname])
             if project
             else None,
             active=active.to_internal_filter() if active else GenericFilter(eq=True),

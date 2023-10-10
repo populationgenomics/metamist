@@ -112,6 +112,8 @@ class ProjectPermissionsTable:
         Get projects that are accessible by the specified user
         """
         assert author
+        if self.gtable.allow_full_access:
+            return await self._get_project_rows_internal()
 
         group_name = 'read_group_id' if readonly else 'write_group_id'
         _query = f"""
