@@ -136,12 +136,14 @@ class GraphQLProject:
         root: 'GraphQLProject',
         type: GraphQLFilter[str] | None = None,
         external_id: GraphQLFilter[str] | None = None,
+        id: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
             external_id=external_id.to_internal_filter() if external_id else None,
+            id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
             meta=meta,
         )
         samples = await loader.load({'id': root.id, 'filter': filter_})
@@ -325,6 +327,13 @@ class GraphQLParticipant:
 
         samples = await info.context[LoaderKeys.SAMPLES_FOR_PARTICIPANTS].load(q)
         return [GraphQLSample.from_internal(s) for s in samples]
+
+    @strawberry.field
+    async def phenotypes(
+        self, info: Info, root: 'GraphQLParticipant'
+    ) -> strawberry.scalars.JSON:
+        loader = info.context[LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS]
+        return await loader.load(root.id)
 
     @strawberry.field
     async def families(
