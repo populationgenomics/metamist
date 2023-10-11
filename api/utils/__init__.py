@@ -7,6 +7,7 @@ from .db import (
     get_project_readonly_connection,
     get_project_write_connection,
     get_projectless_db_connection,
+    get_projectless_bq_connection,
 )
 
 T = TypeVar('T')

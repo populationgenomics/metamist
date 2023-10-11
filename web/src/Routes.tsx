@@ -9,6 +9,7 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import EtlAdmin from './pages/etl/EtlAdmin'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -35,6 +36,8 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route path="admin" element={<ProjectsAdmin />} />
+
+        <Route path="etl" element={<EtlAdmin />} />
 
         <Route path="/" element={<DocumentationArticle articleid="index" />} />
 
