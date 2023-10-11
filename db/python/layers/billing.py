@@ -257,6 +257,9 @@ class BillingDb(BqDbBase):
     ) -> list[BillingRowRecord] | None:
         """Get Billing record from BQ"""
 
+        # TODO: THis function is not going to be used most likely
+        # get_total_cost will replace it
+
         # cost of this BQ is 30MB on DEV,
         # DEV is partition by day and date is required filter params,
         # cost is aprox per query: AU$ 0.000023 per query
@@ -268,17 +271,29 @@ class BillingDb(BqDbBase):
         if not any(required_fields):
             raise ValueError('Must provide date to filter on')
 
+        # construct filters
         filters = []
+        query_parameters = []
+
         if filter_.topic:
-            filters.append(f'topic IN ("{filter_.topic.eq}")')
+            filters.append('topic IN UNNEST(@topic)')
+            query_parameters.append(
+                bigquery.ArrayQueryParameter('topic', 'STRING', filter_.topic.eq),
+            )
 
         if filter_.date:
-            filters.append(
-                f'DATE_TRUNC(usage_end_time, DAY) = TIMESTAMP("{filter_.date.eq}")'
+            filters.append('DATE_TRUNC(usage_end_time, DAY) = TIMESTAMP(@date)')
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('date', 'STRING', filter_.date.eq),
             )
 
         if filter_.cost_category:
-            filters.append(f'service.description IN ("{filter_.cost_category.eq}")')
+            filters.append('service.description IN UNNEST(@cost_category)')
+            query_parameters.append(
+                bigquery.ArrayQueryParameter(
+                    'cost_category', 'STRING', filter_.cost_category.eq
+                ),
+            )
 
         filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
 
@@ -287,10 +302,21 @@ class BillingDb(BqDbBase):
         labels, export_time, cost, currency, currency_conversion_rate, invoice, cost_type
         FROM `{BQ_AGGREG_RAW}`
         {filter_str}
-        LIMIT {limit}
         """
+        if limit:
+            _query += ' LIMIT @limit_val'
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
+            )
 
-        query_job_result = list(self._connection.connection.query(_query).result())
+        print("============ \n _query: ", _query, "\n ============")
+
+        print("============ \n query_parameters: ", query_parameters, "\n ============")
+
+        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
 
         if query_job_result:
             return [BillingRowRecord.from_json(dict(row)) for row in query_job_result]
