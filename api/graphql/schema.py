@@ -136,14 +136,12 @@ class GraphQLProject:
         root: 'GraphQLProject',
         type: GraphQLFilter[str] | None = None,
         external_id: GraphQLFilter[str] | None = None,
-        id: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLSample']:
         loader = info.context[LoaderKeys.SAMPLES_FOR_PROJECTS]
         filter_ = SampleFilter(
             type=type.to_internal_filter() if type else None,
             external_id=external_id.to_internal_filter() if external_id else None,
-            id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
             meta=meta,
         )
         samples = await loader.load({'id': root.id, 'filter': filter_})
@@ -329,13 +327,6 @@ class GraphQLParticipant:
         return [GraphQLSample.from_internal(s) for s in samples]
 
     @strawberry.field
-    async def phenotypes(
-        self, info: Info, root: 'GraphQLParticipant'
-    ) -> strawberry.scalars.JSON:
-        loader = info.context[LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS]
-        return await loader.load(root.id)
-
-    @strawberry.field
     async def families(
         self, info: Info, root: 'GraphQLParticipant'
     ) -> list[GraphQLFamily]:
@@ -484,8 +475,17 @@ class GraphQLSequencingGroup:
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         active: GraphQLFilter[bool] | None = None,
+        project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLAnalysis]:
+        connection = info.context['connection']
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
+        project_id_map = {}
+        if project:
+            ptable = ProjectPermissionsTable(connection.connection)
+            project_ids = project.all_values()
+            project_id_map = await ptable.get_project_id_map_for_names(
+                author=connection.author, project_names=project_ids, readonly=True
+            )
         analyses = await loader.load(
             {
                 'id': root.internal_id,
@@ -496,6 +496,9 @@ class GraphQLSequencingGroup:
                     active=active.to_internal_filter()
                     if active
                     else GenericFilter(eq=True),
+                    project=project.to_internal_filter(lambda val: project_id_map[val])
+                    if project
+                    else None,
                 ),
             }
         )
