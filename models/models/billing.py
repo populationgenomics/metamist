@@ -164,6 +164,11 @@ class BillingTotalCostQueryModel(SMBase):
     limit: int | None = None
     offset: int | None = None
 
+    def __hash__(self):
+        ret = hash(self.limit)
+        print('hash', ret)
+        return ret
+
 
 class BillingTotalCostRecord(SMBase):
     """Return class for the Billing Total Cost record"""

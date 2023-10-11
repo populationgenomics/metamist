@@ -1,8 +1,10 @@
 """
 Billing routes
 """
-
 from fastapi import APIRouter
+from fastapi_cache.decorator import cache
+
+from api.settings import BILLING_CACHE_RESPONSE_TTL
 from api.utils.db import (
     BqConnection,
     get_projectless_bq_connection,
@@ -15,6 +17,7 @@ from models.models.billing import (
     BillingTotalCostQueryModel,
 )
 
+
 router = APIRouter(prefix='/billing', tags=['billing'])
 
 
@@ -23,6 +26,7 @@ router = APIRouter(prefix='/billing', tags=['billing'])
     response_model=list[str],
     operation_id='getTopics',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_topics(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
@@ -38,6 +42,7 @@ async def get_topics(
     response_model=list[str],
     operation_id='getCostCategories',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_categories(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
@@ -53,6 +58,7 @@ async def get_cost_categories(
     response_model=list[str],
     operation_id='getSkus',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_skus(
     limit: int = 10,
     offset: int | None = None,
@@ -74,6 +80,7 @@ async def get_skus(
     response_model=list[str],
     operation_id='getDatasets',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_datasets(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
@@ -92,6 +99,7 @@ async def get_datasets(
     response_model=list[str],
     operation_id='getSequencingTypes',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_sequencing_types(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
@@ -110,6 +118,7 @@ async def get_sequencing_types(
     response_model=list[str],
     operation_id='getStages',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_stages(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:
@@ -128,6 +137,7 @@ async def get_stages(
     response_model=list[str],
     operation_id='getSequencingGroups',
 )
+@cache(expire=BILLING_CACHE_RESPONSE_TTL)
 async def get_sequencing_groups(
     connection: BqConnection = get_projectless_bq_connection,
 ) -> list[str]:

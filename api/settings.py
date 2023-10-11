@@ -41,6 +41,7 @@ BQ_GCP_BILLING_PROJECT = os.getenv('SM_GCP_BILLING_PROJECT')
 # This is to optimise BQ queries, DEV table has data only for Mar 2023
 # TODO change to 7 days or similar before merging into DEV
 BQ_DAYS_BACK_OPTIMAL = 210
+BILLING_CACHE_RESPONSE_TTL = 1800  # 30 minutes
 
 
 def get_default_user() -> str | None:

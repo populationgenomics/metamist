@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.inmemory import InMemoryBackend
 from pydantic import ValidationError
 from starlette.responses import FileResponse
 
@@ -67,6 +69,9 @@ async def startup():
     """Server is starting up, connect dbs"""
     if not SKIP_DATABASE_CONNECTION:
         await SMConnections.connect()
+
+    # Initial in memory API caching
+    FastAPICache.init(backend=InMemoryBackend())
 
 
 @app.on_event('shutdown')
