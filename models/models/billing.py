@@ -22,9 +22,9 @@ class BillingQueryModel(SMBase):
     def to_filter(self) -> BillingFilter:
         """Convert to internal analysis filter"""
         return BillingFilter(
-            topic=GenericFilter(eq=self.topic) if self.topic else None,
+            topic=GenericFilter(in_=self.topic) if self.topic else None,
             date=GenericFilter(eq=self.date),
-            cost_category=GenericFilter(eq=self.cost_category)
+            cost_category=GenericFilter(in_=self.cost_category)
             if self.cost_category
             else None,
         )

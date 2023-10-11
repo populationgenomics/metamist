@@ -278,7 +278,7 @@ class BillingDb(BqDbBase):
         if filter_.topic:
             filters.append('topic IN UNNEST(@topic)')
             query_parameters.append(
-                bigquery.ArrayQueryParameter('topic', 'STRING', filter_.topic.eq),
+                bigquery.ArrayQueryParameter('topic', 'STRING', filter_.topic.in_),
             )
 
         if filter_.date:
@@ -291,7 +291,7 @@ class BillingDb(BqDbBase):
             filters.append('service.description IN UNNEST(@cost_category)')
             query_parameters.append(
                 bigquery.ArrayQueryParameter(
-                    'cost_category', 'STRING', filter_.cost_category.eq
+                    'cost_category', 'STRING', filter_.cost_category.in_
                 ),
             )
 
@@ -308,10 +308,6 @@ class BillingDb(BqDbBase):
             query_parameters.append(
                 bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
             )
-
-        print("============ \n _query: ", _query, "\n ============")
-
-        print("============ \n query_parameters: ", query_parameters, "\n ============")
 
         job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
         query_job_result = list(
