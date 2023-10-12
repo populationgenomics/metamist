@@ -8,7 +8,15 @@ from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
 from metamist.graphql import query_async, gql
 
-
+ANALYSIS_TYPES_QUERY = gql(
+    """
+    query seqTypes {
+        enum {
+            sequencingType
+        }
+    }
+    """
+)
 ANALYSIS_TYPES = [
     'QC',
     'JOINT-CALLING',
@@ -51,7 +59,7 @@ QUERY_SG_ANALYSES = gql(
         query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
           sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
             id
-            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}) {
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
               id
               meta
               output
@@ -284,12 +292,13 @@ class GenericAuditor(AuditHelper):
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
         logging.getLogger().setLevel(logging.WARN)
+        analysis_types = await query_async(ANALYSIS_TYPES_QUERY)
         sg_analyse_query_result = await query_async(
             QUERY_SG_ANALYSES,
             {
                 'dataset': self.dataset,
                 'sgIds': sgs_without_crams,
-                'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM'],
+                'analysisTypes': [t for t in analysis_types['enum']['analysisType'] if t != 'cram'],
             },
         )
         logging.getLogger().setLevel(logging.INFO)
