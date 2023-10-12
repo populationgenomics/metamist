@@ -72,6 +72,7 @@ AssayReportEntry = namedtuple(
     'sg_id assay_id assay_file_path analysis_id filesize',
 )
 
+
 @cache
 async def get_analysis_types():
     """Return the list of analysis types from the enum table."""
