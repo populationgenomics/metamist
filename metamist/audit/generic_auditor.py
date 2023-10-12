@@ -1,4 +1,5 @@
 from collections import defaultdict, namedtuple
+from functools import cache
 import logging
 import os
 from typing import Any
@@ -70,6 +71,16 @@ AssayReportEntry = namedtuple(
     'AssayReportEntry',
     'sg_id assay_id assay_file_path analysis_id filesize',
 )
+
+@cache
+async def get_analysis_types():
+    """Return the list of analysis types from the enum table."""
+    logging.getLogger().setLevel(logging.WARN)
+    analysis_types = await query_async(ANALYSIS_TYPES_QUERY)
+    logging.getLogger().setLevel(logging.INFO)
+    return analysis_types['enum'][  # pylint: disable=unsubscriptable-object
+        'analysisType'
+    ]
 
 
 class GenericAuditor(AuditHelper):
@@ -281,13 +292,12 @@ class GenericAuditor(AuditHelper):
         all_sg_analyses: dict[str, list[dict[str, int | str]]] = defaultdict(list)
 
         logging.getLogger().setLevel(logging.WARN)
-        analysis_types = await query_async(ANALYSIS_TYPES_QUERY)
         sg_analyse_query_result = await query_async(
             QUERY_SG_ANALYSES,
             {
                 'dataset': self.dataset,
                 'sgIds': sgs_without_crams,
-                'analysisTypes': [t for t in analysis_types['enum']['analysisType'] if t != 'cram'],
+                'analysisTypes': [t for t in await get_analysis_types() if t != 'cram'],
             },
         )
         logging.getLogger().setLevel(logging.INFO)
