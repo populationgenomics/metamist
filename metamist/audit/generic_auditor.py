@@ -10,9 +10,9 @@ from metamist.graphql import query_async, gql
 
 ANALYSIS_TYPES_QUERY = gql(
     """
-    query seqTypes {
+    query analysisTypes {
         enum {
-            sequencingType
+            analysisType
         }
     }
     """
