@@ -208,9 +208,9 @@ query MyQuery($project: String!) {
         )
 
         q = """
-query MyQuery($sg_id: String!) {
+query MyQuery($sg_id: String!, $project: String!) {
   sequencingGroups(id: {in_: [$sg_id]}) {
-    analyses {
+    analyses(project: {eq: $project}) {
       id
       meta
       output
@@ -219,7 +219,8 @@ query MyQuery($sg_id: String!) {
 }"""
 
         resp = await self.run_graphql_query_async(
-            q, {'sg_id': sequencing_group_id_format(sg_id)}
+            q,
+            {'sg_id': sequencing_group_id_format(sg_id), 'project': self.project_name},
         )
         self.assertIn('sequencingGroups', resp)
         self.assertEqual(1, len(resp['sequencingGroups']))
