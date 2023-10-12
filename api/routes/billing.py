@@ -2,12 +2,12 @@
 Billing routes
 """
 from fastapi import APIRouter
-from fastapi_cache.decorator import cache
+from async_lru import alru_cache
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL
 from api.utils.db import (
     BqConnection,
-    get_projectless_bq_connection,
+    get_author,
 )
 from db.python.layers.billing import BillingLayer
 from models.models.billing import (
@@ -26,12 +26,12 @@ router = APIRouter(prefix='/billing', tags=['billing'])
     response_model=list[str],
     operation_id='getTopics',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_topics(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """Get list of all topics in database"""
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_topics()
     return records
@@ -42,12 +42,12 @@ async def get_topics(
     response_model=list[str],
     operation_id='getCostCategories',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_categories(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """Get list of all service description / cost categories in database"""
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_cost_categories()
     return records
@@ -58,18 +58,18 @@ async def get_cost_categories(
     response_model=list[str],
     operation_id='getSkus',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_skus(
     limit: int = 10,
     offset: int | None = None,
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """
     Get list of all SKUs in database
     There is over 400 Skus so limit is required
     Results are sorted ASC
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_skus(limit, offset)
     return records
@@ -80,15 +80,15 @@ async def get_skus(
     response_model=list[str],
     operation_id='getDatasets',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_datasets(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """
     Get list of all datasets in database
     Results are sorted ASC
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_datasets()
     return records
@@ -99,15 +99,15 @@ async def get_datasets(
     response_model=list[str],
     operation_id='getSequencingTypes',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_sequencing_types(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """
     Get list of all sequencing_types in database
     Results are sorted ASC
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_types()
     return records
@@ -118,15 +118,15 @@ async def get_sequencing_types(
     response_model=list[str],
     operation_id='getStages',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_stages(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """
     Get list of all stages in database
     Results are sorted ASC
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_stages()
     return records
@@ -137,15 +137,15 @@ async def get_stages(
     response_model=list[str],
     operation_id='getSequencingGroups',
 )
-@cache(expire=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_sequencing_groups(
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[str]:
     """
     Get list of all sequencing_groups in database
     Results are sorted ASC
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_groups()
     return records
@@ -154,10 +154,11 @@ async def get_sequencing_groups(
 @router.post(
     '/query', response_model=list[BillingRowRecord], operation_id='queryBilling'
 )
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def query_billing(
     query: BillingQueryModel,
     limit: int = 10,
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[BillingRowRecord]:
     """
     Get Billing records by some criteria, date is required to minimize BQ cost
@@ -171,7 +172,7 @@ async def query_billing(
         }
 
     """
-
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.query(query.to_filter(), limit)
     return records
@@ -182,9 +183,10 @@ async def query_billing(
     response_model=list[BillingTotalCostRecord],
     operation_id='getTotalCost',
 )
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_total_cost(
     query: BillingTotalCostQueryModel,
-    connection: BqConnection = get_projectless_bq_connection,
+    author: str = get_author,
 ) -> list[BillingTotalCostRecord]:
     """Get Total cost of selected fields for requested time interval
 
@@ -283,6 +285,7 @@ async def get_total_cost(
 
     """
 
+    connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_total_cost(query)
     return records

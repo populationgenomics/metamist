@@ -29,6 +29,10 @@ class BillingQueryModel(SMBase):
             else None,
         )
 
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.json())
+
 
 class BillingRowRecord(SMBase):
     """Return class for the Billing record"""
@@ -115,7 +119,7 @@ class BillingRowRecord(SMBase):
         )
 
 
-class BillingColumn(Enum):
+class BillingColumn(str, Enum):
     """List of billing columns"""
 
     # base view columns
@@ -165,9 +169,8 @@ class BillingTotalCostQueryModel(SMBase):
     offset: int | None = None
 
     def __hash__(self):
-        ret = hash(self.limit)
-        print('hash', ret)
-        return ret
+        """Create hash for this object to use in caching"""
+        return hash(self.json())
 
 
 class BillingTotalCostRecord(SMBase):
