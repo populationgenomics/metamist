@@ -17,17 +17,6 @@ ANALYSIS_TYPES_QUERY = gql(
     }
     """
 )
-ANALYSIS_TYPES = [
-    'QC',
-    'JOINT-CALLING',
-    'GVCF',
-    'CRAM',
-    'CUSTOM',
-    'ES-INDEX',
-    'SV',
-    'WEB',
-    'ANALYSIS-RUNNER',
-]
 
 QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
     """
