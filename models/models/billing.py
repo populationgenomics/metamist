@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
+from enum import Enum
 
-from pydantic.tools import parse_obj_as
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
 
@@ -22,27 +22,16 @@ class BillingQueryModel(SMBase):
     def to_filter(self) -> BillingFilter:
         """Convert to internal analysis filter"""
         return BillingFilter(
-            topic=GenericFilter(eq='","'.join(self.topic)) if self.topic else None,
+            topic=GenericFilter(in_=self.topic) if self.topic else None,
             date=GenericFilter(eq=self.date),
-            cost_category=GenericFilter(eq='","'.join(self.cost_category))
+            cost_category=GenericFilter(in_=self.cost_category)
             if self.cost_category
             else None,
         )
 
-
-class BillingTopicCostCategoryRecord(SMBase):
-    """Return class for the Billing record"""
-
-    day: datetime.date
-    topic: str
-    cost_category: str | None
-    cost: Decimal
-    currency: str
-
-    @staticmethod
-    def from_json(record):
-        """Create BillingTopicCostCategoryRecord from json"""
-        return parse_obj_as(BillingTopicCostCategoryRecord, record)
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.json())
 
 
 class BillingRowRecord(SMBase):
@@ -127,4 +116,95 @@ class BillingRowRecord(SMBase):
             currency_conversion_rate=record['currency_conversion_rate'],
             invoice_month=record['invoice'].get('month', ''),
             cost_type=record['cost_type'],
+        )
+
+
+class BillingColumn(str, Enum):
+    """List of billing columns"""
+
+    # base view columns
+    TOPIC = 'topic'
+    DAY = 'day'
+    COST_CATEGORY = 'cost_category'
+    SKU = 'sku'
+    AR_GUID = 'ar_guid'
+    CURRENCY = 'currency'
+    COST = 'cost'
+
+    # extended, filtered view columns
+    DATASET = 'dataset'
+    BATCH_ID = 'batch_id'
+    SEQUENCING_TYPE = 'sequencing_type'
+    STAGE = 'stage'
+    SEQUENCING_GROUP = 'sequencing_group'
+
+    @classmethod
+    def extended_cols(cls) -> list[str]:
+        """Return list of extended column names"""
+        return [
+            'dataset',
+            'batch_id',
+            'sequencing_type',
+            'stage',
+            'sequencing_group',
+        ]
+
+
+class BillingTotalCostQueryModel(SMBase):
+    """
+    Used to query for billing total cost
+    TODO: needs to be fully implemented, esp. to_filter
+    """
+
+    # required
+    fields: list[BillingColumn]
+    start_date: str
+    end_date: str
+
+    # optional
+    filters: dict[BillingColumn, str] | None = None
+    # order by, reverse= TRUE for DESC, FALSE for ASC
+    order_by: dict[BillingColumn, bool] | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+    def __hash__(self):
+        """Create hash for this object to use in caching"""
+        return hash(self.json())
+
+
+class BillingTotalCostRecord(SMBase):
+    """Return class for the Billing Total Cost record"""
+
+    day: datetime.date | None
+    topic: str | None
+    cost_category: str | None
+    sku: str | None
+    ar_guid: str | None
+    # extended columns
+    dataset: str | None
+    batch_id: str | None
+    sequencing_type: str | None
+    stage: str | None
+    sequencing_group: str | None
+
+    cost: Decimal
+    currency: str | None
+
+    @staticmethod
+    def from_json(record):
+        """Create BillingTopicCostCategoryRecord from json"""
+        return BillingTotalCostRecord(
+            day=record.get('day'),
+            topic=record.get('topic'),
+            cost_category=record.get('cost_category'),
+            sku=record.get('sku'),
+            ar_guid=record.get('ar_guid'),
+            dataset=record.get('dataset'),
+            batch_id=record.get('batch_id'),
+            sequencing_type=record.get('sequencing_type'),
+            stage=record.get('stage'),
+            sequencing_group=record.get('sequencing_group'),
+            cost=record.get('cost'),
+            currency=record.get('currency'),
         )
