@@ -214,6 +214,9 @@ class SequencingGroupTable(DbBase):
         return {r[0]: r[1].date() for r in rows}
 
     async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+        """
+        Get a map of {internal_sg_id: sample_date_created} for list of sg_ids
+        """
         if len(sequencing_group_ids) == 0:
             return {}
 

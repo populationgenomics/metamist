@@ -154,5 +154,7 @@ class ProportionalDateModel(BaseModel):
 
 
 class ProportionalDateTemporalMethod(enum.Enum):
+    """Method for which to calculate the "start" date"""
+
     SAMPLE_CREATE_DATE = 'SAMPLE_CREATE_DATE'
-    SG_JOINT_CALL_DATE = 'SG_JOINT_CALL_DATE'
+    SG_ES_INDEX_DATE = 'ES_INDEX_DATE'

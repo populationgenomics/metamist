@@ -31,7 +31,7 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 app = FastAPI()
 
 if PROFILE_REQUESTS:
-    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+    from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 

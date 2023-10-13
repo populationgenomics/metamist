@@ -317,13 +317,23 @@ async def get_sample_reads_map(
     # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
 )
 async def get_proportionate_map(
-    sequencing_types: list[str],
+    start: str,
     projects: list[str],
-    start: str = None,
+    temporal_methods: list[ProportionalDateTemporalMethod],
+    sequencing_types: list[str] | None = None,
     end: str = None,
-    temporal_method: ProportionalDateTemporalMethod = ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE,
     connection: Connection = get_projectless_db_connection,
 ):
+    """
+    Get proportionate map of project sizes over time, specifying the temporal
+    methods to use. These will be given back as:
+    {
+        [temporalMethod]: {
+            date: Date,
+            projects: [{ project: string, percentage: float, size: int }]
+        }
+    }
+    """
     pt = ProjectPermissionsTable(connection=connection.connection)
     project_ids = await pt.get_project_ids_from_names_and_user(
         connection.author, projects, readonly=True
@@ -335,10 +345,10 @@ async def get_proportionate_map(
     at = AnalysisLayer(connection)
     results = await at.get_cram_size_proportionate_map(
         projects=project_ids,
-        sequencingsequencing_types_type=sequencing_types,
+        sequencing_types=sequencing_types,
         start_date=start_date,
         end_date=end_date,
-        temporal_method=temporal_method,
+        temporal_methods=temporal_methods,
     )
 
     return results
