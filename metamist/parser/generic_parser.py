@@ -1,47 +1,45 @@
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-locals,unused-argument,assignment-from-none,invalid-name,ungrouped-imports
-import json
-import sys
 import asyncio
 import csv
+import json
 import logging
 import os
 import re
+import sys
 from abc import abstractmethod
 from collections import defaultdict
+from functools import wraps
 from io import StringIO
 from typing import (
-    List,
-    Dict,
-    Union,
-    Optional,
-    Tuple,
-    Match,
     Any,
-    Sequence,
-    TypeVar,
-    Iterator,
     Coroutine,
-    Set,
-    Iterable,
+    Dict,
     Hashable,
+    Iterable,
+    Iterator,
+    List,
+    Match,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
 )
-from functools import wraps
 
 from cloudpathlib import AnyPath
 
-from metamist.graphql import query_async, gql
-from metamist.parser.cloudhelper import CloudHelper, group_by
-
-from metamist.apis import SampleApi, AssayApi, AnalysisApi, ParticipantApi
+from metamist.apis import AnalysisApi, AssayApi, ParticipantApi, SampleApi
+from metamist.graphql import gql, query_async
 from metamist.models import (
     Analysis,
     AnalysisStatus,
+    AssayUpsert,
     ParticipantUpsert,
     SampleUpsert,
     SequencingGroupUpsert,
-    AssayUpsert,
 )
-
+from metamist.parser.cloudhelper import CloudHelper, group_by
 
 # https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-new-additions-to-the-typing-module
 if sys.version_info >= (3, 8):
@@ -322,8 +320,8 @@ class ParsedAssay:
     def to_sm(self) -> AssayUpsert:
         """Convert to SM upsert model"""
         return AssayUpsert(
-            type=self.assay_type,
             id=self.internal_id,
+            type=self.assay_type,
             external_ids=self.external_ids,
             # sample_id=self.s,
             meta=self.meta,
@@ -428,7 +426,7 @@ class GenericParser(
         self.ignore_extra_keys = ignore_extra_keys
 
         if not project:
-            raise ValueError('sample-metadata project is required')
+            raise ValueError('A metamist project is required')
 
         self.project = project
 
@@ -508,6 +506,10 @@ class GenericParser(
         rows = await self.file_pointer_to_rows(
             file_pointer=file_pointer, delimiter=delimiter
         )
+        return await self.from_json(rows, confirm, dry_run)
+
+    async def from_json(self, rows, confirm=False, dry_run=False):
+        """Parse passed rows"""
         await self.validate_rows(rows)
 
         # one participant with no value
@@ -562,6 +564,11 @@ class GenericParser(
 
         # remove sequencing groups with no assays
         sequencing_groups = [sg for sg in sequencing_groups if sg.assays]
+        for sample in samples:
+            sample.sequencing_groups = [
+                sg for sg in sample.sequencing_groups if sg.assays
+            ]
+
         # match assay ids after sequencing groups
         await self.match_assay_ids(assays)
         # match sequencing group ids after assays
@@ -1080,7 +1087,9 @@ class GenericParser(
             for external_id, analysis in chunked_analysis:
                 # TODO: resolve this external_to_internal_id_map
                 # this one is going to be slightly harder :
-                analysis.sequence_group_ids = [external_to_internal_id_map[external_id]]
+                analysis.sequencing_group_ids = [
+                    external_to_internal_id_map[external_id]
+                ]
                 promises.append(
                     analysisapi.create_analysis_async(
                         project=proj, analysis_model=analysis

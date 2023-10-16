@@ -1,9 +1,21 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
+from db.python.layers import (
+    AssayLayer,
+    ParticipantLayer,
+    SampleLayer,
+    SequencingGroupLayer,
+    WebLayer,
+)
 from models.enums import MetaSearchEntityPrefix
 from models.models import (
+    Assay,
+    AssayInternal,
+    AssayUpsertInternal,
     ParticipantUpsertInternal,
+    ProjectSummaryInternal,
     SampleUpsertInternal,
+    SearchItem,
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
     ProjectSummaryInternal,
@@ -11,17 +23,8 @@ from models.models import (
     AssayInternal,
     Assay,
 )
-from models.models import WebProject, SearchItem
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
-
-from db.python.layers import (
-    AssayLayer,
-    SequencingGroupLayer,
-    SampleLayer,
-    ParticipantLayer,
-    WebLayer,
-)
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -242,9 +245,7 @@ class TestWeb(DbIsolatedTest):
 
         # Expect an empty project
         expected = ProjectSummaryInternal(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
@@ -346,9 +347,7 @@ class TestWeb(DbIsolatedTest):
             ],
         )
         empty_result = ProjectSummaryInternal(
-            project=WebProject(
-                **{'id': 1, 'name': 'test', 'meta': {}, 'dataset': 'test'}
-            ),
+            project=WebProject(id=1, name='test', meta={}, dataset='test'),
             total_samples=0,
             total_samples_in_query=0,
             total_participants=0,
@@ -493,12 +492,10 @@ class TestWeb(DbIsolatedTest):
             token=0,
             grid_filter=[
                 SearchItem(
-                    **{
-                        'model_type': MetaSearchEntityPrefix.ASSAY,
-                        'query': 'field wi',
-                        'field': 'field with spaces',
-                        'is_meta': True,
-                    }
+                    model_type=MetaSearchEntityPrefix.ASSAY,
+                    query='field wi',
+                    field='field with spaces',
+                    is_meta=True,
                 )
             ],
         )

@@ -1,8 +1,7 @@
 import unittest
 from io import StringIO
-from unittest.mock import patch
-
 from test.testbase import run_as_sync
+from unittest.mock import patch
 
 from scripts.process_ont_products import OntProductParser
 
@@ -20,7 +19,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
         """
         Test processing one row with all files existing
         """
-        mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
+        mock_get_sample_id.return_value = {'Sample01': 'CPGaaa'}
         mock_filesize.return_value = 111
         mock_fileexists.return_value = True
 
@@ -36,7 +35,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
             dry_run=True,
         )
 
-        parser.skip_checking_gcs_objects = True
+        # parser.skip_checking_gcs_objects = True
         fs = [
             'Sample01.bam',
             'Sample01.sv.vcf.gz',
@@ -44,7 +43,7 @@ class TestOntSampleSheetParser(unittest.TestCase):
             'Sample01.indels.vcf.gz',
         ]
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
-        parser.skip_checking_gcs_objects = True
+        # parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
         analyses = await parser.parse_manifest(

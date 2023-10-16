@@ -736,5 +736,16 @@
             </column>
         </createTable>
     </changeSet>
-
+	<changeSet id="2023-10-04_sample-type" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<!-- change the sample.type field from an enum, to reference sample_type.id -->
+		<sql>ALTER TABLE sample MODIFY COLUMN type VARCHAR(255);</sql>
+		<addForeignKeyConstraint
+			constraintName="FK_SAMPLE_SAMPLE_TYPE"
+			baseTableName="sample"
+			baseColumnNames="type"
+			referencedTableName="sample_type"
+			referencedColumnNames="id"
+			/>
+		</changeSet>
 </databaseChangeLog>

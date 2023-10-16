@@ -16,10 +16,11 @@ from db.python.tables.assay import AssayTable
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from models.models import (
+    AssayInternal,
+    FamilySimpleInternal,
     NestedParticipantInternal,
     NestedSampleInternal,
     NestedSequencingGroupInternal,
-    AssayInternal,
     SearchItem,
     FamilySimpleInternal,
     ProjectsSummaryInternal,
@@ -375,7 +376,7 @@ class WebProjectSummaryDb(DbBase):
         """
         Get query for getting list of samples
         """
-        wheres = ['s.project = :project', 'NOT sg.archived']
+        wheres = ['s.project = :project', 's.active']
         values = {'project': self.project}
         where_str = ''
         for query in grid_filter:
@@ -405,7 +406,7 @@ class WebProjectSummaryDb(DbBase):
         # the query to determine the total count, then take the selection of samples
         # for the current page. This is more efficient than doing 2 queries separately.
         sample_query = f"""
-        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id
+        SELECT s.id, s.external_id, s.type, s.meta, s.participant_id, s.active
         FROM sample s
         LEFT JOIN assay a ON s.id = a.sample_id
         LEFT JOIN participant p ON p.id = s.participant_id
@@ -512,6 +513,7 @@ class WebProjectSummaryDb(DbBase):
                 created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
                 non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
+                active=bool(ord(s['active'])),
             )
             for s in sample_rows
         ]
@@ -725,8 +727,8 @@ WHERE fp.participant_id in :pids
             sg_models_by_sample_id=seq_group_models_by_sample_id,
             sample_id_start_times=sample_id_start_times,
         )
-        # the pydantic model is casting to the id to a str, as that makes sense on the front end
-        # but cast back here to do the lookup
+        # the pydantic model is casting to the id to a str, as that makes sense on
+        # the front end but cast back here to do the lookup
         sid_to_pid = {s['id']: s['participant_id'] for s in sample_rows}
         smodels_by_pid = group_by(smodels, lambda s: sid_to_pid[int(s.id)])
 
@@ -752,7 +754,7 @@ WHERE fp.participant_id in :pids
                         reported_sex=None,
                         reported_gender=None,
                         karyotype=None,
-                        project=self.project,
+                        # project=self.project,
                     )
                 )
             elif pid not in pid_seen:
@@ -768,7 +770,7 @@ WHERE fp.participant_id in :pids
                         reported_sex=p['reported_sex'],
                         reported_gender=p['reported_gender'],
                         karyotype=p['karyotype'],
-                        project=self.project,
+                        # project=self.project,
                     )
                 )
 

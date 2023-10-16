@@ -1,11 +1,10 @@
 from io import StringIO
+from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from test.testbase import run_as_sync, DbIsolatedTest
-
 from db.python.layers import ParticipantLayer
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
 from metamist.parser.generic_parser import ParsedParticipant
+from models.models import ParticipantUpsertInternal, SampleUpsertInternal
 from scripts.parse_ont_sheet import OntParser
 
 
@@ -38,10 +37,6 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         )
 
         mock_graphql_query.side_effect = self.run_graphql_query_async
-
-        # mock_get_participant_id.return_value = {'Sample01': 1}
-        # mock_get_sample_id.return_value = {'Sample01': 'CPG001'}
-        # mock_get_sequence_ids.return_value = {}
 
         rows = [
             'Sequencing_date,Experiment name,Sample ID,Protocol,Flow cell,Barcoding,Device,Flowcell ID,MUX total,Basecalling,Fail FASTQ filename,Pass FASTQ filename',
@@ -125,6 +120,6 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             ],
         }
         self.maxDiff = None
-        sequence_group = participants[0].samples[0].sequencing_groups[0]
-        self.assertDictEqual(seqgroup_meta, sequence_group.meta)
-        self.assertDictEqual(meta_dict, sequence_group.assays[0].meta)
+        sequencing_group = participants[0].samples[0].sequencing_groups[0]
+        self.assertDictEqual(seqgroup_meta, sequencing_group.meta)
+        self.assertDictEqual(meta_dict, sequencing_group.assays[0].meta)
