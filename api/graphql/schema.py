@@ -484,8 +484,17 @@ class GraphQLSequencingGroup:
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         active: GraphQLFilter[bool] | None = None,
+        project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLAnalysis]:
+        connection = info.context['connection']
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
+        project_id_map = {}
+        if project:
+            ptable = ProjectPermissionsTable(connection.connection)
+            project_ids = project.all_values()
+            project_id_map = await ptable.get_project_id_map_for_names(
+                author=connection.author, project_names=project_ids, readonly=True
+            )
         analyses = await loader.load(
             {
                 'id': root.internal_id,
@@ -496,6 +505,9 @@ class GraphQLSequencingGroup:
                     active=active.to_internal_filter()
                     if active
                     else GenericFilter(eq=True),
+                    project=project.to_internal_filter(lambda val: project_id_map[val])
+                    if project
+                    else None,
                 ),
             }
         )
