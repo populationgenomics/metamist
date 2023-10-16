@@ -1,4 +1,5 @@
 from collections import defaultdict, namedtuple
+from functools import cache
 import logging
 import os
 from typing import Any
@@ -8,18 +9,15 @@ from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
 from metamist.graphql import query_async, gql
 
-
-ANALYSIS_TYPES = [
-    'QC',
-    'JOINT-CALLING',
-    'GVCF',
-    'CRAM',
-    'CUSTOM',
-    'ES-INDEX',
-    'SV',
-    'WEB',
-    'ANALYSIS-RUNNER',
-]
+ANALYSIS_TYPES_QUERY = gql(
+    """
+    query analysisTypes {
+        enum {
+            analysisType
+        }
+    }
+    """
+)
 
 QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS = gql(
     """
@@ -51,7 +49,7 @@ QUERY_SG_ANALYSES = gql(
         query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
           sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
             id
-            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}) {
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
               id
               meta
               output
@@ -73,6 +71,17 @@ AssayReportEntry = namedtuple(
     'AssayReportEntry',
     'sg_id assay_id assay_file_path analysis_id filesize',
 )
+
+
+@cache
+async def get_analysis_types():
+    """Return the list of analysis types from the enum table."""
+    logging.getLogger().setLevel(logging.WARN)
+    analysis_types = await query_async(ANALYSIS_TYPES_QUERY)
+    logging.getLogger().setLevel(logging.INFO)
+    return analysis_types['enum'][  # pylint: disable=unsubscriptable-object
+        'analysisType'
+    ]
 
 
 class GenericAuditor(AuditHelper):
@@ -289,7 +298,7 @@ class GenericAuditor(AuditHelper):
             {
                 'dataset': self.dataset,
                 'sgIds': sgs_without_crams,
-                'analysisTypes': [t for t in ANALYSIS_TYPES if t != 'CRAM'],
+                'analysisTypes': [t for t in await get_analysis_types() if t != 'cram'],
             },
         )
         logging.getLogger().setLevel(logging.INFO)

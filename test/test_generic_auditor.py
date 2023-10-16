@@ -537,7 +537,25 @@ class TestGenericAuditor(unittest.TestCase):
             'CPGaaa',
         ]
 
-        mock_query.return_value = {
+        mock_analysis_types_query_result = {
+            'enum': {
+                'analysisType': [
+                    'analysis-runner',
+                    'cram',
+                    'custom',
+                    'es-index',
+                    'gvcf',
+                    'joint-calling',
+                    'mito-cram',
+                    'mito_cram',
+                    'qc',
+                    'sv',
+                    'web',
+                ]
+            }
+        }
+
+        mock_sg_analyses_query_result = {
             'sequencingGroups': [
                 {
                     'id': 'CPGaaa',
@@ -553,6 +571,11 @@ class TestGenericAuditor(unittest.TestCase):
                 }
             ]
         }
+
+        mock_query.side_effect = [
+            mock_analysis_types_query_result,
+            mock_sg_analyses_query_result,
+        ]
 
         with self.assertLogs(level='WARNING') as log:
             # catch the warning logs from here and check below
