@@ -121,7 +121,21 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                     {} as { [tMethod in ProportionalDateTemporalMethod]: IPropMapData[] }
                 )
 
-                setAllPropMapData(allGraphData)
+                // if there's only one element in the list, this breaks the stacked area chart, so add
+                // a second entry at 
+                // convert end to date if exists, or use current date
+                const graphEnd = !!end ? new Date(end) : new Date()
+                for (const temporalMethod of Object.keys(allGraphData)) {
+                    const temporalMethodKey = temporalMethod as ProportionalDateTemporalMethod;
+                    if (allGraphData[temporalMethodKey].length === 1) {
+                        allGraphData[temporalMethodKey].push({
+                            ...allGraphData[temporalMethodKey][0],
+                            date: graphEnd,
+                        } as IPropMapData);
+                    }
+                }
+
+                setAllPropMapData(allGraphData);
             })
             .catch((er: Error) => {
                 // @ts-ignore
@@ -180,7 +194,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         const margin = { top: 10, right: 240, bottom: 100, left: 80 }
         const width = graphWidth
         const minHeightForProjects = 25 + (Object.keys(projectSelections || {}).length + 1) * 20
-        const height = Math.min(1200, Math.max(minHeightForProjects, Math.min(900, width * 0.6)))
+        const height = Math.min(950, Math.max(minHeightForProjects, Math.min(500, width * 0.6)))
         const innerWidth = width - margin.left - margin.right
         const innerHeight = height - margin.top - margin.bottom
         const id = '1'

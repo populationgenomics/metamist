@@ -351,4 +351,4 @@ async def get_proportionate_map(
         temporal_methods=temporal_methods,
     )
 
-    return results
+    return {k.value: v for k,v in results.items()}
