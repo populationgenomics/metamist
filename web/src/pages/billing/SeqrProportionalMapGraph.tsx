@@ -4,7 +4,10 @@ import _ from 'lodash'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../sm-api'
 import { Message, Select } from 'semantic-ui-react'
-import { IStackedAreaChartData, StackedAreaChart } from '../../shared/components/Graphs/StackedAreaChart'
+import {
+    IStackedAreaChartData,
+    StackedAreaChart,
+} from '../../shared/components/Graphs/StackedAreaChart'
 
 interface IProportionalDateProjectModel {
     project: string
@@ -22,13 +25,10 @@ interface ISeqrProportionalMapGraphProps {
     end: string
 }
 
-
 const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGraphProps> = ({
     start,
     end,
 }) => {
-    const tooltipRef = React.useRef()
-    const [hovered, setHovered] = React.useState('')
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
 
@@ -38,17 +38,8 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     const [projectSelections, setProjectSelections] = React.useState<
         { [key: string]: boolean } | undefined
     >()
-    const [graphWidth, setGraphWidth] = React.useState<number>(
-        document.getElementById('billing-container')?.clientWidth || 1600
-    )
     const [allPropMapData, setAllPropMapData] =
         React.useState<{ [m in ProportionalDateTemporalMethod]: IStackedAreaChartData[] }>()
-
-    // const [propMap, setPropMap] = React.useState<>()
-
-    function updateWindowWidth() {
-        setGraphWidth(document.getElementById('billing-container')?.clientWidth || 1600)
-    }
 
     function updateProjects(projects: { [key: string]: boolean }) {
         const updatedProjects = { ...(projectSelections || {}), ...projects }
@@ -58,7 +49,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
 
     // @ts-ignore
     const allMethods = Object.keys(ProportionalDateTemporalMethod).map(
-        (key) => ProportionalDateTemporalMethod[key]
+        (key) => ProportionalDateTemporalMethod[key as keyof typeof ProportionalDateTemporalMethod]
     )
 
     function loadPropMap(projects: { [key: string]: boolean } = {}) {
@@ -82,7 +73,6 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         )
             .then((summary) => {
                 setIsLoading(false)
-                updateWindowWidth()
                 const allGraphData: {
                     [tMethod in ProportionalDateTemporalMethod]: IStackedAreaChartData[]
                 } = Object.keys(summary.data).reduce(
@@ -106,21 +96,24 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                     {} as { [tMethod in ProportionalDateTemporalMethod]: IStackedAreaChartData[] }
                 )
 
-                // if there's only one element in the list, this breaks the stacked area chart, so add
-                // a second entry at 
                 // convert end to date if exists, or use current date
                 const graphEnd = !!end ? new Date(end) : new Date()
+
+                // If the graph isn't at endDate, add a second entry at the endDate
+                // so it finishes at endDate for a better visual graph
                 for (const temporalMethod of Object.keys(allGraphData)) {
-                    const temporalMethodKey = temporalMethod as ProportionalDateTemporalMethod;
-                    if (allGraphData[temporalMethodKey].length === 1) {
+                    const temporalMethodKey = temporalMethod as ProportionalDateTemporalMethod
+                    const values = allGraphData[temporalMethodKey]
+                    const lastValue = values[values.length - 1]
+                    if (lastValue.date <= graphEnd) {
                         allGraphData[temporalMethodKey].push({
                             date: graphEnd,
-                            values: allGraphData[temporalMethodKey][0].values,
-                        } as IStackedAreaChartData);
+                            values: lastValue.values,
+                        } as IStackedAreaChartData)
                     }
                 }
 
-                setAllPropMapData(allGraphData);
+                setAllPropMapData(allGraphData)
             })
             .catch((er: Error) => {
                 // @ts-ignore
@@ -169,25 +162,32 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     const selectedProjects: string[] = projectSelections
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
-    window.addEventListener('resize', updateWindowWidth)
 
     let graphComponent: React.ReactElement | undefined = undefined
 
     if (allPropMapData) {
-        graphComponent = <StackedAreaChart
-            keys={selectedProjects}
-            data={allPropMapData[temporalMethod]}
-
-            start={new Date(start)}
-            end={new Date(end)}
-            isPercentage={true}
-        />
+        graphComponent = (
+            <StackedAreaChart
+                keys={selectedProjects}
+                data={allPropMapData[temporalMethod]}
+                start={new Date(start)}
+                end={new Date(end)}
+                isPercentage={true}
+            />
+        )
     }
 
     return (
         <>
             <h5>Seqr proportional costs</h5>
-            {isLoading && <LoadingDucks />}
+            {isLoading && (
+                <>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
+                    </p>
+                </>
+            )}
             {error && <Message negative>{error}</Message>}
             <Select
                 options={allMethods.map((m) => ({

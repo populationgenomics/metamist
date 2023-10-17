@@ -1,5 +1,3 @@
-
-
 import {
     scaleLinear,
     extent,
@@ -55,27 +53,45 @@ function getTimeInterval(timeDiffMinutes: number) {
     return utcMonth.every(3)
 }
 
-export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({ data, keys, start, end, isPercentage }) => {
-
+export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({
+    data,
+    keys,
+    start,
+    end,
+    isPercentage,
+}) => {
     const tooltipRef = React.useRef()
+    const containerDivRef = React.useRef<HTMLDivElement>()
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
-    const [graphWidth, setGraphWidth] = React.useState<number>(
-        document.getElementById('billing-container')?.clientWidth || 1600
-    )
+    const [graphWidth, setGraphWidth] = React.useState<number>(768)
 
-    const _start = start || _.min(data.map(d => d.date))
-    const _end = end || _.max(data.map(d => d.date))
+    const _start = start || _.min(data.map((d) => d.date))
+    const _end = end || _.max(data.map((d) => d.date))
 
-    function updateWindowWidth() {
-        setGraphWidth(document.getElementById('billing-container')?.clientWidth || 1600)
-    }
+    React.useEffect(() => {
+        function updateWindowWidth() {
+            setGraphWidth(containerDivRef.current?.clientWidth || 768)
+        }
+        if (containerDivRef.current) {
+            updateWindowWidth()
+        }
+        window.addEventListener('resize', updateWindowWidth)
+
+        return () => {
+            window.removeEventListener('resize', updateWindowWidth)
+        }
+    }, [])
 
     if (!_start || !_end) {
-        return <Message error>Start ({start}) / End ({end}) were not valid</Message>
+        return (
+            <Message error>
+                Start ({start}) / End ({end}) were not valid
+            </Message>
+        )
     }
 
     const margin = { top: 10, right: 240, bottom: 100, left: 80 }
-    const width = 500
+    const width = graphWidth
 
     const minHeightForProjects = 25 + (keys.length + 1) * 20
 
@@ -85,7 +101,9 @@ export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({ data, keys,
     const id = '1'
 
     // d3 function that turns the data into stacked proportions
-    const stackedData = stack().offset(stackOffsetExpand).keys(keys)(data.map(d => ({ date: d.date, ...d.values })))
+    const stackedData = stack().offset(stackOffsetExpand).keys(keys)(
+        data.map((d) => ({ date: d.date, ...d.values }))
+    )
     // function for generating the x Axis
     // domain refers to the min and max of the data (in this case earliest and latest dates)
     // range refers to the min and max pixel positions on the screen
@@ -124,8 +142,13 @@ export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({ data, keys,
             select(tooltipDiv).transition().duration(200).style('opacity', 0.9)
             select(tooltipDiv)
                 .html(
-                    `<h4>${key} - ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}</h4>
-                    <h6>${getDisplayValue(prevValue, isPercentage)} &#8594; ${getDisplayValue(newValue, isPercentage)}</h6>
+                    `<h4>${key} - ${date.getDate()}/${
+                        date.getMonth() + 1
+                    }/${date.getFullYear()}</h4>
+                    <h6>${getDisplayValue(prevValue, isPercentage)} &#8594; ${getDisplayValue(
+                        newValue,
+                        isPercentage
+                    )}</h6>
                     `
                 )
                 .style('left', `${pos[0] + 95}px`)
@@ -140,116 +163,110 @@ export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({ data, keys,
         }
     }
 
-    return <div>
-        <div
-            className="tooltip"
-            ref={tooltipRef}
-            style={{
-                position: 'absolute',
-                textAlign: 'center',
-                padding: '2px',
-                font: '12px sans-serif',
-                background: 'lightsteelblue',
-                border: '0px',
-                borderRadius: '8px',
-                pointerEvents: 'none',
-                opacity: 0,
-            }}
-        />
-        <svg id={id} width={width} height={height}>
-            {/* transform and translate move the relative (0,0) so you can draw accurately. Consider svg as a cartesian plane with (0, 0) top left and positive directions left and down the page
+    return (
+        <div ref={containerDivRef}>
+            <div
+                className="tooltip"
+                ref={tooltipRef}
+                style={{
+                    position: 'absolute',
+                    textAlign: 'center',
+                    padding: '2px',
+                    font: '12px sans-serif',
+                    background: 'lightsteelblue',
+                    border: '0px',
+                    borderRadius: '8px',
+                    pointerEvents: 'none',
+                    opacity: 0,
+                }}
+            />
+            <svg id={id} width={width} height={height}>
+                {/* transform and translate move the relative (0,0) so you can draw accurately. Consider svg as a cartesian plane with (0, 0) top left and positive directions left and down the page
 then to draw in svg you just need to give coordinates. We've specified the width and height above so this svg 'canvas' can be drawn on anywhere between pixel 0 and the max height and width pixels */}
-            <g transform={`translate(${margin.left}, ${margin.top})`}>
-                {/* x-axis */}
-                <g id={`${id}-x-axis`}>
-                    {/* draws the little ticks marks off the x axis + labels
+                <g transform={`translate(${margin.left}, ${margin.top})`}>
+                    {/* x-axis */}
+                    <g id={`${id}-x-axis`}>
+                        {/* draws the little ticks marks off the x axis + labels
          xScale.ticks() generates a list of evenly spaces ticks from min to max domain
          You can pass an argument to ticks() to specify number of ticks to generate
          Calling xScale(tick) turns a tick value into a pixel position to be drawn
          eg in the domain [2000, 2010] and range[0, 200] passing 2005 would be 50% of the way across the domain so 50% of the way between min and max specified pixel positions so it would draw at 100
          */}
-                    {xScale.ticks(interval).map((tick) => (
-                        <g
-                            key={`x-tick-${tick.toString()}`}
-                            transform={`translate(${xScale(tick)}, ${innerHeight})`}
-                        >
-                            <text
-                                y={8}
-                                transform="translate(0, 10)rotate(-45)"
-                                textAnchor="end"
-                                alignmentBaseline="middle"
-                                fontSize={14}
-                                cursor="help"
+                        {xScale.ticks(interval).map((tick) => (
+                            <g
+                                key={`x-tick-${tick.toString()}`}
+                                transform={`translate(${xScale(tick)}, ${innerHeight})`}
                             >
-                                {/* change this for different date formats */}
-                                {`${tick.toLocaleString('en-us', { month: 'short', year: 'numeric' })}`}
-                            </text>
-                            {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
-                            <line y2={6} stroke="black" />
-                        </g>
-                    ))}
-                </g>
+                                <text
+                                    y={8}
+                                    transform="translate(0, 10)rotate(-45)"
+                                    textAnchor="end"
+                                    alignmentBaseline="middle"
+                                    fontSize={14}
+                                    cursor="help"
+                                >
+                                    {/* change this for different date formats */}
+                                    {`${tick.toLocaleString('en-us', {
+                                        month: 'short',
+                                        year: 'numeric',
+                                    })}`}
+                                </text>
+                                {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
+                                <line y2={6} stroke="black" />
+                            </g>
+                        ))}
+                    </g>
 
-                {/* y-axis (same as above) */}
-                <g id={`${id}-y-axis`}>
-                    {yScale.ticks().map((tick) => (
-                        <g key={tick} transform={`translate(0, ${yScale(tick)})`}>
-                            <text
-                                key={tick}
-                                textAnchor="end"
-                                alignmentBaseline="middle"
-                                fontSize={14}
-                                fontWeight={600}
-                                x={-8}
-                                y={3}
-                            >
-                                {tick * 100}%
-                            </text>
-                            <line x2={-3} stroke="black" />
-                        </g>
-                    ))}
-                </g>
+                    {/* y-axis (same as above) */}
+                    <g id={`${id}-y-axis`}>
+                        {yScale.ticks().map((tick) => (
+                            <g key={tick} transform={`translate(0, ${yScale(tick)})`}>
+                                <text
+                                    key={tick}
+                                    textAnchor="end"
+                                    alignmentBaseline="middle"
+                                    fontSize={14}
+                                    fontWeight={600}
+                                    x={-8}
+                                    y={3}
+                                >
+                                    {getDisplayValue(tick, isPercentage)}
+                                </text>
+                                <line x2={-3} stroke="black" />
+                            </g>
+                        ))}
+                    </g>
 
-                {/* stacked areas */}
-                <g id={`${id}-stacked-areas`}>
-                    {/* for each 'project', draws a path (using path function) and fills it a new colour (using colour function) */}
-                    {stackedData.map((area, i) => (
-                        <React.Fragment key={`bigArea-${i}`}>
-                            {area.map((region, j) => {
-                                // don't draw an extra area at the end
-                                if (j + 1 >= area.length) {
-                                    return (
-                                        <React.Fragment key={`${i}-${j}`}></React.Fragment>
-                                    )
-                                }
-                                const areas = area.slice(j, j + 2)
-                                // don't draw empty areas
-                                if (
-                                    areas[0][1] - areas[0][0] === 0 &&
-                                    areas[1][1] - areas[1][0] === 0
-                                ) {
-                                    return (
-                                        <React.Fragment key={`${i}-${j}`}></React.Fragment>
-                                    )
-                                }
+                    {/* stacked areas */}
+                    <g id={`${id}-stacked-areas`}>
+                        {/* for each 'project', draws a path (using path function) and fills it a new colour (using colour function) */}
+                        {stackedData.map((area, i) => (
+                            <React.Fragment key={`bigArea-${i}`}>
+                                {area.map((region, j) => {
+                                    // don't draw an extra area at the end
+                                    if (j + 1 >= area.length) {
+                                        return <React.Fragment key={`${i}-${j}`}></React.Fragment>
+                                    }
+                                    const areas = area.slice(j, j + 2)
+                                    // don't draw empty areas
+                                    if (
+                                        areas[0][1] - areas[0][0] === 0 &&
+                                        areas[1][1] - areas[1][0] === 0
+                                    ) {
+                                        return <React.Fragment key={`${i}-${j}`}></React.Fragment>
+                                    }
 
-                                const colour = interpolateRainbow(i / keys.length)
-                                // @ts-ignore
-                                const key = keys[i]
-                                const date = data[i].date
-                                // const colour = colors[i]
-                                return (
-                                    <path
-                                        key={`${i}-${j}`}
-                                        d={areaGenerator(areas)}
-                                        style={{
-                                            fill: colour,
-                                            stroke: colour,
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            select(e.target).style('opacity', 0.6)
-                                        }}
-                                        onMouseMove={(e) =>
+                                    const colour = interpolateRainbow(i / keys.length)
+                                    // @ts-ignore
+                                    const key = keys[i]
+                                    const date = data[j]?.date
+                                    // const colour = colors[i]
+                                    const kwargs: React.SVGProps<SVGPathElement> = {}
+                                    if (date) {
+                                        kwargs.onMouseEnter = (e) => {
+                                            select(e.currentTarget).style('opacity', 0.6)
+                                        }
+                                        kwargs.onMouseMove = (e) => {
                                             mouseover(
                                                 e,
                                                 areas[0][1] - areas[0][0],
@@ -258,103 +275,114 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                                 date
                                             )
                                         }
-                                        onMouseLeave={(e) => {
-                                            select(e.target).style('opacity', 1)
+
+                                        kwargs.onMouseLeave = (e) => {
+                                            select(e.currentTarget).style('opacity', 1)
                                             mouseout()
-                                        }}
-                                    />
-                                )
-                            })}
+                                        }
+                                    }
+                                    return (
+                                        <path
+                                            key={`${i}-${j}`}
+                                            d={areaGenerator(areas)}
+                                            style={{
+                                                fill: colour,
+                                                stroke: colour,
+                                            }}
+                                            {...kwargs}
+                                        />
+                                    )
+                                })}
+                            </React.Fragment>
+                        ))}
+
+                        {stackedData.map((area, i) => {
+                            const areaStart = area.findIndex((p) => p[1] - p[0])
+                            // debugger
+                            if (areaStart === -1) {
+                                return <React.Fragment key={`bigArea-${i}`}></React.Fragment>
+                            }
+                            return (
+                                <path
+                                    key={`bigArea-${i}`}
+                                    d={areaGenerator(
+                                        area.slice(
+                                            // clamp at the start to avoid unintentional wraparound
+                                            Math.max(0, areaStart - 1),
+                                            area.length + 1
+                                        )
+                                    )}
+                                    style={{
+                                        stroke: i === hoveredIndex ? 'black' : 'none',
+                                        strokeWidth: i === hoveredIndex ? 2 : 'none',
+                                        opacity: i === hoveredIndex ? 1 : 0,
+                                        fill: 'none',
+                                    }}
+                                />
+                            )
+                        })}
+                    </g>
+
+                    {/* draws the main x axis line */}
+                    <line
+                        y1={`${innerHeight}`}
+                        y2={`${innerHeight}`}
+                        x2={`${innerWidth}`}
+                        stroke="black"
+                    />
+
+                    {/* draws the main y axis line */}
+                    <line y2={`${innerHeight}`} stroke="black" />
+
+                    {/* x-axis label */}
+                    <g id={`${id}-x-axis-label`}>
+                        <text
+                            x={`${innerWidth / 2}`}
+                            y={innerHeight + 80}
+                            fontSize={20}
+                            textAnchor="middle"
+                        >
+                            {'Date'}
+                        </text>
+                    </g>
+
+                    {/* y-axis label */}
+                    <g
+                        id={`${id}-y-axis-label`}
+                        transform={`rotate(-90) translate(-${innerHeight / 2}, -60)`}
+                    >
+                        <text textAnchor="middle" fontSize={20}>
+                            {'Proportion'}
+                        </text>
+                    </g>
+                </g>
+                <g transform={`translate(${width - margin.right + 30}, ${margin.top + 15})`}>
+                    <text fontSize={20}>Projects</text>
+                    {keys.map((project, i) => (
+                        <React.Fragment key={`${project}-key`}>
+                            <g
+                                transform={`translate(0, ${25 + i * 20})`}
+                                onMouseEnter={() => {
+                                    setHoveredIndex(i)
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredIndex(null)
+                                }}
+                            >
+                                <circle
+                                    // cy={25 + i * 25}
+                                    cx={10}
+                                    r={8}
+                                    fill={interpolateRainbow(i / keys.length)}
+                                />
+                                <text key={`${project}-legend`} x={30} y={5}>
+                                    {project}
+                                </text>
+                            </g>
                         </React.Fragment>
                     ))}
-
-                    {stackedData.map((area, i) => {
-                        const areaStart = area.findIndex((p) => p[1] - p[0])
-                        // debugger
-                        if (areaStart === -1) {
-                            return <React.Fragment key={`bigArea-${i}`}></React.Fragment>
-                        }
-                        return (
-                            <path
-                                key={`bigArea-${i}`}
-                                d={areaGenerator(
-                                    area.slice(
-                                        // clamp at the start to avoid unintentional wraparound
-                                        Math.max(0, areaStart - 1),
-                                        area.length + 1
-                                    )
-                                )}
-                                style={{
-                                    stroke: i === hoveredIndex ? 'black' : 'none',
-                                    strokeWidth: i === hoveredIndex ? 2 : 'none',
-                                    opacity: i === hoveredIndex ? 1 : 0,
-                                    fill: 'none',
-                                }}
-                            />
-                        )
-                    })}
                 </g>
-
-                {/* draws the main x axis line */}
-                <line
-                    y1={`${innerHeight}`}
-                    y2={`${innerHeight}`}
-                    x2={`${innerWidth}`}
-                    stroke="black"
-                />
-
-                {/* draws the main y axis line */}
-                <line y2={`${innerHeight}`} stroke="black" />
-
-                {/* x-axis label */}
-                <g id={`${id}-x-axis-label`}>
-                    <text
-                        x={`${innerWidth / 2}`}
-                        y={innerHeight + 80}
-                        fontSize={20}
-                        textAnchor="middle"
-                    >
-                        {'Date'}
-                    </text>
-                </g>
-
-                {/* y-axis label */}
-                <g
-                    id={`${id}-y-axis-label`}
-                    transform={`rotate(-90) translate(-${innerHeight / 2}, -60)`}
-                >
-                    <text textAnchor="middle" fontSize={20}>
-                        {'Proportion'}
-                    </text>
-                </g>
-            </g>
-            <g transform={`translate(${width - margin.right + 30}, ${margin.top + 15})`}>
-                <text fontSize={20}>Projects</text>
-                {keys.map((project, i) => (
-                    <React.Fragment key={`${project}-key`}>
-                        <g
-                            transform={`translate(0, ${25 + i * 20})`}
-                            onMouseEnter={() => {
-                                setHoveredIndex(i)
-                            }}
-                            onMouseLeave={() => {
-                                setHoveredIndex(null)
-                            }}
-                        >
-                            <circle
-                                // cy={25 + i * 25}
-                                cx={10}
-                                r={8}
-                                fill={interpolateRainbow(i / keys.length)}
-                            />
-                            <text key={`${project}-legend`} x={30} y={5}>
-                                {project}
-                            </text>
-                        </g>
-                    </React.Fragment>
-                ))}
-            </g>
-        </svg>
-    </div>
-
+            </svg>
+        </div>
+    )
 }
