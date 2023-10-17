@@ -9,7 +9,9 @@ cloudpathlib
 requests
 google-auth>=2.19.0
 google-cloud-secret-manager==2.8.0
+google-cloud-bigquery==3.11.4
 google-cloud-logging==2.7.0
+google-cloud-pubsub==2.18.3
 google-cloud-storage==1.43.0
 uvicorn==0.18.3
 fastapi[all]==0.85.1
