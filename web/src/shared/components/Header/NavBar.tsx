@@ -14,6 +14,39 @@ import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
 import SwaggerIcon from '../SwaggerIcon'
 import './NavBar.css'
 
+const menuItems = [
+    {
+        title: 'Explore',
+        url: '/project',
+        icon: <ExploreIcon />,
+    },
+    {
+        title: 'Analysis Runner',
+        url: '/analysis-runner',
+        icon: <InsightsIcon />,
+    },
+    {
+        title: 'Billing',
+        url: '/billing',
+        icon: <InsightsIcon />,
+    },
+    {
+        title: 'Swagger',
+        url: '/swagger',
+        icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />
+    },
+    {
+        title: 'Docs',
+        url: '/documentation',
+        icon: <DescriptionIcon />,
+    },
+    {
+        title: 'GraphQL',
+        url: '/graphql',
+        icon: <BuildIcon />,
+    }
+]
+
 const NavBar: React.FunctionComponent = () => (
     <header className="App-header">
         <div className="header">
@@ -25,58 +58,19 @@ const NavBar: React.FunctionComponent = () => (
                 <span className="d-none d-lg-block">METAMIST</span>
             </Link>
 
-            <Link to="/project">
-                <span className="d-none d-lg-block navbarLink">Explore</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<ExploreIcon />} hoverable position="bottom center">
-                        <h5>Explore</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/analysis-runner">
-                <span className="d-none d-lg-block navbarLink">Analysis Runner</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<InsightsIcon />} hoverable position="bottom center">
-                        <h5>Analysis Runner</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/billing">
-                <span className="d-none d-lg-block navbarLink">Billing</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<InsightsIcon />} hoverable position="bottom center">
-                        <h5>Billing</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/swagger">
-                <span className="d-none d-lg-block navbarLink">Swagger</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup
-                        trigger={<SwaggerIcon height={22} style={{ marginTop: '2px' }} />}
-                        hoverable
-                        position="bottom center"
-                    >
-                        <h5>Swagger</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/documentation">
-                <span className="d-none d-lg-block navbarLink">Docs</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<DescriptionIcon />} hoverable position="bottom center">
-                        <h5>Docs</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <a href="/graphql">
-                <span className="d-none d-lg-block navbarLink">GraphQL</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<BuildIcon />} hoverable position="bottom center">
-                        <h5>GraphQL</h5>
-                    </Popup>
-                </span>
-            </a>
+            {menuItems.map((item, index) => {
+                return (
+                    <Link to={item.url} key={index}>
+                        <span className="d-none d-lg-block navbarLink">{item.title}</span>
+                        <span className="d-lg-none navbarIcon">
+                            <Popup trigger={<ExploreIcon />} hoverable position="bottom center">
+                                <h5>{item.title}</h5>
+                            </Popup>
+                        </span>
+                    </Link>
+                )
+            })}
+
             <div style={{ marginLeft: 'auto' }}>
                 <DarkModeTriButton />
             </div>
