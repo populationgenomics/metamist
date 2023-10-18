@@ -1,3 +1,5 @@
+from collections import Counter
+from typing import Any
 from google.cloud import bigquery
 
 from models.models import (
@@ -5,6 +7,7 @@ from models.models import (
     BillingTotalCostRecord,
     BillingTotalCostQueryModel,
     BillingColumn,
+    BillingCostBudgetRecord,
 )
 
 from db.python.gcp_connect import BqDbBase
@@ -109,6 +112,13 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.get_total_cost(query)
+
+    async def get_running_cost(self) -> list[BillingCostBudgetRecord]:
+        """
+        Get Running costs including monthly budget
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_running_cost()
 
 
 class BillingDb(BqDbBase):
@@ -424,3 +434,223 @@ class BillingDb(BqDbBase):
 
         # return empty list if no record found
         return []
+
+    async def get_budget(
+        self,
+    ) -> dict[str, float] | None:
+        """
+        Get budget for all topics
+        """
+        _query = f"""
+        SELECT topic, budget
+        FROM `{BQ_GCP_BILLING_PROJECT}.billing.budget_by_project_montly`
+        """
+
+        query_job_result = list(self._connection.connection.query(_query).result())
+
+        if query_job_result:
+            return {row.topic: row.budget for row in query_job_result}
+
+        return None
+
+    async def get_running_cost(
+        self,
+    ) -> list[BillingCostBudgetRecord]:
+        """
+        Get currently running cost of seelected topics
+        """
+
+        # by default look at the normal view
+        view_to_use = BQ_AGGREG_VIEW
+
+        budget = await self.get_budget()
+
+        # TODO for production change to select current day, month
+        start_day = "2023-03-01"
+        current_day = "2023-03-10"
+
+        _query = f"""
+        SELECT
+            month.topic,
+            month.cost_category,
+            month.cost as monthly_cost,
+            day.cost as daily_cost
+        FROM
+        (
+            SELECT
+            *
+            FROM
+            (
+                SELECT
+                topic,
+                cost_category,
+                SUM(cost) as cost
+                FROM
+                `{view_to_use}`
+                WHERE day >= TIMESTAMP(@start_day) AND
+                day <= TIMESTAMP(@current_day)
+                GROUP BY
+                topic,
+                cost_category
+            )
+            WHERE
+            cost > 0.1
+        ) month
+        LEFT JOIN (
+            SELECT
+                topic,
+                cost_category,
+                SUM(cost) as cost
+            FROM
+            `{view_to_use}`
+            WHERE day > TIMESTAMP_ADD(
+                TIMESTAMP(@current_day), INTERVAL -2 DAY
+            ) AND day <=  TIMESTAMP(@current_day)
+            GROUP BY
+                topic,
+                cost_category
+        ) day 
+        ON month.topic = day.topic
+        AND month.cost_category = day.cost_category
+        ORDER BY topic ASC, daily_cost DESC;
+        """
+
+        query_parameters = []
+
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+        )
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('current_day', 'STRING', current_day),
+        )
+
+        print(_query)
+
+        # TODO some all as '_All projects:_',
+        """
+        Costs are Compute (C), Storage (S) and Total (T) by the past 24h and then by month.
+        Sorted by percent used (if > 52%) followed by sum of daily cost descendin
+        
+        Projects  24h cost/Month cost (% used)
+        All projects:           C: 459 S: 270  / T: 10771
+        
+        hail-295901:            C: 191   S: 0.86  / T: 2162 (31%)
+        seqr-308602:            C: 70.17 S: 32.31 / T: 1681 (16%)
+        
+        
+        Table:
+        Project, 24h Compute cost, 24H Storage cost, Acc Monthly cost, % of Budget used
+        
+        order by daily total desc
+        """
+
+        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
+
+        results = []
+        if query_job_result:
+            # prepare data
+            total_monthly = {'C': Counter(), 'S': Counter()}
+            total_daily = {'C': Counter(), 'S': Counter()}
+            topic_details = {}  # detail category cost for each topic
+            total_monthly_category = Counter()
+            total_daily_category = Counter()
+            for row in query_job_result:
+                if row.topic not in topic_details:
+                    topic_details[row.topic] = []
+
+                topic_details[row.topic].append(
+                    {
+                        'cost_group': 'S'
+                        if row.cost_category == 'Cloud Storage'
+                        else 'C',
+                        'cost_category': row.cost_category,
+                        'daily_cost': row.daily_cost,
+                        'monthly_cost': row.monthly_cost,
+                    }
+                )
+
+                total_monthly_category[row.cost_category] += row.monthly_cost
+                if row.daily_cost:
+                    total_daily_category[row.cost_category] += row.daily_cost
+
+                # cost groups S/C
+                if row.cost_category == 'Cloud Storage':
+                    total_monthly['S']['ALL'] += row.monthly_cost
+                    total_monthly['S'][row.topic] += row.monthly_cost
+                    if row.daily_cost:
+                        total_daily['S']['ALL'] += row.daily_cost
+                        total_daily['S'][row.topic] += row.daily_cost
+                else:
+                    total_monthly['C']['ALL'] += row.monthly_cost
+                    total_monthly['C'][row.topic] += row.monthly_cost
+                    if row.daily_cost:
+                        total_daily['C']['ALL'] += row.daily_cost
+                        total_daily['C'][row.topic] += row.daily_cost
+
+            # add total
+            # construct ALL projects details
+            all_details = []
+            for cat, mth_cost in total_monthly_category.items():
+                all_details.append(
+                    {
+                        'cost_group': 'S' if cat == 'Cloud Storage' else 'C',
+                        'cost_category': cat,
+                        'daily_cost': total_daily_category[cat],
+                        'monthly_cost': mth_cost,
+                    }
+                )
+
+            results.append(
+                {
+                    'topic': 'All projects',
+                    'total_monthly': (
+                        total_monthly['C']['ALL'] + total_monthly['S']['ALL']
+                    ),
+                    'total_daily': total_daily['C']['ALL'] + total_daily['S']['ALL'],
+                    'compute_monthly': total_monthly['C']['ALL'],
+                    'compute_daily': total_daily['C']['ALL'],
+                    'storage_monthly': total_monthly['S']['ALL'],
+                    'storage_daily': total_daily['S']['ALL'],
+                    'budget': None,
+                    'monthly_percent': None,
+                    'details': all_details,
+                }
+            )
+
+            # add by topic, sort by daily total desc
+            for topic, details in topic_details.items():
+                topic_budget = budget.get(topic, None)
+                compute_daily = (
+                    total_daily['C'][topic] if topic in total_daily['C'] else 0
+                )
+                storage_daily = (
+                    total_daily['S'][topic] if topic in total_daily['S'] else 0
+                )
+                compute_monthly = (
+                    total_monthly['C'][topic] if topic in total_monthly['C'] else 0
+                )
+                storage_monthly = (
+                    total_monthly['S'][topic] if topic in total_monthly['S'] else 0
+                )
+                monthly = compute_monthly + storage_monthly
+                results.append(
+                    {
+                        'topic': topic,
+                        'total_monthly': monthly,
+                        'total_daily': (compute_daily + storage_daily),
+                        'compute_monthly': compute_monthly,
+                        'compute_daily': compute_daily,
+                        'storage_monthly': storage_monthly,
+                        'storage_daily': storage_daily,
+                        'budget': topic_budget,
+                        'monthly_percent': 100 * monthly / topic_budget
+                        if topic_budget
+                        else None,
+                        'details': details,
+                    }
+                )
+
+        return results
