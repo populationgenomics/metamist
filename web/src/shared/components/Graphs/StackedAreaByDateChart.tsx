@@ -142,21 +142,27 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     ) => {
         const tooltipDiv = tooltipRef.current
         const pos = pointer(event)
-        if (tooltipDiv) {
-            select(tooltipDiv).transition().duration(200).style('opacity', 0.9)
-            select(tooltipDiv)
-                .html(
-                    `<h4>${key} - ${date.getDate()}/${date.getMonth() + 1
-                    }/${date.getFullYear()}</h4>
-                    <h6>${getDisplayValue(prevValue, isPercentage)} &#8594; ${getDisplayValue(
-                        newValue,
-                        isPercentage
-                    )}</h6>
-                    `
-                )
-                .style('left', `${pos[0] + 95}px`)
-                .style('top', `${pos[1] + 100}px`)
+        if (!tooltipDiv) {
+            return
         }
+
+        select(tooltipDiv).transition().duration(200).style('opacity', 0.9)
+        select(tooltipDiv)
+            .html(
+                `<h4>
+                    ${key} - ${date.getDate()}/
+                    ${date.getMonth() + 1}/
+                    ${date.getFullYear()}
+                </h4>
+                <h6>
+                    ${getDisplayValue(prevValue, isPercentage)}
+                    &#8594;
+                    ${getDisplayValue(newValue, isPercentage)}
+                </h6>
+                `
+            )
+            .style('left', `${pos[0] + 95}px`)
+            .style('top', `${pos[1] + 100}px`)
     }
 
     const mouseout = () => {

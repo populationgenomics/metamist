@@ -93,7 +93,9 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                             },
                         })),
                     }),
-                    {} as { [tMethod in ProportionalDateTemporalMethod]: IStackedAreaByDateChartData[] }
+                    {} as {
+                        [tMethod in ProportionalDateTemporalMethod]: IStackedAreaByDateChartData[]
+                    }
                 )
 
                 // convert end to date if exists, or use current date
