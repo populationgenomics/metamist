@@ -5,9 +5,9 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../sm-api'
 import { Message, Select } from 'semantic-ui-react'
 import {
-    IStackedAreaChartData,
-    StackedAreaChart,
-} from '../../shared/components/Graphs/StackedAreaChart'
+    IStackedAreaByDateChartData,
+    StackedAreaByDateChart,
+} from '../../shared/components/Graphs/StackedAreaByDateChart'
 
 interface IProportionalDateProjectModel {
     project: string
@@ -39,7 +39,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         { [key: string]: boolean } | undefined
     >()
     const [allPropMapData, setAllPropMapData] =
-        React.useState<{ [m in ProportionalDateTemporalMethod]: IStackedAreaChartData[] }>()
+        React.useState<{ [m in ProportionalDateTemporalMethod]: IStackedAreaByDateChartData[] }>()
 
     function updateProjects(projects: { [key: string]: boolean }) {
         const updatedProjects = { ...(projectSelections || {}), ...projects }
@@ -74,7 +74,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             .then((summary) => {
                 setIsLoading(false)
                 const allGraphData: {
-                    [tMethod in ProportionalDateTemporalMethod]: IStackedAreaChartData[]
+                    [tMethod in ProportionalDateTemporalMethod]: IStackedAreaByDateChartData[]
                 } = Object.keys(summary.data).reduce(
                     (prev, tMethod) => ({
                         ...prev,
@@ -93,7 +93,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                             },
                         })),
                     }),
-                    {} as { [tMethod in ProportionalDateTemporalMethod]: IStackedAreaChartData[] }
+                    {} as { [tMethod in ProportionalDateTemporalMethod]: IStackedAreaByDateChartData[] }
                 )
 
                 // convert end to date if exists, or use current date
@@ -109,7 +109,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                         allGraphData[temporalMethodKey].push({
                             date: graphEnd,
                             values: lastValue.values,
-                        } as IStackedAreaChartData)
+                        } as IStackedAreaByDateChartData)
                     }
                 }
 
@@ -163,20 +163,6 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
-    let graphComponent: React.ReactElement | undefined = undefined
-
-    if (allPropMapData) {
-        graphComponent = (
-            <StackedAreaChart
-                keys={selectedProjects}
-                data={allPropMapData[temporalMethod]}
-                start={new Date(start)}
-                end={new Date(end)}
-                isPercentage={true}
-            />
-        )
-    }
-
     return (
         <>
             <h5>Seqr proportional costs</h5>
@@ -200,7 +186,13 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                     setTemporalMethod(value as ProportionalDateTemporalMethod)
                 }}
             />
-            {graphComponent}
+            <StackedAreaByDateChart
+                keys={selectedProjects}
+                data={allPropMapData?.[temporalMethod]}
+                start={new Date(start)}
+                end={new Date(end)}
+                isPercentage={true}
+            />
         </>
     )
 }

@@ -17,16 +17,16 @@ import _ from 'lodash'
 import React from 'react'
 import { Message } from 'semantic-ui-react'
 
-export interface IStackedAreaChartData {
+export interface IStackedAreaByDateChartData {
     date: Date
     values: { [key: string]: number }
 }
 
-interface IStackedAreaChartProps {
+interface IStackedAreaByDateChartProps {
     start?: Date
     end?: Date
 
-    data: IStackedAreaChartData[]
+    data?: IStackedAreaByDateChartData[]
     keys: string[]
     isPercentage: boolean
 }
@@ -53,13 +53,17 @@ function getTimeInterval(timeDiffMinutes: number) {
     return utcMonth.every(3)
 }
 
-export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({
+export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     data,
     keys,
     start,
     end,
     isPercentage,
 }) => {
+    if (!data || data.length === 0) {
+        return <React.Fragment />
+    }
+
     const tooltipRef = React.useRef()
     const containerDivRef = React.useRef<HTMLDivElement>()
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null)
@@ -142,8 +146,7 @@ export const StackedAreaChart: React.FC<IStackedAreaChartProps> = ({
             select(tooltipDiv).transition().duration(200).style('opacity', 0.9)
             select(tooltipDiv)
                 .html(
-                    `<h4>${key} - ${date.getDate()}/${
-                        date.getMonth() + 1
+                    `<h4>${key} - ${date.getDate()}/${date.getMonth() + 1
                     }/${date.getFullYear()}</h4>
                     <h6>${getDisplayValue(prevValue, isPercentage)} &#8594; ${getDisplayValue(
                         newValue,
