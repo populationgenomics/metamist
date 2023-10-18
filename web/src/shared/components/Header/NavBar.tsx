@@ -63,7 +63,7 @@ const NavBar: React.FunctionComponent = () => (
                     <Link to={item.url} key={index}>
                         <span className="d-none d-lg-block navbarLink">{item.title}</span>
                         <span className="d-lg-none navbarIcon">
-                            <Popup trigger={<ExploreIcon />} hoverable position="bottom center">
+                            <Popup trigger={item.icon} hoverable position="bottom center">
                                 <h5>{item.title}</h5>
                             </Popup>
                         </span>
