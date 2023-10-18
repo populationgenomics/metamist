@@ -23,7 +23,7 @@ from models.models import (
     NestedSequencingGroupInternal,
     SearchItem,
     FamilySimpleInternal,
-    ProjectsSummaryInternal,
+    ProjectSeqrStatsInternal,
 )
 from models.models.web import ProjectSummaryInternal, WebProject
 
@@ -46,16 +46,16 @@ class WebLayer(BaseLayer):
             grid_filter=grid_filter, token=token, limit=limit
         )
 
-    async def get_projects_summary(
+    async def get_project_seqr_stats(
         self,
         projects: list[int],
         sequencing_types: list[str],
-    ) -> list[ProjectsSummaryInternal]:
+    ) -> list[ProjectSeqrStatsInternal]:
         """
         Get summary and analysis stats for a list of projects
         """
         webprojectsdb = WebProjectsSummaryDb(self.connection)
-        return await webprojectsdb.get_projects_summary(
+        return await webprojectsdb.get_projects_seqr_stats(
             projects=projects, sequencing_types=sequencing_types
         )
 
@@ -283,7 +283,7 @@ GROUP BY
     #         """
     #         return _latest_joint_call_by_project_id_and_seq_type
 
-    async def get_projects_summary(
+    async def get_projects_seqr_stats(
         self, projects: list[int], sequencing_types: list[str]
     ):
         """ """
@@ -323,7 +323,7 @@ GROUP BY
             project = await ptable.get_project_by_id(pid)
             for sequencing_type in sequencing_types:
                 response.append(
-                    ProjectsSummaryInternal(
+                    ProjectSeqrStatsInternal(
                         project=project.id,
                         dataset=project.name,
                         sequencing_type=sequencing_type,

@@ -21,6 +21,7 @@ metamist/*
 !sample_metadata/audit/
 !metamist/parser
 !metamist/audit
+ingestion_metadata/
 
 *.egg-info/
 db/liquibase.jar
@@ -59,3 +60,4 @@ web/src/__generated__
 
 # pulumi config files
 Pulumi*.yaml
+ingestion_metadata/

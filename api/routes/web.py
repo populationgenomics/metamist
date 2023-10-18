@@ -7,17 +7,22 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from api.utils.db import (
-    get_project_readonly_connection,
-    get_projectless_db_connection,
-    get_project_write_connection,
     Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
+    get_projectless_db_connection,
 )
 from db.python.layers.search import SearchLayer
 from db.python.layers.seqr import SeqrLayer
-from db.python.layers.web import WebLayer, SearchItem
+from db.python.layers.web import SearchItem, WebLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.search import SearchResponse
-from models.models.web import ProjectsSummaryInternal, ProjectSummary, PagingLinks
+from models.models.web import (
+    PagingLinks,
+    ProjectSeqrStats,
+    ProjectSeqrStatsInternal,
+    ProjectSummary,
+)
 
 
 class SearchResponseModel(BaseModel):
@@ -125,59 +130,74 @@ async def sync_seqr_project(
         # return {'success': False, 'message': str(e)}
 
 
-@router.post('/projects-summary', operation_id='getProjectsSummary')
-async def get_projects_summary(
+@router.post(
+    '/projects-seqr-stats',
+    operation_id='getProjectsSeqrStats',
+    response_model=list[ProjectSeqrStats],
+)
+async def get_projects_seqr_stats(
     projects: list[int] = None, sequencing_types: list[str] = None
 ):
     """
-    Get the project summaries
+    Get the seqr project stats for a list of projects
     """
-    summaries = [
-        ProjectsSummaryInternal(
-            project=1,
-            dataset='test-dataset-1',
-            sequencing_type='genome',
-            total_families=1,
-            total_participants=3,
-            total_samples=3,
-            total_sequencing_groups=3,
-            total_crams=3,
-            latest_es_index_id=1,
-            total_sgs_in_latest_es_index=3,
-            latest_annotate_dataset_id=2,
-            total_sgs_in_latest_annotate_dataset=3,
-        ),
-        ProjectsSummaryInternal(
-            project=1,
-            dataset='test-dataset-1',
-            sequencing_type='exome',
-            total_families=1,
-            total_participants=1,
-            total_samples=1,
-            total_sequencing_groups=1,
-            total_crams=1,
-            latest_es_index_id=3,
-            total_sgs_in_latest_es_index=1,
-            latest_annotate_dataset_id=4,
-            total_sgs_in_latest_annotate_dataset=1,
-        ),
-        ProjectsSummaryInternal(
-            project=2,
-            dataset='test-dataset-2',
-            sequencing_type='genome',
-            total_families=5,
-            total_participants=5,
-            total_samples=5,
-            total_sequencing_groups=5,
-            total_crams=4,
-            latest_es_index_id=3,
-            total_sgs_in_latest_es_index=4,
-            latest_annotate_dataset_id=6,
-            total_sgs_in_latest_annotate_dataset=4,
-        ),
-    ]
+    summaries = []
+    if 1 in projects:
+        summaries.append(
+            ProjectSeqrStatsInternal(
+                project=1,
+                dataset='greek-myth',
+                sequencing_type='genome',
+                total_families=1,
+                total_participants=3,
+                total_samples=3,
+                total_sequencing_groups=3,
+                total_crams=3,
+                latest_es_index_id=1,
+                total_sgs_in_latest_es_index=3,
+                latest_annotate_dataset_id=2,
+                total_sgs_in_latest_annotate_dataset=3,
+            )
+        )
+    if 2 in projects:
+        summaries.append(
+            ProjectSeqrStatsInternal(
+                project=2,
+                dataset='test-dataset-2',
+                sequencing_type='exome',
+                total_families=1,
+                total_participants=1,
+                total_samples=1,
+                total_sequencing_groups=1,
+                total_crams=1,
+                latest_es_index_id=3,
+                total_sgs_in_latest_es_index=1,
+                latest_annotate_dataset_id=4,
+                total_sgs_in_latest_annotate_dataset=1,
+            )
+        )
+    if 3 in projects:
+        summaries.append(
+            ProjectSeqrStatsInternal(
+                project=3,
+                dataset='test-dataset-3',
+                sequencing_type='genome',
+                total_families=5,
+                total_participants=5,
+                total_samples=5,
+                total_sequencing_groups=5,
+                total_crams=4,
+                latest_es_index_id=3,
+                total_sgs_in_latest_es_index=4,
+                latest_annotate_dataset_id=6,
+                total_sgs_in_latest_annotate_dataset=4,
+            )
+        )
 
-    return [s.to_external() for s in summaries]
-    return await WebLayer(get_projectless_db_connection).get_projects_summary(
-        sequencing_types=sequencing_types
-    )
+    if not summaries:
+        return []
+
+    return [s.to_external(links={}) for s in summaries]
+    # return await WebLayer(get_projectless_db_connection).get_project_seqr_stats(
+    #     sequencing_types=sequencing_types
+    # )

@@ -23,7 +23,7 @@ class PagingLinks(SMBase):
 
 
 @dataclasses.dataclass
-class ProjectsSummaryInternal:
+class ProjectSeqrStatsInternal:
     """Return class for the projects summary endpoint"""
 
     project: int
@@ -41,7 +41,7 @@ class ProjectsSummaryInternal:
 
     def to_external(self, links):
         """Convert to transport model"""
-        return ProjectsSummary(
+        return ProjectSeqrStats(
             project=self.project,
             dataset=self.dataset,
             sequencing_type=self.sequencing_type,
@@ -58,7 +58,7 @@ class ProjectsSummaryInternal:
         )
 
 
-class ProjectsSummary:
+class ProjectSeqrStats(SMBase):
     """Return class for the projects summary endpoint"""
 
     project: int
@@ -77,7 +77,7 @@ class ProjectsSummary:
     links: PagingLinks | None
 
     class Config:
-        """Config for ProjectsSummaryResponse"""
+        """Config for ProjectSeqrStatsResponse"""
 
         fields = {'links': '_links'}
 

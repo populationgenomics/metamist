@@ -58,7 +58,7 @@ from models.models.web import (
     ProjectSummary,
     ProjectSummaryInternal,
     WebProject,
-    ProjectSummary,
+    ProjectSeqrStats,
     PagingLinks,
-    ProjectsSummaryInternal,
+    ProjectSeqrStatsInternal,
 )

@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM --platform=linux/amd64 debian:buster-slim
 
 ARG SM_ENVIRONMENT
 
