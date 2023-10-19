@@ -12,6 +12,7 @@ from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
     AssayUpsertInternal,
+    ProportionalDateTemporalMethod,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
@@ -178,7 +179,8 @@ class TestAnalysis(DbIsolatedTest):
         )
 
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[self.project_id]
+            project_ids=[self.project_id],
+            temporal_methods=[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE],
         )
         expected = {
             'project': self.project_id,
@@ -194,8 +196,12 @@ class TestAnalysis(DbIsolatedTest):
         }
 
         # Check output is formatted correctly
-        self.assertEqual(1, len(result))
-        self.assertDictEqual(expected, result[0])
+        self.assertEqual(
+            1, len(result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE])
+        )
+        self.assertDictEqual(
+            expected, result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE][0]
+        )
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_single_sample_double_sg(self):
@@ -246,9 +252,12 @@ class TestAnalysis(DbIsolatedTest):
 
         # Assert that the exome size was added correctly
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[self.project_id]
+            project_ids=[self.project_id],
+            temporal_methods=[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE],
         )
-        self.assertDictEqual(expected, result[0])
+        self.assertDictEqual(
+            expected, result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE][0]
+        )
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_exclusive_date_range(self):
@@ -261,10 +270,12 @@ class TestAnalysis(DbIsolatedTest):
         # that is doesn't show up in the map
         yesterday = today - timedelta(days=3)
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[self.project_id], end_date=yesterday
+            project_ids=[self.project_id],
+            end_date=yesterday,
+            temporal_methods=[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE],
         )
 
-        self.assertEqual([], result)
+        self.assertEqual([], result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE])
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_newer_sample(self):
@@ -306,9 +317,12 @@ class TestAnalysis(DbIsolatedTest):
         }
 
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[self.project_id]
+            project_ids=[self.project_id],
+            temporal_methods=[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE],
         )
-        self.assertDictEqual(expected, result[0])
+        self.assertDictEqual(
+            expected, result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE][0]
+        )
 
     @run_as_sync
     async def test_get_sequencing_group_file_sizes_two_samples(self):
@@ -384,6 +398,12 @@ class TestAnalysis(DbIsolatedTest):
         }
 
         result = await self.al.get_sequencing_group_file_sizes(
-            project_ids=[self.project_id]
+            project_ids=[self.project_id],
+            temporal_methods=[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE],
         )
-        self.assertDictEqual(expected, result[0])
+        self.assertDictEqual(
+            expected, result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE][0]
+        )
+        self.assertDictEqual(
+            expected, result[ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE][0]
+        )

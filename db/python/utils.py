@@ -1,11 +1,10 @@
+import dataclasses
+import json
 import logging
 import os
 import re
-import json
-import dataclasses
 from enum import Enum
-from typing import Sequence, TypeVar, Generic, Any
-
+from typing import Any, Generic, Sequence, TypeVar
 
 T = TypeVar('T')
 ProjectId = int
@@ -144,9 +143,14 @@ class GenericFilter(Generic[T]):
         if self.in_ is not None:
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
-            k = self.generate_field_name(_column_name + '_in')
-            conditionals.append(f'{column} IN :{k}')
-            values[k] = self._sql_value_prep(self.in_)
+            if len(self.in_) == 1:
+                k = self.generate_field_name(_column_name + '_in_eq')
+                conditionals.append(f'{column} = :{k}')
+                values[k] = self._sql_value_prep(self.in_[0])
+            else:
+                k = self.generate_field_name(_column_name + '_in')
+                conditionals.append(f'{column} IN :{k}')
+                values[k] = self._sql_value_prep(self.in_)
         if self.nin is not None:
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')

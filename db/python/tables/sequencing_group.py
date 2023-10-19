@@ -213,6 +213,23 @@ class SequencingGroupTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
 
+    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+        """
+        Get a map of {internal_sg_id: sample_date_created} for list of sg_ids
+        """
+        if len(sequencing_group_ids) == 0:
+            return {}
+
+        _query = """
+        SELECT sg.id, min(s.row_start)
+        FROM sequencing_group sg
+        INNER JOIN sample s ON s.id = sg.sample_id
+        WHERE sg.id in :sgids
+        GROUP BY sg.id
+        """
+        rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
+        return {r[0]: r[1].date() for r in rows}
+
     async def get_sequencing_groups_by_analysis_ids(
         self, analysis_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[SequencingGroupInternal]]]:
