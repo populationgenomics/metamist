@@ -488,9 +488,11 @@ class GraphQLSequencingGroup:
         if project:
             ptable = ProjectPermissionsTable(connection.connection)
             project_ids = project.all_values()
-            project_id_map = await ptable.get_project_ids_from_names_and_user(
+            projects = await ptable.get_and_check_access_to_projects_for_names(
                 user=connection.author, project_names=project_ids, readonly=True
             )
+            project_id_map = {p.name: p.id for p in projects}
+
         analyses = await loader.load(
             {
                 'id': root.internal_id,
