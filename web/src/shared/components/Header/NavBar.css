@@ -9,22 +9,22 @@
     /* height: 50px; */
 }
 
-.metamist {
-    font-family: 'Raleway', sans-serif;
+.App-header a {
     color: white;
-    font-size: 28px;
-    /* display: inline-block; */
+    text-decoration: none;
 }
 
-.header {
+.ui.header.menu {
     background-color: #24344f;
     display: flex;
     align-items: center;
     padding: 0px 80px 0px 80px;
+    box-shadow: none;
+    border: none;
 }
 
-.metamist-img {
-    vertical-align: bottom;
+.ui.header.menu>.navitem {
+    padding: 0px;
 }
 
 .navbarLink {
@@ -38,9 +38,22 @@
 .navbarIcon {
     padding: 0 8px;
     display: inline-block;
+    color: #f2f2f2;
 }
 
-.App-header a {
+#metamist {
+    font-family: 'Raleway', sans-serif;
     color: white;
-    text-decoration: none;
+    font-size: 28px;
+    padding: 0px;
+}
+
+#metamist-img {
+    vertical-align: bottom;
+    padding: 0px;
+
+    &:hover {
+        cursor: pointer;
+        background-color: #24344f;
+    }
 }
