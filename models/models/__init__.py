@@ -3,6 +3,9 @@ from models.models.analysis import (
     AnalysisInternal,
     DateSizeModel,
     ProjectSizeModel,
+    ProportionalDateModel,
+    ProportionalDateProjectModel,
+    ProportionalDateTemporalMethod,
     SequencingGroupSizeModel,
 )
 from models.models.assay import (
@@ -58,4 +61,10 @@ from models.models.web import (
     ProjectSummary,
     ProjectSummaryInternal,
     WebProject,
+)
+from models.models.billing import (
+    BillingRowRecord,
+    BillingTotalCostRecord,
+    BillingTotalCostQueryModel,
+    BillingColumn,
 )

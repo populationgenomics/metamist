@@ -8,6 +8,7 @@ from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
+from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     Connection,
     get_project_readonly_connection,
@@ -20,7 +21,11 @@ from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models.analysis import Analysis, AnalysisInternal, ProjectSizeModel
+from models.models.analysis import (
+    Analysis,
+    AnalysisInternal,
+    ProportionalDateTemporalMethod,
+)
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
@@ -307,52 +312,44 @@ async def get_sample_reads_map(
     )
 
 
-@router.get('/sample-file-sizes', operation_id='getSequencingGroupFileSizes')
-async def get_sequencing_group_file_sizes(
-    project_names: list[str] = Query(None),  # type: ignore
-    start_date: str = None,
-    end_date: str = None,
+@router.post(
+    '/cram-proportionate-map',
+    operation_id='getProportionateMap',
+    # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
+)
+async def get_proportionate_map(
+    start: str,
+    projects: list[str],
+    temporal_methods: list[ProportionalDateTemporalMethod],
+    sequencing_types: list[str] | None = None,
+    end: str = None,
     connection: Connection = get_projectless_db_connection,
-) -> list[ProjectSizeModel]:
+):
     """
-    Get the per sample file size by type over the given projects and date range
+    Get proportionate map of project sizes over time, specifying the temporal
+    methods to use. These will be given back as:
+    {
+        [temporalMethod]: {
+            date: Date,
+            projects: [{ project: string, percentage: float, size: int }]
+        }
+    }
     """
+    pt = ProjectPermissionsTable(connection=connection.connection)
+    project_ids = await pt.get_project_ids_from_names_and_user(
+        connection.author, projects, readonly=True
+    )
 
-    raise NotImplementedError('This route is broken, and not properly implemented yet')
-    # atable = AnalysisLayer(connection)
+    start_date = parse_date_only_string(start) if start else None
+    end_date = parse_date_only_string(end) if end else None
 
-    # # Check access to projects
-    # project_ids = None
-    # pt = ProjectPermissionsTable(connection=connection.connection)
-    # project_ids = await pt.get_project_ids_from_names_and_user(
-    #     connection.author, project_names, readonly=True
-    # )
+    at = AnalysisLayer(connection)
+    results = await at.get_cram_size_proportionate_map(
+        projects=project_ids,
+        sequencing_types=sequencing_types,
+        start_date=start_date,
+        end_date=end_date,
+        temporal_methods=temporal_methods,
+    )
 
-    # # Map from internal pids to project name
-    # prj_name_map = dict(zip(project_ids, project_names))
-
-    # # Convert dates
-    # start = parse_date_only_string(start_date)
-    # end = parse_date_only_string(end_date)
-
-    # # Get results with internal ids as keys
-    # results = await atable.get_sequencing_group_file_sizes(
-    #     project_ids=project_ids, start_date=start, end_date=end
-    # )
-
-    # # Convert to the correct output type, converting internal ids to external
-    # fixed_pids: list[Any] = [
-    #     ProjectSizeModel(
-    #         project=prj_name_map[project_data['project']],
-    #         samples=[
-    #             SequencingGroupSizeModel(
-    #                 sample=sample_id_format(s['sample']),
-    #                 dates=[DateSizeModel(**d) for d in s['dates']],
-    #             )
-    #             for s in project_data['samples']
-    #         ],
-    #     )
-    #     for project_data in results
-    # ]
-
-    # return fixed_pids
+    return {k.value: v for k, v in results.items()}

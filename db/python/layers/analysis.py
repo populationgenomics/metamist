@@ -1,17 +1,22 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-from db.python.tables.analysis import AnalysisTable, AnalysisFilter
+from db.python.tables.analysis import AnalysisFilter, AnalysisTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import get_logger, GenericFilter
+from db.python.utils import GenericFilter, get_logger
 from models.enums import AnalysisStatus
-from models.models.analysis import AnalysisInternal
+from models.models import (
+    AnalysisInternal,
+    ProportionalDateModel,
+    ProportionalDateProjectModel,
+    ProportionalDateTemporalMethod,
+)
 
 logger = get_logger()
 
@@ -120,55 +125,133 @@ class AnalysisLayer(BaseLayer):
 
         return analyses
 
+    async def get_sg_history_for_temporal_method(
+        self,
+        sequencing_group_ids: list[int],
+        temporal_method: ProportionalDateTemporalMethod,
+    ) -> dict[int, date]:
+        """Get the history of samples for the given temporal method"""
+        sglayer = SequencingGroupLayer(self.connection)
+
+        if temporal_method == ProportionalDateTemporalMethod.SAMPLE_CREATE_DATE:
+            return await sglayer.get_samples_create_date_from_sgs(sequencing_group_ids)
+        if temporal_method == ProportionalDateTemporalMethod.SG_ES_INDEX_DATE:
+            return await self.at.get_sg_add_to_project_es_index(
+                sg_ids=sequencing_group_ids
+            )
+
+        raise NotImplementedError(
+            f'Have not implemented {temporal_method.value} temporal method yet'
+        )
+
+    @staticmethod
+    def _sg_history_keep_sg_group(
+        sgid: int, sg_history: dict[int, date], start_date, end_date
+    ):
+        """Keep the sequencing group for prop map based on the params"""
+        d = sg_history.get(sgid)
+        if not d:
+            return False
+        if start_date and d <= start_date:
+            return True
+        if end_date and d <= end_date:
+            return True
+        if not start_date and not end_date:
+            return True
+        return False
+
     async def get_sequencing_group_file_sizes(
         self,
+        temporal_methods: list[ProportionalDateTemporalMethod],
         project_ids: list[int] = None,
         start_date: date = None,
         end_date: date = None,
-    ) -> list[dict]:
+        sequencing_types: list[str] = None,
+    ) -> dict[ProportionalDateTemporalMethod, list[dict]]:
         """
         Get the file sizes from all the given projects group by sample filtered
         on the date range
         """
 
+        if not temporal_methods:
+            return {}
+
         # Get samples from pids
         sglayer = SequencingGroupLayer(self.connection)
-        sequencing_groups = await sglayer.query(
-            SequencingGroupFilter(project=GenericFilter(in_=project_ids))
+        sgfilter = SequencingGroupFilter(
+            project=GenericFilter(in_=project_ids),
+            type=GenericFilter(in_=sequencing_types) if sequencing_types else None,
         )
 
-        sequencing_group_ids = [sg.id for sg in sequencing_groups]
+        sequencing_groups = await sglayer.query(sgfilter)
+        sg_to_project = {sg.id: sg.project for sg in sequencing_groups}
 
-        # Get sample history
-        history = await sglayer.get_sequencing_groups_create_date(sequencing_group_ids)
-
-        def keep_sequencing_group(sid):
-            d = history[sid]
-            if start_date and d <= start_date:
-                return True
-            if end_date and d <= end_date:
-                return True
-            if not start_date and not end_date:
-                return True
-            return False
-
-        # Get size of analysis crams
-        filtered_sequencing_group_ids = list(
-            filter(keep_sequencing_group, sequencing_group_ids)
-        )
-        if not filtered_sequencing_group_ids:
-            # if there are no sequencing group IDs, the query analysis treats that
-            # as not including a filter (so returns all for the project IDs)
-            return []
         crams = await self.at.query(
             AnalysisFilter(
-                sequencing_group_id=GenericFilter(in_=filtered_sequencing_group_ids),
+                sequencing_group_id=GenericFilter(in_=list(sg_to_project.keys())),
                 type=GenericFilter(eq='cram'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
             )
         )
+
+        sg_history_by_method = {}
+        # Get size of analysis crams
+        for method in temporal_methods:
+            sg_history_by_method[method] = await self.get_sg_date_sizes_for_method(
+                sg_to_project=sg_to_project,
+                method=method,
+                start_date=start_date,
+                end_date=end_date,
+                crams=crams,
+            )
+        return sg_history_by_method
+
+    async def get_sg_date_sizes_for_method(
+        self,
+        sg_to_project: dict,
+        method: ProportionalDateTemporalMethod,
+        start_date: date,
+        end_date: date | None,
+        crams: list[AnalysisInternal],
+    ):
+        """
+        Take the params, determine the history method to use,
+        and return the format:
+
+        {
+            {
+                'project': p,
+                'sequencing_groups': [
+
+                ]
+            project_id: {
+                sg_id: [{
+                    'start': date,
+                    'end': date | None
+                    'size': size,
+                }]
+            }
+        }
+        """
+        method_history = await self.get_sg_history_for_temporal_method(
+            sequencing_group_ids=list(sg_to_project.keys()), temporal_method=method
+        )
+        filtered_sequencing_group_ids = {
+            sgid
+            for sgid in sg_to_project
+            if self._sg_history_keep_sg_group(
+                sgid=sgid,
+                sg_history=method_history,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        }
+        if not filtered_sequencing_group_ids:
+            # if there are no sequencing group IDs, the query analysis treats that
+            # as not including a filter (so returns all for the project IDs)
+            return []
+
         crams_by_project: dict[int, dict[int, list[dict]]] = defaultdict(dict)
-        sg_by_id = {s.id: s for s in sequencing_groups}
 
         # Manual filtering to find the most recent analysis cram of each sequence type
         # for each sample
@@ -179,28 +262,168 @@ class AnalysisLayer(BaseLayer):
                 affected_analyses.append(cram)
                 continue
 
+            sgid = int(sgids[0])
+            if sgid not in filtered_sequencing_group_ids:
+                continue
+
+            # Allow for multiple crams per sample in the future
+            # even though for now we only support 1
+            if sgid not in method_history:
+                # sometimes we might find crams that actually shouldn't
+                # be included in the cost yet, we can skip them :)
+                continue
+
             if size := cram.meta.get('size'):
-                sgid = int(sgids[0])
-                sg = sg_by_id.get(sgid)
-                if not sg:
-                    affected_analyses.append(cram)
-                    continue
+                if project := sg_to_project.get(sgid):
+                    crams_by_project[project][sgid] = [
+                        {
+                            'start': method_history[sgid],
+                            'end': None,  # TODO: add functionality for deleted samples
+                            'size': size,
+                        }
+                    ]
 
-                # Allow for multiple crams per sample in the future
-                # even though for now we only support 1
-                crams_by_project[sg.project][sgid] = [
-                    {
-                        'start': history[sgid],
-                        'end': None,  # TODO: add functionality for deleted samples
-                        'size': size,
-                    }
-                ]
-
-        formated = [
+        return [
             {'project': p, 'sequencing_groups': crams_by_project[p]}
             for p in crams_by_project
         ]
-        return formated
+
+    async def get_cram_size_proportionate_map(
+        self,
+        projects: list[ProjectId],
+        sequencing_types: list[str] | None,
+        temporal_methods: list[ProportionalDateTemporalMethod],
+        start_date: date = None,
+        end_date: date = None,
+    ) -> dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]]:
+        """
+        This is a bit more complex, but we want to generate a map of cram size by day,
+        based on the temporal_method (sample create date, joint call date).
+            NB: Can't use the align date because the data is not good enough
+        """
+        # sanity checks
+        if not start_date:
+            raise ValueError('start_date must be set')
+        if end_date and start_date and end_date < start_date:
+            raise ValueError('end_date must be after start_date')
+
+        if start_date < date(2020, 1, 1):
+            raise ValueError('start_date must be after 2020-01-01')
+
+        end_date_date = None
+        if end_date:
+            if isinstance(end_date, date):
+                end_date_date = end_date
+            elif isinstance(end_date, datetime):
+                end_date_date = end_date.date()
+            else:
+                raise ValueError('end_date must be a date or datetime')
+
+        project_objs = await self.ptable.get_projects_by_ids(projects)
+        project_name_map = {p.id: p.name for p in project_objs}
+
+        sg_sizes_by_method_by_project = await self.get_sequencing_group_file_sizes(
+            project_ids=projects,
+            start_date=start_date,
+            end_date=end_date,
+            sequencing_types=sequencing_types,
+            temporal_methods=temporal_methods,
+        )
+
+        results: dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]] = {}
+        for (
+            method,
+            sequencing_group_sizes_by_project,
+        ) in sg_sizes_by_method_by_project.items():
+            results[
+                method
+            ] = self.get_cram_size_proportionate_map_from_sequencing_group_sizes(
+                sequencing_group_sizes_by_project=sequencing_group_sizes_by_project,
+                project_name_map=project_name_map,
+                start_date=start_date,
+                end_date=end_date_date,
+            )
+
+        return results
+
+    def get_cram_size_proportionate_map_from_sequencing_group_sizes(
+        self,
+        sequencing_group_sizes_by_project: list[dict],
+        project_name_map: dict[int, str],
+        start_date: date,
+        end_date: date = None,
+    ):
+        """
+        Turn the sequencing_group_sizes_project into a proportionate map
+
+        We'll do this in three steps:
+
+        1. First assign the cram a {dataset: total_size} map on the relevant day.
+            This generates a diff of each dataset by day.
+
+        2. Iterate over the days, and progressively sum up the sizes in the map.
+
+        3. Iterate over the days, and proportion each day by total size in the day.
+        """
+        by_date_diff: dict[date, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+        # 1.
+        for obj in sequencing_group_sizes_by_project:
+            project_name = project_name_map.get(obj['project'])
+            for sg_dates in obj['sequencing_groups'].values():
+                sizes_dates: list[tuple[date, int]] = []
+                for obj in sg_dates:
+                    obj_date = obj['start']
+                    size = int(obj['size'])
+                    if end_date and start_date > end_date:
+                        continue
+                    if len(sizes_dates) > 0:
+                        # subtract last size to get the difference
+                        # if the crams got smaller, this number will be negative
+                        size -= sizes_dates[-1][1]
+
+                    adjusted_start_date = obj_date
+                    if start_date and obj_date < start_date:
+                        adjusted_start_date = start_date
+                    by_date_diff[adjusted_start_date][project_name] += size
+                    sizes_dates.append((adjusted_start_date, size))
+
+        # 2: progressively sum up the sizes, prepping for step 3
+
+        by_date_totals: list[tuple[date, dict[str, int]]] = []
+        sorted_days = list(sorted(by_date_diff.items(), key=lambda el: el[0]))
+        for idx, (dt, project_map) in enumerate(sorted_days):
+            if idx == 0:
+                by_date_totals.append((dt, project_map))
+                continue
+
+            new_project_map = {**by_date_totals[idx - 1][1]}
+
+            for pn, cram_size in project_map.items():
+                if pn not in new_project_map:
+                    new_project_map[pn] = cram_size
+                else:
+                    new_project_map[pn] += cram_size
+
+            by_date_totals.append((dt, new_project_map))
+
+        # 3: proportion each day
+        prop_map: list[ProportionalDateModel] = []
+        for dt, project_map in by_date_totals:
+            total_size = sum(project_map.values())
+            for_date = ProportionalDateModel(date=dt, projects=[])
+            for project_name, size in project_map.items():
+                for_date.projects.append(
+                    ProportionalDateProjectModel(
+                        project=project_name,
+                        percentage=float(size) / total_size,
+                        size=size,
+                    )
+                )
+
+            prop_map.append(for_date)
+
+        return prop_map
 
     # CREATE / UPDATE
 
