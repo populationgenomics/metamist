@@ -9,6 +9,7 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
+import BillingDashboard from './pages/billing/BillingDashboard'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -61,6 +62,15 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <SampleView />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="billing"
+            element={
+                <ErrorBoundary>
+                    <BillingDashboard />
                 </ErrorBoundary>
             }
         />
