@@ -1,7 +1,6 @@
 """
 Billing routes
 """
-from typing import Any
 from fastapi import APIRouter
 from async_lru import alru_cache
 

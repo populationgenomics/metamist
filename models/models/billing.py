@@ -240,14 +240,12 @@ class BillingCostBudgetRecord(SMBase):
     compute_daily: Decimal | None
     storage_monthly: Decimal | None
     storage_daily: Decimal | None
-    budget: Decimal | None
-    monthly_percent: Decimal | None
     details: list[BillingCostDetailsRecord] | None
 
     @staticmethod
     def from_json(record):
         """Create BillingTopicCostCategoryRecord from json"""
-        return BillingTotalCostRecord(
+        return BillingCostBudgetRecord(
             topic=record.get('topic'),
             total_monthly=record.get('total_monthly'),
             total_daily=record.get('total_daily'),
@@ -255,8 +253,6 @@ class BillingCostBudgetRecord(SMBase):
             compute_daily=record.get('compute_daily'),
             storage_monthly=record.get('storage_monthly'),
             storage_daily=record.get('storage_daily'),
-            budget=record.get('budget'),
-            monthly_percent=record.get('monthly_percent'),
             details=[
                 BillingCostDetailsRecord.from_json(row) for row in record.get('details')
             ],
