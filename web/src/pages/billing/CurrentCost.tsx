@@ -150,17 +150,21 @@ const CurrentCost = () => {
                                 {HEADER_FIELDS.map((k) => {
                                     switch (k.category) {
                                         case 'topic':
-                                            return <SUITable.Cell>{p[k.category]}</SUITable.Cell>
+                                            return (
+                                                <SUITable.Cell>
+                                                    <b>{p[k.category]}</b>
+                                                </SUITable.Cell>
+                                            )
                                         case 'monthly_percent':
                                             return (
                                                 <SUITable.Cell>
-                                                    {percFormat(p[k.category])}
+                                                    <b>{percFormat(p[k.category])}</b>
                                                 </SUITable.Cell>
                                             )
                                         default:
                                             return (
                                                 <SUITable.Cell>
-                                                    {currencyFormat(p[k.category])}
+                                                    <b>{currencyFormat(p[k.category])}</b>
                                                 </SUITable.Cell>
                                             )
                                     }
@@ -178,22 +182,18 @@ const CurrentCost = () => {
                                         key={p.topic}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell>
-                                            <code>
-                                                {dk.cost_category} ({dk.cost_group})
-                                            </code>
-                                        </SUITable.Cell>
+                                        <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
 
                                         {dk.cost_group === 'C' ? (
                                             <React.Fragment>
                                                 <SUITable.Cell>
-                                                    <code>{currencyFormat(dk.daily_cost)}</code>
+                                                    {currencyFormat(dk.daily_cost)}
                                                 </SUITable.Cell>
 
                                                 <SUITable.Cell colspan="2" />
 
                                                 <SUITable.Cell>
-                                                    <code>{currencyFormat(dk.monthly_cost)}</code>
+                                                    {currencyFormat(dk.monthly_cost)}
                                                 </SUITable.Cell>
                                                 <SUITable.Cell colspan="2" />
                                             </React.Fragment>
@@ -201,12 +201,12 @@ const CurrentCost = () => {
                                             <React.Fragment>
                                                 <SUITable.Cell />
                                                 <SUITable.Cell>
-                                                    <code>{currencyFormat(dk.daily_cost)}</code>
+                                                    {currencyFormat(dk.daily_cost)}
                                                 </SUITable.Cell>
 
                                                 <SUITable.Cell colspan="2" />
                                                 <SUITable.Cell>
-                                                    <code>{currencyFormat(dk.monthly_cost)}</code>
+                                                    {currencyFormat(dk.monthly_cost)}
                                                 </SUITable.Cell>
                                                 <SUITable.Cell />
                                             </React.Fragment>
