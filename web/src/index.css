@@ -46,6 +46,7 @@ html[data-theme='dark-mode'] {
     --color-check-green: #659251;
     --color-table-header: rgba(0, 0, 0, 0.15);
 }
+
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
 html[data-theme='dark-mode'] .swagger-ui {
     filter: invert(88%) hue-rotate(180deg);
@@ -61,18 +62,18 @@ html[data-theme='dark-mode'] .ui.selection.dropdown {
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.selection.visible.dropdown > .text:not(.default) {
+html[data-theme='dark-mode'] .ui.selection.visible.dropdown>.text:not(.default) {
     color: rgba(255, 255, 255, 0.87);
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
+html[data-theme='dark-mode'] .ui.dropdown .menu>.item {
     background-color: #353535;
     color: rgba(255, 255, 255, 0.87);
     border: none;
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu > .item:hover {
+html[data-theme='dark-mode'] .ui.dropdown .menu>.item:hover {
     background-color: #2c2c2c;
     z-index: 10;
 }
@@ -122,6 +123,7 @@ blockquote {
   max-width: 768px;
   margin: calc(50px + 1vmin) auto 0 auto; */
     padding: 80px;
+    padding-top: 40px;
 }
 
 @media screen and (min-width: 1200px) {
@@ -154,6 +156,7 @@ html[data-theme='dark-mode'] .ui.styled.accordion .content {
     background-color: #353535;
     border-color: rgba(255, 255, 255, 0.87);
 }
+
 html[data-theme='dark-mode'] .ui.styled.accordion .title {
     background-color: #242424;
     color: rgba(255, 255, 255, 0.87);

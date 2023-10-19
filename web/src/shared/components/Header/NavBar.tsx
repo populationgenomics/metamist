@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, Dropdown, Popup } from 'semantic-ui-react'
+import { Icon, Menu, Dropdown, Popup } from 'semantic-ui-react'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
@@ -8,6 +8,7 @@ import Searchbar from './Search'
 import MuckTheDuck from '../MuckTheDuck'
 import SwaggerIcon from '../SwaggerIcon'
 import HomeIcon from '@mui/icons-material/Home'
+import MenuIcon from '@mui/icons-material/Menu'
 import ExploreIcon from '@mui/icons-material/Explore'
 import InsightsIcon from '@mui/icons-material/Insights'
 import TableRowsIcon from '@mui/icons-material/TableRows'
@@ -77,59 +78,48 @@ interface MenuItemProps {
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
-    const theme = React.useContext(ThemeContext)
-
     return item.submenu ? (
-        <Dropdown className="navitem navbarLink" text={item.title} key={index}>
-            <Dropdown.Menu>
-                {item.submenu.map((subitem, subindex) => (
-                    <Dropdown.Item as={Link} to={subitem.url} key={subindex}>
-                        <span className="d-none d-lg-block navbarLink">{subitem.title}</span>
-                        <span className="d-lg-none navbarIcon">
-                            <Popup trigger={subitem.icon} hoverable position="bottom center">
-                                <h5>{subitem.title}</h5>
-                            </Popup>
-                        </span>
-                    </Dropdown.Item>
-                ))}
-            </Dropdown.Menu>
-
-            {/* <span className="d-none d-lg-block navbarLink">{item.title}</span>
-            <span className="d-lg-none navbarIcon">
-                <Popup trigger={item.icon} hoverable position="bottom center">
-                    <h5>{item.title}</h5>
-                </Popup>
-            </span> */}
-        </Dropdown>
+        <Menu.Item className="navItem">
+            <Dropdown text={item.title} key={index}>
+                <Dropdown.Menu>
+                    {item.submenu.map((subitem, subindex) => (
+                        <Dropdown.Item as={Link} className="navItem dropitem" to={subitem.url} key={subindex}>
+                            {subitem.title}
+                        </Dropdown.Item>
+                    ))}
+                </Dropdown.Menu>
+            </Dropdown>
+        </Menu.Item>
     ) : (
-        <Menu.Item as={Link} className="navitem" to={item.url} key={index}>
-            <span className="d-none d-lg-block navbarLink">{item.title}</span>
-            <span className="d-lg-none navbarIcon">
-                <Popup trigger={item.icon} hoverable position="bottom center">
-                    <h5>{item.title}</h5>
-                </Popup>
-            </span>
+        <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
+            {item.title}
         </Menu.Item>
     )
 }
 
-const NavBar: React.FC = () => (
+interface NavBarProps {
+    fixed?: boolean
+}
+
+const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
     <header className="App-header">
-        <Menu className="header">
+        <Menu className="header" stackable>
             <Menu.Item as={Link} id="metamist-img" to="/">
                 <MuckTheDuck height={28} style={{ marginRight: '5px' }} />
-            </Menu.Item>
-
-            <Menu.Item as={Link} id="metamist" to="/">
                 METAMIST
             </Menu.Item>
 
             {menuItems.map((item, index) => <MenuItem index={index} item={item} />)}
 
-            <div style={{ marginLeft: 'auto' }}>
-                <DarkModeTriButton />
-            </div>
-            <Searchbar />
+            <Menu.Menu position="right">
+                <Menu.Item>
+                    <DarkModeTriButton />
+                </Menu.Item>
+
+                <Menu.Item>
+                    <Searchbar />
+                </Menu.Item>
+            </Menu.Menu>
         </Menu>
     </header >
 )
