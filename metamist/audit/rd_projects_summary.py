@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# pylint: disable=unsubscriptable-object,too-many-nested-blocks,too-many-locals,consider-using-with
+# pylint: disable=unsubscriptable-object,too-many-nested-blocks,too-many-locals,consider-using-with,too-many-branches,too-many-statements
 
 """
 This script goes through the Rare Disease datasets in Metamist, and finds all families, participants,
@@ -22,7 +22,11 @@ from metamist.audit.audithelper import AuditHelper
 from metamist.apis import ProjectApi
 
 proj_api = ProjectApi()
-RD_DATASETS = [dataset for dataset in proj_api.get_my_projects() if 'test' not in dataset and 'training' not in dataset]
+RD_DATASETS = [
+    dataset
+    for dataset in proj_api.get_my_projects()
+    if 'test' not in dataset and 'training' not in dataset
+]
 
 CSV_FIELDS = [
     'Dataset',
@@ -218,7 +222,6 @@ def get_web_reports(datasets: list[str]):
             mito_report = False
 
             sg_id = sg['id']
-            sg['type']
             web_analyses = sg['analyses']
             if not web_analyses:
                 sg_web_reports[sg_id] = None

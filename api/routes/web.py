@@ -19,8 +19,8 @@ from db.python.tables.project import ProjectPermissionsTable
 from models.models.search import SearchResponse
 from models.models.web import (
     PagingLinks,
+    ProjectSeqrDetails,
     ProjectSeqrStats,
-    ProjectSeqrStatsInternal,
     ProjectSummary,
 )
 
@@ -136,68 +136,37 @@ async def sync_seqr_project(
     response_model=list[ProjectSeqrStats],
 )
 async def get_projects_seqr_stats(
-    projects: list[int] = None, sequencing_types: list[str] = None
+    projects: list[int] = None,
+    sequencing_types: list[str] = None,
+    connection: Connection = get_projectless_db_connection,
 ):
     """
     Get the seqr project stats for a list of projects
     """
-    summaries = []
-    if 1 in projects:
-        summaries.append(
-            ProjectSeqrStatsInternal(
-                project=1,
-                dataset='greek-myth',
-                sequencing_type='genome',
-                total_families=1,
-                total_participants=3,
-                total_samples=3,
-                total_sequencing_groups=3,
-                total_crams=3,
-                latest_es_index_id=1,
-                total_sgs_in_latest_es_index=3,
-                latest_annotate_dataset_id=2,
-                total_sgs_in_latest_annotate_dataset=3,
-            )
-        )
-    if 2 in projects:
-        summaries.append(
-            ProjectSeqrStatsInternal(
-                project=2,
-                dataset='test-dataset-2',
-                sequencing_type='exome',
-                total_families=1,
-                total_participants=1,
-                total_samples=1,
-                total_sequencing_groups=1,
-                total_crams=1,
-                latest_es_index_id=3,
-                total_sgs_in_latest_es_index=1,
-                latest_annotate_dataset_id=4,
-                total_sgs_in_latest_annotate_dataset=1,
-            )
-        )
-    if 3 in projects:
-        summaries.append(
-            ProjectSeqrStatsInternal(
-                project=3,
-                dataset='test-dataset-3',
-                sequencing_type='genome',
-                total_families=5,
-                total_participants=5,
-                total_samples=5,
-                total_sequencing_groups=5,
-                total_crams=4,
-                latest_es_index_id=3,
-                total_sgs_in_latest_es_index=4,
-                latest_annotate_dataset_id=6,
-                total_sgs_in_latest_annotate_dataset=4,
-            )
-        )
+    weblayer = WebLayer(connection)
+    projects_seqr_stats = await weblayer.get_projects_seqr_stats(
+        projects=projects, sequencing_types=sequencing_types
+    )
 
-    if not summaries:
-        return []
+    return [s.to_external(links={}) for s in projects_seqr_stats]
 
-    return [s.to_external(links={}) for s in summaries]
-    # return await WebLayer(get_projectless_db_connection).get_project_seqr_stats(
-    #     sequencing_types=sequencing_types
-    # )
+
+@router.post(
+    '/projects-seqr-details',
+    operation_id='getProjectsSeqrDetails',
+    response_model=list[ProjectSeqrDetails],
+)
+async def get_projects_seqr_details(
+    projects: list[int] = None,
+    sequencing_types: list[str] = None,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Get the seqr project details for a list of projects
+    """
+    weblayer = WebLayer(connection)
+    projects_seqr_details = await weblayer.get_project_seqr_details(
+        projects=projects, sequencing_types=sequencing_types
+    )
+
+    return [s.to_external(links={}) for s in projects_seqr_details]

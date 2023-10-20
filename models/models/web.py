@@ -23,8 +23,74 @@ class PagingLinks(SMBase):
 
 
 @dataclasses.dataclass
+class ProjectSeqrDetailsInternal:
+    """Return class for the projects seqr details endpoint"""
+
+    project: int
+    dataset: str
+    sequencing_type: str
+    family_id: int
+    family_ext_id: str
+    participant_id: int
+    participant_ext_id: str
+    sample_id: str
+    sample_ext_id: str
+    sequencing_group_id: str
+    completed_cram: bool
+    in_latest_es_index: bool
+    in_latest_annotate_dataset: bool
+    sequencing_group_report_links: dict[str, str]
+
+    def to_external(self, links):
+        """Convert to transport model"""
+        return ProjectSeqrDetails(
+            project=self.project,
+            dataset=self.dataset,
+            sequencing_type=self.sequencing_type,
+            family_id=self.family_id,
+            family_ext_id=self.family_ext_id,
+            participant_id=self.participant_id,
+            participant_ext_id=self.participant_ext_id,
+            sample_id=self.sample_id,
+            sample_ext_id=self.sample_ext_id,
+            sequencing_group_id=self.sequencing_group_id,
+            completed_cram=self.completed_cram,
+            in_latest_es_index=self.in_latest_es_index,
+            in_latest_annotate_dataset=self.in_latest_annotate_dataset,
+            sequencing_group_report_links=self.sequencing_group_report_links,
+            links=links,
+        )
+
+
+class ProjectSeqrDetails(SMBase):
+    """Return class for the projects seqr details endpoint"""
+
+    project: int
+    dataset: str
+    sequencing_type: str
+    family_id: int
+    family_ext_id: str
+    participant_id: int
+    participant_ext_id: str
+    sample_id: str
+    sample_ext_id: str
+    sequencing_group_id: str
+    completed_cram: bool
+    in_latest_es_index: bool
+    in_latest_annotate_dataset: bool
+    sequencing_group_report_links: dict[str, str]
+
+    links: PagingLinks | None
+
+    class Config:
+        """Config for ProjectSeqrDetailsResponse"""
+
+        fields = {'links': '_links'}
+
+
+@dataclasses.dataclass
 class ProjectSeqrStatsInternal:
-    """Return class for the projects summary endpoint"""
+    """Return class for the projects seqr stats endpoint"""
 
     project: int
     dataset: str
@@ -59,7 +125,7 @@ class ProjectSeqrStatsInternal:
 
 
 class ProjectSeqrStats(SMBase):
-    """Return class for the projects summary endpoint"""
+    """Return class for the projects seqr stats endpoint"""
 
     project: int
     dataset: str

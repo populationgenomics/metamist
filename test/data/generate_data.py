@@ -180,6 +180,32 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
     analyses_to_insert.extend(
         [
             Analysis(
+                sequencing_group_ids=[s],
+                type='web',
+                status=AnalysisStatus('completed'),
+                output=f'FAKE://greek-myth/web/stripy/{s}.html',
+                meta={'sequencing_type': 'genome', 'stage': 'stripy'},
+            )
+            for s in random.choices(sequencing_group_ids, k=10)
+        ]
+    )
+
+    analyses_to_insert.extend(
+        [
+            Analysis(
+                sequencing_group_ids=[s],
+                type='web',
+                status=AnalysisStatus('completed'),
+                output=f'FAKE://greek-myth/web/mito/{s}.html',
+                meta={'sequencing_type': 'genome', 'stage': 'mitoreport'},
+            )
+            for s in random.choices(sequencing_group_ids, k=10)
+        ]
+    )
+
+    analyses_to_insert.extend(
+        [
+            Analysis(
                 sample_ids=[],
                 type='analysis-runner',
                 status=AnalysisStatus('completed'),
@@ -211,7 +237,20 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             type='es-index',
             status=AnalysisStatus('completed'),
             output=f'FAKE::greek-myth-genome-{datetime.date.today()}',
-            meta={},
+            meta={'stage': 'MtToEs', 'sequencing_type': 'genome'},
+        )
+    )
+
+    # joint-call / AnnotateDataset
+    analyses_to_insert.append(
+        Analysis(
+            sequencing_group_ids=random.sample(
+                sequencing_group_ids, len(sequencing_group_ids) // 2
+            ),
+            type='custom',
+            status=AnalysisStatus('completed'),
+            output=f'FAKE::greek-myth-genome-{datetime.date.today()}',
+            meta={'stage': 'AnnotateDataset', 'sequencing_type': 'genome'},
         )
     )
 

@@ -13,15 +13,12 @@ from models.models import (
     AssayInternal,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
+    ProjectSeqrStatsInternal,
     ProjectSummaryInternal,
     SampleUpsertInternal,
     SearchItem,
     SequencingGroupUpsertInternal,
-    AssayUpsertInternal,
-    ProjectSummaryInternal,
-    ProjectsSummaryInternal,
-    AssayInternal,
-    Assay,
+    WebProject,
 )
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
@@ -204,17 +201,17 @@ class TestWeb(DbIsolatedTest):
         self.seql = AssayLayer(self.connection)
 
     @run_as_sync
-    async def test_projects_summary(self):
+    async def test_projects_seqr_stats(self):
         """Test getting the summaries for all available projects"""
 
         await self.partl.upsert_participant(get_test_participant())
 
-        result = await self.webl.get_projects_summary(
+        result = await self.webl.get_projects_seqr_stats(
             projects=[self.project_id], sequencing_types=['genome', 'exome']
         )
 
         expected = [
-            ProjectsSummaryInternal(
+            ProjectSeqrStatsInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='genome',
@@ -223,8 +220,12 @@ class TestWeb(DbIsolatedTest):
                 total_samples=1,
                 total_sequencing_groups=1,
                 total_crams=0,
+                latest_es_index_id=None,
+                total_sgs_in_latest_es_index=0,
+                latest_annotate_dataset_id=None,
+                total_sgs_in_latest_annotate_dataset=0,
             ),
-            ProjectsSummaryInternal(
+            ProjectSeqrStatsInternal(
                 project=self.project_id,
                 dataset='test',
                 sequencing_type='exome',
@@ -233,6 +234,10 @@ class TestWeb(DbIsolatedTest):
                 total_samples=0,
                 total_sequencing_groups=0,
                 total_crams=0,
+                latest_es_index_id=None,
+                total_sgs_in_latest_es_index=0,
+                latest_annotate_dataset_id=None,
+                total_sgs_in_latest_annotate_dataset=0,
             ),
         ]
 

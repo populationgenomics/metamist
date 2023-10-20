@@ -54,11 +54,11 @@ from models.models.sequencing_group import (
     SequencingGroupUpsertInternal,
 )
 from models.models.web import (
-    PagingLinks,
     ProjectSummary,
     ProjectSummaryInternal,
     WebProject,
     ProjectSeqrStats,
     PagingLinks,
+    ProjectSeqrDetailsInternal,
     ProjectSeqrStatsInternal,
 )
