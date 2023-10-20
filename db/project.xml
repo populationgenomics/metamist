@@ -747,5 +747,17 @@
 			referencedTableName="sample_type"
 			referencedColumnNames="id"
 			/>
-		</changeSet>
+	</changeSet>
+	<changeSet id="2023-10-20-analysis-type" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<!-- change the sample.type field from an enum, to reference sample_type.id -->
+		<sql>ALTER TABLE analysis MODIFY COLUMN type VARCHAR(255);</sql>
+		<addForeignKeyConstraint
+			constraintName="FK_ANALYSIS_ANALYSIS_TYPE"
+			baseTableName="analysis"
+			baseColumnNames="type"
+			referencedTableName="analysis_type"
+			referencedColumnNames="id"
+		/>
+	</changeSet>
 </databaseChangeLog>
