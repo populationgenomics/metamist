@@ -220,9 +220,9 @@ class TestWeb(DbIsolatedTest):
                 total_samples=1,
                 total_sequencing_groups=1,
                 total_crams=0,
-                latest_es_index_id=None,
+                latest_es_index_id=0,
                 total_sgs_in_latest_es_index=0,
-                latest_annotate_dataset_id=None,
+                latest_annotate_dataset_id=0,
                 total_sgs_in_latest_annotate_dataset=0,
             ),
             ProjectSeqrStatsInternal(
@@ -234,9 +234,9 @@ class TestWeb(DbIsolatedTest):
                 total_samples=0,
                 total_sequencing_groups=0,
                 total_crams=0,
-                latest_es_index_id=None,
+                latest_es_index_id=0,
                 total_sgs_in_latest_es_index=0,
-                latest_annotate_dataset_id=None,
+                latest_annotate_dataset_id=0,
                 total_sgs_in_latest_annotate_dataset=0,
             ),
         ]
