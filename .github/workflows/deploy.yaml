@@ -20,7 +20,6 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       # used for generating API
       SM_DOCKER: australia-southeast1-docker.pkg.dev/sample-metadata/images/server:${{ github.sha }}
-      SM_API_DOCKER: australia-southeast1-docker.pkg.dev/cpg-common/images/sm-api
     defaults:
       run:
         shell: bash -eo pipefail -l {0}

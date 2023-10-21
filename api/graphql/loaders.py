@@ -333,7 +333,9 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list[Proj
     Get projects by IDs
     """
     pttable = ProjectPermissionsTable(connection.connection)
-    projects = await pttable.get_projects_by_ids(project_ids)
+    projects = await pttable.get_and_check_access_to_projects_for_ids(
+        user=connection.user, project_ids=project_ids, readonly=True
+    )
     p_by_id = {p.id: p for p in projects}
     return [p_by_id.get(p) for p in project_ids]
 

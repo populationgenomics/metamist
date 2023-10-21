@@ -72,8 +72,6 @@ class GraphQLProject:
     name: str
     dataset: str
     meta: strawberry.scalars.JSON
-    read_group_name: str | None = None
-    write_group_name: str | None = None
 
     @staticmethod
     def from_internal(internal: Project) -> 'GraphQLProject':
@@ -82,8 +80,6 @@ class GraphQLProject:
             name=internal.name,
             dataset=internal.dataset,
             meta=internal.meta,
-            read_group_name=internal.read_group_name,
-            write_group_name=internal.write_group_name,
         )
 
     @strawberry.field()
@@ -492,9 +488,11 @@ class GraphQLSequencingGroup:
         if project:
             ptable = ProjectPermissionsTable(connection.connection)
             project_ids = project.all_values()
-            project_id_map = await ptable.get_project_id_map_for_names(
-                author=connection.author, project_names=project_ids, readonly=True
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_ids, readonly=True
             )
+            project_id_map = {p.name: p.id for p in projects}
+
         analyses = await loader.load(
             {
                 'id': root.internal_id,
@@ -562,11 +560,10 @@ class Query:
     async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
-        project_id = await ptable.get_project_id_from_name_and_user(
+        project = await ptable.get_and_check_access_to_project_for_name(
             user=connection.author, project_name=name, readonly=True
         )
-        presponse = await ptable.get_projects_by_ids([project_id])
-        return GraphQLProject.from_internal(presponse[0])
+        return GraphQLProject.from_internal(project)
 
     @strawberry.field
     async def sample(
@@ -590,11 +587,13 @@ class Query:
         if external_id and not project:
             raise ValueError('Must provide project when using external_id filter')
 
+        project_name_map: dict[str, int] = {}
         if project:
             project_ids = project.all_values()
-            project_id_map = await ptable.get_project_id_map_for_names(
-                author=connection.author, project_names=project_ids, readonly=True
+            projects = await ptable.get_and_check_access_to_projects_for_ids(
+                user=connection.author, project_ids=project_ids, readonly=True
             )
+            project_name_map = {p.name: p.id for p in projects}
 
         filter_ = SampleFilter(
             id=id.to_internal_filter(sample_id_transform_to_raw) if id else None,
@@ -604,7 +603,7 @@ class Query:
             participant_id=participant_id.to_internal_filter()
             if participant_id
             else None,
-            project=project.to_internal_filter(lambda pname: project_id_map[pname])
+            project=project.to_internal_filter(lambda pname: project_name_map[pname])
             if project
             else None,
             active=active.to_internal_filter() if active else GenericFilter(eq=True),
@@ -635,9 +634,10 @@ class Query:
         project_id_map = {}
         if project:
             project_ids = project.all_values()
-            project_id_map = await ptable.get_project_id_map_for_names(
-                author=connection.author, project_names=project_ids, readonly=True
+            projects = await ptable.get_and_check_access_to_projects_for_ids(
+                user=connection.author, project_ids=project_ids, readonly=True
             )
+            project_id_map = {p.name: p.id for p in projects}
 
         filter_ = SequencingGroupFilter(
             project=project.to_internal_filter(lambda val: project_id_map[val])
@@ -681,10 +681,9 @@ class Query:
     async def my_projects(self, info: Info) -> list[GraphQLProject]:
         connection = info.context['connection']
         ptable = ProjectPermissionsTable(connection.connection)
-        project_map = await ptable.get_projects_accessible_by_user(
+        projects = await ptable.get_projects_accessible_by_user(
             connection.author, readonly=True
         )
-        projects = await ptable.get_projects_by_ids(list(project_map.keys()))
         return [GraphQLProject.from_internal(p) for p in projects]
 
 

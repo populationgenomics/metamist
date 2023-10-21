@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter
 
@@ -13,47 +13,42 @@ router = APIRouter(prefix='/project', tags=['project'])
 async def get_all_projects(connection=get_projectless_db_connection):
     """Get list of projects"""
     ptable = ProjectPermissionsTable(connection.connection)
-    return await ptable.get_project_rows(
-        author=connection.author, check_permissions=False
-    )
+    return await ptable.get_all_projects(author=connection.author)
 
 
 @router.get('/', operation_id='getMyProjects', response_model=List[str])
 async def get_my_projects(connection=get_projectless_db_connection):
     """Get projects I have access to"""
     ptable = ProjectPermissionsTable(connection.connection)
-    pmap = await ptable.get_projects_accessible_by_user(
+    projects = await ptable.get_projects_accessible_by_user(
         author=connection.author, readonly=True
     )
-    return list(pmap.values())
+    return [p.name for p in projects]
 
 
 @router.put('/', operation_id='createProject')
 async def create_project(
     name: str,
     dataset: str,
-    read_group_name: Optional[str] = None,
-    write_group_name: Optional[str] = None,
-    create_test_project: bool = True,
+    create_test_project: bool = False,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
     """
     Create a new project
     """
-    if not read_group_name:
-        read_group_name = f'{dataset}-sample-metadata-main-read'
-    if not write_group_name:
-        write_group_name = f'{dataset}-sample-metadata-main-write'
-
     ptable = ProjectPermissionsTable(connection.connection)
     pid = await ptable.create_project(
         project_name=name,
         dataset_name=dataset,
-        read_group_name=read_group_name,
-        write_group_name=write_group_name,
-        create_test_project=create_test_project,
         author=connection.author,
     )
+
+    if create_test_project:
+        await ptable.create_project(
+            project_name=name + '-test',
+            dataset_name=dataset,
+            author=connection.author,
+        )
 
     return pid
 
@@ -90,11 +85,32 @@ async def delete_project_data(
     Requires READ access + project-creator permissions
     """
     ptable = ProjectPermissionsTable(connection.connection)
-    pid = await ptable.get_project_id_from_name_and_user(
-        connection.author, project, readonly=False
+    p_obj = await ptable.get_and_check_access_to_project_for_name(
+        user=connection.author, project_name=project, readonly=False
     )
     success = await ptable.delete_project_data(
-        project_id=pid, delete_project=delete_project, author=connection.author
+        project_id=p_obj.id, delete_project=delete_project, author=connection.author
     )
 
     return {'success': success}
+
+
+@router.patch('/{project}/members', operation_id='updateProjectMembers')
+async def update_project_members(
+    project: str,
+    members: list[str],
+    readonly: bool,
+    connection: Connection = get_projectless_db_connection,
+):
+    """
+    Update project members for specific read / write group.
+    Not that this is protected by access to a specific access group
+    """
+    ptable = ProjectPermissionsTable(connection.connection)
+    await ptable.set_group_members(
+        group_name=ptable.get_project_group_name(project, readonly=readonly),
+        members=members,
+        author=connection.author,
+    )
+
+    return {'success': True}
