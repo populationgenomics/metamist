@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.connect import DbBase, NotFoundError
@@ -552,24 +552,10 @@ GROUP BY seq_type
     # endregion STATS
 
     async def get_sg_add_to_project_es_index(
-        self, sg_ids: list[int], min_date: date
-    ) -> list[tuple[date, set[int]]]:
+        self, sg_ids: list[int]
+    ) -> dict[int, date]:
         """
-        We can have multiple joint-calls and es-indices on one day, and
-        es-indices are cumulative, and only deal with a single project.
-
-        ORIGINAL ATTEMPT:
-            Keep track of which dataset an es-index belongs to, and then on
-            a second pass evaluate the total samples for all DAY changes.
-            We add a *SPECIAL CASE* if the project-name is seqr, then that
-            sets the samples for the whole day to cover the joint-calls.
-            This unfortunately fails because the samples reported in some
-            es-indices are very small, and blows out any numbers
-
-        CURRENT IMPLEMENTATION
-            We just take a cumulative samples seen over all time. So we
-            CANNOT tell if a sample is removed once it's in an ES index.
-            Though I think this is rare.
+        Get all the sequencing groups that should be added to seqr joint calls
         """
         _query = """
         SELECT
@@ -584,33 +570,7 @@ GROUP BY seq_type
         GROUP BY a_sg.sequencing_group_id
         """
 
-        relevant_analyses = await self.connection.fetch_all(_query, {'sg_ids': sg_ids})
-
-        day_project_delta_sample_map: dict[date, set[str]] = defaultdict(set)
-        for analysis in relevant_analyses:
-            # Using timestamp_completed as the start time for the propmap
-            # is a small problem because then this script won't charge the new samples
-            # for the current joint-call as:
-            #   joint_call.completed_timestamp > hail_joint_call.started_timestamp
-            # We might be able to roughly accept this by subtracting a day from the
-            # joint-call, and sort of hope that no joint-call runs over 24 hours.
-
-            dt = datetime.fromisoformat(
-                analysis['timestamp_completed']
-            ).date() - timedelta(days=2)
-            # get the changes of samples for a specific day
-            day_project_delta_sample_map[max(min_date, dt)].add(analysis['sg_id'])
-
-        analysis_day_samples: list[tuple[date, set[int]]] = []
-
-        for analysis_day, aday_samples in sorted(
-            day_project_delta_sample_map.items(), key=lambda r: r[0]
-        ):
-            if len(analysis_day_samples) == 0:
-                analysis_day_samples.append((analysis_day, aday_samples))
-                continue
-
-            new_samples = aday_samples | analysis_day_samples[-1][1]
-            analysis_day_samples.append((analysis_day, new_samples))
-
-        return analysis_day_samples
+        rows = await self.connection.fetch_all(
+            _query, {'sg_ids': sg_ids}
+        )
+        return {r['sg_id']: r['timestamp_completed'].date() for r in rows}
