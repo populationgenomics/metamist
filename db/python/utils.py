@@ -39,6 +39,10 @@ class Forbidden(Exception):
     """Forbidden action"""
 
 
+class NotFoundError(Exception):
+    """Custom error when you can't find something"""
+
+
 class InternalError(Exception):
     """An internal programming error"""
 

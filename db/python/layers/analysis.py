@@ -319,7 +319,9 @@ class AnalysisLayer(BaseLayer):
             else:
                 raise ValueError('end_date must be a date or datetime')
 
-        project_objs = await self.ptable.get_projects_by_ids(projects)
+        project_objs = await self.ptable.get_and_check_access_to_projects_for_ids(
+            project_ids=projects, user=self.author, readonly=True
+        )
         project_name_map = {p.id: p.name for p in project_objs}
 
         sg_sizes_by_method_by_project = await self.get_sequencing_group_file_sizes(
