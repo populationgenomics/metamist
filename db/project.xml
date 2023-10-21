@@ -833,7 +833,7 @@
 				type="INT"
 			>
 				<constraints
-					nullable="false"
+					nullable="true"
 					foreignKeyName="FK_PROJECT_WRITE_GROUP_GROUP_ID"
 					references="group(id)" />
 			</column>
