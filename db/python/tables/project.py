@@ -125,7 +125,9 @@ class ProjectPermissionsTable:
         relevant_project_ids = await self.connection.fetch_all(
             _query, {'author': author}
         )
-        projects = await self._get_projects_by_ids(relevant_project_ids)
+        projects = await self._get_projects_by_ids(
+            [p['id'] for p in relevant_project_ids]
+        )
 
         return projects
 
@@ -571,21 +573,20 @@ class GroupTable:
         """
         Set group members for a group (by id)
         """
-        async with self.connection.transaction():
-            await self.connection.execute(
-                """
-                DELETE FROM group_member
-                WHERE group_id = :group_id
-                """,
-                {'group_id': group_id},
-            )
-            await self.connection.execute_many(
-                """
-                INSERT INTO group_member (group_id, member, author)
-                VALUES (:group_id, :member, :author)
-                """,
-                [
-                    {'group_id': group_id, 'member': member, 'author': author}
-                    for member in members
-                ],
-            )
+        await self.connection.execute(
+            """
+            DELETE FROM group_member
+            WHERE group_id = :group_id
+            """,
+            {'group_id': group_id},
+        )
+        await self.connection.execute_many(
+            """
+            INSERT INTO group_member (group_id, member, author)
+            VALUES (:group_id, :member, :author)
+            """,
+            [
+                {'group_id': group_id, 'member': member, 'author': author}
+                for member in members
+            ],
+        )

@@ -198,3 +198,28 @@ class TestProjectAccess(DbIsolatedTest):
             user=self.author, project_name=g, readonly=True
         )
         self.assertEqual(pid, project_for_name.id)
+
+    @run_as_sync
+    async def test_get_my_projects(self):
+        """
+        Test that a user with permission only has MY projects
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
+
+        g = str(uuid.uuid4())
+
+        pid = await self.pttable.create_project(g, g, self.author)
+
+        await self.pttable.set_group_members(
+            group_name=self.pttable.get_project_group_name(g, readonly=True),
+            members=[self.author],
+            author=self.author,
+        )
+
+        projects = await self.pttable.get_projects_accessible_by_user(
+            author=self.author
+        )
+
+        self.assertEqual(1, len(projects))
+        self.assertEqual(pid, projects[0].id)

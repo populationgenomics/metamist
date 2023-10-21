@@ -30,7 +30,7 @@ async def get_my_projects(connection=get_projectless_db_connection):
 async def create_project(
     name: str,
     dataset: str,
-    create_test_project: bool = True,
+    create_test_project: bool = False,
     connection: Connection = get_projectless_db_connection,
 ) -> int:
     """
