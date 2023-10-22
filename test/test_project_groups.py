@@ -95,29 +95,30 @@ class TestGroupAccess(DbIsolatedTest):
 
     @run_as_sync
     async def test_check_which_groups_member_is_missing(self):
-        """Test the check_which_groups_member_is_missing function"""
+        """Test the check_which_groups_member_has function"""
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
         group = str(uuid.uuid4())
         gid = await self.pttable.gtable.create_group(group)
-        missing_gids = await self.pttable.gtable.check_which_groups_member_is_missing(
+        present_gids = await self.pttable.gtable.check_which_groups_member_has(
             {gid}, self.author
         )
-
+        missing_gids = {gid} - present_gids
         self.assertEqual(1, len(missing_gids))
         self.assertEqual(gid, missing_gids.pop())
 
     @run_as_sync
     async def test_check_which_groups_member_is_missing_none(self):
-        """Test the check_which_groups_member_is_missing function"""
+        """Test the check_which_groups_member_has function"""
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
         group = str(uuid.uuid4())
         gid = await self.pttable.gtable.create_group(group)
         await self.pttable.gtable.set_group_members(gid, [self.author], self.author)
-        missing_gids = await self.pttable.gtable.check_which_groups_member_is_missing(
+        present_gids = await self.pttable.gtable.check_which_groups_member_has(
             {gid}, self.author
         )
+        missing_gids = {gid} - present_gids
 
         self.assertEqual(0, len(missing_gids))
 
