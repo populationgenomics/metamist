@@ -551,14 +551,15 @@ class GroupTable:
             return set()
 
         _query = """
-            SELECT g.group_id
+            SELECT gm.group_id as gid
             FROM group_member gm
-            WHERE gm.member = member AND gm.group_id IN :group_ids
+            WHERE gm.member = :member AND gm.group_id IN :group_ids
         """
-        membered_group_ids = await self.connection.fetch_all(
+        results = await self.connection.fetch_all(
             _query, {'group_ids': group_ids, 'member': member}
         )
-        return set(group_ids) - set(membered_group_ids)
+        membered_group_ids = set(r['gid'] for r in results)
+        return set(group_ids) - membered_group_ids
 
     async def create_group(self, name: str) -> int:
         """Create a new group"""
