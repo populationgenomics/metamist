@@ -101,7 +101,7 @@ class TestGroupAccess(DbIsolatedTest):
         group = str(uuid.uuid4())
         gid = await self.pttable.gtable.create_group(group)
         missing_gids = await self.pttable.gtable.check_which_groups_member_is_missing(
-            [gid], self.author
+            {gid}, self.author
         )
 
         self.assertEqual(1, len(missing_gids))
@@ -116,7 +116,7 @@ class TestGroupAccess(DbIsolatedTest):
         gid = await self.pttable.gtable.create_group(group)
         await self.pttable.gtable.set_group_members(gid, [self.author], self.author)
         missing_gids = await self.pttable.gtable.check_which_groups_member_is_missing(
-            [gid], self.author
+            {gid}, self.author
         )
 
         self.assertEqual(0, len(missing_gids))

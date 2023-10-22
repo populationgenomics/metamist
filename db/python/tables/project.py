@@ -559,7 +559,7 @@ class GroupTable:
             _query, {'group_ids': group_ids, 'member': member}
         )
         membered_group_ids = set(r['gid'] for r in results)
-        return set(group_ids) - membered_group_ids
+        return group_ids - membered_group_ids
 
     async def create_group(self, name: str) -> int:
         """Create a new group"""
