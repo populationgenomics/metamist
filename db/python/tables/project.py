@@ -551,7 +551,7 @@ class GroupTable:
         Check which groups a member has
         """
         if self.allow_full_access:
-            return set()
+            return group_ids
 
         _query = """
             SELECT gm.group_id as gid
