@@ -113,12 +113,14 @@ class BillingLayer(BqBaseLayer):
         billing_db = BillingDb(self.connection)
         return await billing_db.get_total_cost(query)
 
-    async def get_running_cost(self) -> list[BillingCostBudgetRecord]:
+    async def get_running_cost(
+        self, field: BillingColumn
+    ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget
         """
         billing_db = BillingDb(self.connection)
-        return await billing_db.get_running_cost()
+        return await billing_db.get_running_cost(field)
 
 
 class BillingDb(BqDbBase):
@@ -435,15 +437,31 @@ class BillingDb(BqDbBase):
         # return empty list if no record found
         return []
 
-    async def get_running_cost(
-        self,
-    ) -> list[BillingCostBudgetRecord]:
+    async def get_budget(self) -> dict[str, float] | None:
         """
-        Get currently running cost of seelected topics
+        Get budget for projects
+        """
+        _query = f"""
+        SELECT gcp_project, budget
+        FROM `{BQ_GCP_BILLING_PROJECT}.billing.budget_by_project_montly`
         """
 
+        query_job_result = list(self._connection.connection.query(_query).result())
+
+        if query_job_result:
+            return {row.gcp_project: row.budget for row in query_job_result}
+
+        return None
+
+    async def execute_running_cost_query(self, field: BillingColumn):
+        """
+        Run query to get running cost of selected field
+        """
         # by default look at the normal view
-        view_to_use = BQ_AGGREG_VIEW
+        if field in BillingColumn.extended_cols():
+            view_to_use = BQ_AGGREG_EXT_VIEW
+        else:
+            view_to_use = BQ_AGGREG_VIEW
 
         # TODO for production change to select current day, month
         start_day = '2023-03-01'
@@ -451,7 +469,7 @@ class BillingDb(BqDbBase):
 
         _query = f"""
         SELECT
-            month.topic,
+            CASE WHEN month.field IS NULL THEN 'N/A' ELSE month.field END as field,
             month.cost_category,
             month.cost as monthly_cost,
             day.cost as daily_cost
@@ -462,7 +480,7 @@ class BillingDb(BqDbBase):
             FROM
             (
                 SELECT
-                topic,
+                {field.value} as field,
                 cost_category,
                 SUM(cost) as cost
                 FROM
@@ -470,7 +488,7 @@ class BillingDb(BqDbBase):
                 WHERE day >= TIMESTAMP(@start_day) AND
                 day <= TIMESTAMP(@current_day)
                 GROUP BY
-                topic,
+                field,
                 cost_category
             )
             WHERE
@@ -478,7 +496,7 @@ class BillingDb(BqDbBase):
         ) month
         LEFT JOIN (
             SELECT
-                topic,
+                {field.value} as field,
                 cost_category,
                 SUM(cost) as cost
             FROM
@@ -487,136 +505,159 @@ class BillingDb(BqDbBase):
                 TIMESTAMP(@current_day), INTERVAL -2 DAY
             ) AND day <=  TIMESTAMP(@current_day)
             GROUP BY
-                topic,
+                field,
                 cost_category
         ) day
-        ON month.topic = day.topic
+        ON month.field = day.field
         AND month.cost_category = day.cost_category
-        ORDER BY topic ASC, daily_cost DESC;
+        ORDER BY field ASC, daily_cost DESC;
         """
 
-        query_parameters = []
-
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+        return list(
+            self._connection.connection.query(
+                _query,
+                job_config=bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+                        bigquery.ScalarQueryParameter(
+                            'current_day', 'STRING', current_day
+                        ),
+                    ]
+                ),
+            ).result()
         )
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('current_day', 'STRING', current_day),
-        )
 
-        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
+    async def get_running_cost(
+        self, field: BillingColumn
+    ) -> list[BillingCostBudgetRecord]:
+        """
+        Get currently running cost of selected field
+        """
 
+        # accept only Topic, Dataset or Project at this stage
+        if field not in (
+            BillingColumn.TOPIC,
+            BillingColumn.PROJECT,
+            BillingColumn.DATASET,
+        ):
+            raise ValueError('Invalid field')
+
+        query_job_result = await self.execute_running_cost_query(field)
+        if not query_job_result:
+            # return empty list
+            return []
+
+        # prepare data
         results = []
-        if query_job_result:
-            # prepare data
-            total_monthly: dict[str, Counter[str]] = {
-                'C': Counter(),
-                'S': Counter(),
-            }
-            total_daily: dict[str, Counter[str]] = {
-                'C': Counter(),
-                'S': Counter(),
-            }
-            topic_details: dict[
-                str, list[Any]
-            ] = {}  # detail category cost for each topic
-            total_monthly_category: Counter[str] = Counter()
-            total_daily_category: Counter[str] = Counter()
-            for row in query_job_result:
-                if row.topic not in topic_details:
-                    topic_details[row.topic] = []
 
-                topic_details[row.topic].append(
-                    {
-                        'cost_group': 'S'
-                        if row.cost_category == 'Cloud Storage'
-                        else 'C',
-                        'cost_category': row.cost_category,
-                        'daily_cost': row.daily_cost,
-                        'monthly_cost': row.monthly_cost,
-                    }
-                )
+        total_monthly: dict[str, Counter[str]] = {
+            'C': Counter(),
+            'S': Counter(),
+        }
+        total_daily: dict[str, Counter[str]] = {
+            'C': Counter(),
+            'S': Counter(),
+        }
+        field_details: dict[str, list[Any]] = {}  # detail category cost for each field
+        total_monthly_category: Counter[str] = Counter()
+        total_daily_category: Counter[str] = Counter()
+        for row in query_job_result:
+            if row.field not in field_details:
+                field_details[row.field] = []
 
-                total_monthly_category[row.cost_category] += row.monthly_cost
+            field_details[row.field].append(
+                {
+                    'cost_group': 'S' if row.cost_category == 'Cloud Storage' else 'C',
+                    'cost_category': row.cost_category,
+                    'daily_cost': row.daily_cost,
+                    'monthly_cost': row.monthly_cost,
+                }
+            )
+
+            total_monthly_category[row.cost_category] += row.monthly_cost
+            if row.daily_cost:
+                total_daily_category[row.cost_category] += row.daily_cost
+
+            # cost groups S/C
+            if row.cost_category == 'Cloud Storage':
+                total_monthly['S']['ALL'] += row.monthly_cost
+                total_monthly['S'][row.field] += row.monthly_cost
                 if row.daily_cost:
-                    total_daily_category[row.cost_category] += row.daily_cost
+                    total_daily['S']['ALL'] += row.daily_cost
+                    total_daily['S'][row.field] += row.daily_cost
+            else:
+                total_monthly['C']['ALL'] += row.monthly_cost
+                total_monthly['C'][row.field] += row.monthly_cost
+                if row.daily_cost:
+                    total_daily['C']['ALL'] += row.daily_cost
+                    total_daily['C'][row.field] += row.daily_cost
 
-                # cost groups S/C
-                if row.cost_category == 'Cloud Storage':
-                    total_monthly['S']['ALL'] += row.monthly_cost
-                    total_monthly['S'][row.topic] += row.monthly_cost
-                    if row.daily_cost:
-                        total_daily['S']['ALL'] += row.daily_cost
-                        total_daily['S'][row.topic] += row.daily_cost
-                else:
-                    total_monthly['C']['ALL'] += row.monthly_cost
-                    total_monthly['C'][row.topic] += row.monthly_cost
-                    if row.daily_cost:
-                        total_daily['C']['ALL'] += row.daily_cost
-                        total_daily['C'][row.topic] += row.daily_cost
+        # add total
+        # construct ALL fields details
+        all_details = []
+        for cat, mth_cost in total_monthly_category.items():
+            all_details.append(
+                {
+                    'cost_group': 'S' if cat == 'Cloud Storage' else 'C',
+                    'cost_category': cat,
+                    'daily_cost': total_daily_category[cat],
+                    'monthly_cost': mth_cost,
+                }
+            )
 
-            # add total
-            # construct ALL projects details
-            all_details = []
-            for cat, mth_cost in total_monthly_category.items():
-                all_details.append(
-                    {
-                        'cost_group': 'S' if cat == 'Cloud Storage' else 'C',
-                        'cost_category': cat,
-                        'daily_cost': total_daily_category[cat],
-                        'monthly_cost': mth_cost,
-                    }
-                )
+        # add total row first
+        results.append(
+            BillingCostBudgetRecord.from_json(
+                {
+                    'field': f'All {field.value}s',
+                    'total_monthly': (
+                        total_monthly['C']['ALL'] + total_monthly['S']['ALL']
+                    ),
+                    'total_daily': total_daily['C']['ALL'] + total_daily['S']['ALL'],
+                    'compute_monthly': total_monthly['C']['ALL'],
+                    'compute_daily': total_daily['C']['ALL'],
+                    'storage_monthly': total_monthly['S']['ALL'],
+                    'storage_daily': total_daily['S']['ALL'],
+                    'details': all_details,
+                }
+            )
+        )
 
+        # get budget map per gcp project
+        if field == BillingColumn.PROJECT:
+            budget = await self.get_budget()
+        else:
+            # only projects have budget
+            budget = None
+
+        # add rows by field
+        for key, details in field_details.items():
+            compute_daily = total_daily['C'][key] if key in total_daily['C'] else 0
+            storage_daily = total_daily['S'][key] if key in total_daily['S'] else 0
+            compute_monthly = (
+                total_monthly['C'][key] if key in total_monthly['C'] else 0
+            )
+            storage_monthly = (
+                total_monthly['S'][key] if key in total_monthly['S'] else 0
+            )
+            monthly = compute_monthly + storage_monthly
+            budget_monthly = budget.get(key, 0) if budget else 0
             results.append(
                 BillingCostBudgetRecord.from_json(
                     {
-                        'topic': 'All projects',
-                        'total_monthly': (
-                            total_monthly['C']['ALL'] + total_monthly['S']['ALL']
-                        ),
-                        'total_daily': total_daily['C']['ALL']
-                        + total_daily['S']['ALL'],
-                        'compute_monthly': total_monthly['C']['ALL'],
-                        'compute_daily': total_daily['C']['ALL'],
-                        'storage_monthly': total_monthly['S']['ALL'],
-                        'storage_daily': total_daily['S']['ALL'],
-                        'details': all_details,
+                        'field': key,
+                        'total_monthly': monthly,
+                        'total_daily': (compute_daily + storage_daily),
+                        'compute_monthly': compute_monthly,
+                        'compute_daily': compute_daily,
+                        'storage_monthly': storage_monthly,
+                        'storage_daily': storage_daily,
+                        'details': details,
+                        'budget_spent': 100 * monthly / budget_monthly
+                        if budget_monthly
+                        else None,
                     }
                 )
             )
-
-            # add by topic, sort by daily total desc
-            for topic, details in topic_details.items():
-                compute_daily = (
-                    total_daily['C'][topic] if topic in total_daily['C'] else 0
-                )
-                storage_daily = (
-                    total_daily['S'][topic] if topic in total_daily['S'] else 0
-                )
-                compute_monthly = (
-                    total_monthly['C'][topic] if topic in total_monthly['C'] else 0
-                )
-                storage_monthly = (
-                    total_monthly['S'][topic] if topic in total_monthly['S'] else 0
-                )
-                monthly = compute_monthly + storage_monthly
-                results.append(
-                    BillingCostBudgetRecord.from_json(
-                        {
-                            'topic': topic,
-                            'total_monthly': monthly,
-                            'total_daily': (compute_daily + storage_daily),
-                            'compute_monthly': compute_monthly,
-                            'compute_daily': compute_daily,
-                            'storage_monthly': storage_monthly,
-                            'storage_daily': storage_daily,
-                            'details': details,
-                        }
-                    )
-                )
 
         return results
