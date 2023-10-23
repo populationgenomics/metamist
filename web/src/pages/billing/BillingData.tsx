@@ -37,6 +37,7 @@ const BillingData: React.FunctionComponent<IBillingDataProps> = (
     return (
         <div className="article">
             <h1>Billing Data</h1>
+            <p>Placeholder for table page</p>
         </div>
     )
 }
