@@ -9,21 +9,17 @@ from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupTable
 from models.enums.search import SearchResponseType
-from models.models.sample import (
-    sample_id_format,
-    sample_id_transform_to_raw,
+from models.models.sample import sample_id_format, sample_id_transform_to_raw
+from models.models.search import (
+    FamilySearchResponseData,
+    ParticipantSearchResponseData,
+    SampleSearchResponseData,
+    SearchResponse,
+    SequencingGroupSearchResponseData,
 )
-
 from models.models.sequencing_group import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
-)
-from models.models.search import (
-    SearchResponse,
-    SampleSearchResponseData,
-    ParticipantSearchResponseData,
-    FamilySearchResponseData,
-    SequencingGroupSearchResponseData,
 )
 
 
@@ -72,8 +68,8 @@ class SearchLayer(BaseLayer):
 
         sample_eids = [sample.external_id]
         participant_id = int(sample.participant_id) if sample.participant_id else None
-        participant_eids = []
-        family_eids = []
+        participant_eids: list[str] = []
+        family_eids: list[str] = []
 
         title = cpg_id
         id_field = cpg_id

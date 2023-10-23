@@ -48,15 +48,14 @@ repos:
     rev: v1.5.1
     hooks:
       - id: mypy
-        args:
-          [
+        args: [
             --pretty,
             --show-error-codes,
             --no-strict-optional,
             --ignore-missing-imports,
             --install-types,
             --non-interactive,
-            --show-error-context,
+            # --show-error-context,
             --check-untyped-defs,
             --explicit-package-bases,
             --disable-error-code,

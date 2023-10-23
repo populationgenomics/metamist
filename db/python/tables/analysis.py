@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.connect import DbBase, NotFoundError
@@ -550,3 +550,27 @@ GROUP BY seq_type
         return {r['seq_type']: r['n'] for r in rows}
 
     # endregion STATS
+
+    async def get_sg_add_to_project_es_index(
+        self, sg_ids: list[int]
+    ) -> dict[int, date]:
+        """
+        Get all the sequencing groups that should be added to seqr joint calls
+        """
+        _query = """
+        SELECT
+            a_sg.sequencing_group_id as sg_id,
+            MIN(a.timestamp_completed) as timestamp_completed
+        FROM analysis a
+        INNER JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
+        WHERE
+            a.status = 'completed'
+            AND a.type = 'es-index'
+            AND a_sg.sequencing_group_id IN :sg_ids
+        GROUP BY a_sg.sequencing_group_id
+        """
+
+        rows = await self.connection.fetch_all(
+            _query, {'sg_ids': sg_ids}
+        )
+        return {r['sg_id']: r['timestamp_completed'].date() for r in rows}

@@ -7,7 +7,6 @@ import socket
 import subprocess
 import unittest
 from functools import wraps
-
 from typing import Dict
 
 import nest_asyncio
@@ -18,10 +17,10 @@ from api.graphql.loaders import get_context  # type: ignore
 from api.graphql.schema import schema  # type: ignore
 from api.settings import set_all_access
 from db.python.connect import (
-    ConnectionStringDatabaseConfiguration,
-    Connection,
-    SMConnections,
     TABLES_ORDERED_BY_FK_DEPS,
+    Connection,
+    ConnectionStringDatabaseConfiguration,
+    SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
 
@@ -76,6 +75,7 @@ class DbTest(unittest.TestCase):
     # and don't get recreated per test.
     dbs: Dict[str, MySqlContainer] = {}
     connections: Dict[str, Connection] = {}
+    author: str
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -126,10 +126,11 @@ class DbTest(unittest.TestCase):
                     ConnectionStringDatabaseConfiguration(con_string)
                 )
                 await sm_db.connect()
+                cls.author = 'testuser'
                 connection = Connection(
                     connection=sm_db,
                     project=1,
-                    author='testuser',
+                    author=cls.author,
                 )
                 cls.connections[cls.__name__] = connection
 
@@ -140,10 +141,7 @@ class DbTest(unittest.TestCase):
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
-                    create_test_project=False,
                     author='testuser',
-                    read_group_name='None',
-                    write_group_name='None',
                     check_permissions=False,
                 )
 
@@ -198,7 +196,7 @@ class DbTest(unittest.TestCase):
             variable_values=variables,
             context_value=await get_context(
                 connection=self.connection,
-                request=None,   # pylint: disable
+                request=None,  # pylint: disable
             ),
         )
         if value.errors:
@@ -215,14 +213,16 @@ class DbIsolatedTest(DbTest):
     async def setUp(self) -> None:
         super().setUp()
 
-        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project'}
+        ignore = {'DATABASECHANGELOG', 'DATABASECHANGELOGLOCK', 'project', 'group'}
         for table in TABLES_ORDERED_BY_FK_DEPS:
             if table in ignore:
                 continue
             try:
                 await self.connection.connection.execute(
-                    f'DELETE FROM {table} WHERE 1;'
+                    f'DELETE FROM `{table}` WHERE 1;'
                 )
-                await self.connection.connection.execute(f'DELETE HISTORY FROM {table}')
+                await self.connection.connection.execute(
+                    f'DELETE HISTORY FROM `{table}`'
+                )
             except IntegrityError as e:
                 raise IntegrityError(f'Could not delete {table}') from e

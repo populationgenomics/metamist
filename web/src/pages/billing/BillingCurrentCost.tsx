@@ -4,7 +4,7 @@ import _ from 'lodash'
 import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 
-const CurrentCost = () => {
+const BillingCurrentCost = () => {
     const [openRows, setOpenRows] = React.useState<string[]>([])
 
     const [costRecords, setCosts] = React.useState<BillingCostBudgetRecord[]>([])
@@ -262,4 +262,4 @@ const CurrentCost = () => {
     )
 }
 
-export default CurrentCost
+export default BillingCurrentCost
