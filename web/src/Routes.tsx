@@ -44,11 +44,13 @@ const Routes: React.FunctionComponent = () => (
 
         <Route path="/billing/" element={<BillingHome />} />
         <Route path="/billing/data" element={<BillingData />} />
-        <Route path="/billing/dashboard" element={
-            <ErrorBoundary>
-                <BillingDashboard />
-            </ErrorBoundary>
-        }
+        <Route
+            path="/billing/dashboard"
+            element={
+                <ErrorBoundary>
+                    <BillingDashboard />
+                </ErrorBoundary>
+            }
         />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
@@ -72,7 +74,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
     </Switch>
 )
 

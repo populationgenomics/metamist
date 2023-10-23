@@ -51,7 +51,7 @@ const menuItems = [
                 title: 'Billing Dashboard',
                 url: '/billing/dashboard',
                 icon: <TableRowsIcon />,
-            }
+            },
         ],
     },
     {
