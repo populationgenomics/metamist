@@ -3,6 +3,9 @@ from models.models.analysis import (
     AnalysisInternal,
     DateSizeModel,
     ProjectSizeModel,
+    ProportionalDateModel,
+    ProportionalDateProjectModel,
+    ProportionalDateTemporalMethod,
     SequencingGroupSizeModel,
 )
 from models.models.assay import (

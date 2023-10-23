@@ -2,7 +2,7 @@ import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
 
-import { Dropdown } from 'semantic-ui-react'
+import { Dropdown, Message } from 'semantic-ui-react'
 
 import { useQuery } from '@apollo/client'
 
@@ -25,7 +25,12 @@ const ProjectSelector: React.FunctionComponent<ProjectSelectorProps> = ({ onClic
     const { projectName } = useParams()
 
     if (error) {
-        return <p>An error occurred while getting projects: {error}</p>
+        return (
+            <Message negative>
+                <h4>An error occurred while getting projects</h4>
+                <p>{JSON.stringify(error?.networkError || error)}</p>
+            </Message>
+        )
     }
 
     if (loading) {

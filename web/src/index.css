@@ -62,18 +62,18 @@ html[data-theme='dark-mode'] .ui.selection.dropdown {
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.selection.visible.dropdown>.text:not(.default) {
+html[data-theme='dark-mode'] .ui.selection.visible.dropdown > .text:not(.default) {
     color: rgba(255, 255, 255, 0.87);
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu>.item {
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item {
     background-color: #353535;
     color: rgba(255, 255, 255, 0.87);
     border: none;
     z-index: 10;
 }
 
-html[data-theme='dark-mode'] .ui.dropdown .menu>.item:hover {
+html[data-theme='dark-mode'] .ui.dropdown .menu > .item:hover {
     background-color: #2c2c2c;
     z-index: 10;
 }

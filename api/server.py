@@ -20,7 +20,7 @@ from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
 from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.3.2'
+_VERSION = '6.4.0'
 
 logger = get_logger()
 
@@ -31,7 +31,7 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 app = FastAPI()
 
 if PROFILE_REQUESTS:
-    from fastapi_profiler.profiler_middleware import PyInstrumentProfilerMiddleware
+    from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
 
     app.add_middleware(PyInstrumentProfilerMiddleware)
 

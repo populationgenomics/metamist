@@ -36,14 +36,14 @@ const { MediaContextProvider, Media } = createMedia({
  */
 
 interface HomepageHeadingProps {
-    mobile?: boolean,
+    mobile?: boolean
 }
 
 const HomepageHeading: React.FC<HomepageHeadingProps> = ({ mobile }) => (
     <Container text>
         <Header
-            as='h1'
-            content='Imagine-a-Company'
+            as="h1"
+            content="Imagine-a-Company"
             inverted
             style={{
                 fontSize: mobile ? '2em' : '4em',
@@ -53,8 +53,8 @@ const HomepageHeading: React.FC<HomepageHeadingProps> = ({ mobile }) => (
             }}
         />
         <Header
-            as='h2'
-            content='Do whatever you want when you want to.'
+            as="h2"
+            content="Do whatever you want when you want to."
             inverted
             style={{
                 fontSize: mobile ? '1.5em' : '1.7em',
@@ -62,47 +62,47 @@ const HomepageHeading: React.FC<HomepageHeadingProps> = ({ mobile }) => (
                 marginTop: mobile ? '0.5em' : '1.5em',
             }}
         />
-        <Button primary size='huge'>
+        <Button primary size="huge">
             Get Started
-            <Icon name='arrow right' />
+            <Icon name="arrow right" />
         </Button>
     </Container>
 )
 
 interface DesktopContainerProps {
-    children: React.ReactNode,
+    children: React.ReactNode
 }
 
 const DesktopContainer: React.FC<DesktopContainerProps> = ({ children }) => {
     const [fixed, toggleFixedMenu] = React.useState(true)
 
     return (
-        <Media greaterThan='mobile' >
+        <Media greaterThan="mobile">
             <InView onChange={toggleFixedMenu}>
                 <Segment
                     inverted
-                    textAlign='center'
+                    textAlign="center"
                     style={{ minHeight: 700, padding: '1em 0em' }}
                     vertical
                 >
-                    <Menu
-                        inverted={!fixed}
-                        pointing={!fixed}
-                        secondary={!fixed}
-                        size='large'
-                    >
+                    <Menu inverted={!fixed} pointing={!fixed} secondary={!fixed} size="large">
                         <Container>
-                            <Menu.Item as='a' active>
+                            <Menu.Item as="a" active>
                                 Home
                             </Menu.Item>
-                            <Menu.Item as='a'>Work</Menu.Item>
-                            <Menu.Item as='a'>Company</Menu.Item>
-                            <Menu.Item as='a'>Careers</Menu.Item>
-                            <Menu.Item position='right'>
-                                <Button as='a' inverted={!fixed}>
+                            <Menu.Item as="a">Work</Menu.Item>
+                            <Menu.Item as="a">Company</Menu.Item>
+                            <Menu.Item as="a">Careers</Menu.Item>
+                            <Menu.Item position="right">
+                                <Button as="a" inverted={!fixed}>
                                     Log in
                                 </Button>
-                                <Button as='a' inverted={!fixed} primary={fixed} style={{ marginLeft: '0.5em' }}>
+                                <Button
+                                    as="a"
+                                    inverted={!fixed}
+                                    primary={fixed}
+                                    style={{ marginLeft: '0.5em' }}
+                                >
                                     Sign Up
                                 </Button>
                             </Menu.Item>
@@ -113,12 +113,12 @@ const DesktopContainer: React.FC<DesktopContainerProps> = ({ children }) => {
             </InView>
 
             {children}
-        </Media >
+        </Media>
     )
 }
 
 interface MobileContainerProps {
-    children: React.ReactNode,
+    children: React.ReactNode
 }
 
 const MobileContainer: React.FC<MobileContainerProps> = ({ children }) => {
@@ -128,43 +128,43 @@ const MobileContainer: React.FC<MobileContainerProps> = ({ children }) => {
     const handleToggle = () => setSidebarOpened(true)
 
     return (
-        <Media at='mobile'>
+        <Media at="mobile">
             <Sidebar.Pushable>
                 <Sidebar
                     as={Menu}
-                    animation='overlay'
+                    animation="overlay"
                     inverted
                     onHide={handleSidebarHide}
                     vertical
                     visible={sidebarOpened}
                 >
-                    <Menu.Item as='a' active>
+                    <Menu.Item as="a" active>
                         Home
                     </Menu.Item>
-                    <Menu.Item as='a'>Work</Menu.Item>
-                    <Menu.Item as='a'>Company</Menu.Item>
-                    <Menu.Item as='a'>Careers</Menu.Item>
-                    <Menu.Item as='a'>Log in</Menu.Item>
-                    <Menu.Item as='a'>Sign Up</Menu.Item>
+                    <Menu.Item as="a">Work</Menu.Item>
+                    <Menu.Item as="a">Company</Menu.Item>
+                    <Menu.Item as="a">Careers</Menu.Item>
+                    <Menu.Item as="a">Log in</Menu.Item>
+                    <Menu.Item as="a">Sign Up</Menu.Item>
                 </Sidebar>
 
                 <Sidebar.Pusher dimmed={sidebarOpened}>
                     <Segment
                         inverted
-                        textAlign='center'
+                        textAlign="center"
                         style={{ minHeight: 350, padding: '1em 0em' }}
                         vertical
                     >
                         <Container>
-                            <Menu inverted pointing secondary size='large'>
+                            <Menu inverted pointing secondary size="large">
                                 <Menu.Item onClick={handleToggle}>
-                                    <Icon name='sidebar' />
+                                    <Icon name="sidebar" />
                                 </Menu.Item>
-                                <Menu.Item position='right'>
-                                    <Button as='a' inverted>
+                                <Menu.Item position="right">
+                                    <Button as="a" inverted>
                                         Log in
                                     </Button>
-                                    <Button as='a' inverted style={{ marginLeft: '0.5em' }}>
+                                    <Button as="a" inverted style={{ marginLeft: '0.5em' }}>
                                         Sign Up
                                     </Button>
                                 </Menu.Item>
@@ -195,6 +195,4 @@ const ResponsiveContainer: React.FC<ResponsiveContainerProps> = ({ children }) =
     </MediaContextProvider>
 )
 
-
-
-export default ResponsiveContainer;
+export default ResponsiveContainer

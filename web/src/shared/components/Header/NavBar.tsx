@@ -46,13 +46,18 @@ const menuItems = [
                 title: 'Billing Data',
                 url: '/billing/data',
                 icon: <TableRowsIcon />,
+            },
+            {
+                title: 'Billing Dashboard',
+                url: '/billing/dashboard',
+                icon: <TableRowsIcon />,
             }
-        ]
+        ],
     },
     {
         title: 'Swagger',
         url: '/swagger',
-        icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />
+        icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />,
     },
     {
         title: 'Docs',
@@ -63,7 +68,7 @@ const menuItems = [
         title: 'GraphQL',
         url: '/graphql',
         icon: <TroubleshootIcon />,
-    }
+    },
 ]
 
 interface MenuItem {
@@ -84,22 +89,32 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     const dropdown = (item: MenuItem) => (
         <Dropdown text={item.title} key={index}>
             <Dropdown.Menu>
-                {item.submenu && item.submenu.map((subitem, subindex) => (
-                    <Dropdown.Item as={Link} className="navItem dropitem" to={subitem.url} key={subindex}>
-                        {subitem.title}
-                    </Dropdown.Item>
-                ))}
+                {item.submenu &&
+                    item.submenu.map((subitem, subindex) => (
+                        <Dropdown.Item
+                            as={Link}
+                            className="navItem dropitem"
+                            to={subitem.url}
+                            key={subindex}
+                        >
+                            {subitem.title}
+                        </Dropdown.Item>
+                    ))}
             </Dropdown.Menu>
         </Dropdown>
     )
 
     const popup = (child: React.ReactNode, icon: JSX.Element) => (
         <>
-            <span className="d-none d-lg-block navbarLink">
-                {child}
-            </span>
+            <span className="d-none d-lg-block navbarLink">{child}</span>
             <span className="d-lg-none navbarIcon">
-                <Popup inverted={isDarkMode} className="navPopup" trigger={icon} hoverable position="bottom center">
+                <Popup
+                    inverted={isDarkMode}
+                    className="navPopup"
+                    trigger={icon}
+                    hoverable
+                    position="bottom center"
+                >
                     <h5>{child}</h5>
                 </Popup>
             </span>
@@ -107,9 +122,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
     )
 
     return item.submenu ? (
-        <Menu.Item className="navItem">
-            {popup(dropdown(item), item.icon)}
-        </Menu.Item>
+        <Menu.Item className="navItem">{popup(dropdown(item), item.icon)}</Menu.Item>
     ) : (
         <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
             {popup(item.title, item.icon)}
@@ -129,7 +142,9 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
                 METAMIST
             </Menu.Item>
 
-            {menuItems.map((item, index) => <MenuItem index={index} item={item} />)}
+            {menuItems.map((item, index) => (
+                <MenuItem index={index} item={item} />
+            ))}
 
             <Menu.Menu position="right">
                 <Menu.Item>
@@ -140,9 +155,8 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
                     <Searchbar />
                 </Menu.Item>
             </Menu.Menu>
-
         </Menu>
-    </header >
+    </header>
 )
 
 export default NavBar

@@ -13,13 +13,14 @@ import databases
 
 from api.settings import LOG_DATABASE_QUERIES
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import InternalError, NoOpAenter
+from db.python.utils import InternalError, NoOpAenter, NotFoundError
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
+    'group',
     'analysis',
     'participant',
     'sample',
@@ -33,6 +34,7 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family',
     'family_participant',
     'participant_phenotypes',
+    'group_member',
 ][::-1]
 
 
@@ -56,10 +58,6 @@ class Connection:
                 'An internal error has occurred when passing the project context, '
                 'please send this stacktrace to your system administrator'
             )
-
-
-class NotFoundError(Exception):
-    """Custom error when you can't find something"""
 
 
 class DatabaseConfiguration(abc.ABC):
@@ -200,11 +198,11 @@ class SMConnections:
         conn = await SMConnections._get_made_connection()
         pt = ProjectPermissionsTable(connection=conn)
 
-        project_id = await pt.get_project_id_from_name_and_user(
+        project = await pt.get_and_check_access_to_project_for_name(
             user=author, project_name=project_name, readonly=readonly
         )
 
-        return Connection(connection=conn, author=author, project=project_id)
+        return Connection(connection=conn, author=author, project=project.id)
 
     @staticmethod
     async def get_connection_no_project(author: str):

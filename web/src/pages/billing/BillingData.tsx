@@ -26,9 +26,7 @@ const RouterLink = (props: any) => {
     return <Link to={link}>{props.children}</Link>
 }
 
-const BillingData: React.FunctionComponent<IBillingDataProps> = (
-    props: IBillingDataProps
-) => {
+const BillingData: React.FunctionComponent<IBillingDataProps> = (props: IBillingDataProps) => {
     const [text, setText] = React.useState<string | null>(null)
     const theme = React.useContext(ThemeContext)
     const isDarkMode = theme.theme === 'dark-mode'

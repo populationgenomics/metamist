@@ -2,7 +2,7 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
-import { BillingHome, BillingData } from './pages/billing'
+import { BillingHome, BillingData, BillingDashboard } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
@@ -44,6 +44,12 @@ const Routes: React.FunctionComponent = () => (
 
         <Route path="/billing/" element={<BillingHome />} />
         <Route path="/billing/data" element={<BillingData />} />
+        <Route path="/billing/dashboard" element={
+            <ErrorBoundary>
+                <BillingDashboard />
+            </ErrorBoundary>
+        }
+        />
 
         <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
@@ -66,6 +72,7 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
+
     </Switch>
 )
 

@@ -10,14 +10,14 @@
     opacity: 0;
 }
 
-.switch-toggle input+label {
+.switch-toggle input + label {
     padding: 7px;
     float: left;
     color: #fff;
     cursor: pointer;
 }
 
-.switch-toggle input:checked+label {
+.switch-toggle input:checked + label {
     background: green;
     border-radius: 25px;
     outline: solid;
