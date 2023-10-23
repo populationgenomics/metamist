@@ -35,7 +35,7 @@ logger.setLevel(logging.INFO)
     help='The metamist project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='wgs')
+@click.option('--default-sequencing-type', default='wgs')
 @click.option('--default-sequence-technology', default='short-read')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
