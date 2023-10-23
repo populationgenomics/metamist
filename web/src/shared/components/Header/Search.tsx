@@ -245,31 +245,38 @@ const Searchbar: React.FunctionComponent = () => {
     )
 
     return (
-        <Search
-            showNoResults={false}
-            selectFirstResult
-            loading={loading}
-            placeholder="Search..."
-            onResultSelect={(e, data) => {
-                dispatch({
-                    type: ActionKind.Update,
-                    selection: data.result.title,
-                    query: '',
-                    results: {},
-                } as Action)
-                searchResultToRoute(
-                    data.result.type,
-                    data.result.data.sample_external_id,
-                    data.result.data?.sg_external_id
-                )
-            }}
-            resultRenderer={resultRenderer}
-            onSearchChange={handleSearchChange}
-            results={results}
-            value={value}
-            className="nav-searchbar"
-            id="navsearch"
-        />
+        <div className="search-container">
+            <Search
+                showNoResults={false}
+                selectFirstResult
+                fluid
+                input={{ fluid: true }}
+                loading={loading}
+                placeholder="Search..."
+                onResultSelect={(e, data) => {
+                    dispatch({
+                        type: ActionKind.Update,
+                        selection: data.result.title,
+                        query: '',
+                        results: {},
+                    } as Action)
+                    searchResultToRoute(
+                        data.result.type,
+                        data.result.data.sample_external_id,
+                        data.result.data?.sg_external_id
+                    )
+                }}
+                resultRenderer={resultRenderer}
+                onSearchChange={handleSearchChange}
+                results={results}
+                value={value}
+                className="nav-searchbar"
+                id="navsearch"
+            />
+            <label className="searchbutton" htmlFor="navsearch">
+                <SearchIcon />
+            </label>
+        </div>
     )
 }
 

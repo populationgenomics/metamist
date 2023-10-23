@@ -78,21 +78,41 @@ interface MenuItemProps {
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+
+    const dropdown = (item: MenuItem) => (
+        <Dropdown text={item.title} key={index}>
+            <Dropdown.Menu>
+                {item.submenu && item.submenu.map((subitem, subindex) => (
+                    <Dropdown.Item as={Link} className="navItem dropitem" to={subitem.url} key={subindex}>
+                        {subitem.title}
+                    </Dropdown.Item>
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    )
+
+    const popup = (child: React.ReactNode, icon: JSX.Element) => (
+        <>
+            <span className="d-none d-lg-block navbarLink">
+                {child}
+            </span>
+            <span className="d-lg-none navbarIcon">
+                <Popup inverted={isDarkMode} className="navPopup" trigger={icon} hoverable position="bottom center">
+                    <h5>{child}</h5>
+                </Popup>
+            </span>
+        </>
+    )
+
     return item.submenu ? (
         <Menu.Item className="navItem">
-            <Dropdown text={item.title} key={index}>
-                <Dropdown.Menu>
-                    {item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item as={Link} className="navItem dropitem" to={subitem.url} key={subindex}>
-                            {subitem.title}
-                        </Dropdown.Item>
-                    ))}
-                </Dropdown.Menu>
-            </Dropdown>
+            {popup(dropdown(item), item.icon)}
         </Menu.Item>
     ) : (
         <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
-            {item.title}
+            {popup(item.title, item.icon)}
         </Menu.Item>
     )
 }
@@ -103,7 +123,7 @@ interface NavBarProps {
 
 const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
     <header className="App-header">
-        <Menu className="header" stackable>
+        <Menu className="header">
             <Menu.Item as={Link} id="metamist-img" to="/">
                 <MuckTheDuck height={28} style={{ marginRight: '5px' }} />
                 METAMIST
@@ -120,6 +140,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
                     <Searchbar />
                 </Menu.Item>
             </Menu.Menu>
+
         </Menu>
     </header >
 )
