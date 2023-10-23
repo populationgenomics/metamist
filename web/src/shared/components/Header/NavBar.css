@@ -1,35 +1,55 @@
 .App-header {
     background-color: #24344f;
-    position: fixed;
+    position: sticky;
     top: 0;
     width: 100%;
     z-index: 999;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding: 0 8px;
     /* height: 50px; */
 }
 
-.metamist {
-    font-family: 'Raleway', sans-serif;
+.App-header a {
+    color: white !important;
+    text-decoration: none;
+}
+
+.App-header div {
     color: white;
-    font-size: 28px;
-    /* display: inline-block; */
+    text-decoration: none;
 }
 
-.header {
+.navItem {
+    padding: 0 8px;
+}
+
+.ui.header.menu {
     background-color: #24344f;
-    display: flex;
-    align-items: center;
-    padding: 0px 80px 0px 80px;
+    box-shadow: none;
+    border: none;
 }
 
-.metamist-img {
-    vertical-align: bottom;
+.ui.dropdown .menu {
+    border: none;
+    background: #24344f !important;
+    top: 150% !important;
 }
 
-.navbarLink {
+.ui.menu .ui.dropdown .menu > .item.dropitem {
+    color: #f2f2f2 !important;
+    padding: 16px !important;
+    background: #24344f !important;
+
+    &:hover {
+        color: #f2f2f2 !important;
+    }
+}
+
+.ui.menu .item {
+    padding: 8px !important;
+}
+
+.navbarText {
     color: #f2f2f2;
-    padding: 0 16px;
     text-decoration: none;
     font-size: 17px;
     display: inline-block;
@@ -38,9 +58,33 @@
 .navbarIcon {
     padding: 0 8px;
     display: inline-block;
+    color: #f2f2f2;
 }
 
-.App-header a {
+.navPopup {
+    background-color: #24344f;
+    color: #f2f2f2;
+}
+
+.navbarLink {
+    padding: 0 8px;
+}
+
+#metamist {
+    font-family: 'Raleway', sans-serif;
     color: white;
-    text-decoration: none;
+    font-size: 28px;
+    /* padding: 0 8px; */
+}
+
+#metamist-img {
+    vertical-align: bottom;
+    font-size: 28px;
+    font-weight: bold;
+    padding: 16px;
+
+    &:hover {
+        cursor: pointer;
+        background-color: #24344f;
+    }
 }
