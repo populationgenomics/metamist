@@ -892,7 +892,9 @@ class WebProjectSummaryDb(DbBase):
         sampl = SampleLayer(self._connection)
         sample_query, values = self._project_summary_sample_query(grid_filter)
         ptable = ProjectPermissionsTable(self.connection)
-        project_db = await ptable.get_project_by_id(self.project)
+        project_db = await ptable.get_and_check_access_to_project_for_id(
+            self.author, self.project, readonly=True
+        )
         project = WebProject(
             id=project_db.id,
             name=project_db.name,
@@ -996,7 +998,7 @@ WHERE fp.participant_id in :pids
             sgtable.get_type_numbers_for_project(project=self.project),
             seqtable.get_assay_type_numbers_by_batch_for_project(project=self.project),
             atable.get_seqr_stats_by_sequencing_type(project=self.project),
-            SeqrLayer(self._connection).get_synchronisable_types(self.project),
+            SeqrLayer(self._connection).get_synchronisable_types(project_db),
         )
 
         # post-processing

@@ -1,3 +1,4 @@
+import enum
 import json
 from datetime import date
 from typing import Any
@@ -133,3 +134,27 @@ class ProjectSizeModel(BaseModel):
 
     project: str
     sequencing_groups: list[SequencingGroupSizeModel]
+
+
+class ProportionalDateProjectModel(BaseModel):
+    """Stores the percentage / total size of a project on a date"""
+
+    project: str
+    percentage: float | int
+    size: int
+
+
+class ProportionalDateModel(BaseModel):
+    """
+    Stores the percentage / total size of all projects for a date
+    """
+
+    date: date
+    projects: list[ProportionalDateProjectModel]
+
+
+class ProportionalDateTemporalMethod(enum.Enum):
+    """Method for which to calculate the "start" date"""
+
+    SAMPLE_CREATE_DATE = 'SAMPLE_CREATE_DATE'
+    SG_ES_INDEX_DATE = 'ES_INDEX_DATE'

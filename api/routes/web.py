@@ -23,6 +23,7 @@ from models.models.web import (
     ProjectSeqrStats,
     ProjectSummary,
 )
+from models.models.web import PagingLinks, ProjectSummary
 
 
 class SearchResponseModel(BaseModel):
@@ -86,7 +87,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )
-    project_ids = list(projects.keys())
+    project_ids = [p.id for p in projects]
     responses = await SearchLayer(connection).search(keyword, project_ids=project_ids)
 
     for res in responses:

@@ -8,3 +8,4 @@ from api.routes.project import router as project_router
 from api.routes.web import router as web_router
 from api.routes.enum import router as enum_router
 from api.routes.sequencing_groups import router as sequencing_groups_router
+from api.routes.billing import router as billing_router

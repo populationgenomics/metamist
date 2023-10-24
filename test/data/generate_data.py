@@ -172,7 +172,14 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             type='cram',
             status=AnalysisStatus('completed'),
             output=f'FAKE://greek-myth/crams/{s}.cram',
-            meta={'sequencing_type': 'genome'},
+            timestamp_completed=(
+                datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
+            ).isoformat(),
+            meta={
+                'sequencing_type': 'genome',
+                # random size between 5, 25 GB
+                'size': random.randint(5 * 1024, 25 * 1024) * 1024 * 1024,
+            },
         )
         for s in sequencing_group_ids
     ]

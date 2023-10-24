@@ -10,6 +10,7 @@ import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import SeqrStats from './pages/seqrStats/SeqrStats'
+import BillingDashboard from './pages/billing/BillingDashboard'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -67,6 +68,14 @@ const Routes: React.FunctionComponent = () => (
         />
 
         <Route path="seqr/stats" element={<SeqrStats />} />
+        <Route
+            path="billing"
+            element={
+                <ErrorBoundary>
+                    <BillingDashboard />
+                </ErrorBoundary>
+            }
+        />
     </Switch>
 )
 

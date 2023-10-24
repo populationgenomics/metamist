@@ -36,6 +36,13 @@ SAMPLE_CHECKSUM_OFFSET = int(os.getenv('SM_SAMPLECHECKOFFSET', '2'))
 SEQUENCING_GROUP_PREFIX = os.getenv('SM_SEQUENCINGGROUPPREFIX', 'CPGLCL').upper()
 SEQUENCING_GROUP_CHECKSUM_OFFSET = int(os.getenv('SM_SEQUENCINGGROUPCHECKOFFSET', '9'))
 
+# billing settings
+BQ_GCP_BILLING_PROJECT = os.getenv('SM_GCP_BILLING_PROJECT')
+# This is to optimise BQ queries, DEV table has data only for Mar 2023
+# TODO change to 7 days or similar before merging into DEV
+BQ_DAYS_BACK_OPTIMAL = 210
+BILLING_CACHE_RESPONSE_TTL = 1800  # 30 minutes
+
 
 def get_default_user() -> str | None:
     """Determine if a default user is available"""
