@@ -43,6 +43,11 @@ const menuItems = [
                 icon: <HomeIcon />,
             },
             {
+                title: 'Billing Current Cost',
+                url: '/billing/currentCost',
+                icon: <TableRowsIcon />,
+            },
+            {
                 title: 'Billing Data',
                 url: '/billing/data',
                 icon: <TableRowsIcon />,

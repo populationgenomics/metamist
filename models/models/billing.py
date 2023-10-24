@@ -124,6 +124,7 @@ class BillingColumn(str, Enum):
 
     # base view columns
     TOPIC = 'topic'
+    PROJECT = 'project'
     DAY = 'day'
     COST_CATEGORY = 'cost_category'
     SKU = 'sku'
@@ -207,4 +208,55 @@ class BillingTotalCostRecord(SMBase):
             sequencing_group=record.get('sequencing_group'),
             cost=record.get('cost'),
             currency=record.get('currency'),
+        )
+
+
+class BillingCostDetailsRecord(SMBase):
+    """_summary_"""
+
+    cost_group: str
+    cost_category: str
+    daily_cost: Decimal | None
+    monthly_cost: Decimal | None
+
+    @staticmethod
+    def from_json(record):
+        """Create BillingCostDetailsRecord from json"""
+        return BillingCostDetailsRecord(
+            cost_group=record.get('cost_group'),
+            cost_category=record.get('cost_category'),
+            daily_cost=record.get('daily_cost'),
+            monthly_cost=record.get('monthly_cost'),
+        )
+
+
+class BillingCostBudgetRecord(SMBase):
+    """Return class for the Billing Total Budget / Cost record"""
+
+    field: str | None
+    total_monthly: Decimal | None
+    total_daily: Decimal | None
+
+    compute_monthly: Decimal | None
+    compute_daily: Decimal | None
+    storage_monthly: Decimal | None
+    storage_daily: Decimal | None
+    details: list[BillingCostDetailsRecord] | None
+    budget_spent: Decimal | None
+
+    @staticmethod
+    def from_json(record):
+        """Create BillingTopicCostCategoryRecord from json"""
+        return BillingCostBudgetRecord(
+            field=record.get('field'),
+            total_monthly=record.get('total_monthly'),
+            total_daily=record.get('total_daily'),
+            compute_monthly=record.get('compute_monthly'),
+            compute_daily=record.get('compute_daily'),
+            storage_monthly=record.get('storage_monthly'),
+            storage_daily=record.get('storage_daily'),
+            details=[
+                BillingCostDetailsRecord.from_json(row) for row in record.get('details')
+            ],
+            budget_spent=record.get('budget_spent'),
         )

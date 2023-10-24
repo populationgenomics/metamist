@@ -11,6 +11,8 @@ from api.utils.db import (
 )
 from db.python.layers.billing import BillingLayer
 from models.models.billing import (
+    BillingColumn,
+    BillingCostBudgetRecord,
     BillingQueryModel,
     BillingRowRecord,
     BillingTotalCostRecord,
@@ -288,4 +290,30 @@ async def get_total_cost(
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_total_cost(query)
+    return records
+
+
+@router.get(
+    '/running-cost/{field}',
+    response_model=list[BillingCostBudgetRecord],
+    operation_id='getRunningCost',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_running_costs(
+    field: BillingColumn,
+    author: str = get_author,
+) -> list[BillingCostBudgetRecord]:
+    """
+    Get running cost for specified fields in database
+    e.g. fields = ['dataset', 'project', 'topic']
+    """
+
+    # TODO replace alru_cache with async-cache?
+    # so we can skip author for caching?
+    # pip install async-cache
+    # @AsyncTTL(time_to_live=BILLING_CACHE_RESPONSE_TTL, maxsize=1024, skip_args=2)
+
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_running_cost(field)
     return records
