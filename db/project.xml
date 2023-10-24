@@ -1204,4 +1204,31 @@
 			"analysis-runner" </sql>
 
 	</changeSet>
+	<changeSet id="2023-10-24-sample-external-id" author="john.marshall">
+		<createTable tableName="sample_external_id">
+			<column name="project" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_PROJECT_SAMPLE_EXTERNAL_ID"
+					references="project(id)" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_SAMPLE_SAMPLE_EXTERNAL_ID"
+					references="sample(id)" />
+			</column>
+			<column name="external_id" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_SAMPLE_EXTERNAL_ID_CHANGELOG_ID"
+					references="audit_log(id)" />
+			</column>
+			<column name="name" type="TEXT" />
+			<column name="meta" type="LONGTEXT" />
+		</createTable>
+	</changeSet>
 </databaseChangeLog>
