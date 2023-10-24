@@ -492,7 +492,7 @@ WHERE
 
         response = []
         for pid in projects:
-            project = await ptable.get_project_by_id(pid)
+            project = await ptable.get_and_check_access_to_project_for_id(self.author, pid, readonly=True)
             for sequencing_type in sequencing_types:
                 crams_in_project_and_sequencing_type = [
                     cram['sequencing_group_id']
@@ -575,7 +575,7 @@ WHERE
 
         response = []
         for pid in projects:
-            project = await ptable.get_project_by_id(pid)
+            project = await ptable.get_and_check_access_to_project_for_id(self.author, pid, readonly=True)
             for sequencing_type in sequencing_types:
                 sequencing_groups_with_crams = [
                     cram['sequencing_group_id'] for cram in crams
