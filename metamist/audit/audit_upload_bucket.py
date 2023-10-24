@@ -82,7 +82,7 @@ def audit_upload_bucket(
                 default_analysis_type,
                 default_analysis_status,
             ),
-            timeout=60,
+            timeout=None,
         )
     )
 
@@ -114,6 +114,7 @@ class UploadBucketAuditor(GenericAuditor):
         assay_files_to_delete: list[tuple[str, int, str, list[int]]],
         assay_files_to_ingest: list[tuple[str, str, str, int, str]],
         unaligned_sgs: list[tuple[str, str]],
+        write_to_local: bool = True,
     ):
         """
         Writes the 'assay files to delete/ingest' csv reports and upload them to the bucket.
@@ -124,7 +125,10 @@ class UploadBucketAuditor(GenericAuditor):
         """
         today = datetime.today().strftime('%Y-%m-%d')
 
-        report_path = f'gs://{bucket_name}/audit_results/{today}/'
+        if write_to_local:
+            report_path = f'/Users/michar/Desktop/tmp/{today}/'
+        else:
+            report_path = f'gs://{bucket_name}/audit_results/{today}/'
 
         if set(sequencing_types) == set(get_sequencing_types()):
             sequencing_types_str = 'all'
@@ -247,7 +251,14 @@ async def audit_upload_bucket_async(
         sg_sample_id_map,
         assay_sg_id_map,
         assay_filepaths_filesizes,
-    ) = auditor.get_assay_map_from_participants(participant_data)
+        md5_check_list,
+    ) = await auditor.get_assay_map_from_participants(participant_data)
+
+    await asyncio.gather(*md5_check_list)
+
+    mismatched_md5_hashed = await auditor.get_mismatched_md5_hashed_files(
+        participant_data, assay_filepaths_filesizes
+    )
 
     # Get all completed cram output paths for the samples in the dataset and validate them
     sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(
@@ -284,15 +295,17 @@ async def audit_upload_bucket_async(
         reads_to_ingest, sg_cram_paths
     )
 
+    # COMMENTED OUT AS TO AVOID WRITING TO BUCKETS
     # Write the reads to delete, reads to ingest, and unaligned SGs reports
-    await auditor.write_upload_bucket_audit_reports(
-        bucket,
-        sequencing_types=sequencing_types,
-        file_types=file_types,
-        assay_files_to_delete=reads_to_delete,
-        assay_files_to_ingest=possible_assay_ingests,
-        unaligned_sgs=unaligned_sgs,
-    )
+    # await auditor.write_upload_bucket_audit_reports(
+    #     bucket,
+    #     sequencing_types=sequencing_types,
+    #     file_types=file_types,
+    #     assay_files_to_delete=reads_to_delete,
+    #     assay_files_to_ingest=possible_assay_ingests,
+    #     unaligned_sgs=unaligned_sgs,
+    #     write_to_local=True,
+    # )
 
 
 @click.command()

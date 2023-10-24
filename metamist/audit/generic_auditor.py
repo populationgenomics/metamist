@@ -4,6 +4,8 @@ import logging
 import os
 from typing import Any
 from datetime import datetime
+import base64
+import asyncio
 
 from gql.transport.requests import log as requests_logger
 from metamist.audit.audithelper import AuditHelper
@@ -176,7 +178,7 @@ class GenericAuditor(AuditHelper):
             for sample in participant['samples']
         }
 
-    def get_assay_map_from_participants(
+    async def get_assay_map_from_participants(
         self, participants: list[dict]
     ) -> tuple[dict[str, str], dict[int, str], dict[Any, list[tuple[Any, Any]]]]:
         """
@@ -197,6 +199,9 @@ class GenericAuditor(AuditHelper):
             for participant in participants
             for sample in participant['samples']
         }
+
+        md5_check_list = []
+
         for sample_id, sgs in sample_sgs.items():
             for sg in sgs:
                 if sg['type'].lower() not in self.sequencing_types:
@@ -240,7 +245,87 @@ class GenericAuditor(AuditHelper):
                             )
                         )
 
-        return sg_sample_id_map, assay_sg_id_map, assay_filepaths_filesizes
+                        # here implement md5 hash check
+                        location = read.get('location')
+                        checksum = read.get('checksum').split(' ')[0].split(':')[1]
+                        md5_check_list.append(self.check_md5_hash(location, checksum))
+
+        return (
+            sg_sample_id_map,
+            assay_sg_id_map,
+            assay_filepaths_filesizes,
+            md5_check_list,
+        )
+
+    async def check_md5_hash(self, location, checksum):
+        gcs_md5_hash = await self.get_md5_hash(location)
+        gcs_md5_hash = base64.b64decode(gcs_md5_hash).hex()  # convert md5 hash to hex
+        if not gcs_md5_hash:
+            logging.error(f'{self.dataset} :: Could not get md5 hash for {location}')
+        if gcs_md5_hash != checksum:
+            logging.error(f'{self.dataset} :: MD5 hash mismatch for {location}')
+
+    async def get_md5_hash(self, filepath: str) -> str:
+        """
+        Returns the md5 hash of a file in GCS.
+        """
+        if not filepath.startswith('gs://'):
+            return ''
+        bucket_name, blob_name = filepath.removeprefix('gs://').split('/', 1)
+        blob = await self.get_gcs_blob(filepath)
+        if not blob:
+            return ''
+        return blob.md5_hash
+
+    def get_md5_from_metamist(self, participant_data, assay_id, assay_filepaths):
+        """
+        Returns the md5 hash of a file in Metamist.
+        """
+        for participant in participant_data:
+            for sample in participant['samples']:
+                for sequencingGroup in sample['sequencingGroups']:
+                    for assay in sequencingGroup['assays']:
+                        if assay['id'] == assay_id:
+                            reads = assay['meta'].get('reads')
+                            if reads is None:
+                                logging.warning(
+                                    f'{self.dataset} :: Attempting to get md5 for SG {sequencingGroup["id"]} assay {assay["id"]}. No reads field'
+                                )
+                            for read in reads:
+                                if read.get('location') in [
+                                    path[0] for path in assay_filepaths
+                                ]:
+                                    return read.get('checksum')
+
+    async def get_mismatched_md5_hashed_files(
+        self,
+        participant_data: list[dict],
+        assay_filepaths_filesizes: dict[Any, list[tuple[Any, Any]]],
+    ) -> list[tuple[str, str]]:
+        """
+        Returns a list of tuples containing the filepaths of files that have mismatched md5 hashes between Metamist and GCS.
+        """
+        mismatched_md5_hashes = []
+        for assay_id, assay_filepaths in assay_filepaths_filesizes.items():
+            for filepath, filesize in assay_filepaths:
+                if not filepath.startswith('gs://'):
+                    continue
+                gcs_md5_hash = await self.get_md5_hash(filepath)
+                if not gcs_md5_hash:
+                    logging.error(
+                        f'{self.dataset} :: Could not get md5 hash for {filepath}'
+                    )
+                for file_path in assay_filepaths:
+                    metamist_md5_hash = (
+                        self.get_md5_from_metamist(
+                            participant_data, assay_id, assay_filepaths
+                        )
+                        .split(' ')[0]
+                        .split(':')[1]
+                    )
+                if gcs_md5_hash != metamist_md5_hash:
+                    mismatched_md5_hashes.append((filepath, gcs_md5_hash))
+        return mismatched_md5_hashes
 
     async def get_analysis_cram_paths_for_dataset_sgs(
         self,
@@ -260,6 +345,16 @@ class GenericAuditor(AuditHelper):
         logging.getLogger().setLevel(logging.INFO)
 
         analyses = analyses_query_result['sequencingGroups']
+        # check if sg only has CRAM analyses
+        for sg in analyses:
+            analyses_list = sg['analyses']
+            analysis_types = set(
+                analysis.get['type'] for analysis in analyses_list if analysis
+            )
+            if analysis_types == {'cram'}:
+                logging.warning(
+                    f'{self.dataset} :: SG {sg["id"]} has only CRAM analyses'
+                )
         analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
 
         # Report any crams missing the sequencing type
@@ -323,6 +418,10 @@ class GenericAuditor(AuditHelper):
                     logging.warning(
                         f'{self.dataset} :: SG {sg_without_cram} missing CRAM but has analysis {completed_analysis}'
                     )
+        else:  # no analyses found for any of the sgs
+            logging.warning(
+                f'{self.dataset} :: No analyses found for any of the sgs without crams: {sgs_without_crams}'
+            )
 
     async def get_complete_and_incomplete_sgs(
         self,
