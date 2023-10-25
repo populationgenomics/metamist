@@ -633,11 +633,15 @@ class Query:
         # we list project names, but internally we want project ids
         project_id_map = {}
         if project:
-            project_ids = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_ids(
-                user=connection.author, project_ids=project_ids, readonly=True
+            print(project)
+            project_names = project.all_values()
+            print(project_names)
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
             )
+            print(projects)
             project_id_map = {p.name: p.id for p in projects}
+            print(project_id_map)
 
         filter_ = SequencingGroupFilter(
             project=project.to_internal_filter(lambda val: project_id_map[val])
