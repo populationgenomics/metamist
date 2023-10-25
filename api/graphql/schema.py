@@ -589,9 +589,9 @@ class Query:
 
         project_name_map: dict[str, int] = {}
         if project:
-            project_ids = project.all_values()
-            projects = await ptable.get_and_check_access_to_projects_for_ids(
-                user=connection.author, project_ids=project_ids, readonly=True
+            project_names = project.all_values()
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
 
