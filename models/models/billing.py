@@ -124,7 +124,7 @@ class BillingColumn(str, Enum):
 
     # base view columns
     TOPIC = 'topic'
-    PROJECT = 'project'
+    PROJECT = 'gcp_project'
     DAY = 'day'
     COST_CATEGORY = 'cost_category'
     SKU = 'sku'

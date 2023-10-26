@@ -24,6 +24,22 @@ router = APIRouter(prefix='/billing', tags=['billing'])
 
 
 @router.get(
+    '/gcp-projects',
+    response_model=list[str],
+    operation_id='getGcpProjects',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_gcp_projects(
+    author: str = get_author,
+) -> list[str]:
+    """Get list of all GCP projects in database"""
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_gcp_projects()
+    return records
+
+
+@router.get(
     '/topics',
     response_model=list[str],
     operation_id='getTopics',

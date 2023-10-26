@@ -2,7 +2,13 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
-import { BillingHome, BillingData, BillingDashboard, BillingCurrentCost } from './pages/billing'
+import {
+    BillingHome,
+    BillingData,
+    BillingDashboard,
+    BillingCurrentCost,
+    BillingCostByTime,
+} from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
@@ -44,6 +50,14 @@ const Routes: React.FunctionComponent = () => (
 
         <Route path="/billing/" element={<BillingHome />} />
         <Route path="/billing/currentCost" element={<BillingCurrentCost />} />
+        <Route
+            path="/billing/costByTime"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByTime />
+                </ErrorBoundary>
+            }
+        />
         <Route path="/billing/data" element={<BillingData />} />
         <Route
             path="/billing/dashboard"

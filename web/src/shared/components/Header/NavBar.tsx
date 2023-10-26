@@ -48,6 +48,11 @@ const menuItems = [
                 icon: <TableRowsIcon />,
             },
             {
+                title: 'Billing Cost By Time',
+                url: '/billing/costByTime',
+                icon: <TableRowsIcon />,
+            },
+            {
                 title: 'Billing Data',
                 url: '/billing/data',
                 icon: <TableRowsIcon />,
