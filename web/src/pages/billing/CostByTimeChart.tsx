@@ -113,8 +113,11 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
                 start={new Date(start)}
                 end={new Date(end)}
                 isPercentage={false}
+                xLabel=""
                 yLabel="Cost (AUD)"
                 seriesLabel="Service"
+                extended={false}
+                showDate={true}
             />
         </>
     )
