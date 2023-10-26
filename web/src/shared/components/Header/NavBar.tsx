@@ -43,17 +43,12 @@ const menuItems = [
                 icon: <HomeIcon />,
             },
             {
-                title: 'Billing Current Cost',
+                title: 'Current Cost',
                 url: '/billing/currentCost',
                 icon: <TableRowsIcon />,
             },
             {
-                title: 'Billing Data',
-                url: '/billing/data',
-                icon: <TableRowsIcon />,
-            },
-            {
-                title: 'Billing Dashboard',
+                title: 'Dashboard',
                 url: '/billing/dashboard',
                 icon: <TableRowsIcon />,
             },
@@ -93,12 +88,12 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
 
     const dropdown = (item: MenuItem) => (
         <Dropdown text={item.title} key={index}>
-            <Dropdown.Menu>
+            <Dropdown.Menu id="navDrop">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
                         <Dropdown.Item
                             as={Link}
-                            className="navItem dropitem"
+                            id="navItem"
                             to={subitem.url}
                             key={subindex}
                         >

@@ -19,7 +19,7 @@
 }
 
 .navItem {
-    padding: 0 8px;
+    padding: 8px;
 }
 
 .ui.header.menu {
@@ -28,19 +28,19 @@
     border: none;
 }
 
-.ui.dropdown .menu {
-    border: none;
+#navDrop {
     background: #24344f !important;
     top: 150% !important;
 }
 
-.ui.menu .ui.dropdown .menu > .item.dropitem {
+.ui.menu .ui.dropdown .menu>#navItem {
     color: #f2f2f2 !important;
     padding: 16px !important;
     background: #24344f !important;
 
     &:hover {
         color: #f2f2f2 !important;
+        background: #0f1827 !important;
     }
 }
 
@@ -56,7 +56,7 @@
 }
 
 .navbarIcon {
-    padding: 0 8px;
+    padding: 8px;
     display: inline-block;
     color: #f2f2f2;
 }
@@ -67,7 +67,7 @@
 }
 
 .navbarLink {
-    padding: 0 8px;
+    padding: 8px;
 }
 
 #metamist {
