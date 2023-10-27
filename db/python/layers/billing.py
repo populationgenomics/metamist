@@ -1,5 +1,8 @@
-from collections import Counter
+import re
+
 from typing import Any
+from datetime import datetime
+from collections import Counter
 from google.cloud import bigquery
 
 from models.models import (
@@ -22,6 +25,8 @@ BQ_AGGREG_RAW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate-dev'
 BQ_AGGREG_EXT_VIEW = (
     f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost_extended-dev'
 )
+
+INVOICE_DAY_DIFF = 3
 
 
 class BillingLayer(BqBaseLayer):
@@ -132,13 +137,13 @@ class BillingLayer(BqBaseLayer):
         return await billing_db.get_total_cost(query)
 
     async def get_running_cost(
-        self, field: BillingColumn
+        self, field: BillingColumn, invoice_month: str | None = None
     ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget
         """
         billing_db = BillingDb(self.connection)
-        return await billing_db.get_running_cost(field)
+        return await billing_db.get_running_cost(field, invoice_month)
 
 
 class BillingDb(BqDbBase):
@@ -530,7 +535,9 @@ class BillingDb(BqDbBase):
 
         return None
 
-    async def execute_running_cost_query(self, field: BillingColumn):
+    async def execute_running_cost_query(
+        self, field: BillingColumn, invoice_month: str | None = None
+    ):
         """
         Run query to get running cost of selected field
         """
@@ -540,9 +547,33 @@ class BillingDb(BqDbBase):
         else:
             view_to_use = BQ_AGGREG_VIEW
 
-        # TODO for production change to select current day, month
-        start_day = '2023-03-01'
-        current_day = '2023-03-10'
+        has_valid_invoice_month = False
+        invoice_month_filter = ''
+        if not invoice_month or not re.match(r'^\d{6}$'):
+            # TODO for production change to select current day, month
+            start_day = '2023-03-01'
+            current_day = '2023-03-10'
+        else:
+            # Grab the first day of invoice month then subtract INVOICE_DAY_DIFF days
+            start_day = (
+                datetime.strptime(invoice_month, '%Y%m')
+                .replace(day=1)
+                .timedelta(days=-INVOICE_DAY_DIFF)
+            )
+
+            # Grab the last day of invoice month then add INVOICE_DAY_DIFF days
+            current_day = (
+                datetime.strptime(invoice_month, '%Y%m')
+                .replace(day=1)
+                .timedelta(month=1, days=-1)
+                .timedelta(days=INVOICE_DAY_DIFF)
+            )
+
+            start_day = start_day.strftime('%Y-%m-%d')
+            current_day = current_day.strftime('%Y-%m-%d')
+
+            has_valid_invoice_month = True
+            invoice_month_filter = ' AND invoice_month = @invoice_month'
 
         _query = f"""
         SELECT
@@ -564,6 +595,7 @@ class BillingDb(BqDbBase):
                 `{view_to_use}`
                 WHERE day >= TIMESTAMP(@start_day) AND
                 day <= TIMESTAMP(@current_day)
+                {invoice_month_filter}
                 GROUP BY
                 field,
                 cost_category
@@ -580,7 +612,8 @@ class BillingDb(BqDbBase):
             `{view_to_use}`
             WHERE day > TIMESTAMP_ADD(
                 TIMESTAMP(@current_day), INTERVAL -2 DAY
-            ) AND day <=  TIMESTAMP(@current_day)
+            ) AND day <= TIMESTAMP(@current_day)
+            {invoice_month_filter}
             GROUP BY
                 field,
                 cost_category
@@ -590,22 +623,25 @@ class BillingDb(BqDbBase):
         ORDER BY field ASC, daily_cost DESC;
         """
 
+        query_params = [
+            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+            bigquery.ScalarQueryParameter('current_day', 'STRING', current_day),
+        ]
+
+        if has_valid_invoice_month:
+            query_params.append(
+                bigquery.ScalarQueryParameter('invoice_month', 'STRING', invoice_month)
+            )
+
         return list(
             self._connection.connection.query(
                 _query,
-                job_config=bigquery.QueryJobConfig(
-                    query_parameters=[
-                        bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
-                        bigquery.ScalarQueryParameter(
-                            'current_day', 'STRING', current_day
-                        ),
-                    ]
-                ),
+                job_config=bigquery.QueryJobConfig(query_parameters=query_params),
             ).result()
         )
 
     async def get_running_cost(
-        self, field: BillingColumn
+        self, field: BillingColumn, invoice_month: str | None = None
     ) -> list[BillingCostBudgetRecord]:
         """
         Get currently running cost of selected field

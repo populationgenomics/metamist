@@ -22,12 +22,23 @@ const BillingCurrentCost = () => {
     })
 
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.GcpProject)
+    const [invoiceMonth, setInvoiceMonth] = React.useState<string>()
 
-    const getCosts = (grp: BillingColumn) => {
+    const onGroupBySelect = (event: any, data: any) => {
+        setGroupBy(data.value)
+        getCosts(data.value, invoiceMonth)
+    }
+
+    const onInvoiceMonthSelect = (event: any, data: any) => {
+        setInvoiceMonth(data.value)
+        getCosts(groupBy, data.value)
+    }
+
+    const getCosts = (grp: BillingColumn, invoiceMonth: string) => {
         setIsLoading(true)
         setError(undefined)
         new BillingApi()
-            .getRunningCost(grp)
+            .getRunningCost(grp, invoiceMonth)
             .then((response) => {
                 setIsLoading(false)
                 setCosts(response.data)
@@ -120,24 +131,27 @@ const BillingCurrentCost = () => {
         return undefined
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        getCosts(data.value)
-    }
-
     return (
-        <div>
-            <h1>Billing Current Invoice Month</h1>
+        <>
+            <h1>Billing By Invoice Month</h1>
 
-            <Grid>
-                <Grid.Row>
+            <Grid columns='equal'>
+                <Grid.Column>
                     <FieldSelector
                         label="Group By"
                         fieldName="Group"
                         onClickFunction={onGroupBySelect}
                         selected={groupBy}
                     />
-                </Grid.Row>
+                </Grid.Column>
+                <Grid.Column>
+                    <FieldSelector
+                        label="Invoice Month"
+                        fieldName="InvoiceMonth"
+                        onClickFunction={onInvoiceMonthSelect}
+                        selected={invoiceMonth}
+                    />
+                </Grid.Column>
             </Grid>
 
 
@@ -289,7 +303,7 @@ const BillingCurrentCost = () => {
                     ))}
                 </SUITable.Body>
             </Table>
-        </div>
+        </>
     )
 }
 

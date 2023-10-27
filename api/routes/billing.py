@@ -336,6 +336,7 @@ async def get_total_cost(
 @alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_running_costs(
     field: BillingColumn,
+    invoice_month: str | None = None,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """
@@ -350,5 +351,5 @@ async def get_running_costs(
 
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
-    records = await billing_layer.get_running_cost(field)
+    records = await billing_layer.get_running_cost(field, invoice_month)
     return records

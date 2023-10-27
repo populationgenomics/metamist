@@ -6,17 +6,14 @@ import { BrowserRouter as Router } from 'react-router-dom'
 
 import Routes from './Routes'
 import NavBar from './shared/components/Header/NavBar'
-import ResponsiveContainer from './shared/components/ResponsiveContainer'
 
 const App: React.FunctionComponent = () => (
     <Router>
         <div className="App">
-            {/* <ResponsiveContainer> */}
             <NavBar />
             <div className="body">
                 <Routes />
             </div>
-            {/* </ResponsiveContainer> */}
         </div>
     </Router>
 )
