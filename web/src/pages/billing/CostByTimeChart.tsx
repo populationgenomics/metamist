@@ -18,7 +18,7 @@ interface ICostByTimeChartProps {
     start: string
     end: string
     groupBy: string
-    selectedGroup: string
+    selectedGroup: string | undefined
 }
 
 const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({

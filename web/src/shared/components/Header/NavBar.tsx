@@ -148,7 +148,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
             </Menu.Item>
 
             {menuItems.map((item, index) => (
-                <MenuItem index={index} item={item} />
+                <MenuItem index={index} item={item} key={index} />
             ))}
 
             <Menu.Menu position="right">

@@ -131,6 +131,7 @@ class BillingColumn(str, Enum):
     AR_GUID = 'ar_guid'
     CURRENCY = 'currency'
     COST = 'cost'
+    INVOICE_MONTH = 'invoice_month'
 
     # extended, filtered view columns
     DATASET = 'dataset'

@@ -2,11 +2,13 @@ import * as React from 'react'
 
 import { useParams } from 'react-router-dom'
 
-import { Dropdown, Message } from 'semantic-ui-react'
+import { Dropdown, Grid, Input, Message } from 'semantic-ui-react'
 
 import { BillingApi, BillingColumn } from '../../sm-api'
 
 import './Billing.css'
+
+import { convertFieldName } from '../../shared/utilities/fieldName'
 
 interface FieldSelectorProps {
     label: string
@@ -30,9 +32,9 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     const extendRecords = (records: string[]) => {
         if (includeAll) {
             if (fieldName === 'GCP-Project') {
-                return [`All gcp_projects`, ...records]
+                return [`All ${convertFieldName(fieldName)}`, ...records]
             }
-            return [`All ${fieldName.toLowerCase()}s`, ...records]
+            return [`All ${convertFieldName(fieldName)}s`, ...records]
         }
         return records
     }
@@ -40,6 +42,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     const getTopics = () => {
         setLoading(true)
         setError(undefined)
+        console.log('Starting loading')
         new BillingApi()
             .getTopics()
             .then((response) => {
@@ -47,11 +50,13 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
+        console.log('Done loading')
     }
 
     const getGcpProjects = () => {
         setLoading(true)
         setError(undefined)
+        console.log('Starting loading')
         new BillingApi()
             .getGcpProjects()
             .then((response) => {
@@ -59,11 +64,13 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
+        console.log('Done loading')
     }
 
     const getInvoiceMonths = () => {
         setLoading(true)
         setError(undefined)
+        console.log('Starting loading')
         new BillingApi()
             .getInvoiceMonths()
             .then((response) => {
@@ -71,15 +78,19 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
+        console.log('Done loading')
     }
 
     React.useEffect(() => {
-        if (fieldName === 'Topic') getTopics()
-        else if (fieldName === 'InvoiceMonth') getInvoiceMonths()
+        if (fieldName === BillingColumn.Topic) getTopics()
+        else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
         else if (fieldName === 'Group') {
             setRecords([BillingColumn.GcpProject, BillingColumn.Topic])
             setLoading(false)
-        } else if (fieldName === 'GCP-Project') getGcpProjects()
+        } else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
+        else {
+            setError(`Could not load records for ${fieldName}`)
+        }
     }, [label, fieldName])
 
     const capitalize = (str: string): string => {
@@ -88,6 +99,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         }
         return str.charAt(0).toUpperCase() + str.slice(1)
     }
+
 
     const recordsMap = (records: any[]) => {
         if (fieldName === 'Group') {
@@ -113,33 +125,30 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         )
     }
 
-    if (loading) {
-        return <p>{`Loading ${fieldName}s ... `}</p>
-    }
-
     return (
-        <table>
-            <tr>
-                <td className="field-selector-label">
-                    <h3>{label}</h3>
-                </td>
-                <td className="field-selector-dropdown">
-                    <Dropdown
-                        id="group-by-dropdown"
-                        search
-                        selection
-                        fluid
-                        onChange={onClickFunction}
-                        placeholder={`Select ${fieldName}`}
-                        value={selected ?? ''}
-                        options={
-                            records &&
-                            recordsMap(records)
-                        }
-                    />
-                </td>
-            </tr>
-        </table>
+        <Input
+            label={label}
+            fluid
+            input={
+                <Dropdown
+                    id="group-by-dropdown"
+                    loading={loading}
+                    search
+                    selection
+                    fluid
+                    onChange={onClickFunction}
+                    placeholder={`Select ${convertFieldName(fieldName)}`}
+                    value={selected ?? ''}
+                    options={
+                        records &&
+                        recordsMap(records)
+                    }
+                    style={{
+                        borderRadius: "0 4px 4px 0"
+                    }}
+                />
+            }
+        />
     )
 }
 

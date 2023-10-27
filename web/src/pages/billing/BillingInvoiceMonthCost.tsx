@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { Table as SUITable, Message, Button, Checkbox, Dropdown, Grid } from 'semantic-ui-react'
 import _ from 'lodash'
 
@@ -9,6 +9,8 @@ import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api
 
 import './Billing.css'
 import FieldSelector from './FieldSelector'
+
+import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -21,13 +23,31 @@ const BillingCurrentCost = () => {
         direction: 'undefined',
     })
 
+    // Pull search params for use in the component
+    const [searchParams] = useSearchParams()
+    const inputGroupBy: string | null = searchParams.get('groupBy')
+    const fixedGroupBy: BillingColumn = inputGroupBy ? inputGroupBy as BillingColumn : BillingColumn.GcpProject
+    const inputInvoiceMonth = searchParams.get('invoiceMonth')
+
+    // use navigate and update url params
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+        let url = `${location.pathname}?groupBy=${grp}`
+        if (invoiceMonth) {
+            url += `&invoiceMonth=${invoiceMonth}`
+        }
+        navigate(url)
+    }
+
     // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
     // toISOString().substring(0, 7) will give you YYYY-MM
     // .replace('-', '') will give you YYYYMM
     const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
 
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.GcpProject)
-    const [invoiceMonth, setInvoiceMonth] = React.useState<string>(thisMonth)
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(fixedGroupBy ?? BillingColumn.GcpProject)
+    const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
 
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
@@ -40,6 +60,7 @@ const BillingCurrentCost = () => {
     }
 
     const getCosts = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+        updateNav(groupBy, invoiceMonth)
         setIsLoading(true)
         setError(undefined)
         new BillingApi()
@@ -86,7 +107,7 @@ const BillingCurrentCost = () => {
             return ''
         }
 
-        return `${num.toFixed(0).toString()}%`
+        return `${num.toFixed(0).toString()} % `
     }
 
     function capitalize(str: string): string {
@@ -136,6 +157,10 @@ const BillingCurrentCost = () => {
         return undefined
     }
 
+    const linkTo = (data: string) => {
+        return `/billing/costByTime?groupBy=${groupBy}&selectedData=${data}`
+    }
+
     return (
         <>
             <h1>Billing By Invoice Month</h1>
@@ -152,7 +177,7 @@ const BillingCurrentCost = () => {
                 <Grid.Column>
                     <FieldSelector
                         label="Invoice Month"
-                        fieldName="InvoiceMonth"
+                        fieldName={BillingColumn.InvoiceMonth}
                         onClickFunction={onInvoiceMonthSelect}
                         selected={invoiceMonth}
                     />
@@ -218,7 +243,7 @@ const BillingCurrentCost = () => {
                         [sort.column],
                         sort.direction === 'ascending' ? ['asc'] : ['desc']
                     ).map((p) => (
-                        <React.Fragment key={`total-${p.field}`}>
+                        <React.Fragment key={`total - ${p.field}`}>
                             <SUITable.Row>
                                 <SUITable.Cell collapsing>
                                     <Checkbox
@@ -234,9 +259,7 @@ const BillingCurrentCost = () => {
                                                 <SUITable.Cell>
                                                     <b>
                                                         <Link
-                                                            to={`/billing/costByTime?groupBy=${capitalize(
-                                                                groupBy
-                                                            )}&selectedGroup=${p[k.category]}`}
+                                                            to={linkTo(p[k.category])}
                                                         >
                                                             {p[k.category]}
                                                         </Link>
@@ -266,7 +289,7 @@ const BillingCurrentCost = () => {
                                                 : 'none',
                                             backgroundColor: 'var(--color-bg)',
                                         }}
-                                        key={`${dk.cost_category}-${p.field}`}
+                                        key={`${dk.cost_category} - ${p.field}`}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
                                         <SUITable.Cell>{dk.cost_category}</SUITable.Cell>

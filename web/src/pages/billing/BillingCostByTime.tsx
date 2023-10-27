@@ -1,8 +1,11 @@
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Card, Input } from 'semantic-ui-react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Card, Grid, Input } from 'semantic-ui-react'
 import CostByTimeChart from './CostByTimeChart'
 import FieldSelector from './FieldSelector'
+import { BillingColumn } from '../../sm-api'
+
+import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
@@ -15,20 +18,38 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const [searchParams] = useSearchParams()
 
-    const inGroupBy = searchParams.get('groupBy')
-    const inSelectedGroup = searchParams.get('selectedGroup')
+    const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
+    const fixedGroupBy: BillingColumn = inputGroupBy ? inputGroupBy as BillingColumn : BillingColumn.GcpProject
+    const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
-    const [groupBy, setGroupBy] = React.useState<string | null>(inGroupBy)
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(fixedGroupBy ?? BillingColumn.GcpProject)
+    const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
-    const [selectedGroup, setSelectedGroup] = React.useState<string | null>(inSelectedGroup)
+    // use navigate and update url params
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const updateNav = (grp: string | undefined, data: string | undefined) => {
+        let url = `${location.pathname}`
+        if (grp || data) url += '?'
+
+        let params: string[] = []
+        if (grp) params.push(`groupBy=${grp}`)
+        if (data) params.push(`selectedData=${data}`)
+
+        url += params.join('&')
+        navigate(url)
+    }
 
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
-        setSelectedGroup(null)
+        setSelectedData(undefined)
+        updateNav(data.value, undefined)
     }
 
     const onSelect = (event: any, data: any) => {
-        setSelectedGroup(data.value)
+        setSelectedData(data.value)
+        updateNav(groupBy, data.value)
     }
 
     return (
@@ -50,55 +71,57 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 </div>
                 <br />
             </div>
-            <form style={{ maxWidth: '100%' }}>
-                <FieldSelector
-                    label="Group By"
-                    fieldName="Group"
-                    onClickFunction={onGroupBySelect}
-                    selected={groupBy}
-                />
+            <div>
+                <Grid columns='equal'>
+                    <Grid.Column>
+                        <FieldSelector
+                            label="Group By"
+                            fieldName="Group"
+                            onClickFunction={onGroupBySelect}
+                            selected={groupBy}
+                        />
+                    </Grid.Column>
 
-                <FieldSelector
-                    label={groupBy}
-                    fieldName={groupBy}
-                    onClickFunction={onSelect}
-                    selected={selectedGroup}
-                    includeAll={true}
-                />
+                    <Grid.Column>
+                        <FieldSelector
+                            label={convertFieldName(groupBy)}
+                            fieldName={groupBy}
+                            onClickFunction={onSelect}
+                            selected={selectedData}
+                            includeAll={true}
+                        />
+                    </Grid.Column>
+                </Grid>
 
-                <table>
-                    <tr>
-                        <td className="field-selector-label">
-                            <h3>Start</h3>
-                        </td>
-                        <td>
-                            <Input
-                                type="date"
-                                onChange={(e) => setStart(e.target.value)}
-                                value={start}
-                            />
-                        </td>
-                        <td className="field-selector-label"></td>
-                        <td className="field-selector-label">
-                            <h3>Finish</h3>
-                        </td>
-                        <td>
-                            <Input
-                                type="date"
-                                onChange={(e) => setEnd(e.target.value)}
-                                value={end}
-                            />
-                        </td>
-                    </tr>
-                </table>
-            </form>
+                <Grid columns='equal'>
+                    <Grid.Column className="field-selector-label">
+                        <Input
+                            label="Start"
+                            fluid
+                            type="date"
+                            onChange={(e) => setStart(e.target.value)}
+                            value={start}
+                        />
+                    </Grid.Column>
+
+                    <Grid.Column className="field-selector-label">
+                        <Input
+                            label="Finish"
+                            fluid
+                            type="date"
+                            onChange={(e) => setEnd(e.target.value)}
+                            value={end}
+                        />
+                    </Grid.Column>
+                </Grid>
+            </div>
             <CostByTimeChart
                 start={start}
                 end={end}
                 groupBy={groupBy}
-                selectedGroup={selectedGroup}
+                selectedGroup={selectedData}
             />
-        </Card>
+        </Card >
     )
 }
 
