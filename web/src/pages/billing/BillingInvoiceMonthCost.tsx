@@ -34,7 +34,7 @@ const BillingCurrentCost = () => {
         getCosts(groupBy, data.value)
     }
 
-    const getCosts = (grp: BillingColumn, invoiceMonth: string) => {
+    const getCosts = (grp: BillingColumn, invoiceMonth: string | undefined) => {
         setIsLoading(true)
         setError(undefined)
         new BillingApi()
@@ -47,7 +47,7 @@ const BillingCurrentCost = () => {
     }
 
     React.useEffect(() => {
-        getCosts(groupBy)
+        getCosts(groupBy, invoiceMonth)
     }, [])
 
     const HEADER_FIELDS = [
