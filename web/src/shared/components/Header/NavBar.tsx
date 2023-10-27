@@ -53,8 +53,8 @@ const menuItems = [
                 icon: <TableRowsIcon />,
             },
             {
-                title: 'Dashboard',
-                url: '/billing/dashboard',
+                title: 'Seqr Prop Map',
+                url: '/billing/seqrPropMap',
                 icon: <TableRowsIcon />,
             },
         ],

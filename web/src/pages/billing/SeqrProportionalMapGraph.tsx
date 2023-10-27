@@ -3,7 +3,7 @@ import _ from 'lodash'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../sm-api'
-import { Message, Select } from 'semantic-ui-react'
+import { Grid, Message, Select } from 'semantic-ui-react'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
@@ -165,41 +165,56 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
+    const chart = (
+        <>
+            <Grid>
+                <Grid.Column stretched>
+                    <Select
+                        options={allMethods.map((m) => ({
+                            key: m,
+                            text: m,
+                            value: m,
+                        }))}
+                        value={temporalMethod}
+                        onChange={(e, { value }) => {
+                            setTemporalMethod(value as ProportionalDateTemporalMethod)
+                        }}
+                    />
+                </Grid.Column>
+            </Grid>
+            <Grid>
+                <Grid.Column stretched>
+                    <StackedAreaByDateChart
+                        keys={selectedProjects}
+                        data={allPropMapData?.[temporalMethod]}
+                        start={new Date(start)}
+                        end={new Date(end)}
+                        isPercentage={true}
+                        xLabel="Date"
+                        yLabel="Proportion"
+                        seriesLabel="Projects"
+                        extended={true}
+                        showDate={false}
+                    />
+                </Grid.Column>
+            </Grid>
+        </>
+    )
+
     return (
         <>
-            <h5>Seqr proportional costs</h5>
-            {isLoading && (
+            {/* <Grid> */}
+            <h3>Seqr proportional costs</h3>
+            {error && <Message negative>{error}</Message>}
+            {isLoading ? (
                 <>
                     <LoadingDucks />
                     <p style={{ textAlign: 'center', marginTop: '5px' }}>
                         <em>This query takes a while...</em>
                     </p>
                 </>
-            )}
-            {error && <Message negative>{error}</Message>}
-            <Select
-                options={allMethods.map((m) => ({
-                    key: m,
-                    text: m,
-                    value: m,
-                }))}
-                value={temporalMethod}
-                onChange={(e, { value }) => {
-                    setTemporalMethod(value as ProportionalDateTemporalMethod)
-                }}
-            />
-            <StackedAreaByDateChart
-                keys={selectedProjects}
-                data={allPropMapData?.[temporalMethod]}
-                start={new Date(start)}
-                end={new Date(end)}
-                isPercentage={true}
-                xLabel="Date"
-                yLabel="Proportion"
-                seriesLabel="Projects"
-                extended={true}
-                showDate={false}
-            />
+            ) : chart
+            }
         </>
     )
 }

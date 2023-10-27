@@ -4,9 +4,9 @@ import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
 import {
     BillingHome,
-    BillingDashboard,
-    BillingInvoiceMonthCost,
+    BillingSeqrProp,
     BillingCostByTime,
+    BillingInvoiceMonthCost,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
@@ -58,10 +58,10 @@ const Routes: React.FunctionComponent = () => (
             }
         />
         <Route
-            path="/billing/dashboard"
+            path="/billing/seqrPropMap"
             element={
                 <ErrorBoundary>
-                    <BillingDashboard />
+                    <BillingSeqrProp />
                 </ErrorBoundary>
             }
         />

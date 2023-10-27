@@ -346,7 +346,7 @@ class AnalysisLayer(BaseLayer):
                 end_date=end_date_date,
             )
 
-        return results
+        return {k.value: v for k, v in results.items()}
 
     def get_cram_size_proportionate_map_from_sequencing_group_sizes(
         self,

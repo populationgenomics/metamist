@@ -67,23 +67,10 @@ const BillingCostByTime: React.FunctionComponent = () => {
     return (
         <>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <div
-                    style={{
-                        marginTop: 20,
-                        paddingTop: 20,
-                        marginBottom: 20,
-                    }}
-                >
-                    <div
-                        style={{
-                            fontSize: 50,
-                            marginLeft: 20,
-                        }}
-                    >
-                        Billing Cost By Time
-                    </div>
-                    <br />
-                </div>
+                <h1 style={{
+                    fontSize: 40
+                }}>Billing Cost By Time</h1>
+
                 <Grid columns='equal'>
                     <Grid.Column>
                         <FieldSelector
@@ -140,7 +127,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
             </Card >
             <Card fluid style={{ padding: '20px' }} id="billing-container-data">
-                <p>This is a placeholder for the data given the current gcp-project/topic as well as the start and end dates</p>
+                <p>This is a placeholder for the {convertFieldName(groupBy)} {selectedData ?? '<not selected>'} from {start} to {end} inclusive</p>
             </Card>
         </>
     )
