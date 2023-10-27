@@ -73,14 +73,50 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .catch((er) => setError(er.message))
     }
 
+    const getGroups = () => {
+        setLoading(false)
+        setError(undefined)
+        const group_map = (g) => {
+
+        }
+
+
+        return [
+            BillingColumn.GcpProject,
+            BillingColumn.Topic
+        ]
+    }
+
     React.useEffect(() => {
         if (fieldName === 'Topic') getTopics()
         else if (fieldName === 'InvoiceMonth') getInvoiceMonths()
         else if (fieldName === 'Group') {
-            setRecords(['GCP-Project', 'Topic'])
+            setRecords([BillingColumn.GcpProject, BillingColumn.Topic])
             setLoading(false)
         } else if (fieldName === 'GCP-Project') getGcpProjects()
     }, [label, fieldName])
+
+    const capitalize = (str: string): string => {
+        if (str === 'gcp_project') {
+            return 'GCP-Project'
+        }
+        return str.charAt(0).toUpperCase() + str.slice(1)
+    }
+
+    const recordsMap = (records: any[]) => {
+        if (fieldName === 'Group') {
+            return records.map((p: BillingColumn) => ({
+                key: p,
+                text: capitalize(p),
+                value: p,
+            }))
+        }
+        return records.map((p: string) => ({
+            key: p,
+            text: p,
+            value: p,
+        }))
+    }
 
     if (error) {
         return (
@@ -112,11 +148,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                         value={selected ?? ''}
                         options={
                             records &&
-                            records.map((p) => ({
-                                key: p,
-                                text: p,
-                                value: p,
-                            }))
+                            recordsMap(records)
                         }
                     />
                 </td>

@@ -125,11 +125,6 @@ const BillingCurrentCost = () => {
         getCosts(data.value)
     }
 
-    const dataset_field_options = [
-        { key: 1, text: 'By GCP Project', value: BillingColumn.GcpProject },
-        { key: 2, text: 'By Topic', value: BillingColumn.Topic },
-    ]
-
     return (
         <div>
             <h1>Billing Current Invoice Month</h1>
