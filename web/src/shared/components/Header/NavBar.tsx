@@ -43,8 +43,13 @@ const menuItems = [
                 icon: <HomeIcon />,
             },
             {
-                title: 'Current Cost',
-                url: '/billing/currentCost',
+                title: 'Invoice Month Cost',
+                url: '/billing/invoiceMonthCost',
+                icon: <TableRowsIcon />,
+            },
+            {
+                title: 'Cost By Time',
+                url: '/billing/costByTime',
                 icon: <TableRowsIcon />,
             },
             {

@@ -24,6 +24,22 @@ router = APIRouter(prefix='/billing', tags=['billing'])
 
 
 @router.get(
+    '/gcp-projects',
+    response_model=list[str],
+    operation_id='getGcpProjects',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_gcp_projects(
+    author: str = get_author,
+) -> list[str]:
+    """Get list of all GCP projects in database"""
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_gcp_projects()
+    return records
+
+
+@router.get(
     '/topics',
     response_model=list[str],
     operation_id='getTopics',
@@ -150,6 +166,25 @@ async def get_sequencing_groups(
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_groups()
+    return records
+
+
+@router.get(
+    '/invoice_months',
+    response_model=list[str],
+    operation_id='getInvoiceMonths',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_sequencing_groups(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all invoice months in database
+    Results are sorted DESC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_invoice_months()
     return records
 
 

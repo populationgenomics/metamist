@@ -194,6 +194,11 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                 start={new Date(start)}
                 end={new Date(end)}
                 isPercentage={true}
+                xLabel="Date"
+                yLabel="Proportion"
+                seriesLabel="Projects"
+                extended={true}
+                showDate={false}
             />
         </>
     )
