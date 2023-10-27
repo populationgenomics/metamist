@@ -9,12 +9,6 @@ import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
-    const [start, setStart] = React.useState<string>(`${now.getFullYear()}-03-01`)
-    const [end, setEnd] = React.useState<string>(`${now.getFullYear()}-03-05`)
-    // TODO once we have more data change to the current month
-    // (
-    //     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
-    // )
 
     const [searchParams] = useSearchParams()
 
@@ -22,6 +16,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const fixedGroupBy: BillingColumn = inputGroupBy ? inputGroupBy as BillingColumn : BillingColumn.GcpProject
     const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
+    // TODO once we have more data change to the current month
+    // (
+    //     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    // )
+    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? `${now.getFullYear()}-03-01`)
+    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? `${now.getFullYear()}-03-05`)
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(fixedGroupBy ?? BillingColumn.GcpProject)
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
@@ -29,13 +29,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const updateNav = (grp: string | undefined, data: string | undefined) => {
+    const updateNav = (grp: string | undefined, data: string | undefined, start: string, end: string) => {
         let url = `${location.pathname}`
         if (grp || data) url += '?'
 
         let params: string[] = []
         if (grp) params.push(`groupBy=${grp}`)
         if (data) params.push(`selectedData=${data}`)
+        if (start) params.push(`start=${start}`)
+        if (end) params.push(`end=${end}`)
 
         url += params.join('&')
         navigate(url)
@@ -44,34 +46,44 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
         setSelectedData(undefined)
-        updateNav(data.value, undefined)
+        updateNav(data.value, undefined, start, end)
     }
 
     const onSelect = (event: any, data: any) => {
         setSelectedData(data.value)
-        updateNav(groupBy, data.value)
+        updateNav(groupBy, data.value, start, end)
+    }
+
+    const changeDate = (name: string, value: string) => {
+        let start_update = start
+        let end_update = end
+        if (name === 'start') start_update = value
+        if (name === 'end') end_update = value
+        setStart(start_update)
+        setEnd(end_update)
+        updateNav(groupBy, selectedData, start_update, end_update)
     }
 
     return (
-        <Card fluid style={{ padding: '20px' }} id="billing-container">
-            <div
-                style={{
-                    marginTop: 20,
-                    paddingTop: 20,
-                    marginBottom: 20,
-                }}
-            >
+        <>
+            <Card fluid style={{ padding: '20px' }} id="billing-container">
                 <div
                     style={{
-                        fontSize: 50,
-                        marginLeft: 20,
+                        marginTop: 20,
+                        paddingTop: 20,
+                        marginBottom: 20,
                     }}
                 >
-                    Billing Cost By Time
+                    <div
+                        style={{
+                            fontSize: 50,
+                            marginLeft: 20,
+                        }}
+                    >
+                        Billing Cost By Time
+                    </div>
+                    <br />
                 </div>
-                <br />
-            </div>
-            <div>
                 <Grid columns='equal'>
                     <Grid.Column>
                         <FieldSelector
@@ -99,7 +111,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             label="Start"
                             fluid
                             type="date"
-                            onChange={(e) => setStart(e.target.value)}
+                            onChange={(e) => changeDate('start', e.target.value)}
                             value={start}
                         />
                     </Grid.Column>
@@ -109,19 +121,28 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             label="Finish"
                             fluid
                             type="date"
-                            onChange={(e) => setEnd(e.target.value)}
+                            onChange={(e) => changeDate('end', e.target.value)}
                             value={end}
                         />
                     </Grid.Column>
                 </Grid>
-            </div>
-            <CostByTimeChart
-                start={start}
-                end={end}
-                groupBy={groupBy}
-                selectedGroup={selectedData}
-            />
-        </Card >
+
+                <Grid>
+                    <Grid.Column width={16}>
+                        <CostByTimeChart
+                            start={start}
+                            end={end}
+                            groupBy={groupBy}
+                            selectedGroup={selectedData}
+                        />
+                    </Grid.Column>
+                </Grid>
+
+            </Card >
+            <Card fluid style={{ padding: '20px' }} id="billing-container-data">
+                <p>This is a placeholder for the data given the current gcp-project/topic as well as the start and end dates</p>
+            </Card>
+        </>
     )
 }
 

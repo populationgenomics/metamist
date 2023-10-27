@@ -217,7 +217,7 @@ const BillingCurrentCost = () => {
                                     resize: 'horizontal',
                                 }}
                             >
-                                {k.title}
+                                {convertFieldName(k.title)}
                             </SUITable.HeaderCell>
                         ))}
 
