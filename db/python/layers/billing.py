@@ -27,6 +27,15 @@ BQ_AGGREG_EXT_VIEW = (
 class BillingLayer(BqBaseLayer):
     """Billing layer"""
 
+    async def get_gcp_projects(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All GCP projects in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_gcp_projects()
+
     async def get_topics(
         self,
     ) -> list[str] | None:
@@ -125,6 +134,37 @@ class BillingLayer(BqBaseLayer):
 
 class BillingDb(BqDbBase):
     """Db layer for billing related routes"""
+
+    async def get_gcp_projects(self):
+        """Get all GCP projects in database"""
+
+        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
+        _query = f"""
+        SELECT DISTINCT gcp_project
+        FROM `{BQ_AGGREG_VIEW}`
+        WHERE day > TIMESTAMP_ADD(
+            CURRENT_TIMESTAMP(), INTERVAL @days DAY
+        )
+        AND gcp_project IS NOT NULL
+        ORDER BY gcp_project ASC;
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
+        if query_job_result:
+            return [str(dict(row)['gcp_project']) for row in query_job_result]
+
+        # return empty list if no record found
+        return []
 
     async def get_topics(self):
         """Get all topics in database"""

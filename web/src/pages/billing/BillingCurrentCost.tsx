@@ -1,10 +1,16 @@
 import * as React from 'react'
+import { Link } from 'react-router-dom'
 import { Table as SUITable, Message, Button, Checkbox, Dropdown } from 'semantic-ui-react'
 import _ from 'lodash'
+
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 
+import './Billing.css'
+
 const BillingCurrentCost = () => {
+    const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [openRows, setOpenRows] = React.useState<string[]>([])
 
     const [costRecords, setCosts] = React.useState<BillingCostBudgetRecord[]>([])
@@ -14,13 +20,15 @@ const BillingCurrentCost = () => {
         direction: 'undefined',
     })
 
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.Project)
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.GcpProject)
 
     const getCosts = (grp: BillingColumn) => {
+        setIsLoading(true)
         setError(undefined)
         new BillingApi()
             .getRunningCost(grp)
             .then((response) => {
+                setIsLoading(false)
                 setCosts(response.data)
             })
             .catch((er) => setError(er.message))
@@ -64,6 +72,13 @@ const BillingCurrentCost = () => {
         return `${num.toFixed(0).toString()}%`
     }
 
+    function capitalize(str: string): string {
+        if (str === 'gcp_project') {
+            return 'GCP-Project'
+        }
+        return str.charAt(0).toUpperCase() + str.slice(1)
+    }
+
     if (error)
         return (
             <Message negative>
@@ -75,7 +90,15 @@ const BillingCurrentCost = () => {
             </Message>
         )
 
-    if (!costRecords) return <div>Loading...</div>
+    if (isLoading)
+        return (
+            <div>
+                <LoadingDucks />
+                <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                    <em>This query takes a while...</em>
+                </p>
+            </div>
+        )
 
     const handleSort = (clickedColumn: string) => {
         if (sort.column !== clickedColumn) {
@@ -102,9 +125,8 @@ const BillingCurrentCost = () => {
     }
 
     const field_options = [
-        { key: 1, text: 'By Project', value: BillingColumn.Project },
+        { key: 1, text: 'By GCP Project', value: BillingColumn.GcpProject },
         { key: 2, text: 'By Topic', value: BillingColumn.Topic },
-        { key: 3, text: 'By Dataset', value: BillingColumn.Dataset },
     ]
 
     return (
@@ -112,12 +134,14 @@ const BillingCurrentCost = () => {
             <h1>Billing Current Invoice Month</h1>
 
             <Dropdown
+                id="group-by-dropdown"
                 selection
                 fluid
                 onChange={onGroupBySelect}
                 value={groupBy}
                 options={field_options}
             />
+
             <Table celled compact sortable>
                 <SUITable.Header>
                     <SUITable.Row>
@@ -126,7 +150,7 @@ const BillingCurrentCost = () => {
                         <SUITable.HeaderCell></SUITable.HeaderCell>
 
                         <SUITable.HeaderCell colSpan="3">24H</SUITable.HeaderCell>
-                        {groupBy === BillingColumn.Project ? (
+                        {groupBy === BillingColumn.GcpProject ? (
                             <SUITable.HeaderCell colSpan="4">
                                 Invoice Month (Acc)
                             </SUITable.HeaderCell>
@@ -154,7 +178,7 @@ const BillingCurrentCost = () => {
                             </SUITable.HeaderCell>
                         ))}
 
-                        {groupBy === BillingColumn.Project ? (
+                        {groupBy === BillingColumn.GcpProject ? (
                             <SUITable.HeaderCell
                                 key={'budget_spent'}
                                 sorted={checkDirection('budget_spent')}
@@ -190,7 +214,15 @@ const BillingCurrentCost = () => {
                                         case 'field':
                                             return (
                                                 <SUITable.Cell>
-                                                    <b>{p[k.category]}</b>
+                                                    <b>
+                                                        <Link
+                                                            to={`/billing/costByTime?groupBy=${capitalize(
+                                                                groupBy
+                                                            )}&selectedGroup=${p[k.category]}`}
+                                                        >
+                                                            {p[k.category]}
+                                                        </Link>
+                                                    </b>
                                                 </SUITable.Cell>
                                             )
                                         default:
@@ -202,7 +234,7 @@ const BillingCurrentCost = () => {
                                     }
                                 })}
 
-                                {groupBy === BillingColumn.Project ? (
+                                {groupBy === BillingColumn.GcpProject ? (
                                     <SUITable.Cell>{percFormat(p.budget_spent)}</SUITable.Cell>
                                 ) : null}
                             </SUITable.Row>
@@ -249,7 +281,7 @@ const BillingCurrentCost = () => {
                                             </React.Fragment>
                                         )}
 
-                                        {groupBy === BillingColumn.Project ? (
+                                        {groupBy === BillingColumn.GcpProject ? (
                                             <SUITable.Cell />
                                         ) : null}
                                     </SUITable.Row>
