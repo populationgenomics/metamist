@@ -87,7 +87,7 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-    </Switch >
+    </Switch>
 )
 
 export default Routes

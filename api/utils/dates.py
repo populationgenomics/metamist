@@ -15,6 +15,7 @@ def parse_date_only_string(d: str | None) -> date | None:
 
 
 def get_invoice_month_range(convert_month: date) -> tuple[date, date]:
+    """Get the start and end date of the invoice month for a given date"""
     first_day = convert_month.replace(day=1)
 
     # Grab the first day of invoice month then subtract INVOICE_DAY_DIFF days

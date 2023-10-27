@@ -175,7 +175,7 @@ async def get_sequencing_groups(
     operation_id='getInvoiceMonths',
 )
 @alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
-async def get_sequencing_groups(
+async def get_invoice_months(
     author: str = get_author,
 ) -> list[str]:
     """

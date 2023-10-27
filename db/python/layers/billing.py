@@ -1,7 +1,8 @@
+# pylint: disable=ungrouped-imports
 import re
 
 from typing import Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import Counter
 from google.cloud import bigquery
 from api.utils.dates import get_invoice_month_range
@@ -555,9 +556,11 @@ class BillingDb(BqDbBase):
         else:
             # get start day and current day for given invoice month
             invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
-            start_day, current_day = get_invoice_month_range(invoice_month_date)
-            start_day = start_day.strftime('%Y-%m-%d')
-            current_day = current_day.strftime('%Y-%m-%d')
+            start_day_date, current_day_date = get_invoice_month_range(
+                invoice_month_date
+            )
+            start_day = start_day_date.strftime('%Y-%m-%d')
+            current_day = current_day_date.strftime('%Y-%m-%d')
 
             has_valid_invoice_month = True
             invoice_month_filter = ' AND invoice_month = @invoice_month'

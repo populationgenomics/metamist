@@ -96,12 +96,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
             <Dropdown.Menu id="navDrop">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item
-                            as={Link}
-                            id="navItem"
-                            to={subitem.url}
-                            key={subindex}
-                        >
+                        <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
                             {subitem.title}
                         </Dropdown.Item>
                     ))}

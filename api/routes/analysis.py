@@ -338,14 +338,9 @@ async def get_proportionate_map(
         }
     }
     """
-    # Tuples required for hashing, convert to lists
-    projects = list(projects)
-    temporal_methods = list(temporal_methods)
-    sequencing_types = list(sequencing_types) if sequencing_types else None
-
     pt = ProjectPermissionsTable(connection=connection.connection)
     project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, projects, readonly=True
+        connection.author, list(projects), readonly=True
     )
 
     start_date = parse_date_only_string(start) if start else None
@@ -354,8 +349,8 @@ async def get_proportionate_map(
     at = AnalysisLayer(connection)
     return await at.get_cram_size_proportionate_map(
         projects=project_ids,
-        sequencing_types=sequencing_types,
+        sequencing_types=list(sequencing_types),
         start_date=start_date,
         end_date=end_date,
-        temporal_methods=temporal_methods,
+        temporal_methods=list(temporal_methods),
     )

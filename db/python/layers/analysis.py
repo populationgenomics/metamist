@@ -295,7 +295,7 @@ class AnalysisLayer(BaseLayer):
         temporal_methods: list[ProportionalDateTemporalMethod],
         start_date: date = None,
         end_date: date = None,
-    ) -> dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]]:
+    ) -> dict[str, list[ProportionalDateModel]]:
         """
         This is a bit more complex, but we want to generate a map of cram size by day,
         based on the temporal_method (sample create date, joint call date).

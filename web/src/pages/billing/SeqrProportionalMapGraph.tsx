@@ -213,8 +213,9 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
                         <em>This query takes a while...</em>
                     </p>
                 </>
-            ) : chart
-            }
+            ) : (
+                chart
+            )}
         </>
     )
 }

@@ -100,7 +100,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         return str.charAt(0).toUpperCase() + str.slice(1)
     }
 
-
     const recordsMap = (records: any[]) => {
         if (fieldName === 'Group') {
             return records.map((p: BillingColumn) => ({
@@ -139,12 +138,9 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                     onChange={onClickFunction}
                     placeholder={`Select ${convertFieldName(fieldName)}`}
                     value={selected ?? ''}
-                    options={
-                        records &&
-                        recordsMap(records)
-                    }
+                    options={records && recordsMap(records)}
                     style={{
-                        borderRadius: "0 4px 4px 0"
+                        borderRadius: '0 4px 4px 0',
                     }}
                 />
             }

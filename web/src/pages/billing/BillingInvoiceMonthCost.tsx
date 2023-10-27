@@ -26,12 +26,14 @@ const BillingCurrentCost = () => {
     // Pull search params for use in the component
     const [searchParams] = useSearchParams()
     const inputGroupBy: string | null = searchParams.get('groupBy')
-    const fixedGroupBy: BillingColumn = inputGroupBy ? inputGroupBy as BillingColumn : BillingColumn.GcpProject
+    const fixedGroupBy: BillingColumn = inputGroupBy
+        ? (inputGroupBy as BillingColumn)
+        : BillingColumn.GcpProject
     const inputInvoiceMonth = searchParams.get('invoiceMonth')
 
     // use navigate and update url params
-    const location = useLocation();
-    const navigate = useNavigate();
+    const location = useLocation()
+    const navigate = useNavigate()
 
     const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
         let url = `${location.pathname}?groupBy=${grp}`
@@ -46,7 +48,9 @@ const BillingCurrentCost = () => {
     // .replace('-', '') will give you YYYYMM
     const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
 
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(fixedGroupBy ?? BillingColumn.GcpProject)
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
+        fixedGroupBy ?? BillingColumn.GcpProject
+    )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
 
     const onGroupBySelect = (event: any, data: any) => {
@@ -165,7 +169,7 @@ const BillingCurrentCost = () => {
         <>
             <h1>Billing By Invoice Month</h1>
 
-            <Grid columns='equal'>
+            <Grid columns="equal">
                 <Grid.Column>
                     <FieldSelector
                         label="Group By"
@@ -183,7 +187,6 @@ const BillingCurrentCost = () => {
                     />
                 </Grid.Column>
             </Grid>
-
 
             <Table celled compact sortable>
                 <SUITable.Header>
@@ -258,9 +261,7 @@ const BillingCurrentCost = () => {
                                             return (
                                                 <SUITable.Cell>
                                                     <b>
-                                                        <Link
-                                                            to={linkTo(p[k.category])}
-                                                        >
+                                                        <Link to={linkTo(p[k.category])}>
                                                             {p[k.category]}
                                                         </Link>
                                                     </b>

@@ -11,8 +11,8 @@ const BillingSeqrProp: React.FunctionComponent = () => {
     )
 
     // use navigate and update url params
-    const location = useLocation();
-    const navigate = useNavigate();
+    const location = useLocation()
+    const navigate = useNavigate()
 
     const updateNav = (start: string, end: string) => {
         let url = `${location.pathname}`
@@ -32,20 +32,33 @@ const BillingSeqrProp: React.FunctionComponent = () => {
 
     return (
         <Card fluid style={{ padding: '20px' }} id="billing-container">
-            <h1 style={{
-                fontSize: 40
-            }}>Billing Seqr Proportionate Map over Time</h1>
-            <Grid columns='equal'>
+            <h1
+                style={{
+                    fontSize: 40,
+                }}
+            >
+                Billing Seqr Proportionate Map over Time
+            </h1>
+            <Grid columns="equal">
                 <Grid.Column stretched>
-                    <Input label="Start" type="date" onChange={(e) => setStart(e.target.value)} value={start} />
+                    <Input
+                        label="Start"
+                        type="date"
+                        onChange={(e) => setStart(e.target.value)}
+                        value={start}
+                    />
                 </Grid.Column>
                 <Grid.Column stretched>
-                    <Input label="Finish" type="date" onChange={(e) => setEnd(e.target.value)} value={end} />
+                    <Input
+                        label="Finish"
+                        type="date"
+                        onChange={(e) => setEnd(e.target.value)}
+                        value={end}
+                    />
                 </Grid.Column>
-
             </Grid>
             <SeqrProportionalMapGraph start={start} end={end} />
-        </Card >
+        </Card>
     )
 }
 

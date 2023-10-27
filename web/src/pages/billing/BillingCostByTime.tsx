@@ -13,23 +13,36 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
     const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
-    const fixedGroupBy: BillingColumn = inputGroupBy ? inputGroupBy as BillingColumn : BillingColumn.GcpProject
+    const fixedGroupBy: BillingColumn = inputGroupBy
+        ? (inputGroupBy as BillingColumn)
+        : BillingColumn.GcpProject
     const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
     // TODO once we have more data change to the current month
     // (
     //     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
     // )
-    const [start, setStart] = React.useState<string>(searchParams.get('start') ?? `${now.getFullYear()}-03-01`)
-    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? `${now.getFullYear()}-03-05`)
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(fixedGroupBy ?? BillingColumn.GcpProject)
+    const [start, setStart] = React.useState<string>(
+        searchParams.get('start') ?? `${now.getFullYear()}-03-01`
+    )
+    const [end, setEnd] = React.useState<string>(
+        searchParams.get('end') ?? `${now.getFullYear()}-03-05`
+    )
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
+        fixedGroupBy ?? BillingColumn.GcpProject
+    )
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
     // use navigate and update url params
-    const location = useLocation();
-    const navigate = useNavigate();
+    const location = useLocation()
+    const navigate = useNavigate()
 
-    const updateNav = (grp: string | undefined, data: string | undefined, start: string, end: string) => {
+    const updateNav = (
+        grp: string | undefined,
+        data: string | undefined,
+        start: string,
+        end: string
+    ) => {
         let url = `${location.pathname}`
         if (grp || data) url += '?'
 
@@ -67,11 +80,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     return (
         <>
             <Card fluid style={{ padding: '20px' }} id="billing-container">
-                <h1 style={{
-                    fontSize: 40
-                }}>Billing Cost By Time</h1>
+                <h1
+                    style={{
+                        fontSize: 40,
+                    }}
+                >
+                    Billing Cost By Time
+                </h1>
 
-                <Grid columns='equal'>
+                <Grid columns="equal">
                     <Grid.Column>
                         <FieldSelector
                             label="Group By"
@@ -92,7 +109,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
 
-                <Grid columns='equal'>
+                <Grid columns="equal">
                     <Grid.Column className="field-selector-label">
                         <Input
                             label="Start"
@@ -124,10 +141,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
                 </Grid>
-
-            </Card >
+            </Card>
             <Card fluid style={{ padding: '20px' }} id="billing-container-data">
-                <p>This is a placeholder for the {convertFieldName(groupBy)} {selectedData ?? '<not selected>'} from {start} to {end} inclusive</p>
+                <p>
+                    This is a placeholder for the {convertFieldName(groupBy)}{' '}
+                    {selectedData ?? '<not selected>'} from {start} to {end} inclusive
+                </p>
             </Card>
         </>
     )
