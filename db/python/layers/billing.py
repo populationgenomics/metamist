@@ -1,9 +1,10 @@
 import re
 
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import Counter
 from google.cloud import bigquery
+from api.utils.dates import get_invoice_month_range
 
 from models.models import (
     BillingRowRecord,
@@ -25,8 +26,6 @@ BQ_AGGREG_RAW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate-dev'
 BQ_AGGREG_EXT_VIEW = (
     f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost_extended-dev'
 )
-
-INVOICE_DAY_DIFF = 3
 
 
 class BillingLayer(BqBaseLayer):
@@ -549,26 +548,14 @@ class BillingDb(BqDbBase):
 
         has_valid_invoice_month = False
         invoice_month_filter = ''
-        if not invoice_month or not re.match(r'^\d{6}$'):
+        if not invoice_month or not re.match(r'^\d{6}$', invoice_month):
             # TODO for production change to select current day, month
             start_day = '2023-03-01'
             current_day = '2023-03-10'
         else:
-            # Grab the first day of invoice month then subtract INVOICE_DAY_DIFF days
-            start_day = (
-                datetime.strptime(invoice_month, '%Y%m')
-                .replace(day=1)
-                .timedelta(days=-INVOICE_DAY_DIFF)
-            )
-
-            # Grab the last day of invoice month then add INVOICE_DAY_DIFF days
-            current_day = (
-                datetime.strptime(invoice_month, '%Y%m')
-                .replace(day=1)
-                .timedelta(month=1, days=-1)
-                .timedelta(days=INVOICE_DAY_DIFF)
-            )
-
+            # get start day and current day for given invoice month
+            invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
+            start_day, current_day = get_invoice_month_range(invoice_month_date)
             start_day = start_day.strftime('%Y-%m-%d')
             current_day = current_day.strftime('%Y-%m-%d')
 
@@ -655,7 +642,7 @@ class BillingDb(BqDbBase):
         ):
             raise ValueError('Invalid field')
 
-        query_job_result = await self.execute_running_cost_query(field)
+        query_job_result = await self.execute_running_cost_query(field, invoice_month)
         if not query_job_result:
             # return empty list
             return []

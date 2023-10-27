@@ -73,20 +73,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .catch((er) => setError(er.message))
     }
 
-    const getGroups = () => {
-        setLoading(false)
-        setError(undefined)
-        const group_map = (g) => {
-
-        }
-
-
-        return [
-            BillingColumn.GcpProject,
-            BillingColumn.Topic
-        ]
-    }
-
     React.useEffect(() => {
         if (fieldName === 'Topic') getTopics()
         else if (fieldName === 'InvoiceMonth') getInvoiceMonths()

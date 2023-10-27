@@ -21,8 +21,13 @@ const BillingCurrentCost = () => {
         direction: 'undefined',
     })
 
+    // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
+    // toISOString().substring(0, 7) will give you YYYY-MM
+    // .replace('-', '') will give you YYYYMM
+    const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.GcpProject)
-    const [invoiceMonth, setInvoiceMonth] = React.useState<string>()
+    const [invoiceMonth, setInvoiceMonth] = React.useState<string>(thisMonth)
 
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
@@ -96,7 +101,7 @@ const BillingCurrentCost = () => {
             <Message negative>
                 {error}
                 <br />
-                <Button color="red" onClick={() => getCosts(groupBy)}>
+                <Button color="red" onClick={() => getCosts(groupBy, invoiceMonth)}>
                     Retry
                 </Button>
             </Message>
