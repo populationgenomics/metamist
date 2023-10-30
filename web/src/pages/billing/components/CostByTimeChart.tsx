@@ -1,18 +1,11 @@
 import * as React from 'react'
 import _ from 'lodash'
 
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import {
-    BillingApi,
-    BillingColumn,
-    BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
-} from '../../sm-api'
-import { Message } from 'semantic-ui-react'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
-} from '../../shared/components/Graphs/StackedAreaByDateChart'
+} from '../../../shared/components/Graphs/StackedAreaByDateChart'
 
 interface ICostByTimeChartProps {
     start: string
@@ -29,7 +22,7 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
     isLoading,
     data,
 }) => {
-    if (isLoading)
+    if (isLoading) {
         return (
             <div>
                 <LoadingDucks />
@@ -38,6 +31,9 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
                 </p>
             </div>
         )
+    }
+
+    console.log(data)
 
     return (
         <>

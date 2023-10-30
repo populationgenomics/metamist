@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
-import CostByTimeChart from './CostByTimeChart'
+import { Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
+import CostByTimeChart from './components/CostByTimeChart'
 import FieldSelector from './FieldSelector'
 import {
     BillingApi,
@@ -12,6 +12,7 @@ import {
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
@@ -233,11 +234,14 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
             </Card>
-            <Card fluid style={{ padding: '20px' }} id="billing-container-data">
-                <p>
-                    This is a placeholder for the {convertFieldName(groupBy)}{' '}
-                    {selectedData ?? '<not selected>'} from {start} to {end} inclusive
-                </p>
+            <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+                <BillingCostByTimeTable
+                    start={start}
+                    end={end}
+                    groups={groups}
+                    isLoading={isLoading}
+                    data={data}
+                />
             </Card>
         </>
     )
