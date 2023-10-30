@@ -1,104 +1,154 @@
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Card, Input } from 'semantic-ui-react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Card, Grid, Input } from 'semantic-ui-react'
 import CostByTimeChart from './CostByTimeChart'
 import FieldSelector from './FieldSelector'
+import { BillingColumn } from '../../sm-api'
+
+import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
-    const [start, setStart] = React.useState<string>(`${now.getFullYear()}-03-01`)
-    const [end, setEnd] = React.useState<string>(`${now.getFullYear()}-03-05`)
+
+    const [searchParams] = useSearchParams()
+
+    const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
+    const fixedGroupBy: BillingColumn = inputGroupBy
+        ? (inputGroupBy as BillingColumn)
+        : BillingColumn.GcpProject
+    const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
+
     // TODO once we have more data change to the current month
     // (
     //     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
     // )
+    const [start, setStart] = React.useState<string>(
+        searchParams.get('start') ?? `${now.getFullYear()}-03-01`
+    )
+    const [end, setEnd] = React.useState<string>(
+        searchParams.get('end') ?? `${now.getFullYear()}-03-05`
+    )
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
+        fixedGroupBy ?? BillingColumn.GcpProject
+    )
+    const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
-    const [searchParams] = useSearchParams()
+    // use navigate and update url params
+    const location = useLocation()
+    const navigate = useNavigate()
 
-    const inGroupBy = searchParams.get('groupBy')
-    const inSelectedGroup = searchParams.get('selectedGroup')
+    const updateNav = (
+        grp: string | undefined,
+        data: string | undefined,
+        start: string,
+        end: string
+    ) => {
+        let url = `${location.pathname}`
+        if (grp || data) url += '?'
 
-    const [groupBy, setGroupBy] = React.useState<string | null>(inGroupBy)
+        let params: string[] = []
+        if (grp) params.push(`groupBy=${grp}`)
+        if (data) params.push(`selectedData=${data}`)
+        if (start) params.push(`start=${start}`)
+        if (end) params.push(`end=${end}`)
 
-    const [selectedGroup, setSelectedGroup] = React.useState<string | null>(inSelectedGroup)
+        url += params.join('&')
+        navigate(url)
+    }
 
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
-        setSelectedGroup(null)
+        setSelectedData(undefined)
+        updateNav(data.value, undefined, start, end)
     }
 
     const onSelect = (event: any, data: any) => {
-        setSelectedGroup(data.value)
+        setSelectedData(data.value)
+        updateNav(groupBy, data.value, start, end)
+    }
+
+    const changeDate = (name: string, value: string) => {
+        let start_update = start
+        let end_update = end
+        if (name === 'start') start_update = value
+        if (name === 'end') end_update = value
+        setStart(start_update)
+        setEnd(end_update)
+        updateNav(groupBy, selectedData, start_update, end_update)
     }
 
     return (
-        <Card fluid style={{ padding: '20px' }} id="billing-container">
-            <div
-                style={{
-                    marginTop: 20,
-                    paddingTop: 20,
-                    marginBottom: 20,
-                }}
-            >
-                <div
+        <>
+            <Card fluid style={{ padding: '20px' }} id="billing-container">
+                <h1
                     style={{
-                        fontSize: 50,
-                        marginLeft: 20,
+                        fontSize: 40,
                     }}
                 >
                     Billing Cost By Time
-                </div>
-                <br />
-            </div>
-            <form style={{ maxWidth: '100%' }}>
-                <FieldSelector
-                    label="Group By"
-                    fieldName="Group"
-                    onClickFunction={onGroupBySelect}
-                    selected={groupBy}
-                />
+                </h1>
 
-                <FieldSelector
-                    label={groupBy}
-                    fieldName={groupBy}
-                    onClickFunction={onSelect}
-                    selected={selectedGroup}
-                    includeAll={true}
-                />
+                <Grid columns="equal">
+                    <Grid.Column>
+                        <FieldSelector
+                            label="Group By"
+                            fieldName="Group"
+                            onClickFunction={onGroupBySelect}
+                            selected={groupBy}
+                        />
+                    </Grid.Column>
 
-                <table>
-                    <tr>
-                        <td className="field-selector-label">
-                            <h3>Start</h3>
-                        </td>
-                        <td>
-                            <Input
-                                type="date"
-                                onChange={(e) => setStart(e.target.value)}
-                                value={start}
-                            />
-                        </td>
-                        <td className="field-selector-label"></td>
-                        <td className="field-selector-label">
-                            <h3>Finish</h3>
-                        </td>
-                        <td>
-                            <Input
-                                type="date"
-                                onChange={(e) => setEnd(e.target.value)}
-                                value={end}
-                            />
-                        </td>
-                    </tr>
-                </table>
-            </form>
-            <CostByTimeChart
-                start={start}
-                end={end}
-                groupBy={groupBy}
-                selectedGroup={selectedGroup}
-            />
-        </Card>
+                    <Grid.Column>
+                        <FieldSelector
+                            label={convertFieldName(groupBy)}
+                            fieldName={groupBy}
+                            onClickFunction={onSelect}
+                            selected={selectedData}
+                            includeAll={true}
+                        />
+                    </Grid.Column>
+                </Grid>
+
+                <Grid columns="equal">
+                    <Grid.Column className="field-selector-label">
+                        <Input
+                            label="Start"
+                            fluid
+                            type="date"
+                            onChange={(e) => changeDate('start', e.target.value)}
+                            value={start}
+                        />
+                    </Grid.Column>
+
+                    <Grid.Column className="field-selector-label">
+                        <Input
+                            label="Finish"
+                            fluid
+                            type="date"
+                            onChange={(e) => changeDate('end', e.target.value)}
+                            value={end}
+                        />
+                    </Grid.Column>
+                </Grid>
+
+                <Grid>
+                    <Grid.Column width={16}>
+                        <CostByTimeChart
+                            start={start}
+                            end={end}
+                            groupBy={groupBy}
+                            selectedGroup={selectedData}
+                        />
+                    </Grid.Column>
+                </Grid>
+            </Card>
+            <Card fluid style={{ padding: '20px' }} id="billing-container-data">
+                <p>
+                    This is a placeholder for the {convertFieldName(groupBy)}{' '}
+                    {selectedData ?? '<not selected>'} from {start} to {end} inclusive
+                </p>
+            </Card>
+        </>
     )
 }
 

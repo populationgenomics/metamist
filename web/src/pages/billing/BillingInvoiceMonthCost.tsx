@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
-import { Table as SUITable, Message, Button, Checkbox, Dropdown } from 'semantic-ui-react'
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
+import { Table as SUITable, Message, Button, Checkbox, Dropdown, Grid } from 'semantic-ui-react'
 import _ from 'lodash'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -8,6 +8,9 @@ import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 
 import './Billing.css'
+import FieldSelector from './FieldSelector'
+
+import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -20,13 +23,52 @@ const BillingCurrentCost = () => {
         direction: 'undefined',
     })
 
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(BillingColumn.GcpProject)
+    // Pull search params for use in the component
+    const [searchParams] = useSearchParams()
+    const inputGroupBy: string | null = searchParams.get('groupBy')
+    const fixedGroupBy: BillingColumn = inputGroupBy
+        ? (inputGroupBy as BillingColumn)
+        : BillingColumn.GcpProject
+    const inputInvoiceMonth = searchParams.get('invoiceMonth')
 
-    const getCosts = (grp: BillingColumn) => {
+    // use navigate and update url params
+    const location = useLocation()
+    const navigate = useNavigate()
+
+    const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+        let url = `${location.pathname}?groupBy=${grp}`
+        if (invoiceMonth) {
+            url += `&invoiceMonth=${invoiceMonth}`
+        }
+        navigate(url)
+    }
+
+    // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
+    // toISOString().substring(0, 7) will give you YYYY-MM
+    // .replace('-', '') will give you YYYYMM
+    const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
+        fixedGroupBy ?? BillingColumn.GcpProject
+    )
+    const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
+
+    const onGroupBySelect = (event: any, data: any) => {
+        setGroupBy(data.value)
+        getCosts(data.value, invoiceMonth)
+    }
+
+    const onInvoiceMonthSelect = (event: any, data: any) => {
+        setInvoiceMonth(data.value)
+        getCosts(groupBy, data.value)
+    }
+
+    const getCosts = (grp: BillingColumn, invoiceMonth: string | undefined) => {
+        updateNav(groupBy, invoiceMonth)
         setIsLoading(true)
         setError(undefined)
         new BillingApi()
-            .getRunningCost(grp)
+            .getRunningCost(grp, invoiceMonth)
             .then((response) => {
                 setIsLoading(false)
                 setCosts(response.data)
@@ -35,7 +77,7 @@ const BillingCurrentCost = () => {
     }
 
     React.useEffect(() => {
-        getCosts(groupBy)
+        getCosts(groupBy, invoiceMonth)
     }, [])
 
     const HEADER_FIELDS = [
@@ -69,7 +111,7 @@ const BillingCurrentCost = () => {
             return ''
         }
 
-        return `${num.toFixed(0).toString()}%`
+        return `${num.toFixed(0).toString()} % `
     }
 
     function capitalize(str: string): string {
@@ -84,7 +126,7 @@ const BillingCurrentCost = () => {
             <Message negative>
                 {error}
                 <br />
-                <Button color="red" onClick={() => getCosts(groupBy)}>
+                <Button color="red" onClick={() => getCosts(groupBy, invoiceMonth)}>
                     Retry
                 </Button>
             </Message>
@@ -119,28 +161,32 @@ const BillingCurrentCost = () => {
         return undefined
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        getCosts(data.value)
+    const linkTo = (data: string) => {
+        return `/billing/costByTime?groupBy=${groupBy}&selectedData=${data}`
     }
 
-    const field_options = [
-        { key: 1, text: 'By GCP Project', value: BillingColumn.GcpProject },
-        { key: 2, text: 'By Topic', value: BillingColumn.Topic },
-    ]
-
     return (
-        <div>
-            <h1>Billing Current Invoice Month</h1>
+        <>
+            <h1>Billing By Invoice Month</h1>
 
-            <Dropdown
-                id="group-by-dropdown"
-                selection
-                fluid
-                onChange={onGroupBySelect}
-                value={groupBy}
-                options={field_options}
-            />
+            <Grid columns="equal">
+                <Grid.Column>
+                    <FieldSelector
+                        label="Group By"
+                        fieldName="Group"
+                        onClickFunction={onGroupBySelect}
+                        selected={groupBy}
+                    />
+                </Grid.Column>
+                <Grid.Column>
+                    <FieldSelector
+                        label="Invoice Month"
+                        fieldName={BillingColumn.InvoiceMonth}
+                        onClickFunction={onInvoiceMonthSelect}
+                        selected={invoiceMonth}
+                    />
+                </Grid.Column>
+            </Grid>
 
             <Table celled compact sortable>
                 <SUITable.Header>
@@ -174,7 +220,7 @@ const BillingCurrentCost = () => {
                                     resize: 'horizontal',
                                 }}
                             >
-                                {k.title}
+                                {convertFieldName(k.title)}
                             </SUITable.HeaderCell>
                         ))}
 
@@ -200,7 +246,7 @@ const BillingCurrentCost = () => {
                         [sort.column],
                         sort.direction === 'ascending' ? ['asc'] : ['desc']
                     ).map((p) => (
-                        <React.Fragment key={`total-${p.field}`}>
+                        <React.Fragment key={`total - ${p.field}`}>
                             <SUITable.Row>
                                 <SUITable.Cell collapsing>
                                     <Checkbox
@@ -215,11 +261,7 @@ const BillingCurrentCost = () => {
                                             return (
                                                 <SUITable.Cell>
                                                     <b>
-                                                        <Link
-                                                            to={`/billing/costByTime?groupBy=${capitalize(
-                                                                groupBy
-                                                            )}&selectedGroup=${p[k.category]}`}
-                                                        >
+                                                        <Link to={linkTo(p[k.category])}>
                                                             {p[k.category]}
                                                         </Link>
                                                     </b>
@@ -248,7 +290,7 @@ const BillingCurrentCost = () => {
                                                 : 'none',
                                             backgroundColor: 'var(--color-bg)',
                                         }}
-                                        key={`${dk.cost_category}-${p.field}`}
+                                        key={`${dk.cost_category} - ${p.field}`}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
                                         <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
@@ -290,7 +332,7 @@ const BillingCurrentCost = () => {
                     ))}
                 </SUITable.Body>
             </Table>
-        </div>
+        </>
     )
 }
 
