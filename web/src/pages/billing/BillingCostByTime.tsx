@@ -1,11 +1,17 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Card, Grid, Input } from 'semantic-ui-react'
+import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
 import CostByTimeChart from './CostByTimeChart'
 import FieldSelector from './FieldSelector'
-import { BillingColumn } from '../../sm-api'
+import {
+    BillingApi,
+    BillingColumn,
+    BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
+} from '../../sm-api'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
@@ -32,6 +38,12 @@ const BillingCostByTime: React.FunctionComponent = () => {
         fixedGroupBy ?? BillingColumn.GcpProject
     )
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
+
+    // Data loading
+    const [isLoading, setIsLoading] = React.useState<boolean>(true)
+    const [error, setError] = React.useState<string | undefined>()
+    const [groups, setGroups] = React.useState<string[]>([])
+    const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -75,6 +87,84 @@ const BillingCostByTime: React.FunctionComponent = () => {
         setStart(start_update)
         setEnd(end_update)
         updateNav(groupBy, selectedData, start_update, end_update)
+    }
+
+    const getData = (query: BillingTotalCostQueryModel) => {
+        setIsLoading(true)
+        setError(undefined)
+        new BillingApi()
+            .getTotalCost(query)
+            .then((response) => {
+                setIsLoading(false)
+                const rec_grps = Array.from(
+                    new Set(response.data.map((item: BillingTotalCostRecord) => item.cost_category))
+                )
+                const records = response.data.reduce(
+                    (
+                        acc: { [key: string]: { [key: string]: number } },
+                        item: BillingTotalCostRecord
+                    ) => {
+                        const { day, cost_category, cost } = item
+                        if (day !== undefined) {
+                            if (!acc[day] || cost_category === undefined) {
+                                acc[day] = {}
+                                rec_grps.forEach((k) => {
+                                    acc[day][k] = 0
+                                })
+                            } else {
+                                acc[day][cost_category] = cost
+                            }
+                        }
+                        return acc
+                    },
+                    {}
+                )
+                const no_undefined: string[] = rec_grps.filter(
+                    (item): item is string => item !== undefined
+                )
+                setGroups(no_undefined)
+                setData(
+                    Object.keys(records).map((key) => ({
+                        date: new Date(key),
+                        values: records[key],
+                    }))
+                )
+            })
+            .catch((er) => setError(er.message))
+    }
+
+    // on first load
+    React.useEffect(() => {
+        if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
+            if (selectedData.startsWith('All ')) {
+                getData({
+                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                    start_date: start,
+                    end_date: end,
+                    order_by: { day: false },
+                })
+            } else {
+                getData({
+                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
+                    start_date: start,
+                    end_date: end,
+                    filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
+                    order_by: { day: false },
+                })
+            }
+        }
+    }, [start, end, groupBy, selectedData])
+
+    if (error) {
+        return (
+            <Message negative onDismiss={() => setError(undefined)}>
+                {error}
+                <br />
+                <Button color="red" onClick={() => setStart(start)}>
+                    Retry
+                </Button>
+            </Message>
+        )
     }
 
     return (
@@ -136,8 +226,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         <CostByTimeChart
                             start={start}
                             end={end}
-                            groupBy={groupBy}
-                            selectedGroup={selectedData}
+                            groups={groups}
+                            isLoading={isLoading}
+                            data={data}
                         />
                     </Grid.Column>
                 </Grid>
