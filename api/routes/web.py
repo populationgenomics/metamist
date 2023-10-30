@@ -138,7 +138,7 @@ async def sync_seqr_project(
 )
 async def get_projects_seqr_stats(
     projects: list[int] = None,
-    sequencing_types: list[str] = None,
+    sequencing_types: list[str] = ['genome', 'exome'],
     connection: Connection = get_projectless_db_connection,
 ):
     """

@@ -76,18 +76,17 @@ const SeqrStats: React.FC = () => {
             <Table>
                 <thead>
                     <tr>
-                        <th>Project</th>
-                        <th>sequencing_type</th>
-                        <th>total_families</th>
-                        <th>total_participants</th>
-                        <th>total_samples</th>
-                        <th>total_sequencing_grouss</th>
-                        <th>total_crams</th>
-                        <th>latest_es_index_id</th>
-                        <th>total_sgs_in_latest_es_index</th>
-                        <th>latest_annotate_dataset_id</th>
-                        <th>total_sgs_in_latest_annotate_dataset</th>
-                        <th>links</th>
+                        <th>Dataset</th>
+                        <th>Type</th>
+                        <th>Families</th>
+                        <th>Participants</th>
+                        <th>Samples</th>
+                        <th>Sequencing Groups</th>
+                        <th>CRAMs</th>
+                        <th>ES-Index</th>
+                        <th>ES-Index SGs</th>
+                        <th>Joint Call</th>
+                        <th>Joint Call SGs</th>
                     </tr>
                 </thead>
                 <tbody>
