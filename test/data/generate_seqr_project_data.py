@@ -288,7 +288,6 @@ async def main():
                         ),
                     },
                     participant_id=pid,
-                    assays=[],
                     sequencing_groups=[],
                 )
                 samples.append(sample)
@@ -319,6 +318,7 @@ async def main():
                                 type=assay_type,
                                 meta={
                                     'facility': facility,
+                                    'reads' : [],
                                     'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
                                     'sequencing_type': stype,
                                     'sequencing_technology': stechnology,
