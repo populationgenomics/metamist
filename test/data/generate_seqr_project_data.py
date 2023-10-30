@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # pylint: disable=too-many-locals,unsubscriptable-object
-import argparse
 import asyncio
 import csv
 import datetime
@@ -9,8 +8,8 @@ import random
 import tempfile
 
 import sys
-from pathlib import Path
 from pprint import pprint
+from typing import Set, List
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async
@@ -47,7 +46,7 @@ NAMES = [
     'NOVA',
 ]
 
-PROJECTS = [    
+PROJECTS = [
     'SIGMA',
     'DELTA',
     'ALPHA',
@@ -62,8 +61,37 @@ PROJECTS = [
     'OMEGA',
 ]
 
+QUERY_PROJECT_SGS = gql(
+    """
+    query MyQuery($project: String!) {
+        project(name: $project) {
+            sequencingGroups {
+            id
+            type
+            }
+        }
+    }
+    """
+)
+
+QUERY_ENUMS = gql(
+    """
+    query EnumsQuery {
+        enum {
+            analysisType
+            assayType
+            sampleType
+            sequencingPlatform
+            sequencingTechnology
+            sequencingType
+        }
+    }
+    """
+)
+
 
 class ped_row:
+    """The pedigree row class"""
     def __init__(self, values):
         (
             self.family_id,
@@ -85,7 +113,7 @@ class ped_row:
 
 def generate_random_id(used_ids: set):
     """Generate a random ID using the NAMES list."""
-    random_id = '{:s}_{:04d}'.format(random.choice(NAMES), random.randint(1, 9999))
+    random_id = f'{random.choice(NAMES)}_{random.randint(1, 9999):04}'
     if random_id in used_ids:
         return generate_random_id(used_ids)
     used_ids.add(random_id)
@@ -100,10 +128,10 @@ def generate_pedigree_rows(num_families=1):
     - num_families: The number of families to generate.
 
     Returns:
-    A list of rows, each row represented as a list of column values.
+    A list of ped_row objects representing a project's pedigree.
     """
-    used_ids = set()
-    rows = []
+    used_ids: Set[str] = set()
+    rows: List[ped_row] = []
     for _ in range(num_families):
         num_individuals_in_family = random.randint(1, 5)
         family_id = generate_random_id(used_ids)
@@ -116,7 +144,7 @@ def generate_pedigree_rows(num_families=1):
             )
             continue
 
-        elif num_individuals_in_family == 2:  # Duo
+        if num_individuals_in_family == 2:  # Duo
             parent_id = generate_random_id(used_ids)
             parent_sex = random.choice([1, 2])
             parent_affected = random.choices([0, 1, 2], weights=[0.05, 0.8, 0.15], k=1)[
@@ -156,7 +184,7 @@ def generate_pedigree_rows(num_families=1):
                 sex = i + 1
                 affected = random.choices([0, 1, 2], weights=[0.05, 0.8, 0.15], k=1)[0]
                 founders.append(ped_row([family_id, founder_id, '', '', sex, affected]))
-                
+
             rows.extend(founders)
             # Generate remaining individuals in the family
             for _ in range(num_individuals_in_family - len(founders)):
@@ -179,67 +207,41 @@ def generate_pedigree_rows(num_families=1):
 
     return rows
 
-QUERY_PROJECT_SGS = gql(
-    """
-query MyQuery($project: String!) {
-  project(name: $project) {
-    sequencingGroups {
-      id
-      type
-    }
-  }
-}"""
-)
-
-QUERY_ENUMS = gql(
-    """
-query EnumsQuery {
-  enum {
-    analysisType
-    assayType
-    sampleType
-    sequencingPlatform
-    sequencingTechnology
-    sequencingType
-  }
-}"""
-)
-
 
 async def main():
     """
     Generates a number of projects and populates them with randomly generated pedigrees.
     Creates family, participant, sample, and sequencing group records for the projects.
-    Upserts a number of analyses for each project and sequencing group to test seqr related endpoints.
+    Upserts a number of analyses for each project to test seqr related endpoints.
+    The upserted analyses include CRAMs, joint-called AnnotateDatasets, and ES-indexes.
     """
     aapi = AnalysisApi()
     papi = ProjectApi()
     sapi = SampleApi()
-    
-    how_many_samples = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
-    how_many_sequencing_groups = {1: 0.78, 2: 0.16, 3: 0.05}
 
-    def get_sequencing_types():
+    sample_count_distribution = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
+    sequencing_group_count_distribution = {1: 0.78, 2: 0.16, 3: 0.05}
+
+    enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
+    sample_types = enum_resp['enum']['sampleType']
+    sequencing_technologies = enum_resp['enum']['sequencingTechnology']
+    sequencing_platforms = enum_resp['enum']['sequencingPlatform']
+    sequencing_types = ['genome', 'exome', 'transcriptome']
+    assay_type = 'sequencing'
+
+    def generate_sequencing_type():
         """Return a random length of random sequencing types"""
         k = random.choices(
-            list(how_many_sequencing_groups.keys()),
-            list(how_many_sequencing_groups.values()),
+            list(sequencing_group_count_distribution.keys()),
+            list(sequencing_group_count_distribution.values()),
         )[0]
         return random.choices(sequencing_types, weights=[0.49, 0.49, 0.02], k=k)
 
     def generate_random_number_within_distribution():
+        """Return a random number within a distribution"""
         return random.choices(
-            list(how_many_samples.keys()), list(how_many_samples.values())
+            list(sample_count_distribution.keys()), list(sample_count_distribution.values())
         )[0]
-
-    enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
-    # analysis_types = enum_resp['enum']['analysisType']
-    sample_types = enum_resp['enum']['sampleType']
-    sequencing_technologies = enum_resp['enum']['sequencingTechnology']
-    sequencing_platforms = enum_resp['enum']['sequencingPlatform']
-    # sequencing_types = enum_resp['enum']['sequencingType']
-    sequencing_types = ['genome', 'exome', 'transcriptome']
-    assay_type = 'sequencing'
 
     existing_projects = await papi.get_my_projects_async()
     for project in PROJECTS:
@@ -247,15 +249,15 @@ async def main():
             await papi.create_project_async(
                 name=project, dataset=project, create_test_project=False
             )
-            print('Created project', project)
+            logging.info(f'Created project "{project}"')
             await papi.update_project_async(
-                project=project, body={'meta': {'is_seqr': "true"}},
+                project=project, body={'meta': {'is_seqr': 'true'}},
             )
-            print('Updated project', project, 'to be seqr project')
-            
+            logging.info(f'Set {project} as seqr project')
+
         project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
         participant_eids = [row.individual_id for row in project_pedigree]
-        
+
         pedfile = tempfile.NamedTemporaryFile(mode='w')
         ped_writer = csv.writer(pedfile, delimiter='\t')
         for row in project_pedigree:
@@ -292,7 +294,7 @@ async def main():
                 )
                 samples.append(sample)
 
-                for stype in get_sequencing_types():
+                for stype in generate_sequencing_type():
                     facility = random.choice(
                         [
                             'Amazing sequence centre',
@@ -331,15 +333,16 @@ async def main():
         pprint(response)
 
         sgid_response = await query_async(QUERY_PROJECT_SGS, {'project': project})
-        sequencing_group_ids = [
-            sg for sg in sgid_response['project']['sequencingGroups']
-        ]
+        sequencing_group_ids = list(sgid_response['project']['sequencingGroups'])
+
+        # Randomly allocate some of the sequencing groups to be aligned
         aligned_sgs = random.sample(sequencing_group_ids, k=random.randint(int(len(sequencing_group_ids)/2), len(sequencing_group_ids)))
-        
+
         genome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome']
         exome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome']
         transcriptome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
 
+        # Insert completed CRAM analyses for the aligned sequencing groups
         analyses_to_insert = [
             Analysis(
                 sequencing_group_ids=[sg['id']],
@@ -356,13 +359,13 @@ async def main():
             )
             for sg in aligned_sgs
         ]
-        
-        # joint-call / AnnotateDataset stage + es-index stage
+
+        # Insert joint-call / AnnotateDataset stage analysis + es-index stage analysis
         for seq_type, sg_list in {'genome': genome_sgs, 'exome': exome_sgs, 'transcriptome': transcriptome_sgs}.items():
             if not sg_list:
                 continue
             joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
-            
+
             analyses_to_insert.extend(
                 [
                     Analysis(
