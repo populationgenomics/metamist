@@ -42,7 +42,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     const getTopics = () => {
         setLoading(true)
         setError(undefined)
-        console.log('Starting loading')
         new BillingApi()
             .getTopics()
             .then((response) => {
@@ -50,13 +49,11 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
-        console.log('Done loading')
     }
 
     const getGcpProjects = () => {
         setLoading(true)
         setError(undefined)
-        console.log('Starting loading')
         new BillingApi()
             .getGcpProjects()
             .then((response) => {
@@ -64,13 +61,11 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
-        console.log('Done loading')
     }
 
     const getInvoiceMonths = () => {
         setLoading(true)
         setError(undefined)
-        console.log('Starting loading')
         new BillingApi()
             .getInvoiceMonths()
             .then((response) => {
@@ -78,7 +73,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setRecords(extendRecords(response.data))
             })
             .catch((er) => setError(er.message))
-        console.log('Done loading')
     }
 
     React.useEffect(() => {
