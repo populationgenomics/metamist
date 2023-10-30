@@ -97,11 +97,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .then((response) => {
                 setIsLoading(false)
                 const rec_grps = Array.from(
-                    new Set(
-                        response.data.map(
-                            (item: BillingTotalCostRecord) => item.cost_category
-                        )
-                    )
+                    new Set(response.data.map((item: BillingTotalCostRecord) => item.cost_category))
                 )
                 const records = response.data.reduce(
                     (
