@@ -3,7 +3,12 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Grid, Input, Message } from 'semantic-ui-react'
 import CostByTimeChart from './CostByTimeChart'
 import FieldSelector from './FieldSelector'
-import { BillingApi, BillingColumn, BillingTotalCostQueryModel, BillingTotalCostRecord } from '../../sm-api'
+import {
+    BillingApi,
+    BillingColumn,
+    BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
+} from '../../sm-api'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
@@ -114,7 +119,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     },
                     {}
                 )
-                const no_undefined: string[] = rec_grps.filter((item): item is string => item !== undefined)
+                const no_undefined: string[] = rec_grps.filter(
+                    (item): item is string => item !== undefined
+                )
                 setGroups(no_undefined)
                 setData(
                     Object.keys(records).map((key) => ({

@@ -29,7 +29,6 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
     isLoading,
     data,
 }) => {
-
     if (isLoading)
         return (
             <div>
