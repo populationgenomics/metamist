@@ -351,11 +351,6 @@ async def main():
 
         # Randomly allocate some of the sequencing groups to be aligned
         aligned_sgs = random.sample(sequencing_group_ids, k=random.randint(int(len(sequencing_group_ids)/2), len(sequencing_group_ids)))
-        seq_type_sg_list = {
-            'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
-            'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
-            'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
-        }
 
         # Insert completed CRAM analyses for the aligned sequencing groups
         analyses_to_insert = [
@@ -376,7 +371,12 @@ async def main():
         ]
 
         # Insert joint-call / AnnotateDataset stage analysis + es-index stage analysis
-        for seq_type, sg_list in seq_type_sg_list.items():
+        seq_type_to_sg_list = {
+            'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
+            'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
+            'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
+        }
+        for seq_type, sg_list in seq_type_to_sg_list.items():
             if not sg_list:
                 continue
             joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
