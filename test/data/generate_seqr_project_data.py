@@ -208,9 +208,98 @@ def generate_pedigree_rows(num_families=1):
     return rows
 
 
+def generate_sequencing_type(count_distribution: dict[int, float], sequencing_types: list[str]):
+    """Return a random length of random sequencing types"""
+    k = random.choices(
+        list(count_distribution.keys()),
+        list(count_distribution.values()),
+    )[0]
+    return random.choices(sequencing_types, weights=[0.49, 0.49, 0.02], k=k)
+
+
+def generate_random_number_within_distribution(count_distribution: dict[int, float]):
+    """Return a random number within a distribution"""
+    return random.choices(
+        list(count_distribution.keys()), list(count_distribution.values())
+    )[0]
+
+
+def generate_sample_entries(participant_id_map: dict[str, int], metamist_enums: dict[str, dict[str, list[str]]]):
+    """
+    Generates a number of samples for each participant in the input id map.
+    Generates sequencing groups of random sequencing type, and subsequently
+    generates assays for each sequencing group.
+    """
+    sample_types = metamist_enums['enum']['sampleType']
+    sequencing_technologies = metamist_enums['enum']['sequencingTechnology']
+    sequencing_platforms = metamist_enums['enum']['sequencingPlatform']
+    sequencing_types = ['genome', 'exome', 'transcriptome']
+    assay_type = 'sequencing'
+
+    # Arbitrary distribution for number of samples, sequencing groups, assays
+    default_count_probabilities = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
+
+    samples = []
+    for participant_eid, participant_id in participant_id_map.items():
+        nsamples = generate_random_number_within_distribution(default_count_probabilities)
+        for i in range(nsamples):
+            sample = SampleUpsert(
+                external_id=f'{participant_eid}_{i+1}',
+                type=random.choice(sample_types),
+                meta={
+                    'collection_date': datetime.datetime.now()
+                    - datetime.timedelta(minutes=random.randint(-100, 10000)),
+                    'specimen': random.choice(
+                        ['blood', 'phlegm', 'yellow bile', 'black bile']
+                    ),
+                },
+                participant_id=participant_id,
+                sequencing_groups=[],
+            )
+            samples.append(sample)
+
+            for stype in generate_sequencing_type(default_count_probabilities, sequencing_types):
+                facility = random.choice(
+                    [
+                        'Amazing sequence centre',
+                        'Sequence central',
+                        'Dept of Seq.',
+                    ]
+                )
+                stechnology = random.choice(sequencing_technologies)
+                splatform = random.choice(sequencing_platforms)
+                sg = SequencingGroupUpsert(
+                    type=stype,
+                    technology=stechnology,
+                    platform=splatform,
+                    meta={
+                        'facility': facility,
+                    },
+                    assays=[],
+                )
+                sample.sequencing_groups.append(sg)
+                for _ in range(generate_random_number_within_distribution(default_count_probabilities)):
+                    sg.assays.append(
+                        AssayUpsert(
+                            type=assay_type,
+                            meta={
+                                'facility': facility,
+                                'reads' : [],
+                                'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
+                                'sequencing_type': stype,
+                                'sequencing_technology': stechnology,
+                                'sequencing_platform': splatform,
+                            },
+                        )
+                    )
+
+    return samples
+
+
 async def main():
     """
     Generates a number of projects and populates them with randomly generated pedigrees.
+    Sets each project as a seqr project via the project's meta field.
     Creates family, participant, sample, and sequencing group records for the projects.
     Upserts a number of analyses for each project to test seqr related endpoints.
     The upserted analyses include CRAMs, joint-called AnnotateDatasets, and ES-indexes.
@@ -219,29 +308,7 @@ async def main():
     papi = ProjectApi()
     sapi = SampleApi()
 
-    sample_count_distribution = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
-    sequencing_group_count_distribution = {1: 0.78, 2: 0.16, 3: 0.05}
-
     enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
-    sample_types = enum_resp['enum']['sampleType']
-    sequencing_technologies = enum_resp['enum']['sequencingTechnology']
-    sequencing_platforms = enum_resp['enum']['sequencingPlatform']
-    sequencing_types = ['genome', 'exome', 'transcriptome']
-    assay_type = 'sequencing'
-
-    def generate_sequencing_type():
-        """Return a random length of random sequencing types"""
-        k = random.choices(
-            list(sequencing_group_count_distribution.keys()),
-            list(sequencing_group_count_distribution.values()),
-        )[0]
-        return random.choices(sequencing_types, weights=[0.49, 0.49, 0.02], k=k)
-
-    def generate_random_number_within_distribution():
-        """Return a random number within a distribution"""
-        return random.choices(
-            list(sample_count_distribution.keys()), list(sample_count_distribution.values())
-        )[0]
 
     existing_projects = await papi.get_my_projects_async()
     for project in PROJECTS:
@@ -255,6 +322,7 @@ async def main():
             )
             logging.info(f'Set {project} as seqr project')
 
+        # Insert families and participants via pedigree file
         project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
         participant_eids = [row.individual_id for row in project_pedigree]
 
@@ -273,62 +341,8 @@ async def main():
             project=project, request_body=participant_eids
         )
 
-        samples = []
-        for participant_eid in participant_eids:
-            pid = id_map[participant_eid]
-
-            nsamples = generate_random_number_within_distribution()
-            for i in range(nsamples):
-                sample = SampleUpsert(
-                    external_id=f'{participant_eid}_{i+1}',
-                    type=random.choice(sample_types),
-                    meta={
-                        'collection_date': datetime.datetime.now()
-                        - datetime.timedelta(minutes=random.randint(-100, 10000)),
-                        'specimen': random.choice(
-                            ['blood', 'phlegm', 'yellow bile', 'black bile']
-                        ),
-                    },
-                    participant_id=pid,
-                    sequencing_groups=[],
-                )
-                samples.append(sample)
-
-                for stype in generate_sequencing_type():
-                    facility = random.choice(
-                        [
-                            'Amazing sequence centre',
-                            'Sequence central',
-                            'Dept of Seq.',
-                        ]
-                    )
-                    stechnology = random.choice(sequencing_technologies)
-                    splatform = random.choice(sequencing_platforms)
-                    sg = SequencingGroupUpsert(
-                        type=stype,
-                        technology=stechnology,
-                        platform=splatform,
-                        meta={
-                            'facility': facility,
-                        },
-                        assays=[],
-                    )
-                    sample.sequencing_groups.append(sg)
-                    for _ in range(generate_random_number_within_distribution()):
-                        sg.assays.append(
-                            AssayUpsert(
-                                type=assay_type,
-                                meta={
-                                    'facility': facility,
-                                    'reads' : [],
-                                    'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
-                                    'sequencing_type': stype,
-                                    'sequencing_technology': stechnology,
-                                    'sequencing_platform': splatform,
-                                },
-                            )
-                        )
-
+        # Insert samples, sequencing groups, and assays for each participant
+        samples = generate_sample_entries(id_map, enum_resp)
         response = await sapi.upsert_samples_async(project, samples)
         pprint(response)
 
@@ -337,10 +351,11 @@ async def main():
 
         # Randomly allocate some of the sequencing groups to be aligned
         aligned_sgs = random.sample(sequencing_group_ids, k=random.randint(int(len(sequencing_group_ids)/2), len(sequencing_group_ids)))
-
-        genome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome']
-        exome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome']
-        transcriptome_sgs = [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
+        seq_type_sg_list = {
+            'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
+            'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
+            'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
+        }
 
         # Insert completed CRAM analyses for the aligned sequencing groups
         analyses_to_insert = [
@@ -361,7 +376,7 @@ async def main():
         ]
 
         # Insert joint-call / AnnotateDataset stage analysis + es-index stage analysis
-        for seq_type, sg_list in {'genome': genome_sgs, 'exome': exome_sgs, 'transcriptome': transcriptome_sgs}.items():
+        for seq_type, sg_list in seq_type_sg_list.items():
             if not sg_list:
                 continue
             joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
