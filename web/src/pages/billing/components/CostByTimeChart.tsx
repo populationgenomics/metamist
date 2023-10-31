@@ -33,8 +33,6 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
         )
     }
 
-    console.log(data)
-
     return (
         <>
             <StackedAreaByDateChart
