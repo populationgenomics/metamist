@@ -1,12 +1,12 @@
-import { Checkbox, Grid, Header, Table as SUITable } from "semantic-ui-react"
-import Table from "../../../shared/components/Table"
-import React from "react"
-import { BillingColumn } from "../../../sm-api"
-import { convertFieldName } from "../../../shared/utilities/fieldName"
-import LoadingDucks from "../../../shared/components/LoadingDucks/LoadingDucks"
-import { IStackedAreaByDateChartData } from "../../../shared/components/Graphs/StackedAreaByDateChart"
-import orderBy from "../../../shared/utilities/orderBy"
-import { ErrorBarDataPointFormatter } from "recharts/types/cartesian/ErrorBar"
+import { Checkbox, Grid, Header, Table as SUITable } from 'semantic-ui-react'
+import Table from '../../../shared/components/Table'
+import React from 'react'
+import { BillingColumn } from '../../../sm-api'
+import { convertFieldName } from '../../../shared/utilities/fieldName'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { IStackedAreaByDateChartData } from '../../../shared/components/Graphs/StackedAreaByDateChart'
+import orderBy from '../../../shared/utilities/orderBy'
+import { ErrorBarDataPointFormatter } from 'recharts/types/cartesian/ErrorBar'
 
 interface IBillingCostByTimeTableProps {
     heading: string
@@ -23,20 +23,22 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     end,
     groups,
     isLoading,
-    data
+    data,
 }) => {
     const [internalData, setInternalData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [internalGroups, setInternalGroups] = React.useState<string[]>([])
 
     // Format data
     React.useEffect(() => {
-        setInternalData(data.map((p) => {
-            let newP = { ...p }
-            const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
-            newP.values['Daily Total'] = total
-            newP.values['Compute Cost'] = total - p.values['Cloud Storage']
-            return newP
-        }))
+        setInternalData(
+            data.map((p) => {
+                let newP = { ...p }
+                const total = Object.values(p.values).reduce((acc, cur) => acc + cur, 0)
+                newP.values['Daily Total'] = total
+                newP.values['Compute Cost'] = total - p.values['Cloud Storage']
+                return newP
+            })
+        )
 
         setInternalGroups(groups.concat(['Daily Total', 'Compute Cost']))
     }, [data, groups])
@@ -65,7 +67,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         if (expandCompute) {
             return internalGroups
                 .sort(headerSort)
-                .filter(group => group != 'Compute Cost')
+                .filter((group) => group != 'Compute Cost')
                 .map((group: string) => ({
                     category: group,
                     title: group,
@@ -83,7 +85,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             {
                 category: 'Compute Cost',
                 title: 'Compute Cost',
-            }
+            },
         ]
     }
 
@@ -128,21 +130,27 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     const dataSort = (
         data: IStackedAreaByDateChartData[],
         props: string[],
-        orders?: ("asc" | "desc")[]
-    ) => (
-        [...data].sort((a, b) =>
-            props.reduce((acc, prop, i) => {
-                if (acc === 0) {
-                    const [p1, p2] =
-                        orders && orders[i] === "desc"
-                            ? [b.values[prop as keyof typeof b], a.values[prop as keyof typeof a]]
-                            : [a.values[prop as keyof typeof a], b.values[prop as keyof typeof b]];
-                    acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0;
-                }
-                return acc;
-            }, 0) as number // explicitly cast the result to a number
+        orders?: ('asc' | 'desc')[]
+    ) =>
+        [...data].sort(
+            (a, b) =>
+                props.reduce((acc, prop, i) => {
+                    if (acc === 0) {
+                        const [p1, p2] =
+                            orders && orders[i] === 'desc'
+                                ? [
+                                      b.values[prop as keyof typeof b],
+                                      a.values[prop as keyof typeof a],
+                                  ]
+                                : [
+                                      a.values[prop as keyof typeof a],
+                                      b.values[prop as keyof typeof b],
+                                  ]
+                        acc = p1 > p2 ? 1 : p1 < p2 ? -1 : 0
+                    }
+                    return acc
+                }, 0) as number // explicitly cast the result to a number
         )
-    );
 
     const dataToBody = (data: IStackedAreaByDateChartData[]) => (
         <>
@@ -157,11 +165,8 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             <b>{p.date.toLocaleDateString()}</b>
                         </SUITable.Cell>
                         {headerFields().map((k) => (
-                            <SUITable.Cell>
-                                {currencyFormat(p.values[k.category])}
-                            </SUITable.Cell>
-                        )
-                        )}
+                            <SUITable.Cell>{currencyFormat(p.values[k.category])}</SUITable.Cell>
+                        ))}
                     </SUITable.Row>
                 </React.Fragment>
             ))}
@@ -170,11 +175,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
 
     return (
         <>
-            <Header as='h3'>{convertFieldName(heading)} costs from {start} to {end}</Header>
+            <Header as="h3">
+                {convertFieldName(heading)} costs from {start} to {end}
+            </Header>
             <Table celled compact sortable selectable>
                 <SUITable.Header>
                     <SUITable.Row>
-                        <SUITable.HeaderCell colSpan={2} textAlign='center'>
+                        <SUITable.HeaderCell colSpan={2} textAlign="center">
                             <Checkbox
                                 label="Expand"
                                 fitted
@@ -190,9 +197,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         </SUITable.HeaderCell>
                     </SUITable.Row>
                     <SUITable.Row>
-                        <SUITable.HeaderCell style={{
-                            borderBottom: 'none'
-                        }}>Date</SUITable.HeaderCell>
+                        <SUITable.HeaderCell
+                            style={{
+                                borderBottom: 'none',
+                            }}
+                        >
+                            Date
+                        </SUITable.HeaderCell>
                         {headerFields().map((k) => (
                             <SUITable.HeaderCell
                                 key={k.category}
@@ -217,7 +228,14 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                         </SUITable.Cell>
                         {headerFields().map((k) => (
                             <SUITable.Cell>
-                                <b>{currencyFormat(internalData.reduce((acc, cur) => acc + cur.values[k.category], 0))}</b>
+                                <b>
+                                    {currencyFormat(
+                                        internalData.reduce(
+                                            (acc, cur) => acc + cur.values[k.category],
+                                            0
+                                        )
+                                    )}
+                                </b>
                             </SUITable.Cell>
                         ))}
                     </SUITable.Row>
@@ -227,4 +245,4 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
     )
 }
 
-export default BillingCostByTimeTable;
+export default BillingCostByTimeTable

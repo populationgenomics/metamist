@@ -73,13 +73,13 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     seriesLabel,
     extended,
     showDate,
-    colors
+    colors,
 }) => {
     if (!data || data.length === 0) {
         return <React.Fragment />
     }
 
-    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow;
+    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
 
     const tooltipRef = React.useRef()
     const containerDivRef = React.useRef<HTMLDivElement>()
@@ -143,8 +143,8 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     const yScale = extended
         ? scaleLinear().range([height - margin.top - margin.bottom, 0])
         : scaleLinear()
-            .domain([0, Math.max(...maxY.flatMap((val) => val))])
-            .range([height - margin.top - margin.bottom, 0])
+              .domain([0, Math.max(...maxY.flatMap((val) => val))])
+              .range([height - margin.top - margin.bottom, 0])
 
     // function that assigns each category a colour
     // can fiddle with the schemeAccent parameter for different colour scales - see https://d3js.org/d3-scale-chromatic/categorical#schemeAccent
@@ -243,14 +243,14 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                     {/* change this for different date formats */}
                                     {showDate
                                         ? `${tick.toLocaleString('en-us', {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric',
-                                        })}`
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                          })}`
                                         : `${tick.toLocaleString('en-us', {
-                                            month: 'short',
-                                            year: 'numeric',
-                                        })}`}
+                                              month: 'short',
+                                              year: 'numeric',
+                                          })}`}
                                 </text>
                                 {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
                                 <line y2={6} stroke="black" />

@@ -234,7 +234,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
             </Card>
-            <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+            <Card
+                fluid
+                style={{ padding: '20px', overflowX: 'scroll' }}
+                id="billing-container-data"
+            >
                 <BillingCostByTimeTable
                     heading={selectedData}
                     start={start}
