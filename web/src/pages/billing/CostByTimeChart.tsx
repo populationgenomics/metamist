@@ -1,10 +1,6 @@
 import * as React from 'react'
 import _ from 'lodash'
 
-import Container from 'react-bootstrap/Container'
-import Row from 'react-bootstrap/Row'
-import Col from 'react-bootstrap/Col'
-
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import {
     BillingApi,
@@ -19,7 +15,7 @@ import {
 } from '../../shared/components/Graphs/StackedAreaByDateChart'
 
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
-import DonutChart from '../../shared/components/Graphs/DonutChart'
+import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 
 interface ICostByTimeChartProps {
     start: string
@@ -42,6 +38,8 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
 
     const [barChartData, setBarChartData] = React.useState<IData[]>([])
     const [donutChartData, setDonutChartData] = React.useState<[]>([])
+
+    const maxDataPoints = 7
 
     const getData = (query: BillingTotalCostQueryModel) => {
         setIsLoading(true)
@@ -97,16 +95,17 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
                 const barData: IData[] = Object.entries(sortedRecTotals)
                     .map(([label, value]) => ({ label, value }))
                     .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
-                        if (index < 5) {
+                        if (index < maxDataPoints) {
                             acc.push(curr)
                         } else {
                             const restValue = arr
                                 .slice(index)
                                 .reduce((sum, { value }) => sum + value, 0)
-                            if (acc.length === 5) {
-                                acc.push({ label: 'Rest', value: restValue })
+                            
+                            if (acc.length == maxDataPoints) {
+                                acc.push({ label: 'Rest*', value: restValue })
                             } else {
-                                acc[5].value += restValue
+                                acc[maxDataPoints].value += restValue
                             }
                         }
                         return acc
@@ -158,32 +157,37 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
         )
 
     return (
-        <Container>
-            <Row>
-                <Col>
-                    <BarChart data={barChartData} />
-                </Col>
-                <Col>
-                    <DonutChart data={donutChartData} />
-                </Col>
-            </Row>
-            <Row>
-                <Col colspan="2">
+        <div>
+            <table>
+                <tr>
+                    <td>
+                    <BarChart data={barChartData} maxSlices={groups.length} />
+                    </td>
+                    <td>
+                    <DonutChart data={donutChartData} maxSlices={groups.length} />
+                    </td>
+                </tr>
+                <tr>
+                    <td colSpan={2}>
                     <StackedAreaByDateChart
-                        keys={groups}
-                        data={data}
-                        start={new Date(start)}
-                        end={new Date(end)}
-                        isPercentage={false}
-                        xLabel=""
-                        yLabel="Cost (AUD)"
-                        seriesLabel="Service"
-                        extended={false}
-                        showDate={true}
-                    />
-                </Col>
-            </Row>
-        </Container>
+                    keys={groups}
+                    data={data}
+                    start={new Date(start)}
+                    end={new Date(end)}
+                    isPercentage={false}
+                    xLabel=""
+                    yLabel="Cost (AUD)"
+                    seriesLabel="Service"
+                    extended={false}
+                    showDate={true}
+                />
+                    </td>
+                </tr>
+            </table>
+            
+            
+                
+        </div>
     )
 }
 
