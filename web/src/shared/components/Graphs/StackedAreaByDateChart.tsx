@@ -35,6 +35,7 @@ interface IStackedAreaByDateChartProps {
     seriesLabel: string
     extended?: boolean
     showDate?: boolean
+    colors?: (t: number) => string
 }
 
 function getDisplayValue(value: number, isPercentage: boolean) {
@@ -72,10 +73,13 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     seriesLabel,
     extended,
     showDate,
+    colors,
 }) => {
     if (!data || data.length === 0) {
         return <React.Fragment />
     }
+
+    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
 
     const tooltipRef = React.useRef()
     const containerDivRef = React.useRef<HTMLDivElement>()
@@ -293,7 +297,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                         return <React.Fragment key={`${i}-${j}`}></React.Fragment>
                                     }
 
-                                    const colour = interpolateRainbow(i / keys.length)
+                                    const colour = colorFunc(i / keys.length)
                                     // @ts-ignore
                                     const key = keys[i]
                                     const date = data[j]?.date
@@ -410,7 +414,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                     // cy={25 + i * 25}
                                     cx={10}
                                     r={8}
-                                    fill={interpolateRainbow(i / keys.length)}
+                                    fill={colorFunc(i / keys.length)}
                                 />
                                 <text key={`${project}-legend`} x={30} y={5}>
                                     {project}
