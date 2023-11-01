@@ -101,7 +101,7 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
                             const restValue = arr
                                 .slice(index)
                                 .reduce((sum, { value }) => sum + value, 0)
-                            
+
                             if (acc.length == maxDataPoints) {
                                 acc.push({ label: 'Rest*', value: restValue })
                             } else {
@@ -161,32 +161,29 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
             <table>
                 <tr>
                     <td>
-                    <BarChart data={barChartData} maxSlices={groups.length} />
+                        <BarChart data={barChartData} maxSlices={groups.length} />
                     </td>
                     <td>
-                    <DonutChart data={donutChartData} maxSlices={groups.length} />
+                        <DonutChart data={donutChartData} maxSlices={groups.length} />
                     </td>
                 </tr>
                 <tr>
                     <td colSpan={2}>
-                    <StackedAreaByDateChart
-                    keys={groups}
-                    data={data}
-                    start={new Date(start)}
-                    end={new Date(end)}
-                    isPercentage={false}
-                    xLabel=""
-                    yLabel="Cost (AUD)"
-                    seriesLabel="Service"
-                    extended={false}
-                    showDate={true}
-                />
+                        <StackedAreaByDateChart
+                            keys={groups}
+                            data={data}
+                            start={new Date(start)}
+                            end={new Date(end)}
+                            isPercentage={false}
+                            xLabel=""
+                            yLabel="Cost (AUD)"
+                            seriesLabel="Service"
+                            extended={false}
+                            showDate={true}
+                        />
                     </td>
                 </tr>
             </table>
-            
-            
-                
         </div>
     )
 }
