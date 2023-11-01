@@ -269,11 +269,19 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
                 <Grid>
                     <Grid.Column width={10}>
-                        <BarChart data={aggregatedData} maxSlices={maxDataPoints} />
+                        <BarChart
+                            data={aggregatedData}
+                            maxSlices={groups.length}
+                            isLoading={isLoading}
+                        />
                     </Grid.Column>
 
-                    <Grid.Column width={6}>
-                        <DonutChart data={aggregatedData} maxSlices={maxDataPoints} />
+                    <Grid.Column width={6} className="donut-chart">
+                        <DonutChart
+                            data={aggregatedData}
+                            maxSlices={groups.length}
+                            isLoading={isLoading}
+                        />
                     </Grid.Column>
                 </Grid>
 

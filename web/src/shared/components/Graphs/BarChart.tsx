@@ -1,5 +1,7 @@
 import React from 'react'
 import { axisBottom, axisLeft, scaleBand, scaleLinear, select, interpolateRainbow } from 'd3'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
+import formatMoney from '../../utilities/formatMoney'
 
 export interface IData {
     label: string
@@ -10,13 +12,10 @@ interface BarChartProps {
     data: IData[]
     maxSlices: number
     colors: (t: number) => string | undefined
+    isLoading: boolean
 }
 
-function formatMoney(val: number) {
-    return `$${val.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`
-}
-
-export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors }) => {
+export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isLoading }) => {
     if (!data || data.length === 0) {
         return <div>No data available</div>
     }
@@ -55,6 +54,17 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors }) =
     if (contDiv) {
         // reset svg
         contDiv.innerHTML = ''
+
+        if (isLoading) {
+            return (
+                <div>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
+                    </p>
+                </div>
+            )
+        }
 
         // construct svg
         const svg = select(contDiv)

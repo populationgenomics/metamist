@@ -1,5 +1,7 @@
 import React from 'react'
 import { select, interpolateRainbow, pie, arc } from 'd3'
+import LoadingDucks from '../LoadingDucks/LoadingDucks'
+import formatMoney from '../../utilities/formatMoney'
 
 export interface IDonutChartData {
     label: string
@@ -10,6 +12,7 @@ export interface IDonutChartProps {
     data?: IDonutChartData[]
     maxSlices: number
     colors: (t: number) => string | undefined
+    isLoading: boolean
 }
 
 interface IDonutChartPreparadData {
@@ -26,11 +29,7 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     })`
 }
 
-function formatMoney(val: number) {
-    return `$${val.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`
-}
-
-export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors }) => {
+export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
     if (!data || data.length === 0) {
         return <div>No data available</div>
     }
@@ -106,6 +105,17 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
         // reset svg
         contDiv.innerHTML = ''
 
+        if (isLoading) {
+            return (
+                <div>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
+                    </p>
+                </div>
+            )
+        }
+
         // construct svg
         const svg = select(contDiv)
             .append('svg')
@@ -144,7 +154,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
         // labels
         svg.append('g')
             .attr('font-family', 'sans-serif')
-            .attr('font-size', 18)
+            .attr('font-size', '1.5em')
             .attr('text-anchor', 'middle')
             .selectAll('text')
             .data(data_ready)
@@ -188,6 +198,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
                     .attr('dy', '0.35em')
                     .attr('id', (d) => `legend${d.index}`)
                     .text(d.data.label)
+                    .attr('font-size', '0.9em')
                 select(this)
                     .on('mouseover', (event, v) => {
                         const element = select(`#path${d.index}`)
