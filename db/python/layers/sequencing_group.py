@@ -13,6 +13,7 @@ from db.python.utils import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupUpsertInternal,
+    SequencingGroupInternalId,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
@@ -117,7 +118,9 @@ class SequencingGroupLayer(BaseLayer):
 
         return await self.seqgt.get_sequencing_groups_create_date(sequencing_group_ids)
 
-    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+    async def get_samples_create_date_from_sgs(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[SequencingGroupInternalId, date]:
         """
         Get a map of {internal_sg_id: sample_date_created}
         for a list of sequencing_groups

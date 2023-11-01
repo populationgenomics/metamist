@@ -212,7 +212,7 @@ class GraphQLAnalysis:
     type: str
     status: strawberry.enum(AnalysisStatus)
     output: str | None
-    timestamp_completed: str | None = None
+    timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
     author: str
