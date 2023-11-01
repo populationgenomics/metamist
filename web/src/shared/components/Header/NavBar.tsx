@@ -43,23 +43,18 @@ const menuItems = [
                 icon: <HomeIcon />,
             },
             {
-                title: 'Billing Current Cost',
-                url: '/billing/currentCost',
+                title: 'Invoice Month Cost',
+                url: '/billing/invoiceMonthCost',
                 icon: <TableRowsIcon />,
             },
             {
-                title: 'Billing Cost By Time',
+                title: 'Cost By Time',
                 url: '/billing/costByTime',
                 icon: <TableRowsIcon />,
             },
             {
-                title: 'Billing Data',
-                url: '/billing/data',
-                icon: <TableRowsIcon />,
-            },
-            {
-                title: 'Billing Dashboard',
-                url: '/billing/dashboard',
+                title: 'Seqr Prop Map',
+                url: '/billing/seqrPropMap',
                 icon: <TableRowsIcon />,
             },
         ],
@@ -98,15 +93,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
 
     const dropdown = (item: MenuItem) => (
         <Dropdown text={item.title} key={index}>
-            <Dropdown.Menu>
+            <Dropdown.Menu id="navDrop">
                 {item.submenu &&
                     item.submenu.map((subitem, subindex) => (
-                        <Dropdown.Item
-                            as={Link}
-                            className="navItem dropitem"
-                            to={subitem.url}
-                            key={subindex}
-                        >
+                        <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
                             {subitem.title}
                         </Dropdown.Item>
                     ))}
@@ -153,7 +143,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => (
             </Menu.Item>
 
             {menuItems.map((item, index) => (
-                <MenuItem index={index} item={item} />
+                <MenuItem index={index} item={item} key={index} />
             ))}
 
             <Menu.Menu position="right">

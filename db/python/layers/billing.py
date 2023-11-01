@@ -1,6 +1,11 @@
-from collections import Counter
+# pylint: disable=ungrouped-imports
+import re
+
 from typing import Any
+from datetime import datetime
+from collections import Counter
 from google.cloud import bigquery
+from api.utils.dates import get_invoice_month_range
 
 from models.models import (
     BillingRowRecord,
@@ -101,6 +106,15 @@ class BillingLayer(BqBaseLayer):
         billing_db = BillingDb(self.connection)
         return await billing_db.get_extended_values('sequencing_group')
 
+    async def get_invoice_months(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All invoice months in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_invoice_months()
+
     async def query(
         self,
         _filter: BillingFilter,
@@ -123,13 +137,13 @@ class BillingLayer(BqBaseLayer):
         return await billing_db.get_total_cost(query)
 
     async def get_running_cost(
-        self, field: BillingColumn
+        self, field: BillingColumn, invoice_month: str | None = None
     ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget
         """
         billing_db = BillingDb(self.connection)
-        return await billing_db.get_running_cost(field)
+        return await billing_db.get_running_cost(field, invoice_month)
 
 
 class BillingDb(BqDbBase):
@@ -192,6 +206,34 @@ class BillingDb(BqDbBase):
         )
         if query_job_result:
             return [str(dict(row)['topic']) for row in query_job_result]
+
+        # return empty list if no record found
+        return []
+
+    async def get_invoice_months(self):
+        """Get all invoice months in database"""
+
+        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
+        _query = f"""
+        SELECT DISTINCT FORMAT_DATE("%Y%m", day) as invoice_month
+        FROM `{BQ_AGGREG_VIEW}`
+        WHERE EXTRACT(day from day) = 1
+        ORDER BY invoice_month DESC;
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
+                ),
+            ]
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
+        if query_job_result:
+            return [str(dict(row)['invoice_month']) for row in query_job_result]
 
         # return empty list if no record found
         return []
@@ -493,7 +535,9 @@ class BillingDb(BqDbBase):
 
         return None
 
-    async def execute_running_cost_query(self, field: BillingColumn):
+    async def execute_running_cost_query(
+        self, field: BillingColumn, invoice_month: str | None = None
+    ):
         """
         Run query to get running cost of selected field
         """
@@ -503,9 +547,23 @@ class BillingDb(BqDbBase):
         else:
             view_to_use = BQ_AGGREG_VIEW
 
-        # TODO for production change to select current day, month
-        start_day = '2023-03-01'
-        current_day = '2023-03-10'
+        has_valid_invoice_month = False
+        invoice_month_filter = ''
+        if not invoice_month or not re.match(r'^\d{6}$', invoice_month):
+            # TODO for production change to select current day, month
+            start_day = '2023-03-01'
+            current_day = '2023-03-10'
+        else:
+            # get start day and current day for given invoice month
+            invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
+            start_day_date, current_day_date = get_invoice_month_range(
+                invoice_month_date
+            )
+            start_day = start_day_date.strftime('%Y-%m-%d')
+            current_day = current_day_date.strftime('%Y-%m-%d')
+
+            has_valid_invoice_month = True
+            invoice_month_filter = ' AND invoice_month = @invoice_month'
 
         _query = f"""
         SELECT
@@ -527,6 +585,7 @@ class BillingDb(BqDbBase):
                 `{view_to_use}`
                 WHERE day >= TIMESTAMP(@start_day) AND
                 day <= TIMESTAMP(@current_day)
+                {invoice_month_filter}
                 GROUP BY
                 field,
                 cost_category
@@ -543,7 +602,8 @@ class BillingDb(BqDbBase):
             `{view_to_use}`
             WHERE day > TIMESTAMP_ADD(
                 TIMESTAMP(@current_day), INTERVAL -2 DAY
-            ) AND day <=  TIMESTAMP(@current_day)
+            ) AND day <= TIMESTAMP(@current_day)
+            {invoice_month_filter}
             GROUP BY
                 field,
                 cost_category
@@ -553,22 +613,25 @@ class BillingDb(BqDbBase):
         ORDER BY field ASC, daily_cost DESC;
         """
 
+        query_params = [
+            bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+            bigquery.ScalarQueryParameter('current_day', 'STRING', current_day),
+        ]
+
+        if has_valid_invoice_month:
+            query_params.append(
+                bigquery.ScalarQueryParameter('invoice_month', 'STRING', invoice_month)
+            )
+
         return list(
             self._connection.connection.query(
                 _query,
-                job_config=bigquery.QueryJobConfig(
-                    query_parameters=[
-                        bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
-                        bigquery.ScalarQueryParameter(
-                            'current_day', 'STRING', current_day
-                        ),
-                    ]
-                ),
+                job_config=bigquery.QueryJobConfig(query_parameters=query_params),
             ).result()
         )
 
     async def get_running_cost(
-        self, field: BillingColumn
+        self, field: BillingColumn, invoice_month: str | None = None
     ) -> list[BillingCostBudgetRecord]:
         """
         Get currently running cost of selected field
@@ -582,7 +645,7 @@ class BillingDb(BqDbBase):
         ):
             raise ValueError('Invalid field')
 
-        query_job_result = await self.execute_running_cost_query(field)
+        query_job_result = await self.execute_running_cost_query(field, invoice_month)
         if not query_job_result:
             # return empty list
             return []

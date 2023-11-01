@@ -169,6 +169,25 @@ async def get_sequencing_groups(
     return records
 
 
+@router.get(
+    '/invoice_months',
+    response_model=list[str],
+    operation_id='getInvoiceMonths',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_invoice_months(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all invoice months in database
+    Results are sorted DESC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_invoice_months()
+    return records
+
+
 @router.post(
     '/query', response_model=list[BillingRowRecord], operation_id='queryBilling'
 )
@@ -317,6 +336,7 @@ async def get_total_cost(
 @alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_running_costs(
     field: BillingColumn,
+    invoice_month: str | None = None,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """
@@ -331,5 +351,5 @@ async def get_running_costs(
 
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
-    records = await billing_layer.get_running_cost(field)
+    records = await billing_layer.get_running_cost(field, invoice_month)
     return records

@@ -295,7 +295,7 @@ class AnalysisLayer(BaseLayer):
         temporal_methods: list[ProportionalDateTemporalMethod],
         start_date: date = None,
         end_date: date = None,
-    ) -> dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]]:
+    ) -> dict[str, list[ProportionalDateModel]]:
         """
         This is a bit more complex, but we want to generate a map of cram size by day,
         based on the temporal_method (sample create date, joint call date).
@@ -346,7 +346,7 @@ class AnalysisLayer(BaseLayer):
                 end_date=end_date_date,
             )
 
-        return results
+        return {k.value: v for k, v in results.items()}
 
     def get_cram_size_proportionate_map_from_sequencing_group_sizes(
         self,
