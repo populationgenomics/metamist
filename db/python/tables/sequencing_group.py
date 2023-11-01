@@ -12,7 +12,10 @@ from db.python.utils import (
     ProjectId,
     to_db_json,
 )
-from models.models.sequencing_group import SequencingGroupInternal
+from models.models.sequencing_group import (
+    SequencingGroupInternal,
+    SequencingGroupInternalId,
+)
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -213,7 +216,9 @@ class SequencingGroupTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'sgids': sequencing_group_ids})
         return {r[0]: r[1].date() for r in rows}
 
-    async def get_samples_create_date_from_sgs(self, sequencing_group_ids: list[int]):
+    async def get_samples_create_date_from_sgs(
+        self, sequencing_group_ids: list[int]
+    ) -> dict[SequencingGroupInternalId, date]:
         """
         Get a map of {internal_sg_id: sample_date_created} for list of sg_ids
         """

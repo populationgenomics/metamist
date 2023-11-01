@@ -14,6 +14,10 @@ class GraphQLFilter(Generic[T]):
     eq: T | None = None
     in_: list[T] | None = None
     nin: list[T] | None = None
+    gt: T | None = None
+    gte: T | None = None
+    lt: T | None = None
+    lte: T | None = None
 
     def all_values(self):
         """
@@ -26,6 +30,14 @@ class GraphQLFilter(Generic[T]):
             v.extend(self.in_)
         if self.nin:
             v.extend(self.nin)
+        if self.gt:
+            v.append(self.gt)
+        if self.gte:
+            v.append(self.gte)
+        if self.lt:
+            v.append(self.lt)
+        if self.lte:
+            v.append(self.lte)
 
         return v
 
@@ -37,9 +49,21 @@ class GraphQLFilter(Generic[T]):
                 eq=f(self.eq) if self.eq else None,
                 in_=list(map(f, self.in_)) if self.in_ else None,
                 nin=list(map(f, self.nin)) if self.nin else None,
+                gt=f(self.gt) if self.gt else None,
+                gte=f(self.gte) if self.gte else None,
+                lt=f(self.lt) if self.lt else None,
+                lte=f(self.lte) if self.lte else None,
             )
 
-        return GenericFilter(eq=self.eq, in_=self.in_, nin=self.nin)
+        return GenericFilter(
+            eq=self.eq,
+            in_=self.in_,
+            nin=self.nin,
+            gt=self.gt,
+            gte=self.gte,
+            lt=self.lt,
+            lte=self.lte,
+        )
 
 
 GraphQLMetaFilter = strawberry.scalars.JSON

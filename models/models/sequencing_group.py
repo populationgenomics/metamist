@@ -9,6 +9,10 @@ from models.utils.sequencing_group_id_format import (
 )
 
 
+SequencingGroupInternalId = int
+SequencingGroupExternalId = str
+
+
 class SequencingGroupInternal(SMBase):
     """
     A group of sequences that would be aligned and analysed together.
@@ -27,7 +31,7 @@ class SequencingGroupInternal(SMBase):
 
     # similar to a sample ID, this is stored internally as an integer,
     # but displayed as a string
-    id: int | None = None
+    id: SequencingGroupInternalId | None = None
     type: str | None = None
     technology: str | None = None
     platform: str | None = None
@@ -71,7 +75,7 @@ class SequencingGroupInternal(SMBase):
 class NestedSequencingGroupInternal(SMBase):
     """SequencingGroupInternal with nested assays"""
 
-    id: int | None = None
+    id: SequencingGroupInternalId | None = None
     type: str | None = None
     technology: str | None = None
     platform: str | None = None
@@ -98,7 +102,7 @@ class SequencingGroupUpsertInternal(SMBase):
     Upsert model for sequence group
     """
 
-    id: int | None = None
+    id: SequencingGroupInternalId | None = None
     type: str | None = None
     technology: str | None = None  # fk
     platform: str | None = None  # fk
@@ -134,7 +138,7 @@ class SequencingGroupUpsertInternal(SMBase):
 class SequencingGroup(SMBase):
     """External model for sequencing group"""
 
-    id: str
+    id: SequencingGroupExternalId
     type: str
     technology: str
     platform: str  # uppercase
@@ -148,7 +152,7 @@ class SequencingGroup(SMBase):
 class NestedSequencingGroup(SMBase):
     """External model for sequencing group with nested assays"""
 
-    id: str
+    id: SequencingGroupExternalId
     type: str
     technology: str
     platform: str
