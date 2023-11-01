@@ -254,11 +254,11 @@ async def audit_upload_bucket_async(
         md5_check_list,
     ) = await auditor.get_assay_map_from_participants(participant_data)
 
-    await asyncio.gather(*md5_check_list)
+    # await asyncio.gather(*md5_check_list)
 
-    mismatched_md5_hashed = await auditor.get_mismatched_md5_hashed_files(
-        participant_data, assay_filepaths_filesizes
-    )
+    # mismatched_md5_hashed = await auditor.get_mismatched_md5_hashed_files(
+    #     participant_data, assay_filepaths_filesizes
+    # )
 
     # Get all completed cram output paths for the samples in the dataset and validate them
     sg_cram_paths = await auditor.get_analysis_cram_paths_for_dataset_sgs(
@@ -297,15 +297,15 @@ async def audit_upload_bucket_async(
 
     # COMMENTED OUT AS TO AVOID WRITING TO BUCKETS
     # Write the reads to delete, reads to ingest, and unaligned SGs reports
-    # await auditor.write_upload_bucket_audit_reports(
-    #     bucket,
-    #     sequencing_types=sequencing_types,
-    #     file_types=file_types,
-    #     assay_files_to_delete=reads_to_delete,
-    #     assay_files_to_ingest=possible_assay_ingests,
-    #     unaligned_sgs=unaligned_sgs,
-    #     write_to_local=True,
-    # )
+    await auditor.write_upload_bucket_audit_reports(
+        bucket,
+        sequencing_types=sequencing_types,
+        file_types=file_types,
+        assay_files_to_delete=reads_to_delete,
+        assay_files_to_ingest=possible_assay_ingests,
+        unaligned_sgs=unaligned_sgs,
+        write_to_local=True,
+    )
 
 
 @click.command()

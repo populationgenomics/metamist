@@ -63,6 +63,24 @@ QUERY_SG_ANALYSES = gql(
     """
 )
 
+NEW_QUERY_SG_ANALYSES = gql(  # replaces the above query that wasn't working
+    """
+    query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
+        project(name: $dataset) {
+            sequencingGroups(id: {in_: $sgIds}) {
+                id
+                analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}) {
+                    id
+                    meta
+                    output
+                    timestampCompleted
+                }
+            }
+        }
+    }
+"""
+)
+
 # Variable type definitions
 AssayId = int
 SampleId = str
@@ -339,12 +357,12 @@ class GenericAuditor(AuditHelper):
 
         logging.getLogger().setLevel(logging.WARN)
         analyses_query_result = await query_async(
-            QUERY_SG_ANALYSES,
+            NEW_QUERY_SG_ANALYSES,
             {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']},
         )
         logging.getLogger().setLevel(logging.INFO)
 
-        analyses = analyses_query_result['sequencingGroups']
+        analyses = analyses_query_result['project']['sequencingGroups']
         # check if sg only has CRAM analyses
         for sg in analyses:
             analyses_list = sg['analyses']
@@ -389,7 +407,7 @@ class GenericAuditor(AuditHelper):
 
         logging.getLogger().setLevel(logging.WARN)
         sg_analyse_query_result = await query_async(
-            QUERY_SG_ANALYSES,
+            NEW_QUERY_SG_ANALYSES,
             {
                 'dataset': self.dataset,
                 'sgIds': sgs_without_crams,
@@ -398,7 +416,7 @@ class GenericAuditor(AuditHelper):
         )
         logging.getLogger().setLevel(logging.INFO)
 
-        sg_analyses = sg_analyse_query_result['sequencingGroups']
+        sg_analyses = sg_analyse_query_result['project']['sequencingGroups']
 
         for sg_analysis in sg_analyses:
             sg_id = sg_analysis['id']

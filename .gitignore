@@ -61,3 +61,9 @@ web/src/__generated__
 Pulumi*.yaml
 
 venv/
+checking_ingestion_numbers.py
+current_meteamist_19_10_23.json
+find_manifests_with_missing_fastqs.sh
+scraps.ipynb
+yes
+yes.pub
