@@ -1,7 +1,7 @@
 from collections import defaultdict, namedtuple
 import asyncio
 import pandas as pd
-from metamist.audit.generic_auditor import GenericAuditor
+from metamist.audit.non_async_auditor import GenericAuditor
 from metamist.audit.audithelper import AuditHelper
 import logging
 from typing import Any
@@ -24,7 +24,7 @@ class TobWgsAuditor(GenericAuditor):
             default_analysis_status=default_analysis_status,
         )
 
-    async def get_assay_map_from_participants(
+    def get_assay_map_from_participants(
         self, participants: list[dict]
     ) -> tuple[dict[str, str], dict[int, str], dict[Any, list[tuple[Any, Any]]]]:
         """
@@ -56,6 +56,7 @@ class TobWgsAuditor(GenericAuditor):
                 sg_sample_id_map[sg['id']] = sample_id
                 for assay in sg['assays']:
                     reads = assay['meta'].get('reads')
+                    print(reads)
                     if not reads:
                         logging.warning(
                             f'{self.dataset} :: SG {sg["id"]} assay {assay["id"]} has no reads field'
@@ -116,28 +117,6 @@ def audit_tob_wgs(
     default_analysis_type: str,
     default_analysis_status: str,
 ):
-    """Entrypoint for running upload bucket auditor asynchronously."""
-    asyncio.get_event_loop().run_until_complete(
-        asyncio.wait_for(
-            audit_tob_wgs_async(
-                dataset,
-                sequencing_types,
-                file_types,
-                default_analysis_type,
-                default_analysis_status,
-            ),
-            timeout=None,
-        )
-    )
-
-
-async def audit_tob_wgs_async(
-    dataset: str,
-    sequencing_types: list[str],
-    file_types: list[str],
-    default_analysis_type: str,
-    default_analysis_status: str,
-):
     auditor = TobWgsAuditor(
         dataset=dataset,
         sequencing_types=sequencing_types,
@@ -146,7 +125,7 @@ async def audit_tob_wgs_async(
         default_analysis_status=default_analysis_status,
     )
 
-    participant_data = await auditor.get_participant_data_for_dataset()
+    participant_data = auditor.get_participant_data_for_dataset()
     sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
         participant_data
     )
@@ -155,7 +134,7 @@ async def audit_tob_wgs_async(
         assay_sg_id_map,
         assay_filepaths_filesizes,
         # md5_check_list,
-    ) = await auditor.get_assay_map_from_participants(participant_data)
+    ) = auditor.get_assay_map_from_participants(participant_data)
     return participant_data
 
 
@@ -166,5 +145,3 @@ audit_tob_wgs(
     default_analysis_type='cram',
     default_analysis_status='completed',
 )
-
-print()
