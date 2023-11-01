@@ -13,6 +13,8 @@ import {
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import BillingCostByTimeTable from './components/BillingCostByTimeTable'
+import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
+import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
@@ -40,11 +42,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     )
     const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
 
+    // Max Aggregated Data Points, rest will be aggregated into "Rest"
+    const maxDataPoints = 7
+
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [groups, setGroups] = React.useState<string[]>([])
     const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
+    const [aggregatedData, setAggregatedData] = React.useState<IData[]>([])
 
     // use navigate and update url params
     const location = useLocation()
@@ -130,6 +136,45 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         values: records[key],
                     }))
                 )
+
+                // calc totals per cost_category
+                const recTotals = response.data.reduce(
+                    (
+                        acc: { [key: string]: { [key: string]: number } },
+                        item: BillingTotalCostRecord
+                    ) => {
+                        const { cost_category, cost } = item
+                        if (!acc[cost_category]) {
+                            acc[cost_category] = 0
+                        }
+                        acc[cost_category] += cost
+                        return acc
+                    },
+                    {}
+                )
+                const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
+                    Object.entries(recTotals).sort(([, a], [, b]) => b - a)
+                )
+                const aggData: IData[] = Object.entries(sortedRecTotals)
+                    .map(([label, value]) => ({ label, value }))
+                    .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
+                        if (index < maxDataPoints) {
+                            acc.push(curr)
+                        } else {
+                            const restValue = arr
+                                .slice(index)
+                                .reduce((sum, { value }) => sum + value, 0)
+
+                            if (acc.length == maxDataPoints) {
+                                acc.push({ label: 'Rest*', value: restValue })
+                            } else {
+                                acc[maxDataPoints].value += restValue
+                            }
+                        }
+                        return acc
+                    }, [])
+
+                setAggregatedData(aggData)
             })
             .catch((er) => setError(er.message))
     }
@@ -219,6 +264,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             onChange={(e) => changeDate('end', e.target.value)}
                             value={end}
                         />
+                    </Grid.Column>
+                </Grid>
+
+                <Grid>
+                    <Grid.Column width={10}>
+                        <BarChart data={aggregatedData} maxSlices={maxDataPoints} />
+                    </Grid.Column>
+
+                    <Grid.Column width={6}>
+                        <DonutChart data={aggregatedData} maxSlices={maxDataPoints} />
                     </Grid.Column>
                 </Grid>
 

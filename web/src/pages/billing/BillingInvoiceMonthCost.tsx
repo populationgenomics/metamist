@@ -114,13 +114,6 @@ const BillingCurrentCost = () => {
         return `${num.toFixed(0).toString()} % `
     }
 
-    function capitalize(str: string): string {
-        if (str === 'gcp_project') {
-            return 'GCP-Project'
-        }
-        return str.charAt(0).toUpperCase() + str.slice(1)
-    }
-
     if (error)
         return (
             <Message negative>
