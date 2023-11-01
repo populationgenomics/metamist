@@ -404,6 +404,7 @@ class AnalysisLayer(BaseLayer):
         for sg_id, analyses in crams.items():
             for idx, cram in enumerate(analyses):
                 project = project_name_map.get(sg_by_id[sg_id].project)
+                delta = None
                 if idx == 0:
                     # use the sample_create_date for the first analysis
                     sg_start_date = sample_create_dates[sg_id]
@@ -411,15 +412,16 @@ class AnalysisLayer(BaseLayer):
                 else:
                     # replace with the current analyses timestamp_completed
                     sg_start_date = check_or_parse_date(cram.timestamp_completed)
-                    delta = cram.meta.get('size', 0) - analyses[idx - 1].meta.get(
-                        'size', 0
-                    )
-
+                    if new_cram_size := cram.meta.get('size'):
+                        delta = new_cram_size - analyses[idx - 1].meta.get('size', 0)
+                if not delta:
+                    continue
                 if end_date and sg_start_date > end_date:
                     continue
 
-                # this will eventually get the "best" cram size correctly by applying deltas for multiple crams
-                # before the start datetime.date, so the clamping here is fine.
+                # this will eventually get the "best" cram size correctly by applying
+                # deltas for multiple crams before the start datetime.date, so the
+                # clamping here is fine.
                 clamped_date = max(sg_start_date, start_date)
                 by_date_diff[clamped_date][project] += delta
 
