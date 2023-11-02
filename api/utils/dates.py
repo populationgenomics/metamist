@@ -22,10 +22,10 @@ def get_invoice_month_range(convert_month: date) -> tuple[date, date]:
     start_day = first_day + timedelta(days=-INVOICE_DAY_DIFF)
 
     # Grab the last day of invoice month then add INVOICE_DAY_DIFF days
-    current_day = (
+    last_day = (
         first_day.replace(month=(convert_month.month + 1) % 12)
         + timedelta(days=-1)
         + timedelta(days=INVOICE_DAY_DIFF)
     )
 
-    return start_day, current_day
+    return start_day, last_day
