@@ -150,6 +150,13 @@ class BillingColumn(str, Enum):
             'stage',
             'sequencing_group',
         ]
+        
+    @staticmethod
+    def generate_all_title(record) -> str:
+        if record == BillingColumn.PROJECT:
+            return 'All GCP Projects'
+        
+        return f'All {record.title()}s'
 
 
 class BillingTotalCostQueryModel(SMBase):
