@@ -114,13 +114,13 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         const { day, cost_category, cost } = item
                         if (day !== undefined) {
                             if (!acc[day] || cost_category === undefined) {
+                                // initialise day structure
                                 acc[day] = {}
                                 rec_grps.forEach((k) => {
                                     acc[day][k] = 0
                                 })
-                            } else {
-                                acc[day][cost_category] = cost
                             }
+                            acc[day][cost_category] = cost
                         }
                         return acc
                     },
