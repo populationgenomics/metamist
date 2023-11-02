@@ -1,14 +1,12 @@
 import * as React from 'react'
 
-import { useParams } from 'react-router-dom'
+import { Dropdown, Input, Message } from 'semantic-ui-react'
 
-import { Dropdown, Grid, Input, Message } from 'semantic-ui-react'
+import { BillingApi, BillingColumn } from '../../../sm-api'
 
-import { BillingApi, BillingColumn } from '../../sm-api'
+import '../Billing.css'
 
-import './Billing.css'
-
-import { convertFieldName } from '../../shared/utilities/fieldName'
+import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface FieldSelectorProps {
     label: string
@@ -113,7 +111,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         return (
             <Message negative>
                 <h4>An error occurred while getting projects</h4>
-                <p>{JSON.stringify(error?.networkError || error)}</p>
+                <p>{JSON.stringify(error)}</p>
             </Message>
         )
     }

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Grid, Card, Input } from 'semantic-ui-react'
-import SeqrProportionalMapGraph from './SeqrProportionalMapGraph'
+import SeqrProportionalMapGraph from './components/SeqrProportionalMapGraph'
 
 const BillingSeqrProp: React.FunctionComponent = () => {
     const now = new Date()
