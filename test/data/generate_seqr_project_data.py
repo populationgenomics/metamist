@@ -5,9 +5,9 @@ import csv
 import datetime
 import logging
 import random
+import sys
 import tempfile
 
-import sys
 from pprint import pprint
 from typing import Set, List
 
@@ -224,17 +224,49 @@ def generate_random_number_within_distribution(count_distribution: dict[int, flo
     )[0]
 
 
-def generate_sample_entries(participant_id_map: dict[str, int], metamist_enums: dict[str, dict[str, list[str]]]):
+async def generate_project_pedigree(project: str):
+    """
+    Generates a pedigree file for a project with random families and participants
+    Returns the participant internal - external id map for the project
+    """
+    project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
+    participant_eids = [row.individual_id for row in project_pedigree]
+
+    pedfile = tempfile.NamedTemporaryFile(mode='w')
+    ped_writer = csv.writer(pedfile, delimiter='\t')
+    for row in project_pedigree:
+        ped_writer.writerow(row)
+    pedfile.flush()
+
+    with open(pedfile.name) as f:
+        await FamilyApi().import_pedigree_async(
+            project=project, file=f, has_header=False, create_missing_participants=True
+        )
+
+    id_map = await ParticipantApi().get_participant_id_map_by_external_ids_async(
+        project=project, request_body=participant_eids
+    )
+
+    return id_map
+
+
+async def generate_sample_entries(
+    project: str,
+    participant_id_map: dict[str, int],
+    metamist_enums: dict[str, dict[str, list[str]]],
+    sapi: SampleApi,
+):
     """
     Generates a number of samples for each participant in the input id map.
-    Generates sequencing groups of random sequencing type, and subsequently
-    generates assays for each sequencing group.
+    Generates sequencing groups with random sequencing types, and then
+    assays for each sequencing group.
+    Combines and inserts the entries into the project through the sample API.
     """
+
     sample_types = metamist_enums['enum']['sampleType']
     sequencing_technologies = metamist_enums['enum']['sequencingTechnology']
     sequencing_platforms = metamist_enums['enum']['sequencingPlatform']
     sequencing_types = ['genome', 'exome', 'transcriptome']
-    assay_type = 'sequencing'
 
     # Arbitrary distribution for number of samples, sequencing groups, assays
     default_count_probabilities = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
@@ -281,7 +313,7 @@ def generate_sample_entries(participant_id_map: dict[str, int], metamist_enums: 
                 for _ in range(generate_random_number_within_distribution(default_count_probabilities)):
                     sg.assays.append(
                         AssayUpsert(
-                            type=assay_type,
+                            type='sequencing',
                             meta={
                                 'facility': facility,
                                 'reads' : [],
@@ -293,67 +325,27 @@ def generate_sample_entries(participant_id_map: dict[str, int], metamist_enums: 
                         )
                     )
 
-    return samples
+    response = await sapi.upsert_samples_async(project, samples)
+    pprint(response)
 
 
-async def main():
+async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):
     """
-    Generates a number of projects and populates them with randomly generated pedigrees.
-    Sets each project as a seqr project via the project's meta field.
-    Creates family, participant, sample, and sequencing group records for the projects.
-    Upserts a number of analyses for each project to test seqr related endpoints.
-    The upserted analyses include CRAMs, joint-called AnnotateDatasets, and ES-indexes.
+    Queries the list of sequencing groups for a project and randomly selects some
+    to generate CRAM analysis entries for.
     """
-    aapi = AnalysisApi()
-    papi = ProjectApi()
-    sapi = SampleApi()
+    sgid_response = await query_async(QUERY_PROJECT_SGS, {'project': project})
+    sequencing_groups = list(sgid_response['project']['sequencingGroups'])
 
-    enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
+    # Randomly allocate some of the sequencing groups to be aligned
+    aligned_sgs = random.sample(
+        sequencing_groups,
+        k=random.randint(int(len(sequencing_groups)/2), len(sequencing_groups))
+    )
 
-    existing_projects = await papi.get_my_projects_async()
-    for project in PROJECTS:
-        if project not in existing_projects:
-            await papi.create_project_async(
-                name=project, dataset=project, create_test_project=False
-            )
-            logging.info(f'Created project "{project}"')
-            await papi.update_project_async(
-                project=project, body={'meta': {'is_seqr': 'true'}},
-            )
-            logging.info(f'Set {project} as seqr project')
-
-        # Insert families and participants via pedigree file
-        project_pedigree = generate_pedigree_rows(num_families=random.randint(1, 10))
-        participant_eids = [row.individual_id for row in project_pedigree]
-
-        pedfile = tempfile.NamedTemporaryFile(mode='w')
-        ped_writer = csv.writer(pedfile, delimiter='\t')
-        for row in project_pedigree:
-            ped_writer.writerow(row)
-        pedfile.flush()
-
-        with open(pedfile.name) as f:
-            await FamilyApi().import_pedigree_async(
-                project=project, file=f, has_header=False, create_missing_participants=True
-            )
-
-        id_map = await ParticipantApi().get_participant_id_map_by_external_ids_async(
-            project=project, request_body=participant_eids
-        )
-
-        # Insert samples, sequencing groups, and assays for each participant
-        samples = generate_sample_entries(id_map, enum_resp)
-        response = await sapi.upsert_samples_async(project, samples)
-        pprint(response)
-
-        sgid_response = await query_async(QUERY_PROJECT_SGS, {'project': project})
-        sequencing_group_ids = list(sgid_response['project']['sequencingGroups'])
-
-        # Randomly allocate some of the sequencing groups to be aligned
-        aligned_sgs = random.sample(sequencing_group_ids, k=random.randint(int(len(sequencing_group_ids)/2), len(sequencing_group_ids)))
-
-        # Insert completed CRAM analyses for the aligned sequencing groups
-        analyses_to_insert = [
+    # Insert completed CRAM analyses for the aligned sequencing groups
+    analyses_to_insert.extend(
+        [
             Analysis(
                 sequencing_group_ids=[sg['id']],
                 type='cram',
@@ -369,40 +361,84 @@ async def main():
             )
             for sg in aligned_sgs
         ]
+    )
 
-        # Insert joint-call / AnnotateDataset stage analysis + es-index stage analysis
-        seq_type_to_sg_list = {
-            'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
-            'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
-            'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
-        }
-        for seq_type, sg_list in seq_type_to_sg_list.items():
-            if not sg_list:
-                continue
-            joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
+    return aligned_sgs
 
-            analyses_to_insert.extend(
-                [
-                    Analysis(
-                        sequencing_group_ids=joint_called_sgs,
-                        type='custom',
-                        status=AnalysisStatus('completed'),
-                        output=f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt',
-                        meta={'stage': 'AnnotateDataset', 'sequencing_type': seq_type},
-                    ),
-                    Analysis(
-                        sequencing_group_ids=joint_called_sgs,
-                        type='es-index',
-                        status=AnalysisStatus('completed'),
-                        output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
-                        meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
-                    )
-                ]
+
+async def generate_joint_called_analyses(project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]):
+    """
+    Selects a subset of the aligned sequencing groups for the input project and
+    generates joint-called AnnotateDataset and ES-index analysis entries for them.
+    """
+    seq_type_to_sg_list = {
+        'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
+        'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
+        'transcriptome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome']
+    }
+    for seq_type, sg_list in seq_type_to_sg_list.items():
+        if not sg_list:
+            continue
+        joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
+
+        analyses_to_insert.extend(
+            [
+                Analysis(
+                    sequencing_group_ids=joint_called_sgs,
+                    type='custom',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt',
+                    meta={'stage': 'AnnotateDataset', 'sequencing_type': seq_type},
+                ),
+                Analysis(
+                    sequencing_group_ids=joint_called_sgs,
+                    type='es-index',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
+                    meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
+                )
+            ]
+        )
+
+
+async def main():
+    """
+    Generates a number of projects and populates them with randomly generated pedigrees.
+    Sets each project as a seqr project via the project's meta field.
+    Creates family, participant, sample, and sequencing group records for the projects.
+    Upserts a number of analyses for each project to test seqr related endpoints.
+    The upserted analyses include CRAMs, joint-called AnnotateDatasets, and ES-indexes.
+    """
+
+    papi = ProjectApi()
+    sapi = SampleApi()
+    metamist_enums: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
+
+    analyses_to_insert: list[Analysis] = []
+    existing_projects = await papi.get_my_projects_async()
+    for project in PROJECTS:
+        if project not in existing_projects:
+            await papi.create_project_async(
+                name=project, dataset=project, create_test_project=False
             )
+            logging.info(f'Created project "{project}"')
+            await papi.update_project_async(
+                project=project, body={'meta': {'is_seqr': 'true'}},
+            )
+            logging.info(f'Set {project} as seqr project')
 
-        for ans in chunk(analyses_to_insert, 50):
-            print(f'Inserting {len(ans)} analysis entries')
-            await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
+        participant_id_map = await generate_project_pedigree(project)
+
+        await generate_sample_entries(project, participant_id_map, metamist_enums, sapi)
+
+        aligned_sgs = await generate_cram_analyses(project, analyses_to_insert)
+
+        await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
+
+    aapi = AnalysisApi()
+    for analyses in chunk(analyses_to_insert, 50):
+        logging.info(f'Inserting {len(analyses)} analysis entries')
+        await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in analyses])
 
 
 if __name__ == '__main__':
