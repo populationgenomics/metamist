@@ -18,5 +18,5 @@ billing_envs = [
     'SM_GCP_BQ_BUDGET_VIEW',
 ]
 
-if all([os.environ.get(env) for env in billing_envs]):
+if all((os.environ.get(env) for env in billing_envs)):
     from api.routes.billing import router as billing_router

@@ -160,7 +160,7 @@ const BillingCurrentCost = () => {
         const month = invoiceMonth.substring(4, 6)
         let nextYear = year
         let nextMonth = (parseInt(month, 10) + 1).toString()
-        if(month === '12') {
+        if (month === '12') {
             nextYear = (parseInt(year, 10) + 1).toString()
             nextMonth = '01'
         }
