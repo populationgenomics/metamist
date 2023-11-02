@@ -103,9 +103,26 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .getTotalCost(query)
             .then((response) => {
                 setIsLoading(false)
-                const rec_grps = Array.from(
-                    new Set(response.data.map((item: BillingTotalCostRecord) => item.cost_category))
+
+                // calc totals per cost_category
+                const recTotals = response.data.reduce(
+                    (
+                        acc: { [key: string]: { [key: string]: number } },
+                        item: BillingTotalCostRecord
+                    ) => {
+                        const { cost_category, cost } = item
+                        if (!acc[cost_category]) {
+                            acc[cost_category] = 0
+                        }
+                        acc[cost_category] += cost
+                        return acc
+                    },
+                    {}
                 )
+                const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
+                    Object.entries(recTotals).sort(([, a], [, b]) => b - a)
+                )
+                const rec_grps = Object.keys(sortedRecTotals)
                 const records = response.data.reduce(
                     (
                         acc: { [key: string]: { [key: string]: number } },
@@ -135,25 +152,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         date: new Date(key),
                         values: records[key],
                     }))
-                )
-
-                // calc totals per cost_category
-                const recTotals = response.data.reduce(
-                    (
-                        acc: { [key: string]: { [key: string]: number } },
-                        item: BillingTotalCostRecord
-                    ) => {
-                        const { cost_category, cost } = item
-                        if (!acc[cost_category]) {
-                            acc[cost_category] = 0
-                        }
-                        acc[cost_category] += cost
-                        return acc
-                    },
-                    {}
-                )
-                const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
-                    Object.entries(recTotals).sort(([, a], [, b]) => b - a)
                 )
                 const aggData: IData[] = Object.entries(sortedRecTotals)
                     .map(([label, value]) => ({ label, value }))
@@ -267,7 +265,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
 
-                <Grid>
+                <Grid columns={2} stackable>
                     <Grid.Column width={10}>
                         <BarChart
                             data={aggregatedData}
