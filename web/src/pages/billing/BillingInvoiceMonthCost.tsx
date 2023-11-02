@@ -8,7 +8,7 @@ import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 
 import './Billing.css'
-import FieldSelector from './FieldSelector'
+import FieldSelector from './components/FieldSelector'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
 

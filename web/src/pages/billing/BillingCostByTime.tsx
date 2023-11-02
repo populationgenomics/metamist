@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
 import CostByTimeChart from './components/CostByTimeChart'
-import FieldSelector from './FieldSelector'
+import FieldSelector from './components/FieldSelector'
 import {
     BillingApi,
     BillingColumn,

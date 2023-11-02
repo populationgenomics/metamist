@@ -19,13 +19,12 @@ from db.python.gcp_connect import BqDbBase
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.billing import BillingFilter
 
-from api.settings import BQ_GCP_BILLING_PROJECT, BQ_DAYS_BACK_OPTIMAL
-
-# TODO update beore merging into DEV
-BQ_AGGREG_VIEW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost-dev'
-BQ_AGGREG_RAW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate-dev'
-BQ_AGGREG_EXT_VIEW = (
-    f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost_extended-dev'
+from api.settings import (
+    BQ_DAYS_BACK_OPTIMAL,
+    BQ_AGGREG_VIEW,
+    BQ_AGGREG_RAW,
+    BQ_AGGREG_EXT_VIEW,
+    BQ_BUDGET_VIEW,
 )
 
 
@@ -525,7 +524,7 @@ class BillingDb(BqDbBase):
         """
         _query = f"""
         SELECT gcp_project, budget
-        FROM `{BQ_GCP_BILLING_PROJECT}.billing.budget_by_project_montly`
+        FROM `{BQ_BUDGET_VIEW}`
         """
 
         query_job_result = list(self._connection.connection.query(_query).result())
