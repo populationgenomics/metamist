@@ -15,6 +15,7 @@ billing_envs = [
     'SM_GCP_BQ_AGGREG_VIEW',
     'SM_GCP_BQ_AGGREG_RAW',
     'SM_GCP_BQ_AGGREG_EXT_VIEW',
+    'SM_GCP_BQ_BUDGET_VIEW',
 ]
 
 if all([os.environ.get(env) for env in billing_envs]):

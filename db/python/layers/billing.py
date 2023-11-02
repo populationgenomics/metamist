@@ -24,6 +24,7 @@ from api.settings import (
     BQ_AGGREG_VIEW,
     BQ_AGGREG_RAW,
     BQ_AGGREG_EXT_VIEW,
+    BQ_BUDGET_VIEW,
 )
 
 
@@ -523,7 +524,7 @@ class BillingDb(BqDbBase):
         """
         _query = f"""
         SELECT gcp_project, budget
-        FROM `{BQ_GCP_BILLING_PROJECT}.billing.budget_by_project_montly`
+        FROM `{BQ_BUDGET_VIEW}`
         """
 
         query_job_result = list(self._connection.connection.query(_query).result())

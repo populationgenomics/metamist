@@ -50,7 +50,6 @@ const billingPages = {
     ],
 }
 
-
 interface MenuItem {
     title: string
     url: string
@@ -139,17 +138,11 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     ])
 
     React.useEffect(() => {
-        new BillingApi()
-            .getTopics()
-            .then((response) => {
-                if (response.status === 200) {
-                    setMenuItems([
-                        ...menuItems.slice(0, 2),
-                        billingPages,
-                        ...menuItems.slice(2),
-                    ])
-                }
-            })
+        new BillingApi().getTopics().then((response) => {
+            if (response.status === 200) {
+                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+            }
+        })
     }, [])
 
     return (
