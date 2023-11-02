@@ -46,7 +46,11 @@ const BillingCurrentCost = () => {
     // toISOString() will give you YYYY-MM-DDTHH:mm:ss.sssZ
     // toISOString().substring(0, 7) will give you YYYY-MM
     // .replace('-', '') will give you YYYYMM
-    const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+
+    // TODO enable this once we have data in the aggreg table
+    // const thisMonth = new Date().toISOString().substring(0, 7).replace('-', '')
+
+    const thisMonth = '202303' // for now this is temporary until we have data in the aggreg table
 
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
