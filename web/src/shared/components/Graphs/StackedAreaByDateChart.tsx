@@ -134,16 +134,15 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
         .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object? Yes :)
         .range([0, width - margin.left - margin.right])
 
+    // use last stackData value to calculate max Y axis point
+    const diffX = stackedData[stackedData.length - 1].flatMap((val) => val[1])
+
     // function for generating the y Axis
     // no domain needed as it defaults to [0, 1] which is appropriate for proportions
-    const maxY = data.map((d: IStackedAreaByDateChartData) =>
-        Object.values(d.values).reduce((acc, val) => acc + val, 0)
-    )
-
     const yScale = extended
         ? scaleLinear().range([height - margin.top - margin.bottom, 0])
         : scaleLinear()
-              .domain([0, Math.max(...maxY.flatMap((val) => val))])
+              .domain([0, Math.max(...diffX.flatMap((val) => val))])
               .range([height - margin.top - margin.bottom, 0])
 
     // function that assigns each category a colour

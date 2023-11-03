@@ -711,7 +711,7 @@ class BillingDb(BqDbBase):
         results.append(
             BillingCostBudgetRecord.from_json(
                 {
-                    'field': f'All {field.value}s',
+                    'field': f'{BillingColumn.generate_all_title(field)}',
                     'total_monthly': (
                         total_monthly['C']['ALL'] + total_monthly['S']['ALL']
                     ),
