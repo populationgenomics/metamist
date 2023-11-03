@@ -260,7 +260,9 @@ class GenericAuditor(AuditHelper):
         logging.getLogger().setLevel(logging.INFO)
 
         analyses = analyses_query_result['sequencingGroups']
-        analyses = self.get_most_recent_analyses_by_sg(analyses_list=analyses)
+        analyses = self.get_most_recent_analyses_by_sg(
+            self.dataset, analyses_list=analyses
+        )
 
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
