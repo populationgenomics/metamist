@@ -152,7 +152,7 @@ class SampleTable(DbBase):
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('changelog_id', self.changelog_id),
+            ('changelog_id', await self.changelog_id()),
             ('project', project or self.project),
         ]
 
@@ -183,7 +183,7 @@ class SampleTable(DbBase):
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {'changelog_id': self.changelog_id}
+        values: dict[str, Any] = {'changelog_id': await self.changelog_id()}
         fields = [
             'changelog_id = :changelog_id',
         ]
@@ -261,7 +261,7 @@ class SampleTable(DbBase):
         values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
                 'meta': to_db_json(meta),
             },
             'ids': {'id_keep': id_keep, 'id_merge': id_merge},

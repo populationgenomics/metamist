@@ -61,8 +61,8 @@ class Connection:
 
         self._changelog_id: int | None = None
 
-    @property
-    def changelog_id(self):
+    async def changelog_id(self):
+        """Get changelog ID for write operations, cached per connection"""
         if self.readonly:
             raise InternalError(
                 'Trying to get a changelog ID, but not a write connection'
@@ -70,7 +70,7 @@ class Connection:
 
         with changelog_lock:
             if not self._changelog_id:
-                changelog_promise = self.connection.fetch_val(
+                cl_id = await self.connection.fetch_val(
                     """
                     INSERT INTO changelog (author, on_behalf_of, ar_guid)
                     VALUES (:author, :on_behalf_of, :ar_guid)
@@ -83,7 +83,6 @@ class Connection:
                     },
                 )
 
-                cl_id = asyncio.get_event_loop().run_until_complete(changelog_promise)
                 self._changelog_id = cl_id
 
         return self._changelog_id

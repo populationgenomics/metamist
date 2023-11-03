@@ -849,6 +849,9 @@
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
+			<column name="timestamp" type="TIMESTAMP" defaultValue="now()">
+				<constraints nullable="false" />
+			</column>
 			<column name="author" type="VARCHAR(255)">
 				<constraints nullable="false" />
 			</column>

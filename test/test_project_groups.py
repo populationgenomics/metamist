@@ -39,7 +39,7 @@ class TestGroupAccess(DbIsolatedTest):
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
             },
         )
 
@@ -115,7 +115,7 @@ class TestGroupAccess(DbIsolatedTest):
         group = str(uuid.uuid4())
         gid = await self.pttable.gtable.create_group(group)
         await self.pttable.gtable.set_group_members(
-            gid, [self.author], changelog_id=self.changelog_id
+            gid, [self.author], changelog_id=await self.changelog_id()
         )
         present_gids = await self.pttable.gtable.check_which_groups_member_has(
             group_ids={gid}, member=self.author

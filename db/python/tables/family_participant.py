@@ -32,7 +32,7 @@ class FamilyParticipantTable(DbBase):
             'maternal_participant_id': maternal_id,
             'affected': affected,
             'notes': notes,
-            'changelog_id': self.changelog_id,
+            'changelog_id': await self.changelog_id(),
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -74,7 +74,7 @@ VALUES
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
             }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)

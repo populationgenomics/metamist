@@ -25,12 +25,11 @@ class DbBase:
         if self.author is None:
             raise InternalError(f'Must provide author to {self.__class__.__name__}')
 
-    @property
-    def changelog_id(self):
+    async def changelog_id(self):
         """
         Get changelog ID (or fail otherwise)
         """
-        return self._connection.changelog_id
+        return await self._connection.changelog_id()
 
     # piped from the connection
 

@@ -220,10 +220,9 @@ class DbTest(unittest.TestCase):
             raise value.errors[0]
         return value.data
 
-    @property
-    def changelog_id(self):
+    async def changelog_id(self):
         """Get changelog_id for the test"""
-        return self.connection.changelog_id
+        return await self.connection.changelog_id()
 
 
 class DbIsolatedTest(DbTest):

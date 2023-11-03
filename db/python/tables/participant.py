@@ -97,7 +97,7 @@ RETURNING id
                 'reported_gender': reported_gender,
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
                 'project': project or self.project,
             },
         )
@@ -116,7 +116,7 @@ RETURNING id
         function will update EVERY participant with the provided meta values.
         """
         updaters = ['changelog_id = :changelog_id']
-        changelog_id = self.changelog_id
+        changelog_id = await self.changelog_id()
         values: dict[str, list[Any]] = {
             'pid': participant_ids,
             'changelog_id': [changelog_id] * len(participant_ids),
@@ -157,7 +157,7 @@ RETURNING id
         Update participant
         """
         updaters = ['changelog_id = :changelog_id']
-        fields = {'pid': participant_id, 'changelog_id': self.changelog_id}
+        fields = {'pid': participant_id, 'changelog_id': await self.changelog_id()}
 
         if external_id:
             updaters.append('external_id = :external_id')

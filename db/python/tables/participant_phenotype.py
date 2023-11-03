@@ -31,7 +31,7 @@ ON DUPLICATE KEY UPDATE
                 'participant_id': r[0],
                 'description': r[1],
                 'value': json.dumps(r[2]),
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
             }
             for r in rows
         ]

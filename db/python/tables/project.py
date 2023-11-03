@@ -83,8 +83,7 @@ class ProjectPermissionsTable:
             ar_guid=ar_guid,
         )
 
-    @property
-    def changelog_id(self):
+    async def changelog_id(self):
         """
         Generate (or return) a changelog_id by inserting a row into the database
         """
@@ -92,7 +91,7 @@ class ProjectPermissionsTable:
             raise ValueError(
                 'Cannot call changelog_id without a fully formed connection'
             )
-        return self._connection.changelog_id
+        return await self._connection.changelog_id()
 
     # region UNPROTECTED_GETS
 
@@ -371,7 +370,7 @@ class ProjectPermissionsTable:
             values = {
                 'name': project_name,
                 'dataset': dataset_name,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
                 'read_group_id': read_group_id,
                 'write_group_id': write_group_id,
             }
@@ -390,7 +389,7 @@ class ProjectPermissionsTable:
         meta = update.get('meta')
 
         fields: Dict[str, Any] = {
-            'changelog_id': self.changelog_id,
+            'changelog_id': await self.changelog_id(),
             'name': project_name,
         }
 
@@ -484,7 +483,7 @@ DELETE FROM analysis WHERE project = :project;
             )
         group_id = await self.gtable.get_group_name_from_id(group_name)
         await self.gtable.set_group_members(
-            group_id, members, changelog_id=self.changelog_id
+            group_id, members, changelog_id=await self.changelog_id()
         )
 
     # endregion CREATE / UPDATE

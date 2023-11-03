@@ -274,7 +274,6 @@ class SampleLayer(BaseLayer):
         self,
         samples: list[SampleUpsertInternal],
         open_transaction: bool = True,
-        author: str = None,
         project: ProjectId = None,
         check_project_id=True,
     ) -> list[SampleUpsertInternal]:
@@ -298,7 +297,6 @@ class SampleLayer(BaseLayer):
             for sample in samples:
                 await self.upsert_sample(
                     sample,
-                    author=author,
                     project=project,
                     process_sequencing_groups=False,
                     process_assays=False,

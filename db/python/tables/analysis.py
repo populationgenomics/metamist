@@ -73,7 +73,7 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
-                ('changelog_id', self.changelog_id),
+                ('changelog_id', await self.changelog_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
             ]
@@ -145,7 +145,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         fields: Dict[str, Any] = {
             'analysis_id': analysis_id,
             'on_behalf_of': self.author,
-            'changelog_id': self.changelog_id,
+            'changelog_id': await self.changelog_id(),
         }
         setters = ['changelog_id = :changelog_id', 'on_behalf_of = :on_behalf_of']
         if status:
@@ -494,7 +494,7 @@ ORDER BY a.timestamp_completed DESC;
 
         if author:
             wheres.append('changelog_id = :changelog_id')
-            values['changelog_id'] = self.changelog_id
+            values['changelog_id'] = await self.changelog_id()
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')

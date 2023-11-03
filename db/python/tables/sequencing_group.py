@@ -340,13 +340,13 @@ class SequencingGroupTable(DbBase):
 
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
-                {**values, 'changelog_id': self.changelog_id},
+                {**values, 'changelog_id': await self.changelog_id()},
             )
             assay_id_insert_values = [
                 {
                     'seqgroup': id_of_seq_group,
                     'assayid': s,
-                    'changelog_id': self.changelog_id,
+                    'changelog_id': await self.changelog_id(),
                 }
                 for s in assay_ids
             ]
@@ -402,7 +402,7 @@ class SequencingGroupTable(DbBase):
             _query,
             {
                 'sequencing_group_id': sequencing_group_id,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
             },
         )
         await self.connection.execute(

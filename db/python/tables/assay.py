@@ -256,7 +256,7 @@ class AssayTable(DbBase):
                     'sample_id': sample_id,
                     'meta': to_db_json(meta),
                     'type': assay_type,
-                    'changelog_id': self.changelog_id,
+                    'changelog_id': await self.changelog_id(),
                 },
             )
 
@@ -279,7 +279,7 @@ class AssayTable(DbBase):
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
-                        'changelog_id': self.changelog_id,
+                        'changelog_id': await self.changelog_id(),
                     }
                     for name, eid in external_ids.items()
                 ]
@@ -325,7 +325,7 @@ class AssayTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            fields = {'assay_id': assay_id, 'changelog_id': self.changelog_id}
+            fields = {'assay_id': assay_id, 'changelog_id': await self.changelog_id()}
 
             updaters = ['changelog_id = :changelog_id']
             if meta is not None:
@@ -384,7 +384,7 @@ class AssayTable(DbBase):
                             'assay_id': assay_id,
                             'external_id': eid,
                             'name': name,
-                            'changelog_id': self.changelog_id,
+                            'changelog_id': await self.changelog_id(),
                         }
                         for name, eid in to_update.items()
                     ]

@@ -181,7 +181,7 @@ class FamilyTable(DbBase):
         coded_phenotype: str = None,
     ) -> bool:
         """Update values for a family"""
-        values: Dict[str, Any] = {'changelog_id': self.changelog_id}
+        values: Dict[str, Any] = {'changelog_id': await self.changelog_id()}
         if external_id:
             values['external_id'] = external_id
         if description:
@@ -212,7 +212,7 @@ WHERE id = :id
             'external_id': external_id,
             'description': description,
             'coded_phenotype': coded_phenotype,
-            'changelog_id': self.changelog_id,
+            'changelog_id': await self.changelog_id(),
             'project': project or self.project,
         }
         keys = list(updater.keys())
@@ -241,7 +241,7 @@ RETURNING id
                 'external_id': eid,
                 'description': descr,
                 'coded_phenotype': cph,
-                'changelog_id': self.changelog_id,
+                'changelog_id': await self.changelog_id(),
                 'project': project or self.project,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)

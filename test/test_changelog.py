@@ -27,4 +27,4 @@ class TestChangelog(DbIsolatedTest):
             'SELECT changelog_id FROM sample WHERE id = :sid', {'sid': sample.id}
         )
 
-        self.assertEqual(self.changelog_id, sample_cl_id)
+        self.assertEqual(await self.changelog_id(), sample_cl_id)
