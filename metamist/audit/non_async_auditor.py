@@ -260,14 +260,14 @@ class GenericAuditor(AuditHelper):
         logging.getLogger().setLevel(logging.INFO)
 
         analyses = analyses_query_result['sequencingGroups']
-        analyses = self.get_most_recent_analyses_by_sg(
+        cram_analyses, _ = self.get_most_recent_analyses_by_sg(
             self.dataset, analyses_list=analyses
         )
 
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
             analysis['id']
-            for analysis in analyses.values()
+            for analysis in cram_analyses.values()
             if 'sequencing_type' not in analysis['meta']
         ]
         if crams_with_missing_seq_type:
@@ -277,7 +277,7 @@ class GenericAuditor(AuditHelper):
 
         # For each sg id, collect the analysis id and cram paths
         sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
-        for sg_id, analysis in analyses.items():
+        for sg_id, analysis in cram_analyses.items():
             cram_path = analysis['output']
             if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
                 logging.warning(

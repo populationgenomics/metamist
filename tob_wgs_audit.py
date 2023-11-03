@@ -148,7 +148,7 @@ class TobWgsAuditor(GenericAuditor):
         completed analysis for each sequencing group, creating a 1:1 mapping of SG to analysis.
         """
         most_recent_analysis_by_sg = {}
-
+        most_recent_long_read_analysis_by_sg = {}
         for sg_analyses in analyses_list:
             sg_id = sg_analyses['id']
             analyses = sg_analyses['analyses']
@@ -157,6 +157,12 @@ class TobWgsAuditor(GenericAuditor):
                 analysis
                 for analysis in analyses
                 if analysis['output'].endswith('.cram')
+            ]
+
+            long_read_analyses = [
+                analysis
+                for analysis in analyses
+                if 'ont' in analysis['meta'].get('sequence_type')
             ]
 
             if not cram_analyses:
@@ -173,9 +179,20 @@ class TobWgsAuditor(GenericAuditor):
                     x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
                 ),
             )
-            most_recent_analysis_by_sg[sg_id] = sorted_cram_analyses[-1]
 
-        return most_recent_analysis_by_sg
+            sorted_long_read_analyses = sorted(
+                long_read_analyses,
+                key=lambda x: datetime.strptime(
+                    x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
+                ),
+            )
+            most_recent_analysis_by_sg[sg_id] = sorted_cram_analyses[-1]
+            if sorted_long_read_analyses:
+                most_recent_long_read_analysis_by_sg[sg_id] = sorted_long_read_analyses[
+                    -1
+                ]
+
+        return most_recent_analysis_by_sg, most_recent_long_read_analysis_by_sg
 
 
 def audit_tob_wgs(
