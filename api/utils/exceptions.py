@@ -1,4 +1,4 @@
-from db.python.connect import NotFoundError
+from db.python.utils import NotFoundError
 from db.python.utils import Forbidden
 
 

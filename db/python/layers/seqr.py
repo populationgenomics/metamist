@@ -122,7 +122,7 @@ class SeqrLayer(BaseLayer):
             raise ValueError('Seqr synchronisation is not configured in metamist')
 
         token = self.generate_seqr_auth_token()
-        pptable = ProjectPermissionsTable(connection=self.connection.connection)
+        pptable = ProjectPermissionsTable(self.connection)
         project = await pptable.get_and_check_access_to_project_for_id(
             self.connection.author,
             project_id=self.connection.project,

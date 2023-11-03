@@ -1,4 +1,4 @@
-from db.python.connect import Connection, ProjectPermissionsTable
+from db.python.tables.project import Connection, ProjectPermissionsTable
 
 
 class BaseLayer:
@@ -6,7 +6,7 @@ class BaseLayer:
 
     def __init__(self, connection: Connection):
         self.connection = connection
-        self.ptable = ProjectPermissionsTable(self.connection.connection)
+        self.ptable = ProjectPermissionsTable(connection)
 
     @property
     def author(self):

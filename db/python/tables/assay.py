@@ -4,13 +4,15 @@ import re
 from collections import defaultdict
 from typing import Any
 
-from db.python.connect import DbBase, NotFoundError, NoOpAenter
+from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import (
     to_db_json,
     GenericFilterModel,
     GenericFilter,
     GenericMetaFilter,
+    NotFoundError,
+    NoOpAenter,
 )
 from models.models.assay import AssayInternal
 
@@ -212,7 +214,6 @@ class AssayTable(DbBase):
         external_ids: dict[str, str] | None,
         assay_type: str,
         meta: dict[str, Any] | None,
-        author: str | None = None,
         project: int | None = None,
         open_transaction: bool = True,
     ) -> int:
@@ -241,8 +242,8 @@ class AssayTable(DbBase):
 
         _query = """\
             INSERT INTO assay
-                (sample_id, meta, type, author)
-            VALUES (:sample_id, :meta, :type, :author)
+                (sample_id, meta, type, changelog_id)
+            VALUES (:sample_id, :meta, :type, :changelog_id)
             RETURNING id;
         """
 
@@ -255,7 +256,7 @@ class AssayTable(DbBase):
                     'sample_id': sample_id,
                     'meta': to_db_json(meta),
                     'type': assay_type,
-                    'author': author or self.author,
+                    'changelog_id': self.changelog_id,
                 },
             )
 
@@ -270,7 +271,7 @@ class AssayTable(DbBase):
                 _eid_query = """
                 INSERT INTO assay_external_id
                     (project, assay_id, external_id, name, author)
-                VALUES (:project, :assay_id, :external_id, :name, :author);
+                VALUES (:project, :assay_id, :external_id, :name, :changelog_id);
                 """
                 eid_values = [
                     {
@@ -278,7 +279,7 @@ class AssayTable(DbBase):
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
-                        'author': author or self.author,
+                        'changelog_id': self.changelog_id,
                     }
                     for name, eid in external_ids.items()
                 ]
@@ -288,7 +289,7 @@ class AssayTable(DbBase):
         return id_of_new_assay
 
     async def insert_many_assays(
-        self, assays: list[AssayInternal], author=None, open_transaction: bool = True
+        self, assays: list[AssayInternal], open_transaction: bool = True
     ):
         """Insert many sequencing, returning no IDs"""
         with_function = self.connection.transaction if open_transaction else NoOpAenter
@@ -303,7 +304,6 @@ class AssayTable(DbBase):
                         sample_id=assay.sample_id,
                         external_ids=assay.external_ids,
                         meta=assay.meta,
-                        author=author,
                         assay_type=assay.type,
                         open_transaction=False,
                     )
@@ -320,15 +320,14 @@ class AssayTable(DbBase):
         sample_id: int | None = None,
         project: ProjectId | None = None,
         open_transaction: bool = True,
-        author=None,
     ):
         """Update an assay"""
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            fields = {'assay_id': assay_id, 'author': author or self.author}
+            fields = {'assay_id': assay_id, 'changelog_id': self.changelog_id}
 
-            updaters = ['author = :author']
+            updaters = ['changelog_id = :changelog_id']
             if meta is not None:
                 updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
                 fields['meta'] = to_db_json(meta)
@@ -376,8 +375,8 @@ class AssayTable(DbBase):
 
                     _update_query = """\
                         INSERT INTO assay_external_id (project, assay_id, external_id, name, author)
-                            VALUES (:project, :assay_id, :external_id, :name, :author)
-                            ON DUPLICATE KEY UPDATE external_id = :external_id, author = :author
+                            VALUES (:project, :assay_id, :external_id, :name, :changelog_id)
+                            ON DUPLICATE KEY UPDATE external_id = :external_id, changelog_id = :changelog_id
                     """
                     values = [
                         {
@@ -385,7 +384,7 @@ class AssayTable(DbBase):
                             'assay_id': assay_id,
                             'external_id': eid,
                             'name': name,
-                            'author': author or self.author,
+                            'changelog_id': self.changelog_id,
                         }
                         for name, eid in to_update.items()
                     ]

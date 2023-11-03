@@ -4,13 +4,15 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from db.python.connect import DbBase, NoOpAenter, NotFoundError
+from db.python.tables.base import DbBase
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
     ProjectId,
     to_db_json,
+    NotFoundError,
+    NoOpAenter,
 )
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -276,7 +278,6 @@ class SequencingGroupTable(DbBase):
         platform: str,
         assay_ids: list[int],
         meta: dict = None,
-        author: str = None,
         open_transaction=True,
     ) -> int:
         """Create sequence group"""
@@ -308,15 +309,15 @@ class SequencingGroupTable(DbBase):
         _query = """
         INSERT INTO sequencing_group
             (sample_id, type, technology, platform, meta, author, archived)
-        VALUES (:sample_id, :type, :technology, :platform, :meta, :author, false)
+        VALUES (:sample_id, :type, :technology, :platform, :meta, :changelog_id, false)
         RETURNING id;
         """
 
         _seqg_linker_query = """
         INSERT INTO sequencing_group_assay
-            (sequencing_group_id, assay_id, author)
+            (sequencing_group_id, assay_id, changelog_id)
         VALUES
-            (:seqgroup, :assayid, :author)
+            (:seqgroup, :assayid, :changelog_id)
         """
 
         values = {
@@ -339,13 +340,13 @@ class SequencingGroupTable(DbBase):
 
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
-                {**values, 'author': author or self.author},
+                {**values, 'changelog_id': self.changelog_id},
             )
             assay_id_insert_values = [
                 {
                     'seqgroup': id_of_seq_group,
                     'assayid': s,
-                    'author': author or self.author,
+                    'changelog_id': self.changelog_id,
                 }
                 for s in assay_ids
             ]
@@ -388,7 +389,7 @@ class SequencingGroupTable(DbBase):
         """
         _query = """
         UPDATE sequencing_group
-        SET archived = 1, author = :author
+        SET archived = 1, changelog_id = :changelog_id
         WHERE id = :sequencing_group_id;
         """
         # do this so we can reuse the sequencing_group_ids
@@ -398,7 +399,11 @@ class SequencingGroupTable(DbBase):
         WHERE sequencing_group_id = :sequencing_group_id;
         """
         await self.connection.execute(
-            _query, {'sequencing_group_id': sequencing_group_id, 'author': self.author}
+            _query,
+            {
+                'sequencing_group_id': sequencing_group_id,
+                'changelog_id': self.changelog_id,
+            },
         )
         await self.connection.execute(
             _external_id_query,

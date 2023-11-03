@@ -1,6 +1,7 @@
 from datetime import date
 
-from db.python.connect import Connection, NotFoundError
+from db.python.connect import Connection
+from db.python.utils import NotFoundError
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
@@ -261,7 +262,6 @@ class SequencingGroupLayer(BaseLayer):
                 platform=seqgroup.platform,
                 meta={**seqgroup.meta, **meta},
                 assay_ids=assays,
-                author=self.author,
                 open_transaction=False,
             )
 

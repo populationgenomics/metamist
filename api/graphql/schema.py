@@ -491,7 +491,7 @@ class GraphQLSequencingGroup:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
         project_id_map = {}
         if project:
-            ptable = ProjectPermissionsTable(connection.connection)
+            ptable = ProjectPermissionsTable(connection)
             project_ids = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
                 user=connection.author, project_names=project_ids, readonly=True
@@ -564,7 +564,7 @@ class Query:
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         project = await ptable.get_and_check_access_to_project_for_name(
             user=connection.author, project_name=name, readonly=True
         )
@@ -583,7 +583,7 @@ class Query:
         active: GraphQLFilter[bool] | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         slayer = SampleLayer(connection)
 
         if not id and not project:
@@ -631,7 +631,7 @@ class Query:
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         if not (project or sample_id or id):
             raise ValueError('Must filter by project, sample or id')
 
@@ -685,7 +685,7 @@ class Query:
     @strawberry.field
     async def my_projects(self, info: Info) -> list[GraphQLProject]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         projects = await ptable.get_projects_accessible_by_user(
             connection.author, readonly=True
         )

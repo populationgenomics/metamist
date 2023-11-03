@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import date
 
 from api.utils import group_by
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.seqr import SeqrLayer

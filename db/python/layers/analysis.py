@@ -535,7 +535,6 @@ class AnalysisLayer(BaseLayer):
     async def create_analysis(
         self,
         analysis: AnalysisInternal,
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """Create a new analysis"""
@@ -546,7 +545,6 @@ class AnalysisLayer(BaseLayer):
             meta=analysis.meta,
             output=analysis.output,
             active=analysis.active,
-            author=author,
             project=project,
         )
 
@@ -570,7 +568,6 @@ class AnalysisLayer(BaseLayer):
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
         output: str | None = None,
-        author: str | None = None,
         check_project_id=True,
     ):
         """
@@ -587,7 +584,6 @@ class AnalysisLayer(BaseLayer):
             status=status,
             meta=meta,
             output=output,
-            author=author,
         )
 
     async def get_analysis_runner_log(

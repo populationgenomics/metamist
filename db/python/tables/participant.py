@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import Any
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.utils import ProjectId, to_db_json
+from db.python.tables.base import DbBase
+from db.python.utils import ProjectId, to_db_json, NotFoundError
 from models.models.participant import ParticipantInternal
 
 
@@ -75,7 +75,6 @@ class ParticipantTable(DbBase):
         reported_gender: str | None,
         karyotype: str | None,
         meta: dict | None,
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -86,7 +85,7 @@ class ParticipantTable(DbBase):
 
         _query = f"""
 INSERT INTO participant (external_id, reported_sex, reported_gender, karyotype, meta, author, project)
-VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :author, :project)
+VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :changelog_id, :project)
 RETURNING id
         """
 
@@ -98,7 +97,7 @@ RETURNING id
                 'reported_gender': reported_gender,
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
-                'author': author or self.author,
+                'changelog_id': self.changelog_id,
                 'project': project or self.project,
             },
         )
@@ -110,18 +109,17 @@ RETURNING id
         reported_genders: list[str] | None,
         karyotypes: list[str] | None,
         metas: list[dict] | None,
-        author=None,
     ):
         """
         Update many participants, expects that all lists contain the same number of values.
         You can't update selective fields on selective samples, if you provide metas, this
         function will update EVERY participant with the provided meta values.
         """
-        _author = author or self.author
-        updaters = ['author = :author']
+        updaters = ['changelog_id = :changelog_id']
+        changelog_id = self.changelog_id
         values: dict[str, list[Any]] = {
             'pid': participant_ids,
-            'author': [_author] * len(participant_ids),
+            'changelog_id': [changelog_id] * len(participant_ids),
         }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
@@ -154,13 +152,12 @@ RETURNING id
         reported_gender: str | None,
         karyotype: str | None,
         meta: dict | None,
-        author=None,
     ):
         """
         Update participant
         """
-        updaters = ['author = :author']
-        fields = {'pid': participant_id, 'author': author or self.author}
+        updaters = ['changelog_id = :changelog_id']
+        fields = {'pid': participant_id, 'changelog_id': self.changelog_id}
 
         if external_id:
             updaters.append('external_id = :external_id')

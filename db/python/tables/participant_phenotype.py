@@ -3,7 +3,7 @@ from typing import List, Tuple, Any, Dict
 import json
 from collections import defaultdict
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 
 
 class ParticipantPhenotypeTable(DbBase):
@@ -13,9 +13,7 @@ class ParticipantPhenotypeTable(DbBase):
 
     table_name = 'participant_phenotype'
 
-    async def add_key_value_rows(
-        self, rows: List[Tuple[int, str, Any]], author: str = None
-    ) -> None:
+    async def add_key_value_rows(self, rows: List[Tuple[int, str, Any]]) -> None:
         """
         Create a new sample, and add it to database
         """
@@ -23,9 +21,9 @@ class ParticipantPhenotypeTable(DbBase):
             return None
         _query = f"""
 INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
-VALUES (:participant_id, :description, :value, :author, 'DESCRIPTION')
+VALUES (:participant_id, :description, :value, :changelog_id, 'DESCRIPTION')
 ON DUPLICATE KEY UPDATE
-    description=:description, value=:value, author=:author
+    description=:description, value=:value, changelog_id=:changelog_id
         """
 
         formatted_rows = [
@@ -33,7 +31,7 @@ ON DUPLICATE KEY UPDATE
                 'participant_id': r[0],
                 'description': r[1],
                 'value': json.dumps(r[2]),
-                'author': author or self.author,
+                'changelog_id': self.changelog_id,
             }
             for r in rows
         ]

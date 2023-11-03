@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import Tuple, List, Dict, Optional, Set, Any
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from models.models.family import PedRowInternal
 
@@ -21,7 +21,6 @@ class FamilyParticipantTable(DbBase):
         maternal_id: int,
         affected: int,
         notes: str = None,
-        author=None,
     ) -> Tuple[int, int]:
         """
         Create a new sample, and add it to database
@@ -33,7 +32,7 @@ class FamilyParticipantTable(DbBase):
             'maternal_participant_id': maternal_id,
             'affected': affected,
             'notes': notes,
-            'author': author or self.author,
+            'changelog_id': self.changelog_id,
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -52,7 +51,6 @@ VALUES
     async def create_rows(
         self,
         rows: list[PedRowInternal],
-        author=None,
     ):
         """
         Create many rows, dictionaries must have keys:
@@ -76,7 +74,7 @@ VALUES
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
-                'author': author or self.author,
+                'changelog_id': self.changelog_id,
             }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)

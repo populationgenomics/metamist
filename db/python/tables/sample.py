@@ -3,12 +3,13 @@ from datetime import date
 from typing import Iterable, Any
 import dataclasses
 
-from db.python.connect import DbBase, NotFoundError
+from db.python.tables.base import DbBase
 from db.python.utils import (
     to_db_json,
     GenericFilterModel,
     GenericFilter,
     GenericMetaFilter,
+    NotFoundError,
 )
 from db.python.tables.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
@@ -139,7 +140,6 @@ class SampleTable(DbBase):
         active: bool,
         meta: dict | None,
         participant_id: int | None,
-        author=None,
         project=None,
     ) -> int:
         """
@@ -152,7 +152,7 @@ class SampleTable(DbBase):
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('author', author or self.author),
+            ('changelog_id', self.changelog_id),
             ('project', project or self.project),
         ]
 
@@ -179,16 +179,13 @@ class SampleTable(DbBase):
         participant_id: int | None,
         external_id: str | None,
         type_: str | None,
-        author: str = None,
         active: bool = None,
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {
-            'author': author or self.author,
-        }
+        values: dict[str, Any] = {'changelog_id': self.changelog_id}
         fields = [
-            'author = :author',
+            'changelog_id = :changelog_id',
         ]
         if participant_id:
             values['participant_id'] = participant_id
@@ -220,7 +217,6 @@ class SampleTable(DbBase):
         self,
         id_keep: int = None,
         id_merge: int = None,
-        author: str = None,
     ):
         """Merge two samples together"""
         sid_merge = sample_id_format(id_merge)
@@ -265,7 +261,7 @@ class SampleTable(DbBase):
         values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
-                'author': author or self.author,
+                'changelog_id': self.changelog_id,
                 'meta': to_db_json(meta),
             },
             'ids': {'id_keep': id_keep, 'id_merge': id_merge},
@@ -273,7 +269,7 @@ class SampleTable(DbBase):
 
         _query = """
             UPDATE sample
-            SET author = :author,
+            SET changelog_id = :changelog_id,
                 meta = :meta
             WHERE id = :id
         """
@@ -301,7 +297,6 @@ class SampleTable(DbBase):
 
         project, new_sample = await self.get_sample_by_id(id_keep)
         new_sample.project = project
-        new_sample.author = author or self.author
 
         return new_sample
 
@@ -420,6 +415,7 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
+            'changelog_id',
         ]
         keys_str = ', '.join(keys)
         _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'

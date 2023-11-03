@@ -4,7 +4,7 @@ from functools import lru_cache
 
 from async_lru import alru_cache
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 
 table_name_matcher = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 

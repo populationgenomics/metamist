@@ -79,7 +79,7 @@ async def get_assays_by_criteria(
 ):
     """Get assays by criteria"""
     assay_layer = AssayLayer(connection)
-    pt = ProjectPermissionsTable(connection.connection)
+    pt = ProjectPermissionsTable(connection)
 
     pids: list[int] | None = None
     if projects:

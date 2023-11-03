@@ -1,7 +1,8 @@
 from collections import defaultdict
 from typing import List, Optional, Set, Any, Dict
 
-from db.python.connect import DbBase, NotFoundError
+from db.python.utils import NotFoundError
+from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from models.models.family import FamilyInternal
 
@@ -178,10 +179,9 @@ class FamilyTable(DbBase):
         external_id: str = None,
         description: str = None,
         coded_phenotype: str = None,
-        author: str = None,
     ) -> bool:
         """Update values for a family"""
-        values: Dict[str, Any] = {'author': author or self.author}
+        values: Dict[str, Any] = {'changelog_id': self.changelog_id}
         if external_id:
             values['external_id'] = external_id
         if description:
@@ -203,7 +203,6 @@ WHERE id = :id
         external_id: str,
         description: Optional[str],
         coded_phenotype: Optional[str],
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -213,7 +212,7 @@ WHERE id = :id
             'external_id': external_id,
             'description': description,
             'coded_phenotype': coded_phenotype,
-            'author': author or self.author,
+            'changelog_id': self.changelog_id,
             'project': project or self.project,
         }
         keys = list(updater.keys())
@@ -235,7 +234,6 @@ RETURNING id
         descriptions: List[str],
         coded_phenotypes: List[Optional[str]],
         project: int = None,
-        author: str = None,
     ):
         """Upsert"""
         updater = [
@@ -243,7 +241,7 @@ RETURNING id
                 'external_id': eid,
                 'description': descr,
                 'coded_phenotype': cph,
-                'author': author or self.author,
+                'changelog_id': self.changelog_id,
                 'project': project or self.project,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)

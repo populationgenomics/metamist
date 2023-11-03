@@ -10,7 +10,7 @@ from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import get_projectless_db_connection, group_by
-from db.python.connect import NotFoundError
+from db.python.utils import NotFoundError
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
@@ -332,7 +332,7 @@ async def load_projects_for_ids(project_ids: list[int], connection) -> list[Proj
     """
     Get projects by IDs
     """
-    pttable = ProjectPermissionsTable(connection.connection)
+    pttable = ProjectPermissionsTable(connection)
     projects = await pttable.get_and_check_access_to_projects_for_ids(
         user=connection.user, project_ids=project_ids, readonly=True
     )

@@ -34,12 +34,12 @@ class TestGroupAccess(DbIsolatedTest):
         await self.connection.connection.execute(
             """
             INSERT INTO group_member (group_id, member, author)
-            VALUES (:group_id, :member, :author);
+            VALUES (:group_id, :member, :changelog_id);
             """,
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'author': self.author,
+                'changelog_id': self.changelog_id,
             },
         )
 
@@ -114,9 +114,11 @@ class TestGroupAccess(DbIsolatedTest):
 
         group = str(uuid.uuid4())
         gid = await self.pttable.gtable.create_group(group)
-        await self.pttable.gtable.set_group_members(gid, [self.author], self.author)
+        await self.pttable.gtable.set_group_members(
+            gid, [self.author], changelog_id=self.changelog_id
+        )
         present_gids = await self.pttable.gtable.check_which_groups_member_has(
-            {gid}, self.author
+            group_ids={gid}, member=self.author
         )
         missing_gids = {gid} - present_gids
 

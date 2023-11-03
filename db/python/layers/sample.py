@@ -2,7 +2,7 @@ import datetime
 from typing import Any
 
 from api.utils import group_by
-from db.python.connect import NotFoundError
+from db.python.utils import NotFoundError
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
 from db.python.layers.sequencing_group import SequencingGroupLayer
@@ -22,7 +22,7 @@ class SampleLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
         self.st: SampleTable = SampleTable(connection)
-        self.pt = ProjectPermissionsTable(connection.connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     # GETS
@@ -220,7 +220,6 @@ class SampleLayer(BaseLayer):
     async def upsert_sample(
         self,
         sample: SampleUpsertInternal,
-        author: str = None,
         project: ProjectId = None,
         process_sequencing_groups: bool = True,
         process_assays: bool = True,
@@ -239,7 +238,6 @@ class SampleLayer(BaseLayer):
                     active=True,
                     meta=sample.meta,
                     participant_id=sample.participant_id,
-                    author=author,
                     project=project,
                 )
             else:
@@ -329,20 +327,18 @@ class SampleLayer(BaseLayer):
         self,
         id_keep: int,
         id_merge: int,
-        author=None,
         check_project_id=True,
     ):
         """Merge two samples into one another"""
         if check_project_id:
             projects = await self.st.get_project_ids_for_sample_ids([id_keep, id_merge])
             await self.ptable.check_access_to_project_ids(
-                user=author or self.author, project_ids=projects, readonly=False
+                user=self.author, project_ids=projects, readonly=False
             )
 
         return await self.st.merge_samples(
             id_keep=id_keep,
             id_merge=id_merge,
-            author=author,
         )
 
     async def update_many_participant_ids(
