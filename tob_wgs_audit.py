@@ -58,7 +58,6 @@ class TobWgsAuditor(GenericAuditor):
                 sg_sample_id_map[sg['id']] = sample_id
                 for assay in sg['assays']:
                     reads = assay['meta'].get('reads')
-                    print(reads)
                     if not reads:
                         logging.warning(
                             f'{self.dataset} :: SG {sg["id"]} assay {assay["id"]} has no reads field'
@@ -115,29 +114,28 @@ class TobWgsAuditor(GenericAuditor):
         # if i peruse the cpg-tob-wgs-main bucket for crams can i assume these are 1:1 matches with CPG ID's in metamist?
         pass
 
-    def map_sgid_to_primary_study(self, participants: list[dict]):
+    def map_bone_marrow_sgid_to_assay(
+        self, participants: list[dict], sg_cram_paths: dict
+    ):
         # get the bone marrow samples from the participant list
-        tob_participants: Dict = {}
-        bone_marrow_samples: Dict = {}
-        sgs_without_primary_study: Dict[list] = defaultdict(list)
+        bone_marrow_sg_assay: Dict = {}
         for participant in participants:
             for sample in participant['samples']:
-                for sg in sample['sequencingGroups']:
-                    for assay in sg['assays']:
-                        meta = assay.get('meta')
-                        if not meta:
-                            logging.warning(
-                                f'{self.dataset} :: Assay {assay["id"]} has no meta field'
-                            )
-                            continue
-                        if meta.get('Primary study') == 'TOB':
-                            tob_participants[sg['id']] = assay['id']
-                        if meta.get('Primary study') == 'Pilot/bone marrow':
-                            bone_marrow_samples[sg['id']] = assay['id']
-                        if meta.get('Primary study') is None:
-                            sgs_without_primary_study[sg['id']].append(assay['id'])
-
-        return tob_participants, bone_marrow_samples, sgs_without_primary_study
+                sgs = sample['sequencingGroups']
+                for sg in sgs:
+                    if sg['id'] not in sg_cram_paths.keys():
+                        continue
+                    if sg['id'] in sg_cram_paths.keys():
+                        for assay in sg['assays']:
+                            meta = assay.get('meta')
+                            if not meta:
+                                logging.warning(
+                                    f'{self.dataset} :: Assay {assay["id"]} has no meta field'
+                                )
+                                continue
+                            if meta.get('Primary study') == 'Pilot/bone marrow':
+                                bone_marrow_sg_assay[sg['id']] = assay['id']
+        return bone_marrow_sg_assay
 
     @staticmethod
     def get_most_recent_analyses_by_sg(
@@ -149,6 +147,7 @@ class TobWgsAuditor(GenericAuditor):
         """
         most_recent_analysis_by_sg = {}
         most_recent_long_read_analysis_by_sg = {}
+        sg_ids_with_no_analyses = []
         for sg_analyses in analyses_list:
             sg_id = sg_analyses['id']
             analyses = sg_analyses['analyses']
@@ -166,6 +165,7 @@ class TobWgsAuditor(GenericAuditor):
             ]
 
             if not cram_analyses:
+                sg_ids_with_no_analyses.append(sg_id)
                 logging.warning(f'{dataset} :: SG {sg_id} has no completed analyses')
                 continue
 
@@ -191,8 +191,17 @@ class TobWgsAuditor(GenericAuditor):
                 most_recent_long_read_analysis_by_sg[sg_id] = sorted_long_read_analyses[
                     -1
                 ]
+            # log long read analyses
+            if len(most_recent_long_read_analysis_by_sg) > 0:
+                logging.warning(
+                    f'{dataset} :: SG {sg_id} has multiple long read analyses: {most_recent_long_read_analysis_by_sg}'
+                )
 
-        return most_recent_analysis_by_sg, most_recent_long_read_analysis_by_sg
+        return (
+            most_recent_analysis_by_sg,
+            most_recent_long_read_analysis_by_sg,
+            sg_ids_with_no_analyses,
+        )
 
 
 def audit_tob_wgs(
@@ -214,11 +223,6 @@ def audit_tob_wgs(
     sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
         participant_data
     )
-    (
-        tob_participants,
-        bone_marrow_samples,
-        sgs_without_primary_study,
-    ) = auditor.map_sgid_to_primary_study(participant_data)
 
     (
         sg_sample_id_map,
@@ -227,7 +231,19 @@ def audit_tob_wgs(
         # md5_check_list,
     ) = auditor.get_assay_map_from_participants(participant_data)
 
-    assay_sg_id_map = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
+    (
+        sg_cram_paths,
+        long_read_analyses,
+        sg_ids_with_no_analyses,
+    ) = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
+    complete_incomplete_crams = auditor.get_complete_and_incomplete_sgs(
+        assay_sg_id_map, sg_cram_paths
+    )
+
+    # map sg's with analyses (most recent analyses) to their primary study
+    bone_marrow_sg_assay = auditor.map_bone_marrow_sgid_to_assay(
+        participant_data, sg_cram_paths
+    )
     return participant_data
 
 

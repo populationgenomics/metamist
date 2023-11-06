@@ -260,9 +260,11 @@ class GenericAuditor(AuditHelper):
         logging.getLogger().setLevel(logging.INFO)
 
         analyses = analyses_query_result['sequencingGroups']
-        cram_analyses, _ = self.get_most_recent_analyses_by_sg(
-            self.dataset, analyses_list=analyses
-        )
+        (
+            cram_analyses,
+            long_read_analyses,
+            sg_ids_with_no_analyses,
+        ) = self.get_most_recent_analyses_by_sg(self.dataset, analyses_list=analyses)
 
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [
@@ -287,7 +289,7 @@ class GenericAuditor(AuditHelper):
 
             sg_cram_paths[sg_id][analysis['id']] = analysis['output']
 
-        return sg_cram_paths
+        return sg_cram_paths, long_read_analyses, sg_ids_with_no_analyses
 
     def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""

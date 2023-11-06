@@ -68,3 +68,9 @@ scraps.ipynb
 yes
 yes.pub
 tob-wgs-bucket-sgids.txt
+dictionary_analyses/
+most_recent_analysis_by_sg.txt
+tob_airtable_participant_ids.txt
+tob_participants.txt
+tob_wgs_project_sample_sgids.txt
+tobwgs_sg_query.txt
