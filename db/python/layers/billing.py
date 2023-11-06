@@ -552,14 +552,16 @@ class BillingDb(BqDbBase):
             # TODO for production change to select current day, month
             start_day = '2023-03-01'
             current_day = '2023-03-10'
+            last_day = '2023-03-30'
         else:
             # get start day and current day for given invoice month
             invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
-            start_day_date, current_day_date = get_invoice_month_range(
+            start_day_date, last_day_date = get_invoice_month_range(
                 invoice_month_date
             )
             start_day = start_day_date.strftime('%Y-%m-%d')
-            current_day = current_day_date.strftime('%Y-%m-%d')
+            last_day = last_day_date.strftime('%Y-%m-%d')
+            current_day = datetime.now().strftime('%Y-%m-%d')
 
             has_valid_invoice_month = True
             invoice_month_filter = ' AND invoice_month = @invoice_month'
@@ -583,7 +585,7 @@ class BillingDb(BqDbBase):
                 FROM
                 `{view_to_use}`
                 WHERE day >= TIMESTAMP(@start_day) AND
-                day <= TIMESTAMP(@current_day)
+                day <= TIMESTAMP(@last_day)
                 {invoice_month_filter}
                 GROUP BY
                 field,
@@ -601,8 +603,9 @@ class BillingDb(BqDbBase):
             `{view_to_use}`
             WHERE day > TIMESTAMP_ADD(
                 TIMESTAMP(@current_day), INTERVAL -2 DAY
-            ) AND day <= TIMESTAMP(@current_day)
-            {invoice_month_filter}
+            ) AND day <= TIMESTAMP_ADD(
+                TIMESTAMP(@current_day), INTERVAL 1 DAY
+            )
             GROUP BY
                 field,
                 cost_category
@@ -614,6 +617,7 @@ class BillingDb(BqDbBase):
 
         query_params = [
             bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
+            bigquery.ScalarQueryParameter('last_day', 'STRING', last_day),
             bigquery.ScalarQueryParameter('current_day', 'STRING', current_day),
         ]
 
