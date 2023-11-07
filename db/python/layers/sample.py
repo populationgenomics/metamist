@@ -91,7 +91,7 @@ class SampleLayer(BaseLayer):
     async def get_single_by_external_id(
         self, external_id, project: ProjectId, check_active=True
     ) -> SampleInternal:
-        """Get a Sample by its external_id"""
+        """Get a Sample by (any of) its external_id(s)"""
         return await self.st.get_single_by_external_id(
             external_id, project, check_active=check_active
         )
@@ -102,7 +102,7 @@ class SampleLayer(BaseLayer):
         project: ProjectId = None,
         allow_missing=False,
     ) -> dict[str, int]:
-        """Get map of samples {external_id: internal_id}"""
+        """Get map of samples {(any) external_id: internal_id}"""
         external_ids_set = set(external_ids)
         _project = project or self.connection.project
         assert _project

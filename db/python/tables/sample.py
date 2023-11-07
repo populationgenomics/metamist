@@ -41,14 +41,14 @@ class SampleTable(DbBase):
     table_name = 'sample'
 
     common_get_keys = [
-        'id',
-        'external_id',
-        'participant_id',
-        'meta',
-        'active',
-        'type',
-        'project',
-        'audit_log_id',
+        's.id',
+        'seid.external_id',
+        's.participant_id',
+        's.meta',
+        's.active',
+        's.type',
+        's.project',
+        's.audit_log_id',
     ]
 
     # region GETS
@@ -66,13 +66,24 @@ class SampleTable(DbBase):
         self, filter_: SampleFilter
     ) -> tuple[set[ProjectId], list[SampleInternal]]:
         """Query samples"""
-        wheres, values = filter_.to_sql(field_overrides={})
+        sql_overrides = {
+            'id': 's.id',
+            'type': 's.type',
+            'meta': 's.meta',
+            'external_id': 'seid.external_id',
+            'participant_id': 's.participant_id',
+            'project': 's.project',
+            'active': 's.active',
+        }
+        # TODO Maybe raise ValueError('Must provide a project if filtering by external_id')
+        wheres, values = filter_.to_sql(sql_overrides)
         if not wheres:
             raise ValueError(f'Invalid filter: {filter_}')
         common_get_keys_str = ', '.join(self.common_get_keys)
         _query = f"""
         SELECT {common_get_keys_str}
-        FROM sample
+        FROM sample s
+        INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
         WHERE {wheres}
         """
         rows = await self.connection.fetch_all(_query, values)
@@ -83,7 +94,7 @@ class SampleTable(DbBase):
     async def get_sample_by_id(
         self, internal_id: int
     ) -> tuple[ProjectId, SampleInternal]:
-        """Get a Sample by its external_id"""
+        """Get a Sample by its internal_id"""
         projects, samples = await self.query(
             SampleFilter(id=GenericFilter(eq=internal_id))
         )
@@ -98,7 +109,7 @@ class SampleTable(DbBase):
         self, external_id, project: ProjectId, check_active=True
     ) -> SampleInternal:
         """
-        Get a single sample by its external_id
+        Get a single sample by (any of) its external_id(s)
         """
         _, samples = await self.query(
             SampleFilter(
@@ -345,9 +356,10 @@ class SampleTable(DbBase):
         """
 
         _query = """
-            SELECT project, id, external_id, participant_id
-            FROM sample
-            WHERE project in :project_ids AND external_id LIKE :search_pattern
+            SELECT s.project AS project, s.id AS id, seid.external_id AS external_id, s.participant_id AS participant_id
+            FROM sample s
+            INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+            WHERE s.project in :project_ids AND seid.external_id LIKE :search_pattern
             LIMIT :limit
         """.strip()
         rows = await self.connection.fetch_all(
@@ -376,9 +388,10 @@ class SampleTable(DbBase):
             raise ValueError('Must specify project when getting by external ids')
 
         _query = """\
-            SELECT id, external_id
-            FROM sample
-            WHERE external_id in :external_ids AND project = :project
+            SELECT s.id AS id, seid.external_id AS external_id
+            FROM sample s
+            INNER JOIN sample_external_id seid ON s.project = seid.project AND s.id = seid.sample_id
+            WHERE seid.external_id in :external_ids AND s.project = :project
         """
         rows = await self.connection.fetch_all(
             _query, {'external_ids': external_ids, 'project': project or self.project}
