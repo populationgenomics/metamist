@@ -409,7 +409,7 @@ async def main():
     Upserts a number of analyses for each project to test seqr related endpoints.
     The upserted analyses include CRAMs, joint-called AnnotateDatasets, and ES-indexes.
     """
-
+    aapi = AnalysisApi()
     papi = ProjectApi()
     sapi = SampleApi()
     metamist_enums: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
@@ -435,10 +435,9 @@ async def main():
 
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 
-    aapi = AnalysisApi()
-    for analyses in chunk(analyses_to_insert, 50):
-        logging.info(f'Inserting {len(analyses)} analysis entries')
-        await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in analyses])
+        for analyses in chunk(analyses_to_insert, 50):
+            logging.info(f'Inserting {len(analyses)} analysis entries')
+            await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in analyses])
 
 
 if __name__ == '__main__':
