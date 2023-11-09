@@ -53,6 +53,19 @@ const BillingCurrentCost = () => {
     )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
 
+    const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
+        updateNav(groupBy, invoiceMth)
+        setIsLoading(true)
+        setError(undefined)
+        new BillingApi()
+            .getRunningCost(grp, invoiceMth)
+            .then((response) => {
+                setIsLoading(false)
+                setCosts(response.data)
+            })
+            .catch((er) => setError(er.message))
+    }
+
     const onGroupBySelect = (event: any, data: any) => {
         setGroupBy(data.value)
         getCosts(data.value, invoiceMonth)
@@ -63,31 +76,18 @@ const BillingCurrentCost = () => {
         getCosts(groupBy, data.value)
     }
 
-    const getCosts = (grp: BillingColumn, invoiceMonth: string | undefined) => {
-        updateNav(groupBy, invoiceMonth)
-        setIsLoading(true)
-        setError(undefined)
-        new BillingApi()
-            .getRunningCost(grp, invoiceMonth)
-            .then((response) => {
-                setIsLoading(false)
-                setCosts(response.data)
-            })
-            .catch((er) => setError(er.message))
-    }
-
     React.useEffect(() => {
         getCosts(groupBy, invoiceMonth)
     }, [])
 
     const HEADER_FIELDS = [
-        { category: 'field', title: groupBy.toUpperCase() },
-        { category: 'compute_daily', title: 'C' },
-        { category: 'storage_daily', title: 'S' },
-        { category: 'total_daily', title: 'Total' },
-        { category: 'compute_monthly', title: 'C' },
-        { category: 'storage_monthly', title: 'S' },
-        { category: 'total_monthly', title: 'Total' },
+        { category: 'field', title: groupBy.toUpperCase(), show_always: true },
+        { category: 'compute_daily', title: 'C', show_always: false },
+        { category: 'storage_daily', title: 'S', show_always: false },
+        { category: 'total_daily', title: 'Total', show_always: false },
+        { category: 'compute_monthly', title: 'C', show_always: true },
+        { category: 'storage_monthly', title: 'S', show_always: true },
+        { category: 'total_monthly', title: 'Total', show_always: true },
     ]
 
     const handleToggle = (field: string) => {
@@ -201,7 +201,10 @@ const BillingCurrentCost = () => {
 
                         <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                        <SUITable.HeaderCell colSpan="3">24H</SUITable.HeaderCell>
+                        {invoiceMonth === thisMonth ? (
+                            <SUITable.HeaderCell colSpan="3">24H</SUITable.HeaderCell>
+                        ) : null}
+
                         {groupBy === BillingColumn.GcpProject ? (
                             <SUITable.HeaderCell colSpan="4">
                                 Invoice Month (Acc)
@@ -215,22 +218,29 @@ const BillingCurrentCost = () => {
                     <SUITable.Row>
                         <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                        {HEADER_FIELDS.map((k) => (
-                            <SUITable.HeaderCell
-                                key={k.category}
-                                sorted={checkDirection(k.category)}
-                                onClick={() => handleSort(k.category)}
-                                style={{
-                                    borderBottom: 'none',
-                                    position: 'sticky',
-                                    resize: 'horizontal',
-                                }}
-                            >
-                                {convertFieldName(k.title)}
-                            </SUITable.HeaderCell>
-                        ))}
+                        {HEADER_FIELDS.map((k) => {
+                            switch (k.show_always || invoiceMonth === thisMonth) {
+                                case true:
+                                    return (
+                                        <SUITable.HeaderCell
+                                            key={k.category}
+                                            sorted={checkDirection(k.category)}
+                                            onClick={() => handleSort(k.category)}
+                                            style={{
+                                                borderBottom: 'none',
+                                                position: 'sticky',
+                                                resize: 'horizontal',
+                                            }}
+                                        >
+                                            {convertFieldName(k.title)}
+                                        </SUITable.HeaderCell>
+                                    )
+                                default:
+                                    return null
+                            }
+                        })}
 
-                        {groupBy === BillingColumn.GcpProject ? (
+                        {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth ? (
                             <SUITable.HeaderCell
                                 key={'budget_spent'}
                                 sorted={checkDirection('budget_spent')}
@@ -274,15 +284,21 @@ const BillingCurrentCost = () => {
                                                 </SUITable.Cell>
                                             )
                                         default:
-                                            return (
-                                                <SUITable.Cell>
-                                                    {currencyFormat(p[k.category])}
-                                                </SUITable.Cell>
-                                            )
+                                            switch (k.show_always || invoiceMonth === thisMonth) {
+                                                case true:
+                                                    return (
+                                                        <SUITable.Cell>
+                                                            {currencyFormat(p[k.category])}
+                                                        </SUITable.Cell>
+                                                    )
+                                                default:
+                                                    return null
+                                            }
                                     }
                                 })}
 
-                                {groupBy === BillingColumn.GcpProject ? (
+                                {groupBy === BillingColumn.GcpProject &&
+                                invoiceMonth === thisMonth ? (
                                     <SUITable.Cell>{percFormat(p.budget_spent)}</SUITable.Cell>
                                 ) : null}
                             </SUITable.Row>
@@ -303,12 +319,15 @@ const BillingCurrentCost = () => {
 
                                         {dk.cost_group === 'C' ? (
                                             <React.Fragment>
-                                                <SUITable.Cell>
-                                                    {currencyFormat(dk.daily_cost)}
-                                                </SUITable.Cell>
+                                                {invoiceMonth === thisMonth ? (
+                                                    <React.Fragment>
+                                                        <SUITable.Cell>
+                                                            {currencyFormat(dk.daily_cost)}
+                                                        </SUITable.Cell>
 
-                                                <SUITable.Cell colSpan="2" />
-
+                                                        <SUITable.Cell colSpan="2" />
+                                                    </React.Fragment>
+                                                ) : null}
                                                 <SUITable.Cell>
                                                     {currencyFormat(dk.monthly_cost)}
                                                 </SUITable.Cell>
@@ -317,11 +336,15 @@ const BillingCurrentCost = () => {
                                         ) : (
                                             <React.Fragment>
                                                 <SUITable.Cell />
-                                                <SUITable.Cell>
-                                                    {currencyFormat(dk.daily_cost)}
-                                                </SUITable.Cell>
+                                                {invoiceMonth === thisMonth ? (
+                                                    <React.Fragment>
+                                                        <SUITable.Cell>
+                                                            {currencyFormat(dk.daily_cost)}
+                                                        </SUITable.Cell>
 
-                                                <SUITable.Cell colSpan="2" />
+                                                        <SUITable.Cell colSpan="2" />
+                                                    </React.Fragment>
+                                                ) : null}
                                                 <SUITable.Cell>
                                                     {currencyFormat(dk.monthly_cost)}
                                                 </SUITable.Cell>
