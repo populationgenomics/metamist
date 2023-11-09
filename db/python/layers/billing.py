@@ -523,8 +523,14 @@ class BillingDb(BqDbBase):
         Get budget for projects
         """
         _query = f"""
-        SELECT gcp_project, budget
-        FROM `{BQ_BUDGET_VIEW}`
+        WITH t AS (
+            SELECT gcp_project, MAX(created_at) as last_created_at
+            FROM `{BQ_BUDGET_VIEW}`
+            GROUP BY 1
+        )
+        SELECT t.gcp_project, d.budget
+        FROM t inner join `{BQ_BUDGET_VIEW}` d
+        ON d.gcp_project = t.gcp_project AND d.created_at = t.last_created_at
         """
 
         query_job_result = list(self._connection.connection.query(_query).result())
