@@ -289,7 +289,7 @@ class GenericAuditor(AuditHelper):
 
             sg_cram_paths[sg_id][analysis['id']] = analysis['output']
 
-        return sg_cram_paths, long_read_analyses, sg_ids_with_no_analyses
+        return sg_cram_paths, long_read_analyses, sg_ids_with_no_analyses, analyses
 
     def analyses_for_sgs_without_crams(self, sgs_without_crams: list[str]):
         """Checks if other completed analyses exist for samples without completed crams"""

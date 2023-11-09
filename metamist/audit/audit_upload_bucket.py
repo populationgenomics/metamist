@@ -297,15 +297,15 @@ async def audit_upload_bucket_async(
 
     # COMMENTED OUT AS TO AVOID WRITING TO BUCKETS
     # Write the reads to delete, reads to ingest, and unaligned SGs reports
-    await auditor.write_upload_bucket_audit_reports(
-        bucket,
-        sequencing_types=sequencing_types,
-        file_types=file_types,
-        assay_files_to_delete=reads_to_delete,
-        assay_files_to_ingest=possible_assay_ingests,
-        unaligned_sgs=unaligned_sgs,
-        write_to_local=True,
-    )
+    # await auditor.write_upload_bucket_audit_reports(
+    #     bucket,
+    #     sequencing_types=sequencing_types,
+    #     file_types=file_types,
+    #     assay_files_to_delete=reads_to_delete,
+    #     assay_files_to_ingest=possible_assay_ingests,
+    #     unaligned_sgs=unaligned_sgs,
+    #     write_to_local=True,
+    # )
 
 
 @click.command()
