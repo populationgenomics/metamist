@@ -220,16 +220,8 @@ class BillingDb(BqDbBase):
         ORDER BY invoice_month DESC;
         """
 
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter(
-                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
-                ),
-            ]
-        )
-
         query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
+            self._connection.connection.query(_query).result()
         )
         if query_job_result:
             return [str(dict(row)['invoice_month']) for row in query_job_result]
