@@ -254,6 +254,8 @@ class BillingCostBudgetRecord(SMBase):
     details: list[BillingCostDetailsRecord] | None
     budget_spent: Decimal | None
 
+    last_loaded_day: str | None
+
     @staticmethod
     def from_json(record):
         """Create BillingTopicCostCategoryRecord from json"""
@@ -269,4 +271,5 @@ class BillingCostBudgetRecord(SMBase):
                 BillingCostDetailsRecord.from_json(row) for row in record.get('details')
             ],
             budget_spent=record.get('budget_spent'),
+            last_loaded_day=record.get('last_loaded_day'),
         )
