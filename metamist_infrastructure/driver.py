@@ -218,11 +218,22 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_configuration_secret_version(self):
         """Get the versioned secret, that contains the latest configuration"""
-        body_to_write = self.config.metamist.etl.accessors.to_dict()
+
+        def map_accessors_to_new_body(arg):
+            accessors = dict(arg)
+            remapped = {
+                accessors[k]: v
+                for k, v in self.config.metamist.etl.accessors.to_dict().items()
+            }
+            return json.dumps(remapped)
+
+        remapped_with_id = pulumi.Output.all(**self.etl_accessors).apply(
+            map_accessors_to_new_body
+        )
         return gcp.secretmanager.SecretVersion(
             'metamist-etl-accessor-configuration',
             secret=self.etl_configuration_secret.id,
-            secret_data=json.dumps(body_to_write),
+            secret_data=remapped_with_id,
         )
 
     def _setup_etl_configuration_secret_value(self):
