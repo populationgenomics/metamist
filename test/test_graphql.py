@@ -209,7 +209,7 @@ query MyQuery($project: String!) {
 
         q = """
 query MyQuery($sg_id: String!, $project: String!) {
-  sequencingGroups(id: {in_: [$sg_id]}) {
+  sequencingGroups(id: {in_: [$sg_id]}, project: {eq: $project}) {
     analyses(project: {eq: $project}) {
       id
       meta

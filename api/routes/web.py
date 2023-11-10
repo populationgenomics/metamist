@@ -81,11 +81,18 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )
-    project_ids = [p.id for p in projects]
-    responses = await SearchLayer(connection).search(keyword, project_ids=project_ids)
+    pmap = {p.id: p for p in projects}
+    responses = await SearchLayer(connection).search(
+        keyword, project_ids=list(pmap.keys())
+    )
 
     for res in responses:
-        res.data.project = projects.get(res.data.project, res.data.project)  # type: ignore
+        if res.data.project in pmap:
+            # the solution to the type issue is to create internal / external models
+            # and convert between them for transport
+            res.data.project = pmap[res.data.project].name  # type: ignore
+        else:
+            res.data.project = str(res.data.project)
 
     return SearchResponseModel(responses=responses)
 

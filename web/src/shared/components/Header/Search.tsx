@@ -72,12 +72,15 @@ const SearchReducer = (state: State, action: Action): State => {
     }
 }
 
-const resultRenderer = ({ ...props }) => {
+const resultRenderer = ({ data, ...props }) => {
     let components = []
     let icon: React.ReactElement = <></>
     let available: string | undefined
     let colour = 'black'
-    if (!props.data.id) {
+    if (!data) {
+        return <em>An error occurred when rendering search results</em>
+    }
+    if (!data?.id) {
         available = `No access to this ${props.type}`
         colour = 'gray'
     }
@@ -89,27 +92,27 @@ const resultRenderer = ({ ...props }) => {
 
     switch (props.type) {
         case SearchResponseType.Sample: {
-            components.push(...(props.data.sample_external_ids || []))
+            components.push(...(data.sample_external_ids || []))
             icon = <BloodtypeRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Participant: {
-            components.push(...(props.data.participant_external_ids || []))
+            components.push(...(data.participant_external_ids || []))
             icon = <PersonRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Family: {
-            components.push(...(props.data.family_external_ids || []))
+            components.push(...(data.family_external_ids || []))
             icon = <Diversity3RoundedIcon sx={style} />
             break
         }
         case SearchResponseType.SequencingGroup: {
-            components.push(...(props.data.sample_external_ids || []))
+            components.push(...(data.sample_external_ids || []))
             icon = <VaccinesRoundedIcon sx={style} />
             break
         }
         case SearchResponseType.Error: {
-            components.push(props.data.error)
+            components.push(data?.error)
             icon = <ErrorRoundedIcon sx={style} />
             break
         }
@@ -120,7 +123,7 @@ const resultRenderer = ({ ...props }) => {
 
     const subtitle = components.length > 0 ? components.join(' · ') : null
 
-    const key = String(props.data.id || `${props.data.project}|${props.data.title}`)
+    const key = String(data.id || `${data.project}|${data.title}`)
 
     // prefer early return for empty results
     if (!props.title || !props.type) return <></>
@@ -148,7 +151,7 @@ const resultRenderer = ({ ...props }) => {
                         fontStyle: 'italic',
                     }}
                 >
-                    {props.data.project}
+                    {data.project}
                 </div>
             </div>
         </div>
@@ -227,7 +230,10 @@ const Searchbar: React.FunctionComponent = () => {
                             {
                                 title: 'Error',
                                 type: 'error',
-                                error: { error: er.message },
+                                data: {
+                                    id: '#error',
+                                    error: er.response?.data?.description || er.message,
+                                },
                             },
                         ] as SearchResponse[],
                         query: '',

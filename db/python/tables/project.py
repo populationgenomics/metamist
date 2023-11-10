@@ -198,10 +198,11 @@ class ProjectPermissionsTable:
             group_id_project_map = {p.write_group_id: p for p in projects}
 
         group_ids = set(gid for gid in group_id_project_map.keys() if gid)
-        # awkward double negative to find missing projects
-        missing_group_ids = await self.gtable.check_which_groups_member_is_missing(
+
+        present_group_ids = await self.gtable.check_which_groups_member_has(
             group_ids=group_ids, member=user
         )
+        missing_group_ids = group_ids - present_group_ids
 
         if missing_group_ids:
             # so we can directly return the project names they're missing
@@ -248,10 +249,10 @@ class ProjectPermissionsTable:
             group_id_project_map = {p.write_group_id: p for p in projects}
 
         group_ids = set(gid for gid in group_id_project_map.keys() if gid)
-        # awkward double negative to find missing projects
-        missing_group_ids = await self.gtable.check_which_groups_member_is_missing(
+        present_group_ids = await self.gtable.check_which_groups_member_has(
             group_ids=group_ids, member=user
         )
+        missing_group_ids = group_ids - present_group_ids
 
         if missing_group_ids:
             # so we can directly return the project names they're missing
@@ -543,22 +544,24 @@ class GroupTable:
 
         return bool(value)
 
-    async def check_which_groups_member_is_missing(
+    async def check_which_groups_member_has(
         self, group_ids: set[int], member: str
     ) -> set[int]:
-        """Check if a member is in a group"""
+        """
+        Check which groups a member has
+        """
         if self.allow_full_access:
-            return set()
+            return group_ids
 
         _query = """
-            SELECT g.group_id
+            SELECT gm.group_id as gid
             FROM group_member gm
-            WHERE gm.member = member AND gm.group_id IN :group_ids
+            WHERE gm.member = :member AND gm.group_id IN :group_ids
         """
-        membered_group_ids = await self.connection.fetch_all(
+        results = await self.connection.fetch_all(
             _query, {'group_ids': group_ids, 'member': member}
         )
-        return set(group_ids) - set(membered_group_ids)
+        return set(r['gid'] for r in results)
 
     async def create_group(self, name: str) -> int:
         """Create a new group"""
