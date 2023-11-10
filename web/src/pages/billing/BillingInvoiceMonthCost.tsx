@@ -53,6 +53,8 @@ const BillingCurrentCost = () => {
     )
     const [invoiceMonth, setInvoiceMonth] = React.useState<string>(inputInvoiceMonth ?? thisMonth)
 
+    const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
+
     const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
         updateNav(groupBy, invoiceMth)
         setIsLoading(true)
@@ -62,6 +64,7 @@ const BillingCurrentCost = () => {
             .then((response) => {
                 setIsLoading(false)
                 setCosts(response.data)
+                setLastLoadedDay(response.data[0].last_loaded_day)
             })
             .catch((er) => setError(er.message))
     }
@@ -202,7 +205,9 @@ const BillingCurrentCost = () => {
                         <SUITable.HeaderCell></SUITable.HeaderCell>
 
                         {invoiceMonth === thisMonth ? (
-                            <SUITable.HeaderCell colSpan="3">24H</SUITable.HeaderCell>
+                            <SUITable.HeaderCell colSpan="3">
+                                24H (day UTC {lastLoadedDay})
+                            </SUITable.HeaderCell>
                         ) : null}
 
                         {groupBy === BillingColumn.GcpProject ? (
