@@ -1,4 +1,5 @@
 from collections import defaultdict, namedtuple
+import csv
 import asyncio
 from datetime import datetime
 import pandas as pd
@@ -30,6 +31,62 @@ class TobWgsAuditor(GenericAuditor):
             default_analysis_status=default_analysis_status,
         )
 
+    def check_assay_meta_fields(self, sg_id: str, assay: Dict) -> Dict[str, str]:
+        """
+        check if 'type' of sg is present (and if it is in the sequencing types list?)
+        if reads isnt a dictionary, add the sg to the erroneous assays dictionary
+        if reads_type field isn't present and also see what do to with reads_type field
+        if the meta field doesn't exist, add the sg to the erroneous assays dictionary
+        if assay doesn't have 'gvcf' key, then does it have something else?
+        check all file locations and if they exist in the meta field, add the sg to the erroneous assays dictionary
+            gvcf locations needs checking
+        """
+        assay_id = assay['id']
+        erroneous_assay_meta_fields = defaultdict(dict)
+        erroneous_assay_meta_fields[assay_id]['meta field present'] = (
+            '0' if assay.get('meta') is None else '1'
+        )
+        erroneous_assay_meta_fields[assay_id]['incorrect reads field'] = (
+            '1' if isinstance(assay['meta'].get('reads'), dict) else '0'
+        )
+        reads = assay['meta'].get('reads')
+        reads_type = (
+            '1'
+            if isinstance(reads, dict)
+            and assay['meta']['reads_type'] in basename(reads).split('.')
+            else '0'
+            if isinstance(reads, dict)
+            else 'N/A'
+        )
+        erroneous_assay_meta_fields[assay_id][
+            'reads_type matches file type'
+        ] = reads_type
+        # check gvcf field exists
+        gvcf = assay['meta'].get('gvcf')
+        gvcf_exists = (
+            '1'
+            if gvcf and self.check_gcs_file_exists(gvcf['location'])  # gvcf exists
+            else '0'  # gvcf does not exist
+            if gvcf
+            else 'N/A'  # no gvcf field
+        )
+        erroneous_assay_meta_fields[assay_id]['gvcf file exists'] = gvcf_exists
+        # check 'secondary_files' field exists
+        # TODO: figure out if there's other fields that should be checked here
+        if gvcf:
+            secondary_files = assay['meta'].get('gvcf').get('secondaryFiles')
+            secondary_files_exists = (
+                '1'
+                if secondary_files and isinstance(secondary_files, list)
+                else '0'
+                if secondary_files
+                else 'N/A'
+            )
+            erroneous_assay_meta_fields[assay_id][
+                'secondaryFiles field exists'
+            ] = secondary_files_exists
+        return erroneous_assay_meta_fields
+
     def get_assay_map_from_participants(
         self, participants: list[dict]
     ) -> tuple[dict[str, str], dict[int, str], dict[Any, list[tuple[Any, Any]]]]:
@@ -53,21 +110,19 @@ class TobWgsAuditor(GenericAuditor):
         }
 
         # md5_check_list = []
-
+        erroneous_assays = defaultdict(dict)
         for sample_id, sgs in sample_sgs.items():
             for sg in sgs:
                 if sg['type'].lower() not in self.sequencing_types:
                     continue
-
                 sg_sample_id_map[sg['id']] = sample_id
+                erroneous_assay_meta_fields = []
                 for assay in sg['assays']:
                     reads = assay['meta'].get('reads')
-                    if not reads:
-                        logging.warning(
-                            f'{self.dataset} :: SG {sg["id"]} assay {assay["id"]} has no reads field'
+                    if not reads or not isinstance(reads, dict):
+                        erroneous_assay_meta_fields.append(
+                            self.check_assay_meta_fields(sg['id'], assay)
                         )
-                        continue
-
                     if assay_sg_id_map.get(assay['id']):
                         raise ValueError(
                             f'{self.dataset} :: Assay {assay["id"]} has multiple SGs: {assay_sg_id_map[assay["id"]]} and {sg["id"]}'
@@ -106,12 +161,15 @@ class TobWgsAuditor(GenericAuditor):
                         location = read.get('location')
                         checksum = read.get('checksum').split(' ')[0].split(':')[1]
                         # md5_check_list.append(self.check_md5_hash(location, checksum))
+                if erroneous_assay_meta_fields:
+                    erroneous_assays[sg['id']] = erroneous_assay_meta_fields
 
         return (
             sg_sample_id_map,
             assay_sg_id_map,
             assay_filepaths_filesizes,
             # md5_check_list,
+            erroneous_assays,
         )
 
     def map_bone_marrow_sgid_to_assay(
@@ -203,41 +261,6 @@ class TobWgsAuditor(GenericAuditor):
             sg_ids_with_no_analyses,
         )
 
-    def find_sgs_with_erroneous_meta_fields(
-        self, participant_data: list[dict], sg_ids_with_no_analyses: list[str]
-    ) -> dict[str, str]:
-        """
-        Check meta fields of assays for the following errors:
-        1. No meta field
-        2. No primary study field
-        3. Reads field is not a file location
-        4. Reads_type field does not match file type
-        5. Reads field points to a non-existent file
-        6. Secondary_files field has accurate attirubtes
-            - location, checksum
-            - Does not repeat primary meta field information
-        """
-        multi_sample_participants = {}
-        for participant in participant_data:
-            pid = participant['id']
-            if len(participant['samples']) > 0:
-                multi_sample_participants[pid] = participant['samples']
-            for sample in participant['samples']:
-                for sg in sample['sequencingGroups']:
-                    for assay in sg['assays']:
-                        if assay.get('meta') is None:
-                            logging.warning(
-                                f'{self.dataset} :: Assay {assay["id"]} has no meta field'
-                            )
-                            continue
-                        if not isinstance(assay['meta'].get('reads'), list):
-                            logging.warning(
-                                f'{self.dataset} :: Assay {assay["id"]} reads field is not a list'
-                            )
-                            continue
-                    # this has been checked before - see if i can integrate into those areas a writing of these errors/caching them
-        pass
-
     @lru_cache
     def get_contents_of_gs_path(
         self, gcs_client: storage, filepath: str, bucket_name: str, prefix: str
@@ -253,9 +276,13 @@ class TobWgsAuditor(GenericAuditor):
     def check_gcs_file_exists(self, filepath: str) -> list[bool]:
         """Check if files exist in GCS"""
         gcs_client = self.gcs_client
-        bucket_name, prefix = (
+        filepath_parts = (
             dirname(filepath).removeprefix('gs://').strip('/').split('/', maxsplit=1)
         )
+        if len(filepath_parts) == 1:  # files in root of bucket
+            bucket_name, prefix = filepath_parts[0], ''
+        else:
+            bucket_name, prefix = filepath_parts
         return (prefix + '/' + basename(filepath)) in self.get_contents_of_gs_path(
             gcs_client, dirname(filepath), bucket_name, prefix
         )
@@ -279,11 +306,12 @@ class TobWgsAuditor(GenericAuditor):
         erroneous_analyses = defaultdict(dict)
         for sg_analyses in analyses_list:
             sg_id = sg_analyses['id']
-            erroneous_analyses[sg_id] = {}
+            erroneous_analysis_meta_fields = []
             for analysis in sg_analyses['analyses']:
                 analysis_id = analysis['id']
+                analysis_meta_fields = {}
                 meta_field_present = '1' if analysis['meta'] else '0'
-                erroneous_analyses[sg_id][analysis_id] = {
+                analysis_meta_fields[analysis_id] = {
                     'meta field present': meta_field_present
                 }
 
@@ -293,29 +321,76 @@ class TobWgsAuditor(GenericAuditor):
                     and 'sequencing_type' in analysis['meta']
                     else '0'
                 )
-                erroneous_analyses[sg_id][analysis_id][
+                analysis_meta_fields[analysis_id][
                     'duplicate sequence_type'
                 ] = duplicate_sequence_type
 
                 if analysis['output']:
+                    if analysis['output'].endswith('.mt') or analysis[
+                        'output'
+                    ].endswith(
+                        '.ht'
+                    ):  # skip table/matrix-table files
+                        continue
                     file_exists = (
                         '1' if self.check_gcs_file_exists(analysis['output']) else '0'
                     )
-                    erroneous_analyses[sg_id][analysis_id]['file exists'] = file_exists
+                    analysis_meta_fields[analysis_id]['file exists'] = file_exists
                     if analysis['type'] and file_exists == '1':
                         if analysis['type'] != analysis['output'].split('.')[-1]:
-                            erroneous_analyses[sg_id][analysis_id][
+                            analysis_meta_fields[analysis_id][
                                 'mismatched analysis type'
                             ] = '1'
                         else:
-                            erroneous_analyses[sg_id][analysis_id][
+                            analysis_meta_fields[analysis_id][
                                 'mismatched analysis type'
                             ] = '0'
-                    erroneous_analyses[sg_id][analysis_id]['no analysis type'] = (
-                        '1' if not analysis['type'] else '0'
+                    elif analysis['type'] and file_exists == '0':
+                        analysis_meta_fields[analysis_id][
+                            'mismatched analysis type'
+                        ] = 'N/A'
+                    analysis_meta_fields[analysis_id]['analysis type present'] = (
+                        '1' if analysis['type'] else '0'
                     )
+                erroneous_analysis_meta_fields.append(analysis_meta_fields)
+            erroneous_analyses[sg_id] = erroneous_analysis_meta_fields
 
-                print()
+        return erroneous_analyses
+
+    def write_summary_files(
+        self, input_dict: Dict[str, list[Dict[int, Dict[str, str]]]], meta_type: str
+    ):
+        """
+        Write summary files for erroneous assays and analyses
+        """
+        today = datetime.today().strftime('%Y-%m-%d')
+
+        header = set()
+        for inner_list in input_dict.values():
+            for inner_dict in inner_list:
+                for value in inner_dict.values():
+                    for k in value.keys():
+                        header.add(k)
+
+        header = ['sg_id', f'{meta_type}_id'] + sorted(
+            header, key=lambda x: next(iter(x))
+        )
+
+        # Write to CSV
+        csv_file_path = f'{meta_type}_meta_field_summary_{today}.csv'
+        with open(csv_file_path, 'w', newline='') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=header)
+            writer.writeheader()
+
+            for sg_id, inner_list in input_dict.items():
+                for inner_dict in inner_list:
+                    meta_id = next(iter(inner_dict))
+                    row = {
+                        'sg_id': sg_id,
+                        f'{meta_type}_id': meta_id,
+                        **inner_dict[meta_id],
+                    }
+                    writer.writerow(row)
 
 
 def audit_tob_wgs(
@@ -343,35 +418,28 @@ def audit_tob_wgs(
         assay_sg_id_map,
         assay_filepaths_filesizes,
         # md5_check_list,
+        erroneous_assays,
     ) = auditor.get_assay_map_from_participants(participant_data)
 
     (
         sg_cram_paths,
         long_read_analyses,
         sg_ids_with_no_analyses,
-        analyses,
+        cram_analyses,
     ) = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
     complete_incomplete_crams = auditor.get_complete_and_incomplete_sgs(
         assay_sg_id_map, sg_cram_paths
     )
 
-    directories_to_check = []
-    erroneous_file_locations = defaultdict(list)
-    for sg_id, analysis in sg_cram_paths.items():
-        for analysis_id, filepath in analysis.items():
-            if not auditor.check_gcs_file_exists(filepath=filepath):
-                erroneous_file_locations[sg_id].append((analysis, filepath))
-    print()
     # map sg's with analyses (most recent analyses) to their primary study
     bone_marrow_sg_assay = auditor.map_bone_marrow_sgid_to_assay(
         participant_data, sg_cram_paths
     )
 
-    erroneous_meta_fields = auditor.find_sgs_with_erroneous_meta_fields(
-        participant_data, sg_ids_with_no_analyses
-    )
+    erroneous_analyses = auditor.check_analysis_fields(cram_analyses)
 
-    sg_erroneous_analyses = auditor.check_analysis_fields(analyses)
+    auditor.write_summary_files(erroneous_assays, 'assay')
+    auditor.write_summary_files(erroneous_analyses, 'analysis')
 
     return participant_data
 
