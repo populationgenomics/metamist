@@ -485,18 +485,23 @@ def audit_tob_wgs(
         sg_cram_paths,
         long_read_analyses,
         sg_ids_with_no_analyses,
-        cram_analyses,
+        all_cram_analyses,
     ) = auditor.get_analysis_cram_paths_for_dataset_sgs(assay_sg_id_map)
     complete_incomplete_crams = auditor.get_complete_and_incomplete_sgs(
         assay_sg_id_map, sg_cram_paths
     )
+
+    for inner_dict in sg_cram_paths.values():
+        for cram_filepath in inner_dict.values():
+            if not auditor.check_gcs_file_exists(cram_filepath):
+                logging.error(f'{dataset} :: {cram_filepath} does not exist')
 
     # map sg's with analyses (most recent analyses) to their primary study
     bone_marrow_sg_assay = auditor.map_bone_marrow_sgid_to_assay(
         participant_data, sg_cram_paths
     )
 
-    erroneous_analyses = auditor.check_analysis_fields(cram_analyses)
+    erroneous_analyses = auditor.check_analysis_fields(all_cram_analyses)
 
     auditor.write_summary_files(erroneous_assays, 'assay')
     auditor.write_summary_files(erroneous_analyses, 'analysis')
