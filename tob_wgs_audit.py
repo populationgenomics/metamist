@@ -1,17 +1,13 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import csv
-import asyncio
 from datetime import datetime
-import pandas as pd
 from typing import Dict, Any
 from metamist.audit.non_async_auditor import GenericAuditor
-from metamist.audit.audithelper import AuditHelper
 import logging
 from typing import Any
 from functools import lru_cache
-from os.path import basename, dirname, join
+from os.path import basename, dirname
 from google.cloud import storage
-from scripts.cache_bucket_files import check_gs_exists_path, get_contents_of_gs_path
 
 
 class TobWgsAuditor(GenericAuditor):
@@ -33,13 +29,24 @@ class TobWgsAuditor(GenericAuditor):
 
     def check_assay_meta_fields(self, sg_id: str, assay: Dict) -> Dict[str, str]:
         """
-        check if 'type' of sg is present (and if it is in the sequencing types list?)
-        if reads isnt a dictionary, add the sg to the erroneous assays dictionary
-        if reads_type field isn't present and also see what do to with reads_type field
-        if the meta field doesn't exist, add the sg to the erroneous assays dictionary
-        if assay doesn't have 'gvcf' key, then does it have something else?
-        check all file locations and if they exist in the meta field, add the sg to the erroneous assays dictionary
-            gvcf locations needs checking
+        Check various meta fields in an assay and record issues in a dictionary.
+
+        Args:
+        - sg_id (str): The sequencing group ID associated with the assay.
+        - assay (Dict): A dictionary containing assay information.
+
+        Returns:
+        A dictionary (erroneous_assay_meta_fields) with issues found in the assay's meta fields.
+        Keys include 'meta field present', 'incorrect reads field', 'reads_type matches file type',
+        'gvcf file exists', and 'secondaryFiles field exists'. Values are '1' for True, '0' for False,
+        and 'N/A' for not applicable.
+
+        Notes:
+        - 'meta field present': Indicates if the 'meta' field is present in the assay.
+        - 'incorrect reads field': Indicates if the 'reads' field is a dictionary.
+        - 'reads_type matches file type': Indicates if 'reads_type' matches the file type.
+        - 'gvcf file exists': Indicates if the 'gvcf' file exists.
+        - 'secondaryFiles field exists': Indicates if the 'secondaryFiles' field exists (if 'gvcf' exists).
         """
         assay_id = assay['id']
         erroneous_assay_meta_fields = defaultdict(dict)
@@ -89,7 +96,12 @@ class TobWgsAuditor(GenericAuditor):
 
     def get_assay_map_from_participants(
         self, participants: list[dict]
-    ) -> tuple[dict[str, str], dict[int, str], dict[Any, list[tuple[Any, Any]]]]:
+    ) -> tuple[
+        dict[str, str],
+        dict[int, str],
+        dict[Any, list[tuple[Any, Any]]],
+        dict[str, list[dict[int, dict[str, str]]]],
+    ]:
         """
         Input the list of Metamist participant dictionaries from the 'QUERY_PARTICIPANTS_SAMPLES_SGS_ASSAYS' query
 
@@ -174,8 +186,23 @@ class TobWgsAuditor(GenericAuditor):
 
     def map_bone_marrow_sgid_to_assay(
         self, participants: list[dict], sg_cram_paths: dict
-    ):
-        # get the bone marrow samples from the participant list
+    ) -> dict[str, int]:
+        """
+        Extract bone marrow assays for each sequencing group from participant data.
+
+        Args:
+        - participants (list[dict]): A list of dictionaries containing participant information.
+        - sg_cram_paths (dict): A dictionary mapping sequencing group IDs to CRAM paths.
+
+        Returns:
+        A dictionary (bone_marrow_sg_assay) where keys are sequencing group IDs and values
+        are the corresponding bone marrow assay IDs. Only includes assays with a 'Primary study'
+        meta field set to 'Pilot/bone marrow'.
+
+        Note:
+        - If an assay has no 'meta' field, a warning is logged, and the assay is skipped.
+        - Only assays from sequencing groups with corresponding CRAM paths are considered.
+        """
         bone_marrow_sg_assay: Dict = {}
         for participant in participants:
             for sample in participant['samples']:
@@ -200,8 +227,33 @@ class TobWgsAuditor(GenericAuditor):
         dataset: str, analyses_list: list[dict[str, Any]]
     ) -> dict[str, dict[str, Any]]:
         """
-        Takes a list of completed analyses for a number of sequencing groups and returns the latest
-        completed analysis for each sequencing group, creating a 1:1 mapping of SG to analysis.
+        Retrieve the most recent completed analyses for each sequencing group.
+
+        Args:
+        - dataset (str): The name of the dataset.
+        - analyses_list (list[dict[str, Any]]): A list of dictionaries containing information
+        about completed analyses for various sequencing groups.
+
+        Returns:
+        A tuple containing:
+        - most_recent_analysis_by_sg (dict[str, Any]): A dictionary mapping sequencing group
+        IDs (sg_id) to their most recent completed analysis with a .cram extension in the
+        output field.
+        - most_recent_long_read_analysis_by_sg (dict[str, Any]): A dictionary mapping sequencing
+        group IDs (sg_id) to their most recent completed long-read analysis with 'ont' in the
+        'sequence_type' metadata field.
+        - sg_ids_with_no_analyses (List[str]): A list of sequencing group IDs that have no
+        completed analyses.
+
+        Warnings:
+        - If a sequencing group has no completed analyses, a warning is logged.
+        - If a sequencing group has multiple long-read analyses, a warning is logged.
+
+        Note:
+        - Analyses are considered based on the .cram extension in the output field for
+        most_recent_analysis_by_sg and the presence of 'ont' in the 'sequence_type' metadata
+        field for most_recent_long_read_analysis_by_sg.
+        - The timestampCompleted field is used to determine the most recent analysis.
         """
         most_recent_analysis_by_sg = {}
         most_recent_long_read_analysis_by_sg = {}
@@ -289,19 +341,27 @@ class TobWgsAuditor(GenericAuditor):
 
     def check_analysis_fields(self, analyses_list: list[dict]):
         """
-        Find analyses that are out of date/point to files that don't exist
-        dictionary of issues with analyses fields:
-            erroneous_analyses{
-                sg_id : {
-                    meta field present : bool,
-                    duplicate 'sequencing_type' and 'sequence_type' fields : bool,
-                    no project field : bool,
-                    file exists : bool,
-                    sequence_type matches file type : bool,
-                    no analysis type : bool,
-                    if multiqc check if files exist (bool) (not checking metrics),
-                }
-            }
+        Check metadata fields for a list of analyses and identify issues.
+
+        Args:
+        - analyses_list (list[dict]): A list of dictionaries, each containing information
+        about a sequencing group and its associated analyses.
+
+        Returns:
+        - erroneous_analyses (defaultdict[dict]): A defaultdict where keys are sequencing group
+        IDs (sg_id), and values are dictionaries indicating issues with analyses metadata.
+        Each entry represents a sequencing group, and the associated values are lists of
+        dictionaries. Each dictionary represents an analysis and contains the following
+        fields:
+
+        - 'analysis_id': The ID of the analysis.
+        - 'meta field present': '1' if a meta field is present, '0' otherwise.
+        - 'duplicate sequence_type': '1' if there are both a 'sequence_type' and
+            'sequencing_type' field, '0' otherwise.
+        - 'file exists': '1' if the associated file exists, '0' otherwise.
+        - 'mismatched analysis type': '1' if the analysis type mismatches the file type,
+            '0' if there is no mismatch (or N/A if the file doesn't exist).
+        - 'analysis type present': '1' if an analysis type is present, '0' otherwise.
         """
         erroneous_analyses = defaultdict(dict)
         for sg_analyses in analyses_list:
