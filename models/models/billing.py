@@ -171,6 +171,8 @@ class BillingTotalCostQueryModel(SMBase):
     fields: list[BillingColumn]
     start_date: str
     end_date: str
+    # optional, can be aggregate or gcp_billing
+    source: str | None = None
 
     # optional
     filters: dict[BillingColumn, str] | None = None
@@ -189,6 +191,7 @@ class BillingTotalCostRecord(SMBase):
 
     day: datetime.date | None
     topic: str | None
+    gcp_project: str | None
     cost_category: str | None
     sku: str | None
     ar_guid: str | None
@@ -208,6 +211,7 @@ class BillingTotalCostRecord(SMBase):
         return BillingTotalCostRecord(
             day=record.get('day'),
             topic=record.get('topic'),
+            gcp_project=record.get('gcp_project'),
             cost_category=record.get('cost_category'),
             sku=record.get('sku'),
             ar_guid=record.get('ar_guid'),

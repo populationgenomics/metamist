@@ -180,12 +180,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // on first load
     React.useEffect(() => {
         if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
+            let source = 'aggregate'
+            if (groupBy === BillingColumn.GcpProject) {
+                source = 'gcp_billing'
+            }
             if (selectedData.startsWith('All ')) {
                 getData({
                     fields: [BillingColumn.Day, BillingColumn.CostCategory],
                     start_date: start,
                     end_date: end,
                     order_by: { day: false },
+                    source: source,
                 })
             } else {
                 getData({
@@ -194,6 +199,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     end_date: end,
                     filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
                     order_by: { day: false },
+                    source: source,
                 })
             }
         }
