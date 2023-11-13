@@ -235,7 +235,8 @@ async def get_total_cost(
             "fields": ["topic"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": {"cost": true}
+            "order_by": {"cost": true},
+            "source": "aggregate"
         }
 
     2. Get total cost by day and topic for March 2023, order by day ASC and topic DESC:
@@ -320,6 +321,16 @@ async def get_total_cost(
             "order_by": {"cost": true}
         }
 
+    10. Get total gcp_project for month of March 2023, ordered by cost DESC:
+
+        {
+            "fields": ["gcp_project"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": {"cost": true},
+            "source": "gcp_billing"
+        }
+
     """
 
     connection = BqConnection(author)
@@ -337,11 +348,12 @@ async def get_total_cost(
 async def get_running_costs(
     field: BillingColumn,
     invoice_month: str | None = None,
+    source: str | None = None,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """
     Get running cost for specified fields in database
-    e.g. fields = ['dataset', 'project', 'topic']
+    e.g. fields = ['gcp_project', 'topic']
     """
 
     # TODO replace alru_cache with async-cache?
@@ -351,5 +363,5 @@ async def get_running_costs(
 
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
-    records = await billing_layer.get_running_cost(field, invoice_month)
+    records = await billing_layer.get_running_cost(field, invoice_month, source)
     return records

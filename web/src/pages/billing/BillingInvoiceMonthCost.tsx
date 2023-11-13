@@ -59,8 +59,12 @@ const BillingCurrentCost = () => {
         updateNav(groupBy, invoiceMth)
         setIsLoading(true)
         setError(undefined)
+        let source = 'aggregate'
+        if (grp === BillingColumn.GcpProject) {
+            source = 'gcp_billing'
+        }
         new BillingApi()
-            .getRunningCost(grp, invoiceMth)
+            .getRunningCost(grp, invoiceMth, source)
             .then((response) => {
                 setIsLoading(false)
                 setCosts(response.data)

@@ -41,6 +41,7 @@ BQ_AGGREG_VIEW = os.getenv('SM_GCP_BQ_AGGREG_VIEW')
 BQ_AGGREG_RAW = os.getenv('SM_GCP_BQ_AGGREG_RAW')
 BQ_AGGREG_EXT_VIEW = os.getenv('SM_GCP_BQ_AGGREG_EXT_VIEW')
 BQ_BUDGET_VIEW = os.getenv('SM_GCP_BQ_BUDGET_VIEW')
+BQ_GCP_BILLING_VIEW = os.getenv('SM_GCP_BQ_BILLING_VIEW')
 
 # This is to optimise BQ queries, DEV table has data only for Mar 2023
 BQ_DAYS_BACK_OPTIMAL = 30   # Look back 30 days for optimal query
