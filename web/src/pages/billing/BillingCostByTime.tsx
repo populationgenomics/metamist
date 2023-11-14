@@ -27,15 +27,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
         : BillingColumn.GcpProject
     const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
-    // TODO once we have more data change to the current month
-    // (
-    //     `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
-    // )
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? `${now.getFullYear()}-03-01`
+        searchParams.get('start') ?? `${now.getFullYear()}-${now.getMonth() + 1}-01`
     )
     const [end, setEnd] = React.useState<string>(
-        searchParams.get('end') ?? `${now.getFullYear()}-03-05`
+        searchParams.get('end') ?? `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
     )
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
@@ -177,7 +173,6 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .catch((er) => setError(er.message))
     }
 
-    // on first load
     React.useEffect(() => {
         if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
             let source = 'aggregate'

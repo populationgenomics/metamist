@@ -113,7 +113,7 @@ async def get_datasets(
 
 
 @router.get(
-    '/sequencing_types',
+    '/sequencing-types',
     response_model=list[str],
     operation_id='getSequencingTypes',
 )
@@ -151,7 +151,7 @@ async def get_stages(
 
 
 @router.get(
-    '/sequencing_groups',
+    '/sequencing-groups',
     response_model=list[str],
     operation_id='getSequencingGroups',
 )
@@ -170,7 +170,7 @@ async def get_sequencing_groups(
 
 
 @router.get(
-    '/invoice_months',
+    '/invoice-months',
     response_model=list[str],
     operation_id='getInvoiceMonths',
 )
