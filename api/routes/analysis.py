@@ -3,13 +3,11 @@ import io
 from datetime import date
 from typing import Any
 
-from async_lru import alru_cache
 from fastapi import APIRouter
 from fastapi.params import Body, Query
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
-from api.settings import BILLING_CACHE_RESPONSE_TTL
 from api.utils.dates import parse_date_only_string
 from api.utils.db import (
     Connection,
@@ -319,12 +317,11 @@ async def get_sample_reads_map(
     operation_id='getProportionateMap',
     # response_model=list[ProportionalDateModel] # don't uncomment this, breaks python API
 )
-@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_proportionate_map(
     start: str,
-    projects: tuple[str, ...],
-    temporal_methods: tuple[ProportionalDateTemporalMethod, ...],
-    sequencing_types: tuple[str, ...] | None = None,
+    projects: list[str],
+    temporal_methods: list[ProportionalDateTemporalMethod],
+    sequencing_types: list[str] | None = None,
     end: str = None,
     connection: Connection = get_projectless_db_connection,
 ):
@@ -340,17 +337,19 @@ async def get_proportionate_map(
     """
     pt = ProjectPermissionsTable(connection=connection.connection)
     project_ids = await pt.get_project_ids_from_names_and_user(
-        connection.author, list(projects), readonly=True
+        connection.author, projects, readonly=True
     )
 
     start_date = parse_date_only_string(start) if start else None
     end_date = parse_date_only_string(end) if end else None
 
     at = AnalysisLayer(connection)
-    return await at.get_cram_size_proportionate_map(
+    results = await at.get_cram_size_proportionate_map(
         projects=project_ids,
-        sequencing_types=list(sequencing_types),
+        sequencing_types=sequencing_types,
         start_date=start_date,
         end_date=end_date,
-        temporal_methods=list(temporal_methods),
+        temporal_methods=temporal_methods,
     )
+
+    return {k.value: v for k, v in results.items()}
