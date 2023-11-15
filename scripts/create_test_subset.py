@@ -21,17 +21,11 @@ from collections import Counter
 
 from google.cloud import storage
 
-from metamist.apis import AnalysisApi, AssayApi, SampleApi, FamilyApi, ParticipantApi
+from metamist.apis import (AnalysisApi, AssayApi, FamilyApi, ParticipantApi,
+                           SampleApi)
 from metamist.graphql import gql, query
-from metamist.models import (
-    AssayUpsert,
-    SampleUpsert,
-    Analysis,
-    AnalysisStatus,
-    AnalysisUpdateModel,
-    SequencingGroupUpsert,
-)
-
+from metamist.models import (Analysis, AnalysisStatus, AnalysisUpdateModel,
+                             AssayUpsert, SampleUpsert, SequencingGroupUpsert)
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -385,7 +379,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -401,7 +395,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
