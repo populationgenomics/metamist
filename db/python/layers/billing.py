@@ -3,7 +3,7 @@ import re
 
 from typing import Any
 from datetime import datetime
-from collections import Counter
+from collections import Counter, defaultdict
 from google.cloud import bigquery
 from api.utils.dates import get_invoice_month_range
 
@@ -750,9 +750,13 @@ class BillingDb(BqDbBase):
         if field not in (
             BillingColumn.TOPIC,
             BillingColumn.PROJECT,
-            BillingColumn.DATASET,
         ):
-            raise ValueError('Invalid field')
+            raise ValueError(
+                (
+                    'Invalid field. Select on of '
+                    f'({BillingColumn.TOPIC}, {BillingColumn.PROJECT})'
+                )
+            )
 
         (
             is_current_month,
@@ -781,13 +785,11 @@ class BillingDb(BqDbBase):
             'C': Counter(),
             'S': Counter(),
         }
-        field_details: dict[str, list[Any]] = {}  # detail category cost for each field
+        # detail category cost for each field
+        field_details: dict[str, list[Any]] = defaultdict(list)
         total_monthly_category: Counter[str] = Counter()
         total_daily_category: Counter[str] = Counter()
         for row in query_job_result:
-            if row.field not in field_details:
-                field_details[row.field] = []
-
             field_details[row.field].append(
                 {
                     'cost_group': 'S' if row.cost_category == 'Cloud Storage' else 'C',
