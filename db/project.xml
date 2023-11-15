@@ -843,4 +843,17 @@
 		<sql>INSERT INTO `group` (name) VALUES ('project-creators');</sql>
 		<sql>INSERT INTO `group` (name) VALUES ('members-admin');</sql>
 	</changeSet>
+
+<changeSet id="2023-10-07_cohort-builder-changes" author="vivian.bakiris">
+    <!-- Modify the 'derived_from' column to make it nullable -->
+    <modifyDataType tableName="cohort" columnName="derived_from" newDataType="INT" />
+	<addColumn tableName="cohort">
+		<column name="project" type="INT">
+		<constraints nullable="false" foreignKeyName="fk_project_cohort" references="project(id)" />
+		</column>
+	</addColumn>
+</changeSet>
+
+
+
 </databaseChangeLog>

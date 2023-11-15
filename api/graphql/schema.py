@@ -17,31 +17,25 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
+from db.python.layers import (AnalysisLayer, CohortLayer, SampleLayer,
+                              SequencingGroupLayer)
 from db.python.layers.assay import AssayLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
+from db.python.tables.cohort import CohortFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models import (
-    AnalysisInternal,
-    AssayInternal,
-    FamilyInternal,
-    ParticipantInternal,
-    Project,
-    SampleInternal,
-    SequencingGroupInternal,
-)
+from models.models import (AnalysisInternal, AssayInternal, FamilyInternal,
+                           ParticipantInternal, Project, SampleInternal,
+                           SequencingGroupInternal)
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_format,
-    sequencing_group_id_transform_to_raw,
-)
+    sequencing_group_id_format, sequencing_group_id_transform_to_raw)
 
 enum_methods = {}
 for enum in enum_tables.__dict__.values():
@@ -63,6 +57,27 @@ for enum in enum_tables.__dict__.values():
 
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
+
+#Create cohort GraphQL model 
+@strawberry.type
+class GraphQLCohort:
+    """Cohort GraphQL model"""
+
+    id: int
+    name: str
+    description: str
+
+    project_id: strawberry.Private[int]
+
+
+    #TODO: We need to fix this, so that we can return this type.
+    #@staticmethod
+    #def from_internal(internal: CohortInternal) -> 'GraphQLCohort':
+    #     return GraphQLCohort(
+    #         id=internal.id,
+    #         name=internal.name,
+    #         description=internal.description,
+    #     )
 
 @strawberry.type
 class GraphQLProject:
@@ -547,14 +562,39 @@ class GraphQLAssay:
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
 
-
 @strawberry.type
-class Query:
+class Query: #entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
     def enum(self, info: Info) -> GraphQLEnum:
         return GraphQLEnum()
+    
+    @strawberry.field()
+    async def cohort(self, info: Info, project: GraphQLFilter[str] | None = None,)-> str:
+        #TODO: Fix the return type for this.
+        connection = info.context['connection']
+        clayer = CohortLayer(connection)
+        ptable = ProjectPermissionsTable(connection.connection)
+        project_name_map: dict[str, int] = {}
+        if project:
+            project_names = project.all_values()
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
+            )
+            project_name_map = {p.name: p.id for p in projects}
+
+
+        filter_ = CohortFilter(
+            project=project.to_internal_filter(lambda pname: project_name_map[pname])
+            if project
+            else None,
+        )
+
+        cohort = await clayer.query(filter_)
+        print(cohort)
+        
+        return cohort
 
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:
