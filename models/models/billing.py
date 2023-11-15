@@ -148,6 +148,7 @@ class BillingColumn(str, Enum):
             'sequencing_type',
             'stage',
             'sequencing_group',
+            'ar_guid'
         ]
 
     @staticmethod
