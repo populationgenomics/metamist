@@ -640,7 +640,10 @@ class BillingDb(BqDbBase):
         last_loaded_day = None
         query_params = []
 
-        # get start day and current day for given invoice month
+        # Get start day and current day for given invoice month
+        # This is for partitioning efficiency. The query is effectively just a filter
+        # by invoice_month. The partitioning is by day, so we need to find the
+        # start and end day of the invoice month to filter on the partition
         invoice_month_date = datetime.strptime(invoice_month, '%Y%m')
         start_day_date, last_day_date = get_invoice_month_range(invoice_month_date)
         start_day = start_day_date.strftime('%Y-%m-%d')
