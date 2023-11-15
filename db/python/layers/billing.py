@@ -25,14 +25,11 @@ from api.settings import (
     BQ_BUDGET_VIEW,
     BQ_GCP_BILLING_VIEW,
 )
-from api.utils.dates import (
-    get_invoice_month_range,
-    reformat_datetime
-)
+from api.utils.dates import get_invoice_month_range, reformat_datetime
 
 
 def abbrev_cost_category(cost_category: str) -> str:
-    """"abbreviate cost category"""
+    """abbreviate cost category"""
     return 'S' if cost_category == 'Cloud Storage' else 'C'
 
 
@@ -144,7 +141,10 @@ class BillingLayer(BqBaseLayer):
         return await billing_db.get_total_cost(query)
 
     async def get_running_cost(
-        self, field: BillingColumn, invoice_month: str | None = None, source: str | None = None
+        self,
+        field: BillingColumn,
+        invoice_month: str | None = None,
+        source: str | None = None,
     ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget
@@ -234,9 +234,7 @@ class BillingDb(BqDbBase):
         ORDER BY invoice_month DESC;
         """
 
-        query_job_result = list(
-            self._connection.connection.query(_query).result()
-        )
+        query_job_result = list(self._connection.connection.query(_query).result())
         if query_job_result:
             return [str(dict(row)['invoice_month']) for row in query_job_result]
 
@@ -610,11 +608,7 @@ class BillingDb(BqDbBase):
         return None
 
     async def prepare_daily_cost_subquery(
-        self,
-        field,
-        view_to_use,
-        source,
-        query_params
+        self, field, view_to_use, source, query_params
     ):
         """prepare daily cost subquery"""
 
@@ -655,16 +649,15 @@ class BillingDb(BqDbBase):
         """
 
         query_params.append(
-            bigquery.ScalarQueryParameter(
-                'last_loaded_day', 'STRING', last_loaded_day
-            ),
+            bigquery.ScalarQueryParameter('last_loaded_day', 'STRING', last_loaded_day),
         )
         return (last_loaded_day, query_params, daily_cost_field, daily_cost_join)
 
     async def execute_running_cost_query(
-        self, field: BillingColumn,
+        self,
+        field: BillingColumn,
         invoice_month: str | None = None,
-        source: str | None = None
+        source: str | None = None,
     ):
         """
         Run query to get running cost of selected field
@@ -680,9 +673,7 @@ class BillingDb(BqDbBase):
         # get start day and current day for given invoice month
         # This is to optimise the query, BQ view is partitioned by day
         # and not by invoice month
-        start_day_date, last_day_date = get_invoice_month_range(
-            invoice_month_date
-        )
+        start_day_date, last_day_date = get_invoice_month_range(invoice_month_date)
         start_day = start_day_date.strftime('%Y-%m-%d')
         last_day = last_day_date.strftime('%Y-%m-%d')
 
@@ -720,7 +711,7 @@ class BillingDb(BqDbBase):
         # start_day and last_day are in to optimise the query
         query_params = [
             bigquery.ScalarQueryParameter('start_day', 'STRING', start_day),
-            bigquery.ScalarQueryParameter('last_day', 'STRING', last_day)
+            bigquery.ScalarQueryParameter('last_day', 'STRING', last_day),
         ]
 
         current_day = datetime.now().strftime('%Y-%m-%d')
@@ -734,12 +725,9 @@ class BillingDb(BqDbBase):
                 last_loaded_day,
                 query_params,
                 daily_cost_field,
-                daily_cost_join
+                daily_cost_join,
             ) = await self.prepare_daily_cost_subquery(
-                field,
-                view_to_use,
-                source,
-                query_params
+                field, view_to_use, source, query_params
             )
         else:
             # Do not calculate last 24H cost
@@ -775,11 +763,15 @@ class BillingDb(BqDbBase):
             bigquery.ScalarQueryParameter('invoice_month', 'STRING', invoice_month)
         )
 
-        return is_current_month, last_loaded_day, list(
-            self._connection.connection.query(
-                _query,
-                job_config=bigquery.QueryJobConfig(query_parameters=query_params),
-            ).result()
+        return (
+            is_current_month,
+            last_loaded_day,
+            list(
+                self._connection.connection.query(
+                    _query,
+                    job_config=bigquery.QueryJobConfig(query_parameters=query_params),
+                ).result()
+            ),
         )
 
     async def append_total_running_cost(
@@ -791,7 +783,7 @@ class BillingDb(BqDbBase):
         total_daily: dict,
         total_monthly_category: dict,
         total_daily_category: dict,
-        results: list[BillingCostBudgetRecord]
+        results: list[BillingCostBudgetRecord],
     ) -> list[BillingCostBudgetRecord]:
         """
         Add total row: compute + storage to the results
@@ -803,7 +795,9 @@ class BillingDb(BqDbBase):
                 {
                     'cost_group': abbrev_cost_category(cat),
                     'cost_category': cat,
-                    'daily_cost': total_daily_category[cat] if is_current_month else None,
+                    'daily_cost': total_daily_category[cat]
+                    if is_current_month
+                    else None,
                     'monthly_cost': mth_cost,
                 }
             )
@@ -816,17 +810,17 @@ class BillingDb(BqDbBase):
                     'total_monthly': (
                         total_monthly['C']['ALL'] + total_monthly['S']['ALL']
                     ),
-                    'total_daily': (
-                        total_daily['C']['ALL'] + total_daily['S']['ALL']
-                    ) if is_current_month else None,
+                    'total_daily': (total_daily['C']['ALL'] + total_daily['S']['ALL'])
+                    if is_current_month
+                    else None,
                     'compute_monthly': total_monthly['C']['ALL'],
-                    'compute_daily': (
-                        total_daily['C']['ALL']
-                    ) if is_current_month else None,
+                    'compute_daily': (total_daily['C']['ALL'])
+                    if is_current_month
+                    else None,
                     'storage_monthly': total_monthly['S']['ALL'],
-                    'storage_daily': (
-                        total_daily['S']['ALL']
-                    ) if is_current_month else None,
+                    'storage_daily': (total_daily['S']['ALL'])
+                    if is_current_month
+                    else None,
                     'details': all_details,
                     'last_loaded_day': last_loaded_day,
                 }
@@ -843,7 +837,7 @@ class BillingDb(BqDbBase):
         total_monthly: dict,
         total_daily: dict,
         field_details: dict,
-        results: list[BillingCostBudgetRecord]
+        results: list[BillingCostBudgetRecord],
     ) -> list[BillingCostBudgetRecord]:
         """
         Add all the selected field rows: compute + storage to the results
@@ -871,9 +865,9 @@ class BillingDb(BqDbBase):
                     {
                         'field': key,
                         'total_monthly': monthly,
-                        'total_daily': (
-                            compute_daily + storage_daily
-                        ) if is_current_month else None,
+                        'total_daily': (compute_daily + storage_daily)
+                        if is_current_month
+                        else None,
                         'compute_monthly': compute_monthly,
                         'compute_daily': compute_daily,
                         'storage_monthly': storage_monthly,
@@ -890,9 +884,10 @@ class BillingDb(BqDbBase):
         return results
 
     async def get_running_cost(
-        self, field: BillingColumn,
+        self,
+        field: BillingColumn,
         invoice_month: str | None = None,
-        source: str | None = None
+        source: str | None = None,
     ) -> list[BillingCostBudgetRecord]:
         """
         Get currently running cost of selected field
@@ -909,10 +904,8 @@ class BillingDb(BqDbBase):
         (
             is_current_month,
             last_loaded_day,
-            query_job_result
-        ) = await self.execute_running_cost_query(
-            field, invoice_month, source
-        )
+            query_job_result,
+        ) = await self.execute_running_cost_query(field, invoice_month, source)
         if not query_job_result:
             # return empty list
             return []
@@ -922,9 +915,7 @@ class BillingDb(BqDbBase):
 
         # reformat last_loaded_day if present
         last_loaded_day = reformat_datetime(
-            last_loaded_day,
-            '%Y-%m-%d %H:%M:%S+00:00',
-            '%b %d'
+            last_loaded_day, '%Y-%m-%d %H:%M:%S+00:00', '%b %d'
         )
 
         total_monthly: dict[str, Counter[str]] = defaultdict(Counter)
@@ -961,17 +952,25 @@ class BillingDb(BqDbBase):
 
         # add total row: compute + storage
         results = await self.append_total_running_cost(
-            field, is_current_month, last_loaded_day,
-            total_monthly, total_daily, total_monthly_category,
+            field,
+            is_current_month,
+            last_loaded_day,
+            total_monthly,
+            total_daily,
+            total_monthly_category,
             total_daily_category,
-            results
+            results,
         )
 
         # add rest of the records: compute + storage
         results = await self.append_running_cost_records(
-            field, is_current_month, last_loaded_day,
-            total_monthly, total_daily, field_details,
-            results
+            field,
+            is_current_month,
+            last_loaded_day,
+            total_monthly,
+            total_daily,
+            field_details,
+            results,
         )
 
         return results

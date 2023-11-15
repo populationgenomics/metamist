@@ -150,7 +150,7 @@ class AnalysisLayer(BaseLayer):
         temporal_methods: list[ProportionalDateTemporalMethod],
         start_date: datetime.date = None,
         end_date: datetime.date = None,
-    ) -> dict[str, list[ProportionalDateModel]]:
+    ) -> dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]]:
         """
         This is a bit more complex, but we want to generate a map of cram size by day,
         based on the temporal_method (sample create datetime.date, joint call datetime.date).
@@ -218,7 +218,7 @@ class AnalysisLayer(BaseLayer):
                     f'Have not implemented {method.value} temporal method yet'
                 )
 
-        return {k.value: v for k, v in results.items()}
+        return results
 
     async def get_prop_map_for_sample_create_date(
         self,
