@@ -58,7 +58,7 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 
-#Create cohort GraphQL model 
+#Create cohort GraphQL model
 @strawberry.type
 class GraphQLCohort:
     """Cohort GraphQL model"""
@@ -569,7 +569,7 @@ class Query: #entry point to graphql.
     @strawberry.field()
     def enum(self, info: Info) -> GraphQLEnum:
         return GraphQLEnum()
-    
+
     @strawberry.field()
     async def cohort(self, info: Info, project: GraphQLFilter[str] | None = None,)-> str:
         #TODO: Fix the return type for this.
@@ -593,7 +593,7 @@ class Query: #entry point to graphql.
 
         cohort = await clayer.query(filter_)
         print(cohort)
-        
+
         return cohort
 
     @strawberry.field()

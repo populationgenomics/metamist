@@ -11,7 +11,7 @@ def main(projects, sequencing_groups, sequencing_groups_meta):
     print("Sequencing Groups Meta:", sequencing_groups_meta)
 
     #1. Get SG's for the cohort
-    #Replace this with a graphql query. 
+    #Replace this with a graphql query.
     sgs = capi.get_sgs_for_cohort(projects)
     print(sgs)
     #2. Create cohort

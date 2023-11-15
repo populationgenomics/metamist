@@ -51,4 +51,4 @@ class CohortLayer(BaseLayer):
         """Create a new cohort"""
         output = await self.ct.create_cohort(project=project, cohort_name=cohort_name, sequencing_group_ids=sequencing_group_ids,description=description,author=author)
         return {'cohort_id': cohort_name, 'sg': sequencing_group_ids, 'output': output }
-    
+

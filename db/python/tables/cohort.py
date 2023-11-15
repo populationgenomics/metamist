@@ -56,7 +56,7 @@ class CohortTable(DbBase):
         """
         Get all sequencing groups for a cohort
         """
-    
+
         _query = 'SELECT * FROM sequencing_group INNER JOIN sample ON sample.id = sequencing_group.sample_id WHERE sample.project in :project'
 
         rows = await self.connection.fetch_all(_query, {'project': projects})
@@ -76,7 +76,7 @@ class CohortTable(DbBase):
         Create a new cohort
         """
 
-        # Create cohort 
+        # Create cohort
 
         #TODO: Update scheme to handle cohort name
         print(cohort_name)
@@ -84,10 +84,10 @@ class CohortTable(DbBase):
         _query = 'INSERT INTO cohort (derived_from, author, description, project) VALUES (:derived_from, :author, :description, :project) RETURNING id'
         cohort_id = await self.connection.fetch_val(_query, {'derived_from': derived_from , 'author': author, 'description': description, 'project': project})
         print(cohort_id)
-        #populate sequencing groups 
+        #populate sequencing groups
         _query = 'INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) VALUES (:cohort_id, :sequencing_group_id)'
         for sg in sequencing_group_ids:
             await self.connection.execute(_query, {'cohort_id': cohort_id, 'sequencing_group_id': sequencing_group_id_transform_to_raw(sg)})
 
         return cohort_id
-    
+
