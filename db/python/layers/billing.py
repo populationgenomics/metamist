@@ -512,15 +512,10 @@ class BillingDb(BqDbBase):
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
         _query = f"""
-        SELECT * FROM
-        (
-            SELECT {fields_selected}, SUM(cost) as cost
-            FROM `{view_to_use}`
-            {filter_str}
-            GROUP BY {fields_selected}
-
-        )
-        WHERE cost > 0.01
+        SELECT {fields_selected}, SUM(cost) as cost
+        FROM `{view_to_use}`
+        {filter_str}
+        GROUP BY {fields_selected}
         {order_by_str}
         """
 

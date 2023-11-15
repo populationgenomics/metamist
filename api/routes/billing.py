@@ -331,6 +331,16 @@ async def get_total_cost(
             "source": "gcp_billing"
         }
 
+    11. Get total cost by sku for given ar_guid, order by cost DESC:
+
+        {
+            "fields": ["sku"],
+            "start_date": "2023-10-23",
+            "end_date": "2023-10-23",
+            "filters": { "ar_guid": "4e53702e-8b6c-48ea-857f-c5d33b7e72d7"},
+            "order_by": {"cost": true}
+        }
+
     """
 
     connection = BqConnection(author)
