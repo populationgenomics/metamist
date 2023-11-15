@@ -170,7 +170,7 @@ async def get_sequencing_groups(
 
 
 @router.get(
-    '/invoice_months',
+    '/invoice-months',
     response_model=list[str],
     operation_id='getInvoiceMonths',
 )
