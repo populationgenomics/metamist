@@ -1,5 +1,4 @@
 import datetime
-from decimal import Decimal
 from enum import Enum
 
 from db.python.tables.billing import BillingFilter
@@ -153,8 +152,7 @@ class BillingColumn(str, Enum):
 
     @staticmethod
     def generate_all_title(record) -> str:
-        """Generate Column as All Title
-        """
+        """Generate Column as All Title"""
         if record == BillingColumn.PROJECT:
             return 'All GCP Projects'
 
@@ -202,7 +200,7 @@ class BillingTotalCostRecord(SMBase):
     stage: str | None
     sequencing_group: str | None
 
-    cost: Decimal
+    cost: float
     currency: str | None
 
     @staticmethod
@@ -230,8 +228,8 @@ class BillingCostDetailsRecord(SMBase):
 
     cost_group: str
     cost_category: str
-    daily_cost: Decimal | None
-    monthly_cost: Decimal | None
+    daily_cost: float | None
+    monthly_cost: float | None
 
     @staticmethod
     def from_json(record):
@@ -248,15 +246,15 @@ class BillingCostBudgetRecord(SMBase):
     """Return class for the Billing Total Budget / Cost record"""
 
     field: str | None
-    total_monthly: Decimal | None
-    total_daily: Decimal | None
+    total_monthly: float | None
+    total_daily: float | None
 
-    compute_monthly: Decimal | None
-    compute_daily: Decimal | None
-    storage_monthly: Decimal | None
-    storage_daily: Decimal | None
+    compute_monthly: float | None
+    compute_daily: float | None
+    storage_monthly: float | None
+    storage_daily: float | None
     details: list[BillingCostDetailsRecord] | None
-    budget_spent: Decimal | None
+    budget_spent: float | None
 
     last_loaded_day: str | None
 
