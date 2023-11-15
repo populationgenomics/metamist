@@ -17,13 +17,8 @@ def parse_date_only_string(d: str | None) -> date | None:
 def get_invoice_month_range(convert_month: date) -> tuple[date, date]:
     """
     Get the start and end date of the invoice month for a given date
-
-    Specifically it will return the start and end date of the invoice month passed in.
-    This enables us to optimise queries where the main date filtering is by
-    invoice_month. Of course the partiontioning is not by invoice_month, it's by day.
-
-    So given an invoice_month, return an start and end day to filter on the partition
-    to reduce query costs and time.
+    Start and end date are used mostly for optimising BQ queries
+    All our BQ tables/views are partitioned by day
     """
     first_day = convert_month.replace(day=1)
 
@@ -39,3 +34,21 @@ def get_invoice_month_range(convert_month: date) -> tuple[date, date]:
     last_day = next_month + timedelta(days=-1) + timedelta(days=INVOICE_DAY_DIFF)
 
     return start_day, last_day
+
+
+def reformat_datetime(
+    in_date: str | None, in_format: str, out_format: str
+) -> str | None:
+    """
+    Reformat datetime as string to another string format
+    This function take string as input and return string as output
+    """
+    if not in_date:
+        return None
+
+    try:
+        result = datetime.strptime(in_date, in_format)
+        return result.strftime(out_format)
+
+    except Exception as excep:
+        raise ValueError(f'Date could not be converted: {in_date}') from excep
