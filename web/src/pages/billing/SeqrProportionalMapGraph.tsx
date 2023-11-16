@@ -25,6 +25,11 @@ interface ISeqrProportionalMapGraphProps {
     end: string
 }
 
+const TEMPORAL_METHODS_TO_DISPLAY = [
+    ProportionalDateTemporalMethod.SampleCreateDate,
+    ProportionalDateTemporalMethod.EsIndexDate,
+]
+
 const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGraphProps> = ({
     start,
     end,
@@ -33,7 +38,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     const [error, setError] = React.useState<string | undefined>()
 
     const [temporalMethod, setTemporalMethod] = React.useState<ProportionalDateTemporalMethod>(
-        ProportionalDateTemporalMethod.SampleCreateDate
+        TEMPORAL_METHODS_TO_DISPLAY[0]
     )
     const [projectSelections, setProjectSelections] = React.useState<
         { [key: string]: boolean } | undefined
@@ -64,10 +69,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             {
                 projects: projectsToSearch,
                 sequencing_types: [], // searches across all seq types
-                temporal_methods: [
-                    ProportionalDateTemporalMethod.SampleCreateDate,
-                    ProportionalDateTemporalMethod.EsIndexDate,
-                ],
+                temporal_methods: TEMPORAL_METHODS_TO_DISPLAY,
             },
             end
         )
@@ -178,7 +180,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             )}
             {error && <Message negative>{error}</Message>}
             <Select
-                options={allMethods.map((m) => ({
+                options={TEMPORAL_METHODS_TO_DISPLAY.map((m) => ({
                     key: m,
                     text: m,
                     value: m,

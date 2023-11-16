@@ -7,6 +7,7 @@ Schema for GraphQL.
 Note, we silence a lot of linting here because GraphQL looks at type annotations
 and defaults to decide the GraphQL schema, so it might not necessarily look correct.
 """
+import datetime
 from inspect import isclass
 
 import strawberry
@@ -194,6 +195,7 @@ class GraphQLProject:
         status: GraphQLFilter[strawberry.enum(AnalysisStatus)] | None = None,
         active: GraphQLFilter[bool] | None = None,
         meta: GraphQLMetaFilter | None = None,
+        timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
     ) -> list['GraphQLAnalysis']:
         connection = info.context['connection']
         connection.project = root.id
@@ -206,6 +208,9 @@ class GraphQLProject:
                 active=active.to_internal_filter() if active else None,
                 project=GenericFilter(eq=root.id),
                 meta=meta,
+                timestamp_completed=timestamp_completed.to_internal_filter()
+                if timestamp_completed
+                else None,
             )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
@@ -219,7 +224,7 @@ class GraphQLAnalysis:
     type: str
     status: strawberry.enum(AnalysisStatus)
     output: str | None
-    timestamp_completed: str | None = None
+    timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
     author: str
