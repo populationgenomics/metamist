@@ -15,18 +15,17 @@ import sys
 from collections import defaultdict, namedtuple
 from datetime import datetime, timezone
 
+import aiohttp
 import click
+import asyncio
 from cloudpathlib import AnyPath, GSPath
-from metamist.graphql import query, gql
+from metamist.graphql import query, gql, query_async, get_async_client
 from metamist.audit.audithelper import AuditHelper
 from metamist.apis import ProjectApi
+from gql import Client
+from gql.transport.aiohttp import AIOHTTPTransport
 
-proj_api = ProjectApi()
-RD_DATASETS = [
-    dataset
-    for dataset in proj_api.get_my_projects()
-    if 'test' not in dataset and 'training' not in dataset
-]
+
 
 CSV_FIELDS = [
     'Dataset',
@@ -108,8 +107,14 @@ TODAY = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d')
 
 summary_row = namedtuple('Summary_Row', CSV_FIELDS)
 
+async def query_async(query, variables):
+    # transport = AIOHTTPTransport(url='https://sample-metadata-api-mnrpw3mdza-ts.a.run.app/graphql', client_session_args=client_session_args)
+    client = await get_async_client()
+    async with client as session:
+        return await session.execute(query, variable_values=variables)
+    
 
-def get_crams(datasets: list[str]):
+async def get_crams_async(datasets: list[str], client):
     """
     Iterates through each dataset, collecting families, participants,
     samples, sample_sequence type, and the latest completed CRAM for each sample
@@ -144,15 +149,22 @@ def get_crams(datasets: list[str]):
             }
         """
     )
+    
+    tasks = [asyncio.create_task(query_async(_query, {'datasetName': dataset})) for dataset in datasets]
+        
+    resps = await asyncio.gather(*tasks)
+    return {dataset: resp['project']['families'] for dataset, resp in zip(datasets, resps)}
 
+
+def parse_crams(datasets_crams: list[dict]):
+    """"""
     family_intext_id_map = {}
     participant_intext_id_map = {}
     sample_intext_id_map = {}
     sg_type_map = {}  # Sequencing type map for sequencing group entries
 
     datasets_crams = []
-    for dataset in datasets:
-        families = query(_query, {'datasetName': dataset})['project']['families']
+    for dataset, families in datasets_crams.items():
         dataset_families = defaultdict(list)
 
         for family in families:
@@ -210,11 +222,11 @@ def get_crams(datasets: list[str]):
     return datasets_crams, intext_id_maps
 
 
-def get_web_reports(datasets: list[str]):
+async def get_web_reports(datasets: list[str]):
     """Find all completed Stripy and MitoReport entries across the list of datasets"""
     sg_web_reports = {}
     for dataset in datasets:
-        sgs = query(WEB_REPORTS_QUERY, {'datasetName': dataset})['project'][
+        sgs = query_async(WEB_REPORTS_QUERY, {'datasetName': dataset})['project'][
             'sequencingGroups'
         ]
         for sg in sgs:
@@ -251,7 +263,7 @@ def get_web_reports(datasets: list[str]):
     return sg_web_reports
 
 
-def query_analyses_for_latest_by_meta_type(
+async def query_analyses_for_latest_by_meta_type(
     datasets: list[str], query_str, meta_type: str
 ):
     """
@@ -262,7 +274,7 @@ def query_analyses_for_latest_by_meta_type(
     dataset_genome_analyses = {}
     dataset_exome_analysis = {}
     for dataset in datasets:
-        analyses = query(query_str, {'datasetName': dataset})['project']['analyses']
+        analyses = await query_async(query_str, {'datasetName': dataset})['project']['analyses']
         if meta_type:
             analyses = [
                 analysis
@@ -560,22 +572,29 @@ def create_summary_csv_rows(
     return csv_rows
 
 
-@click.command()
-@click.option('--output-path', '-o', help='Output CSV location')
-@click.option('--datasets', '-d', multiple=True, default=RD_DATASETS)
-def main(output_path, datasets):
+# @click.command()
+# @click.option('--output-path', '-o', help='Output CSV location', default='.')
+# @click.option('--datasets', '-d', multiple=True, default=None)
+async def main(
+    output_path, 
+    datasets
+):
     """
     Performs the audit over the list of specified datasets (default: all rare disease datasets)
     Outputs the results in a CSV with file suffix containing the run data in yyyy-mm-dd format,
     at path specified by the --output-path option.
     """
+    # print(1)
+    
+    # if not datasets:
+    #     datasets = RD_DATASETS
 
-    # Validate datasets are a subset of all rare disease datasets
-    if any(dataset not in RD_DATASETS for dataset in datasets):
-        invalid_datasets = list(filter(lambda ds: ds not in RD_DATASETS, datasets))
-        logging.warning(f'Dataset(s) outside of scope detected: {invalid_datasets}')
-        sys.exit()
-
+    # # Validate datasets are a subset of all rare disease datasets
+    # if any(dataset not in RD_DATASETS for dataset in datasets):
+    #     invalid_datasets = list(filter(lambda ds: ds not in RD_DATASETS, datasets))
+    #     logging.warning(f'Dataset(s) outside of scope detected: {invalid_datasets}')
+    #     sys.exit()
+    client = await get_async_client()
     # Validate write access by creating the output csv - GCP or local
     if isinstance(AnyPath(output_path), GSPath):
         output_file = output_path.joinpath(f'RD_Datasets_Summary_{TODAY}.csv')
@@ -586,27 +605,33 @@ def main(output_path, datasets):
         output_file = os.path.join(output_path, f'RD_Datasets_Summary_{TODAY}.csv')
         open(output_file, 'a').close()
 
-    datasets_crams, intext_id_maps = get_crams(datasets=datasets)
-    es_indexes = query_analyses_for_latest_by_meta_type(
-        datasets=datasets, query_str=ES_INDEXES_QUERY, meta_type=''
-    )
-    joint_calls = query_analyses_for_latest_by_meta_type(
-        datasets=datasets,
-        query_str=JOINT_CALLS_QUERY,
-        meta_type='annotated-dataset-callset',
-    )
-    web_reports = get_web_reports(datasets=datasets)
+    datasets_crams = await get_crams_async(datasets=datasets, client=client)
+    dataset_families, intext_id_maps = parse_crams(datasets_crams)
+    for k, v in dataset_families.items():
+        print(k, len(v))
+    # es_indexes = asyncio.create_task(
+    #     query_analyses_for_latest_by_meta_type(
+    #         datasets=datasets, query_str=ES_INDEXES_QUERY, meta_type=''
+    #     )
+    # )
+    # joint_calls = asyncio.run(
+    #     query_analyses_for_latest_by_meta_type(
+    #         datasets=datasets,
+    #         query_str=JOINT_CALLS_QUERY,
+    #         meta_type='annotated-dataset-callset',
+    #     )
+    # )
+    # web_reports = asyncio.run(get_web_reports(datasets=datasets))
 
-    summary_rows = create_summary_csv_rows(
-        datasets_crams,
-        es_indexes,
-        joint_calls,
-        web_reports,
-        intext_id_maps,
-    )
+    # summary_rows = create_summary_csv_rows(
+    #     datasets_crams,
+    #     es_indexes,
+    #     joint_calls,
+    #     web_reports,
+    #     intext_id_maps,
+    # )
 
-    AuditHelper.write_csv_report_to_cloud(summary_rows, output_file, CSV_FIELDS)
-
+    # AuditHelper.write_csv_report_to_cloud(summary_rows, output_file, CSV_FIELDS)
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -615,5 +640,11 @@ if __name__ == '__main__':
         datefmt='%Y-%M-%d %H:%M:%S',
         stream=sys.stderr,
     )
+    proj_api = ProjectApi()
+    RD_DATASETS = [
+        dataset
+        for dataset in proj_api.get_my_projects()
+        if 'test' not in dataset and 'training' not in dataset
+    ]
 
-    main()  # pylint: disable=no-value-for-parameter
+    asyncio.run(main('/Users/edwfor/Code/RD_Analysis', RD_DATASETS))
