@@ -29,9 +29,9 @@ from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models import (AnalysisInternal, AssayInternal, FamilyInternal,
-                           ParticipantInternal, Project, SampleInternal,
-                           SequencingGroupInternal)
+from models.models import (AnalysisInternal, AssayInternal, Cohort,
+                           FamilyInternal, ParticipantInternal, Project,
+                           SampleInternal, SequencingGroupInternal)
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
@@ -64,20 +64,17 @@ class GraphQLCohort:
     """Cohort GraphQL model"""
 
     id: int
-    name: str
+    project: str
     description: str
 
-    project_id: strawberry.Private[int]
 
-
-    #TODO: We need to fix this, so that we can return this type.
-    #@staticmethod
-    #def from_internal(internal: CohortInternal) -> 'GraphQLCohort':
-    #     return GraphQLCohort(
-    #         id=internal.id,
-    #         name=internal.name,
-    #         description=internal.description,
-    #     )
+    @staticmethod
+    def from_internal(internal: Cohort) -> 'GraphQLCohort':
+        return GraphQLCohort(
+            id=internal.id,
+            project=internal.project,
+            description=internal.description,
+        )
 
 @strawberry.type
 class GraphQLProject:
@@ -571,8 +568,7 @@ class Query: #entry point to graphql.
         return GraphQLEnum()
 
     @strawberry.field()
-    async def cohort(self, info: Info, project: GraphQLFilter[str] | None = None,)-> str:
-        #TODO: Fix the return type for this.
+    async def cohort(self, info: Info, project: GraphQLFilter[str] | None = None,)-> list[GraphQLCohort]:
         connection = info.context['connection']
         clayer = CohortLayer(connection)
         ptable = ProjectPermissionsTable(connection.connection)
