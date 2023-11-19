@@ -162,8 +162,9 @@ class ExistingCohortParser(GenericMetadataParser):
 
         if not read_filenames and not warning_flag:
             raise ValueError(f'No read files found for {sample_id}')
-        else:
-            logger.warning(f'No read files found for {sample_id}')
+
+        logger.warning(f'No read files found for {sample_id}')
+
         return read_filenames
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
