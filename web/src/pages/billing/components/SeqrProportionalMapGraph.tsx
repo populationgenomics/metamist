@@ -1,13 +1,13 @@
 import * as React from 'react'
 import _ from 'lodash'
 
-import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../sm-api'
-import { Message, Select } from 'semantic-ui-react'
+import LoadingDucks from '../../../shared/components/LoadingDucks/LoadingDucks'
+import { AnalysisApi, Project, ProjectApi, ProportionalDateTemporalMethod } from '../../../sm-api'
+import { Grid, Message, Select } from 'semantic-ui-react'
 import {
     IStackedAreaByDateChartData,
     StackedAreaByDateChart,
-} from '../../shared/components/Graphs/StackedAreaByDateChart'
+} from '../../../shared/components/Graphs/StackedAreaByDateChart'
 
 interface IProportionalDateProjectModel {
     project: string
@@ -25,11 +25,6 @@ interface ISeqrProportionalMapGraphProps {
     end: string
 }
 
-const TEMPORAL_METHODS_TO_DISPLAY = [
-    ProportionalDateTemporalMethod.SampleCreateDate,
-    ProportionalDateTemporalMethod.EsIndexDate,
-]
-
 const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGraphProps> = ({
     start,
     end,
@@ -38,7 +33,7 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
     const [error, setError] = React.useState<string | undefined>()
 
     const [temporalMethod, setTemporalMethod] = React.useState<ProportionalDateTemporalMethod>(
-        TEMPORAL_METHODS_TO_DISPLAY[0]
+        ProportionalDateTemporalMethod.SampleCreateDate
     )
     const [projectSelections, setProjectSelections] = React.useState<
         { [key: string]: boolean } | undefined
@@ -69,7 +64,10 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
             {
                 projects: projectsToSearch,
                 sequencing_types: [], // searches across all seq types
-                temporal_methods: TEMPORAL_METHODS_TO_DISPLAY,
+                temporal_methods: [
+                    ProportionalDateTemporalMethod.SampleCreateDate,
+                    ProportionalDateTemporalMethod.EsIndexDate,
+                ],
             },
             end
         )
@@ -167,36 +165,57 @@ const SeqrProportionalMapGraph: React.FunctionComponent<ISeqrProportionalMapGrap
         ? _.sortBy(Object.keys(projectSelections).filter((project) => projectSelections[project]))
         : []
 
+    const chart = (
+        <>
+            <Grid>
+                <Grid.Column stretched>
+                    <Select
+                        options={allMethods.map((m) => ({
+                            key: m,
+                            text: m,
+                            value: m,
+                        }))}
+                        value={temporalMethod}
+                        onChange={(e, { value }) => {
+                            setTemporalMethod(value as ProportionalDateTemporalMethod)
+                        }}
+                    />
+                </Grid.Column>
+            </Grid>
+            <Grid>
+                <Grid.Column stretched>
+                    <StackedAreaByDateChart
+                        keys={selectedProjects}
+                        data={allPropMapData?.[temporalMethod]}
+                        start={new Date(start)}
+                        end={new Date(end)}
+                        isPercentage={true}
+                        xLabel="Date"
+                        yLabel="Proportion"
+                        seriesLabel="Projects"
+                        extended={true}
+                        showDate={false}
+                    />
+                </Grid.Column>
+            </Grid>
+        </>
+    )
+
     return (
         <>
-            <h5>Seqr proportional costs</h5>
-            {isLoading && (
+            {/* <Grid> */}
+            <h3>Seqr proportional costs</h3>
+            {error && <Message negative>{error}</Message>}
+            {isLoading ? (
                 <>
                     <LoadingDucks />
                     <p style={{ textAlign: 'center', marginTop: '5px' }}>
                         <em>This query takes a while...</em>
                     </p>
                 </>
+            ) : (
+                chart
             )}
-            {error && <Message negative>{error}</Message>}
-            <Select
-                options={TEMPORAL_METHODS_TO_DISPLAY.map((m) => ({
-                    key: m,
-                    text: m,
-                    value: m,
-                }))}
-                value={temporalMethod}
-                onChange={(e, { value }) => {
-                    setTemporalMethod(value as ProportionalDateTemporalMethod)
-                }}
-            />
-            <StackedAreaByDateChart
-                keys={selectedProjects}
-                data={allPropMapData?.[temporalMethod]}
-                start={new Date(start)}
-                end={new Date(end)}
-                isPercentage={true}
-            />
         </>
     )
 }
