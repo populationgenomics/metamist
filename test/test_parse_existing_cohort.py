@@ -249,7 +249,6 @@ class TestExistingCohortParser(DbIsolatedTest):
         """Test when warning_flag is True and records with missing fastqs, no ValueError is raised"""
 
         mock_graphql_query.side_effect = self.run_graphql_query_async
-        # mock_get_read_filenames.return_value = []
 
         rows = [
             'HEADER',
