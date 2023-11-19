@@ -105,11 +105,14 @@ class ExistingCohortParser(GenericMetadataParser):
         search_locations,
         batch_number,
         include_participant_column,
+        warning_flag,
     ):
         if include_participant_column:
             participant_column = Columns.PARTICIPANT_COLUMN
         else:
             participant_column = Columns.EXTERNAL_ID
+
+        self.warning_flag = warning_flag
 
         super().__init__(
             project=project,
@@ -134,12 +137,16 @@ class ExistingCohortParser(GenericMetadataParser):
         return reader
 
     async def get_read_filenames(
-        self, sample_id: Optional[str], row: SingleRow
+        self,
+        sample_id: Optional[str],
+        row: SingleRow,
     ) -> List[str]:
         """
         We don't have fastq urls in a manifest, so overriding this method to take
         urls from a bucket listing.
         """
+
+        warning_flag = self.warning_flag
 
         read_filenames = [
             filename
@@ -148,8 +155,10 @@ class ExistingCohortParser(GenericMetadataParser):
             and any(filename.endswith(ext) for ext in READS_EXTENSIONS)
         ]
 
-        if not read_filenames:
+        if not read_filenames and not warning_flag:
             raise ValueError(f'No read files found for {sample_id}')
+        else:
+            logger.warning(f'No read files found for {sample_id}')
         return read_filenames
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:

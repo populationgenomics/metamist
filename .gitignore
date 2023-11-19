@@ -60,3 +60,7 @@ web/src/__generated__
 
 # pulumi config files
 Pulumi*.yaml
+
+venv/
+scraps.ipynb
+db/mariadb-java-client-3.0.3.jar.1
