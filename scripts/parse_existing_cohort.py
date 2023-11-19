@@ -30,6 +30,11 @@ input CSV files that should be discarded.
 Additionally, the reads-column is not provided for existing-cohort csvs.
 This information is derived from the fluidX id pulled from the filename.
 
+Additional Options:
+--warning-flag:
+Set this flag to parse manifests with missing data and generate warnings instead of raising errors.
+This allows the script to proceed even if some data is missing.
+
 """
 
 import csv
@@ -214,6 +219,12 @@ class ExistingCohortParser(GenericMetadataParser):
 @click.option(
     '--include-participant-column', 'include_participant_column', is_flag=True
 )
+@click.option(
+    '--warning-flag',
+    'warning_flag',
+    is_flag=True,
+    help='Set this flag to parse manifests with missing data',
+)
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(
@@ -224,6 +235,7 @@ async def main(
     confirm=True,
     dry_run=False,
     include_participant_column=False,
+    warning_flag=False,
 ):
     """Run script from CLI arguments"""
 
@@ -232,6 +244,7 @@ async def main(
         search_locations=search_locations,
         batch_number=batch_number,
         include_participant_column=include_participant_column,
+        warning_flag=warning_flag,
     )
 
     for manifest_path in manifests:

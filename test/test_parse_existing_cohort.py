@@ -45,6 +45,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            warning_flag=False,
         )
 
         parser.filename_map = {
@@ -115,6 +116,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            warning_flag=False,
         )
 
         parser.filename_map = {
@@ -215,6 +217,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            warning_flag=False,
         )
 
         parser.filename_map = {
@@ -270,7 +273,7 @@ class TestExistingCohortParser(DbIsolatedTest):
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
         except ValueError:
-            self.fail("ValueError was raised")
+            self.fail('ValueError was raised')
 
         mock_get_read_filenames.assert_called()
 
