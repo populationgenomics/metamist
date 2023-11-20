@@ -1,11 +1,16 @@
 import React from 'react'
-import { ProjectSeqrStats, WebApi, ProjectApi } from '../../sm-api'
+import { ProjectSeqrStats, WebApi, ProjectApi, EnumsApi } from '../../sm-api'
 import SeqrProjectSelector from './SeqrProjectSelector'
+import SequencingTypeSelector from './SequencingTypeSelector'
 
 import { Table } from 'semantic-ui-react'
 
 interface SeqrProjectProps {
     id: number
+    name: string
+}
+
+interface SequencingTypeProps {
     name: string
 }
 
@@ -15,6 +20,7 @@ const SeqrStats: React.FC = () => {
     const [seqrProjectIds, setSeqrProjectIds] = React.useState<number[]>([])
     const [selectedProjectNames, setSelectedProjectNames] = React.useState<string[]>([])
     const [selectedProjectIds, setSelectedProjectIds] = React.useState<number[]>([])
+    const [selectedSequencingTypes, setSelectedSequencingTypes] = React.useState<string[]>([])
 
     const handleProjectSelected = (projectName: string, isSelected: boolean) => {
         const projectIndex = seqrProjectNames.indexOf(projectName)
@@ -50,6 +56,26 @@ const SeqrStats: React.FC = () => {
         }
     }, [selectedProjectIds])
 
+    const handleSequencingTypeSelected = (sequencingType: string, isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedSequencingTypes([...selectedSequencingTypes, sequencingType])
+        } else {
+            setSelectedSequencingTypes(
+                selectedSequencingTypes.filter((type) => type !== sequencingType)
+            )
+        }
+    }
+    
+    React.useEffect(() => {
+        // filter responses by sequencing type
+        // Select from 'exome' and 'genome' sequencing types and filter the displayed results
+        new EnumsApi().getSequencingTypes().then((resp) => {
+            const sequencingTypes: SequencingTypeProps[] = resp.data
+            setSelectedSequencingTypes(sequencingTypes.map((type) => type.name))
+        })
+    }, [])
+
+
     const pagedResults = responses.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize)
 
     return (
@@ -73,19 +99,24 @@ const SeqrStats: React.FC = () => {
                     </option>
                 ))}
             </select>
+            <h1>Select sequencing types</h1>
+            <SequencingTypeSelector
+                seqTypes={selectedSequencingTypes}
+                onSeqTypeSelected={handleSequencingTypeSelected}
+            />
             <Table>
                 <thead>
                     <tr>
                         <th>Dataset</th>
-                        <th>Type</th>
+                        <th>Sequencing Type</th>
                         <th>Families</th>
                         <th>Participants</th>
                         <th>Samples</th>
                         <th>Sequencing Groups</th>
                         <th>CRAMs</th>
-                        <th>ES-Index</th>
+                        <th>ES-Index Analysis ID</th>
                         <th>ES-Index SGs</th>
-                        <th>Joint Call</th>
+                        <th>Joint Call Analysis ID</th>
                         <th>Joint Call SGs</th>
                     </tr>
                 </thead>
