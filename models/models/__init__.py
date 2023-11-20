@@ -67,4 +67,6 @@ from models.models.billing import (
     BillingTotalCostRecord,
     BillingTotalCostQueryModel,
     BillingColumn,
+    BillingCostBudgetRecord,
+    BillingCostDetailsRecord,
 )

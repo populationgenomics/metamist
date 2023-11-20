@@ -2,6 +2,7 @@
     display: flex;
     align-items: center;
     height: 38px;
+    min-width: 38px;
 }
 
 @media (max-width: 1350px) {
@@ -45,7 +46,7 @@
     }
 
     .ui.search.nav-searchbar.focus #navsearch {
-        width: 363px;
+        width: 363px !important;
         padding: 10px;
         margin-top: 8px;
         opacity: 1;
