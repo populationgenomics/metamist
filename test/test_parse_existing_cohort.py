@@ -238,7 +238,7 @@ class TestExistingCohortParser(DbIsolatedTest):
 
     @run_as_sync
     async def test_get_read_filenames_no_reads_fail(self):
-        """Test when allow_missing_files is False and records with missing fastqs, ValueError is raised"""
+        """Test ValueError is raised when allow_missing_files is False and sequencing groups have no reads"""
 
         single_row = {Columns.MANIFEST_FLUID_X: ''}
 
