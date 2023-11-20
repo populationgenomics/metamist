@@ -223,7 +223,7 @@ class ExistingCohortParser(GenericMetadataParser):
     '--allow-missing-files',
     'allow_missing_files',
     is_flag=True,
-    help='Set this flag to parse manifests with missing data',
+    help='Set this flag to parse/ingest sequencing groups with missing reads',
 )
 @click.argument('manifests', nargs=-1)
 @run_as_sync
