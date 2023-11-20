@@ -1,13 +1,12 @@
 from datetime import datetime
 from io import StringIO
+from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from test.testbase import run_as_sync, DbIsolatedTest
-
 from db.python.layers import ParticipantLayer
-from scripts.parse_existing_cohort import ExistingCohortParser
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
 from metamist.parser.generic_parser import ParsedParticipant
+from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from scripts.parse_existing_cohort import Columns, ExistingCohortParser
 
 
 class TestExistingCohortParser(DbIsolatedTest):
@@ -45,7 +44,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
-            warning_flag=False,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -116,7 +115,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
-            warning_flag=False,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -155,7 +154,7 @@ class TestExistingCohortParser(DbIsolatedTest):
     #         batch_number='M01',
     #         search_locations=[],
     #         project=self.project_name,
-    #         warning_flag=False,
+    #         allow_missing_files=False,
     #     )
 
     #     parser.filename_map = {
@@ -217,7 +216,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
-            warning_flag=False,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -238,42 +237,40 @@ class TestExistingCohortParser(DbIsolatedTest):
         return
 
     @run_as_sync
-    @patch('metamist.parser.generic_parser.query_async')
-    @patch(
-        'metamist.parser.generic_metadata_parser.GenericMetadataParser.get_read_filenames',
-        return_value=[],
-    )
-    async def test_parse_cohort_with_warning(
-        self, mock_graphql_query, mock_get_read_filenames
-    ):
-        """Test when warning_flag is True and records with missing fastqs, no ValueError is raised"""
+    async def test_get_read_filenames_no_reads_fail(self):
+        """Test when allow_missing_files is False and records with missing fastqs, ValueError is raised"""
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
-
-        rows = [
-            'HEADER',
-            '""',
-            'Application\tExternal ID\tSample Concentration (ng/ul)\tVolume (uL)\tSex\tSample/Name\tReference Genome\t',
-            'App\tEXTID1234\t100\t100\tFemale\t220405_FLUIDX1234\thg38\t',
-        ]
+        single_row = {Columns.MANIFEST_FLUID_X: ''}
 
         parser = ExistingCohortParser(
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
-            warning_flag=True,
+            allow_missing_files=False,
         )
+        parser.filename_map = {}
 
-        file_contents = '\n'.join(rows)
+        with self.assertRaises(ValueError):
+            # this will raise a ValueError because the allow_missing_files=False,
+            # and there are no matching reads in the filename map
+            await parser.get_read_filenames(sample_id='', row=single_row)
 
-        try:
-            await parser.parse_manifest(
-                StringIO(file_contents), delimiter='\t', dry_run=True
-            )
-        except ValueError:
-            self.fail('ValueError was raised')
+    @run_as_sync
+    async def test_get_read_filenames_no_reads_pass(self):
+        """Test when allow_missing_files is True and records with missing fastqs, no ValueError is raised"""
 
-        mock_get_read_filenames.assert_called()
+        single_row = {Columns.MANIFEST_FLUID_X: ''}
 
-        return
+        parser = ExistingCohortParser(
+            include_participant_column=False,
+            batch_number='M01',
+            search_locations=[],
+            project=self.project_name,
+            allow_missing_files=True,
+        )
+        parser.filename_map = {}
+
+        read_filenames = await parser.get_read_filenames(sample_id='', row=single_row)
+
+        self.assertEqual(len(read_filenames), 0)

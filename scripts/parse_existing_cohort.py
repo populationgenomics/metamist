@@ -31,7 +31,7 @@ Additionally, the reads-column is not provided for existing-cohort csvs.
 This information is derived from the fluidX id pulled from the filename.
 
 Additional Options:
---warning-flag:
+--allow-missing-files:
 Set this flag to parse manifests with missing data and generate warnings instead of raising errors.
 This allows the script to proceed even if some data is missing.
 
@@ -110,14 +110,14 @@ class ExistingCohortParser(GenericMetadataParser):
         search_locations,
         batch_number,
         include_participant_column,
-        warning_flag,
+        allow_missing_files,
     ):
         if include_participant_column:
             participant_column = Columns.PARTICIPANT_COLUMN
         else:
             participant_column = Columns.EXTERNAL_ID
 
-        self.warning_flag = warning_flag
+        self.allow_missing_files = allow_missing_files
 
         super().__init__(
             project=project,
@@ -151,8 +151,6 @@ class ExistingCohortParser(GenericMetadataParser):
         urls from a bucket listing.
         """
 
-        warning_flag = self.warning_flag
-
         read_filenames = [
             filename
             for filename, path in self.filename_map.items()
@@ -160,10 +158,11 @@ class ExistingCohortParser(GenericMetadataParser):
             and any(filename.endswith(ext) for ext in READS_EXTENSIONS)
         ]
 
-        if not read_filenames and not warning_flag:
-            raise ValueError(f'No read files found for {sample_id}')
+        if not read_filenames:
+            if not self.allow_missing_files:
+                raise ValueError(f'No read files found for {sample_id}')
 
-        logger.warning(f'No read files found for {sample_id}')
+            logger.warning(f'No read files found for {sample_id}')
 
         return read_filenames
 
@@ -221,8 +220,8 @@ class ExistingCohortParser(GenericMetadataParser):
     '--include-participant-column', 'include_participant_column', is_flag=True
 )
 @click.option(
-    '--warning-flag',
-    'warning_flag',
+    '--allow-missing-files',
+    'allow_missing_files',
     is_flag=True,
     help='Set this flag to parse manifests with missing data',
 )
@@ -236,7 +235,7 @@ async def main(
     confirm=True,
     dry_run=False,
     include_participant_column=False,
-    warning_flag=False,
+    allow_missing_files=False,
 ):
     """Run script from CLI arguments"""
 
@@ -245,7 +244,7 @@ async def main(
         search_locations=search_locations,
         batch_number=batch_number,
         include_participant_column=include_participant_column,
-        warning_flag=warning_flag,
+        allow_missing_files=allow_missing_files,
     )
 
     for manifest_path in manifests:
