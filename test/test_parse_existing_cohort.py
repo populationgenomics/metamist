@@ -2,8 +2,6 @@ from datetime import datetime
 from io import StringIO
 from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
-import sys
-import logging
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
