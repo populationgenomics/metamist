@@ -2,6 +2,8 @@ from datetime import datetime
 from io import StringIO
 from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
+import sys
+import logging
 
 from db.python.layers import ParticipantLayer
 from metamist.parser.generic_parser import ParsedParticipant
@@ -271,6 +273,12 @@ class TestExistingCohortParser(DbIsolatedTest):
         )
         parser.filename_map = {}
 
-        read_filenames = await parser.get_read_filenames(sample_id='', row=single_row)
+        with self.assertLogs(level='INFO') as cm:
+            read_filenames = await parser.get_read_filenames(
+                sample_id='', row=single_row
+            )
+
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn('No read files found for ', cm.output[0])
 
         self.assertEqual(len(read_filenames), 0)
