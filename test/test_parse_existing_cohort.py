@@ -1,13 +1,12 @@
 from datetime import datetime
 from io import StringIO
+from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from test.testbase import run_as_sync, DbIsolatedTest
-
 from db.python.layers import ParticipantLayer
-from scripts.parse_existing_cohort import ExistingCohortParser
-from models.models import ParticipantUpsertInternal, SampleUpsertInternal
 from metamist.parser.generic_parser import ParsedParticipant
+from models.models import ParticipantUpsertInternal, SampleUpsertInternal
+from scripts.parse_existing_cohort import Columns, ExistingCohortParser
 
 
 class TestExistingCohortParser(DbIsolatedTest):
@@ -45,6 +44,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -115,6 +115,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -141,7 +142,7 @@ class TestExistingCohortParser(DbIsolatedTest):
     #     Tests case where the fastq's in the storage do not match the ingested samples.
     #     """
     #     mock_graphql_query.side_effect = self.run_graphql_query_async
-    #
+
     #     rows = [
     #         'HEADER',
     #         '""',
@@ -153,15 +154,16 @@ class TestExistingCohortParser(DbIsolatedTest):
     #         batch_number='M01',
     #         search_locations=[],
     #         project=self.project_name,
+    #         allow_missing_files=False,
     #     )
-    #
+
     #     parser.filename_map = {
     #         'HG3F_2_220405_FLUIDXMISTMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
     #         'HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDXMISMATCH1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
     #     }
-    #
+
     #     file_contents = '\n'.join(rows)
-    #
+
     #     with self.assertRaises(ValueError):
     #         await parser.parse_manifest(
     #             StringIO(file_contents), delimiter='\t', dry_run=True
@@ -214,6 +216,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             batch_number='M01',
             search_locations=[],
             project=self.project_name,
+            allow_missing_files=False,
         )
 
         parser.filename_map = {
@@ -232,3 +235,48 @@ class TestExistingCohortParser(DbIsolatedTest):
         self.assertEqual(0, summary['assays']['update'])
 
         return
+
+    @run_as_sync
+    async def test_get_read_filenames_no_reads_fail(self):
+        """Test ValueError is raised when allow_missing_files is False and sequencing groups have no reads"""
+
+        single_row = {Columns.MANIFEST_FLUID_X: ''}
+
+        parser = ExistingCohortParser(
+            include_participant_column=False,
+            batch_number='M01',
+            search_locations=[],
+            project=self.project_name,
+            allow_missing_files=False,
+        )
+        parser.filename_map = {}
+
+        with self.assertRaises(ValueError):
+            # this will raise a ValueError because the allow_missing_files=False,
+            # and there are no matching reads in the filename map
+            await parser.get_read_filenames(sample_id='', row=single_row)
+
+    @run_as_sync
+    async def test_get_read_filenames_no_reads_pass(self):
+        """Test when allow_missing_files is True and records with missing fastqs, no ValueError is raised"""
+
+        single_row = {Columns.MANIFEST_FLUID_X: ''}
+
+        parser = ExistingCohortParser(
+            include_participant_column=False,
+            batch_number='M01',
+            search_locations=[],
+            project=self.project_name,
+            allow_missing_files=True,
+        )
+        parser.filename_map = {}
+
+        with self.assertLogs(level='INFO') as cm:
+            read_filenames = await parser.get_read_filenames(
+                sample_id='', row=single_row
+            )
+
+        self.assertEqual(len(cm.output), 1)
+        self.assertIn('No read files found for ', cm.output[0])
+
+        self.assertEqual(len(read_filenames), 0)
