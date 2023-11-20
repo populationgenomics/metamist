@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+import datetime
 from collections import defaultdict
-from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.connect import DbBase, NotFoundError
@@ -29,6 +29,7 @@ class AnalysisFilter(GenericFilterModel):
     meta: GenericMetaFilter = None
     output: GenericFilter[str] = None
     active: GenericFilter[bool] = None
+    timestamp_completed: GenericFilter[datetime.datetime] = None
 
     def __hash__(self):  # pylint: disable=useless-parent-delegation
         return super().__hash__()
@@ -81,7 +82,7 @@ class AnalysisTable(DbBase):
                 kv_pairs.append(('on_behalf_of', self.author))
 
             if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.utcnow()))
+                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
 
             kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
             keys = [k for k, _ in kv_pairs]
@@ -116,6 +117,22 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sequencing_group_ids)
         await self.connection.execute_many(_query, list(values))
 
+    async def find_sgs_in_joint_call_or_es_index_up_to_date(
+        self, date: datetime.date
+    ) -> set[int]:
+        """Find all the sequencing groups that have been in a joint-call or es-index up to a date"""
+        _query = """
+        SELECT DISTINCT asg.sequencing_group_id
+        FROM analysis_sequencing_group asg
+        INNER JOIN analysis a ON asg.analysis_id = a.id
+        WHERE
+            a.type IN ('joint-calling', 'es-index')
+            AND a.timestamp_completed <= :date
+        """
+
+        results = await self.connection.fetch_all(_query, {'date': date})
+        return {r['sequencing_group_id'] for r in results}
+
     async def update_analysis(
         self,
         analysis_id: int,
@@ -144,7 +161,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             fields['active'] = active
 
         if status == AnalysisStatus.COMPLETED:
-            fields['timestamp_completed'] = datetime.utcnow()
+            fields['timestamp_completed'] = datetime.datetime.utcnow()
             setters.append('timestamp_completed = :timestamp_completed')
 
         if output:
@@ -553,7 +570,7 @@ GROUP BY seq_type
 
     async def get_sg_add_to_project_es_index(
         self, sg_ids: list[int]
-    ) -> dict[int, date]:
+    ) -> dict[int, datetime.date]:
         """
         Get all the sequencing groups that should be added to seqr joint calls
         """
@@ -570,7 +587,5 @@ GROUP BY seq_type
         GROUP BY a_sg.sequencing_group_id
         """
 
-        rows = await self.connection.fetch_all(
-            _query, {'sg_ids': sg_ids}
-        )
+        rows = await self.connection.fetch_all(_query, {'sg_ids': sg_ids})
         return {r['sg_id']: r['timestamp_completed'].date() for r in rows}

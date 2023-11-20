@@ -32,7 +32,6 @@ from metamist.models import (
     SequencingGroupUpsert,
 )
 
-
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
 logger.setLevel(logging.INFO)
@@ -385,7 +384,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -401,7 +400,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
