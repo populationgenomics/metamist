@@ -7,6 +7,7 @@ import logging
 from typing import Any
 from functools import lru_cache
 from os.path import basename, dirname
+from cloudpathlib import AnyPath
 from google.cloud import storage
 
 
