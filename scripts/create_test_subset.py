@@ -114,7 +114,7 @@ EXISTING_DATA_QUERY = gql(
     """
 )
 
-QUERY_FAMILY_SGID = gql(
+QUERY_FAMILY_SAMPLES = gql(
     """
     query FamilyQuery($project: String!) {
         project(name: $project) {
@@ -127,7 +127,6 @@ QUERY_FAMILY_SGID = gql(
                     }
                 }
             }
-
         }
     }
 """
@@ -190,11 +189,11 @@ def main(
             get_sids_for_families(project, families_n, additional_families)
         )
 
-    # 2. Get all sids in project.
-    logger.info(f'Querying all sids in {project}')
+    # 2. Get all sample IDs and their SG IDs in project.
+    logger.info(f'Querying all samples in {project}')
     sid_output = query(SG_ID_QUERY, variables={'project': project})
     all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')}
-    logger.info(f'Found {len(all_sids)} sids in {project}')
+    logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
     additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
@@ -320,7 +319,7 @@ def upsert_assays(
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
     assays_to_upsert: list[AssayUpsert] = []
-    _existing_assay: dict[str, str] = {}
+    _existing_assay: dict[str, str] = {}        
     for assay in sg.get('assays'):
         # Check if assay exists
         if existing_sgid:
@@ -328,6 +327,7 @@ def upsert_assays(
                 existing_data,
                 sample_external_id,
                 existing_sgid,
+                assay.get('id'),
                 assay.get('type'),
             )
         existing_assay_id = _existing_assay.get('id') if _existing_assay else None
@@ -444,8 +444,8 @@ def get_existing_sg(
 
 
 def get_existing_assay(
-    data: dict, sample_id: str, sg_id: str, assay_type: str
-) -> dict | None:
+    data: dict, sample_id: str, sg_id: str, assay_id: int, assay_type: str
+) -> list[dict] | None:
     """
     Find assay in main data for this sample
     Returns:
@@ -453,7 +453,7 @@ def get_existing_assay(
     """
     if sg := get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id):
         for assay in sg.get('assays', []):
-            if assay.get('type') == assay_type:
+            if assay.get('type') == assay_type and assay.get('id') == assay_id:
                 return assay
 
     return None
@@ -479,7 +479,7 @@ def get_sids_for_families(
 ) -> set[str]:
     """Returns specific samples to be included in the test project."""
 
-    family_sgid_output = query(QUERY_FAMILY_SGID, {'project': project})
+    family_sgid_output = query(QUERY_FAMILY_SAMPLES, {'project': project})
 
     all_family_sgids = family_sgid_output.get('project', {}).get('families', [])
     assert all_family_sgids, 'No families returned in GQL result'
@@ -583,14 +583,16 @@ def transfer_participants(
     """Transfers relevant participants between projects"""
     existing_participants = papi.get_participants(target_project)
 
-    target_project_epids = [
-        participant['external_id'] for participant in existing_participants
-    ]
+    target_project_pid_map = {
+        participant['external_id']: participant['id'] for participant in existing_participants
+    }
 
     participants_to_transfer = []
     for participant in participant_data:
-        if participant['externalId'] not in target_project_epids:
+        if participant['externalId'] in list(target_project_pid_map.keys()):
             # Participants with id field will be updated & those without will be inserted
+            participant['id'] = target_project_pid_map[participant['externalId']]
+        else:
             del participant['id']
         transfer_participant = {
             'external_id': participant['externalId'],
