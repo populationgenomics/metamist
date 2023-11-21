@@ -794,8 +794,14 @@ class BillingDb(BqDbBase):
             BillingColumn.TOPIC,
             BillingColumn.PROJECT,
             BillingColumn.DATASET,
+            BillingColumn.COMPUTE_CATEGORY,
+            BillingColumn.WDL_TASK_NAME,
+            BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
         ):
-            raise ValueError('Invalid field only topic, dataset or project allowed')
+            raise ValueError(
+                'Invalid field only topic, dataset, gcp-project, compute_category, '
+                'wdl_task_name & cromwell_sub_workflow_name are allowed'
+            )
 
         (
             is_current_month,

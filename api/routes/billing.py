@@ -394,6 +394,52 @@ async def get_total_cost(
             "order_by": {"cost": true}
         }
 
+    12. Get total cost by compute_category order by cost DESC:
+
+        {
+            "fields": ["compute_category"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    13. Get total cost by cromwell_sub_workflow_name, order by cost DESC:
+
+        {
+            "fields": ["cromwell_sub_workflow_name"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    14. Get total cost by sku for given cromwell_workflow_id, order by cost DESC:
+
+        {
+            "fields": ["sku"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "filters": {"cromwell_workflow_id": "cromwell-00448f7b-8ef3-4d22-80ab-e302acdb2d28"},
+            "order_by": {"cost": true}
+        }
+
+    15. Get total cost by sku for given goog_pipelines_worker, order by cost DESC:
+
+        {
+            "fields": ["goog_pipelines_worker"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    16. Get total cost by sku for given wdl_task_name, order by cost DESC:
+
+        {
+            "fields": ["wdl_task_name"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
     """
 
     connection = BqConnection(author)
@@ -416,7 +462,7 @@ async def get_running_costs(
 ) -> list[BillingCostBudgetRecord]:
     """
     Get running cost for specified fields in database
-    e.g. fields = ['gcp_project', 'topic']
+    e.g. fields = ['gcp_project', 'topic', 'wdl_task_names', 'cromwell_sub_workflow_name', 'compute_category']
     """
 
     # TODO replace alru_cache with async-cache?
