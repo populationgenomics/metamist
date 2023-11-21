@@ -101,6 +101,7 @@ EXISTING_DATA_QUERY = gql(
                     type
                     assays {
                         id
+                        meta
                         type
                     }
                     analyses {
@@ -327,8 +328,7 @@ def upsert_assays(
                 existing_data,
                 sample_external_id,
                 existing_sgid,
-                assay.get('id'),
-                assay.get('type'),
+                assay
             )
         existing_assay_id = _existing_assay.get('id') if _existing_assay else None
         assay_upsert = AssayUpsert(
@@ -444,7 +444,7 @@ def get_existing_sg(
 
 
 def get_existing_assay(
-    data: dict, sample_id: str, sg_id: str, assay_id: int, assay_type: str
+    data: dict, sample_id: str, sg_id: str, original_assay: dict
 ) -> dict | None:
     """
     Find assay in main data for this sample
@@ -453,7 +453,7 @@ def get_existing_assay(
     """
     if sg := get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id):
         for assay in sg.get('assays', []):
-            if assay.get('type') == assay_type and assay.get('id') == assay_id:
+            if assay.get('type') == original_assay.get('type') and assay.get('meta') == original_assay.get('meta'):
                 return assay
 
     return None
