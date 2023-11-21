@@ -3,7 +3,6 @@ from enum import Enum
 
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
-
 from models.base import SMBase
 
 
@@ -138,6 +137,11 @@ class BillingColumn(str, Enum):
     SEQUENCING_TYPE = 'sequencing_type'
     STAGE = 'stage'
     SEQUENCING_GROUP = 'sequencing_group'
+    COMPUTE_CATEGORY = 'compute_category'
+    CROMWELL_SUB_WORKFLOW_NAME = 'cromwell_sub_workflow_name'
+    CROMWELL_WORKFLOW_ID = 'cromwell_workflow_id'
+    GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
+    WDL_TASK_NAME = 'wdl_task_name'
 
     @classmethod
     def extended_cols(cls) -> list[str]:
@@ -148,7 +152,12 @@ class BillingColumn(str, Enum):
             'sequencing_type',
             'stage',
             'sequencing_group',
-            'ar_guid'
+            'ar_guid',
+            'compute_category',
+            'cromwell_sub_workflow_name',
+            'cromwell_workflow_id',
+            'goog_pipelines_worker',
+            'wdl_task_name',
         ]
 
     @staticmethod
@@ -200,6 +209,11 @@ class BillingTotalCostRecord(SMBase):
     sequencing_type: str | None
     stage: str | None
     sequencing_group: str | None
+    compute_category: str | None
+    cromwell_sub_workflow_name: str | None
+    cromwell_workflow_id: str | None
+    goog_pipelines_worker: str | None
+    wdl_task_name: str | None
 
     cost: float
     currency: str | None
@@ -219,6 +233,11 @@ class BillingTotalCostRecord(SMBase):
             sequencing_type=record.get('sequencing_type'),
             stage=record.get('stage'),
             sequencing_group=record.get('sequencing_group'),
+            compute_category=record.get('compute_category'),
+            cromwell_sub_workflow_name=record.get('cromwell_sub_workflow_name'),
+            cromwell_workflow_id=record.get('cromwell_workflow_id'),
+            goog_pipelines_worker=record.get('goog_pipelines_worker'),
+            wdl_task_name=record.get('wdl_task_name'),
             cost=record.get('cost'),
             currency=record.get('currency'),
         )

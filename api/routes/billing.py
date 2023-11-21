@@ -1,24 +1,20 @@
 """
 Billing routes
 """
-from fastapi import APIRouter
 from async_lru import alru_cache
+from fastapi import APIRouter
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL
-from api.utils.db import (
-    BqConnection,
-    get_author,
-)
+from api.utils.db import BqConnection, get_author
 from db.python.layers.billing import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingQueryModel,
     BillingRowRecord,
-    BillingTotalCostRecord,
     BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
 )
-
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -166,6 +162,63 @@ async def get_sequencing_groups(
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_groups()
+    return records
+
+
+@router.get(
+    '/compute-categories',
+    response_model=list[str],
+    operation_id='getComputeCategories',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_compute_categories(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all compute categories in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_compute_categories()
+    return records
+
+
+@router.get(
+    '/cromwell-sub-workflow-names',
+    response_model=list[str],
+    operation_id='getCromwellSubWorkflowNames',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cromwell_sub_workflow_names(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all cromwell_sub_workflow_names in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_cromwell_sub_workflow_names()
+    return records
+
+
+@router.get(
+    '/wdl-task-names',
+    response_model=list[str],
+    operation_id='getWdlTaskNames',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_wdl_task_names(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all wdl_task_names in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_wdl_task_names()
     return records
 
 

@@ -1,31 +1,29 @@
 import re
-
-from typing import Any
-from datetime import datetime
 from collections import Counter, defaultdict
+from datetime import datetime
+from typing import Any
+
 from google.cloud import bigquery
 
-from models.models import (
-    BillingRowRecord,
-    BillingTotalCostRecord,
-    BillingTotalCostQueryModel,
-    BillingColumn,
-    BillingCostBudgetRecord,
-)
-
-from db.python.gcp_connect import BqDbBase
-from db.python.layers.bq_base import BqBaseLayer
-from db.python.tables.billing import BillingFilter
-
 from api.settings import (
-    BQ_DAYS_BACK_OPTIMAL,
-    BQ_AGGREG_VIEW,
-    BQ_AGGREG_RAW,
     BQ_AGGREG_EXT_VIEW,
+    BQ_AGGREG_RAW,
+    BQ_AGGREG_VIEW,
     BQ_BUDGET_VIEW,
+    BQ_DAYS_BACK_OPTIMAL,
     BQ_GCP_BILLING_VIEW,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
+from db.python.gcp_connect import BqDbBase
+from db.python.layers.bq_base import BqBaseLayer
+from db.python.tables.billing import BillingFilter
+from models.models import (
+    BillingColumn,
+    BillingCostBudgetRecord,
+    BillingRowRecord,
+    BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
+)
 
 
 def abbrev_cost_category(cost_category: str) -> str:
@@ -109,6 +107,33 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.get_extended_values('sequencing_group')
+
+    async def get_compute_categories(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All compute_category values in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_extended_values('compute_category')
+
+    async def get_cromwell_sub_workflow_names(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All cromwell_sub_workflow_name values in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_extended_values('cromwell_sub_workflow_name')
+
+    async def get_wdl_task_names(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All wdl_task_name values in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_extended_values('wdl_task_name')
 
     async def get_invoice_months(
         self,
@@ -323,9 +348,12 @@ class BillingDb(BqDbBase):
 
     async def get_extended_values(self, field: str):
         """
-        Get all extended values in database,
-        e.g. dataset, stage, sequencing_type or sequencing_group
+        Get all extended values in database, for specified field.
+        Field is one of extended coumns.
         """
+
+        if field not in BillingColumn.extended_cols():
+            raise ValueError('Invalid field value')
 
         # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
         # @days is defined by env variable BQ_DAYS_BACK_OPTIMAL
