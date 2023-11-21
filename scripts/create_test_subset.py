@@ -319,7 +319,7 @@ def upsert_assays(
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
     assays_to_upsert: list[AssayUpsert] = []
-    _existing_assay: dict[str, str] = {}        
+    _existing_assay: dict[str, str] = {}
     for assay in sg.get('assays'):
         # Check if assay exists
         if existing_sgid:
@@ -445,7 +445,7 @@ def get_existing_sg(
 
 def get_existing_assay(
     data: dict, sample_id: str, sg_id: str, assay_id: int, assay_type: str
-) -> list[dict] | None:
+) -> dict | None:
     """
     Find assay in main data for this sample
     Returns:
