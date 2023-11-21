@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL
 from api.utils.db import BqConnection, get_author
-from db.python.layers.billing import BillingLayer
+from db.python.layers.billing_layer import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
