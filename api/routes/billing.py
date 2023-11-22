@@ -1,24 +1,20 @@
 """
 Billing routes
 """
-from fastapi import APIRouter
 from async_lru import alru_cache
+from fastapi import APIRouter
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL
-from api.utils.db import (
-    BqConnection,
-    get_author,
-)
-from db.python.layers.billing import BillingLayer
+from api.utils.db import BqConnection, get_author
+from db.python.layers.billing_layer import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingQueryModel,
     BillingRowRecord,
-    BillingTotalCostRecord,
     BillingTotalCostQueryModel,
+    BillingTotalCostRecord,
 )
-
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -166,6 +162,63 @@ async def get_sequencing_groups(
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_groups()
+    return records
+
+
+@router.get(
+    '/compute-categories',
+    response_model=list[str],
+    operation_id='getComputeCategories',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_compute_categories(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all compute categories in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_compute_categories()
+    return records
+
+
+@router.get(
+    '/cromwell-sub-workflow-names',
+    response_model=list[str],
+    operation_id='getCromwellSubWorkflowNames',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cromwell_sub_workflow_names(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all cromwell_sub_workflow_names in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_cromwell_sub_workflow_names()
+    return records
+
+
+@router.get(
+    '/wdl-task-names',
+    response_model=list[str],
+    operation_id='getWdlTaskNames',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_wdl_task_names(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all wdl_task_names in database
+    Results are sorted ASC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_wdl_task_names()
     return records
 
 
@@ -341,6 +394,52 @@ async def get_total_cost(
             "order_by": {"cost": true}
         }
 
+    12. Get total cost by compute_category order by cost DESC:
+
+        {
+            "fields": ["compute_category"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    13. Get total cost by cromwell_sub_workflow_name, order by cost DESC:
+
+        {
+            "fields": ["cromwell_sub_workflow_name"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    14. Get total cost by sku for given cromwell_workflow_id, order by cost DESC:
+
+        {
+            "fields": ["sku"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "filters": {"cromwell_workflow_id": "cromwell-00448f7b-8ef3-4d22-80ab-e302acdb2d28"},
+            "order_by": {"cost": true}
+        }
+
+    15. Get total cost by sku for given goog_pipelines_worker, order by cost DESC:
+
+        {
+            "fields": ["goog_pipelines_worker"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
+    16. Get total cost by sku for given wdl_task_name, order by cost DESC:
+
+        {
+            "fields": ["wdl_task_name"],
+            "start_date": "2023-11-10",
+            "end_date": "2023-11-10",
+            "order_by": {"cost": true}
+        }
+
     """
 
     connection = BqConnection(author)
@@ -363,7 +462,7 @@ async def get_running_costs(
 ) -> list[BillingCostBudgetRecord]:
     """
     Get running cost for specified fields in database
-    e.g. fields = ['gcp_project', 'topic']
+    e.g. fields = ['gcp_project', 'topic', 'wdl_task_names', 'cromwell_sub_workflow_name', 'compute_category']
     """
 
     # TODO replace alru_cache with async-cache?
