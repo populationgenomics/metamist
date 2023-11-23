@@ -189,7 +189,11 @@ class WebDb(DbBase):
                 created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
                 non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
-                active=bool(ord(s['active'])),
+                active=bool(
+                    ord(s['active'])
+                    if isinstance(s['active'], (str, bytes, bytearray))
+                    else bool(s['active'])
+                ),
             )
             for s in sample_rows
         ]
