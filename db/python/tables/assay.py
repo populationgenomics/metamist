@@ -517,6 +517,11 @@ class AssayTable(DbBase):
         projects: set[ProjectId] = set()
         for row in rows:
             drow = dict(row)
+
+            # Set external_id map to empty dict since we don't fetch them for this query
+            # TODO: Get external_ids map for this query if/when they are needed.
+            drow['external_ids'] = drow.pop('external_ids', {})
+
             sequencing_group_id = drow.pop('sequencing_group_id')
             projects.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
