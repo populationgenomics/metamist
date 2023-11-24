@@ -43,7 +43,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setLoading(false)
                 const extRecords = extendRecords(response.data)
                 setRecords(extRecords)
-                if(autoSelect) {
+                if (autoSelect) {
                     // set the first topic as the default
                     onClickFunction(undefined, { value: extRecords[0] })
                 }
@@ -60,7 +60,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setLoading(false)
                 const extRecords = extendRecords(response.data)
                 setRecords(extendRecords(response.data))
-                if(autoSelect) {
+                if (autoSelect) {
                     // set the first project as the default
                     onClickFunction(undefined, { value: extRecords[0] })
                 }
@@ -77,7 +77,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
                 setLoading(false)
                 const extRecords = extendRecords(response.data)
                 setRecords(extendRecords(response.data))
-                if(autoSelect) {
+                if (autoSelect) {
                     // set the first invoice as the default
                     onClickFunction(undefined, { value: extRecords[0] })
                 }

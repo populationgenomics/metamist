@@ -237,6 +237,7 @@ html[data-theme='dark-mode'] .ui.table {
     color: var(--color-text-primary);
 }
 
-.ui.toggle.checkbox input:checked ~ .box, .ui.toggle.checkbox input:checked ~ label {
+.ui.toggle.checkbox input:checked ~ .box,
+.ui.toggle.checkbox input:checked ~ label {
     color: var(--color-text-primary) !important;
 }
