@@ -84,6 +84,8 @@ class BillingDb(BqDbBase):
         WHERE day > TIMESTAMP_ADD(
             CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
+        -- TODO put this back when reloading is fixed
+        AND NOT topic IN ('seqr', 'hail')
         ORDER BY topic ASC;
         """
 
