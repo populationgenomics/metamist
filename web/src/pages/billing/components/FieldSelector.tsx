@@ -59,7 +59,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .then((response) => {
                 setLoading(false)
                 const extRecords = extendRecords(response.data)
-                setRecords(extendRecords(response.data))
+                setRecords(extRecords)
                 if (autoSelect) {
                     // set the first project as the default
                     onClickFunction(undefined, { value: extRecords[0] })
@@ -76,7 +76,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .then((response) => {
                 setLoading(false)
                 const extRecords = extendRecords(response.data)
-                setRecords(extendRecords(response.data))
+                setRecords(extRecords)
                 if (autoSelect) {
                     // set the first invoice as the default
                     onClickFunction(undefined, { value: extRecords[0] })
