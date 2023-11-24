@@ -200,3 +200,43 @@ html[data-theme='dark-mode'] .ui.table {
 [class^='language-'] {
     border: none;
 }
+
+#group-by-dropdown .menu {
+    background: #ffffff !important;
+}
+
+.field-selector-label {
+    width: 200px !important;
+}
+
+.field-selector-dropdown {
+    width: 80% !important;
+}
+
+.donut-chart {
+    margin-top: 20px;
+}
+
+/* missing styles regarding dark/light theme */
+.ui.fluid.card {
+    color: var(--color-text-primary);
+    background: var(--color-bg);
+    fill: var(--color-text-primary);
+}
+
+.ui.header {
+    color: var(--color-text-primary);
+}
+
+.ui.input > input {
+    color: var(--color-text-primary);
+    background: var(--color-bg-card);
+}
+
+.ui.toggle.checkbox label {
+    color: var(--color-text-primary);
+}
+
+.ui.toggle.checkbox input:checked ~ .box, .ui.toggle.checkbox input:checked ~ label {
+    color: var(--color-text-primary) !important;
+}

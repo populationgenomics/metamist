@@ -1,11 +1,6 @@
 import * as React from 'react'
-
 import { Dropdown, Input, Message } from 'semantic-ui-react'
-
 import { BillingApi, BillingColumn } from '../../../sm-api'
-
-import '../Billing.css'
-
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface FieldSelectorProps {
