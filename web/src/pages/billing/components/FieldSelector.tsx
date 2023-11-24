@@ -26,9 +26,6 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
 
     const extendRecords = (recs: string[]) => {
         if (includeAll) {
-            if (fieldName === 'GCP-Project') {
-                return [`All ${convertFieldName(fieldName)}`, ...recs]
-            }
             return [`All ${convertFieldName(fieldName)}s`, ...recs]
         }
         return recs
@@ -38,7 +35,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         setLoading(false)
         const extRecords = extendRecords(response_data)
         setRecords(extRecords)
-        if (autoSelect) {
+        if (!selected && autoSelect) {
             // set the first option as the default
             onClickFunction(undefined, { value: extRecords[0] })
         }
@@ -77,17 +74,29 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .catch((er) => setError(er.message))
     }
 
+    const getStages = () => {
+        setLoading(true)
+        setError(undefined)
+        new BillingApi()
+            .getStages()
+            .then((response) => {
+                processResponse(response.data)
+            })
+            .catch((er) => setError(er.message))
+    }
+
     React.useEffect(() => {
         if (fieldName === BillingColumn.Topic) getTopics()
+        else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
         else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
+        else if (fieldName === BillingColumn.Stage) getStages()
         else if (fieldName === 'Group') {
-            setRecords([BillingColumn.GcpProject, BillingColumn.Topic])
+            setRecords([BillingColumn.GcpProject, BillingColumn.Topic, BillingColumn.Stage])
             setLoading(false)
-        } else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
-        else {
+        } else {
             setError(`Could not load records for ${fieldName}`)
         }
-    }, [label, fieldName])
+    }, [fieldName])
 
     const capitalize = (str: string): string => {
         if (str === 'gcp_project') {

@@ -796,6 +796,7 @@ class BillingDb(BqDbBase):
             BillingColumn.TOPIC,
             BillingColumn.PROJECT,
             BillingColumn.DATASET,
+            BillingColumn.STAGE,
             BillingColumn.COMPUTE_CATEGORY,
             BillingColumn.WDL_TASK_NAME,
             BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,

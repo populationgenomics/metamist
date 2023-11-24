@@ -52,7 +52,7 @@ const BillingCurrentCost = () => {
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
     const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
-        updateNav(groupBy, invoiceMth)
+        updateNav(grp, invoiceMth)
         setIsLoading(true)
         setError(undefined)
         let source = 'aggregate'

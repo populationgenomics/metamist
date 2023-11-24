@@ -230,7 +230,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             fieldName="Group"
                             onClickFunction={onGroupBySelect}
                             selected={groupBy}
-                            autoSelect={true}
+                            autoSelect={false}
                         />
                     </Grid.Column>
 
