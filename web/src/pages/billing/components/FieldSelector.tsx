@@ -13,6 +13,7 @@ interface FieldSelectorProps {
     fieldName: string
     selected?: string
     includeAll?: boolean
+    autoSelect?: boolean
     onClickFunction: (_: any, { value }: any) => void
 }
 
@@ -21,20 +22,21 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     fieldName,
     selected,
     includeAll,
+    autoSelect,
     onClickFunction,
 }) => {
     const [loading, setLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [records, setRecords] = React.useState<string[]>([])
 
-    const extendRecords = (records: string[]) => {
+    const extendRecords = (recs: string[]) => {
         if (includeAll) {
             if (fieldName === 'GCP-Project') {
-                return [`All ${convertFieldName(fieldName)}`, ...records]
+                return [`All ${convertFieldName(fieldName)}`, ...recs]
             }
-            return [`All ${convertFieldName(fieldName)}s`, ...records]
+            return [`All ${convertFieldName(fieldName)}s`, ...recs]
         }
-        return records
+        return recs
     }
 
     const getTopics = () => {
@@ -44,7 +46,12 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .getTopics()
             .then((response) => {
                 setLoading(false)
-                setRecords(extendRecords(response.data))
+                const extRecords = extendRecords(response.data)
+                setRecords(extRecords)
+                if(autoSelect) {
+                    // set the first topic as the default
+                    onClickFunction(undefined, { value: extRecords[0] })
+                }
             })
             .catch((er) => setError(er.message))
     }
@@ -56,7 +63,12 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .getGcpProjects()
             .then((response) => {
                 setLoading(false)
+                const extRecords = extendRecords(response.data)
                 setRecords(extendRecords(response.data))
+                if(autoSelect) {
+                    // set the first project as the default
+                    onClickFunction(undefined, { value: extRecords[0] })
+                }
             })
             .catch((er) => setError(er.message))
     }
@@ -68,7 +80,12 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .getInvoiceMonths()
             .then((response) => {
                 setLoading(false)
+                const extRecords = extendRecords(response.data)
                 setRecords(extendRecords(response.data))
+                if(autoSelect) {
+                    // set the first invoice as the default
+                    onClickFunction(undefined, { value: extRecords[0] })
+                }
             })
             .catch((er) => setError(er.message))
     }

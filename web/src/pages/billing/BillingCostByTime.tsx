@@ -16,6 +16,7 @@ import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 
+
 const BillingCostByTime: React.FunctionComponent = () => {
     const now = new Date()
 
@@ -230,6 +231,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             fieldName="Group"
                             onClickFunction={onGroupBySelect}
                             selected={groupBy}
+                            autoSelect={true}
                         />
                     </Grid.Column>
 
@@ -240,6 +242,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                             onClickFunction={onSelect}
                             selected={selectedData}
                             includeAll={true}
+                            autoSelect={true}
                         />
                     </Grid.Column>
                 </Grid>
