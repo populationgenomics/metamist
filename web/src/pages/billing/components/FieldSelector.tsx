@@ -34,19 +34,23 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         return recs
     }
 
+    const processResponse = (response_data: string[]) => {
+        setLoading(false)
+        const extRecords = extendRecords(response_data)
+        setRecords(extRecords)
+        if (autoSelect) {
+            // set the first option as the default
+            onClickFunction(undefined, { value: extRecords[0] })
+        }
+    }
+
     const getTopics = () => {
         setLoading(true)
         setError(undefined)
         new BillingApi()
             .getTopics()
             .then((response) => {
-                setLoading(false)
-                const extRecords = extendRecords(response.data)
-                setRecords(extRecords)
-                if (autoSelect) {
-                    // set the first topic as the default
-                    onClickFunction(undefined, { value: extRecords[0] })
-                }
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
@@ -57,13 +61,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         new BillingApi()
             .getGcpProjects()
             .then((response) => {
-                setLoading(false)
-                const extRecords = extendRecords(response.data)
-                setRecords(extRecords)
-                if (autoSelect) {
-                    // set the first project as the default
-                    onClickFunction(undefined, { value: extRecords[0] })
-                }
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
@@ -74,13 +72,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         new BillingApi()
             .getInvoiceMonths()
             .then((response) => {
-                setLoading(false)
-                const extRecords = extendRecords(response.data)
-                setRecords(extRecords)
-                if (autoSelect) {
-                    // set the first invoice as the default
-                    onClickFunction(undefined, { value: extRecords[0] })
-                }
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
