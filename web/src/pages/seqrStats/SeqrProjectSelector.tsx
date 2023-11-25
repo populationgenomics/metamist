@@ -14,23 +14,23 @@ const SeqrProjectSelector = ({
     onProjectSelected,
 }: SeqrProjectSelectorProps) => {
     const handleCheckboxChange = (event: FormEvent<HTMLInputElement>, data: CheckboxProps) => {
-        const { name, checked } = data
-        onProjectSelected(name as string, checked || false)
-    }
+        const { name, checked } = data;
+        onProjectSelected(name as string, checked || false);
+    };
 
     return (
-        <div>
-            {projectNames.map((project: string, index: number) => (
-                <div key={index}>
+        <div className="project-selector-grid">
+            {projectNames.map((project, index) => (
+                <div key={projectIds[index]}>
                     <Checkbox
                         label={project}
                         name={project}
-                        onChange={(e, data) => handleCheckboxChange(e, data)}
+                        onChange={handleCheckboxChange}
                     />
                 </div>
             ))}
         </div>
-    )
+    );
 }
 
 export default SeqrProjectSelector

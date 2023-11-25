@@ -17,18 +17,18 @@ const SequencingTypeSelector = ({
     }
 
     return (
-        <div>
-            {seqTypes.map((seqType: string) => (
+        <div className="seq-type-selector-flex">
+            {seqTypes.map(seqType => (
                 <div key={seqType}>
                     <Checkbox
                         label={seqType}
                         name={seqType}
-                        onChange={(e, data) => handleCheckboxChange(e, data)}
+                        onChange={handleCheckboxChange}
                     />
                 </div>
             ))}
         </div>
-    )
+    );
 }
 
 export default SequencingTypeSelector

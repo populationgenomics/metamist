@@ -200,3 +200,17 @@ html[data-theme='dark-mode'] .ui.table {
 [class^='language-'] {
     border: none;
 }
+
+.project-selector-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* 4 columns */
+    grid-gap: 10px; /* Adjust the gap as needed */
+    margin-bottom: 20px;
+}
+
+.seq-type-selector-flex {
+    display: flex;
+    flex-wrap: wrap; /* Allows wrapping if too many types */
+    gap: 10px; /* Adjust the gap as needed */
+    margin-bottom: 20px;
+}
