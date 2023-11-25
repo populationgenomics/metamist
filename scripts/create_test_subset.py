@@ -589,7 +589,7 @@ def transfer_participants(
 
     participants_to_transfer = []
     for participant in participant_data:
-        if participant['externalId'] in list(target_project_pid_map.keys()):
+        if participant['externalId'] in target_project_pid_map:
             # Participants with id field will be updated & those without will be inserted
             participant['id'] = target_project_pid_map[participant['externalId']]
         else:
