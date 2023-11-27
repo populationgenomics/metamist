@@ -10,8 +10,8 @@ from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
-    to_db_json,
     NotFoundError,
+    to_db_json,
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
@@ -107,11 +107,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """Add samples to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_sequencing_group
-                (analysis_id, sequencing_group_id)
-            VALUES (:aid, :sid)
+                (analysis_id, sequencing_group_id, changelog_id)
+            VALUES (:aid, :sid, :changelog_id)
         """
 
-        values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sequencing_group_ids)
+        changelog_id = await self.changelog_id()
+        values = map(
+            lambda sid: {
+                'aid': analysis_id,
+                'sid': sid,
+                'changelog_id': changelog_id,
+            },
+            sequencing_group_ids,
+        )
         await self.connection.execute_many(_query, list(values))
 
     async def find_sgs_in_joint_call_or_es_index_up_to_date(

@@ -9,10 +9,10 @@ from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
+    NoOpAenter,
+    NotFoundError,
     ProjectId,
     to_db_json,
-    NotFoundError,
-    NoOpAenter,
 )
 from models.models.sequencing_group import (
     SequencingGroupInternal,
@@ -308,8 +308,9 @@ class SequencingGroupTable(DbBase):
 
         _query = """
         INSERT INTO sequencing_group
-            (sample_id, type, technology, platform, meta, author, archived)
-        VALUES (:sample_id, :type, :technology, :platform, :meta, :changelog_id, false)
+            (sample_id, type, technology, platform, meta, changelog_id, archived)
+        VALUES 
+            (:sample_id, :type, :technology, :platform, :meta, :changelog_id, false)
         RETURNING id;
         """
 

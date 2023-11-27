@@ -7,12 +7,12 @@ from typing import Any
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import (
-    to_db_json,
-    GenericFilterModel,
     GenericFilter,
+    GenericFilterModel,
     GenericMetaFilter,
-    NotFoundError,
     NoOpAenter,
+    NotFoundError,
+    to_db_json,
 )
 from models.models.assay import AssayInternal
 
@@ -270,16 +270,17 @@ class AssayTable(DbBase):
 
                 _eid_query = """
                 INSERT INTO assay_external_id
-                    (project, assay_id, external_id, name, author)
+                    (project, assay_id, external_id, name, changelog_id)
                 VALUES (:project, :assay_id, :external_id, :name, :changelog_id);
                 """
+                changelog_id = await self.changelog_id()
                 eid_values = [
                     {
                         'project': project or self.project,
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
-                        'changelog_id': await self.changelog_id(),
+                        'changelog_id': changelog_id,
                     }
                     for name, eid in external_ids.items()
                 ]
@@ -374,17 +375,18 @@ class AssayTable(DbBase):
                     )
 
                     _update_query = """\
-                        INSERT INTO assay_external_id (project, assay_id, external_id, name, author)
+                        INSERT INTO assay_external_id (project, assay_id, external_id, name, changelog_id)
                             VALUES (:project, :assay_id, :external_id, :name, :changelog_id)
                             ON DUPLICATE KEY UPDATE external_id = :external_id, changelog_id = :changelog_id
                     """
+                    changelog_id = await self.changelog_id()
                     values = [
                         {
                             'project': project,
                             'assay_id': assay_id,
                             'external_id': eid,
                             'name': name,
-                            'changelog_id': await self.changelog_id(),
+                            'changelog_id': changelog_id,
                         }
                         for name, eid in to_update.items()
                     ]

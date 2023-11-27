@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Any
 
 from db.python.tables.base import DbBase
-from db.python.utils import ProjectId, to_db_json, NotFoundError
+from db.python.utils import NotFoundError, ProjectId, to_db_json
 from models.models.participant import ParticipantInternal
 
 
@@ -83,9 +83,11 @@ class ParticipantTable(DbBase):
         if not (project or self.project):
             raise ValueError('Must provide project to create participant')
 
-        _query = f"""
-INSERT INTO participant (external_id, reported_sex, reported_gender, karyotype, meta, author, project)
-VALUES (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :changelog_id, :project)
+        _query = """
+INSERT INTO participant 
+    (external_id, reported_sex, reported_gender, karyotype, meta, changelog_id, project)
+VALUES 
+    (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :changelog_id, :project)
 RETURNING id
         """
 
@@ -245,7 +247,7 @@ RETURNING id
         self, family_ids: list[int]
     ) -> tuple[set[ProjectId], dict[int, list[ParticipantInternal]]]:
         """Get list of participants keyed by families, duplicates results"""
-        _query = f"""
+        _query = """
             SELECT project, fp.family_id, p.id, p.external_id, p.reported_sex, p.reported_gender, p.karyotype, p.meta
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id

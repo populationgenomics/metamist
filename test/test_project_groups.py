@@ -33,7 +33,7 @@ class TestGroupAccess(DbIsolatedTest):
         )
         await self.connection.connection.execute(
             """
-            INSERT INTO group_member (group_id, member, author)
+            INSERT INTO group_member (group_id, member, changelog_id)
             VALUES (:group_id, :member, :changelog_id);
             """,
             {
@@ -174,13 +174,13 @@ class TestProjectAccess(DbIsolatedTest):
         )
         await self.connection.connection.execute(
             """
-            INSERT INTO group_member (group_id, member, author)
-            VALUES (:group_id, :member, :author);
+            INSERT INTO group_member (group_id, member, changelog_id)
+            VALUES (:group_id, :member, :changelog_id);
             """,
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'author': self.author,
+                'author': await self.changelog_id(),
             },
         )
 

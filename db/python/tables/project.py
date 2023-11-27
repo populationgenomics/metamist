@@ -356,11 +356,14 @@ class ProjectPermissionsTable:
             await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
+            changelog_id = await self.changelog_id()
             read_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=True)
+                self.get_project_group_name(project_name, readonly=True),
+                changelog_id=changelog_id,
             )
             write_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=False)
+                self.get_project_group_name(project_name, readonly=False),
+                changelog_id=changelog_id,
             )
 
             _query = """\
@@ -614,14 +617,16 @@ class GroupTable:
         )
         return set(r['gid'] for r in results)
 
-    async def create_group(self, name: str) -> int:
+    async def create_group(self, name: str, changelog_id: int) -> int:
         """Create a new group"""
         _query = """
-            INSERT INTO `group` (name)
-            VALUES (:name)
+            INSERT INTO `group` (name, changelog_id)
+            VALUES (:name, :changelog_id)
             RETURNING id
         """
-        return await self.connection.fetch_val(_query, {'name': name})
+        return await self.connection.fetch_val(
+            _query, {'name': name, 'changelog_id': changelog_id}
+        )
 
     async def set_group_members(
         self, group_id: int, members: list[str], changelog_id: int

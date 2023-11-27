@@ -1,7 +1,6 @@
-from typing import List, Tuple, Any, Dict
-
 import json
 from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
 from db.python.tables.base import DbBase
 
@@ -19,19 +18,22 @@ class ParticipantPhenotypeTable(DbBase):
         """
         if not rows:
             return None
-        _query = f"""
-INSERT INTO participant_phenotypes (participant_id, description, value, author, hpo_term)
-VALUES (:participant_id, :description, :value, :changelog_id, 'DESCRIPTION')
+        _query = """
+INSERT INTO participant_phenotypes 
+    (participant_id, description, value, changelog_id, hpo_term)
+VALUES 
+    (:participant_id, :description, :value, :changelog_id, 'DESCRIPTION')
 ON DUPLICATE KEY UPDATE
     description=:description, value=:value, changelog_id=:changelog_id
         """
 
+        changelog_id = await self.changelog_id()
         formatted_rows = [
             {
                 'participant_id': r[0],
                 'description': r[1],
                 'value': json.dumps(r[2]),
-                'changelog_id': await self.changelog_id(),
+                'changelog_id': changelog_id,
             }
             for r in rows
         ]
