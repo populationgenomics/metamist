@@ -1,12 +1,13 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+import datetime
 
 from db.python.connect import DbBase
 from db.python.tables.project import ProjectId
+from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.cohort import Cohort
-from models.utils.sequencing_group_id_format import \
-    sequencing_group_id_transform_to_raw
+from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -14,7 +15,12 @@ class CohortFilter(GenericFilterModel):
     """
     Filters for Cohort
     """
+
     id: GenericFilter[int] | None = None
+    name: GenericFilter[str] | None = None
+    author: GenericFilter[str] | None = None
+    derived_from: GenericFilter[int] | None = None
+    timestamp: GenericFilter[datetime.datetime] | None = None
     project: GenericFilter[ProjectId] | None = None
 
 
@@ -26,6 +32,7 @@ class CohortTable(DbBase):
     table_name = 'cohort'
     common_get_keys = [
         'id',
+        'name',
         'derived_from',
         'description',
         'author',
@@ -33,10 +40,11 @@ class CohortTable(DbBase):
     ]
 
     async def query(self, filter_: CohortFilter):
-        """ Query Cohorts"""
+        """Query Cohorts"""
         wheres, values = filter_.to_sql(field_overrides={})
         if not wheres:
             raise ValueError(f'Invalid filter: {filter_}')
+
         common_get_keys_str = ','.join(self.common_get_keys)
         _query = f"""
         SELECT {common_get_keys_str}
@@ -44,12 +52,16 @@ class CohortTable(DbBase):
         WHERE {wheres}
         """
 
-        print(_query)
-        print(values)
-
         rows = await self.connection.fetch_all(_query, values)
         cohorts = [Cohort.from_db(dict(row)) for row in rows]
         return cohorts
+
+    async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list:
+        _query = """
+        SELECT sequencing_group_id FROM cohort_sequencing_group WHERE cohort_id = :cohort_id
+        """
+        rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
+        return [row["sequencing_group_id"] for row in rows]
 
     async def create_cohort(
         self,
@@ -57,23 +69,41 @@ class CohortTable(DbBase):
         cohort_name: str,
         sequencing_group_ids: list[str],
         author: str,
-        derived_from: str = None,
-        description: str = 'This field should accept null',
+        description: str,
+        derived_from: int | None = None,
     ) -> int:
         """
         Create a new cohort
         """
 
-        # Create cohort
-        print(cohort_name)
+        _query = """
+        INSERT INTO cohort (name, derived_from, author, description, project) 
+        VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
+        """
 
-        _query = 'INSERT INTO cohort (derived_from, author, description, project) VALUES (:derived_from, :author, :description, :project) RETURNING id'
-        cohort_id = await self.connection.fetch_val(_query, {'derived_from': derived_from , 'author': author, 'description': description, 'project': project})
-        print(cohort_id)
+        cohort_id = await self.connection.fetch_val(
+            _query,
+            {
+                'derived_from': derived_from,
+                'author': author,
+                'description': description,
+                'project': project,
+                'name': cohort_name,
+            },
+        )
 
-        # populate sequencing groups
-        _query = 'INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) VALUES (:cohort_id, :sequencing_group_id)'
+        _query = """
+        INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) 
+        VALUES (:cohort_id, :sequencing_group_id)
+        """
+
         for sg in sequencing_group_ids:
-            await self.connection.execute(_query, {'cohort_id': cohort_id, 'sequencing_group_id': sequencing_group_id_transform_to_raw(sg)})
+            await self.connection.execute(
+                _query,
+                {
+                    'cohort_id': cohort_id,
+                    'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                },
+            )
 
         return cohort_id

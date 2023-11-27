@@ -41,6 +41,14 @@ const NavBar: React.FunctionComponent = () => (
                     </Popup>
                 </span>
             </Link>
+            <Link to="/cohort-builder">
+                <span className="d-none d-lg-block navbarLink">Cohort Builder</span>
+                <span className="d-lg-none navbarIcon">
+                    <Popup trigger={<InsightsIcon />} hoverable position="bottom center">
+                        <h5>Cohort Builder</h5>
+                    </Popup>
+                </span>
+            </Link>
             <Link to="/swagger">
                 <span className="d-none d-lg-block navbarLink">Swagger</span>
                 <span className="d-lg-none navbarIcon">

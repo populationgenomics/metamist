@@ -854,6 +854,12 @@
 	</addColumn>
 </changeSet>
 
-
+<changeSet id="2023-11-23_cohort-builder-changes" author="daniel.esposito">
+	<addColumn tableName="cohort">
+		<column name="name" type="VARCHAR(255)">
+			<constraints nullable="false" unique="true" />
+		</column>
+	</addColumn>
+</changeSet>
 
 </databaseChangeLog>

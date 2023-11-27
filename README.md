@@ -182,7 +182,6 @@ export PATH="$HB_PREFIX/opt/mariadb@10.8/bin:$PATH"
 If you installed all the software through brew and npm
 like this guide suggests, your `.zshrc` may look like this:
 
-
 ```shell
 alias openapi-generator="npx @openapitools/openapi-generator-cli"
 
@@ -269,6 +268,12 @@ Pull mariadb image
 docker pull mariadb:10.8.3
 ```
 
+If you wish, install the mysql-client using homebrew (or an equivalent linux command) so you can connect to the MariaDB server running via Docker:
+
+```bash
+brew install mysql-client
+```
+
 Run a mariadb container that will server your database. `-p 3307:3306` remaps the port to 3307 in case if you local MySQL is already using 3306
 
 ```bash
@@ -283,10 +288,24 @@ mysql --host=127.0.0.1 --port=3307 -u root -e 'CREATE DATABASE sm_dev;'
 mysql --host=127.0.0.1 --port=3307 -u root -e 'show databases;'
 ```
 
+Similar to the previous section, we need to create the `sm_api` user, and set the corect roles and privileges:
+
+```bash
+mysql --host=127.0.0.1 --port=3307 -u root --execute "
+  CREATE USER sm_api@'%';
+  CREATE USER sm_api@localhost;
+  CREATE ROLE sm_api_role;
+  GRANT sm_api_role TO sm_api@'%';
+  GRANT sm_api_role TO sm_api@localhost;
+  SET DEFAULT ROLE sm_api_role FOR sm_api@'%';
+  SET DEFAULT ROLE sm_api_role FOR sm_api@localhost;
+  GRANT ALL PRIVILEGES ON sm_dev.* TO sm_api_role;
+"
+```
+
 Go into the `db/` subdirectory, download the `mariadb-java-client` and create the schema using liquibase:
 
 ```bash
-
 pushd db/
 wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
 liquibase \
@@ -341,22 +360,22 @@ The following `launch.json` is a good base to debug the web server in VSCode:
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Run API",
-            "type": "python",
-            "request": "launch",
-            "module": "api.server",
-            "justMyCode": false,
-            "env": {
-                "SM_ALLOWALLACCESS": "true",
-                "SM_LOCALONLY_DEFAULTUSER": "<user>-local",
-                "SM_ENVIRONMENT": "local",
-                "SM_DEV_DB_USER": "sm_api",
-            }
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run API",
+      "type": "python",
+      "request": "launch",
+      "module": "api.server",
+      "justMyCode": false,
+      "env": {
+        "SM_ALLOWALLACCESS": "true",
+        "SM_LOCALONLY_DEFAULTUSER": "<user>-local",
+        "SM_ENVIRONMENT": "local",
+        "SM_DEV_DB_USER": "sm_api"
+      }
+    }
+  ]
 }
 ```
 
@@ -419,7 +438,6 @@ npm start
 ```
 
 This will start a web server using Vite, running on [localhost:5173](http://localhost:5173).
-
 
 ### OpenAPI and Swagger
 
