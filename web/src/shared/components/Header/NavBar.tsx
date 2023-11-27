@@ -138,7 +138,7 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     ])
 
     React.useEffect(() => {
-        new BillingApi().getIsBillingEnabled().then((response) => {
+        new BillingApi().isBillingEnabled().then((response) => {
             if (response.status === 200 && response.data === true) {
                 setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
             }
