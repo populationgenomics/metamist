@@ -9,6 +9,7 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 """
 import datetime
 from inspect import isclass
+from pymysql import connect
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -18,8 +19,12 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import (AnalysisLayer, CohortLayer, SampleLayer,
-                              SequencingGroupLayer)
+from db.python.layers import (
+    AnalysisLayer,
+    CohortLayer,
+    SampleLayer,
+    SequencingGroupLayer,
+)
 from db.python.layers.assay import AssayLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.analysis import AnalysisFilter
@@ -30,13 +35,22 @@ from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
-from models.models import (AnalysisInternal, AssayInternal, Cohort,
-                           FamilyInternal, ParticipantInternal, Project,
-                           SampleInternal, SequencingGroupInternal)
+from models.models import (
+    AnalysisInternal,
+    AssayInternal,
+    Cohort,
+    FamilyInternal,
+    ParticipantInternal,
+    Project,
+    SampleInternal,
+    SequencingGroupInternal,
+)
 from models.models.sample import sample_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_format, sequencing_group_id_transform_to_raw)
+    sequencing_group_id_format,
+    sequencing_group_id_transform_to_raw,
+)
 
 enum_methods = {}
 for enum in enum_tables.__dict__.values():
@@ -59,23 +73,41 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 
-#Create cohort GraphQL model
+# Create cohort GraphQL model
 @strawberry.type
 class GraphQLCohort:
     """Cohort GraphQL model"""
 
     id: int
+    name: str
     project: str
     description: str
-
+    author: str
+    derived_from: int | None = None
 
     @staticmethod
     def from_internal(internal: Cohort) -> 'GraphQLCohort':
         return GraphQLCohort(
             id=internal.id,
+            name=internal.name,
             project=internal.project,
             description=internal.description,
+            author=internal.author,
+            derived_from=internal.derived_from,
         )
+
+    @strawberry.field()
+    async def sequencing_groups(
+        self, info: Info, root: 'Cohort'
+    ) -> list['GraphQLSequencingGroup']:
+        connection = info.context['connection']
+        cohort_layer = CohortLayer(connection)
+        sg_ids = await cohort_layer.get_cohort_sequencing_group_ids(root.id)
+
+        sg_layer = SequencingGroupLayer(connection)
+        sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
+        return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
+
 
 @strawberry.type
 class GraphQLProject:
@@ -214,6 +246,31 @@ class GraphQLProject:
             )
         )
         return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
+
+    @strawberry.field()
+    async def cohort(
+        self,
+        info: Info,
+        root: 'Project',
+        id: GraphQLFilter[int] | None = None,
+        name: GraphQLFilter[str] | None = None,
+        author: GraphQLFilter[str] | None = None,
+        derived_from: GraphQLFilter[int] | None = None,
+        timestamp: GraphQLFilter[datetime.datetime] | None = None,
+    ) -> list['GraphQLCohort']:
+        connection = info.context['connection']
+        connection.project = root.id
+
+        c_filter = CohortFilter(
+            id=id.to_internal_filter() if id else None,
+            name=name.to_internal_filter() if name else None,
+            author=author.to_internal_filter() if author else None,
+            derived_from=derived_from.to_internal_filter() if derived_from else None,
+            timestamp=timestamp.to_internal_filter() if timestamp else None,
+        )
+
+        cohorts = await CohortLayer(connection).query(c_filter)
+        return [GraphQLCohort.from_internal(c) for c in cohorts]
 
 
 @strawberry.type
@@ -533,7 +590,8 @@ class GraphQLSequencingGroup:
         self, info: Info, root: 'GraphQLSequencingGroup'
     ) -> list['GraphQLAssay']:
         loader = info.context[LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS]
-        return await loader.load(root.internal_id)
+        assays = await loader.load(root.internal_id)
+        return [GraphQLAssay.from_internal(assay) for assay in assays]
 
 
 @strawberry.type
@@ -564,8 +622,9 @@ class GraphQLAssay:
         sample = await loader.load(root.sample_id)
         return GraphQLSample.from_internal(sample)
 
+
 @strawberry.type
-class Query: #entry point to graphql.
+class Query:  # entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
@@ -573,28 +632,38 @@ class Query: #entry point to graphql.
         return GraphQLEnum()
 
     @strawberry.field()
-    async def cohort(self, info: Info, project: GraphQLFilter[str] | None = None,)-> list[GraphQLCohort]:
+    async def cohort(
+        self,
+        info: Info,
+        id: GraphQLFilter[int] | None = None,
+        project: GraphQLFilter[str] | None = None,
+        name: GraphQLFilter[str] | None = None,
+        author: GraphQLFilter[str] | None = None,
+        derived_from: GraphQLFilter[int] | None = None,
+    ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         clayer = CohortLayer(connection)
+
         ptable = ProjectPermissionsTable(connection.connection)
         project_name_map: dict[str, int] = {}
+        project_filter = None
         if project:
             project_names = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
-
+            project_filter = project.to_internal_filter(lambda pname: project_name_map[pname])
 
         filter_ = CohortFilter(
-            project=project.to_internal_filter(lambda pname: project_name_map[pname])
-            if project
-            else None,
+            id=id.to_internal_filter() if id else None,
+            name=name.to_internal_filter() if name else None,
+            project=project_filter,
+            author=author.to_internal_filter() if author else None,
+            derived_from=derived_from.to_internal_filter() if derived_from else None,
         )
 
         cohort = await clayer.query(filter_)
-        print(cohort)
-
         return cohort
 
     @strawberry.field()
