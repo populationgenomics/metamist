@@ -4,7 +4,7 @@ Billing routes
 from async_lru import alru_cache
 from fastapi import APIRouter
 
-from api.settings import BILLING_CACHE_RESPONSE_TTL
+from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
 from api.utils.db import BqConnection, get_author
 from db.python.layers.billing_layer import BillingLayer
 from models.models.billing import (
@@ -20,6 +20,30 @@ router = APIRouter(prefix='/billing', tags=['billing'])
 
 
 @router.get(
+    '/is-billing-enabled',
+    response_model=bool,
+    operation_id='isBillingEnabled',
+)
+def is_billing_enabled() -> bool:
+    """
+    Return true if billing ie enabled, false otherwise
+    """
+    return BQ_AGGREG_VIEW is not None
+
+
+def initialise_billing_layer(author: str) -> BillingLayer:
+    """
+    Initialise billing
+    """
+    if not is_billing_enabled():
+        raise ValueError('Billing is not enabled')
+
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    return billing_layer
+
+
+@router.get(
     '/gcp-projects',
     response_model=list[str],
     operation_id='getGcpProjects',
@@ -29,8 +53,7 @@ async def get_gcp_projects(
     author: str = get_author,
 ) -> list[str]:
     """Get list of all GCP projects in database"""
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_gcp_projects()
     return records
 
@@ -45,8 +68,7 @@ async def get_topics(
     author: str = get_author,
 ) -> list[str]:
     """Get list of all topics in database"""
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_topics()
     return records
 
@@ -61,8 +83,7 @@ async def get_cost_categories(
     author: str = get_author,
 ) -> list[str]:
     """Get list of all service description / cost categories in database"""
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cost_categories()
     return records
 
@@ -83,8 +104,7 @@ async def get_skus(
     There is over 400 Skus so limit is required
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_skus(limit, offset)
     return records
 
@@ -102,8 +122,7 @@ async def get_datasets(
     Get list of all datasets in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_datasets()
     return records
 
@@ -121,8 +140,7 @@ async def get_sequencing_types(
     Get list of all sequencing_types in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_sequencing_types()
     return records
 
@@ -140,8 +158,7 @@ async def get_stages(
     Get list of all stages in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_stages()
     return records
 
@@ -159,8 +176,7 @@ async def get_sequencing_groups(
     Get list of all sequencing_groups in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_sequencing_groups()
     return records
 
@@ -178,8 +194,7 @@ async def get_compute_categories(
     Get list of all compute categories in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_compute_categories()
     return records
 
@@ -197,8 +212,7 @@ async def get_cromwell_sub_workflow_names(
     Get list of all cromwell_sub_workflow_names in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cromwell_sub_workflow_names()
     return records
 
@@ -216,8 +230,7 @@ async def get_wdl_task_names(
     Get list of all wdl_task_names in database
     Results are sorted ASC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_wdl_task_names()
     return records
 
@@ -235,8 +248,7 @@ async def get_invoice_months(
     Get list of all invoice months in database
     Results are sorted DESC
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_invoice_months()
     return records
 
@@ -262,8 +274,7 @@ async def query_billing(
         }
 
     """
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.query(query.to_filter(), limit)
     return records
 
@@ -441,9 +452,7 @@ async def get_total_cost(
         }
 
     """
-
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_total_cost(query)
     return records
 
@@ -464,13 +473,11 @@ async def get_running_costs(
     Get running cost for specified fields in database
     e.g. fields = ['gcp_project', 'topic', 'wdl_task_names', 'cromwell_sub_workflow_name', 'compute_category']
     """
-
     # TODO replace alru_cache with async-cache?
     # so we can skip author for caching?
     # pip install async-cache
     # @AsyncTTL(time_to_live=BILLING_CACHE_RESPONSE_TTL, maxsize=1024, skip_args=2)
 
-    connection = BqConnection(author)
-    billing_layer = BillingLayer(connection)
+    billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_running_cost(field, invoice_month, source)
     return records
