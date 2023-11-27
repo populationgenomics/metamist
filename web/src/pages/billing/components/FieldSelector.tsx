@@ -1,11 +1,6 @@
 import * as React from 'react'
-
 import { Dropdown, Input, Message } from 'semantic-ui-react'
-
 import { BillingApi, BillingColumn } from '../../../sm-api'
-
-import '../Billing.css'
-
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface FieldSelectorProps {
@@ -13,6 +8,7 @@ interface FieldSelectorProps {
     fieldName: string
     selected?: string
     includeAll?: boolean
+    autoSelect?: boolean
     onClickFunction: (_: any, { value }: any) => void
 }
 
@@ -21,20 +17,28 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
     fieldName,
     selected,
     includeAll,
+    autoSelect,
     onClickFunction,
 }) => {
     const [loading, setLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
     const [records, setRecords] = React.useState<string[]>([])
 
-    const extendRecords = (records: string[]) => {
+    const extendRecords = (recs: string[]) => {
         if (includeAll) {
-            if (fieldName === 'GCP-Project') {
-                return [`All ${convertFieldName(fieldName)}`, ...records]
-            }
-            return [`All ${convertFieldName(fieldName)}s`, ...records]
+            return [`All ${convertFieldName(fieldName)}s`, ...recs]
         }
-        return records
+        return recs
+    }
+
+    const processResponse = (response_data: string[]) => {
+        setLoading(false)
+        const extRecords = extendRecords(response_data)
+        setRecords(extRecords)
+        if (!selected && autoSelect) {
+            // set the first option as the default
+            onClickFunction(undefined, { value: extRecords[0] })
+        }
     }
 
     const getTopics = () => {
@@ -43,8 +47,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         new BillingApi()
             .getTopics()
             .then((response) => {
-                setLoading(false)
-                setRecords(extendRecords(response.data))
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
@@ -55,8 +58,7 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         new BillingApi()
             .getGcpProjects()
             .then((response) => {
-                setLoading(false)
-                setRecords(extendRecords(response.data))
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
@@ -67,23 +69,34 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
         new BillingApi()
             .getInvoiceMonths()
             .then((response) => {
-                setLoading(false)
-                setRecords(extendRecords(response.data))
+                processResponse(response.data)
+            })
+            .catch((er) => setError(er.message))
+    }
+
+    const getStages = () => {
+        setLoading(true)
+        setError(undefined)
+        new BillingApi()
+            .getStages()
+            .then((response) => {
+                processResponse(response.data)
             })
             .catch((er) => setError(er.message))
     }
 
     React.useEffect(() => {
         if (fieldName === BillingColumn.Topic) getTopics()
+        else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
         else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
+        else if (fieldName === BillingColumn.Stage) getStages()
         else if (fieldName === 'Group') {
-            setRecords([BillingColumn.GcpProject, BillingColumn.Topic])
+            setRecords([BillingColumn.GcpProject, BillingColumn.Topic, BillingColumn.Stage])
             setLoading(false)
-        } else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
-        else {
+        } else {
             setError(`Could not load records for ${fieldName}`)
         }
-    }, [label, fieldName])
+    }, [fieldName])
 
     const capitalize = (str: string): string => {
         if (str === 'gcp_project') {

@@ -2,14 +2,10 @@ import * as React from 'react'
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { Table as SUITable, Message, Button, Checkbox, Dropdown, Grid } from 'semantic-ui-react'
 import _ from 'lodash'
-
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
-
-import './Billing.css'
 import FieldSelector from './components/FieldSelector'
-
 import { convertFieldName } from '../../shared/utilities/fieldName'
 
 const BillingCurrentCost = () => {
@@ -56,7 +52,7 @@ const BillingCurrentCost = () => {
     const [lastLoadedDay, setLastLoadedDay] = React.useState<string>()
 
     const getCosts = (grp: BillingColumn, invoiceMth: string | undefined) => {
-        updateNav(groupBy, invoiceMth)
+        updateNav(grp, invoiceMth)
         setIsLoading(true)
         setError(undefined)
         let source = 'aggregate'
