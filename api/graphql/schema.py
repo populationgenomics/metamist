@@ -80,7 +80,6 @@ class GraphQLCohort:
 
     id: int
     name: str
-    project: str
     description: str
     author: str
     derived_from: int | None = None
@@ -107,6 +106,12 @@ class GraphQLCohort:
         sg_layer = SequencingGroupLayer(connection)
         sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
+
+    @strawberry.field()
+    async def project(self, info: Info, root: 'Cohort') -> 'GraphQLProject':
+        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        project = await loader.load(root.project)
+        return GraphQLProject.from_internal(project)
 
 
 @strawberry.type
