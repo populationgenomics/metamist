@@ -6,6 +6,7 @@ import {
     BillingHome,
     BillingSeqrProp,
     BillingCostByTime,
+    BillingCostByBatch,
     BillingInvoiceMonthCost,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
@@ -54,6 +55,14 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <BillingCostByTime />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByBatch"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByBatch />
                 </ErrorBoundary>
             }
         />

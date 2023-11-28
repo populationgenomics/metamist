@@ -451,6 +451,24 @@ async def get_total_cost(
             "order_by": {"cost": true}
         }
 
+    17. Get total cost by sku for provided ID, which can be any of
+    [ar_guid, batch_id, sequencing_group or cromwell_workflow_id],
+    order by cost DESC:
+
+        {
+            "fields": ["sku", "ar_guid", "batch_id", "sequencing_group", "cromwell_workflow_id"],
+            "start_date": "2023-11-01",
+            "end_date": "2023-11-30",
+            "filters": {
+                "ar_guid": "855a6153-033c-4398-8000-46ed74c02fe8",
+                "batch_id": "429518",
+                "sequencing_group": "cpg246751",
+                "cromwell_workflow_id": "cromwell-e252f430-4143-47ec-a9c0-5f7face1b296"
+            },
+            "filters_op": "OR",
+            "order_by": {"cost": true}
+        }
+
     """
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_total_cost(query)
