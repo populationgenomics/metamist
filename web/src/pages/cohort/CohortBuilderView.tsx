@@ -1,10 +1,10 @@
-import React, { useState, useContext, useMemo } from 'react'
+import React, { useState, useContext } from 'react'
 import { Container, Divider, Form, Message, Tab } from 'semantic-ui-react'
 import { uniqBy } from 'lodash'
 import { useQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__'
-import { CohortApi } from '../../sm-api'
+import { CohortApi, CohortBody } from '../../sm-api'
 
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import MuckError from '../../shared/components/MuckError'
@@ -24,18 +24,6 @@ query GetProjectsForCohortBuilder {
     }
 }`)
 
-const cohortName = () => {
-    const nameElement = document.getElementById('cohort-name') as HTMLInputElement
-    if (!nameElement) return ''
-    return nameElement.value.trim()
-}
-
-const cohortDescription = () => {
-    const descriptionElement = document.getElementById('cohort-description') as HTMLInputElement
-    if (!descriptionElement) return ''
-    return descriptionElement.value.trim()
-}
-
 const CohortBuilderView = () => {
     const { theme } = useContext(ThemeContext)
     const inverted = theme === 'dark-mode'
@@ -45,7 +33,12 @@ const CohortBuilderView = () => {
     const [createCohortSuccess, setCreateCohortSuccess] = useState<number | null>(null)
     const [createCohortLoading, setCreateCohortLoading] = useState<boolean>(false)
     const [selectedProject, setSelectedProject] = useState<Project>()
+
+    // Keep the text fields and sequencing groups array separate to prevent re-rendering the
+    // sequencing group table on every input change, which can be slow if there are many
+    // sequencing groups
     const [sequencingGroups, setSequencingGroups] = useState<SequencingGroup[]>([])
+    const [cohortDetails, setCohortDetails] = useState<Partial<CohortBody>>({})
 
     // Loading projects query for drop-down menu selection
     const { loading, error, data } = useQuery(GET_PROJECTS_QUERY)
@@ -58,18 +51,24 @@ const CohortBuilderView = () => {
         setSequencingGroups(sequencingGroups.filter((sg) => sg.id !== id))
     }
 
-    const allowSubmission = useMemo(() => {
-        if (loading) return false
-        if (createCohortLoading) return false
-        if (!selectedProject?.id) return false
-        if (!sequencingGroups || sequencingGroups.length === 0) return false
-        if (cohortName().length === 0) return false
-        if (cohortDescription().length === 0) return false
-        return true
-    }, [loading, createCohortLoading, selectedProject, sequencingGroups])
+    const allowSubmission =
+        !loading &&
+        !createCohortLoading &&
+        selectedProject?.name &&
+        sequencingGroups &&
+        sequencingGroups.length > 0 &&
+        cohortDetails.name &&
+        cohortDetails.name.length > 0 &&
+        cohortDetails.description &&
+        cohortDetails.description.length > 0
 
     const createCohort = () => {
-        if (!allowSubmission || selectedProject == null) return
+        if (!allowSubmission) return
+
+        // Add these here because TypeScript cannot infer that if allowSubmission is true, then
+        // these values are defined
+        if (!cohortDetails.name) return
+        if (!cohortDetails.description) return
 
         // eslint-disable-next-line no-alert
         const proceed = window.confirm(
@@ -84,8 +83,8 @@ const CohortBuilderView = () => {
         const client = new CohortApi()
         client
             .createCohort(selectedProject.name, {
-                name: cohortName(),
-                description: cohortDescription(),
+                name: cohortDetails.name,
+                description: cohortDetails.description,
                 sequencing_group_ids: sequencingGroups.map((sg) => sg.id),
                 derived_from: undefined,
             })
@@ -193,6 +192,12 @@ const CohortBuilderView = () => {
                         placeholder="Cohort Name"
                         maxLength={255}
                         required
+                        onChange={(e) => {
+                            setCohortDetails({
+                                ...cohortDetails,
+                                name: e.target.value.trim(),
+                            })
+                        }}
                     />
                     <Form.Input
                         id="cohort-description"
@@ -208,6 +213,12 @@ const CohortBuilderView = () => {
                         placeholder="Cohort Description"
                         maxLength={255}
                         required
+                        onChange={(e) => {
+                            setCohortDetails({
+                                ...cohortDetails,
+                                description: e.target.value.trim(),
+                            })
+                        }}
                     />
                 </section>
                 <Divider />
@@ -250,7 +261,7 @@ const CohortBuilderView = () => {
                             content={createCohortSuccess}
                         >
                             <h3>Success!</h3>
-                            <p>Create a new cohort with ID {createCohortSuccess}</p>
+                            <p>Created a new cohort with ID {createCohortSuccess}</p>
                         </Message>
                     )}
                     <br />
@@ -267,6 +278,7 @@ const CohortBuilderView = () => {
                             type="button"
                             content="Clear"
                             color="red"
+                            disabled={sequencingGroups.length === 0}
                             loading={createCohortLoading}
                             onClick={() => {
                                 // eslint-disable-next-line no-restricted-globals, no-alert
