@@ -17,7 +17,8 @@ query FetchSequencingGroups(
     $platform: String, 
     $technology: String, 
     $seqType: String,
-    $assayMeta: JSON
+    $assayMeta: JSON,
+    $excludeIds: [String!]
   ) {
     project(name: $project) {
       participants {
@@ -25,6 +26,7 @@ query FetchSequencingGroups(
           assays(meta: $assayMeta) {
             sample {
               sequencingGroups(
+                id: {nin: $excludeIds}
                 platform: {icontains: $platform}
                 technology: {icontains: $technology}
                 type: {contains: $seqType}
@@ -67,6 +69,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
         const seqTypeInput = document.getElementById('seq_type') as HTMLInputElement
         const technologyInput = document.getElementById('technology') as HTMLInputElement
         const platformInput = document.getElementById('platform') as HTMLInputElement
+        const excludeInput = document.getElementById('exclude') as HTMLInputElement
 
         if (!selectedProject?.name) {
             return
@@ -77,6 +80,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
             seqType: null,
             technology: null,
             platform: null,
+            excludeIds: [],
             assayMeta: {},
         }
 
@@ -90,6 +94,13 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
 
         if (platformInput?.value) {
             searchParams.platform = platformInput.value
+        }
+
+        if (excludeInput?.value && excludeInput.value.trim().length > 0) {
+            searchParams.excludeIds = excludeInput.value
+                .split(',')
+                .map((id) => id.trim())
+                .filter((id) => id.length > 0)
         }
 
         assayMetaSearchFields.forEach((field) => {
@@ -106,6 +117,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                 technology: searchParams.technology,
                 platform: searchParams.platform,
                 assayMeta: searchParams.assayMeta,
+                excludeIds: searchParams.excludeIds,
             },
 
             onCompleted: (hits) => {
@@ -188,6 +200,11 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                 {assayMetaSearchFields.map((field) => (
                     <Form.Input label={field.label} id={field.id} key={field.id} />
                 ))}
+                <Form.Input
+                    placeholder="CPG1,CPG2"
+                    label="Exclude Sequencing Group IDs"
+                    id="exclude"
+                />
             </Container>
             <br />
             <Form.Group>
