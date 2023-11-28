@@ -9,7 +9,6 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 """
 import datetime
 from inspect import isclass
-from pymysql import connect
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -19,13 +18,8 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import (
-    AnalysisLayer,
-    CohortLayer,
-    SampleLayer,
-    SequencingGroupLayer,
-)
 from db.python.layers.assay import AssayLayer
+from db.python.layers.cohort import CohortLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
