@@ -15,6 +15,13 @@ query FetchSequencingGroupsById($ids: [String!]!) {
       type
       technology
       platform
+    # FIXME: Add project info to query when connection.user bug is fixed on server
+    #   samples {
+    #     project {
+    #       id
+    #       name
+    #     }
+    #   }
     }
   }
 `)
@@ -73,7 +80,13 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
                 placeholder="Comma separated list of Sequencing Group IDs"
             />
             <Form.Group>
-                <Form.Button type="button" content="Search" onClick={search} disabled={!text} />
+                <Form.Button
+                    type="button"
+                    loading={loading}
+                    content="Search"
+                    onClick={search}
+                    disabled={!text}
+                />
                 <Form.Button
                     type="button"
                     content="Add"
