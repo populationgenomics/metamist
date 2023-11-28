@@ -13,11 +13,21 @@ query CohortDetailView($id: Int!) {
     id
     name
     description
+    project {
+      id
+      name
+    }
     sequencingGroups {
       id
       type
       technology
       platform
+      sample {
+        project {
+            id
+            name
+          }
+      }
     }
   }
 }
@@ -56,7 +66,7 @@ const CohortDetailView: React.FC = () => {
             <Container>
                 <h1>Cohort Information</h1>
                 <Divider />
-                <MuckError message="No data found" />
+                <MuckError message="Cohort not found" />
             </Container>
         )
     }
@@ -69,15 +79,18 @@ const CohortDetailView: React.FC = () => {
                 <b>Name: </b> {cohort.name}
                 <br />
                 <b>Description: </b> {cohort.description}
+                <br />
+                <b>Project: </b> {cohort.project.name}
             </div>
             <Divider />
             <SequencingGroupTable
+                height={800}
                 sequencingGroups={cohort.sequencingGroups.map((sg) => ({
                     id: sg.id,
                     type: sg.type,
                     technology: sg.technology,
                     platform: sg.platform,
-                    project: { name: '?', id: 1 },
+                    project: sg.sample.project,
                 }))}
                 editable={false}
             />
