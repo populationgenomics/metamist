@@ -119,7 +119,9 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                 assayMeta: searchParams.assayMeta,
                 excludeIds: searchParams.excludeIds,
             },
-
+            onError: () => {
+                setSearchHits(null)
+            },
             onCompleted: (hits) => {
                 const samples = hits.project.participants.flatMap((p) => p.samples)
                 const assays = samples.flatMap((s) => s.assays)
@@ -164,25 +166,15 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
     }
 
     const renderTable = () => {
-        if (loading) {
-            return (
-                <>
-                    <br />
-                    <div>Finding sequencing groups...</div>
-                </>
-            )
-        }
-
-        if (searchHits == null) {
+        if (loading || searchHits == null) {
             return null
         }
 
         if (searchHits.length === 0) {
             return (
-                <>
-                    <br />
-                    <b>No sequencing groups found matching your query</b>
-                </>
+                <Message warning visible>
+                    No sequencing groups found matching your query
+                </Message>
             )
         }
 

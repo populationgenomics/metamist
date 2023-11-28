@@ -53,6 +53,9 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
         const ids = element.value.trim().split(',')
         fetchSequencingGroups({
             variables: { ids },
+            onError: () => {
+                setSequencingGroups(null)
+            },
             onCompleted: (hits) =>
                 setSequencingGroups(
                     hits.sequencingGroups.map((sg) => ({
@@ -73,25 +76,15 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
     }
 
     const renderTable = () => {
-        if (loading) {
-            return (
-                <>
-                    <br />
-                    <div>Finding sequencing groups...</div>
-                </>
-            )
-        }
-
-        if (sequencingGroups == null) {
+        if (loading || sequencingGroups == null) {
             return null
         }
 
         if (sequencingGroups.length === 0) {
             return (
-                <>
-                    <br />
-                    <b>No sequencing groups found matching your query</b>
-                </>
+                <Message warning visible>
+                    No sequencing groups found matching your query
+                </Message>
             )
         }
 
