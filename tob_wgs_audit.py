@@ -149,9 +149,7 @@ class TobWgsAuditor(GenericAuditor):
         3. { assay_id    : (read_filepath, read_filesize,) }
         """
 
-        sg_sample_id_map = {}
         assay_sg_id_map = {}
-        assay_filepaths_filesizes = defaultdict(list)
 
         sample_sgs = {
             sample['id']: sample['sequencingGroups']
@@ -161,11 +159,10 @@ class TobWgsAuditor(GenericAuditor):
 
         # md5_check_list = []
         erroneous_assays = defaultdict(dict)
-        for sample_id, sgs in sample_sgs.items():
+        for _, sgs in sample_sgs.items():
             for sg in sgs:
                 if sg['type'].lower() not in self.sequencing_types:
                     continue
-                sg_sample_id_map[sg['id']] = sample_id
                 erroneous_assay_meta_fields = []
                 for assay in sg['assays']:
                     reads = assay['meta'].get('reads')
@@ -179,15 +176,6 @@ class TobWgsAuditor(GenericAuditor):
                         )
                     assay_sg_id_map[assay['id']] = sg['id']
 
-                    if isinstance(reads, dict):
-                        assay_filepaths_filesizes[assay['id']].append(
-                            (
-                                reads.get('location'),
-                                reads.get('size'),
-                            )
-                        )
-                        continue
-
                     if not isinstance(reads, list):
                         logging.error(
                             f'{self.dataset} :: Got {type(reads)} reads for SG {sg["id"]}, expected list type. Reads may have been deleted after analysis'
@@ -200,13 +188,6 @@ class TobWgsAuditor(GenericAuditor):
                             )
                             continue
 
-                        assay_filepaths_filesizes[assay['id']].append(
-                            (
-                                read.get('location'),
-                                read.get('size'),
-                            )
-                        )
-
                         # here implement md5 hash check
                         location = read.get('location')
                         checksum = read.get('checksum').split(' ')[0].split(':')[1]
@@ -215,9 +196,7 @@ class TobWgsAuditor(GenericAuditor):
                     erroneous_assays[sg['id']] = erroneous_assay_meta_fields
 
         return (
-            sg_sample_id_map,
             assay_sg_id_map,
-            assay_filepaths_filesizes,
             # md5_check_list,
             erroneous_assays,
         )
@@ -440,72 +419,33 @@ class TobWgsAuditor(GenericAuditor):
             gcs_client, dirname(filepath), bucket_name, prefix
         )
 
-    def check_gvcf_analysis_fields(self, analyses_list: list[dict]):
-        erroneous_analyses = defaultdict(dict)
-        for sg_analyses in analyses_list:
-            sg_id = sg_analyses['id']
-            erroneous_analysis_meta_fields = []
-            for analysis in sg_analyses['analyses']:
-                analysis_id = analysis['id']
-                analysis_meta_fields = {}
-                meta_field_present = '1' if analysis['meta'] else '0'
-                analysis_meta_fields[analysis_id] = {
-                    'meta field present': meta_field_present
-                }
-                if analysis['output']:
-                    if analysis['output'].endswith('.mt') or analysis[
-                        'output'
-                    ].endswith('.ht'):
-                        logging.warning(f'analysis {analysis_id} is table/matrix-table')
-                        continue
-                nagim_file = (
-                    'N/A'
-                    if analysis['meta'].get('source') is None
-                    else '1'
-                    if analysis['meta']['source'] == 'nagim'
-                    else '0'
-                )
-                analysis_meta_fields[analysis_id]['nagim file'] = nagim_file
-                file_exists = (
-                    '1' if self.check_gcs_file_exists(analysis['output']) else '0'
-                )
-                analysis_meta_fields[analysis_id]['file exists'] = file_exists
-                mismatched_analysis_type = (
-                    ('1' if not analysis['output'].endswith('.g.vcf.gz') else '0')
-                    if file_exists == '1'
-                    else 'N/A'
-                )
-                analysis_meta_fields[analysis_id][
-                    'mismatched analysis type'
-                ] = mismatched_analysis_type
-                erroneous_analysis_meta_fields.append(analysis_meta_fields)
-            erroneous_analyses[sg_id] = erroneous_analysis_meta_fields
-        return erroneous_analyses
-
-    def check_cram_analysis_fields(self, analyses_list: list[dict]):
+    def check_analysis_fields(
+        self, analyses_list: list[dict], analysis_type: str
+    ) -> dict[str, list[dict[int, dict[str, str]]]]:
         """
         Check metadata fields for a list of analyses and identify issues.
 
         Args:
         - analyses_list (list[dict]): A list of dictionaries, each containing information
         about a sequencing group and its associated analyses.
+        - analysis_type (str): The type of analysis to check, either 'cram' or 'gvcf'.
 
         Returns:
         - erroneous_analyses (defaultdict[dict]): A defaultdict where keys are sequencing group
-        IDs (sg_id), and values are dictionaries indicating issues with analyses metadata.
-        Each entry represents a sequencing group, and the associated values are lists of
-        dictionaries. Each dictionary represents an analysis and contains the following
-        fields:
+        IDs (sg_id), and the associated values are lists of dictionaries. Each dictionary
+        represents an analysis and contains the following fields:
 
         - 'analysis_id': The ID of the analysis.
         - 'meta field present': '1' if a meta field is present, '0' otherwise.
         - 'duplicate sequence_type': '1' if there are both a 'sequence_type' and
             'sequencing_type' field, '0' otherwise.
+        - 'nagim file': '1' if the 'source' metadata is 'nagim', '0' otherwise (only for 'gvcf').
         - 'file exists': '1' if the associated file exists, '0' otherwise.
         - 'mismatched analysis type': '1' if the analysis type mismatches the file type,
             '0' if there is no mismatch (or N/A if the file doesn't exist).
         - 'analysis type present': '1' if an analysis type is present, '0' otherwise.
         """
+        analysis_type = analysis_type.lower()
         erroneous_analyses = defaultdict(dict)
         for sg_analyses in analyses_list:
             sg_id = sg_analyses['id']
@@ -517,17 +457,28 @@ class TobWgsAuditor(GenericAuditor):
                 analysis_meta_fields[analysis_id] = {
                     'meta field present': meta_field_present
                 }
+                if analysis_type.lower() == 'cram':
+                    duplicate_sequence_type = (
+                        '1'
+                        if 'sequence_type' in analysis['meta']
+                        and 'sequencing_type' in analysis['meta']
+                        else '0'
+                    )
+                    analysis_meta_fields[analysis_id][
+                        'duplicate sequence_type'
+                    ] = duplicate_sequence_type
 
-                duplicate_sequence_type = (
-                    '1'
-                    if 'sequence_type' in analysis['meta']
-                    and 'sequencing_type' in analysis['meta']
-                    else '0'
-                )
-                analysis_meta_fields[analysis_id][
-                    'duplicate sequence_type'
-                ] = duplicate_sequence_type
+                if analysis_type == 'gvcf':
+                    nagim_file = (
+                        'N/A'
+                        if analysis['meta'].get('source') is None
+                        else '1'
+                        if analysis['meta']['source'] == 'nagim'
+                        else '0'
+                    )
+                    analysis_meta_fields[analysis_id]['nagim file'] = nagim_file
 
+                # check outputs exist
                 if analysis['output']:
                     if analysis['output'].endswith('.mt') or analysis[
                         'output'
@@ -539,19 +490,39 @@ class TobWgsAuditor(GenericAuditor):
                         '1' if self.check_gcs_file_exists(analysis['output']) else '0'
                     )
                     analysis_meta_fields[analysis_id]['file exists'] = file_exists
-                    if analysis['type'] and file_exists == '1':
-                        if analysis['type'] != analysis['output'].split('.')[-1]:
-                            analysis_meta_fields[analysis_id][
-                                'mismatched analysis type'
-                            ] = '1'
+
+                    # check output matches analysis type
+                    if analysis['type']:
+                        if file_exists == '1':
+                            if analysis_type == 'gvcf':
+                                # gvcf check
+                                mismatched_analysis_type = (
+                                    '1'
+                                    if not analysis['output'].endswith('.g.vcf.gz')
+                                    else '0'
+                                )
+                                analysis_meta_fields[analysis_id][
+                                    'mismatched analysis type'
+                                ] = mismatched_analysis_type
+                            elif analysis_type == 'cram':
+                                # cram check
+                                mismatched_analysis_type = (
+                                    '1'
+                                    if not analysis['output'].endswith('.cram')
+                                    else '0'
+                                )
+                                analysis_meta_fields[analysis_id][
+                                    'mismatched analysis type'
+                                ] = mismatched_analysis_type
                         else:
                             analysis_meta_fields[analysis_id][
                                 'mismatched analysis type'
-                            ] = '0'
-                    elif analysis['type'] and file_exists == '0':
+                            ] = 'N/A'
+                    else:
                         analysis_meta_fields[analysis_id][
                             'mismatched analysis type'
                         ] = 'N/A'
+
                     analysis_meta_fields[analysis_id]['analysis type present'] = (
                         '1' if analysis['type'] else '0'
                     )
@@ -648,14 +619,12 @@ def audit_tob_wgs(
     )
 
     participant_data = auditor.get_participant_data_for_dataset()
-    sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
-        participant_data
-    )
+    # sample_internal_external_id_map = auditor.map_internal_to_external_sample_ids(
+    #     participant_data
+    # )
 
     (
-        sg_sample_id_map,
         assay_sg_id_map,
-        assay_filepaths_filesizes,
         # md5_check_list,
         erroneous_assays,
     ) = auditor.get_assay_map_from_participants(participant_data)
@@ -692,8 +661,8 @@ def audit_tob_wgs(
         participant_data, sg_cram_paths
     )
 
-    erroneous_cram_analyses = auditor.check_cram_analysis_fields(all_cram_analyses)
-    erroneous_gvcf_analyses = auditor.check_gvcf_analysis_fields(all_gvcf_analyses)
+    erroneous_cram_analyses = auditor.check_analysis_fields(all_cram_analyses, 'cram')
+    erroneous_gvcf_analyses = auditor.check_analysis_fields(all_gvcf_analyses, 'gvcf')
 
     auditor.write_summary_files(erroneous_assays, 'assay')
     auditor.write_summary_files(erroneous_cram_analyses, 'cram_analysis')
