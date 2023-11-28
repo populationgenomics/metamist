@@ -264,7 +264,9 @@ class GenericAuditor(AuditHelper):
             cram_analyses,
             long_read_analyses,
             sg_ids_with_no_analyses,
-        ) = self.get_most_recent_analyses_by_sg(self.dataset, analyses_list=analyses)
+        ) = self.get_most_recent_analyses_by_sg(
+            self.dataset, analyses_list=analyses, analysis_type='CRAM'
+        )
 
         # Report any crams missing the sequencing type
         crams_with_missing_seq_type = [

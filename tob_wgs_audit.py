@@ -9,6 +9,43 @@ from functools import lru_cache
 from os.path import basename, dirname
 from cloudpathlib import AnyPath
 from google.cloud import storage
+from google.api_core.exceptions import NotFound
+from metamist.graphql import query, gql
+
+
+QUERY_SG_GVCF_ANALYSES = gql(
+    """
+        query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
+          sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
+            id
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
+              id
+              meta
+              output
+              type
+              timestampCompleted
+            }
+          }
+        }
+    """
+)
+
+QUERY_SG_ANALYSES = gql(
+    """
+        query sgAnalyses($dataset: String!, $sgIds: [String!], $analysisTypes: [String!]) {
+          sequencingGroups(id: {in_: $sgIds}, project: {eq: $dataset}) {
+            id
+            analyses(status: {eq: COMPLETED}, type: {in_: $analysisTypes}, project: {eq: $dataset}) {
+              id
+              meta
+              output
+              type
+              timestampCompleted
+            }
+          }
+        }
+    """
+)
 
 
 class TobWgsAuditor(GenericAuditor):
@@ -223,9 +260,60 @@ class TobWgsAuditor(GenericAuditor):
                                 bone_marrow_sg_assay[sg['id']] = assay['id']
         return bone_marrow_sg_assay
 
+    def get_analysis_cram_paths_for_dataset_sgs(
+        self,
+        assay_sg_id_map: dict[int, str],
+    ) -> dict[str, dict[int, str]]:
+        """
+        Fetches all CRAMs for the list of sgs in the given dataset.
+        Returns a dict mapping {sg_id : (analysis_id, cram_path) }
+        """
+        sg_ids = list(assay_sg_id_map.values())
+
+        logging.getLogger().setLevel(logging.WARN)
+        analyses_query_result = query(
+            QUERY_SG_ANALYSES,
+            {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['CRAM']},
+        )
+        logging.getLogger().setLevel(logging.INFO)
+
+        analyses = analyses_query_result['sequencingGroups']
+        (
+            cram_analyses,
+            long_read_analyses,
+            sg_ids_with_no_analyses,
+        ) = self.get_most_recent_analyses_by_sg(
+            self.dataset, analyses_list=analyses, analysis_type='CRAM'
+        )
+
+        # Report any crams missing the sequencing type
+        crams_with_missing_seq_type = [
+            analysis['id']
+            for analysis in cram_analyses.values()
+            if 'sequencing_type' not in analysis['meta']
+        ]
+        if crams_with_missing_seq_type:
+            raise ValueError(
+                f'{self.dataset} :: CRAM analyses are missing sequencing_type field: {crams_with_missing_seq_type}'
+            )
+
+        # For each sg id, collect the analysis id and cram paths
+        sg_cram_paths: dict[str, dict[int, str]] = defaultdict(dict)
+        for sg_id, analysis in cram_analyses.items():
+            cram_path = analysis['output']
+            if not cram_path.startswith('gs://') or not cram_path.endswith('.cram'):
+                logging.warning(
+                    f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
+                )
+                continue
+
+            sg_cram_paths[sg_id][analysis['id']] = analysis['output']
+
+        return sg_cram_paths, long_read_analyses, sg_ids_with_no_analyses, analyses
+
     @staticmethod
     def get_most_recent_analyses_by_sg(
-        dataset: str, analyses_list: list[dict[str, Any]]
+        dataset: str, analyses_list: list[dict[str, Any]], analysis_type: str
     ) -> dict[str, dict[str, Any]]:
         """
         Retrieve the most recent completed analyses for each sequencing group.
@@ -256,6 +344,10 @@ class TobWgsAuditor(GenericAuditor):
         field for most_recent_long_read_analysis_by_sg.
         - The timestampCompleted field is used to determine the most recent analysis.
         """
+        if analysis_type == 'GVCF':
+            suffix = 'g.vcf.gz'
+        else:
+            suffix = analysis_type.lower()
         most_recent_analysis_by_sg = {}
         most_recent_long_read_analysis_by_sg = {}
         sg_ids_with_no_analyses = []
@@ -263,50 +355,52 @@ class TobWgsAuditor(GenericAuditor):
             sg_id = sg_analyses['id']
             analyses = sg_analyses['analyses']
             # Filter analyses to consider only those with a .cram extension in the output field
-            cram_analyses = [
+            requested_analyses = [
                 analysis
                 for analysis in analyses
-                if analysis['output'].endswith('.cram')
+                if analysis['output'].endswith(f'.{suffix}')
             ]
 
-            long_read_analyses = [
-                analysis
-                for analysis in analyses
-                if 'ont' in analysis['meta'].get('sequence_type')
-            ]
+            if analysis_type == 'CRAM' or analysis_type == 'cram':
+                long_read_analyses = [
+                    analysis
+                    for analysis in analyses
+                    if 'ont' in analysis['meta'].get('sequence_type')
+                ]
 
-            if not cram_analyses:
+            if not requested_analyses:
                 sg_ids_with_no_analyses.append(sg_id)
                 logging.warning(f'{dataset} :: SG {sg_id} has no completed analyses')
                 continue
 
-            if len(cram_analyses) == 1:
-                most_recent_analysis_by_sg[sg_id] = cram_analyses[0]
+            if len(requested_analyses) == 1:
+                most_recent_analysis_by_sg[sg_id] = requested_analyses[0]
                 continue
 
-            sorted_cram_analyses = sorted(
-                cram_analyses,
+            sorted_requested_analyses = sorted(
+                requested_analyses,
                 key=lambda x: datetime.strptime(
                     x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
                 ),
             )
 
-            sorted_long_read_analyses = sorted(
-                long_read_analyses,
-                key=lambda x: datetime.strptime(
-                    x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
-                ),
-            )
-            most_recent_analysis_by_sg[sg_id] = sorted_cram_analyses[-1]
-            if sorted_long_read_analyses:
-                most_recent_long_read_analysis_by_sg[sg_id] = sorted_long_read_analyses[
-                    -1
-                ]
-            # log long read analyses
-            if len(most_recent_long_read_analysis_by_sg) > 0:
-                logging.warning(
-                    f'{dataset} :: SG {sg_id} has multiple long read analyses: {most_recent_long_read_analysis_by_sg}'
+            if analysis_type == 'CRAM' or analysis_type == 'cram':
+                sorted_long_read_analyses = sorted(
+                    long_read_analyses,
+                    key=lambda x: datetime.strptime(
+                        x['timestampCompleted'], '%Y-%m-%dT%H:%M:%S'
+                    ),
                 )
+                if sorted_long_read_analyses:
+                    most_recent_long_read_analysis_by_sg[
+                        sg_id
+                    ] = sorted_long_read_analyses[-1]
+                # log long read analyses
+                if len(most_recent_long_read_analysis_by_sg) > 0:
+                    logging.warning(
+                        f'{dataset} :: SG {sg_id} has multiple long read analyses: {most_recent_long_read_analysis_by_sg}'
+                    )
+            most_recent_analysis_by_sg[sg_id] = sorted_requested_analyses[-1]
 
         return (
             most_recent_analysis_by_sg,
@@ -323,7 +417,13 @@ class TobWgsAuditor(GenericAuditor):
         # create gsclient and list contents of blob at path
         # need to supply a user project here if requester-pays bucket
         blobs = gcs_client.list_blobs(bucket_name, prefix=prefix)
-        blob_set = {blob.name for blob in blobs}
+        try:
+            blob_set = {blob.name for blob in blobs}
+        except NotFound as e:  # bucket does not exist
+            logging.error(
+                f'{self.dataset} :: {filepath} :: {"bucket does not exist" if "bucket" in str(e) else e}'
+            )
+            blob_set = set()
         return blob_set
 
     def check_gcs_file_exists(self, filepath: str) -> list[bool]:
@@ -340,7 +440,49 @@ class TobWgsAuditor(GenericAuditor):
             gcs_client, dirname(filepath), bucket_name, prefix
         )
 
-    def check_analysis_fields(self, analyses_list: list[dict]):
+    def check_gvcf_analysis_fields(self, analyses_list: list[dict]):
+        erroneous_analyses = defaultdict(dict)
+        for sg_analyses in analyses_list:
+            sg_id = sg_analyses['id']
+            erroneous_analysis_meta_fields = []
+            for analysis in sg_analyses['analyses']:
+                analysis_id = analysis['id']
+                analysis_meta_fields = {}
+                meta_field_present = '1' if analysis['meta'] else '0'
+                analysis_meta_fields[analysis_id] = {
+                    'meta field present': meta_field_present
+                }
+                if analysis['output']:
+                    if analysis['output'].endswith('.mt') or analysis[
+                        'output'
+                    ].endswith('.ht'):
+                        logging.warning(f'analysis {analysis_id} is table/matrix-table')
+                        continue
+                nagim_file = (
+                    'N/A'
+                    if analysis['meta'].get('source') is None
+                    else '1'
+                    if analysis['meta']['source'] == 'nagim'
+                    else '0'
+                )
+                analysis_meta_fields[analysis_id]['nagim file'] = nagim_file
+                file_exists = (
+                    '1' if self.check_gcs_file_exists(analysis['output']) else '0'
+                )
+                analysis_meta_fields[analysis_id]['file exists'] = file_exists
+                mismatched_analysis_type = (
+                    ('1' if not analysis['output'].endswith('.g.vcf.gz') else '0')
+                    if file_exists == '1'
+                    else 'N/A'
+                )
+                analysis_meta_fields[analysis_id][
+                    'mismatched analysis type'
+                ] = mismatched_analysis_type
+                erroneous_analysis_meta_fields.append(analysis_meta_fields)
+            erroneous_analyses[sg_id] = erroneous_analysis_meta_fields
+        return erroneous_analyses
+
+    def check_cram_analysis_fields(self, analyses_list: list[dict]):
         """
         Check metadata fields for a list of analyses and identify issues.
 
@@ -418,6 +560,42 @@ class TobWgsAuditor(GenericAuditor):
 
         return erroneous_analyses
 
+    def get_analysis_gvcf_paths_for_dataset_sgs(
+        self, assay_sg_id_map: dict[int, str]
+    ) -> dict[str, dict[str, str]]:
+        """
+        Fetches all GVCFs for the list of sgs in the given dataset.
+        Returns a dict mapping {sg_id : (analysis_id, gvcf_path)}
+        """
+        sg_ids = list(assay_sg_id_map.values())
+        logging.getLogger().setLevel(logging.WARN)
+        analyses_query_result = query(
+            QUERY_SG_GVCF_ANALYSES,
+            {'dataset': self.dataset, 'sgId': sg_ids, 'analysisTypes': ['GVCF']},
+        )
+        logging.getLogger().setLevel(logging.INFO)
+
+        analyses = analyses_query_result['sequencingGroups']
+        (
+            gvcf_analyses,
+            _,
+            sg_ids_with_no_analyses,
+        ) = self.get_most_recent_analyses_by_sg(
+            self.dataset, analyses_list=analyses, analysis_type='GVCF'
+        )
+
+        sg_gvcf_paths: dict[str, dict[int, str]] = defaultdict(dict)
+        for sg_id, analysis in gvcf_analyses.items():
+            gvcf_path = analysis['output']
+            if not gvcf_path.startswith('gs://') or not gvcf_path.endswith('.g.vcf.gz'):
+                logging.warning(
+                    f'Analysis {analysis["id"]} invalid output path: {analysis["output"]}'
+                )
+                continue
+            sg_gvcf_paths[sg_id][analysis['id']] = gvcf_path
+
+        return sg_gvcf_paths, sg_ids_with_no_analyses, analyses
+
     def write_summary_files(
         self, input_dict: Dict[str, list[Dict[int, Dict[str, str]]]], meta_type: str
     ):
@@ -492,6 +670,18 @@ def audit_tob_wgs(
         assay_sg_id_map, sg_cram_paths
     )
 
+    (
+        sg_gvcf_paths,
+        sg_ids_with_no_analyses,
+        all_gvcf_analyses,
+    ) = auditor.get_analysis_gvcf_paths_for_dataset_sgs(assay_sg_id_map)
+
+    # check that all gvcf files exist
+    for inner_dict in sg_gvcf_paths.values():
+        for gvcf_filepath in inner_dict.values():
+            if not auditor.check_gcs_file_exists(gvcf_filepath):
+                logging.error(f'{dataset} :: {gvcf_filepath} does not exist')
+    # check that all cram files exist
     for inner_dict in sg_cram_paths.values():
         for cram_filepath in inner_dict.values():
             if not auditor.check_gcs_file_exists(cram_filepath):
@@ -502,10 +692,12 @@ def audit_tob_wgs(
         participant_data, sg_cram_paths
     )
 
-    erroneous_analyses = auditor.check_analysis_fields(all_cram_analyses)
+    erroneous_cram_analyses = auditor.check_cram_analysis_fields(all_cram_analyses)
+    erroneous_gvcf_analyses = auditor.check_gvcf_analysis_fields(all_gvcf_analyses)
 
     auditor.write_summary_files(erroneous_assays, 'assay')
-    auditor.write_summary_files(erroneous_analyses, 'analysis')
+    auditor.write_summary_files(erroneous_cram_analyses, 'cram_analysis')
+    auditor.write_summary_files(erroneous_gvcf_analyses, 'gvcf_analysis')
 
     return participant_data
 
