@@ -11,6 +11,7 @@ import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
 import BillingDashboard from './pages/billing/BillingDashboard'
 import CohortBuilderView from './pages/cohort/CohortBuilderView'
+import CohortDetailView from './pages/cohort/CohortDetailView'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
@@ -81,6 +82,15 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <CohortBuilderView />
+                </ErrorBoundary>
+            }
+        />
+
+        <Route
+            path="/cohort/detail/:id"
+            element={
+                <ErrorBoundary>
+                    <CohortDetailView />
                 </ErrorBoundary>
             }
         />
