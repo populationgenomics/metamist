@@ -76,34 +76,37 @@ class CohortTable(DbBase):
         Create a new cohort
         """
 
-        _query = """
-        INSERT INTO cohort (name, derived_from, author, description, project) 
-        VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
-        """
+        # Use an atomic transaction for a mult-part insert query to prevent the database being
+        # left in an incomplete state if the query fails part way through.
+        async with self.connection.transaction():
+            _query = """
+            INSERT INTO cohort (name, derived_from, author, description, project) 
+            VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
+            """
 
-        cohort_id = await self.connection.fetch_val(
-            _query,
-            {
-                'derived_from': derived_from,
-                'author': author,
-                'description': description,
-                'project': project,
-                'name': cohort_name,
-            },
-        )
-
-        _query = """
-        INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) 
-        VALUES (:cohort_id, :sequencing_group_id)
-        """
-
-        for sg in sequencing_group_ids:
-            await self.connection.execute(
+            cohort_id = await self.connection.fetch_val(
                 _query,
                 {
-                    'cohort_id': cohort_id,
-                    'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                    'derived_from': derived_from,
+                    'author': author,
+                    'description': description,
+                    'project': project,
+                    'name': cohort_name,
                 },
             )
 
-        return cohort_id
+            _query = """
+            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) 
+            VALUES (:cohort_id, :sequencing_group_id)
+            """
+
+            for sg in sequencing_group_ids:
+                await self.connection.execute(
+                    _query,
+                    {
+                        'cohort_id': cohort_id,
+                        'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                    },
+                )
+
+            return cohort_id
