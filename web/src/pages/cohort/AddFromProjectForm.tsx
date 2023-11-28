@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react'
-import { Container, Form } from 'semantic-ui-react'
+import { Container, Form, Message } from 'semantic-ui-react'
 import { useLazyQuery } from '@apollo/client'
 import { uniq } from 'lodash'
 
@@ -57,7 +57,7 @@ interface IAddFromProjectForm {
 
 const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) => {
     const [selectedProject, setSelectedProject] = useState<Project>()
-    const [searchHits, setSearchHits] = useState<SequencingGroup[]>([])
+    const [searchHits, setSearchHits] = useState<SequencingGroup[] | null>(null)
 
     const { theme } = useContext(ThemeContext)
     const inverted = theme === 'dark-mode'
@@ -163,20 +163,42 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
         })
     }
 
+    const renderTable = () => {
+        if (loading) {
+            return (
+                <>
+                    <br />
+                    <div>Finding sequencing groups...</div>
+                </>
+            )
+        }
+
+        if (searchHits == null) {
+            return null
+        }
+
+        if (searchHits.length === 0) {
+            return (
+                <>
+                    <br />
+                    <b>No sequencing groups found matching your query</b>
+                </>
+            )
+        }
+
+        return <SequencingGroupTable sequencingGroups={searchHits} editable={false} />
+    }
+
     const projectOptions = projects.map((project) => ({
         key: project.id,
         value: project.id,
         text: project.name,
     }))
 
-    if (error) {
-        return <MuckError message={error.message} />
-    }
-
     return (
         <Form inverted={inverted}>
             <h3>Project</h3>
-            <p>Include Sequencing Groups from the following project</p>
+            <p>Include sequencing groups from the following project</p>
             <Form.Dropdown
                 placeholder="Select Projects"
                 fluid
@@ -221,29 +243,31 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                         loading ||
                         error != null ||
                         selectedProject == null ||
+                        searchHits == null ||
                         searchHits.length === 0
                     }
                     content="Add"
                     onClick={() => {
+                        if (searchHits == null) return
                         // eslint-disable-next-line no-alert
                         const proceed = window.confirm(
-                            'This will add all Sequencing Groups in the table to your Cohort. ' +
-                                'Sequencing Groups hidden by the interactive table search will ' +
+                            'This will add all sequencing groups in the table to your Cohort. ' +
+                                'sequencing groups hidden by the interactive table search will ' +
                                 'also be added. Do you wish to continue?'
                         )
                         if (proceed) {
                             onAdd(searchHits)
-                            setSearchHits([])
+                            setSearchHits(null)
                         }
                     }}
                 />
             </Form.Group>
-            <br />
-            {loading ? (
-                <div>Finding Sequencing Groups...</div>
-            ) : (
-                <SequencingGroupTable editable={false} sequencingGroups={searchHits} />
+            {error && (
+                <Message color="red">
+                    <MuckError message={error.message} />
+                </Message>
             )}
+            {renderTable()}
         </Form>
     )
 }

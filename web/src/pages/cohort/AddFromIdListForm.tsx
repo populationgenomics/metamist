@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react'
-import { Form } from 'semantic-ui-react'
+import { Form, Message } from 'semantic-ui-react'
 import { useLazyQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__'
@@ -7,6 +7,7 @@ import { ThemeContext } from '../../shared/components/ThemeProvider'
 
 import { SequencingGroup } from './types'
 import SequencingGroupTable from './SequencingGroupTable'
+import MuckError from '../../shared/components/MuckError'
 
 const GET_SEQUENCING_GROUPS_QUERY = gql(`
 query FetchSequencingGroupsById($ids: [String!]!) {
@@ -15,13 +16,12 @@ query FetchSequencingGroupsById($ids: [String!]!) {
       type
       technology
       platform
-    # FIXME: Add project info to query when connection.user bug is fixed on server
-    #   samples {
-    #     project {
-    #       id
-    #       name
-    #     }
-    #   }
+      sample {
+        project {
+          id
+          name
+        }
+      }
     }
   }
 `)
@@ -35,7 +35,7 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
     const inverted = theme === 'dark-mode'
 
     const [text, setText] = useState<string>('')
-    const [sequencingGroups, setSequencingGroups] = useState<SequencingGroup[]>([])
+    const [sequencingGroups, setSequencingGroups] = useState<SequencingGroup[] | null>(null)
 
     const [fetchSequencingGroups, { loading, error }] = useLazyQuery(GET_SEQUENCING_GROUPS_QUERY)
 
@@ -57,15 +57,45 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
                 setSequencingGroups(
                     hits.sequencingGroups.map((sg) => ({
                         ...sg,
-                        project: { id: -1, name: '?' },
+                        project: sg.sample.project,
                     }))
                 ),
         })
     }
 
     const addToCohort = () => {
+        if (sequencingGroups == null) {
+            return
+        }
+
         onAdd(sequencingGroups)
-        setSequencingGroups([])
+        setSequencingGroups(null)
+    }
+
+    const renderTable = () => {
+        if (loading) {
+            return (
+                <>
+                    <br />
+                    <div>Finding sequencing groups...</div>
+                </>
+            )
+        }
+
+        if (sequencingGroups == null) {
+            return null
+        }
+
+        if (sequencingGroups.length === 0) {
+            return (
+                <>
+                    <br />
+                    <b>No sequencing groups found matching your query</b>
+                </>
+            )
+        }
+
+        return <SequencingGroupTable sequencingGroups={sequencingGroups} editable={false} />
     }
 
     return (
@@ -90,16 +120,21 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
                 <Form.Button
                     type="button"
                     content="Add"
-                    disabled={loading || error != null || sequencingGroups.length === 0}
+                    disabled={
+                        loading ||
+                        error != null ||
+                        sequencingGroups == null ||
+                        sequencingGroups.length === 0
+                    }
                     onClick={addToCohort}
                 />
             </Form.Group>
-            <br />
-            {loading ? (
-                <div>Fetching Sequencing Groups...</div>
-            ) : (
-                <SequencingGroupTable editable={false} sequencingGroups={sequencingGroups} />
+            {error && (
+                <Message color="red">
+                    <MuckError message={error.message} />
+                </Message>
             )}
+            {renderTable()}
         </Form>
     )
 }
