@@ -246,6 +246,7 @@ const CohortBuilderView = () => {
 
                     <SequencingGroupTable
                         editable={true}
+                        emptyMessage="No sequencing groups have been added to this cohort"
                         onDelete={removeSequencingGroup}
                         sequencingGroups={sequencingGroups}
                     />
@@ -253,23 +254,28 @@ const CohortBuilderView = () => {
                 <Divider />
                 <section id="form-buttons">
                     {createCohortError && (
-                        <Message negative hidden={!createCohortError}>
-                            <h3>{createCohortError.name}</h3>
-                            <p>{createCohortError.description}</p>
-                            {ALLOW_STACK_TRACE && <pre>{createCohortError.stacktrace}</pre>}
-                        </Message>
+                        <>
+                            <Message negative hidden={!createCohortError}>
+                                <h3>{createCohortError.name}</h3>
+                                <p>{createCohortError.description}</p>
+                                {ALLOW_STACK_TRACE && <pre>{createCohortError.stacktrace}</pre>}
+                            </Message>
+                            <br />
+                        </>
                     )}
                     {createCohortSuccess && (
-                        <Message
-                            positive
-                            hidden={!createCohortSuccess}
-                            content={createCohortSuccess}
-                        >
-                            <h3>Success!</h3>
-                            <p>Created a new cohort with ID {createCohortSuccess}</p>
-                        </Message>
+                        <>
+                            <Message
+                                positive
+                                hidden={!createCohortSuccess}
+                                content={createCohortSuccess}
+                            >
+                                <h3>Success!</h3>
+                                <p>Created a new cohort with ID {createCohortSuccess}</p>
+                            </Message>
+                            <br />
+                        </>
                     )}
-                    <br />
                     <Form.Group>
                         <Form.Button
                             type="submit"

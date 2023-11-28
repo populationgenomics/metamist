@@ -6,16 +6,20 @@ import { SequencingGroup } from './types'
 
 type Direction = 'ascending' | 'descending' | undefined
 
-const SequencingGroupTable = ({
-    editable = true,
-    height = 650,
-    sequencingGroups = [],
-    onDelete = () => {},
-}: {
+interface ISequencingGroupTableProps {
     editable?: boolean
     height?: number
     sequencingGroups?: SequencingGroup[]
+    emptyMessage?: string
     onDelete?: (id: string) => void
+}
+
+const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
+    editable = true,
+    height = 650,
+    sequencingGroups = [],
+    emptyMessage = 'Nothing to display',
+    onDelete = () => {},
 }) => {
     const [sortColumn, setSortColumn] = useState('id')
     const [sortDirection, setSortDirection] = useState<Direction>('ascending')
@@ -60,8 +64,39 @@ const SequencingGroupTable = ({
         { key: 'platform', name: 'Platform' },
     ]
 
-    if (!sequencingGroups.length) {
-        return <b>No Sequencing Groups have been added to this cohort</b>
+    const renderTableBody = () => {
+        if (sequencingGroups.length && !sortedRows.length) {
+            return (
+                <Table.Row>
+                    <Table.Cell colSpan={5}>No rows matching your filters</Table.Cell>
+                </Table.Row>
+            )
+        }
+
+        if (!sequencingGroups.length) {
+            return (
+                <Table.Row>
+                    <Table.Cell colSpan={5}>{emptyMessage}</Table.Cell>
+                </Table.Row>
+            )
+        }
+
+        return sortedRows.map((sg: SequencingGroup) => (
+            <Table.Row key={sg.id}>
+                {editable && sortedRows.length ? (
+                    <Table.Cell>
+                        <Button icon onClick={() => onDelete(sg.id)}>
+                            <Icon name="delete" color="red" />
+                        </Button>
+                    </Table.Cell>
+                ) : null}
+                <Table.Cell>{sg.id}</Table.Cell>
+                <Table.Cell>{sg.project.name}</Table.Cell>
+                <Table.Cell>{sg.type}</Table.Cell>
+                <Table.Cell>{sg.technology}</Table.Cell>
+                <Table.Cell>{sg.platform}</Table.Cell>
+            </Table.Row>
+        ))
     }
 
     return (
@@ -77,7 +112,7 @@ const SequencingGroupTable = ({
                     }}
                 >
                     <Table.Row>
-                        {editable ? <Table.HeaderCell /> : null}
+                        {editable && sortedRows.length ? <Table.HeaderCell /> : null}
                         {tableColumns.map((column) => (
                             <Table.HeaderCell
                                 key={column.key}
@@ -97,33 +132,7 @@ const SequencingGroupTable = ({
                         ))}
                     </Table.Row>
                 </Table.Header>
-                <Table.Body>
-                    {sortedRows.length ? (
-                        sortedRows.map((sg: SequencingGroup) => (
-                            <Table.Row key={sg.id}>
-                                {editable ? (
-                                    <Table.Cell>
-                                        <Button icon onClick={() => onDelete(sg.id)}>
-                                            <Icon name="delete" color="red" />
-                                        </Button>
-                                    </Table.Cell>
-                                ) : null}
-                                <Table.Cell>{sg.id}</Table.Cell>
-                                <Table.Cell>{sg.project.name}</Table.Cell>
-                                <Table.Cell>{sg.type}</Table.Cell>
-                                <Table.Cell>{sg.technology}</Table.Cell>
-                                <Table.Cell>{sg.platform}</Table.Cell>
-                            </Table.Row>
-                        ))
-                    ) : (
-                        <Table.Row>
-                            <Table.Cell colSpan={1} />
-                            <Table.Cell colSpan={5}>
-                                No Sequencing Groups matching your search criteria
-                            </Table.Cell>
-                        </Table.Row>
-                    )}
-                </Table.Body>
+                <Table.Body>{renderTableBody()}</Table.Body>
             </Table>
         </div>
     )

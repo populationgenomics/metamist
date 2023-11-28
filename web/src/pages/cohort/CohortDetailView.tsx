@@ -85,6 +85,7 @@ const CohortDetailView: React.FC = () => {
             <Divider />
             <SequencingGroupTable
                 height={800}
+                emptyMessage={'This cohort does not have any sequencing groups'}
                 sequencingGroups={cohort.sequencingGroups.map((sg) => ({
                     id: sg.id,
                     type: sg.type,
