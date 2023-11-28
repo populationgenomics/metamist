@@ -1,16 +1,20 @@
-import React, { useState, useContext } from 'react'
+import React, { useState, useContext, useMemo } from 'react'
 import { Container, Divider, Form, Message, Tab } from 'semantic-ui-react'
 import { uniqBy } from 'lodash'
 import { useQuery } from '@apollo/client'
 
 import { gql } from '../../__generated__'
+import { CohortApi } from '../../sm-api'
+
 import { ThemeContext } from '../../shared/components/ThemeProvider'
+import MuckError from '../../shared/components/MuckError'
 
 import SequencingGroupTable from './SequencingGroupTable'
 import AddFromProjectForm from './AddFromProjectForm'
 import AddFromIdListForm from './AddFromIdListForm'
-import { Project, SequencingGroup } from './types'
-import MuckError from '../../shared/components/MuckError'
+import { Project, SequencingGroup, APIError } from './types'
+
+const ALLOW_STACK_TRACE = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'dev'
 
 const GET_PROJECTS_QUERY = gql(`
 query GetProjectsForCohortBuilder {
@@ -20,10 +24,16 @@ query GetProjectsForCohortBuilder {
     }
 }`)
 
-interface CohortFormData {
-    name: string
-    description: string
-    sequencingGroups: SequencingGroup[]
+const cohortName = () => {
+    const nameElement = document.getElementById('cohort-name') as HTMLInputElement
+    if (!nameElement) return ''
+    return nameElement.value.trim()
+}
+
+const cohortDescription = () => {
+    const descriptionElement = document.getElementById('cohort-description') as HTMLInputElement
+    if (!descriptionElement) return ''
+    return descriptionElement.value.trim()
 }
 
 const CohortBuilderView = () => {
@@ -31,35 +41,35 @@ const CohortBuilderView = () => {
     const inverted = theme === 'dark-mode'
 
     // State for new cohort data
-    const [createCohortError, setCreateCohortError] = useState<string | null>(null)
-    const [createCohortSuccess, setCreateCohortSuccess] = useState<string | null>(null)
+    const [createCohortError, setCreateCohortError] = useState<APIError | null>(null)
+    const [createCohortSuccess, setCreateCohortSuccess] = useState<number | null>(null)
     const [createCohortLoading, setCreateCohortLoading] = useState<boolean>(false)
     const [selectedProject, setSelectedProject] = useState<Project>()
-    const [cohortFormData, setCohortFormData] = useState<CohortFormData>({
-        name: '',
-        description: '',
-        sequencingGroups: [],
-    })
+    const [sequencingGroups, setSequencingGroups] = useState<SequencingGroup[]>([])
 
     // Loading projects query for drop-down menu selection
     const { loading, error, data } = useQuery(GET_PROJECTS_QUERY)
 
     const addSequencingGroups = (sgs: SequencingGroup[]) => {
-        setCohortFormData({
-            ...cohortFormData,
-            sequencingGroups: uniqBy([...cohortFormData.sequencingGroups, ...sgs], 'id'),
-        })
+        setSequencingGroups(uniqBy([...sequencingGroups, ...sgs], 'id'))
     }
 
     const removeSequencingGroup = (id: string) => {
-        setCohortFormData({
-            ...cohortFormData,
-            sequencingGroups: cohortFormData.sequencingGroups.filter((sg) => sg.id !== id),
-        })
+        setSequencingGroups(sequencingGroups.filter((sg) => sg.id !== id))
     }
 
+    const allowSubmission = useMemo(() => {
+        if (loading) return false
+        if (createCohortLoading) return false
+        if (!selectedProject?.id) return false
+        if (!sequencingGroups || sequencingGroups.length === 0) return false
+        if (cohortName().length === 0) return false
+        if (cohortDescription().length === 0) return false
+        return true
+    }, [loading, createCohortLoading, selectedProject, sequencingGroups])
+
     const createCohort = () => {
-        if (!selectedProject) return
+        if (!allowSubmission || selectedProject == null) return
 
         // eslint-disable-next-line no-alert
         const proceed = window.confirm(
@@ -71,39 +81,19 @@ const CohortBuilderView = () => {
         setCreateCohortError(null)
         setCreateCohortSuccess(null)
 
-        fetch(`/api/v1/cohort/${selectedProject.name}/`, {
-            method: 'POST',
-            body: JSON.stringify({
-                name: cohortFormData.name,
-                description: cohortFormData.description,
-                sequencingGroups: cohortFormData.sequencingGroups.map((sg) => sg.id),
-            }),
-        })
+        const client = new CohortApi()
+        client
+            .createCohort(selectedProject.name, {
+                name: cohortName(),
+                description: cohortDescription(),
+                sequencing_group_ids: sequencingGroups.map((sg) => sg.id),
+                derived_from: undefined,
+            })
             .then((response) => {
-                if (!response.ok) {
-                    let message = `Error creating cohort: ${response.status} (${response.status})`
-                    if (response.status === 404) {
-                        message = `Error creating cohort: Project not found (${response.status})`
-                    }
-                    setCreateCohortError(message)
-                } else {
-                    response
-                        .json()
-                        .then((d) => {
-                            // eslint-disable-next-line no-alert
-                            setCreateCohortSuccess(`Cohort created with ID ${d.cohort_id}`)
-                        })
-                        .catch((e) => {
-                            // Catch JSON parsing error
-                            setCreateCohortError(`Error parsing JSON response: ${e}`)
-                            // eslint-disable-next-line no-console
-                            console.error(e)
-                        })
-                        .finally(() => setCreateCohortLoading(false))
-                }
+                setCreateCohortSuccess(response.data.cohort_id)
             })
             .catch((e) => {
-                setCreateCohortError(`An unknown error occurred while creating cohort: ${e}`)
+                setCreateCohortError(e.response.data)
             })
             .finally(() => setCreateCohortLoading(false))
     }
@@ -137,7 +127,11 @@ const CohortBuilderView = () => {
     }))
 
     if (error) {
-        return <MuckError message={error.message} />
+        return (
+            <Container>
+                return <MuckError message={error.message} />
+            </Container>
+        )
     }
 
     if (loading) {
@@ -163,6 +157,7 @@ const CohortBuilderView = () => {
                 <section id="sequencing-group-details-form">
                     <h2>Details</h2>
                     <Form.Dropdown
+                        id="cohort-project"
                         name="project"
                         label={
                             <>
@@ -179,11 +174,12 @@ const CohortBuilderView = () => {
                         onChange={(_, d) => {
                             const project = data?.myProjects?.find((p) => p.id === d.value)
                             if (!project) return
-                            setSelectedProject({ id: 1, name: 'fake' })
+                            setSelectedProject({ id: project.id, name: project.name })
                         }}
                         options={projectOptions}
                     />
                     <Form.Input
+                        id="cohort-name"
                         name="name"
                         label={
                             <>
@@ -197,11 +193,9 @@ const CohortBuilderView = () => {
                         placeholder="Cohort Name"
                         maxLength={255}
                         required
-                        onChange={(e) =>
-                            setCohortFormData({ ...cohortFormData, name: e.target.value })
-                        }
                     />
                     <Form.Input
+                        id="cohort-description"
                         name="description"
                         label={
                             <>
@@ -214,12 +208,6 @@ const CohortBuilderView = () => {
                         placeholder="Cohort Description"
                         maxLength={255}
                         required
-                        onChange={(e) =>
-                            setCohortFormData({
-                                ...cohortFormData,
-                                description: e.target.value,
-                            })
-                        }
                     />
                 </section>
                 <Divider />
@@ -243,13 +231,28 @@ const CohortBuilderView = () => {
                     <SequencingGroupTable
                         editable={true}
                         onDelete={removeSequencingGroup}
-                        sequencingGroups={cohortFormData.sequencingGroups}
+                        sequencingGroups={sequencingGroups}
                     />
                 </section>
                 <Divider />
                 <section id="form-buttons">
-                    <Message negative hidden={!createCohortError} content={createCohortError} />
-                    <Message positive hidden={!createCohortSuccess} content={createCohortSuccess} />
+                    {createCohortError && (
+                        <Message negative hidden={!createCohortError}>
+                            <h3>{createCohortError.name}</h3>
+                            <p>{createCohortError.description}</p>
+                            {ALLOW_STACK_TRACE && <pre>{createCohortError.stacktrace}</pre>}
+                        </Message>
+                    )}
+                    {createCohortSuccess && (
+                        <Message
+                            positive
+                            hidden={!createCohortSuccess}
+                            content={createCohortSuccess}
+                        >
+                            <h3>Success!</h3>
+                            <p>Create a new cohort with ID {createCohortSuccess}</p>
+                        </Message>
+                    )}
                     <br />
                     <Form.Group>
                         <Form.Button
@@ -258,14 +261,7 @@ const CohortBuilderView = () => {
                             color="green"
                             onClick={createCohort}
                             loading={createCohortLoading}
-                            disabled={
-                                loading ||
-                                createCohortLoading ||
-                                selectedProject == null ||
-                                cohortFormData.sequencingGroups.length === 0 ||
-                                !cohortFormData ||
-                                !cohortFormData
-                            }
+                            disabled={!allowSubmission}
                         />
                         <Form.Button
                             type="button"
@@ -274,15 +270,11 @@ const CohortBuilderView = () => {
                             loading={createCohortLoading}
                             onClick={() => {
                                 // eslint-disable-next-line no-restricted-globals, no-alert
-                                const yes = confirm(
+                                const proceed = confirm(
                                     "Remove all sequencing groups? This can't be undone."
                                 )
-                                if (!yes) return
-
-                                setCohortFormData({
-                                    ...cohortFormData,
-                                    sequencingGroups: [],
-                                })
+                                if (!proceed) return
+                                setSequencingGroups([])
                             }}
                         />
                     </Form.Group>
