@@ -357,15 +357,15 @@ class BillingDb(BqDbBase):
         fields_selected = ','.join(columns)
 
         # construct filters
-        filters = []
+        and_filters = []
         query_parameters = []
 
-        filters.append('day >= TIMESTAMP(@start_date)')
+        and_filters.append('day >= TIMESTAMP(@start_date)')
         query_parameters.append(
             bigquery.ScalarQueryParameter('start_date', 'STRING', query.start_date)
         )
 
-        filters.append('day <= TIMESTAMP(@end_date)')
+        and_filters.append('day <= TIMESTAMP(@end_date)')
         query_parameters.append(
             bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date)
         )
@@ -377,11 +377,12 @@ class BillingDb(BqDbBase):
             # (part_time field in the view)
             # We are querying by day,
             # which can be up to a week behind regarding _PARTITIONTIME
-            filters.append('part_time >= TIMESTAMP(@start_date)')
-            filters.append(
+            and_filters.append('part_time >= TIMESTAMP(@start_date)')
+            and_filters.append(
                 'part_time <= TIMESTAMP_ADD(TIMESTAMP(@end_date), INTERVAL 7 DAY)'
             )
 
+        filters = []
         if query.filters:
             for filter_key, filter_value in query.filters.items():
                 col_name = str(filter_key.value)
@@ -394,7 +395,14 @@ class BillingDb(BqDbBase):
                     # the view has to be extended
                     view_to_use = BQ_AGGREG_EXT_VIEW
 
-        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
+        if query.filters_op == 'OR':
+            if filters:
+                and_filters.append('(' + ' OR '.join(filters) + ')')
+        else:
+            # if not specified, default to AND
+            and_filters.extend(filters)
+
+        filter_str = 'WHERE ' + ' AND '.join(and_filters) if and_filters else ''
 
         # construct order by
         order_by_cols = []

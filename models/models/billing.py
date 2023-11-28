@@ -184,6 +184,9 @@ class BillingTotalCostQueryModel(SMBase):
 
     # optional
     filters: dict[BillingColumn, str] | None = None
+    # optional, AND or OR
+    filters_op: str | None = None
+
     # order by, reverse= TRUE for DESC, FALSE for ASC
     order_by: dict[BillingColumn, bool] | None = None
     limit: int | None = None
