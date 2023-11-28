@@ -174,6 +174,7 @@ const CohortBuilderView = () => {
                         placeholder="Select Project"
                         fluid
                         selection
+                        required
                         onChange={(_, d) => {
                             const project = data?.myProjects?.find((p) => p.id === d.value)
                             if (!project) return
