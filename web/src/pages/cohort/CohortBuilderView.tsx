@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react'
 import { Container, Divider, Form, Message, Tab } from 'semantic-ui-react'
 import { uniqBy } from 'lodash'
 import { useQuery } from '@apollo/client'
+import { useNavigate } from 'react-router-dom'
 
 import { gql } from '../../__generated__'
 import { CohortApi, CohortBody } from '../../sm-api'
@@ -27,6 +28,8 @@ query GetProjectsForCohortBuilder {
 const CohortBuilderView = () => {
     const { theme } = useContext(ThemeContext)
     const inverted = theme === 'dark-mode'
+
+    const navigate = useNavigate()
 
     // State for new cohort data
     const [createCohortError, setCreateCohortError] = useState<APIError | null>(null)
@@ -90,6 +93,7 @@ const CohortBuilderView = () => {
             })
             .then((response) => {
                 setCreateCohortSuccess(response.data.cohort_id)
+                navigate(`/cohort/detail/${response.data.cohort_id}`)
             })
             .catch((e) => {
                 setCreateCohortError(e.response.data)
