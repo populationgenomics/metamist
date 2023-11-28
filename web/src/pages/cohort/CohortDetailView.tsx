@@ -1,10 +1,10 @@
 import React from 'react'
 import { useQuery } from '@apollo/client'
+import { useParams } from 'react-router-dom'
 import { Container, Divider } from 'semantic-ui-react'
 
 import { gql } from '../../__generated__'
 import MuckError from '../../shared/components/MuckError'
-import { Project } from './types'
 import SequencingGroupTable from './SequencingGroupTable'
 
 const COHORT_DETAIL_VIEW_FRAGMENT = gql(`
@@ -23,19 +23,18 @@ query CohortDetailView($id: Int!) {
 }
 `)
 
-interface ICohortDetailViewProps {
-    id: number
-    project: Project
-}
+const CohortDetailView: React.FC = () => {
+    const { id } = useParams()
 
-const CohortDetailView: React.FC<ICohortDetailViewProps> = ({ id, project }) => {
     const { loading, error, data } = useQuery(COHORT_DETAIL_VIEW_FRAGMENT, {
-        variables: { id },
+        variables: { id: id ? parseInt(id, 10) : 0 },
     })
 
     if (loading) {
         return (
             <Container>
+                <h1>Cohort Information</h1>
+                <Divider />
                 <div>Loading Cohort...</div>
             </Container>
         )
@@ -44,6 +43,8 @@ const CohortDetailView: React.FC<ICohortDetailViewProps> = ({ id, project }) => 
     if (error) {
         return (
             <Container>
+                <h1>Cohort Information</h1>
+                <Divider />
                 <MuckError message={error.message} />
             </Container>
         )
@@ -53,6 +54,8 @@ const CohortDetailView: React.FC<ICohortDetailViewProps> = ({ id, project }) => 
     if (!cohort) {
         return (
             <Container>
+                <h1>Cohort Information</h1>
+                <Divider />
                 <MuckError message="No data found" />
             </Container>
         )
@@ -60,8 +63,11 @@ const CohortDetailView: React.FC<ICohortDetailViewProps> = ({ id, project }) => 
 
     return (
         <Container>
+            <h1>Cohort Information</h1>
+            <Divider />
             <div>
                 <b>Name: </b> {cohort.name}
+                <br />
                 <b>Description: </b> {cohort.description}
             </div>
             <Divider />
@@ -71,7 +77,7 @@ const CohortDetailView: React.FC<ICohortDetailViewProps> = ({ id, project }) => 
                     type: sg.type,
                     technology: sg.technology,
                     platform: sg.platform,
-                    project,
+                    project: { name: '?', id: 1 },
                 }))}
                 editable={false}
             />
