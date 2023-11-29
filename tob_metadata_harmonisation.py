@@ -2,12 +2,10 @@
 This script is used to harmonise the assay metadata from the old tob-wgs project with the new metadata schema.
 This script checks the assay metadata for each assay in the project and checks if the field is in the FIELD_MAPPING dictionary.
 If the field is in the dictionary, the field is added to the new_assay_data dictionary with the new field name as the key.
-If the field is not in the dictionary, the field is printed to the console.
+If the field is not in the dictionary, the a ValueError is raised.
 If the field is in the dictionary but the value is None, the field is not added to the new_assay_data dictionary.
 If the field is in the dictionary and the value is not None, the field is added to the new_assay_data dictionary with the new field name as the key and the value as the value.
 If there are multiple mappings to the same field, the value is compared to the value already in the new_assay_data dictionary. If the values are different, the field is printed to the console.
-
-The script is run in the following way:
 """
 
 from metamist.graphql import gql, query
@@ -27,7 +25,7 @@ query MyQuery {
       assays {
         id
         meta
-        
+
       }
     }
   }
@@ -96,17 +94,17 @@ def harmonise_assay_data(response: Dict) -> Dict:
                     existing_value = new_assay_data.get(new_field)
                     if existing_value and old_value != existing_value:
                         print(
-                            f"Multiple fields map to the same harmonised field: {new_field}"
+                            f'Multiple fields map to the same harmonised field: {new_field}'
                         )
                         print(
-                            f"Assay ID: {assay['id']}, old field: {old_field}, new field: {new_field}, old value: {existing_value}, new value: {old_value}"
+                            f'Assay ID: {assay["id"]}, old field: {old_field}, new field: {new_field}, old value: {existing_value}, new value: {old_value}'
                         )
                     else:
                         new_assay_data[new_field] = old_value
             # Add fields from the original assay that are not in FIELD_MAPPING. This should not happen.
             for field in assay['meta']:
                 if field not in FIELD_MAPPING:
-                    raise ValueError(f"Field not in FIELD_MAPPING: {field}")
+                    raise ValueError(f'Field not in FIELD_MAPPING: {field}')
                     # new_assay_data[field] = assay['meta'][field]
             harmonised_data[assay['id']] = new_assay_data
     return harmonised_data
@@ -127,8 +125,8 @@ def main() -> Dict:
             meta=assay_data,
         )  # AssayUpsert |
         # Update Assay
-        api_response = api_instance.update_assay(assay_upsert)
+        _ = api_instance.update_assay(assay_upsert)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
