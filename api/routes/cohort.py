@@ -10,6 +10,8 @@ router = APIRouter(prefix='/cohort', tags=['cohort'])
 
 
 class CohortBody(BaseModel):
+    """Represents the expected JSON body of the create cohort request"""
+
     name: str
     description: str
     sequencing_group_ids: list[str]

@@ -4,7 +4,6 @@ import datetime
 
 from db.python.connect import DbBase
 from db.python.tables.project import ProjectId
-from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.cohort import Cohort
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
@@ -56,12 +55,16 @@ class CohortTable(DbBase):
         cohorts = [Cohort.from_db(dict(row)) for row in rows]
         return cohorts
 
-    async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list:
+    async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list[int]:
+        """
+        Return all sequencing group IDs for the given cohort.
+        """
+
         _query = """
         SELECT sequencing_group_id FROM cohort_sequencing_group WHERE cohort_id = :cohort_id
         """
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
-        return [row["sequencing_group_id"] for row in rows]
+        return [row['sequencing_group_id'] for row in rows]
 
     async def create_cohort(
         self,
@@ -80,7 +83,7 @@ class CohortTable(DbBase):
         # left in an incomplete state if the query fails part way through.
         async with self.connection.transaction():
             _query = """
-            INSERT INTO cohort (name, derived_from, author, description, project) 
+            INSERT INTO cohort (name, derived_from, author, description, project)
             VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
             """
 
@@ -96,7 +99,7 @@ class CohortTable(DbBase):
             )
 
             _query = """
-            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) 
+            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id)
             VALUES (:cohort_id, :sequencing_group_id)
             """
 

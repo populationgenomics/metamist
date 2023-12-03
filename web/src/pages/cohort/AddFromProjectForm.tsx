@@ -13,9 +13,9 @@ import { FetchSequencingGroupsQueryVariables } from '../../__generated__/graphql
 
 const GET_SEQUENCING_GROUPS_QUERY = gql(`
 query FetchSequencingGroups(
-    $project: String!, 
-    $platform: String, 
-    $technology: String, 
+    $project: String!,
+    $platform: String,
+    $technology: String,
     $seqType: String,
     $assayMeta: JSON,
     $excludeIds: [String!]

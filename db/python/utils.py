@@ -80,6 +80,7 @@ class NoProjectAccess(Forbidden):
         )
 
 
+# pylint: disable=too-many-instance-attributes
 class GenericFilter(Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)

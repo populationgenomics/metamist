@@ -1,5 +1,3 @@
-from typing import Any
-
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis import AnalysisTable
@@ -8,7 +6,6 @@ from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.utils import get_logger
 from models.models.cohort import Cohort
-from models.models.sequencing_group import SequencingGroupInternal
 
 logger = get_logger()
 
