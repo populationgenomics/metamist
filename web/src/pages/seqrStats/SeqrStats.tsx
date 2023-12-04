@@ -2,7 +2,7 @@ import React from 'react'
 import { ProjectSeqrStats, WebApi, ProjectApi, EnumsApi } from '../../sm-api'
 import SeqrProjectSelector from './SeqrProjectSelector'
 import SequencingTypeSelector from './SequencingTypeSelector'
-import { Table } from 'semantic-ui-react'
+import { Table, Checkbox, CheckboxProps } from 'semantic-ui-react'
 
 interface SeqrProjectProps {
     id: number
@@ -14,8 +14,11 @@ interface SelectedProject {
     name: string;
 }
 
-interface SequencingTypeProps {
-    name: string
+function getPercentageColor(percentage: number) {
+    const red = 265 - (percentage / 100 * 85); // Reducing intensity
+    const green = 180 + (percentage / 100 * 85); // Reducing intensity
+    const blue = 155; // Adding more blue for a pastel tone
+    return `rgb(${red}, ${green}, ${blue})`;
 }
 
 const SeqrStats: React.FC = () => {
@@ -52,12 +55,17 @@ const SeqrStats: React.FC = () => {
         })
     }, [])
 
+    
+
+
     const [responses, setResponses] = React.useState<ProjectSeqrStats[]>([])
     // 0-indexed page number
     const [pageNumber, setPageNumber] = React.useState<number>(0)
     const [pageSize, setPageSize] = React.useState<number>(10)
 
-    const pagedResults = responses.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize)
+    const pagedResults = responses.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize);
+
+    const [hideFullPercentage, setHideFullPercentage] = React.useState(false);
 
     // New state for sequencing types
     const [seqTypes, setSeqTypes] = React.useState<string[]>([]);
@@ -80,7 +88,7 @@ const SeqrStats: React.FC = () => {
         });
     }, []);
 
-    // Updated effect for fetching project stats
+    // Fetching project stats
     React.useEffect(() => {
         if (selectedProjects.length > 0 && selectedSeqTypes.length > 0) {
             const projectIds = selectedProjects.map(p => p.id);
@@ -107,6 +115,12 @@ const SeqrStats: React.FC = () => {
                 seqTypes={seqTypes}
                 onSeqTypeSelected={handleSeqTypeSelected}
             />
+            <h1>Hide full percentages</h1>
+            <Checkbox
+                label="Hide 100% Aligned"
+                checked={hideFullPercentage}
+                onChange={() => setHideFullPercentage(!hideFullPercentage)}
+            />
             <h2>Page Size</h2>
             <select
                 onChange={(e) => {
@@ -131,29 +145,56 @@ const SeqrStats: React.FC = () => {
                         <th>Samples</th>
                         <th>Sequencing Groups</th>
                         <th>CRAMs</th>
+                        <th>% Aligned</th>
                         <th>ES-Index Analysis ID</th>
                         <th>ES-Index SGs</th>
+                        <th>% in Index</th>
                         <th>Joint Call Analysis ID</th>
                         <th>Joint Call SGs</th>
+                        <th>% in Joint Call</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {pagedResults.map((ss) => (
-                        <tr key={`${ss.project}-${ss.sequencing_type}`}>
-                            <td>{ss.dataset}</td>
-                            <td>{ss.sequencing_type}</td>
-                            <td>{ss.total_families}</td>
-                            <td>{ss.total_participants}</td>
-                            <td>{ss.total_samples}</td>
-                            <td>{ss.total_sequencing_groups}</td>
-                            <td>{ss.total_crams}</td>
-                            <td>{ss.latest_es_index_id}</td>
-                            <td>{ss.total_sgs_in_latest_es_index}</td>
-                            <td>{ss.latest_annotate_dataset_id}</td>
-                            <td>{ss.total_sgs_in_latest_annotate_dataset}</td>
-                            <td></td>
-                        </tr>
-                    ))}
+                    {pagedResults.map((ss) => {
+                        const percentageAligned = ss.total_sequencing_groups > 0 
+                            ? (ss.total_crams / ss.total_sequencing_groups) * 100 
+                            : 0;
+
+                        const percentageInIndex = ss.total_sgs_in_latest_es_index > 0
+                            ? (ss.total_sgs_in_latest_es_index / ss.total_sequencing_groups) * 100
+                            : 0;
+                        
+                        const percentageInJointCall = ss.total_sgs_in_latest_annotate_dataset > 0
+                            ? (ss.total_sgs_in_latest_annotate_dataset / ss.total_sequencing_groups) * 100
+                            : 0;
+                        
+                        const rowClass = ss.sequencing_type === 'exome' ? 'exome-row' : ss.sequencing_type === 'genome' ? 'genome-row' : '';
+                                    
+                        return (
+                            <tr key={`${ss.project}-${ss.sequencing_type}`} className = {rowClass}>
+                                <td>{ss.dataset}</td>
+                                <td>{ss.sequencing_type}</td>
+                                <td>{ss.total_families}</td>
+                                <td>{ss.total_participants}</td>
+                                <td>{ss.total_samples}</td>
+                                <td>{ss.total_sequencing_groups}</td>
+                                <td>{ss.total_crams}</td>
+                                <td style={{ backgroundColor: getPercentageColor(percentageAligned) }}>
+                                    {percentageAligned.toFixed(2)}%
+                                </td>
+                                <td>{ss.latest_es_index_id}</td>
+                                <td>{ss.total_sgs_in_latest_es_index}</td>
+                                <td style={{ backgroundColor: getPercentageColor(percentageInIndex) }}>
+                                    {percentageInIndex.toFixed(2)}%
+                                </td>
+                                <td>{ss.latest_annotate_dataset_id}</td>
+                                <td>{ss.total_sgs_in_latest_annotate_dataset}</td>
+                                <td style={{ backgroundColor: getPercentageColor(percentageInJointCall) }}>
+                                    {percentageInJointCall.toFixed(2)}%
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </Table>
             {

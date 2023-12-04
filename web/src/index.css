@@ -214,3 +214,11 @@ html[data-theme='dark-mode'] .ui.table {
     gap: 10px; /* Adjust the gap as needed */
     margin-bottom: 20px;
 }
+
+.exome-row {
+    background-color: #ccf9ff; /* Light Blue */
+}
+
+.genome-row {
+    background-color: #d5d2f9; /* Light Orange */
+}

@@ -326,7 +326,7 @@ async def generate_sample_entries(
                     )
 
     response = await sapi.upsert_samples_async(project, samples)
-    pprint(response)
+    #pprint(response)
 
 
 async def generate_cram_analyses(project: str, analyses_to_insert: list[Analysis]):
@@ -414,9 +414,9 @@ async def main():
     sapi = SampleApi()
     metamist_enums: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
 
-    analyses_to_insert: list[Analysis] = []
     existing_projects = await papi.get_my_projects_async()
     for project in PROJECTS:
+        analyses_to_insert: list[Analysis] = []
         if project not in existing_projects:
             await papi.create_project_async(
                 name=project, dataset=project, create_test_project=False
@@ -436,7 +436,7 @@ async def main():
         await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
 
         for analyses in chunk(analyses_to_insert, 50):
-            logging.info(f'Inserting {len(analyses)} analysis entries')
+            logging.info(f'Inserting {len(analyses)} analysis entries into {project}')
             await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in analyses])
 
 
