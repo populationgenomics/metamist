@@ -14,6 +14,8 @@ from models.models.billing import (
     BillingRowRecord,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
+    BillingCostBudgetRecord,
+    BillingCostDetailsRecord,
 )
 from models.models.cohort import Cohort
 from models.models.family import (
@@ -63,12 +65,4 @@ from models.models.web import (
     ProjectSummary,
     ProjectSummaryInternal,
     WebProject,
-)
-from models.models.billing import (
-    BillingRowRecord,
-    BillingTotalCostRecord,
-    BillingTotalCostQueryModel,
-    BillingColumn,
-    BillingCostBudgetRecord,
-    BillingCostDetailsRecord,
 )
