@@ -15,7 +15,6 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import BillingDashboard from './pages/billing/BillingDashboard'
 import CohortBuilderView from './pages/cohort/CohortBuilderView'
 import CohortDetailView from './pages/cohort/CohortDetailView'
 
