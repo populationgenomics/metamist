@@ -12,6 +12,7 @@ import {
     interpolateRainbow,
     TimeInterval,
     utcHour,
+    stackOffsetNone,
 } from 'd3'
 import _ from 'lodash'
 import React from 'react'
@@ -29,6 +30,12 @@ interface IStackedAreaByDateChartProps {
     data?: IStackedAreaByDateChartData[]
     keys: string[]
     isPercentage: boolean
+    xLabel: string
+    yLabel: string
+    seriesLabel: string
+    extended?: boolean
+    showDate?: boolean
+    colors?: (t: number) => string
 }
 
 function getDisplayValue(value: number, isPercentage: boolean) {
@@ -42,10 +49,12 @@ function getTimeInterval(timeDiffMinutes: number) {
     if (timeDiffMinutes < 60 * 24) {
         // less than one day
         return utcHour.every(1)
-    } else if (timeDiffMinutes < 60 * 24 * 28) {
+    }
+    if (timeDiffMinutes < 60 * 24 * 28) {
         // less than one month
         return utcDay.every(1)
-    } else if (timeDiffMinutes < 60 * 24 * 365) {
+    }
+    if (timeDiffMinutes < 60 * 24 * 365) {
         // less than one year
         return utcMonth.every(1)
     }
@@ -59,10 +68,18 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     start,
     end,
     isPercentage,
+    xLabel,
+    yLabel,
+    seriesLabel,
+    extended,
+    showDate,
+    colors,
 }) => {
     if (!data || data.length === 0) {
         return <React.Fragment />
     }
+
+    const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
 
     const tooltipRef = React.useRef()
     const containerDivRef = React.useRef<HTMLDivElement>()
@@ -105,9 +122,10 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     const id = '1'
 
     // d3 function that turns the data into stacked proportions
-    const stackedData = stack().offset(stackOffsetExpand).keys(keys)(
-        data.map((d) => ({ date: d.date, ...d.values }))
-    )
+    const stackedData = stack()
+        .offset(extended ? stackOffsetExpand : stackOffsetNone)
+        .keys(keys)(data.map((d) => ({ date: d.date, ...d.values })))
+
     // function for generating the x Axis
     // domain refers to the min and max of the data (in this case earliest and latest dates)
     // range refers to the min and max pixel positions on the screen
@@ -116,9 +134,16 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
         .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object? Yes :)
         .range([0, width - margin.left - margin.right])
 
+    // use last stackData value to calculate max Y axis point
+    const diffX = stackedData[stackedData.length - 1].flatMap((val) => val[1])
+
     // function for generating the y Axis
     // no domain needed as it defaults to [0, 1] which is appropriate for proportions
-    const yScale = scaleLinear().range([height - margin.top - margin.bottom, 0])
+    const yScale = extended
+        ? scaleLinear().range([height - margin.top - margin.bottom, 0])
+        : scaleLinear()
+              .domain([0, Math.max(...diffX.flatMap((val) => val))])
+              .range([height - margin.top - margin.bottom, 0])
 
     // function that assigns each category a colour
     // can fiddle with the schemeAccent parameter for different colour scales - see https://d3js.org/d3-scale-chromatic/categorical#schemeAccent
@@ -215,10 +240,16 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                     cursor="help"
                                 >
                                     {/* change this for different date formats */}
-                                    {`${tick.toLocaleString('en-us', {
-                                        month: 'short',
-                                        year: 'numeric',
-                                    })}`}
+                                    {showDate
+                                        ? `${tick.toLocaleString('en-us', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                          })}`
+                                        : `${tick.toLocaleString('en-us', {
+                                              month: 'short',
+                                              year: 'numeric',
+                                          })}`}
                                 </text>
                                 {/* this is the tiny vertical tick line that getting drawn (6 pixels tall) */}
                                 <line y2={6} stroke="black" />
@@ -265,7 +296,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                         return <React.Fragment key={`${i}-${j}`}></React.Fragment>
                                     }
 
-                                    const colour = interpolateRainbow(i / keys.length)
+                                    const colour = colorFunc(i / keys.length)
                                     // @ts-ignore
                                     const key = keys[i]
                                     const date = data[j]?.date
@@ -351,7 +382,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                             fontSize={20}
                             textAnchor="middle"
                         >
-                            {'Date'}
+                            {xLabel}
                         </text>
                     </g>
 
@@ -361,12 +392,12 @@ then to draw in svg you just need to give coordinates. We've specified the width
                         transform={`rotate(-90) translate(-${innerHeight / 2}, -60)`}
                     >
                         <text textAnchor="middle" fontSize={20}>
-                            {'Proportion'}
+                            {yLabel}
                         </text>
                     </g>
                 </g>
                 <g transform={`translate(${width - margin.right + 30}, ${margin.top + 15})`}>
-                    <text fontSize={20}>Projects</text>
+                    <text fontSize={20}>{seriesLabel}</text>
                     {keys.map((project, i) => (
                         <React.Fragment key={`${project}-key`}>
                             <g
@@ -382,7 +413,7 @@ then to draw in svg you just need to give coordinates. We've specified the width
                                     // cy={25 + i * 25}
                                     cx={10}
                                     r={8}
-                                    fill={interpolateRainbow(i / keys.length)}
+                                    fill={colorFunc(i / keys.length)}
                                 />
                                 <text key={`${project}-legend`} x={30} y={5}>
                                     {project}

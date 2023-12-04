@@ -11,6 +11,8 @@ from api.utils.db import (
 )
 from db.python.layers.billing import BillingLayer
 from models.models.billing import (
+    BillingColumn,
+    BillingCostBudgetRecord,
     BillingQueryModel,
     BillingRowRecord,
     BillingTotalCostRecord,
@@ -19,6 +21,22 @@ from models.models.billing import (
 
 
 router = APIRouter(prefix='/billing', tags=['billing'])
+
+
+@router.get(
+    '/gcp-projects',
+    response_model=list[str],
+    operation_id='getGcpProjects',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_gcp_projects(
+    author: str = get_author,
+) -> list[str]:
+    """Get list of all GCP projects in database"""
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_gcp_projects()
+    return records
 
 
 @router.get(
@@ -95,7 +113,7 @@ async def get_datasets(
 
 
 @router.get(
-    '/sequencing_types',
+    '/sequencing-types',
     response_model=list[str],
     operation_id='getSequencingTypes',
 )
@@ -133,7 +151,7 @@ async def get_stages(
 
 
 @router.get(
-    '/sequencing_groups',
+    '/sequencing-groups',
     response_model=list[str],
     operation_id='getSequencingGroups',
 )
@@ -148,6 +166,25 @@ async def get_sequencing_groups(
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_sequencing_groups()
+    return records
+
+
+@router.get(
+    '/invoice-months',
+    response_model=list[str],
+    operation_id='getInvoiceMonths',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_invoice_months(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all invoice months in database
+    Results are sorted DESC
+    """
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_invoice_months()
     return records
 
 
@@ -198,7 +235,8 @@ async def get_total_cost(
             "fields": ["topic"],
             "start_date": "2023-03-01",
             "end_date": "2023-03-31",
-            "order_by": {"cost": true}
+            "order_by": {"cost": true},
+            "source": "aggregate"
         }
 
     2. Get total cost by day and topic for March 2023, order by day ASC and topic DESC:
@@ -283,9 +321,57 @@ async def get_total_cost(
             "order_by": {"cost": true}
         }
 
+    10. Get total gcp_project for month of March 2023, ordered by cost DESC:
+
+        {
+            "fields": ["gcp_project"],
+            "start_date": "2023-03-01",
+            "end_date": "2023-03-31",
+            "order_by": {"cost": true},
+            "source": "gcp_billing"
+        }
+
+    11. Get total cost by sku for given ar_guid, order by cost DESC:
+
+        {
+            "fields": ["sku"],
+            "start_date": "2023-10-23",
+            "end_date": "2023-10-23",
+            "filters": { "ar_guid": "4e53702e-8b6c-48ea-857f-c5d33b7e72d7"},
+            "order_by": {"cost": true}
+        }
+
     """
 
     connection = BqConnection(author)
     billing_layer = BillingLayer(connection)
     records = await billing_layer.get_total_cost(query)
+    return records
+
+
+@router.get(
+    '/running-cost/{field}',
+    response_model=list[BillingCostBudgetRecord],
+    operation_id='getRunningCost',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_running_costs(
+    field: BillingColumn,
+    invoice_month: str | None = None,
+    source: str | None = None,
+    author: str = get_author,
+) -> list[BillingCostBudgetRecord]:
+    """
+    Get running cost for specified fields in database
+    e.g. fields = ['gcp_project', 'topic']
+    """
+
+    # TODO replace alru_cache with async-cache?
+    # so we can skip author for caching?
+    # pip install async-cache
+    # @AsyncTTL(time_to_live=BILLING_CACHE_RESPONSE_TTL, maxsize=1024, skip_args=2)
+
+    connection = BqConnection(author)
+    billing_layer = BillingLayer(connection)
+    records = await billing_layer.get_running_cost(field, invoice_month, source)
     return records

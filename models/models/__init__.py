@@ -64,3 +64,11 @@ from models.models.web import (
     ProjectSummaryInternal,
     WebProject,
 )
+from models.models.billing import (
+    BillingRowRecord,
+    BillingTotalCostRecord,
+    BillingTotalCostQueryModel,
+    BillingColumn,
+    BillingCostBudgetRecord,
+    BillingCostDetailsRecord,
+)
