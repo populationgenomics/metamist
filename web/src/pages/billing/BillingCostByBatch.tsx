@@ -49,7 +49,11 @@ const BillingCostByBatch: React.FunctionComponent = () => {
     const [error, setError] = React.useState<string | undefined>()
 
     const [start, setStart] = React.useState<string>(
+<<<<<<< HEAD
         searchParams.get('start') ?? `${now.getFullYear()}-${now.getMonth()}-01`
+=======
+        searchParams.get('start') ?? `${now.getFullYear()}-${now.getMonth() + 1}-01`
+>>>>>>> billing-release-002
     )
     const [end, setEnd] = React.useState<string>(
         searchParams.get('end') ?? `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
