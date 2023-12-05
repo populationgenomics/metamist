@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Dropdown, Input, Message } from 'semantic-ui-react'
-import { BillingApi, BillingColumn } from '../../../sm-api'
+import { BillingApi, BillingColumn, BillingTimePeriods } from '../../../sm-api'
 import { convertFieldName } from '../../../shared/utilities/fieldName'
 
 interface FieldSelectorProps {
@@ -85,13 +85,33 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
             .catch((er) => setError(er.message))
     }
 
+    const getCostCategories = () => {
+        setLoading(true)
+        setError(undefined)
+        new BillingApi()
+            .getCostCategories()
+            .then((response) => {
+                processResponse(response.data)
+            })
+            .catch((er) => setError(er.message))
+    }
+
     React.useEffect(() => {
         if (fieldName === BillingColumn.Topic) getTopics()
         else if (fieldName === BillingColumn.GcpProject) getGcpProjects()
         else if (fieldName === BillingColumn.InvoiceMonth) getInvoiceMonths()
         else if (fieldName === BillingColumn.Stage) getStages()
+        else if (fieldName === BillingColumn.CostCategory) getCostCategories()
         else if (fieldName === 'Group') {
             setRecords([BillingColumn.GcpProject, BillingColumn.Topic, BillingColumn.Stage])
+            setLoading(false)
+        } else if (fieldName === 'Period') {
+            setRecords([
+                BillingTimePeriods.Day,
+                BillingTimePeriods.Week,
+                BillingTimePeriods.Month,
+                BillingTimePeriods.InvoiceMonth,
+            ])
             setLoading(false)
         } else {
             setError(`Could not load records for ${fieldName}`)

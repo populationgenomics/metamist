@@ -169,6 +169,16 @@ class BillingColumn(str, Enum):
         return f'All {record.title()}s'
 
 
+class BillingTimePeriods(str, Enum):
+    """List of billing grouping time periods"""
+
+    # grouping time periods
+    DAY = 'day'
+    WEEK = 'week'
+    MONTH = 'month'
+    INVOICE_MONTH = 'invoice_month'
+
+
 class BillingTotalCostQueryModel(SMBase):
     """
     Used to query for billing total cost
@@ -192,6 +202,9 @@ class BillingTotalCostQueryModel(SMBase):
     limit: int | None = None
     offset: int | None = None
 
+    # default to day, can be day, week, month, invoice_month
+    time_periods: BillingTimePeriods | None = None
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.json())
@@ -205,6 +218,7 @@ class BillingTotalCostRecord(SMBase):
     gcp_project: str | None
     cost_category: str | None
     sku: str | None
+    invoice_month: str | None
     ar_guid: str | None
     # extended columns
     dataset: str | None
@@ -230,6 +244,7 @@ class BillingTotalCostRecord(SMBase):
             gcp_project=record.get('gcp_project'),
             cost_category=record.get('cost_category'),
             sku=record.get('sku'),
+            invoice_month=record.get('invoice_month'),
             ar_guid=record.get('ar_guid'),
             dataset=record.get('dataset'),
             batch_id=record.get('batch_id'),
