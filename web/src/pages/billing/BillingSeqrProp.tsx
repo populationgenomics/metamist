@@ -7,7 +7,10 @@ const BillingSeqrProp: React.FunctionComponent = () => {
     const now = new Date()
     const [start, setStart] = React.useState<string>(`${now.getFullYear()}-01-01`)
     const [end, setEnd] = React.useState<string>(
-        `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+        `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
+            .getDate()
+            .toString()
+            .padStart(2, '0')}`
     )
 
     // use navigate and update url params

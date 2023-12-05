@@ -28,10 +28,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? `${now.getFullYear()}-${now.getMonth() + 1}-01`
+        searchParams.get('start') ??
+            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`
     )
     const [end, setEnd] = React.useState<string>(
-        searchParams.get('end') ?? `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+        searchParams.get('end') ??
+            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
+                .getDate()
+                .toString()
+                .padStart(2, '0')}`
     )
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
