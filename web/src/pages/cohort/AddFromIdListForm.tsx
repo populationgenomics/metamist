@@ -16,6 +16,7 @@ query FetchSequencingGroupsById($ids: [String!]!) {
       type
       technology
       platform
+      assayMeta
       sample {
         project {
           id
