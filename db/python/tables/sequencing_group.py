@@ -32,6 +32,15 @@ class SequencingGroupFilter(GenericFilterModel):
     active_only: GenericFilter[bool] | None = GenericFilter(eq=True)
     meta: GenericMetaFilter | None = None
 
+    # These fields are manually handled in the query to speed things up, because multiple table
+    # joins and dynamic computation are required.
+    created_before: GenericFilter[date] | None = None
+    created_on: GenericFilter[date] | None = None
+    created_after: GenericFilter[date] | None = None
+    assay_meta: GenericMetaFilter | None = None
+    has_cram: GenericFilter[bool] | None = None
+    has_gvcf: GenericFilter[bool] | None = None
+
     def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
 
@@ -69,15 +78,37 @@ class SequencingGroupTable(DbBase):
             'platform': 'sg.platform',
             'active_only': 'NOT sg.archived',
             'external_id': 'sgexid.external_id',
+            'created_before': 'DATE(sg.row_start)',
+            'created_on': 'DATE(sg.row_start)',
+            'created_after': 'DATE(sg.row_start)',
+            'assay_meta': 'sga_subquery.assay_meta',
         }
 
         wheres, values = filter_.to_sql(sql_overrides)
         _query = f"""
-            SELECT {self.common_get_keys_str}
-            FROM sequencing_group sg
+            SELECT 
+                {self.common_get_keys_str}, 
+                JSON_ARRAYAGG(sga_subquery.assay_meta) AS assay_meta,
+                TIMESTAMP(sg.row_start) as created_on
+            FROM sequencing_group FOR SYSTEM_TIME ALL AS sg
             LEFT JOIN sample s ON s.id = sg.sample_id
             LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
+            LEFT JOIN (
+                SELECT
+                    sequencing_group_id,
+                    assay_subquery.meta AS assay_meta
+                FROM
+                    sequencing_group_assay
+                    LEFT JOIN (
+                        SELECT
+                            id,
+                            meta
+                        FROM
+                            assay
+                    ) AS assay_subquery ON sequencing_group_assay.assay_id = assay_subquery.id
+            ) AS sga_subquery ON sg.id = sga_subquery.sequencing_group_id
             WHERE {wheres}
+            GROUP BY sg.id
         """
         rows = await self.connection.fetch_all(_query, values)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
