@@ -13,33 +13,28 @@ import { FetchSequencingGroupsQueryVariables } from '../../__generated__/graphql
 
 const GET_SEQUENCING_GROUPS_QUERY = gql(`
 query FetchSequencingGroups(
-    $project: String!,
-    $platform: String,
-    $technology: String,
-    $seqType: String,
-    $assayMeta: JSON,
+    $project: String!, 
+    $platform: String, 
+    $technology: String, 
+    $seqType: String, 
+    $assayMeta: JSON, 
     $excludeIds: [String!]
-  ) {
-    project(name: $project) {
-      participants {
-        samples {
-          assays(meta: $assayMeta) {
-            sample {
-              sequencingGroups(
-                id: {nin: $excludeIds}
-                platform: {icontains: $platform}
-                technology: {icontains: $technology}
-                type: {contains: $seqType}
-              ) {
-                id
-                type
-                technology
-                platform
-              }
-            }
-          }
-        }
-      }
+) {
+    sequencingGroups(
+      id: {nin: $excludeIds}
+      project: {eq: $project}
+      platform: {icontains: $platform}
+      technology: {icontains: $technology}
+      type: {contains: $seqType}
+      assayMeta: $assayMeta,
+      activeOnly: {eq: true}
+    ) {
+      id
+      type
+      technology
+      platform
+      assayMeta
+      createdOn
     }
   }
 `)
@@ -47,7 +42,7 @@ query FetchSequencingGroups(
 // NOTE: Put additional objects here to add more search fields for assay metadata
 const assayMetaSearchFields = [
     { label: 'Batch', id: 'batch', searchVariable: 'batch' },
-    // { label: 'Emoji', id: 'emoji', searchVariable: 'emoji' },
+    { label: 'Coverage', id: 'coverage', searchVariable: 'coverage' },
 ]
 
 interface IAddFromProjectForm {
@@ -123,18 +118,14 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                 setSearchHits(null)
             },
             onCompleted: (hits) => {
-                const samples = hits.project.participants.flatMap((p) => p.samples)
-                const assays = samples.flatMap((s) => s.assays)
-
-                const sgs = assays.flatMap((a) =>
-                    a.sample.sequencingGroups.map((sg) => ({
-                        id: sg.id,
-                        type: sg.type,
-                        technology: sg.technology,
-                        platform: sg.platform,
-                        project: { id: selectedProject.id, name: selectedProject.name },
-                    }))
-                )
+                const sgs = hits.sequencingGroups.map((sg) => ({
+                    id: sg.id,
+                    type: sg.type,
+                    technology: sg.technology,
+                    platform: sg.platform,
+                    assayMeta: sg.assayMeta,
+                    project: { id: selectedProject.id, name: selectedProject.name },
+                }))
 
                 // Remove duplicates by merging string fields with same id
                 const merged: SequencingGroup[] = []
