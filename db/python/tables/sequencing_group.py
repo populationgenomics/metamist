@@ -86,8 +86,8 @@ class SequencingGroupTable(DbBase):
 
         wheres, values = filter_.to_sql(sql_overrides)
         _query = f"""
-            SELECT 
-                {self.common_get_keys_str}, 
+            SELECT
+                {self.common_get_keys_str},
                 JSON_ARRAYAGG(sga_subquery.assay_meta) AS assay_meta,
                 TIMESTAMP(sg.row_start) as created_on
             FROM sequencing_group FOR SYSTEM_TIME ALL AS sg
