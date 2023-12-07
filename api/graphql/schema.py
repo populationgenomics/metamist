@@ -742,6 +742,7 @@ class Query:  # entry point to graphql.
         samples = await slayer.query(filter_)
         return [GraphQLSample.from_internal(sample) for sample in samples]
 
+    # pylint: disable=too-many-arguments
     @strawberry.field
     async def sequencing_groups(
         self,
