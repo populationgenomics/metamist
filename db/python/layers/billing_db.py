@@ -847,10 +847,11 @@ class BillingDb(BqDbBase):
             BillingColumn.COMPUTE_CATEGORY,
             BillingColumn.WDL_TASK_NAME,
             BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
+            BillingColumn.NAMESPACE,
         ):
             raise ValueError(
                 'Invalid field only topic, dataset, gcp-project, compute_category, '
-                'wdl_task_name & cromwell_sub_workflow_name are allowed'
+                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
             )
 
         (

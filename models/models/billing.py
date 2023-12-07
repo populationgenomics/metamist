@@ -142,6 +142,7 @@ class BillingColumn(str, Enum):
     CROMWELL_WORKFLOW_ID = 'cromwell_workflow_id'
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
+    NAMESPACE = 'namespace'
 
     @classmethod
     def extended_cols(cls) -> list[str]:
@@ -158,6 +159,7 @@ class BillingColumn(str, Enum):
             'cromwell_workflow_id',
             'goog_pipelines_worker',
             'wdl_task_name',
+            'namespace',
         ]
 
     @staticmethod
@@ -231,6 +233,7 @@ class BillingTotalCostRecord(SMBase):
     cromwell_workflow_id: str | None
     goog_pipelines_worker: str | None
     wdl_task_name: str | None
+    namespace: str | None
 
     cost: float
     currency: str | None
@@ -256,6 +259,7 @@ class BillingTotalCostRecord(SMBase):
             cromwell_workflow_id=record.get('cromwell_workflow_id'),
             goog_pipelines_worker=record.get('goog_pipelines_worker'),
             wdl_task_name=record.get('wdl_task_name'),
+            namespace=record.get('namespace'),
             cost=record.get('cost'),
             currency=record.get('currency'),
         )
