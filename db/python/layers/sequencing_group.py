@@ -232,6 +232,7 @@ class SequencingGroupLayer(BaseLayer):
             sample_id=next(iter(sample_ids)),
             meta=meta,
             assays=assays,
+            assay_meta=[a.meta for a in assays if a.meta],
         )
 
     async def recreate_sequencing_group_with_new_assays(
