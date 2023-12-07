@@ -1,5 +1,6 @@
 import json
 import datetime
+from typing import Any
 
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
@@ -46,7 +47,7 @@ class SequencingGroupInternal(SMBase):
     assays: list[AssayInternal] | None = None
 
     created_on: datetime.datetime | None = None
-    assay_meta: list[dict[str, str]]
+    assay_meta: list[dict[str, Any]]
 
     @classmethod
     def from_db(cls, **kwargs):
@@ -55,9 +56,14 @@ class SequencingGroupInternal(SMBase):
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
 
-        assay_meta = kwargs.pop('assay_meta')
+        assay_meta = kwargs.pop('assay_meta', [])
+        if not assay_meta:
+            assay_meta = []
+
         if assay_meta and isinstance(assay_meta, str):
             assay_meta = json.loads(assay_meta)
+        elif isinstance(assay_meta, dict):
+            assay_meta = [assay_meta]
 
         _archived = kwargs.pop('archived', None)
         if _archived is not None:
@@ -160,7 +166,7 @@ class SequencingGroup(SMBase):
     archived: bool
     assays: list[Assay]
     created_on: datetime.datetime
-    assay_meta: list[dict[str, str]]
+    assay_meta: list[dict[str, Any]]
 
 
 class NestedSequencingGroup(SMBase):
