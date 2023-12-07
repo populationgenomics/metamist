@@ -476,7 +476,6 @@ class BillingDb(BqDbBase):
         job_config = bigquery.QueryJobConfig(
             query_parameters=query_parameters, labels=BQ_LABELS
         )
-        print(_query)
         query_job_result = list(
             self._connection.connection.query(_query, job_config=job_config).result()
         )

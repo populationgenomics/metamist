@@ -72,13 +72,10 @@ const BillingCostByBatch: React.FunctionComponent = () => {
 
     const updateNav = (searchBy: string | undefined) => {
         let url = `${location.pathname}`
-        if (searchBy) url += '?'
-
-        const params: string[] = []
-        if (searchBy) params.push(`searchBy=${searchBy}`)
-
-        url += params.join('&')
-        navigate(url)
+        if (searchBy) {
+            url += `?searchBy=${searchBy}`
+            navigate(url)
+        }
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -94,6 +91,11 @@ const BillingCostByBatch: React.FunctionComponent = () => {
     }
 
     const handleSearch = () => {
+        if (searchTxt === undefined || searchTxt.length < 6) {
+            // Seaarch text is not large enough
+            setIsLoading(false)
+            return
+        }
         updateNav(searchTxt)
         getData({
             fields: [
