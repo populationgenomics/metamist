@@ -241,3 +241,9 @@ html[data-theme='dark-mode'] .ui.table {
 .ui.toggle.checkbox input:checked ~ label {
     color: var(--color-text-primary) !important;
 }
+
+/* charts */
+.tooltip {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+}

@@ -7,6 +7,7 @@ import Table from '../../shared/components/Table'
 import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api'
 import FieldSelector from './components/FieldSelector'
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -18,6 +19,8 @@ const BillingCurrentCost = () => {
         column: 'undefined',
         direction: 'undefined',
     })
+
+    const [showAsChart, setShowAsChart] = React.useState<boolean>(true)
 
     // Pull search params for use in the component
     const [searchParams] = useSearchParams()
@@ -195,177 +198,247 @@ const BillingCurrentCost = () => {
                         selected={invoiceMonth}
                     />
                 </Grid.Column>
+
+                <Grid.Column>
+                    <Checkbox
+                        label="Show as Chart / Table"
+                        fitted
+                        toggle
+                        checked={showAsChart}
+                        slider
+                        onChange={() => setShowAsChart(!showAsChart)}
+                    />
+                </Grid.Column>
             </Grid>
 
-            <Table celled compact sortable>
-                <SUITable.Header>
-                    <SUITable.Row>
-                        <SUITable.HeaderCell></SUITable.HeaderCell>
+            {(() => {
+                if (!showAsChart) return null
+                if (String(invoiceMonth) === String(thisMonth)) {
+                    return (
+                        <Grid columns={2} stackable doubling>
+                            <Grid.Column width={8}>
+                                <HorizontalStackedBarChart
+                                    data={costRecords}
+                                    title={`24H (day UTC ${lastLoadedDay})`}
+                                    series={['compute_daily', 'storage_daily']}
+                                    labels={['Compute', 'Storage']}
+                                    total_series="total_daily"
+                                    threshold_values={[90, 50]}
+                                    threshold_series="budget_spent"
+                                    sorted_by="total_monthly"
+                                    isLoading={isLoading}
+                                    showLegend={false}
+                                />
+                            </Grid.Column>
+                            <Grid.Column width={8}>
+                                <HorizontalStackedBarChart
+                                    data={costRecords}
+                                    title="Invoice Month (Acc)"
+                                    series={['compute_monthly', 'storage_monthly']}
+                                    labels={['Compute', 'Storage']}
+                                    total_series="total_monthly"
+                                    threshold_values={[90, 50]}
+                                    threshold_series="budget_spent"
+                                    sorted_by="total_monthly"
+                                    isLoading={isLoading}
+                                    showLegend={true}
+                                />
+                            </Grid.Column>
+                        </Grid>
+                    )
+                }
+                return (
+                    <Grid>
+                        <Grid.Column width={12}>
+                            <HorizontalStackedBarChart
+                                data={costRecords}
+                                title="Invoice Month (Acc)"
+                                series={['compute_monthly', 'storage_monthly']}
+                                labels={['Compute', 'Storage']}
+                                total_series="total_monthly"
+                                sorted_by="total_monthly"
+                                isLoading={isLoading}
+                                showLegend={true}
+                            />
+                        </Grid.Column>
+                    </Grid>
+                )
+            })()}
 
-                        <SUITable.HeaderCell></SUITable.HeaderCell>
+            {!showAsChart ? (
+                <Table celled compact sortable>
+                    <SUITable.Header>
+                        <SUITable.Row>
+                            <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                        {invoiceMonth === thisMonth ? (
-                            <SUITable.HeaderCell colSpan="3">
-                                24H (day UTC {lastLoadedDay})
-                            </SUITable.HeaderCell>
-                        ) : null}
+                            <SUITable.HeaderCell></SUITable.HeaderCell>
 
-                        {groupBy === BillingColumn.GcpProject ? (
-                            <SUITable.HeaderCell colSpan="4">
-                                Invoice Month (Acc)
-                            </SUITable.HeaderCell>
-                        ) : (
-                            <SUITable.HeaderCell colSpan="3">
-                                Invoice Month (Acc)
-                            </SUITable.HeaderCell>
-                        )}
-                    </SUITable.Row>
-                    <SUITable.Row>
-                        <SUITable.HeaderCell></SUITable.HeaderCell>
+                            {invoiceMonth === thisMonth ? (
+                                <SUITable.HeaderCell colSpan="3">
+                                    24H (day UTC {lastLoadedDay})
+                                </SUITable.HeaderCell>
+                            ) : null}
 
-                        {HEADER_FIELDS.map((k) => {
-                            switch (k.show_always || invoiceMonth === thisMonth) {
-                                case true:
-                                    return (
-                                        <SUITable.HeaderCell
-                                            key={k.category}
-                                            sorted={checkDirection(k.category)}
-                                            onClick={() => handleSort(k.category)}
+                            {groupBy === BillingColumn.GcpProject ? (
+                                <SUITable.HeaderCell colSpan="4">
+                                    Invoice Month (Acc)
+                                </SUITable.HeaderCell>
+                            ) : (
+                                <SUITable.HeaderCell colSpan="3">
+                                    Invoice Month (Acc)
+                                </SUITable.HeaderCell>
+                            )}
+                        </SUITable.Row>
+                        <SUITable.Row>
+                            <SUITable.HeaderCell></SUITable.HeaderCell>
+
+                            {HEADER_FIELDS.map((k) => {
+                                switch (k.show_always || invoiceMonth === thisMonth) {
+                                    case true:
+                                        return (
+                                            <SUITable.HeaderCell
+                                                key={k.category}
+                                                sorted={checkDirection(k.category)}
+                                                onClick={() => handleSort(k.category)}
+                                                style={{
+                                                    borderBottom: 'none',
+                                                    position: 'sticky',
+                                                    resize: 'horizontal',
+                                                }}
+                                            >
+                                                {convertFieldName(k.title)}
+                                            </SUITable.HeaderCell>
+                                        )
+                                    default:
+                                        return null
+                                }
+                            })}
+
+                            {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth ? (
+                                <SUITable.HeaderCell
+                                    key={'budget_spent'}
+                                    sorted={checkDirection('budget_spent')}
+                                    onClick={() => handleSort('budget_spent')}
+                                    style={{
+                                        borderBottom: 'none',
+                                        position: 'sticky',
+                                        resize: 'horizontal',
+                                    }}
+                                >
+                                    Budget Spend %
+                                </SUITable.HeaderCell>
+                            ) : null}
+                        </SUITable.Row>
+                    </SUITable.Header>
+                    <SUITable.Body>
+                        {_.orderBy(
+                            costRecords,
+                            [sort.column],
+                            sort.direction === 'ascending' ? ['asc'] : ['desc']
+                        ).map((p) => (
+                            <React.Fragment key={`total - ${p.field}`}>
+                                <SUITable.Row>
+                                    <SUITable.Cell collapsing>
+                                        <Checkbox
+                                            checked={openRows.includes(p.field)}
+                                            slider
+                                            onChange={() => handleToggle(p.field)}
+                                        />
+                                    </SUITable.Cell>
+                                    {HEADER_FIELDS.map((k) => {
+                                        switch (k.category) {
+                                            case 'field':
+                                                return (
+                                                    <SUITable.Cell>
+                                                        <b>
+                                                            <Link to={linkTo(p[k.category])}>
+                                                                {p[k.category]}
+                                                            </Link>
+                                                        </b>
+                                                    </SUITable.Cell>
+                                                )
+                                            default:
+                                                switch (
+                                                    k.show_always ||
+                                                    invoiceMonth === thisMonth
+                                                ) {
+                                                    case true:
+                                                        return (
+                                                            <SUITable.Cell>
+                                                                {currencyFormat(p[k.category])}
+                                                            </SUITable.Cell>
+                                                        )
+                                                    default:
+                                                        return null
+                                                }
+                                        }
+                                    })}
+
+                                    {groupBy === BillingColumn.GcpProject &&
+                                    invoiceMonth === thisMonth ? (
+                                        <SUITable.Cell>{percFormat(p.budget_spent)}</SUITable.Cell>
+                                    ) : null}
+                                </SUITable.Row>
+                                {typeof p === 'object' &&
+                                    'details' in p &&
+                                    _.orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
+                                        <SUITable.Row
                                             style={{
-                                                borderBottom: 'none',
-                                                position: 'sticky',
-                                                resize: 'horizontal',
+                                                display: openRows.includes(p.field)
+                                                    ? 'table-row'
+                                                    : 'none',
+                                                backgroundColor: 'var(--color-bg)',
                                             }}
+                                            key={`${dk.cost_category} - ${p.field}`}
                                         >
-                                            {convertFieldName(k.title)}
-                                        </SUITable.HeaderCell>
-                                    )
-                                default:
-                                    return null
-                            }
-                        })}
+                                            <SUITable.Cell style={{ border: 'none' }} />
+                                            <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
 
-                        {groupBy === BillingColumn.GcpProject && invoiceMonth === thisMonth ? (
-                            <SUITable.HeaderCell
-                                key={'budget_spent'}
-                                sorted={checkDirection('budget_spent')}
-                                onClick={() => handleSort('budget_spent')}
-                                style={{
-                                    borderBottom: 'none',
-                                    position: 'sticky',
-                                    resize: 'horizontal',
-                                }}
-                            >
-                                Budget Spend %
-                            </SUITable.HeaderCell>
-                        ) : null}
-                    </SUITable.Row>
-                </SUITable.Header>
-                <SUITable.Body>
-                    {_.orderBy(
-                        costRecords,
-                        [sort.column],
-                        sort.direction === 'ascending' ? ['asc'] : ['desc']
-                    ).map((p) => (
-                        <React.Fragment key={`total - ${p.field}`}>
-                            <SUITable.Row>
-                                <SUITable.Cell collapsing>
-                                    <Checkbox
-                                        checked={openRows.includes(p.field)}
-                                        slider
-                                        onChange={() => handleToggle(p.field)}
-                                    />
-                                </SUITable.Cell>
-                                {HEADER_FIELDS.map((k) => {
-                                    switch (k.category) {
-                                        case 'field':
-                                            return (
-                                                <SUITable.Cell>
-                                                    <b>
-                                                        <Link to={linkTo(p[k.category])}>
-                                                            {p[k.category]}
-                                                        </Link>
-                                                    </b>
-                                                </SUITable.Cell>
-                                            )
-                                        default:
-                                            switch (k.show_always || invoiceMonth === thisMonth) {
-                                                case true:
-                                                    return (
-                                                        <SUITable.Cell>
-                                                            {currencyFormat(p[k.category])}
-                                                        </SUITable.Cell>
-                                                    )
-                                                default:
-                                                    return null
-                                            }
-                                    }
-                                })}
+                                            {dk.cost_group === 'C' ? (
+                                                <React.Fragment>
+                                                    {invoiceMonth === thisMonth ? (
+                                                        <React.Fragment>
+                                                            <SUITable.Cell>
+                                                                {currencyFormat(dk.daily_cost)}
+                                                            </SUITable.Cell>
 
-                                {groupBy === BillingColumn.GcpProject &&
-                                invoiceMonth === thisMonth ? (
-                                    <SUITable.Cell>{percFormat(p.budget_spent)}</SUITable.Cell>
-                                ) : null}
-                            </SUITable.Row>
-                            {typeof p === 'object' &&
-                                'details' in p &&
-                                _.orderBy(p?.details, ['monthly_cost'], ['desc']).map((dk) => (
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(p.field)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${dk.cost_category} - ${p.field}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell>{dk.cost_category}</SUITable.Cell>
+                                                            <SUITable.Cell colSpan="2" />
+                                                        </React.Fragment>
+                                                    ) : null}
+                                                    <SUITable.Cell>
+                                                        {currencyFormat(dk.monthly_cost)}
+                                                    </SUITable.Cell>
+                                                    <SUITable.Cell colSpan="2" />
+                                                </React.Fragment>
+                                            ) : (
+                                                <React.Fragment>
+                                                    <SUITable.Cell />
+                                                    {invoiceMonth === thisMonth ? (
+                                                        <React.Fragment>
+                                                            <SUITable.Cell>
+                                                                {currencyFormat(dk.daily_cost)}
+                                                            </SUITable.Cell>
 
-                                        {dk.cost_group === 'C' ? (
-                                            <React.Fragment>
-                                                {invoiceMonth === thisMonth ? (
-                                                    <React.Fragment>
-                                                        <SUITable.Cell>
-                                                            {currencyFormat(dk.daily_cost)}
-                                                        </SUITable.Cell>
+                                                            <SUITable.Cell colSpan="2" />
+                                                        </React.Fragment>
+                                                    ) : null}
+                                                    <SUITable.Cell>
+                                                        {currencyFormat(dk.monthly_cost)}
+                                                    </SUITable.Cell>
+                                                    <SUITable.Cell />
+                                                </React.Fragment>
+                                            )}
 
-                                                        <SUITable.Cell colSpan="2" />
-                                                    </React.Fragment>
-                                                ) : null}
-                                                <SUITable.Cell>
-                                                    {currencyFormat(dk.monthly_cost)}
-                                                </SUITable.Cell>
-                                                <SUITable.Cell colSpan="2" />
-                                            </React.Fragment>
-                                        ) : (
-                                            <React.Fragment>
+                                            {groupBy === BillingColumn.GcpProject ? (
                                                 <SUITable.Cell />
-                                                {invoiceMonth === thisMonth ? (
-                                                    <React.Fragment>
-                                                        <SUITable.Cell>
-                                                            {currencyFormat(dk.daily_cost)}
-                                                        </SUITable.Cell>
-
-                                                        <SUITable.Cell colSpan="2" />
-                                                    </React.Fragment>
-                                                ) : null}
-                                                <SUITable.Cell>
-                                                    {currencyFormat(dk.monthly_cost)}
-                                                </SUITable.Cell>
-                                                <SUITable.Cell />
-                                            </React.Fragment>
-                                        )}
-
-                                        {groupBy === BillingColumn.GcpProject ? (
-                                            <SUITable.Cell />
-                                        ) : null}
-                                    </SUITable.Row>
-                                ))}
-                        </React.Fragment>
-                    ))}
-                </SUITable.Body>
-            </Table>
+                                            ) : null}
+                                        </SUITable.Row>
+                                    ))}
+                            </React.Fragment>
+                        ))}
+                    </SUITable.Body>
+                </Table>
+            ) : null}
         </>
     )
 }
