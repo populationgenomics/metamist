@@ -7,6 +7,7 @@ import {
     BillingSeqrProp,
     BillingCostByTime,
     BillingCostByBatch,
+    BillingCostByAnalysis,
     BillingInvoiceMonthCost,
     BillingCostByCategory,
 } from './pages/billing'
@@ -39,7 +40,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
         <Route
             path="/analysis-runner/:projectName?"
             element={
@@ -64,6 +64,14 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <BillingCostByBatch />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByAnalysis"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByAnalysis />
                 </ErrorBoundary>
             }
         />
