@@ -537,8 +537,6 @@ class GraphQLSequencingGroup:
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
-    created_on: datetime.date
-    assay_meta: list[strawberry.scalars.JSON]
 
     @staticmethod
     def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
@@ -553,8 +551,6 @@ class GraphQLSequencingGroup:
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
-            created_on=internal.created_on,
-            assay_meta=internal.assay_meta,
         )
 
     @strawberry.field
@@ -754,10 +750,10 @@ class Query:  # entry point to graphql.
         technology: GraphQLFilter[str] | None = None,
         platform: GraphQLFilter[str] | None = None,
         active_only: GraphQLFilter[bool] | None = None,
-        created_before: GraphQLFilter[datetime.date] | None = None,
         created_on: GraphQLFilter[datetime.date] | None = None,
-        created_after: GraphQLFilter[datetime.date] | None = None,
         assay_meta: GraphQLMetaFilter | None = None,
+        has_cram: bool | None = None,
+        has_gvcf: bool | None = None,
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
@@ -798,12 +794,10 @@ class Query:  # entry point to graphql.
                 if active_only
                 else GenericFilter(eq=True)
             ),
-            created_before=created_before.to_internal_filter()
-            if created_after
-            else None,
             created_on=created_on.to_internal_filter() if created_on else None,
-            created_after=created_after.to_internal_filter() if created_after else None,
             assay_meta=assay_meta,
+            has_cram=has_cram,
+            has_gvcf=has_gvcf,
         )
         sgs = await sglayer.query(filter_)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
