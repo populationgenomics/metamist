@@ -142,32 +142,30 @@ class SequencingGroupTable(DbBase):
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
             exclude_fields.extend(['has_cram', 'has_gvcf'])
-            wheres = []
-            values = {}
+            where_statements = []
 
             if filter_.has_cram is not None:
-                values['cram'] = '%cram%'
+                query_values['cram'] = '%cram%'
                 if filter_.has_cram.eq is True:
-                    wheres.append("analysis_types LIKE :cram")
+                    where_statements.append('analysis_types LIKE :cram')
                 elif filter_.has_cram.eq is False:
-                    wheres.append("analysis_types NOT LIKE :cram")
+                    where_statements.append('analysis_types NOT LIKE :cram')
                 else:
                     raise ValueError(
                         f'Invalid value for has_cram: {filter_.has_cram}, must be True or False'
                     )
 
             if filter_.has_gvcf is not None:
-                values['gvcf'] = '%gvcf%'
+                query_values['gvcf'] = '%gvcf%'
                 if filter_.has_gvcf.eq is True:
-                    wheres.append("analysis_types LIKE :gvcf")
+                    where_statements.append('analysis_types LIKE :gvcf')
                 elif filter_.has_gvcf.eq is False:
-                    wheres.append("analysis_types NOT LIKE :gvcf")
+                    where_statements.append('analysis_types NOT LIKE :gvcf')
                 else:
                     raise ValueError(
                         f'Invalid value for has_gvcf: {filter_.has_gvcf}, must be True or False'
                     )
 
-            query_values.update(values)
             _query.append(
                 f"""
             INNER JOIN (
@@ -186,7 +184,7 @@ class SequencingGroupTable(DbBase):
                 GROUP BY
                     sequencing_group_id
                 HAVING
-                    {" AND ".join(wheres)}
+                    {" AND ".join(where_statements)}
             ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
             """
             )
@@ -199,12 +197,7 @@ class SequencingGroupTable(DbBase):
         )
         query_values.update(values)
 
-        print(
-            'QUERY',
-            "".join(_query),
-        )
-
-        rows = await self.connection.fetch_all("\n".join(_query), query_values)
+        rows = await self.connection.fetch_all('\n'.join(_query), query_values)
         sgs = [SequencingGroupInternal.from_db(**dict(r)) for r in rows]
         projects = set(sg.project for sg in sgs)
         return projects, sgs
