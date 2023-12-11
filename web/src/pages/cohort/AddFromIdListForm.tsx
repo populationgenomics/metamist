@@ -53,7 +53,16 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
             return
         }
 
-        const ids = element.value.trim().split(',')
+        const ids = element.value
+            .trim()
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => !!id)
+
+        if (ids.length === 0) {
+            return
+        }
+
         fetchSequencingGroups({
             variables: { ids },
             onError: () => {
