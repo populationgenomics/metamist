@@ -18,20 +18,13 @@ const EXCLUDED_FIELDS = [
     'timestamp',
 ]
 
-const MAIN_FIELDS = [
-    {
-        category: 'Hail Batch',
-        title: 'Hail Batch',
-    },
-    { category: 'GitHub', title: 'GitHub' },
-    { category: 'Author', title: 'Author' },
-    { category: 'Date', title: 'Date' },
-    { category: 'script', title: 'Script' },
-    { category: 'accessLevel', title: 'Access Level' },
-    { category: 'Image', title: 'Driver Image' },
-    { category: 'description', title: 'Description' },
-    { category: 'mode', title: 'Mode' },
-]
+interface Field {
+    category: string
+    title: string
+    width?: string
+    className?: string
+    dataMap?: (data: any, value: string) => any
+}
 
 const HailBatchGrid: React.FunctionComponent<{
     data: any[]
@@ -39,7 +32,10 @@ const HailBatchGrid: React.FunctionComponent<{
     updateFilter: (value: string, category: string) => void
     handleSort: (clickedColumn: string) => void
     sort: { column: string | null; direction: string | null }
-}> = ({ data, filters, updateFilter, handleSort, sort }) => {
+    idColumn?: string
+}> = ({ data, filters, updateFilter, handleSort, sort, idColumn }) => {
+    console.log(data)
+
     const [openRows, setOpenRows] = React.useState<number[]>([])
 
     const handleToggle = (position: number) => {
@@ -56,6 +52,124 @@ const HailBatchGrid: React.FunctionComponent<{
         }
         return undefined
     }
+
+    const MAIN_FIELDS: Field[] = [
+        {
+            category: 'Hail Batch',
+            title: 'Hail Batch',
+            dataMap: (data: any, value: string) => (
+                <a href={`${data.batch_url}`} rel="noopener noreferrer" target="_blank">
+                    {value}
+                </a>
+            ),
+        },
+        {
+            category: 'GitHub',
+            title: 'GitHub',
+            width: '200px',
+            dataMap: (data: any, value: string) => (
+                <a
+                    href={`${`https://www.github.com/populationgenomics/${data.repo}/tree/${data.commit}`}`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                >
+                    {value}
+                </a>
+            ),
+        },
+        {
+            category: 'Author',
+            title: 'Author',
+            dataMap: (data: any, value: string) => (
+                <Popup
+                    trigger={
+                        <span
+                            style={{
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                            }}
+                            onClick={() => {
+                                const author = value
+                                if (
+                                    filters.find((f) => f.category === 'Author')?.value === author
+                                ) {
+                                    updateFilter('', 'Author')
+                                } else {
+                                    updateFilter(value, 'Author')
+                                }
+                            }}
+                        >
+                            {value}
+                        </span>
+                    }
+                    hoverable
+                    position="bottom center"
+                >
+                    {data['email']}
+                </Popup>
+            ),
+        },
+        {
+            category: 'Date',
+            title: 'Date',
+            dataMap: (data: any, value: string) => (
+                <Popup trigger={<span>{value}</span>} hoverable position="bottom center">
+                    {data['timestamp']}
+                </Popup>
+            ),
+        },
+        {
+            category: 'script',
+            title: 'Script',
+            className: 'scriptField',
+            dataMap: (data: any, value: string) => (
+                <code
+                    onClick={() => handleToggle(data.position)}
+                    style={{
+                        cursor: 'pointer',
+                    }}
+                >
+                    {sanitiseValue(value)}
+                </code>
+            ),
+        },
+        {
+            category: 'accessLevel',
+            title: 'Access Level',
+            dataMap: (data: any, value: string) => (
+                <span
+                    style={{
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        width: '100px',
+                    }}
+                    onClick={() => {
+                        if (filters.filter((f) => f.category === 'accessLevel').length > 0) {
+                            updateFilter('', 'accessLevel')
+                        } else {
+                            updateFilter(value, 'accessLevel')
+                        }
+                    }}
+                >
+                    {value}
+                </span>
+            ),
+        },
+        { category: 'Image', title: 'Driver Image' },
+        { category: 'description', title: 'Description' },
+        { category: 'mode', title: 'Mode' },
+    ]
+
+    const expandedRow = (log: any) =>
+        MAIN_FIELDS.map(({ category, title, width, dataMap, className }) => {
+            ;<SUITable.Cell
+                key={category}
+                style={{ width: width ?? '100px' }}
+                className={className}
+            >
+                {dataMap ? dataMap(log, log[category]) : sanitiseValue(log[category])}
+            </SUITable.Cell>
+        })
 
     return (
         <Table celled compact sortable>
@@ -131,8 +245,8 @@ const HailBatchGrid: React.FunctionComponent<{
                 </SUITable.Row>
             </SUITable.Header>
             <SUITable.Body>
-                {data.map((log) => (
-                    <React.Fragment key={log.id}>
+                {data.map((log, idx) => (
+                    <React.Fragment key={idColumn ? log[idColumn] : idx}>
                         <SUITable.Row>
                             <SUITable.Cell collapsing>
                                 <Checkbox
@@ -141,159 +255,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                     onChange={() => handleToggle(log.position)}
                                 />
                             </SUITable.Cell>
-                            {MAIN_FIELDS.map(({ category }) => {
-                                switch (category) {
-                                    case 'Hail Batch':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <a
-                                                    href={`${log.batch_url}`}
-                                                    rel="noopener noreferrer"
-                                                    target="_blank"
-                                                >
-                                                    {_.get(log, category)}
-                                                </a>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'GitHub':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '200px' }}
-                                            >
-                                                <a
-                                                    href={`${`https://www.github.com/populationgenomics/${log.repo}/tree/${log.commit}`}`}
-                                                    rel="noopener noreferrer"
-                                                    target="_blank"
-                                                >
-                                                    {_.get(log, category)}
-                                                </a>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Author':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <Popup
-                                                    trigger={
-                                                        <span
-                                                            style={{
-                                                                textDecoration: 'underline',
-                                                                cursor: 'pointer',
-                                                            }}
-                                                            onClick={() => {
-                                                                const author = _.get(log, category)
-                                                                if (
-                                                                    filters.find(
-                                                                        (f) =>
-                                                                            f.category === category
-                                                                    )?.value === author
-                                                                ) {
-                                                                    updateFilter('', 'Author')
-                                                                } else {
-                                                                    updateFilter(
-                                                                        _.get(log, category),
-                                                                        'Author'
-                                                                    )
-                                                                }
-                                                            }}
-                                                        >
-                                                            {_.get(log, category)}
-                                                        </span>
-                                                    }
-                                                    hoverable
-                                                    position="bottom center"
-                                                >
-                                                    {_.get(log, 'email')}
-                                                </Popup>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Date':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <Popup
-                                                    trigger={<span>{_.get(log, 'Date')}</span>}
-                                                    hoverable
-                                                    position="bottom center"
-                                                >
-                                                    {_.get(log, 'timestamp')}
-                                                </Popup>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'Image':
-                                    case 'mode':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                {_.get(log, category)}
-                                            </SUITable.Cell>
-                                        )
-
-                                    case 'script':
-                                        return (
-                                            <SUITable.Cell key={category} className="scriptField">
-                                                <code
-                                                    onClick={() => handleToggle(log.position)}
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    {sanitiseValue(_.get(log, category))}
-                                                </code>
-                                            </SUITable.Cell>
-                                        )
-                                    case 'accessLevel':
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '100px' }}
-                                            >
-                                                <span
-                                                    style={{
-                                                        textDecoration: 'underline',
-                                                        cursor: 'pointer',
-                                                        width: '100px',
-                                                    }}
-                                                    onClick={() => {
-                                                        if (
-                                                            filters.filter(
-                                                                (f) => f.category === category
-                                                            ).length > 0
-                                                        ) {
-                                                            updateFilter('', 'accessLevel')
-                                                        } else {
-                                                            updateFilter(
-                                                                _.get(log, category),
-                                                                'accessLevel'
-                                                            )
-                                                        }
-                                                    }}
-                                                >
-                                                    {_.get(log, category)}
-                                                </span>
-                                            </SUITable.Cell>
-                                        )
-                                    default:
-                                        return (
-                                            <SUITable.Cell
-                                                key={category}
-                                                style={{ width: '300px' }}
-                                            >
-                                                {sanitiseValue(_.get(log, category))}
-                                            </SUITable.Cell>
-                                        )
-                                }
-                            })}
+                            {expandedRow(log)}
                         </SUITable.Row>
                         {Object.entries(log)
                             .filter(

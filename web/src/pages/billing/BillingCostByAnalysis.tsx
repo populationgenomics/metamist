@@ -93,7 +93,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             .getTotalCost(query)
             .then((response) => {
                 setIsLoading(false)
-                setData(response.data)
+                setData(response.data.map((d, idx) => ({ ...d, position: idx })))
             })
             .catch((er) => setError(er.message))
     }
@@ -232,8 +232,8 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                     </SUITable.Row>
                 </SUITable.Header>
                 <SUITable.Body>
-                    {data.map((k) => (
-                        <SUITable.Row>
+                    {data.map((k, i) => (
+                        <SUITable.Row key={i}>
                             <SUITable.Cell>{k.cost_category}</SUITable.Cell>
                             <SUITable.Cell>{k.sku}</SUITable.Cell>
                             <SUITable.Cell>
@@ -250,6 +250,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
             <HailBatchGrid
                 data={data}
+                // idColumn="analysis_id"
                 filters={filters}
                 updateFilter={updateFilter}
                 sort={sort}
