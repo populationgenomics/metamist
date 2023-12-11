@@ -68,11 +68,6 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
     const [searchSquencingGroups, { loading, error }] = useLazyQuery(GET_SEQUENCING_GROUPS_QUERY)
 
     const search = () => {
-        const seqTypeInput = document.getElementById('seq_type') as HTMLInputElement
-        const technologyInput = document.getElementById('technology') as HTMLInputElement
-        const platformInput = document.getElementById('platform') as HTMLInputElement
-        const excludeInput = document.getElementById('exclude') as HTMLInputElement
-
         if (!selectedProject?.name) {
             return
         }
@@ -82,22 +77,29 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
             seqType: null,
             technology: null,
             platform: null,
+            createdOn: null,
+            hasCram: null,
+            hasGvcf: null,
             excludeIds: [],
             assayMeta: {},
         }
 
+        const seqTypeInput = document.getElementById('seq_type') as HTMLInputElement
         if (seqTypeInput?.value) {
             searchParams.seqType = seqTypeInput.value
         }
 
+        const technologyInput = document.getElementById('technology') as HTMLInputElement
         if (technologyInput?.value) {
             searchParams.technology = technologyInput.value
         }
 
+        const platformInput = document.getElementById('platform') as HTMLInputElement
         if (platformInput?.value) {
             searchParams.platform = platformInput.value
         }
 
+        const excludeInput = document.getElementById('exclude') as HTMLInputElement
         if (excludeInput?.value && excludeInput.value.trim().length > 0) {
             searchParams.excludeIds = excludeInput.value
                 .split(',')
@@ -112,12 +114,36 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
             }
         })
 
+        const createdAfterInput = document.getElementById('created_after') as HTMLInputElement
+        const createdBeforeInput = document.getElementById('created_before') as HTMLInputElement
+        if (createdAfterInput?.value) {
+            searchParams.createdOn = { gte: createdAfterInput.value }
+        }
+        if (createdBeforeInput?.value) {
+            searchParams.createdOn = { ...searchParams.createdOn, lte: createdBeforeInput.value }
+        }
+
+        const hasCramInput = document.getElementById('has_cram') as HTMLInputElement
+        if (hasCramInput?.checked) {
+            searchParams.hasCram = true
+        }
+
+        const hasGvcfInput = document.getElementById('has_gvcf') as HTMLInputElement
+        if (hasGvcfInput?.checked) {
+            searchParams.hasGvcf = true
+        }
+
+        console.log(searchParams)
+
         searchSquencingGroups({
             variables: {
                 project: selectedProject.name,
                 seqType: searchParams.seqType,
                 technology: searchParams.technology,
                 platform: searchParams.platform,
+                createdOn: searchParams.createdOn,
+                hasCram: searchParams.hasCram,
+                hasGvcf: searchParams.hasGvcf,
                 assayMeta: searchParams.assayMeta,
                 excludeIds: searchParams.excludeIds,
             },
@@ -217,8 +243,26 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                     label="Exclude Sequencing Group IDs"
                     id="exclude"
                 />
+                <Form.Group>
+                    <Form.Field
+                        label="Created on or after"
+                        control="input"
+                        type="date"
+                        id="created_after"
+                    />
+                    <Form.Field
+                        label="Created on or before"
+                        control="input"
+                        type="date"
+                        id="created_before"
+                    />
+                </Form.Group>
+                <Form.Group>
+                    <Form.Field label="Has" />
+                    <Form.Checkbox label="CRAM" id="has_cram" />
+                    <Form.Checkbox label="GVCF" id="has_gvcf" />
+                </Form.Group>
             </Container>
-            <br />
             <Form.Group>
                 <Form.Button
                     type="button"
