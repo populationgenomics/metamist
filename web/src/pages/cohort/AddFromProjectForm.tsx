@@ -133,8 +133,6 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
             searchParams.hasGvcf = true
         }
 
-        console.log(searchParams)
-
         searchSquencingGroups({
             variables: {
                 project: selectedProject.name,
