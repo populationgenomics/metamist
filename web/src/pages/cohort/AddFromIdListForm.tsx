@@ -16,7 +16,9 @@ query FetchSequencingGroupsById($ids: [String!]!) {
       type
       technology
       platform
-      assayMeta
+      assays {
+        meta
+      }
       sample {
         project {
           id
@@ -61,6 +63,7 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
                 setSequencingGroups(
                     hits.sequencingGroups.map((sg) => ({
                         ...sg,
+                        assayMeta: (sg?.assays ?? []).map((a) => a.meta),
                         project: sg.sample.project,
                     }))
                 ),

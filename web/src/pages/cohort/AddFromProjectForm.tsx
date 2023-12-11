@@ -18,6 +18,9 @@ query FetchSequencingGroups(
     $technology: String,
     $seqType: String,
     $assayMeta: JSON,
+    $createdOn: DateGraphQLFilter,
+    $hasCram: Boolean,
+    $hasGvcf: Boolean,
     $excludeIds: [String!]
 ) {
     sequencingGroups(
@@ -27,14 +30,18 @@ query FetchSequencingGroups(
       technology: {icontains: $technology}
       type: {contains: $seqType}
       assayMeta: $assayMeta,
+      createdOn: $createdOn,
+      hasCram: $hasCram,
+      hasGvcf: $hasGvcf,
       activeOnly: {eq: true}
     ) {
       id
       type
       technology
       platform
-      assayMeta
-      createdOn
+      assays {
+        meta
+      }
     }
   }
 `)
@@ -123,7 +130,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                     type: sg.type,
                     technology: sg.technology,
                     platform: sg.platform,
-                    assayMeta: sg.assayMeta,
+                    assayMeta: (sg?.assays ?? []).map((a) => a.meta),
                     project: { id: selectedProject.id, name: selectedProject.name },
                 }))
 
