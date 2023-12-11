@@ -11,6 +11,8 @@ import {
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
+import HailBatchGrid from './components/HailBatchGrid'
+import { Filter } from '../project/AnalysisRunnerView/Filter'
 
 function currencyFormat(num: number): string {
     if (num === undefined || num === null) {
@@ -66,6 +68,12 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         searchParams.get('searchBy') ?? undefined
     )
 
+    const [filters, setFilters] = React.useState<Filter[]>([])
+    const [sort, setSort] = React.useState<{ column: string | null; direction: string | null }>({
+        column: 'timestamp',
+        direction: 'descending',
+    })
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
@@ -88,6 +96,25 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 setData(response.data)
             })
             .catch((er) => setError(er.message))
+    }
+
+    const handleSort = (clickedColumn: string) => {
+        if (sort.column !== clickedColumn) {
+            setSort({ column: clickedColumn, direction: 'ascending' })
+            return
+        }
+        if (sort.direction === 'ascending') {
+            setSort({ column: clickedColumn, direction: 'descending' })
+            return
+        }
+        setSort({ column: null, direction: null })
+    }
+
+    const updateFilter = (v: string, c: string) => {
+        setFilters([
+            ...filters.filter(({ category }) => c !== category),
+            ...(v ? [{ value: v, category: c }] : []),
+        ])
     }
 
     const handleSearch = () => {
@@ -160,7 +187,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <br />
                 <p>
                     {' '}
-                    E.g.
+                    e.g.
                     <br />
                     ar_guid: 855a6153-033c-4398-8000-46ed74c02fe8
                     <br />
@@ -174,6 +201,83 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             </Card>
         )
     }
+
+    const dataDumpCard = (data: BillingTotalCostRecord[]) => (
+        <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+            <Header as="h3">{extractHeader(data[0])}</Header>
+            <Table celled compact sortable selectable>
+                <SUITable.Header>
+                    <SUITable.Row>
+                        <SUITable.HeaderCell
+                            style={{
+                                borderBottom: 'none',
+                            }}
+                        >
+                            Cost Category
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
+                            style={{
+                                borderBottom: 'none',
+                            }}
+                        >
+                            SKU
+                        </SUITable.HeaderCell>
+                        <SUITable.HeaderCell
+                            style={{
+                                borderBottom: 'none',
+                            }}
+                        >
+                            Cost
+                        </SUITable.HeaderCell>
+                    </SUITable.Row>
+                </SUITable.Header>
+                <SUITable.Body>
+                    {data.map((k) => (
+                        <SUITable.Row>
+                            <SUITable.Cell>{k.cost_category}</SUITable.Cell>
+                            <SUITable.Cell>{k.sku}</SUITable.Cell>
+                            <SUITable.Cell>
+                                <b>{currencyFormat(k.cost)}</b>
+                            </SUITable.Cell>
+                        </SUITable.Row>
+                    ))}
+                </SUITable.Body>
+            </Table>
+        </Card>
+    )
+
+    const gridCard = (data: BillingTotalCostRecord[]) => (
+        <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+            <HailBatchGrid
+                data={data}
+                filters={filters}
+                updateFilter={updateFilter}
+                sort={sort}
+                handleSort={handleSort}
+            />
+
+            {/* <AnalysisRunnerGrid
+                data={(!sort.column
+                    ? flatData
+                    : _.orderBy(
+                        flatData,
+                        [sort.column],
+                        sort.direction === 'ascending' ? ['asc'] : ['desc']
+                    )
+                )
+                    .filter((log) =>
+                        filters.every(({ category, value }) =>
+                            _.get(log, category, '').includes(value)
+                        )
+                    )
+                    .slice((pageNumber - 1) * pageLimit, pageNumber * pageLimit)}
+                filters={filters}
+                updateFilter={updateFilter}
+                handleSort={handleSort}
+                sort={sort}
+            /> */}
+        </Card>
+    )
 
     if (error) {
         return (
@@ -213,51 +317,8 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     return (
         <>
             {searchCard()}
-            <Card
-                fluid
-                style={{ padding: '20px', overflowX: 'scroll' }}
-                id="billing-container-data"
-            >
-                <Header as="h3">{extractHeader(data[0])}</Header>
-                <Table celled compact sortable selectable>
-                    <SUITable.Header>
-                        <SUITable.Row>
-                            <SUITable.HeaderCell
-                                style={{
-                                    borderBottom: 'none',
-                                }}
-                            >
-                                Cost Category
-                            </SUITable.HeaderCell>
-                            <SUITable.HeaderCell
-                                style={{
-                                    borderBottom: 'none',
-                                }}
-                            >
-                                SKU
-                            </SUITable.HeaderCell>
-                            <SUITable.HeaderCell
-                                style={{
-                                    borderBottom: 'none',
-                                }}
-                            >
-                                Cost
-                            </SUITable.HeaderCell>
-                        </SUITable.Row>
-                    </SUITable.Header>
-                    <SUITable.Body>
-                        {data.map((k) => (
-                            <SUITable.Row>
-                                <SUITable.Cell>{k.cost_category}</SUITable.Cell>
-                                <SUITable.Cell>{k.sku}</SUITable.Cell>
-                                <SUITable.Cell>
-                                    <b>{currencyFormat(k.cost)}</b>
-                                </SUITable.Cell>
-                            </SUITable.Row>
-                        ))}
-                    </SUITable.Body>
-                </Table>
-            </Card>
+            {dataDumpCard(data)}
+            {gridCard(data)}
         </>
     )
 }
