@@ -136,5 +136,7 @@ class TestSequencingGroup(DbIsolatedTest):
         active_sgs = await self.sglayer.query(
             SequencingGroupFilter(sample_id=GenericFilter(sample.id))
         )
+
+        self.assertTrue(all([not sg.archived for sg in active_sgs]))
         self.assertEqual(len(active_sgs), 1)
         self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)
