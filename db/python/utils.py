@@ -273,7 +273,10 @@ class GenericFilterModel:
                 setattr(self, field.name, GenericFilter(eq=value))
 
     def to_sql(
-        self, field_overrides: dict[str, str] = None
+        self,
+        field_overrides: dict[str, str] = None,
+        only: list[str] | None = None,
+        exclude: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Convert the model to SQL, and avoid SQL injection"""
         _foverrides = field_overrides or {}
@@ -290,6 +293,11 @@ class GenericFilterModel:
         fields = dataclasses.fields(self)
         conditionals, values = [], {}
         for field in fields:
+            if only and field.name not in only:
+                continue
+            if exclude and field.name in exclude:
+                continue
+
             fcolumn = _foverrides.get(field.name, field.name)
             if filter_ := getattr(self, field.name):
                 if isinstance(filter_, dict):
