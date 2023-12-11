@@ -46,9 +46,6 @@ class SequencingGroupInternal(SMBase):
 
     assays: list[AssayInternal] | None = None
 
-    created_on: datetime.datetime | None = None
-    assay_meta: list[dict[str, Any]]
-
     @classmethod
     def from_db(cls, **kwargs):
         """From database model"""
@@ -56,22 +53,17 @@ class SequencingGroupInternal(SMBase):
         if meta and isinstance(meta, str):
             meta = json.loads(meta)
 
-        assay_meta = kwargs.pop('assay_meta', [])
-        if not assay_meta:
-            assay_meta = []
-
-        if assay_meta and isinstance(assay_meta, str):
-            assay_meta = json.loads(assay_meta)
-        elif isinstance(assay_meta, dict):
-            assay_meta = [assay_meta]
-
         _archived = kwargs.pop('archived', None)
         if _archived is not None:
-            _archived = _archived != b'\x00'
+            # _archived = _archived != b'\x00'
+            if isinstance(_archived, int):
+                _archived = _archived != 0
+            if isinstance(_archived, bytes):
+                _archived = _archived != b'\x00'
+            else:
+                _archived = bool(_archived)
 
-        return SequencingGroupInternal(
-            **kwargs, archived=_archived, meta=meta, assay_meta=assay_meta
-        )
+        return SequencingGroupInternal(**kwargs, archived=_archived, meta=meta)
 
     def to_external(self):
         """Convert to transport model"""
@@ -85,8 +77,6 @@ class SequencingGroupInternal(SMBase):
             sample_id=sample_id_format(self.sample_id),
             assays=[a.to_external() for a in self.assays or []],
             archived=self.archived,
-            created_on=self.created_on,
-            assay_meta=self.assay_meta,
         )
 
 
@@ -165,8 +155,6 @@ class SequencingGroup(SMBase):
     external_ids: dict[str, str]
     archived: bool
     assays: list[Assay]
-    created_on: datetime.datetime
-    assay_meta: list[dict[str, Any]]
 
 
 class NestedSequencingGroup(SMBase):
