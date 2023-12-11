@@ -142,49 +142,29 @@ class SequencingGroupTable(DbBase):
 
         if filter_.has_cram is not None or filter_.has_gvcf is not None:
             exclude_fields.extend(['has_cram', 'has_gvcf'])
-            where_statements = []
-
-            if filter_.has_cram is not None:
-                query_values['cram'] = '%cram%'
-                if filter_.has_cram.eq is True:
-                    where_statements.append('analysis_types LIKE :cram')
-                elif filter_.has_cram.eq is False:
-                    where_statements.append('analysis_types NOT LIKE :cram')
-                else:
-                    raise ValueError(
-                        f'Invalid value for has_cram: {filter_.has_cram}, must be True or False'
-                    )
-
-            if filter_.has_gvcf is not None:
-                query_values['gvcf'] = '%gvcf%'
-                if filter_.has_gvcf.eq is True:
-                    where_statements.append('analysis_types LIKE :gvcf')
-                elif filter_.has_gvcf.eq is False:
-                    where_statements.append('analysis_types NOT LIKE :gvcf')
-                else:
-                    raise ValueError(
-                        f'Invalid value for has_gvcf: {filter_.has_gvcf}, must be True or False'
-                    )
-
+            wheres, values = filter_.to_sql(
+                sql_overrides, only=['has_cram', 'has_gvcf']
+            )
+            query_values.update(values)
             _query.append(
                 f"""
             INNER JOIN (
                 SELECT
                     sequencing_group_id,
-                    GROUP_CONCAT(anlysis_query.type) AS analysis_types
+                    FIND_IN_SET('cram', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_cram,
+                    FIND_IN_SET('gvcf', GROUP_CONCAT(LOWER(anlysis_query.type))) > 0 AS has_gvcf
                 FROM
                     analysis_sequencing_group
                     INNER JOIN (
                         SELECT
-                            id,
-                            type
+                            id, type
                         FROM
                             analysis
                     ) AS anlysis_query ON analysis_sequencing_group.analysis_id = anlysis_query.id
                 GROUP BY
                     sequencing_group_id
                 HAVING
-                    {" AND ".join(where_statements)}
+                    {wheres}
             ) AS sg_filequery ON sg.id = sg_filequery.sequencing_group_id
             """
             )
