@@ -253,6 +253,24 @@ async def get_invoice_months(
     return records
 
 
+@router.get(
+    '/namespaces',
+    response_model=list[str],
+    operation_id='getNamespaces',
+)
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_namespaces(
+    author: str = get_author,
+) -> list[str]:
+    """
+    Get list of all namespaces in database
+    Results are sorted DESC
+    """
+    billing_layer = initialise_billing_layer(author)
+    records = await billing_layer.get_namespaces()
+    return records
+
+
 @router.post(
     '/query', response_model=list[BillingRowRecord], operation_id='queryBilling'
 )
@@ -467,6 +485,19 @@ async def get_total_cost(
             },
             "filters_op": "OR",
             "order_by": {"cost": true}
+        }
+
+    18. Get weekly total cost by sku for selected cost_category, order by day ASC:
+
+        {
+            "fields": ["sku"],
+            "start_date": "2022-11-01",
+            "end_date": "2023-12-07",
+            "filters": {
+                "cost_category": "Cloud Storage"
+            },
+            "order_by": {"day": false},
+            "time_periods": "week"
         }
 
     """

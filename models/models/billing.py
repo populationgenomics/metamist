@@ -142,6 +142,7 @@ class BillingColumn(str, Enum):
     CROMWELL_WORKFLOW_ID = 'cromwell_workflow_id'
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
+    NAMESPACE = 'namespace'
 
     @classmethod
     def extended_cols(cls) -> list[str]:
@@ -158,6 +159,7 @@ class BillingColumn(str, Enum):
             'cromwell_workflow_id',
             'goog_pipelines_worker',
             'wdl_task_name',
+            'namespace',
         ]
 
     @staticmethod
@@ -167,6 +169,16 @@ class BillingColumn(str, Enum):
             return 'All GCP Projects'
 
         return f'All {record.title()}s'
+
+
+class BillingTimePeriods(str, Enum):
+    """List of billing grouping time periods"""
+
+    # grouping time periods
+    DAY = 'day'
+    WEEK = 'week'
+    MONTH = 'month'
+    INVOICE_MONTH = 'invoice_month'
 
 
 class BillingTotalCostQueryModel(SMBase):
@@ -192,6 +204,9 @@ class BillingTotalCostQueryModel(SMBase):
     limit: int | None = None
     offset: int | None = None
 
+    # default to day, can be day, week, month, invoice_month
+    time_periods: BillingTimePeriods | None = None
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.json())
@@ -205,6 +220,7 @@ class BillingTotalCostRecord(SMBase):
     gcp_project: str | None
     cost_category: str | None
     sku: str | None
+    invoice_month: str | None
     ar_guid: str | None
     # extended columns
     dataset: str | None
@@ -217,6 +233,7 @@ class BillingTotalCostRecord(SMBase):
     cromwell_workflow_id: str | None
     goog_pipelines_worker: str | None
     wdl_task_name: str | None
+    namespace: str | None
 
     cost: float
     currency: str | None
@@ -230,6 +247,7 @@ class BillingTotalCostRecord(SMBase):
             gcp_project=record.get('gcp_project'),
             cost_category=record.get('cost_category'),
             sku=record.get('sku'),
+            invoice_month=record.get('invoice_month'),
             ar_guid=record.get('ar_guid'),
             dataset=record.get('dataset'),
             batch_id=record.get('batch_id'),
@@ -241,6 +259,7 @@ class BillingTotalCostRecord(SMBase):
             cromwell_workflow_id=record.get('cromwell_workflow_id'),
             goog_pipelines_worker=record.get('goog_pipelines_worker'),
             wdl_task_name=record.get('wdl_task_name'),
+            namespace=record.get('namespace'),
             cost=record.get('cost'),
             currency=record.get('currency'),
         )

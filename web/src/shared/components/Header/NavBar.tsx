@@ -48,6 +48,11 @@ const billingPages = {
             icon: <TableRowsIcon />,
         },
         {
+            title: 'Cost By Category',
+            url: '/billing/costByCategory',
+            icon: <TableRowsIcon />,
+        },
+        {
             title: 'Seqr Prop Map',
             url: '/billing/seqrPropMap',
             icon: <TableRowsIcon />,

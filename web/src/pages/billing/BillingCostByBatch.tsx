@@ -49,10 +49,15 @@ const BillingCostByBatch: React.FunctionComponent = () => {
     const [error, setError] = React.useState<string | undefined>()
 
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ?? `${now.getFullYear()}-${now.getMonth() + 1}-01`
+        searchParams.get('start') ??
+            `${now.getFullYear()}-${now.getMonth().toString().padStart(2, '0')}-01`
     )
     const [end, setEnd] = React.useState<string>(
-        searchParams.get('end') ?? `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+        searchParams.get('end') ??
+            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
+                .getDate()
+                .toString()
+                .padStart(2, '0')}`
     )
 
     const [data, setData] = React.useState<BillingTotalCostRecord[]>([])
@@ -67,13 +72,10 @@ const BillingCostByBatch: React.FunctionComponent = () => {
 
     const updateNav = (searchBy: string | undefined) => {
         let url = `${location.pathname}`
-        if (searchBy) url += '?'
-
-        const params: string[] = []
-        if (searchBy) params.push(`searchBy=${searchBy}`)
-
-        url += params.join('&')
-        navigate(url)
+        if (searchBy) {
+            url += `?searchBy=${searchBy}`
+            navigate(url)
+        }
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -89,6 +91,11 @@ const BillingCostByBatch: React.FunctionComponent = () => {
     }
 
     const handleSearch = () => {
+        if (searchTxt === undefined || searchTxt.length < 6) {
+            // Seaarch text is not large enough
+            setIsLoading(false)
+            return
+        }
         updateNav(searchTxt)
         getData({
             fields: [

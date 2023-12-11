@@ -16,20 +16,16 @@ import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 
-const BillingCostByTime: React.FunctionComponent = () => {
+const BillingCostByCategory: React.FunctionComponent = () => {
     const now = new Date()
 
     const [searchParams] = useSearchParams()
 
-    const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
-    const fixedGroupBy: BillingColumn = inputGroupBy
-        ? (inputGroupBy as BillingColumn)
-        : BillingColumn.GcpProject
-    const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
+    const inputCostCategory: string | undefined = searchParams.get('costCategory') ?? undefined
 
     const [start, setStart] = React.useState<string>(
         searchParams.get('start') ??
-            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`
+            `${now.getFullYear() - 1}-${now.getMonth().toString().padStart(2, '0')}-01`
     )
     const [end, setEnd] = React.useState<string>(
         searchParams.get('end') ??
@@ -38,10 +34,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 .toString()
                 .padStart(2, '0')}`
     )
-    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
-        fixedGroupBy ?? BillingColumn.GcpProject
-    )
-    const [selectedData, setSelectedData] = React.useState<string | undefined>(inputSelectedData)
+    const [selectedData, setCostCategory] = React.useState<string | undefined>(inputCostCategory)
+
+    const [selectedPeriod, setPeriod] = React.useState<string | undefined>(undefined)
 
     // Max Aggregated Data Points, rest will be aggregated into "Rest"
     const maxDataPoints = 7
@@ -58,33 +53,35 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const navigate = useNavigate()
 
     const updateNav = (
-        grp: string | undefined,
-        data: string | undefined,
+        category: string | undefined,
+        period: string | undefined,
         start: string,
         end: string
     ) => {
         let url = `${location.pathname}`
-        if (grp || data) url += '?'
 
-        let params: string[] = []
-        if (grp) params.push(`groupBy=${grp}`)
-        if (data) params.push(`selectedData=${data}`)
-        if (start) params.push(`start=${start}`)
-        if (end) params.push(`end=${end}`)
+        if (category && period) {
+            url += '?'
 
-        url += params.join('&')
-        navigate(url)
+            let params: string[] = []
+            if (category) params.push(`costCategory=${category}`)
+            if (period) params.push(`period=${period}`)
+            if (start) params.push(`start=${start}`)
+            if (end) params.push(`end=${end}`)
+
+            url += params.join('&')
+            navigate(url)
+        }
     }
 
-    const onGroupBySelect = (event: any, data: any) => {
-        setGroupBy(data.value)
-        setSelectedData(undefined)
-        updateNav(data.value, undefined, start, end)
+    const onSelect = (event: any, recs: any) => {
+        setCostCategory(recs.value)
+        updateNav(recs.value, selectedPeriod, start, end)
     }
 
-    const onSelect = (event: any, data: any) => {
-        setSelectedData(data.value)
-        updateNav(groupBy, data.value, start, end)
+    const onSelectPeriod = (event: any, recs: any) => {
+        setPeriod(recs.value)
+        updateNav(selectedData, recs.value, start, end)
     }
 
     const changeDate = (name: string, value: string) => {
@@ -94,7 +91,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(groupBy, selectedData, start_update, end_update)
+        updateNav(selectedData, selectedPeriod, start_update, end_update)
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -105,17 +102,17 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .then((response) => {
                 setIsLoading(false)
 
-                // calc totals per cost_category
+                // calc totals per sku
                 const recTotals = response.data.reduce(
                     (
                         acc: { [key: string]: { [key: string]: number } },
                         item: BillingTotalCostRecord
                     ) => {
-                        const { cost_category, cost } = item
-                        if (!acc[cost_category]) {
-                            acc[cost_category] = 0
+                        const { sku, cost } = item
+                        if (!acc[sku]) {
+                            acc[sku] = 0
                         }
-                        acc[cost_category] += cost
+                        acc[sku] += cost
                         return acc
                     },
                     {}
@@ -129,7 +126,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         acc: { [key: string]: { [key: string]: number } },
                         item: BillingTotalCostRecord
                     ) => {
-                        const { day, cost_category, cost } = item
+                        const { day, sku, cost } = item
                         if (day !== undefined) {
                             if (!acc[day]) {
                                 // initialise day structure
@@ -138,7 +135,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                     acc[day][k] = 0
                                 })
                             }
-                            acc[day][cost_category] = cost
+                            acc[day][sku] = cost
                         }
                         return acc
                     },
@@ -154,56 +151,29 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         values: records[key],
                     }))
                 )
-                const aggData: IData[] = Object.entries(sortedRecTotals)
-                    .map(([label, value]) => ({ label, value }))
-                    .reduce((acc: IData[], curr: IData, index: number, arr: IData[]) => {
-                        if (index < maxDataPoints) {
-                            acc.push(curr)
-                        } else {
-                            const restValue = arr
-                                .slice(index)
-                                .reduce((sum, { value }) => sum + value, 0)
-
-                            if (acc.length == maxDataPoints) {
-                                acc.push({ label: 'Rest*', value: restValue })
-                            } else {
-                                acc[maxDataPoints].value += restValue
-                            }
-                        }
-                        return acc
-                    }, [])
-
-                setAggregatedData(aggData)
             })
             .catch((er) => setError(er.message))
     }
 
     React.useEffect(() => {
-        if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
-            let source = 'aggregate'
-            if (groupBy === BillingColumn.GcpProject) {
-                source = 'gcp_billing'
-            }
-            if (selectedData.startsWith('All ')) {
-                getData({
-                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                    start_date: start,
-                    end_date: end,
-                    order_by: { day: false },
-                    source: source,
-                })
-            } else {
-                getData({
-                    fields: [BillingColumn.Day, BillingColumn.CostCategory],
-                    start_date: start,
-                    end_date: end,
-                    filters: { [groupBy.replace('-', '_').toLowerCase()]: selectedData },
-                    order_by: { day: false },
-                    source: source,
-                })
-            }
+        if (
+            selectedData !== undefined &&
+            selectedData !== '' &&
+            selectedData !== null &&
+            selectedPeriod !== undefined &&
+            selectedPeriod !== '' &&
+            selectedPeriod !== null
+        ) {
+            getData({
+                fields: [BillingColumn.Sku],
+                start_date: start,
+                end_date: end,
+                filters: { cost_category: selectedData },
+                order_by: { day: false },
+                time_periods: selectedPeriod,
+            })
         }
-    }, [start, end, groupBy, selectedData])
+    }, [start, end, selectedData, selectedPeriod])
 
     if (error) {
         return (
@@ -225,28 +195,31 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         fontSize: 40,
                     }}
                 >
-                    Billing Cost By Time
+                    Billing Cost By Category
                 </h1>
 
                 <Grid columns="equal">
                     <Grid.Column>
                         <FieldSelector
-                            label="Group By"
-                            fieldName="Group"
-                            onClickFunction={onGroupBySelect}
-                            selected={groupBy}
+                            label="Cost Category"
+                            fieldName="cost_category"
+                            onClickFunction={onSelect}
+                            selected={selectedData}
+                            includeAll={false}
                             autoSelect={false}
                         />
                     </Grid.Column>
+                </Grid>
 
+                <Grid columns="equal">
                     <Grid.Column>
                         <FieldSelector
-                            label={convertFieldName(groupBy)}
-                            fieldName={groupBy}
-                            onClickFunction={onSelect}
-                            selected={selectedData}
-                            includeAll={true}
-                            autoSelect={true}
+                            label="Time Period"
+                            fieldName="Period"
+                            onClickFunction={onSelectPeriod}
+                            selected={selectedPeriod}
+                            includeAll={false}
+                            autoSelect={false}
                         />
                     </Grid.Column>
                 </Grid>
@@ -254,39 +227,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 <Grid columns="equal">
                     <Grid.Column className="field-selector-label">
                         <Input
-                            label="Start"
+                            label="Since"
                             fluid
                             type="date"
                             onChange={(e) => changeDate('start', e.target.value)}
                             value={start}
-                        />
-                    </Grid.Column>
-
-                    <Grid.Column className="field-selector-label">
-                        <Input
-                            label="Finish"
-                            fluid
-                            type="date"
-                            onChange={(e) => changeDate('end', e.target.value)}
-                            value={end}
-                        />
-                    </Grid.Column>
-                </Grid>
-
-                <Grid columns={2} stackable>
-                    <Grid.Column width={10}>
-                        <BarChart
-                            data={aggregatedData}
-                            maxSlices={groups.length}
-                            isLoading={isLoading}
-                        />
-                    </Grid.Column>
-
-                    <Grid.Column width={6} className="donut-chart">
-                        <DonutChart
-                            data={aggregatedData}
-                            maxSlices={groups.length}
-                            isLoading={isLoading}
                         />
                     </Grid.Column>
                 </Grid>
@@ -303,22 +248,8 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
             </Card>
-            <Card
-                fluid
-                style={{ padding: '20px', overflowX: 'scroll' }}
-                id="billing-container-data"
-            >
-                <BillingCostByTimeTable
-                    heading={selectedData}
-                    start={start}
-                    end={end}
-                    groups={groups}
-                    isLoading={isLoading}
-                    data={data}
-                />
-            </Card>
         </>
     )
 }
 
-export default BillingCostByTime
+export default BillingCostByCategory

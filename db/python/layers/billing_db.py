@@ -1,7 +1,7 @@
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
-from typing import Any
+from typing import Any, Tuple
 
 from google.cloud import bigquery
 
@@ -20,6 +20,7 @@ from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingRowRecord,
+    BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -30,6 +31,29 @@ BQ_LABELS = {'source': 'metamist-api'}
 def abbrev_cost_category(cost_category: str) -> str:
     """abbreviate cost category"""
     return 'S' if cost_category == 'Cloud Storage' else 'C'
+
+
+def prepare_time_periods(query: BillingTotalCostQueryModel) -> Tuple[str, str, str]:
+    """Prepare Time periods grouping and parsing formulas"""
+    day_parse_formula = ''
+    day_field = ''
+    day_grp = 'day, '
+
+    # Based on specified time period, add the corresponding column
+    if query.time_periods == BillingTimePeriods.DAY:
+        day_field = 'day, '
+        day_parse_formula = 'day, '
+    elif query.time_periods == BillingTimePeriods.WEEK:
+        day_field = 'FORMAT_DATE("%Y%W", day) as day, '
+        day_parse_formula = 'PARSE_DATE("%Y%W", day) as day, '
+    elif query.time_periods == BillingTimePeriods.MONTH:
+        day_field = 'FORMAT_DATE("%Y%m", day) as day, '
+        day_parse_formula = 'PARSE_DATE("%Y%m", day) as day, '
+    elif query.time_periods == BillingTimePeriods.INVOICE_MONTH:
+        day_field = 'invoice_month as day, '
+        day_parse_formula = 'PARSE_DATE("%Y%m", day) as day, '
+
+    return day_field, day_grp, day_parse_formula
 
 
 class BillingDb(BqDbBase):
@@ -356,6 +380,18 @@ class BillingDb(BqDbBase):
 
         fields_selected = ','.join(columns)
 
+        # prepare grouping by time periods
+        day_parse_formula = ''
+        day_field = ''
+        day_grp = ''
+        if query.time_periods:
+            # remove existing day column, if added to fields
+            # this is to prevent duplicating various time periods in one query
+            if BillingColumn.DAY in query.fields:
+                columns.remove(BillingColumn.DAY)
+
+            day_field, day_grp, day_parse_formula = prepare_time_periods(query)
+
         # construct filters
         and_filters = []
         query_parameters = []
@@ -415,11 +451,14 @@ class BillingDb(BqDbBase):
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
         _query = f"""
-        SELECT {fields_selected}, SUM(cost) as cost
-        FROM `{view_to_use}`
-        {filter_str}
-        GROUP BY {fields_selected}
-        {order_by_str}
+        WITH t AS (
+            SELECT {day_field}{fields_selected}, SUM(cost) as cost
+            FROM `{view_to_use}`
+            {filter_str}
+            GROUP BY {day_grp}{fields_selected}
+            {order_by_str}
+        )
+        SELECT {day_parse_formula}{fields_selected}, cost FROM t
         """
 
         # append LIMIT and OFFSET if present
@@ -808,10 +847,11 @@ class BillingDb(BqDbBase):
             BillingColumn.COMPUTE_CATEGORY,
             BillingColumn.WDL_TASK_NAME,
             BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
+            BillingColumn.NAMESPACE,
         ):
             raise ValueError(
                 'Invalid field only topic, dataset, gcp-project, compute_category, '
-                'wdl_task_name & cromwell_sub_workflow_name are allowed'
+                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
             )
 
         (

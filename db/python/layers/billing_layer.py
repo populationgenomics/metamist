@@ -123,6 +123,15 @@ class BillingLayer(BqBaseLayer):
         billing_db = BillingDb(self.connection)
         return await billing_db.get_invoice_months()
 
+    async def get_namespaces(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All namespaces values in database
+        """
+        billing_db = BillingDb(self.connection)
+        return await billing_db.get_extended_values('namespace')
+
     async def query(
         self,
         _filter: BillingFilter,
