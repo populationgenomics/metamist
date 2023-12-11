@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react'
 import { Container, Form, Message } from 'semantic-ui-react'
 import { useLazyQuery } from '@apollo/client'
-import { uniq } from 'lodash'
 
 import { gql } from '../../__generated__/gql'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
@@ -157,32 +156,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
                     assayMeta: (sg?.assays ?? []).map((a) => a.meta),
                     project: { id: selectedProject.id, name: selectedProject.name },
                 }))
-
-                // Remove duplicates by merging string fields with same id
-                const merged: SequencingGroup[] = []
-                const seen = new Set()
-                sgs.forEach((sg) => {
-                    if (!seen.has(sg.id)) {
-                        merged.push(sg)
-                        seen.add(sg.id)
-                    } else {
-                        const existing = merged.find((e) => e.id === sg.id)
-                        if (existing) {
-                            existing.type = `${existing.type}|${sg.type}`
-                            existing.technology = `${existing.technology}|${sg.technology}`
-                            existing.platform = `${existing.platform}|${sg.platform}`
-                        }
-                    }
-                })
-
-                setSearchHits(
-                    merged.map((sg) => ({
-                        ...sg,
-                        type: uniq(sg.type.split('|')).sort().join(' | '),
-                        technology: uniq(sg.technology.split('|')).sort().join(' | '),
-                        platform: uniq(sg.platform.split('|')).sort().join(' | '),
-                    }))
-                )
+                setSearchHits(sgs)
             },
         })
     }
