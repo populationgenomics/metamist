@@ -1,11 +1,15 @@
+from datetime import date
+
 from test.testbase import DbIsolatedTest, run_as_sync
 from db.python.utils import GenericFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.layers import SequencingGroupLayer, SampleLayer
+from db.python.layers import SequencingGroupLayer, SampleLayer, AnalysisLayer
+from models.enums.analysis import AnalysisStatus
 from models.models import (
     SequencingGroupUpsertInternal,
     AssayUpsertInternal,
     SampleUpsertInternal,
+    AnalysisInternal,
 )
 
 
@@ -50,6 +54,7 @@ class TestSequencingGroup(DbIsolatedTest):
         super().setUp()
         self.sglayer = SequencingGroupLayer(self.connection)
         self.slayer = SampleLayer(self.connection)
+        self.alayer = AnalysisLayer(self.connection)
 
     @run_as_sync
     async def test_insert_sequencing_group(self):
@@ -140,3 +145,178 @@ class TestSequencingGroup(DbIsolatedTest):
         self.assertTrue(all(not sg.archived for sg in active_sgs))
         self.assertEqual(len(active_sgs), 1)
         self.assertEqual(updated_sample.sequencing_groups[0].id, active_sgs[0].id)
+
+    @run_as_sync
+    async def test_query_with_assay_metadata(self):
+        """Test inserting and fetching a sequencing group"""
+        sample_to_insert = get_sample_model()
+
+        # Add extra sequencing group
+        sample_to_insert.sequencing_groups.append(
+            SequencingGroupUpsertInternal(
+                type='exome',
+                technology='short-read',
+                platform='ILLUMINA',
+                meta={
+                    'meta-key': 'meta-value',
+                },
+                external_ids={},
+                assays=[
+                    AssayUpsertInternal(
+                        type='sequencing',
+                        external_ids={},
+                        meta={
+                            'sequencing_type': 'exome',
+                            'sequencing_platform': 'short-read',
+                            'sequencing_technology': 'illumina',
+                        },
+                    )
+                ],
+            )
+        )
+
+        # Create in database
+        sample = await self.slayer.upsert_sample(sample_to_insert)
+
+        # Query for genome assay metadata
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(
+                assay_meta={'sequencing_type': GenericFilter(eq='genome')}
+            )
+        )
+        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+
+        # Query for exome assay metadata
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(
+                assay_meta={'sequencing_type': GenericFilter(eq='exome')}
+            )
+        )
+        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+
+    @run_as_sync
+    async def test_query_with_creation_date(self):
+        sample_to_insert = get_sample_model()
+        await self.slayer.upsert_sample(sample_to_insert)
+
+        # Query for sequencing group with creation date before today
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lt=date.today()))
+        )
+        self.assertTrue(len(sgs) == 0)
+
+        # Query for sequencing group with creation date today
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(created_on=GenericFilter(eq=date.today()))
+        )
+        self.assertTrue(len(sgs) == 1)
+
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(created_on=GenericFilter(lte=date.today()))
+        )
+        self.assertTrue(len(sgs) == 1)
+
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(created_on=GenericFilter(gte=date.today()))
+        )
+        self.assertTrue(len(sgs) == 1)
+
+        # Query for sequencing group with creation date today
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(created_on=GenericFilter(gt=date.today()))
+        )
+        self.assertTrue(len(sgs) == 0)
+
+    @run_as_sync
+    async def test_query_finds_sgs_which_have_cram_analysis(self):
+        sample_to_insert = get_sample_model()
+
+        # Add extra sequencing group
+        sample_to_insert.sequencing_groups.append(
+            SequencingGroupUpsertInternal(
+                type='exome',
+                technology='short-read',
+                platform='ILLUMINA',
+                meta={
+                    'meta-key': 'meta-value',
+                },
+                external_ids={},
+                assays=[
+                    AssayUpsertInternal(
+                        type='sequencing',
+                        external_ids={},
+                        meta={
+                            'sequencing_type': 'exome',
+                            'sequencing_platform': 'short-read',
+                            'sequencing_technology': 'illumina',
+                        },
+                    )
+                ],
+            )
+        )
+
+        # Create in database
+        sample = await self.slayer.upsert_sample(sample_to_insert)
+
+        # Create analysis for cram and gvcf
+        await self.alayer.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[sample.sequencing_groups[0].id],
+                meta={},
+            )
+        )
+        await self.alayer.create_analysis(
+            AnalysisInternal(
+                type='gvcf',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[sample.sequencing_groups[1].id],
+                meta={},
+            )
+        )
+
+        # Query for cram analysis
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(has_cram=GenericFilter(eq=True))
+        )
+        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
+
+        # Query for gvcf analysis
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(has_gvcf=GenericFilter(eq=True))
+        )
+        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
+
+        # Query for both cram AND gvcf analysis
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(
+                has_gvcf=GenericFilter(eq=True),
+                has_cram=GenericFilter(eq=True),
+            )
+        )
+        self.assertTrue(len(sgs) == 0)
+
+        # Add first SG to gvcf analysis
+        await self.alayer.create_analysis(
+            AnalysisInternal(
+                type='gvcf',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[sample.sequencing_groups[0].id],
+                meta={},
+            )
+        )
+
+        # Query for both cram AND gvcf analysis now that first SG has gvcf analysis
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(
+                has_gvcf=GenericFilter(eq=True),
+                has_cram=GenericFilter(eq=True),
+            )
+        )
+        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
