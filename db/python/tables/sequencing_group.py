@@ -36,8 +36,8 @@ class SequencingGroupFilter(GenericFilterModel):
     # joins and dynamic computation are required.
     created_on: GenericFilter[date] | None = None
     assay_meta: GenericMetaFilter | None = None
-    has_cram: GenericFilter[bool] | None = None
-    has_gvcf: GenericFilter[bool] | None = None
+    has_cram: bool | None = None
+    has_gvcf: bool | None = None
 
     def __hash__(self):  # pylint: disable=useless-super-delegation
         return super().__hash__()
