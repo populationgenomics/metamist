@@ -184,7 +184,7 @@ class TestSequencingGroup(DbIsolatedTest):
                 assay_meta={'sequencing_type': GenericFilter(eq='genome')}
             )
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
 
         # Query for exome assay metadata
@@ -193,7 +193,7 @@ class TestSequencingGroup(DbIsolatedTest):
                 assay_meta={'sequencing_type': GenericFilter(eq='exome')}
             )
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
 
     @run_as_sync
@@ -206,29 +206,29 @@ class TestSequencingGroup(DbIsolatedTest):
         sgs = await self.sglayer.query(
             SequencingGroupFilter(created_on=GenericFilter(lt=date.today()))
         )
-        self.assertTrue(len(sgs) == 0)
+        self.assertEqual(len(sgs), 0)
 
         # Query for sequencing group with creation date today
         sgs = await self.sglayer.query(
             SequencingGroupFilter(created_on=GenericFilter(eq=date.today()))
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
 
         sgs = await self.sglayer.query(
             SequencingGroupFilter(created_on=GenericFilter(lte=date.today()))
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
 
         sgs = await self.sglayer.query(
             SequencingGroupFilter(created_on=GenericFilter(gte=date.today()))
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
 
         # Query for sequencing group with creation date today
         sgs = await self.sglayer.query(
             SequencingGroupFilter(created_on=GenericFilter(gt=date.today()))
         )
-        self.assertTrue(len(sgs) == 0)
+        self.assertEqual(len(sgs), 0)
 
     @run_as_sync
     async def test_query_finds_sgs_which_have_cram_analysis(self):
@@ -282,19 +282,19 @@ class TestSequencingGroup(DbIsolatedTest):
 
         # Query for cram analysis
         sgs = await self.sglayer.query(SequencingGroupFilter(has_cram=True))
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
 
         # Query for gvcf analysis
         sgs = await self.sglayer.query(SequencingGroupFilter(has_gvcf=True))
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
 
         # Query for both cram AND gvcf analysis
         sgs = await self.sglayer.query(
             SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
-        self.assertTrue(len(sgs) == 0)
+        self.assertEqual(len(sgs), 0)
 
         # Add first SG to gvcf analysis
         await self.alayer.create_analysis(
@@ -310,5 +310,5 @@ class TestSequencingGroup(DbIsolatedTest):
         sgs = await self.sglayer.query(
             SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
-        self.assertTrue(len(sgs) == 1)
+        self.assertEqual(len(sgs), 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
