@@ -148,7 +148,7 @@ class TestSequencingGroup(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_with_assay_metadata(self):
-        """Test inserting and fetching a sequencing group"""
+        """Test searching with an assay metadata filter"""
         sample_to_insert = get_sample_model()
 
         # Add extra sequencing group
@@ -198,6 +198,7 @@ class TestSequencingGroup(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_with_creation_date(self):
+        """Test fetching using a creation date filter"""
         sample_to_insert = get_sample_model()
         await self.slayer.upsert_sample(sample_to_insert)
 
@@ -231,6 +232,7 @@ class TestSequencingGroup(DbIsolatedTest):
 
     @run_as_sync
     async def test_query_finds_sgs_which_have_cram_analysis(self):
+        """Test querying for sequencing groups which have a cram or gvcf analysis"""
         sample_to_insert = get_sample_model()
 
         # Add extra sequencing group
