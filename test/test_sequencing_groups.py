@@ -281,25 +281,18 @@ class TestSequencingGroup(DbIsolatedTest):
         )
 
         # Query for cram analysis
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(has_cram=GenericFilter(eq=True))
-        )
+        sgs = await self.sglayer.query(SequencingGroupFilter(has_cram=True))
         self.assertTrue(len(sgs) == 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
 
         # Query for gvcf analysis
-        sgs = await self.sglayer.query(
-            SequencingGroupFilter(has_gvcf=GenericFilter(eq=True))
-        )
+        sgs = await self.sglayer.query(SequencingGroupFilter(has_gvcf=True))
         self.assertTrue(len(sgs) == 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[1].id)
 
         # Query for both cram AND gvcf analysis
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(
-                has_gvcf=GenericFilter(eq=True),
-                has_cram=GenericFilter(eq=True),
-            )
+            SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
         self.assertTrue(len(sgs) == 0)
 
@@ -315,10 +308,7 @@ class TestSequencingGroup(DbIsolatedTest):
 
         # Query for both cram AND gvcf analysis now that first SG has gvcf analysis
         sgs = await self.sglayer.query(
-            SequencingGroupFilter(
-                has_gvcf=GenericFilter(eq=True),
-                has_cram=GenericFilter(eq=True),
-            )
+            SequencingGroupFilter(has_gvcf=True, has_cram=True)
         )
         self.assertTrue(len(sgs) == 1)
         self.assertEqual(sgs[0].id, sample.sequencing_groups[0].id)
