@@ -8,6 +8,7 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
+from models.models.billing import BillingSource
 
 
 class BillingLayer(BqBaseLayer):
@@ -164,3 +165,37 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.get_running_cost(field, invoice_month, source)
+
+    async def get_cost_by_ar_guid(
+        self,
+        ar_guid: str | None = None,
+    ) -> list[BillingTotalCostRecord]:
+        """
+        Get Costs by AR GUID
+        """
+        billing_db = BillingDb(self.connection)
+
+        # First get all batches and the min/max day to use for the query
+        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+
+        if not batches:
+            return []
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day,
+            end_date=end_day,
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+        )
+        records = await billing_db.get_total_cost(query)
+        return records

@@ -117,18 +117,51 @@ class BillingRowRecord(SMBase):
         )
 
 
+class BillingSource(str, Enum):
+    """List of billing sources"""
+
+    RAW = 'raw'
+    AGGREGATE = 'aggregate'
+    EXTENDED = 'extended'
+    BUDGET = 'budget'
+    GCP_BILLING = 'gcp_billing'
+    BATCHES = 'batches'
+
+
 class BillingColumn(str, Enum):
     """List of billing columns"""
 
-    # base view columns
+    # raw view columns
+    ID = 'id'
     TOPIC = 'topic'
-    PROJECT = 'gcp_project'
+    SERVICE = 'service'
+    SKU = 'sku'
+    USAGE_START_TIME = 'usage_start_time'
+    USAGE_END_TIME = 'usage_end_time'
+    PROJECT = 'project'
+    LABELS = 'labels'
+    SYSTEM_LABELS = 'system_labels'
+    LOCATION = 'location'
+    EXPORT_TIME = 'export_time'
+    COST = 'cost'
+    CURRENCY = 'currency'
+    CURRENCY_CONVERSION_RATE = 'currency_conversion_rate'
+    USAGE = 'usage'
+    CREDITS = 'credits'
+    INVOICE = 'invoice'
+    COST_TYPE = 'cost_type'
+    ADJUSTMENT_INFO = 'adjustment_info'
+
+    # base view columns
+    # TOPIC = 'topic'
+    # PROJECT = 'gcp_project'
+    # SKU = 'sku'
+    # CURRENCY = 'currency'
+    # COST = 'cost'
+    # LABELS = 'labels'
     DAY = 'day'
     COST_CATEGORY = 'cost_category'
-    SKU = 'sku'
     AR_GUID = 'ar_guid'
-    CURRENCY = 'currency'
-    COST = 'cost'
     INVOICE_MONTH = 'invoice_month'
 
     # extended, filtered view columns
@@ -143,6 +176,53 @@ class BillingColumn(str, Enum):
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
     NAMESPACE = 'namespace'
+
+    @classmethod
+    def str_to_enum(cls, value: str) -> 'BillingColumn':
+        """Convert string to enum"""
+        str_to_enum = dict(BillingColumn.__members__.items())
+        return str_to_enum[value]
+
+    @classmethod
+    def raw_cols(cls) -> list[str]:
+        """Return list of raw column names"""
+        return [
+            'id',
+            'topic',
+            'service',
+            'sku',
+            'usage_start_time',
+            'usage_end_time',
+            'project',
+            'labels',
+            'system_labels',
+            'location',
+            'export_time',
+            'cost',
+            'currency',
+            'currency_conversion_rate',
+            'usage',
+            'credits',
+            'invoice',
+            'cost_type',
+            'adjustment_info',
+        ]
+
+    @classmethod
+    def standard_cols(cls) -> list[str]:
+        """Return list of standard column names"""
+        return [
+            'topic',
+            'gcp_project',
+            'sku',
+            'currency',
+            'cost',
+            'labels',
+            'day',
+            'cost_category',
+            'ar_guid',
+            'invoice_month',
+        ]
 
     @classmethod
     def extended_cols(cls) -> list[str]:
@@ -191,11 +271,11 @@ class BillingTotalCostQueryModel(SMBase):
     fields: list[BillingColumn]
     start_date: str
     end_date: str
-    # optional, can be aggregate or gcp_billing
-    source: str | None = None
+    # optional, can be raw, aggregate or gcp_billing
+    source: BillingSource | None = None
 
     # optional
-    filters: dict[BillingColumn, str] | None = None
+    filters: dict[BillingColumn, str | list | dict] | None = None
     # optional, AND or OR
     filters_op: str | None = None
 

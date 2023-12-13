@@ -298,6 +298,22 @@ async def query_billing(
 
 
 @router.post(
+    '/cost-by-ar-guid/{ar_guid}',
+    response_model=list[BillingTotalCostRecord],
+    operation_id='costByArGuid',
+)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_ar_guid(
+    author: str = get_author,
+    ar_guid: str = None,
+) -> list[BillingTotalCostRecord]:
+    """Get Hail Batch costs by AR GUID"""
+    billing_layer = initialise_billing_layer(author)
+    records = await billing_layer.get_cost_by_ar_guid(ar_guid)
+    return records
+
+
+@router.post(
     '/total-cost',
     response_model=list[BillingTotalCostRecord],
     operation_id='getTotalCost',

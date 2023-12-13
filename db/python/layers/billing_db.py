@@ -12,6 +12,7 @@ from api.settings import (
     BQ_BUDGET_VIEW,
     BQ_DAYS_BACK_OPTIMAL,
     BQ_GCP_BILLING_VIEW,
+    BQ_BATCHES_VIEW,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
@@ -24,6 +25,7 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
+from models.models.billing import BillingSource
 
 BQ_LABELS = {'source': 'metamist-api'}
 
@@ -283,7 +285,7 @@ class BillingDb(BqDbBase):
     ) -> list[BillingRowRecord] | None:
         """Get Billing record from BQ"""
 
-        # TODO: THis function is not going to be used most likely
+        # TODO: This function is not going to be used most likely
         # get_total_cost will replace it
 
         # cost of this BQ is 30MB on DEV,
@@ -347,6 +349,73 @@ class BillingDb(BqDbBase):
 
         raise ValueError('No record found')
 
+    def _prepare_filter_str(self, query: BillingTotalCostQueryModel, view_to_use: str):
+        """Prepare filter string"""
+        and_filters = []
+        query_parameters = []
+
+        and_filters.append('day >= TIMESTAMP(@start_date)')
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('start_date', 'STRING', query.start_date)
+        )
+
+        and_filters.append('day <= TIMESTAMP(@end_date)')
+        query_parameters.append(
+            bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date)
+        )
+
+        if query.source == BillingSource.GCP_BILLING:
+            # BQ_GCP_BILLING_VIEW view is partitioned by different field
+            # BQ has limitation, materialized view can only by partition by base table
+            # partition or its subset, in our case _PARTITIONTIME
+            # (part_time field in the view)
+            # We are querying by day,
+            # which can be up to a week behind regarding _PARTITIONTIME
+            and_filters.append('part_time >= TIMESTAMP(@start_date)')
+            and_filters.append(
+                'part_time <= TIMESTAMP_ADD(TIMESTAMP(@end_date), INTERVAL 7 DAY)'
+            )
+
+        filters = []
+        if query.filters:
+            for filter_key, filter_value in query.filters.items():
+                col_name = str(filter_key.value)
+
+                if filter_key == BillingColumn.LABELS and isinstance(
+                    filter_value, dict
+                ):
+                    for label_key, label_value in filter_value.items():
+                        compare = '=' if isinstance(label_value, list) else 'IN'
+                        type_ = 'ARRAY' if isinstance(label_value, list) else 'STRING'
+                        filters.append(
+                            f'getLabelValue(labels, "{label_key}") {compare} @{label_key}'
+                        )
+                        query_parameters.append(
+                            bigquery.ScalarQueryParameter(label_key, type_, label_value)
+                        )
+
+                compare = '=' if isinstance(filter_value, list) else 'IN'
+                type_ = 'ARRAY' if isinstance(filter_value, list) else 'STRING'
+                filters.append(f'{col_name} {compare} @{col_name}')
+                query_parameters.append(
+                    bigquery.ScalarQueryParameter(col_name, type_, filter_value)
+                )
+                if col_name in BillingColumn.extended_cols():
+                    # if one of the extended columns is needed,
+                    # the view has to be extended
+                    view_to_use = BQ_AGGREG_EXT_VIEW
+
+        if query.filters_op == 'OR':
+            if filters:
+                and_filters.append('(' + ' OR '.join(filters) + ')')
+        else:
+            # if not specified, default to AND
+            and_filters.extend(filters)
+
+        filter_str = 'WHERE ' + ' AND '.join(and_filters) if and_filters else ''
+        return filter_str, query_parameters, view_to_use
+
+    # pylint: disable=too-many-locals
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
@@ -360,8 +429,10 @@ class BillingDb(BqDbBase):
         extended_cols = BillingColumn.extended_cols()
 
         # by default look at the normal view
-        if query.source == 'gcp_billing':
+        if query.source == BillingSource.GCP_BILLING:
             view_to_use = BQ_GCP_BILLING_VIEW
+        elif query.source == BillingSource.RAW:
+            view_to_use = BQ_AGGREG_RAW
         else:
             view_to_use = BQ_AGGREG_VIEW
 
@@ -392,53 +463,9 @@ class BillingDb(BqDbBase):
 
             day_field, day_grp, day_parse_formula = prepare_time_periods(query)
 
-        # construct filters
-        and_filters = []
-        query_parameters = []
-
-        and_filters.append('day >= TIMESTAMP(@start_date)')
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('start_date', 'STRING', query.start_date)
+        filter_str, query_parameters, view_to_use = self._prepare_filter_str(
+            query, view_to_use
         )
-
-        and_filters.append('day <= TIMESTAMP(@end_date)')
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date)
-        )
-
-        if query.source == 'gcp_billing':
-            # BQ_GCP_BILLING_VIEW view is partitioned by different field
-            # BQ has limitation, materialized view can only by partition by base table
-            # partition or its subset, in our case _PARTITIONTIME
-            # (part_time field in the view)
-            # We are querying by day,
-            # which can be up to a week behind regarding _PARTITIONTIME
-            and_filters.append('part_time >= TIMESTAMP(@start_date)')
-            and_filters.append(
-                'part_time <= TIMESTAMP_ADD(TIMESTAMP(@end_date), INTERVAL 7 DAY)'
-            )
-
-        filters = []
-        if query.filters:
-            for filter_key, filter_value in query.filters.items():
-                col_name = str(filter_key.value)
-                filters.append(f'{col_name} = @{col_name}')
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(col_name, 'STRING', filter_value)
-                )
-                if col_name in extended_cols:
-                    # if one of the extended columns is needed,
-                    # the view has to be extended
-                    view_to_use = BQ_AGGREG_EXT_VIEW
-
-        if query.filters_op == 'OR':
-            if filters:
-                and_filters.append('(' + ' OR '.join(filters) + ')')
-        else:
-            # if not specified, default to AND
-            and_filters.extend(filters)
-
-        filter_str = 'WHERE ' + ' AND '.join(and_filters) if and_filters else ''
 
         # construct order by
         order_by_cols = []
@@ -451,6 +478,10 @@ class BillingDb(BqDbBase):
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
         _query = f"""
+        CREATE TEMP FUNCTION getLabelValue(labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING) AS (
+            (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
+        );
+
         WITH t AS (
             SELECT {day_field}{fields_selected}, SUM(cost) as cost
             FROM `{view_to_use}`
@@ -927,3 +958,37 @@ class BillingDb(BqDbBase):
         )
 
         return results
+
+    async def get_batches_by_ar_guid(self, ar_guid) -> tuple[str, str, list[str]]:
+        """
+        Get batches for given ar_guid
+        """
+        _query = f"""
+        SELECT
+            batch_id,
+            MIN(min_day) as start_day,
+            MAX(max_day) as end_day
+        FROM `{BQ_BATCHES_VIEW}`
+        WHERE ar_guid = @ar_guid
+        AND batch_id IS NOT NULL
+        GROUP BY batch_id
+        ORDER BY 1;
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter('ar_guid', 'STRING', ar_guid),
+            ],
+            labels=BQ_LABELS,
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
+        if query_job_result:
+            start_day = min((row.start_day for row in query_job_result))
+            end_day = max((row.end_day for row in query_job_result))
+            return start_day, end_day, [row.batch_id for row in query_job_result]
+
+        # return empty list if no record found
+        return None, None, []
