@@ -7,13 +7,13 @@ If the field is in the dictionary but the value is None, the field is not added 
 If the field is in the dictionary and the value is not None, the field is added to the new_assay_data dictionary with the new field name as the key and the value as the value.
 If there are multiple mappings to the same field, the value is compared to the value already in the new_assay_data dictionary. If the values are different, the field is printed to the console.
 """
+from typing import Dict
 
 from metamist.graphql import gql, query
 
 from metamist.apis import AssayApi
 from metamist.models import AssayUpsert
 
-from typing import Dict
 
 ACTIVE_SG_QUERY = """
 query MyQuery {
@@ -65,10 +65,10 @@ FIELD_MAPPING = {
     'library_id': 'library_id',  # e.g. "LP0001169-NTP_B05"
     'sample.library_id': 'library_id',  # e.g. "LP0001123-NTP_F03"
     'Bioinformatics*': 'bioinformatics_package',
-    'raw_data.FREEMIX': 'freemix',  # type: str
-    'freemix': 'freemix',  # type: str
-    'raw_data.PCT_CHIMERAS': 'pct_chimeras',  # type: str
-    'pct_chimeras': 'pct_chimeras',  # type: str
+    'raw_data.FREEMIX': 'freemix',  # str type
+    'freemix': 'freemix',  # str type
+    'raw_data.PCT_CHIMERAS': 'pct_chimeras',  # str type
+    'pct_chimeras': 'pct_chimeras',  # str type
     'Reference Genome*': 'reference_genome',  # e.g. "GRCh38"
     'reference_genome': 'reference_genome',  # e.g. "hg38"
     'sample.reference_genome': 'reference_genome',  # e.g. "hg38"
@@ -79,10 +79,10 @@ FIELD_MAPPING = {
     'Specimen Type*': 'specimen_type',  # e.g. "102:Normal-Blood derived"
     'sample.flowcell_lane': 'flowcell_lane',  # e.g. "HC2NNDSX2.1-2-3-4"
     'flowcell_lane': 'flowcell_lane',  # e.g. "HLHVVDSX2.1-2-3-4"
-    'median_coverage': 'median_coverage',  # type: str
-    'raw_data.MEDIAN_COVERAGE': 'median_coverage',  # type: str
+    'median_coverage': 'median_coverage',  # str type
+    'raw_data.MEDIAN_COVERAGE': 'median_coverage',  # str type
     'Eppendorf Tube Label': 'Eppendorf_tube_label',
-    'raw_data.PERCENT_DUPLICATION': 'percent_duplication',  # type: str
+    'raw_data.PERCENT_DUPLICATION': 'percent_duplication',  # str type
     'percent_duplication': 'percent_duplication',
     'Rack': 'rack',
     'centre': 'sequencing_centre',  # e.g. "KCCG"
@@ -92,11 +92,11 @@ FIELD_MAPPING = {
     'sequencing_platform': 'sequencing_platform',  # e.g. illumina
     'sample.platform': 'sequencing_platform',  # e.g. ILLUMINA
     'Extraction Method': 'extraction_method',
-    'raw_data.MEDIAN_INSERT_SIZE': 'median_insert_size',  # type: str
-    'median_insert_size': 'median_insert_size',  # type: str
+    'raw_data.MEDIAN_INSERT_SIZE': 'median_insert_size',  # str type
+    'median_insert_size': 'median_insert_size',  # str type
     'Samples for Nanopore sequencing ': 'nanopore_samples_checked',  # 126 instnaces of this field - what does it mean?
     'Sample Buffer*': 'sample_buffer',
-    'batch': 'batch_number',  # type: int
+    'batch': 'batch_number',  # int type
     'batch_name': 'batch_name',
     'ng available': 'ng_available',  # 15 instances of this field
     'Container Type*': 'container_type',
@@ -110,12 +110,47 @@ FIELD_MAPPING = {
 
 
 class AssayHarmoniser:
+    """
+    A class used to harmonise assay data.
+
+    ...
+
+    Attributes
+    ----------
+    api_instance : AssayApi
+        an instance of the AssayApi class
+    active_sg_query : gql
+        a GraphQL query for active sequencing groups
+    inactive_sg_query : gql
+        a GraphQL query for inactive sequencing groups
+
+    Methods
+    -------
+    perform_upsert(new_assay_id: str, assay_data: Dict):
+        Performs an upsert operation on the assay data.
+    get_active_assay_data(active_sgs: Dict, sample_id: str) -> Dict:
+        Retrieves the active assay data for a given sample ID.
+    harmonise_assay_data(assay: Dict) -> Dict:
+        Harmonises the assay data based on a predefined field mapping.
+    main() -> Dict:
+        Executes the main workflow of the class, which includes querying for active and inactive sequencing groups,
+        harmonising the assay data, and performing upsert operations.
+    """
+
     def __init__(self):
         self.api_instance = AssayApi()
         self.active_sg_query = gql(ACTIVE_SG_QUERY)
         self.inactive_sg_query = gql(INACTIVE_SG_QUERY)
 
     def perform_upsert(self, new_assay_id: str, assay_data: Dict):
+        """
+        Creates an upsert function for the given assay data.
+
+        This method creates an upsert function that, when called, will update or insert (upsert) the given assay data
+        using the AssayApi instance. The upsert function is not called within this method; instead, it is returned
+        so it can be called later.
+        """
+
         def upsert():
             assay_upsert = AssayUpsert(
                 id=new_assay_id,
@@ -129,19 +164,39 @@ class AssayHarmoniser:
 
         return upsert
 
-    def get_active_assay_data(self, active_sgs: Dict, sample_id: str) -> Dict:
+    def get_active_assay_data(self, active_sgs: Dict, sample_id: str) -> str | None:
+        """
+        Retrieves the active assay ID for a given sample ID.
+
+        This method iterates over the active sequencing groups and returns the ID of the first assay
+        found for the given sample ID. It assumes that each new sequencing group has only one assay.
+        """
         for sample in active_sgs['sample']:
             if sample_id == sample['id']:
                 for sg in sample['sequencingGroups']:
                     # assumes new SG has only one assay per sequencing group
+                    if len(sg['assays']) > 1:
+                        raise ValueError(
+                            f'Sequencing group has more than one assay: {sg["id"]}'
+                        )
                     assay_id = sg['assays'][0]['id']
                     return assay_id
 
+        return None
+
     def harmonise_assay_data(self, assay: Dict) -> Dict:
+        """
+        Harmonises the assay data based on a predefined field mapping.
+
+        This method iterates over the fields in the assay data and maps them to new fields based on the FIELD_MAPPING
+        dictionary. If multiple old fields map to the same new field and have different values, it prints a warning message.
+        It also checks if there are any fields in the assay data that are not in the FIELD_MAPPING dictionary and raises
+        an error if any are found.
+        """
         harmonised_data = {}
 
         # check if multiple fields map to the same harmonised field
-        new_assay_data = {}
+        new_assay_data: Dict[str, Dict] = {}
         for old_field, new_field in FIELD_MAPPING.items():
             old_value = assay['meta'].get(old_field)
             if old_value is not None:
@@ -162,9 +217,17 @@ class AssayHarmoniser:
         harmonised_data[assay['id']] = new_assay_data
         return harmonised_data
 
-    def main(self) -> Dict:
-        active_response = query(ACTIVE_SG_QUERY)
-        inactive_response = query(INACTIVE_SG_QUERY)
+    def main(self):
+        """
+        Executes the main workflow of the class.
+
+        This method queries for active and inactive sequencing groups, harmonises the assay data, and performs upsert
+        operations. It first creates a list of upsert functions without calling them. After all upsert functions have
+        been created, it iterates over the list and calls each function to perform the upsert operation.
+        """
+        # pylint: disable=unsubscriptable-object
+        active_response: Dict = query(ACTIVE_SG_QUERY)
+        inactive_response: Dict = query(INACTIVE_SG_QUERY)
 
         api_calls = []
         for sample in inactive_response['sample']:
@@ -176,7 +239,7 @@ class AssayHarmoniser:
                         active_response, sample_id
                     )
                     api_calls.append(
-                        self.perform_upsert(active_assay_id, harmonised_assay)
+                        self.perform_upsert(str(active_assay_id), harmonised_assay)
                     )
 
         # perform assay update
