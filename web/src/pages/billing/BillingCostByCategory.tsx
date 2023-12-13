@@ -1,27 +1,32 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
-import CostByTimeChart from './components/CostByTimeChart'
+import { Button, Card, Checkbox, Grid, Input, Message } from 'semantic-ui-react'
+import CostByTimeBarChart from './components/CostByTimeBarChart'
 import FieldSelector from './components/FieldSelector'
 import {
     BillingApi,
     BillingColumn,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
+    BillingTimePeriods,
 } from '../../sm-api'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
-import BillingCostByTimeTable from './components/BillingCostByTimeTable'
-import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
-import { DonutChart } from '../../shared/components/Graphs/DonutChart'
 
 const BillingCostByCategory: React.FunctionComponent = () => {
     const now = new Date()
 
     const [searchParams] = useSearchParams()
 
+    const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
+    const fixedGroupBy: BillingColumn = inputGroupBy
+        ? (inputGroupBy as BillingColumn)
+        : BillingColumn.GcpProject
+
+    const inputSelectedGroup: string | undefined = searchParams.get('group') ?? undefined
     const inputCostCategory: string | undefined = searchParams.get('costCategory') ?? undefined
+    const inputPeriod: string | undefined = searchParams.get('period') ?? BillingTimePeriods.Month
 
     const [start, setStart] = React.useState<string>(
         searchParams.get('start') ??
@@ -34,54 +39,69 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 .toString()
                 .padStart(2, '0')}`
     )
-    const [selectedData, setCostCategory] = React.useState<string | undefined>(inputCostCategory)
 
-    const [selectedPeriod, setPeriod] = React.useState<string | undefined>(undefined)
+    const [selectedGroup, setSelectedGroup] = React.useState<string | undefined>(inputSelectedGroup)
+    const [selectedCostCategory, setCostCategory] = React.useState<string | undefined>(
+        inputCostCategory
+    )
 
-    // Max Aggregated Data Points, rest will be aggregated into "Rest"
-    const maxDataPoints = 7
+    const [selectedPeriod, setPeriod] = React.useState<string | undefined>(inputPeriod)
 
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
-    const [groups, setGroups] = React.useState<string[]>([])
     const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
-    const [aggregatedData, setAggregatedData] = React.useState<IData[]>([])
+
+    const [groupBy, setGroupBy] = React.useState<BillingColumn>(
+        fixedGroupBy ?? BillingColumn.GcpProject
+    )
+
+    const [accumulate, setAccumulate] = React.useState<boolean>(true)
 
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
     const updateNav = (
+        grpBy: BillingColumn,
+        grp: string | undefined,
         category: string | undefined,
         period: string | undefined,
-        start: string,
-        end: string
+        st: string,
+        ed: string
     ) => {
         let url = `${location.pathname}`
-
-        if (category && period) {
-            url += '?'
-
-            let params: string[] = []
-            if (category) params.push(`costCategory=${category}`)
-            if (period) params.push(`period=${period}`)
-            if (start) params.push(`start=${start}`)
-            if (end) params.push(`end=${end}`)
-
-            url += params.join('&')
-            navigate(url)
-        }
+        url += '?'
+        let params: string[] = []
+        if (grpBy) params.push(`groupBy=${grpBy}`)
+        if (grp) params.push(`group=${grp}`)
+        if (category) params.push(`costCategory=${category}`)
+        if (period) params.push(`period=${period}`)
+        if (st) params.push(`start=${st}`)
+        if (ed) params.push(`end=${ed}`)
+        url += params.join('&')
+        navigate(url)
     }
 
-    const onSelect = (event: any, recs: any) => {
+    const onGroupBySelect = (event: any, recs: any) => {
+        setGroupBy(recs.value)
+        setSelectedGroup(undefined)
+        updateNav(recs.value, undefined, selectedCostCategory, selectedPeriod, start, end)
+    }
+
+    const onSelectGroup = (event: any, recs: any) => {
+        setSelectedGroup(recs.value)
+        updateNav(groupBy, recs.value, selectedCostCategory, selectedPeriod, start, end)
+    }
+
+    const onSelectCategory = (event: any, recs: any) => {
         setCostCategory(recs.value)
-        updateNav(recs.value, selectedPeriod, start, end)
+        updateNav(groupBy, selectedGroup, recs.value, selectedPeriod, start, end)
     }
 
     const onSelectPeriod = (event: any, recs: any) => {
         setPeriod(recs.value)
-        updateNav(selectedData, recs.value, start, end)
+        updateNav(groupBy, selectedGroup, selectedCostCategory, recs.value, start, end)
     }
 
     const changeDate = (name: string, value: string) => {
@@ -91,7 +111,14 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         if (name === 'end') end_update = value
         setStart(start_update)
         setEnd(end_update)
-        updateNav(selectedData, selectedPeriod, start_update, end_update)
+        updateNav(
+            groupBy,
+            selectedGroup,
+            selectedCostCategory,
+            selectedPeriod,
+            start_update,
+            end_update
+        )
     }
 
     const getData = (query: BillingTotalCostQueryModel) => {
@@ -141,10 +168,6 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                     },
                     {}
                 )
-                const no_undefined: string[] = rec_grps.filter(
-                    (item): item is string => item !== undefined
-                )
-                setGroups(no_undefined)
                 setData(
                     Object.keys(records).map((key) => ({
                         date: new Date(key),
@@ -156,24 +179,27 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     }
 
     React.useEffect(() => {
-        if (
-            selectedData !== undefined &&
-            selectedData !== '' &&
-            selectedData !== null &&
-            selectedPeriod !== undefined &&
-            selectedPeriod !== '' &&
-            selectedPeriod !== null
-        ) {
+        // if selectedCostCategory is all
+        const selFilters: { [key: string]: string } = {}
+
+        if (groupBy && selectedGroup && !selectedGroup.startsWith('All ')) {
+            selFilters[groupBy] = selectedGroup
+        }
+        if (selectedCostCategory && !selectedCostCategory.startsWith('All ')) {
+            selFilters.cost_category = selectedCostCategory
+        }
+
+        if (selectedPeriod !== undefined && selectedPeriod !== '' && selectedPeriod !== null) {
             getData({
                 fields: [BillingColumn.Sku],
                 start_date: start,
                 end_date: end,
-                filters: { cost_category: selectedData },
+                filters: selFilters,
                 order_by: { day: false },
                 time_periods: selectedPeriod,
             })
         }
-    }, [start, end, selectedData, selectedPeriod])
+    }, [groupBy, selectedGroup, selectedCostCategory, selectedPeriod, start, end])
 
     if (error) {
         return (
@@ -198,20 +224,41 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                     Billing Cost By Category
                 </h1>
 
-                <Grid columns="equal">
+                <Grid columns="equal" stackable doubling>
+                    <Grid.Column>
+                        <FieldSelector
+                            label="Group By"
+                            fieldName="Group"
+                            onClickFunction={onGroupBySelect}
+                            selected={groupBy}
+                            autoSelect={true}
+                        />
+                    </Grid.Column>
+
+                    <Grid.Column>
+                        <FieldSelector
+                            label={convertFieldName(groupBy)}
+                            fieldName={groupBy}
+                            onClickFunction={onSelectGroup}
+                            selected={selectedGroup}
+                            includeAll={true}
+                            autoSelect={true}
+                        />
+                    </Grid.Column>
+
                     <Grid.Column>
                         <FieldSelector
                             label="Cost Category"
                             fieldName="cost_category"
-                            onClickFunction={onSelect}
-                            selected={selectedData}
-                            includeAll={false}
-                            autoSelect={false}
+                            onClickFunction={onSelectCategory}
+                            selected={selectedCostCategory}
+                            includeAll={true}
+                            autoSelect={true}
                         />
                     </Grid.Column>
                 </Grid>
 
-                <Grid columns="equal">
+                <Grid columns="equal" stackable doubling>
                     <Grid.Column>
                         <FieldSelector
                             label="Time Period"
@@ -222,9 +269,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                             autoSelect={false}
                         />
                     </Grid.Column>
-                </Grid>
 
-                <Grid columns="equal">
                     <Grid.Column className="field-selector-label">
                         <Input
                             label="Since"
@@ -237,12 +282,23 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 </Grid>
 
                 <Grid>
+                    <Grid.Column width={13}></Grid.Column>
+                    <Grid.Column width={3}>
+                        <Checkbox
+                            label="Accumulate ON/OFF"
+                            fitted
+                            toggle
+                            checked={accumulate}
+                            onChange={() => setAccumulate(!accumulate)}
+                        />
+                    </Grid.Column>
+                </Grid>
+
+                <Grid>
                     <Grid.Column width={16}>
-                        <CostByTimeChart
-                            start={start}
-                            end={end}
-                            groups={groups}
+                        <CostByTimeBarChart
                             isLoading={isLoading}
+                            accumulate={accumulate}
                             data={data}
                         />
                     </Grid.Column>

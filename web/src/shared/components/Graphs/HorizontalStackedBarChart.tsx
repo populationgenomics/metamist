@@ -178,9 +178,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         }
 
         // set vertical grid line
-        const GridLine = () => {
-            return d3.axisBottom().scale(xScale)
-        }
+        const GridLine = () => d3.axisBottom().scale(xScale)
 
         svg.append('g')
             .attr('class', 'grid')
