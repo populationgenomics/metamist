@@ -1,3 +1,4 @@
+from typing import Any
 from db.python.layers.billing_db import BillingDb
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.billing import BillingFilter
@@ -8,7 +9,7 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
-from models.models.billing import BillingSource
+from models.models.billing import BillingSource, BillingTimeColumn, BillingTimePeriods
 
 
 class BillingLayer(BqBaseLayer):
@@ -169,7 +170,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_ar_guid(
         self,
         ar_guid: str | None = None,
-    ) -> list[BillingTotalCostRecord]:
+    ) -> Any:
         """
         Get Costs by AR GUID
         """
@@ -187,8 +188,8 @@ class BillingLayer(BqBaseLayer):
         query = BillingTotalCostQueryModel(
             fields=all_cols,
             source=BillingSource.RAW,
-            start_date=start_day,
-            end_date=end_day,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
             filters={
                 BillingColumn.LABELS: {
                     'batch_id': batches,
@@ -196,6 +197,9 @@ class BillingLayer(BqBaseLayer):
                 }
             },
             filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
         )
         records = await billing_db.get_total_cost(query)
         return records

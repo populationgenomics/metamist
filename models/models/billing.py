@@ -178,9 +178,25 @@ class BillingColumn(str, Enum):
     NAMESPACE = 'namespace'
 
     @classmethod
+    def can_group_by(cls, value: 'BillingColumn') -> bool:
+        """Return True if column can be grouped by"""
+        return value not in (
+            BillingColumn.SERVICE,
+            BillingColumn.SKU,
+            BillingColumn.PROJECT,
+            BillingColumn.LABELS,
+            BillingColumn.SYSTEM_LABELS,
+            BillingColumn.LOCATION,
+            BillingColumn.USAGE,
+            BillingColumn.CREDITS,
+            BillingColumn.INVOICE,
+            BillingColumn.ADJUSTMENT_INFO,
+        )
+
+    @classmethod
     def str_to_enum(cls, value: str) -> 'BillingColumn':
         """Convert string to enum"""
-        str_to_enum = dict(BillingColumn.__members__.items())
+        str_to_enum = {v.value: v for k, v in BillingColumn.__members__.items()}
         return str_to_enum[value]
 
     @classmethod
@@ -261,6 +277,15 @@ class BillingTimePeriods(str, Enum):
     INVOICE_MONTH = 'invoice_month'
 
 
+class BillingTimeColumn(str, Enum):
+    """List of billing time columns"""
+
+    DAY = 'day'
+    USAGE_START_TIME = 'usage_start_time'
+    USAGE_END_TIME = 'usage_end_time'
+    EXPORT_TIME = 'export_time'
+
+
 class BillingTotalCostQueryModel(SMBase):
     """
     Used to query for billing total cost
@@ -278,6 +303,7 @@ class BillingTotalCostQueryModel(SMBase):
     filters: dict[BillingColumn, str | list | dict] | None = None
     # optional, AND or OR
     filters_op: str | None = None
+    group_by: bool = True
 
     # order by, reverse= TRUE for DESC, FALSE for ASC
     order_by: dict[BillingColumn, bool] | None = None
@@ -285,6 +311,7 @@ class BillingTotalCostQueryModel(SMBase):
     offset: int | None = None
 
     # default to day, can be day, week, month, invoice_month
+    time_column: BillingTimeColumn | None = None
     time_periods: BillingTimePeriods | None = None
 
     def __hash__(self):
@@ -299,9 +326,10 @@ class BillingTotalCostRecord(SMBase):
     topic: str | None
     gcp_project: str | None
     cost_category: str | None
-    sku: str | None
+    sku: str | dict | None
     invoice_month: str | None
     ar_guid: str | None
+
     # extended columns
     dataset: str | None
     batch_id: str | None
