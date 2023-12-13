@@ -26,6 +26,9 @@ def validate_all_objects_in_directory(gs_dir):
 
     blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
     files: Set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
+    print(f'Found {len(files)} files in {gs_dir}')
+    if not files:
+        return
     for obj in files:
         if obj.endswith('.md5'):
             continue
