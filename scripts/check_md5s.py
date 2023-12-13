@@ -26,14 +26,12 @@ def validate_all_objects_in_directory(gs_dir):
 
     blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
     files: Set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
-    print(f'Found {len(files)} files in {gs_dir}')
-    if not files:
-        return
     for obj in files:
         if obj.endswith('.md5'):
             continue
         if f'{obj}.md5' not in files:
-            continue
+            #continue
+            print('No md5 for', obj)
 
         job = b.new_job(f'validate_{os.path.basename(obj)}')
         job.image(DRIVER_IMAGE)
@@ -44,7 +42,7 @@ def validate_all_objects_in_directory(gs_dir):
 
 def validate_md5(job: hb.batch.job, file, md5_path=None) -> hb.batch.job:
     """
-    This quickly validates a file and it's md5
+    This quickly validates a file and it's md5, or creates an md5 if none exists.
     """
 
     # Calculate md5 checksum.
