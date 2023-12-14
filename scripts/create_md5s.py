@@ -54,7 +54,7 @@ def create_md5(job: hb.batch.job, file) -> hb.batch.job:
         f"""\
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     md5_hash=$(gsutil cat {file} | md5sum | cut -d " " -f1) 
-    md5_command="echo '${{md5_hash}}  {file}' > /tmp/uploaded.md5"
+    md5_command="printf '%s  %s' '${{md5_hash}}' '{os.path.basename(file)}' > /tmp/uploaded.md5"
     eval $md5_command
     gsutil cp /tmp/uploaded.md5 {md5}
     """
