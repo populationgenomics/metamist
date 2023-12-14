@@ -7,7 +7,6 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingRowRecord,
     BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
 )
 from models.models.billing import BillingSource, BillingTimeColumn, BillingTimePeriods
 
@@ -148,7 +147,7 @@ class BillingLayer(BqBaseLayer):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-    ) -> list[BillingTotalCostRecord] | None:
+    ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval
         """

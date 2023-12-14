@@ -307,7 +307,7 @@ async def query_billing(
 async def get_cost_by_ar_guid(
     author: str = get_author,
     ar_guid: str = None,
-) -> Any:
+) -> list[dict]:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
@@ -520,7 +520,7 @@ async def get_total_cost(
     """
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_total_cost(query)
-    return records
+    return [BillingTotalCostRecord.from_json(record) for record in records]
 
 
 @router.get(
