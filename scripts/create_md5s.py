@@ -8,7 +8,7 @@ from google.cloud import storage
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest'
 
 
-def create_md5s_for_files_in_directory(skip_filetypes: list[str], gs_dir):
+def create_md5s_for_files_in_directory(skip_filetypes: list[str], billing_project: str | None, gs_dir):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Create md5 checksums for files in {gs_dir}')
     
