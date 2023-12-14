@@ -6,7 +6,7 @@ from cpg_utils.hail_batch import get_config, remote_tmpdir, copy_common_env
 import hailtop.batch as hb
 from google.cloud import storage
 
-DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:8cc869505251c8396fefef01c42225a7b7930a97-hail-0.2.73.devc6f6f09cec08'
+DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest'
 
 
 def validate_all_objects_in_directory(gs_dir):
@@ -35,7 +35,7 @@ def validate_all_objects_in_directory(gs_dir):
 
         job = b.new_job(f'validate_{os.path.basename(obj)}')
         copy_common_env(job)
-        job.image('ubuntu:22.04')
+        job.image(DRIVER_IMAGE)
         create_md5(job, obj)
 
     b.run(wait=False)
@@ -48,6 +48,7 @@ def create_md5(job: hb.batch.job, file) -> hb.batch.job:
 
     # Calculate md5 checksum.
     md5 = f'{file}.md5'
+    job.command('set -euxo pipefail')
     job.env('GOOGLE_APPLICATION_CREDENTIALS', '/gsa-key/key.json')
     job.command(
         f"""\
