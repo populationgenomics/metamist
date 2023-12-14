@@ -43,7 +43,8 @@ def validate_all_objects_in_directory(gs_dir):
 
 def create_md5(job: hb.batch.job, file) -> hb.batch.job:
     """
-    Streams the file with gsutil and calculates the md5 checksum, 
+    Streams the file with gsutil and calculates the md5 checksum,
+    then uploads the checksum to the same path as filename.md5.
     """
 
     # Calculate md5 checksum.
@@ -55,7 +56,8 @@ def create_md5(job: hb.batch.job, file) -> hb.batch.job:
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     md5_hash=$(gsutil cat {file} | md5sum | cut -d " " -f1) 
     spaces='  '
-    printf '%s%s%s' '${{md5_hash}}' \"${{spaces}}\" '{os.path.basename(file)}' > /tmp/uploaded.md5
+    md5_command="printf '%s%s%s' '${{md5_hash}}' \"${{spaces}}\" '{os.path.basename(file)}' > /tmp/uploaded.md5"
+    eval $md5_command
     gsutil cp /tmp/uploaded.md5 {md5}
     """
     )
