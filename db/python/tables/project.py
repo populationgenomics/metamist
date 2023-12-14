@@ -83,15 +83,15 @@ class ProjectPermissionsTable:
             ar_guid=ar_guid,
         )
 
-    async def changelog_id(self):
+    async def audit_log_id(self):
         """
-        Generate (or return) a changelog_id by inserting a row into the database
+        Generate (or return) a audit_log_id by inserting a row into the database
         """
         if not self._connection:
             raise ValueError(
-                'Cannot call changelog_id without a fully formed connection'
+                'Cannot call audit_log_id without a fully formed connection'
             )
-        return await self._connection.changelog_id()
+        return await self._connection.audit_log_id()
 
     # region UNPROTECTED_GETS
 
@@ -356,24 +356,24 @@ class ProjectPermissionsTable:
             await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
-            changelog_id = await self.changelog_id()
+            audit_log_id = await self.audit_log_id()
             read_group_id = await self.gtable.create_group(
                 self.get_project_group_name(project_name, readonly=True),
-                changelog_id=changelog_id,
+                audit_log_id=audit_log_id,
             )
             write_group_id = await self.gtable.create_group(
                 self.get_project_group_name(project_name, readonly=False),
-                changelog_id=changelog_id,
+                audit_log_id=audit_log_id,
             )
 
             _query = """\
-    INSERT INTO project (name, dataset, changelog_id, read_group_id, write_group_id)
-    VALUES (:name, :dataset, :changelog_id, :read_group_id, :write_group_id)
+    INSERT INTO project (name, dataset, audit_log_id, read_group_id, write_group_id)
+    VALUES (:name, :dataset, :audit_log_id, :read_group_id, :write_group_id)
     RETURNING ID"""
             values = {
                 'name': project_name,
                 'dataset': dataset_name,
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
                 'read_group_id': read_group_id,
                 'write_group_id': write_group_id,
             }
@@ -392,11 +392,11 @@ class ProjectPermissionsTable:
         meta = update.get('meta')
 
         fields: Dict[str, Any] = {
-            'changelog_id': await self.changelog_id(),
+            'audit_log_id': await self.audit_log_id(),
             'name': project_name,
         }
 
-        setters = ['changelog_id = :changelog_id']
+        setters = ['audit_log_id = :audit_log_id']
 
         if meta is not None and len(meta) > 0:
             fields['meta'] = to_db_json(meta)
@@ -486,7 +486,7 @@ DELETE FROM analysis WHERE project = :project;
             )
         group_id = await self.gtable.get_group_name_from_id(group_name)
         await self.gtable.set_group_members(
-            group_id, members, changelog_id=await self.changelog_id()
+            group_id, members, audit_log_id=await self.audit_log_id()
         )
 
     # endregion CREATE / UPDATE
@@ -617,19 +617,19 @@ class GroupTable:
         )
         return set(r['gid'] for r in results)
 
-    async def create_group(self, name: str, changelog_id: int) -> int:
+    async def create_group(self, name: str, audit_log_id: int) -> int:
         """Create a new group"""
         _query = """
-            INSERT INTO `group` (name, changelog_id)
-            VALUES (:name, :changelog_id)
+            INSERT INTO `group` (name, audit_log_id)
+            VALUES (:name, :audit_log_id)
             RETURNING id
         """
         return await self.connection.fetch_val(
-            _query, {'name': name, 'changelog_id': changelog_id}
+            _query, {'name': name, 'audit_log_id': audit_log_id}
         )
 
     async def set_group_members(
-        self, group_id: int, members: list[str], changelog_id: int
+        self, group_id: int, members: list[str], audit_log_id: int
     ):
         """
         Set group members for a group (by id)
@@ -643,14 +643,14 @@ class GroupTable:
         )
         await self.connection.execute_many(
             """
-            INSERT INTO group_member (group_id, member, changelog_id)
-            VALUES (:group_id, :member, :changelog_id)
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id)
             """,
             [
                 {
                     'group_id': group_id,
                     'member': member,
-                    'changelog_id': changelog_id,
+                    'audit_log_id': audit_log_id,
                 }
                 for member in members
             ],

@@ -19,21 +19,21 @@ class ParticipantPhenotypeTable(DbBase):
         if not rows:
             return None
         _query = """
-INSERT INTO participant_phenotypes 
-    (participant_id, description, value, changelog_id, hpo_term)
-VALUES 
-    (:participant_id, :description, :value, :changelog_id, 'DESCRIPTION')
+INSERT INTO participant_phenotypes
+    (participant_id, description, value, audit_log_id, hpo_term)
+VALUES
+    (:participant_id, :description, :value, :audit_log_id, 'DESCRIPTION')
 ON DUPLICATE KEY UPDATE
-    description=:description, value=:value, changelog_id=:changelog_id
+    description=:description, value=:value, audit_log_id=:audit_log_id
         """
 
-        changelog_id = await self.changelog_id()
+        audit_log_id = await self.audit_log_id()
         formatted_rows = [
             {
                 'participant_id': r[0],
                 'description': r[1],
                 'value': json.dumps(r[2]),
-                'changelog_id': changelog_id,
+                'audit_log_id': audit_log_id,
             }
             for r in rows
         ]

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Tuple, List, Dict, Optional, Set, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
@@ -32,7 +32,7 @@ class FamilyParticipantTable(DbBase):
             'maternal_participant_id': maternal_id,
             'affected': affected,
             'notes': notes,
-            'changelog_id': await self.changelog_id(),
+            'audit_log_id': await self.audit_log_id(),
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -74,7 +74,7 @@ VALUES
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
             }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)

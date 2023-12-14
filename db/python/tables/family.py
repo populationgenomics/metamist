@@ -1,9 +1,9 @@
 from collections import defaultdict
-from typing import List, Optional, Set, Any, Dict
+from typing import Any, Dict, List, Optional, Set
 
-from db.python.utils import NotFoundError
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
+from db.python.utils import NotFoundError
 from models.models.family import FamilyInternal
 
 
@@ -48,7 +48,7 @@ class FamilyTable(DbBase):
                 JOIN family_participant
                 ON family.id = family_participant.family_id
             """
-            where.append(f'participant_id IN :pids')
+            where.append('participant_id IN :pids')
             values['pids'] = participant_ids
 
         if project or self.project:
@@ -181,7 +181,7 @@ class FamilyTable(DbBase):
         coded_phenotype: str = None,
     ) -> bool:
         """Update values for a family"""
-        values: Dict[str, Any] = {'changelog_id': await self.changelog_id()}
+        values: Dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
         if external_id:
             values['external_id'] = external_id
         if description:
@@ -212,7 +212,7 @@ WHERE id = :id
             'external_id': external_id,
             'description': description,
             'coded_phenotype': coded_phenotype,
-            'changelog_id': await self.changelog_id(),
+            'audit_log_id': await self.audit_log_id(),
             'project': project or self.project,
         }
         keys = list(updater.keys())
@@ -241,7 +241,7 @@ RETURNING id
                 'external_id': eid,
                 'description': descr,
                 'coded_phenotype': cph,
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)

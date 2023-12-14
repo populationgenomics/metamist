@@ -181,7 +181,7 @@ class DbTest(unittest.TestCase):
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]
         # create a connection on each test so we can generate a new
-        # changelog ID for each test
+        # audit_log ID for each test
         self.connection = Connection(
             connection=self._connection,
             project=self.project_id,
@@ -220,9 +220,9 @@ class DbTest(unittest.TestCase):
             raise value.errors[0]
         return value.data
 
-    async def changelog_id(self):
-        """Get changelog_id for the test"""
-        return await self.connection.changelog_id()
+    async def audit_log_id(self):
+        """Get audit_log_id for the test"""
+        return await self.connection.audit_log_id()
 
 
 class DbIsolatedTest(DbTest):

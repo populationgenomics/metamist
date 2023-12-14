@@ -308,17 +308,17 @@ class SequencingGroupTable(DbBase):
 
         _query = """
         INSERT INTO sequencing_group
-            (sample_id, type, technology, platform, meta, changelog_id, archived)
-        VALUES 
-            (:sample_id, :type, :technology, :platform, :meta, :changelog_id, false)
+            (sample_id, type, technology, platform, meta, audit_log_id, archived)
+        VALUES
+            (:sample_id, :type, :technology, :platform, :meta, :audit_log_id, false)
         RETURNING id;
         """
 
         _seqg_linker_query = """
         INSERT INTO sequencing_group_assay
-            (sequencing_group_id, assay_id, changelog_id)
+            (sequencing_group_id, assay_id, audit_log_id)
         VALUES
-            (:seqgroup, :assayid, :changelog_id)
+            (:seqgroup, :assayid, :audit_log_id)
         """
 
         values = {
@@ -341,13 +341,13 @@ class SequencingGroupTable(DbBase):
 
             id_of_seq_group = await self.connection.fetch_val(
                 _query,
-                {**values, 'changelog_id': await self.changelog_id()},
+                {**values, 'audit_log_id': await self.audit_log_id()},
             )
             assay_id_insert_values = [
                 {
                     'seqgroup': id_of_seq_group,
                     'assayid': s,
-                    'changelog_id': await self.changelog_id(),
+                    'audit_log_id': await self.audit_log_id(),
                 }
                 for s in assay_ids
             ]
@@ -390,7 +390,7 @@ class SequencingGroupTable(DbBase):
         """
         _query = """
         UPDATE sequencing_group
-        SET archived = 1, changelog_id = :changelog_id
+        SET archived = 1, audit_log_id = :audit_log_id
         WHERE id = :sequencing_group_id;
         """
         # do this so we can reuse the sequencing_group_ids
@@ -403,7 +403,7 @@ class SequencingGroupTable(DbBase):
             _query,
             {
                 'sequencing_group_id': sequencing_group_id,
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
             },
         )
         await self.connection.execute(

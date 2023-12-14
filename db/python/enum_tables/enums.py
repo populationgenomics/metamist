@@ -58,13 +58,13 @@ class EnumTable(DbBase):
         Insert a new type
         """
         _query = f"""
-            INSERT INTO {self._get_table_name()} (id, name, changelog_id)
-            VALUES (:name, :name, :changelog_id)
-            ON DUPLICATE KEY UPDATE name = :name, changelog_id = :changelog_id
+            INSERT INTO {self._get_table_name()} (id, name, audit_log_id)
+            VALUES (:name, :name, :audit_log_id)
+            ON DUPLICATE KEY UPDATE name = :name, audit_log_id = :audit_log_id
         """
 
         await self.connection.execute(
-            _query, {'name': value.lower(), 'changelog_id': await self.changelog_id}
+            _query, {'name': value.lower(), 'audit_log_id': await self.audit_log_id()}
         )
         # clear the cache so results are up-to-date
         self.get.cache_clear()  # pylint: disable=no-member

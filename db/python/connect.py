@@ -18,7 +18,7 @@ from db.python.utils import InternalError
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-changelog_lock = Lock()
+audit_log_lock = Lock()
 
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
@@ -59,20 +59,20 @@ class Connection:
         self.readonly: bool = readonly
         self.ar_guid: str = ar_guid
 
-        self._changelog_id: int | None = None
+        self._audit_log_id: int | None = None
 
-    async def changelog_id(self):
-        """Get changelog ID for write operations, cached per connection"""
+    async def audit_log_id(self):
+        """Get audit_log ID for write operations, cached per connection"""
         if self.readonly:
             raise InternalError(
-                'Trying to get a changelog ID, but not a write connection'
+                'Trying to get a audit_log ID, but not a write connection'
             )
 
-        with changelog_lock:
-            if not self._changelog_id:
+        with audit_log_lock:
+            if not self._audit_log_id:
                 cl_id = await self.connection.fetch_val(
                     """
-                    INSERT INTO changelog (author, on_behalf_of, ar_guid)
+                    INSERT INTO audit_log (author, on_behalf_of, ar_guid)
                     VALUES (:author, :on_behalf_of, :ar_guid)
                     RETURNING id
                     """,
@@ -83,9 +83,9 @@ class Connection:
                     },
                 )
 
-                self._changelog_id = cl_id
+                self._audit_log_id = cl_id
 
-        return self._changelog_id
+        return self._audit_log_id
 
     def assert_requires_project(self):
         """Assert the project is set, or return an exception"""

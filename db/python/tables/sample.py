@@ -1,17 +1,17 @@
 import asyncio
-from datetime import date
-from typing import Iterable, Any
 import dataclasses
+from datetime import date
+from typing import Any, Iterable
 
 from db.python.tables.base import DbBase
+from db.python.tables.project import ProjectId
 from db.python.utils import (
-    to_db_json,
-    GenericFilterModel,
     GenericFilter,
+    GenericFilterModel,
     GenericMetaFilter,
     NotFoundError,
+    to_db_json,
 )
-from db.python.tables.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
 
@@ -152,7 +152,7 @@ class SampleTable(DbBase):
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('changelog_id', await self.changelog_id()),
+            ('audit_log_id', await self.audit_log_id()),
             ('project', project or self.project),
         ]
 
@@ -183,9 +183,9 @@ class SampleTable(DbBase):
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {'changelog_id': await self.changelog_id()}
+        values: dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
         fields = [
-            'changelog_id = :changelog_id',
+            'audit_log_id = :audit_log_id',
         ]
         if participant_id:
             values['participant_id'] = participant_id
@@ -261,7 +261,7 @@ class SampleTable(DbBase):
         values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
                 'meta': to_db_json(meta),
             },
             'ids': {'id_keep': id_keep, 'id_merge': id_merge},
@@ -269,22 +269,22 @@ class SampleTable(DbBase):
 
         _query = """
             UPDATE sample
-            SET changelog_id = :changelog_id,
+            SET audit_log_id = :audit_log_id,
                 meta = :meta
             WHERE id = :id
         """
-        _query_seqs = f"""
+        _query_seqs = """
             UPDATE sample_sequencing
             SET sample_id = :id_keep
             WHERE sample_id = :id_merge
         """
         # TODO: merge sequencing groups I guess?
-        _query_analyses = f"""
+        _query_analyses = """
             UPDATE analysis_sample
             SET sample_id = :id_keep
             WHERE sample_id = :id_merge
         """
-        _del_sample = f"""
+        _del_sample = """
             DELETE FROM sample
             WHERE id = :id_merge
         """
@@ -415,7 +415,7 @@ class SampleTable(DbBase):
             'type',
             'project',
             'author',
-            'changelog_id',
+            'audit_log_id',
         ]
         keys_str = ', '.join(keys)
         _query = f'SELECT {keys_str} FROM sample FOR SYSTEM_TIME ALL WHERE id = :id'

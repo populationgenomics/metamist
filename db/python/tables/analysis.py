@@ -73,7 +73,7 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
-                ('changelog_id', await self.changelog_id()),
+                ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
             ]
@@ -107,16 +107,16 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """Add samples to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_sequencing_group
-                (analysis_id, sequencing_group_id, changelog_id)
-            VALUES (:aid, :sid, :changelog_id)
+                (analysis_id, sequencing_group_id, audit_log_id)
+            VALUES (:aid, :sid, :audit_log_id)
         """
 
-        changelog_id = await self.changelog_id()
+        audit_log_id = await self.audit_log_id()
         values = map(
             lambda sid: {
                 'aid': analysis_id,
                 'sid': sid,
-                'changelog_id': changelog_id,
+                'audit_log_id': audit_log_id,
             },
             sequencing_group_ids,
         )
@@ -153,9 +153,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         fields: Dict[str, Any] = {
             'analysis_id': analysis_id,
             'on_behalf_of': self.author,
-            'changelog_id': await self.changelog_id(),
+            'audit_log_id': await self.audit_log_id(),
         }
-        setters = ['changelog_id = :changelog_id', 'on_behalf_of = :on_behalf_of']
+        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
         if status:
             setters.append('status = :status')
             fields['status'] = status.value
@@ -501,8 +501,8 @@ ORDER BY a.timestamp_completed DESC;
             values['project_ids'] = project_ids
 
         if author:
-            wheres.append('changelog_id = :changelog_id')
-            values['changelog_id'] = await self.changelog_id()
+            wheres.append('audit_log_id = :audit_log_id')
+            values['audit_log_id'] = await self.audit_log_id()
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')

@@ -84,10 +84,10 @@ class ParticipantTable(DbBase):
             raise ValueError('Must provide project to create participant')
 
         _query = """
-INSERT INTO participant 
-    (external_id, reported_sex, reported_gender, karyotype, meta, changelog_id, project)
-VALUES 
-    (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :changelog_id, :project)
+INSERT INTO participant
+    (external_id, reported_sex, reported_gender, karyotype, meta, audit_log_id, project)
+VALUES
+    (:external_id, :reported_sex, :reported_gender, :karyotype, :meta, :audit_log_id, :project)
 RETURNING id
         """
 
@@ -99,7 +99,7 @@ RETURNING id
                 'reported_gender': reported_gender,
                 'karyotype': karyotype,
                 'meta': to_db_json(meta or {}),
-                'changelog_id': await self.changelog_id(),
+                'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project,
             },
         )
@@ -117,11 +117,11 @@ RETURNING id
         You can't update selective fields on selective samples, if you provide metas, this
         function will update EVERY participant with the provided meta values.
         """
-        updaters = ['changelog_id = :changelog_id']
-        changelog_id = await self.changelog_id()
+        updaters = ['audit_log_id = :audit_log_id']
+        audit_log_id = await self.audit_log_id()
         values: dict[str, list[Any]] = {
             'pid': participant_ids,
-            'changelog_id': [changelog_id] * len(participant_ids),
+            'audit_log_id': [audit_log_id] * len(participant_ids),
         }
         if reported_sexes:
             updaters.append('reported_sex = :reported_sex')
@@ -158,8 +158,8 @@ RETURNING id
         """
         Update participant
         """
-        updaters = ['changelog_id = :changelog_id']
-        fields = {'pid': participant_id, 'changelog_id': await self.changelog_id()}
+        updaters = ['audit_log_id = :audit_log_id']
+        fields = {'pid': participant_id, 'audit_log_id': await self.audit_log_id()}
 
         if external_id:
             updaters.append('external_id = :external_id')

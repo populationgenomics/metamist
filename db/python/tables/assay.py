@@ -242,8 +242,8 @@ class AssayTable(DbBase):
 
         _query = """\
             INSERT INTO assay
-                (sample_id, meta, type, changelog_id)
-            VALUES (:sample_id, :meta, :type, :changelog_id)
+                (sample_id, meta, type, audit_log_id)
+            VALUES (:sample_id, :meta, :type, :audit_log_id)
             RETURNING id;
         """
 
@@ -256,7 +256,7 @@ class AssayTable(DbBase):
                     'sample_id': sample_id,
                     'meta': to_db_json(meta),
                     'type': assay_type,
-                    'changelog_id': await self.changelog_id(),
+                    'audit_log_id': await self.audit_log_id(),
                 },
             )
 
@@ -270,17 +270,17 @@ class AssayTable(DbBase):
 
                 _eid_query = """
                 INSERT INTO assay_external_id
-                    (project, assay_id, external_id, name, changelog_id)
-                VALUES (:project, :assay_id, :external_id, :name, :changelog_id);
+                    (project, assay_id, external_id, name, audit_log_id)
+                VALUES (:project, :assay_id, :external_id, :name, :audit_log_id);
                 """
-                changelog_id = await self.changelog_id()
+                audit_log_id = await self.audit_log_id()
                 eid_values = [
                     {
                         'project': project or self.project,
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
-                        'changelog_id': changelog_id,
+                        'audit_log_id': audit_log_id,
                     }
                     for name, eid in external_ids.items()
                 ]
@@ -326,9 +326,9 @@ class AssayTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            fields = {'assay_id': assay_id, 'changelog_id': await self.changelog_id()}
+            fields = {'assay_id': assay_id, 'audit_log_id': await self.audit_log_id()}
 
-            updaters = ['changelog_id = :changelog_id']
+            updaters = ['audit_log_id = :audit_log_id']
             if meta is not None:
                 updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
                 fields['meta'] = to_db_json(meta)
@@ -375,18 +375,18 @@ class AssayTable(DbBase):
                     )
 
                     _update_query = """\
-                        INSERT INTO assay_external_id (project, assay_id, external_id, name, changelog_id)
-                            VALUES (:project, :assay_id, :external_id, :name, :changelog_id)
-                            ON DUPLICATE KEY UPDATE external_id = :external_id, changelog_id = :changelog_id
+                        INSERT INTO assay_external_id (project, assay_id, external_id, name, audit_log_id)
+                            VALUES (:project, :assay_id, :external_id, :name, :audit_log_id)
+                            ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
                     """
-                    changelog_id = await self.changelog_id()
+                    audit_log_id = await self.audit_log_id()
                     values = [
                         {
                             'project': project,
                             'assay_id': assay_id,
                             'external_id': eid,
                             'name': name,
-                            'changelog_id': changelog_id,
+                            'audit_log_id': audit_log_id,
                         }
                         for name, eid in to_update.items()
                     ]

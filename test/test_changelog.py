@@ -5,12 +5,12 @@ from models.models.sample import SampleUpsertInternal
 
 
 class TestChangelog(DbIsolatedTest):
-    """Test changelog"""
+    """Test audit_log"""
 
     @run_as_sync
     async def test_insert_sample(self):
         """
-        Test inserting a sample, and check that the changelog_id reflects the current
+        Test inserting a sample, and check that the audit_log_id reflects the current
         change
         """
         slayer = SampleLayer(self.connection)
@@ -24,7 +24,7 @@ class TestChangelog(DbIsolatedTest):
         )
 
         sample_cl_id = await self.connection.connection.fetch_val(
-            'SELECT changelog_id FROM sample WHERE id = :sid', {'sid': sample.id}
+            'SELECT audit_log_id FROM sample WHERE id = :sid', {'sid': sample.id}
         )
 
-        self.assertEqual(await self.changelog_id(), sample_cl_id)
+        self.assertEqual(await self.audit_log_id(), sample_cl_id)
