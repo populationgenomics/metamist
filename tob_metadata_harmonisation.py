@@ -15,11 +15,12 @@ from metamist.apis import AssayApi
 from metamist.models import AssayUpsert
 
 
-ACTIVE_SG_QUERY = """
-query MyQuery {
+SG_QUERY = gql(
+    """
+query MyQuery($active_status: Boolean!) {
   sample(project: {eq: "tob-wgs-test"}) {
     id
-    sequencingGroups(activeOnly: {eq: true}) {
+    sequencingGroups(activeOnly: {eq: $active_status}) {
       id
       assays {
         id
@@ -29,36 +30,7 @@ query MyQuery {
   }
 }
 """
-
-
-INACTIVE_SG_QUERY = """
-query MyQuery {
-  sample(project: {eq: "tob-wgs-test"}) {
-    id
-    sequencingGroups(activeOnly: {eq: false}) {
-      id
-      assays {
-        id
-        meta
-      }
-    }
-  }
-}
-"""
-SG_ASSAY_QUERY = """
-query MyQuery {
-  sample(project: {eq: "tob-wgs-test"}) {
-    id
-    sequencingGroups(activeOnly: {}) {
-      id
-      assays {
-        id
-        meta
-      }
-    }
-  }
-}
-"""
+)
 
 FIELD_MAPPING = {
     'sample_count': 'sample_count',
@@ -119,10 +91,8 @@ class AssayHarmoniser:
     ----------
     api_instance : AssayApi
         an instance of the AssayApi class
-    active_sg_query : gql
-        a GraphQL query for active sequencing groups
-    inactive_sg_query : gql
-        a GraphQL query for inactive sequencing groups
+    sg_query : gql
+        a GraphQL query for active and inactive sequencing groups
 
     Methods
     -------
@@ -139,8 +109,6 @@ class AssayHarmoniser:
 
     def __init__(self):
         self.api_instance = AssayApi()
-        self.active_sg_query = gql(ACTIVE_SG_QUERY)
-        self.inactive_sg_query = gql(INACTIVE_SG_QUERY)
 
     def perform_upsert(self, new_assay_id: str, assay_data: Dict):
         """
@@ -198,8 +166,7 @@ class AssayHarmoniser:
         # check if multiple fields map to the same harmonised field
         new_assay_data: Dict[str, Dict] = {}
         for old_field, new_field in FIELD_MAPPING.items():
-            old_value = assay['meta'].get(old_field)
-            if old_value is not None:
+            if old_value := assay['meta'].get(old_field):
                 existing_value = new_assay_data.get(new_field)
                 if existing_value and old_value != existing_value:
                     print(
@@ -226,8 +193,8 @@ class AssayHarmoniser:
         been created, it iterates over the list and calls each function to perform the upsert operation.
         """
         # pylint: disable=unsubscriptable-object
-        active_response: Dict = query(ACTIVE_SG_QUERY)
-        inactive_response: Dict = query(INACTIVE_SG_QUERY)
+        active_response: Dict = query(SG_QUERY, variables={'active_status': True})
+        inactive_response: Dict = query(SG_QUERY, variables={'active_status': False})
 
         api_calls = []
         for sample in inactive_response['sample']:
