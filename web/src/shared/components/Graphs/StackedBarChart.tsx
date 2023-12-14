@@ -13,10 +13,6 @@ interface IStackedBarChartProps {
 }
 
 export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumulate }) => {
-    if (!data || data.length === 0) {
-        return <React.Fragment>No Data</React.Fragment>
-    }
-
     const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
     const margin = { top: 50, right: 50, bottom: 100, left: 100 }
     const height = 800 - margin.top - margin.bottom
@@ -39,6 +35,10 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         }
     }, [])
 
+    if (!data || data.length === 0) {
+        return <React.Fragment>No Data</React.Fragment>
+    }
+
     const contDiv = containerDivRef.current
     if (contDiv) {
         // reset svg
@@ -51,7 +51,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     const series = Object.keys(data[0].values)
     const seriesLength = series.length
 
-    let stackedData = undefined
+    let stackedData
     if (accumulate) {
         const accumulatedData = data.reduce((acc, curr) => {
             const last = acc[acc.length - 1]
@@ -84,8 +84,9 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     }
 
     // todo find max values
-    const yMax = d3.max(stackedData, (y) => d3.max(y))
     const y1Max = d3.max(stackedData, (y) => d3.max(y, (d) => d[1]))
+
+    console.log(data)
 
     // tooltip events
     // create a tooltip

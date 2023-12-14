@@ -214,7 +214,7 @@ html[data-theme='dark-mode'] .ui.table {
 }
 
 .donut-chart {
-    margin-top: 20px;
+    padding-top: 20px;
 }
 
 /* missing styles regarding dark/light theme */
@@ -246,4 +246,29 @@ html[data-theme='dark-mode'] .ui.table {
 .tooltip {
     background-color: var(--color-bg-card);
     color: var(--color-text-primary);
+}
+
+.chart-card {
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary) !important;
+}
+
+.chart-label {
+    color: var(--color-text-primary) !important;
+}
+
+.hb-chart-grid {
+    color: var(--color-divider) !important;
+}
+
+.billing-over-budget {
+    background-color: rgba(128, 0, 0, 0.2) !important;
+}
+
+.billing-half-budget {
+    background-color: rgba(255, 165, 0, 0.2) !important;
+}
+
+.billing-under-budget {
+    background-color: rgba(0, 128, 0, 0.2) !important;
 }
