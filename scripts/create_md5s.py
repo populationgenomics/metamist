@@ -8,16 +8,14 @@ from google.cloud import storage
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest'
 
 
-def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], billing_project: str | None, gs_dir):
+def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], gs_dir):
     """Validate files with MD5s in the provided gs directory"""
     b = get_batch(f'Create md5 checksums for files in {gs_dir}')
 
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
-    config = get_config()
-    if not billing_project:
-        billing_project = config['hail']['billing_project']
+    billing_project = get_config()['hail']['billing_project']
 
     bucket_name, *components = gs_dir[5:].split('/')
 
@@ -38,7 +36,7 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], billing_
     b.run(wait=False)
 
 
-def create_md5(job, file, billing_project=None):
+def create_md5(job, file, billing_project):
     """
     Streams the file with gsutil and calculates the md5 checksum,
     then uploads the checksum to the same path as filename.md5.
@@ -59,11 +57,10 @@ def create_md5(job, file, billing_project=None):
 
 @click.command()
 @click.option('--skip-filetypes', '-s', default=('.crai', '.tbi'), multiple=True)
-@click.option('--billing-project', '-b', help='Billing project to use for gsutil cp, required for requester pays buckets')
 @click.argument('gs_dir')
-def main(skip_filetypes: tuple[str, str], billing_project: str | None, gs_dir: str):
+def main(skip_filetypes: tuple[str, str], gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them."""
-    create_md5s_for_files_in_directory(skip_filetypes, billing_project, gs_dir=gs_dir)
+    create_md5s_for_files_in_directory(skip_filetypes, gs_dir=gs_dir)
 
 
 if __name__ == '__main__':
