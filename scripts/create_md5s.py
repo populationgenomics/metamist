@@ -61,7 +61,7 @@ def create_md5(job, file, billing_project=None):
 @click.option('--skip-filetypes', '-s', default=['.crai', '.tbi'], multiple=True)
 @click.option('--billing-project', '-b', help='Billing project to use for gsutil cp, required for requester pays buckets')
 @click.argument('gs_dir')
-def main(skip_filetypes: tuple[str, str], billing_project: str, gs_dir: str):
+def main(skip_filetypes: list[str], billing_project: str | None, gs_dir: str):
     """Scans the directory for files and creates md5 checksums for them."""
     create_md5s_for_files_in_directory(skip_filetypes, billing_project, gs_dir=gs_dir)
     
