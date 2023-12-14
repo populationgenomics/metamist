@@ -1006,7 +1006,7 @@ class BillingDb(BqDbBase):
         return results
 
     async def get_batches_by_ar_guid(
-        self, ar_guid
+        self, ar_guid: str
     ) -> tuple[datetime, datetime, list[str]]:
         """
         Get batches for given ar_guid
@@ -1040,3 +1040,31 @@ class BillingDb(BqDbBase):
 
         # return empty list if no record found
         return None, None, []
+
+    async def get_ar_guid_by_batch_id(self, batch_id: str) -> str:
+        """
+        Get ar_guid for given batch_id
+        """
+        _query = f"""
+        SELECT ar_guid
+        FROM `{BQ_BATCHES_VIEW}`
+        WHERE batch_id = @batch_id
+        AND ar_guid IS NOT NULL
+        LIMIT 1;
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter('batch_id', 'STRING', batch_id),
+            ],
+            labels=BQ_LABELS,
+        )
+
+        query_job_result = list(
+            self._connection.connection.query(_query, job_config=job_config).result()
+        )
+        if query_job_result:
+            return query_job_result[0]['ar_guid']
+
+        # return None if no ar_guid found
+        return None

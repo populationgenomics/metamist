@@ -1,9 +1,8 @@
 """
 Billing routes
 """
-from typing import Any
-from async_lru import alru_cache
 from fastapi import APIRouter
+from async_lru import alru_cache
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
 from api.utils.db import BqConnection, get_author
@@ -300,10 +299,10 @@ async def query_billing(
 
 @router.get(
     '/cost-by-ar-guid/{ar_guid}',
-    response_model=list[Any],
+    response_model=list[dict],
     operation_id='costByArGuid',
 )
-# @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_ar_guid(
     author: str = get_author,
     ar_guid: str = None,
@@ -311,6 +310,22 @@ async def get_cost_by_ar_guid(
     """Get Hail Batch costs by AR GUID"""
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
+    return records
+
+
+@router.get(
+    '/cost-by-batch-id/{batch_id}',
+    response_model=list[dict],
+    operation_id='costByBatchId',
+)
+# @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_batch_id(
+    author: str = get_author,
+    batch_id: str = None,
+) -> list[dict]:
+    """Get Hail Batch costs by Batch ID"""
+    billing_layer = initialise_billing_layer(author)
+    records = await billing_layer.get_cost_by_batch_id(batch_id)
     return records
 
 

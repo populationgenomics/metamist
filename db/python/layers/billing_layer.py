@@ -202,3 +202,43 @@ class BillingLayer(BqBaseLayer):
         )
         records = await billing_db.get_total_cost(query)
         return records
+
+    async def get_cost_by_batch_id(
+        self,
+        batch_id: str | None = None,
+    ) -> Any:
+        """
+        Get Costs by Batch ID
+        """
+        billing_db = BillingDb(self.connection)
+
+        # First get all batches and the min/max day to use for the query
+        ar_guid = await billing_db.get_ar_guid_by_batch_id(batch_id)
+
+        # The get all batches for the ar_guid
+        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+
+        if not batches:
+            return []
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
+        )
+        records = await billing_db.get_total_cost(query)
+        return records
