@@ -45,15 +45,46 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         contDiv.innerHTML = ''
     }
 
-    // X - values
-    const x_vals = data.map((d) => d.date.toISOString().substring(0, 10))
-
     const series = Object.keys(data[0].values)
     const seriesLength = series.length
 
+    // Get the last date in the data array
+    const lastDate = data[data.length - 1].date
+
+    // Create 3 new dates
+    // TODO make it as custom props
+    const newDates = d3
+        .range(1, 4)
+        .map((day) => new Date(lastDate.getTime() + day * 24 * 60 * 60 * 1000))
+
+    // Interpolate the values for the new dates
+    const newValues = newDates.map((date, i) => {
+        if (i < data.length) {
+            const prevData = data[data.length - 1 - i]
+            const nextData = data[data.length - 1 - i]
+            return {
+                date,
+                values: series.reduce((values, key) => {
+                    // TODO revisit how we extrapolate new data
+                    const interpolator = d3.interpolate(prevData.values[key], nextData.values[key])
+                    values[key] = interpolator((i + 1) / 6)
+                    return values
+                }, {}),
+            }
+        }
+    })
+
+    // Add the new values to the data array
+    let extData = data.concat(newValues)
+    extData = extData.filter((item) => item !== undefined)
+
+    // X - values
+    const x_vals = extData.map((d) => d.date.toISOString().substring(0, 10))
+
+    // prepare stacked data
     let stackedData
     if (accumulate) {
-        const accumulatedData = data.reduce((acc, curr) => {
+        const accumulatedData = extData.reduce((acc: any[], curr) => {
             const last = acc[acc.length - 1]
             const accumulated = {
                 date: curr.date,
@@ -79,17 +110,14 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         stackedData = d3
             .stack()
             .offset(d3.stackOffsetNone)
-            .keys(series)(data.map((d) => ({ date: d.date, ...d.values })))
+            .keys(series)(extData.map((d) => ({ date: d.date, ...d.values })))
             .map((ser, i) => ser.map((d) => ({ ...d, key: series[i] })))
     }
 
-    // todo find max values
+    // find max values for the X axes
     const y1Max = d3.max(stackedData, (y) => d3.max(y, (d) => d[1]))
 
-    console.log(data)
-
     // tooltip events
-    // create a tooltip
     const tooltip = d3.select('body').append('div').attr('id', 'chart').attr('class', 'tooltip')
 
     const mouseover = (d) => {
@@ -114,13 +142,25 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         .rangeRound([margin.left, width - margin.right])
         .padding(0.08)
 
+    // create root svg element
     const svg = d3
         .select(contDiv)
         .append('svg')
         .attr('viewBox', [0, 0, width, height])
-        .attr('width', width - 400)
         .attr('height', height)
         .attr('style', 'max-width: 100%; height: auto;')
+
+    // calculate opacity (for new dates)
+    const opacity = 0.3
+    const calcOpacity = (d) => {
+        const idx = series.indexOf(d.key)
+        const color = d3.color(colorFunc(idx / seriesLength))
+        if (newDates.includes(d.data.date)) {
+            return d3.rgb(color.r, color.g, color.b, opacity)
+        }
+
+        return color
+    }
 
     // bars
     const rect = svg
@@ -136,6 +176,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         .attr('y', height - margin.bottom)
         .attr('width', x.bandwidth())
         .attr('height', 0)
+        .attr('fill', (d) => calcOpacity(d))
         .on('mouseover', mouseover)
         .on('mousemove', mousemove)
         .on('mouseleave', mouseleave)
@@ -169,16 +210,13 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
 
     // animate bars
     rect.transition()
-        .duration(500)
-        .delay((d, i) => i * 20)
+        .duration(200)
+        .delay((d, i) => i * 5)
         .attr('y', (d) => y(d[1]))
         .attr('height', (d) => y(d[0]) - y(d[1]))
         .transition()
         .attr('x', (d, i) => x(i))
         .attr('width', x.bandwidth())
-
-    // set all text to 15px
-    svg.selectAll('text').style('font-size', '20px')
 
     // on Hover
     const onHoverOver = (tg: HTMLElement, v) => {
@@ -197,7 +235,6 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     const svgLegend = d3
         .select(contDiv)
         .append('svg')
-        .attr('width', 400)
         .attr('height', height)
         .attr('viewBox', `0 0 450 ${height}`)
 
@@ -232,6 +269,19 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                     onHoverOut(element.node(), i)
                 })
         })
+
+    // set all text to 15px
+    svg.selectAll('text').style('font-size', '20px')
+
+    // Simple responsive, move legend to bottom if mobile
+    if (width < 1000) {
+        // if mobile / tablet size
+        svgLegend.attr('width', '100%')
+        svg.attr('width', '100%')
+    } else {
+        svgLegend.attr('width', '30%')
+        svg.attr('width', '70%')
+    }
 
     return <div ref={containerDivRef}></div>
 }

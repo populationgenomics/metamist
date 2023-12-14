@@ -98,8 +98,9 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             return acc
         }, {})
 
+        const maxBudget = Math.max(...data.map((item) => item.budget))
+
         if (showLegend) {
-            const maxBudget = Math.max(...data.map((item) => item.budget))
             if (maxBudget > maxTotalSeries) {
                 maxTotalSeries = maxBudget * 1.01
             }
@@ -320,6 +321,22 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .attr('x', 20 + i * 150)
                     .attr('y', -(margin.top / 3.8))
                     .text(labels[i])
+            }
+
+            // add budget bar if defined
+            if (maxBudget !== undefined && maxBudget !== null && maxBudget > 0) {
+                svg.append('rect')
+                    .attr('x', labels.length * 150)
+                    .attr('y', -(margin.top / 2.5))
+                    .attr('width', 3)
+                    .attr('height', 15)
+                    .style('fill', 'darkcyan')
+
+                svg.append('text')
+                    .attr('class', 'legend')
+                    .attr('x', 20 + labels.length * 150)
+                    .attr('y', -(margin.top / 3.8))
+                    .text('Budget')
             }
         }
     }

@@ -224,8 +224,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                     Billing Cost By Category
                 </h1>
 
-                <Grid columns="equal" stackable doubling>
-                    <Grid.Column>
+                <Grid stackable doubling>
+                    <Grid.Column width={4}>
                         <FieldSelector
                             label="Group By"
                             fieldName="Group"
@@ -235,7 +235,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
 
-                    <Grid.Column>
+                    <Grid.Column width={6}>
                         <FieldSelector
                             label={convertFieldName(groupBy)}
                             fieldName={groupBy}
@@ -246,7 +246,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
 
-                    <Grid.Column>
+                    <Grid.Column width={6}>
                         <FieldSelector
                             label="Cost Category"
                             fieldName="cost_category"
@@ -282,8 +282,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 </Grid>
 
                 <Grid>
-                    <Grid.Column width={13}></Grid.Column>
-                    <Grid.Column width={3}>
+                    <Grid.Column width={12}></Grid.Column>
+                    <Grid.Column width={4}>
                         <Checkbox
                             label="Accumulate ON/OFF"
                             fitted
