@@ -16,7 +16,7 @@ def validate_all_objects_in_directory(gs_dir):
         billing_project=get_config()['hail']['billing_project'],
         remote_tmpdir=remote_tmpdir()
     )
-    b = hb.Batch('validate_md5s', backend=backend)
+    b = hb.Batch(f'Create md5 checksums for files in {gs_dir}', backend=backend)
     client = storage.Client()
 
     if not gs_dir.startswith('gs://'):
@@ -54,7 +54,7 @@ def create_md5(job: hb.batch.job, file) -> hb.batch.job:
         f"""\
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     md5_hash=$(gsutil cat {file} | md5sum | cut -d " " -f1) 
-    md5_command="printf '%s  %s' '${{md5_hash}}' '{os.path.basename(file)}' > /tmp/uploaded.md5"
+    md5_command="spaces='  '; printf '%s%s%s' '${{md5_hash}}' \"${{spaces}}\" '{os.path.basename(file)}' > /tmp/uploaded.md5"
     eval $md5_command
     gsutil cp /tmp/uploaded.md5 {md5}
     """
