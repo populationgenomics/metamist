@@ -179,7 +179,11 @@ class BillingColumn(str, Enum):
 
     @classmethod
     def can_group_by(cls, value: 'BillingColumn') -> bool:
-        """Return True if column can be grouped by"""
+        """
+        Return True if column can be grouped by
+        TODO: If any new columns are added above and cannot be in a group by, add them here
+        This could be record, array or struct type
+        """
         return value not in (
             BillingColumn.SERVICE,
             BillingColumn.SKU,

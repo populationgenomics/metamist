@@ -1,6 +1,15 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Header, Button, Card, Grid, Input, Message, Table as SUITable } from 'semantic-ui-react'
+import {
+    Header,
+    Button,
+    Card,
+    Grid,
+    Input,
+    Message,
+    Table as SUITable,
+    Select,
+} from 'semantic-ui-react'
 import SearchIcon from '@mui/icons-material/Search'
 import Table from '../../shared/components/Table'
 
@@ -73,6 +82,16 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         column: 'timestamp',
         direction: 'descending',
     })
+
+    enum SearchType {
+        Ar_guid,
+        Batch_id,
+    }
+    const searchOptions: string[] = Object.keys(SearchType).filter((item) => isNaN(Number(item)))
+    const dropdownOptions = searchOptions.map((item) => ({
+        text: item.replaceAll('_', ' '),
+        value: item,
+    }))
 
     // use navigate and update url params
     const location = useLocation()
@@ -160,6 +179,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }
 
     const handleSearchChange = (event: any, dt: any) => {
+        console.log(dt)
         setSearchTxt(dt.value)
     }
 
@@ -185,15 +205,21 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                         <Input
                             fluid
                             input={{ fluid: true }}
-                            placeholder="Search by AR GUID / BATCH ID / SEQ GRP / CROMWELL ID ... min 6 letters"
+                            placeholder={`Search...`}
                             onChange={handleSearchChange}
                             value={searchTxt}
-                        />
-                    </Grid.Column>
-                    <Grid.Column width={2}>
-                        <Button icon onClick={handleSearch}>
-                            <SearchIcon />
-                        </Button>
+                            action={{ icon: 'search' }}
+                        >
+                            <input />
+                            <Select
+                                compact
+                                options={dropdownOptions}
+                                defaultValue={dropdownOptions[0].value}
+                            />
+                            <Button type="submit">
+                                <SearchIcon />
+                            </Button>
+                        </Input>
                     </Grid.Column>
                 </Grid>
 

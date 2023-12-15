@@ -12,7 +12,7 @@ interface HorizontalStackedBarChartProps {
     threshold_values: number[]
     threshold_series: string
     sorted_by: string
-    colors: (t: number) => string | undefined
+    colors?: (t: number) => string | undefined
     isLoading: boolean
     showLegend: boolean
 }
