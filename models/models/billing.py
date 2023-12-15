@@ -425,3 +425,11 @@ class BillingCostBudgetRecord(SMBase):
             budget_spent=record.get('budget_spent'),
             last_loaded_day=record.get('last_loaded_day'),
         )
+
+
+class BillingHailBatchCostRecord(SMBase):
+    """Return class for the Billing Cost by batch_id/ar_guid"""
+
+    ar_guid: str | None
+    batch_ids: list[str] | None
+    costs: list[dict] | None

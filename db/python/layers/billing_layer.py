@@ -1,4 +1,3 @@
-from typing import Any
 from db.python.layers.billing_db import BillingDb
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.billing import BillingFilter
@@ -8,7 +7,12 @@ from models.models import (
     BillingRowRecord,
     BillingTotalCostQueryModel,
 )
-from models.models.billing import BillingSource, BillingTimeColumn, BillingTimePeriods
+from models.models.billing import (
+    BillingSource,
+    BillingTimeColumn,
+    BillingTimePeriods,
+    BillingHailBatchCostRecord,
+)
 
 
 class BillingLayer(BqBaseLayer):
@@ -169,7 +173,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_ar_guid(
         self,
         ar_guid: str | None = None,
-    ) -> Any:
+    ) -> BillingHailBatchCostRecord:
         """
         Get Costs by AR GUID
         """
@@ -179,7 +183,11 @@ class BillingLayer(BqBaseLayer):
         start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
 
         if not batches:
-            return []
+            return BillingHailBatchCostRecord(
+                ar_guid=ar_guid,
+                batch_ids=[],
+                costs=[],
+            )
 
         # Then get the costs for the given AR GUID/batches from the main table
         all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
@@ -201,12 +209,16 @@ class BillingLayer(BqBaseLayer):
             time_periods=BillingTimePeriods.DAY,
         )
         records = await billing_db.get_total_cost(query)
-        return records
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )
 
     async def get_cost_by_batch_id(
         self,
         batch_id: str | None = None,
-    ) -> Any:
+    ) -> BillingHailBatchCostRecord:
         """
         Get Costs by Batch ID
         """
@@ -219,7 +231,7 @@ class BillingLayer(BqBaseLayer):
         start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
 
         if not batches:
-            return []
+            return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
 
         # Then get the costs for the given AR GUID/batches from the main table
         all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
@@ -241,4 +253,8 @@ class BillingLayer(BqBaseLayer):
             time_periods=BillingTimePeriods.DAY,
         )
         records = await billing_db.get_total_cost(query)
-        return records
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )

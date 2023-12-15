@@ -10,6 +10,7 @@ from db.python.layers.billing_layer import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingHailBatchCostRecord,
     BillingQueryModel,
     BillingRowRecord,
     BillingTotalCostQueryModel,
@@ -299,14 +300,14 @@ async def query_billing(
 
 @router.get(
     '/cost-by-ar-guid/{ar_guid}',
-    response_model=list[dict],
+    response_model=BillingHailBatchCostRecord,
     operation_id='costByArGuid',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_ar_guid(
     author: str = get_author,
     ar_guid: str = None,
-) -> list[dict]:
+) -> BillingHailBatchCostRecord:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
@@ -315,14 +316,14 @@ async def get_cost_by_ar_guid(
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=list[dict],
+    response_model=BillingHailBatchCostRecord,
     operation_id='costByBatchId',
 )
 # @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     author: str = get_author,
     batch_id: str = None,
-) -> list[dict]:
+) -> BillingHailBatchCostRecord:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)
