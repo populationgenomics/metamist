@@ -154,11 +154,11 @@ class BillingColumn(str, Enum):
 
     # base view columns
     # TOPIC = 'topic'
-    # PROJECT = 'gcp_project'
     # SKU = 'sku'
     # CURRENCY = 'currency'
     # COST = 'cost'
     # LABELS = 'labels'
+    GCP_PROJECT = 'gcp_project'
     DAY = 'day'
     COST_CATEGORY = 'cost_category'
     AR_GUID = 'ar_guid'

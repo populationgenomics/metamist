@@ -11,7 +11,7 @@ export interface IData {
 interface BarChartProps {
     data: IData[]
     maxSlices: number
-    colors: (t: number) => string | undefined
+    colors?: (t: number) => string | undefined
     isLoading: boolean
 }
 

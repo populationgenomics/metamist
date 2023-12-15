@@ -11,7 +11,7 @@ export interface IDonutChartData {
 export interface IDonutChartProps {
     data?: IDonutChartData[]
     maxSlices: number
-    colors: (t: number) => string | undefined
+    colors?: (t: number) => string | undefined
     isLoading: boolean
 }
 

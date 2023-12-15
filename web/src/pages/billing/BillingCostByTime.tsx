@@ -6,6 +6,7 @@ import FieldSelector from './components/FieldSelector'
 import {
     BillingApi,
     BillingColumn,
+    BillingSource,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 } from '../../sm-api'
@@ -180,9 +181,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     React.useEffect(() => {
         if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
-            let source = 'aggregate'
+            let source = BillingSource.Aggregate
             if (groupBy === BillingColumn.GcpProject) {
-                source = 'gcp_billing'
+                source = BillingSource.GcpBilling
             }
             if (selectedData.startsWith('All ')) {
                 getData({
@@ -309,7 +310,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 id="billing-container-data"
             >
                 <BillingCostByTimeTable
-                    heading={selectedData}
+                    heading={selectedData ?? 'All'}
                     start={start}
                     end={end}
                     groups={groups}
