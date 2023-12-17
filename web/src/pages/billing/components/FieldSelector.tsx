@@ -26,7 +26,11 @@ const FieldSelector: React.FunctionComponent<FieldSelectorProps> = ({
 
     const extendRecords = (recs: string[]) => {
         if (includeAll) {
-            return [`All ${convertFieldName(fieldName)}s`, ...recs]
+            let fname = convertFieldName(fieldName)
+            if (fname.endsWith('y')) {
+                fname = fname.substring(0, fname.length - 1) + 'ie'
+            }
+            return [`All ${fname}s`, ...recs]
         }
         return recs
     }

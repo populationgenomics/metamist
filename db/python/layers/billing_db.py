@@ -821,6 +821,7 @@ class BillingDb(BqDbBase):
                         'budget_spent': 100 * monthly / budget_monthly
                         if budget_monthly
                         else None,
+                        'budget': budget_monthly,
                         'last_loaded_day': last_loaded_day,
                     }
                 )

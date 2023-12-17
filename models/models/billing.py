@@ -297,6 +297,7 @@ class BillingCostBudgetRecord(SMBase):
     storage_daily: float | None
     details: list[BillingCostDetailsRecord] | None
     budget_spent: float | None
+    budget: float | None
 
     last_loaded_day: str | None
 
@@ -315,5 +316,6 @@ class BillingCostBudgetRecord(SMBase):
                 BillingCostDetailsRecord.from_json(row) for row in record.get('details')
             ],
             budget_spent=record.get('budget_spent'),
+            budget=record.get('budget'),
             last_loaded_day=record.get('last_loaded_day'),
         )

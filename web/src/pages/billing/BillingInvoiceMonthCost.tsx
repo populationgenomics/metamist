@@ -131,15 +131,18 @@ const BillingCurrentCost = () => {
             </Message>
         )
 
-    if (isLoading)
-        return (
-            <div>
-                <LoadingDucks />
-                <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                    <em>This query takes a while...</em>
-                </p>
-            </div>
-        )
+    const rowColor = (p: BillingCostBudgetRecord) => {
+        if (p.budget_spent === undefined || p.budget_spent === null) {
+            return ''
+        }
+        if (p.budget_spent > 90) {
+            return 'billing-over-budget'
+        }
+        if (p.budget_spent > 50) {
+            return 'billing-half-budget'
+        }
+        return 'billing-under-budget'
+    }
 
     const handleSort = (clickedColumn: string) => {
         if (sort.column !== clickedColumn) {
@@ -181,7 +184,7 @@ const BillingCurrentCost = () => {
         <>
             <h1>Billing By Invoice Month</h1>
 
-            <Grid columns="equal">
+            <Grid columns="equal" stackable doubling>
                 <Grid.Column>
                     <FieldSelector
                         label="Group By"
@@ -216,7 +219,7 @@ const BillingCurrentCost = () => {
                 if (String(invoiceMonth) === String(thisMonth)) {
                     return (
                         <Grid columns={2} stackable doubling>
-                            <Grid.Column width={8}>
+                            <Grid.Column width={8} className="chart-card">
                                 <HorizontalStackedBarChart
                                     data={costRecords}
                                     title={`24H (day UTC ${lastLoadedDay})`}
@@ -230,7 +233,7 @@ const BillingCurrentCost = () => {
                                     showLegend={false}
                                 />
                             </Grid.Column>
-                            <Grid.Column width={8}>
+                            <Grid.Column width={8} className="chart-card donut-chart">
                                 <HorizontalStackedBarChart
                                     data={costRecords}
                                     title="Invoice Month (Acc)"
@@ -337,7 +340,7 @@ const BillingCurrentCost = () => {
                             sort.direction === 'ascending' ? ['asc'] : ['desc']
                         ).map((p) => (
                             <React.Fragment key={`total - ${p.field}`}>
-                                <SUITable.Row>
+                                <SUITable.Row className={`${rowColor(p)}`}>
                                     <SUITable.Cell collapsing>
                                         <Checkbox
                                             checked={openRows.includes(p.field)}

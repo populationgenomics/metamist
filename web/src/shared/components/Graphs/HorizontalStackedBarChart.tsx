@@ -2,6 +2,7 @@ import React from 'react'
 import * as d3 from 'd3'
 import LoadingDucks from '../LoadingDucks/LoadingDucks'
 import { BillingCostBudgetRecord } from '../../../sm-api'
+import { grey } from '@mui/material/colors'
 
 interface HorizontalStackedBarChartProps {
     data: BillingCostBudgetRecord[]
@@ -77,7 +78,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         }
 
         // prepare data
-        const maxTotalSeries = Math.max(...data.map((item) => item[total_series]))
+        let maxTotalSeries = Math.max(...data.map((item) => item[total_series]))
         const typeKeys = data.map((d) => d.field)
         data.sort((a, b) => b[sorted_by] - a[sorted_by])
 
@@ -92,6 +93,18 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         const indexedData = stackedData.map((innerArray, outerIdx) =>
             innerArray.map((d, innerIdx) => ({ outerIdx, innerIdx, data: d }))
         )
+        const budgetData = data.reduce((acc, d) => {
+            acc[d.field] = d.budget
+            return acc
+        }, {})
+
+        const maxBudget = Math.max(...data.map((item) => item.budget))
+
+        if (showLegend) {
+            if (maxBudget > maxTotalSeries) {
+                maxTotalSeries = maxBudget * 1.01
+            }
+        }
 
         // construct svg
         const svg = d3
@@ -178,13 +191,13 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         }
 
         // set vertical grid line
-        const GridLine = () => {
-            return d3.axisBottom().scale(xScale)
-        }
+        const GridLine = () => d3.axisBottom().scale(xScale)
 
         svg.append('g')
-            .attr('class', 'grid')
+            .attr('class', 'hb-chart-grid')
             .call(GridLine().tickSize(height, 0, 0).tickFormat('').ticks(8))
+            .selectAll('line')
+            .style('stroke-dasharray', '5,5')
 
         // create a tooltip
         const tooltip = d3.select('body').append('div').attr('id', 'chart').attr('class', 'tooltip')
@@ -236,6 +249,35 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .on('mousemove', mousemove)
             .on('mouseleave', mouseleave)
 
+        // create bidgetn line
+        const budgetFnc = (d) => {
+            if (showLegend) {
+                return xScale(budgetData[d.data.data.field])
+            }
+            return 0
+        }
+
+        const budgetColor = (d) => {
+            const budgetVal = budgetData[d.data.data.field]
+            if (showLegend && budgetVal !== null && budgetVal !== undefined) {
+                return 'darkcyan'
+            }
+            return 'rgba(0, 0, 0, 0)'
+        }
+
+        svg.append('g')
+            .selectAll('g')
+            .data(indexedData)
+            .join('g')
+            .selectAll('rect')
+            .data((d) => d)
+            .join('rect')
+            .attr('x', (d) => budgetFnc(d))
+            .attr('y', (d) => yScale(d.data.data.field) - 5)
+            .attr('width', (d) => 3)
+            .attr('height', yScale.bandwidth() + 10)
+            .attr('fill', (d) => budgetColor(d))
+
         // set title
         svg.append('text')
             .attr('class', 'chart-title')
@@ -279,6 +321,22 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .attr('x', 20 + i * 150)
                     .attr('y', -(margin.top / 3.8))
                     .text(labels[i])
+            }
+
+            // add budget bar if defined
+            if (maxBudget !== undefined && maxBudget !== null && maxBudget > 0) {
+                svg.append('rect')
+                    .attr('x', labels.length * 150)
+                    .attr('y', -(margin.top / 2.5))
+                    .attr('width', 3)
+                    .attr('height', 15)
+                    .style('fill', 'darkcyan')
+
+                svg.append('text')
+                    .attr('class', 'legend')
+                    .attr('x', 20 + labels.length * 150)
+                    .attr('y', -(margin.top / 3.8))
+                    .text('Budget')
             }
         }
     }

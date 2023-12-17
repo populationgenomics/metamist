@@ -228,7 +228,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     Billing Cost By Time
                 </h1>
 
-                <Grid columns="equal">
+                <Grid columns="equal" stackable doubling>
                     <Grid.Column>
                         <FieldSelector
                             label="Group By"
@@ -251,7 +251,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     </Grid.Column>
                 </Grid>
 
-                <Grid columns="equal">
+                <Grid columns="equal" stackable doubling>
                     <Grid.Column className="field-selector-label">
                         <Input
                             label="Start"
@@ -274,7 +274,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 </Grid>
 
                 <Grid columns={2} stackable>
-                    <Grid.Column width={10}>
+                    <Grid.Column width={10} className="chart-card">
                         <BarChart
                             data={aggregatedData}
                             maxSlices={groups.length}
@@ -282,7 +282,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
 
-                    <Grid.Column width={6} className="donut-chart">
+                    <Grid.Column width={6} className="chart-card">
                         <DonutChart
                             data={aggregatedData}
                             maxSlices={groups.length}
@@ -292,7 +292,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 </Grid>
 
                 <Grid>
-                    <Grid.Column width={16}>
+                    <Grid.Column width={16} className="chart-card">
                         <CostByTimeChart
                             start={start}
                             end={end}
