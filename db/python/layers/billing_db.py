@@ -11,10 +11,10 @@ from api.settings import (
     BQ_AGGREG_EXT_VIEW,
     BQ_AGGREG_RAW,
     BQ_AGGREG_VIEW,
+    BQ_BATCHES_VIEW,
     BQ_BUDGET_VIEW,
     BQ_DAYS_BACK_OPTIMAL,
     BQ_GCP_BILLING_VIEW,
-    BQ_BATCHES_VIEW,
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
@@ -398,7 +398,7 @@ class BillingDb(BqDbBase):
 
             return (
                 f'{name} {compare} {b1}@{key}{b2}',
-                param_type(key, 'STRING', label_value),
+                param_type(key, 'STRING', value),
             )
 
         # No additional filters
