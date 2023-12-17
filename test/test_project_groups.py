@@ -21,7 +21,7 @@ class TestGroupAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection, False)
 
     async def _add_group_member_direct(self, group_name):
         """
@@ -162,7 +162,7 @@ class TestProjectAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection, False)
 
     async def _add_group_member_direct(self, group_name):
         """
@@ -180,7 +180,7 @@ class TestProjectAccess(DbIsolatedTest):
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'author': await self.audit_log_id(),
+                'audit_log_id': await self.audit_log_id(),
             },
         )
 

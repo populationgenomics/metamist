@@ -1083,17 +1083,21 @@
 					references="audit_log(id)" />
 			</column>
 		</addColumn>
-		<sql> ALTER TABLE analysis CHANGE author author VARCHAR(255) NULL; ALTER TABLE assay CHANGE
-			author author VARCHAR(255) NULL; ALTER TABLE assay_external_id CHANGE author author
-			VARCHAR(255) NULL; ALTER TABLE cohort CHANGE author author VARCHAR(255) NULL; ALTER
-			TABLE family CHANGE author author VARCHAR(255) NULL; ALTER TABLE family_participant
-			CHANGE author author VARCHAR(255) NULL; ALTER TABLE participant CHANGE author author
-			VARCHAR(255) NULL; ALTER TABLE participant_phenotypes CHANGE author author VARCHAR(255)
-			NULL; ALTER TABLE project CHANGE author author VARCHAR(255) NULL; ALTER TABLE sample
-			CHANGE author author VARCHAR(255) NULL; ALTER TABLE sample_sequencing CHANGE author
-			author VARCHAR(255) NULL; ALTER TABLE sample_sequencing_eid CHANGE author author
-			VARCHAR(255) NULL; ALTER TABLE sequencing_group CHANGE author author VARCHAR(255) NULL;
-			ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL; ALTER TABLE
-			sequencing_group_external_id CHANGE author author VARCHAR(255) NULL; </sql>
+		<sql>ALTER TABLE analysis CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE assay CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE assay_external_id CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE cohort CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE family CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE family_participant CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE group_member CHANGE author author VARCHAR(255) NULL DEFAULT NULL;</sql>
+		<sql>ALTER TABLE participant CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE participant_phenotypes CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE project CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample_sequencing CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sample_sequencing_eid CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
+		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
 </databaseChangeLog>
