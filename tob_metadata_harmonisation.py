@@ -6,6 +6,8 @@ If the field is not in the dictionary, the a ValueError is raised.
 If the field is in the dictionary but the value is None, the field is not added to the new_assay_data dictionary.
 If the field is in the dictionary and the value is not None, the field is added to the new_assay_data dictionary with the new field name as the key and the value as the value.
 If there are multiple mappings to the same field, the value is compared to the value already in the new_assay_data dictionary. If the values are different, the field is printed to the console.
+
+NOTE: When adding metadata to new sequencing groups, it is assumed that each new sequencing group has only one assay.
 """
 from typing import Dict
 
@@ -18,8 +20,9 @@ from metamist.models import AssayUpsert
 SG_QUERY = gql(
     """
 query MyQuery($active_status: Boolean!) {
-  sample(project: {eq: "tob-wgs-test"}) {
+  sample(project: {eq: "tob-wgs"}) {
     id
+    externalId
     sequencingGroups(activeOnly: {eq: $active_status}) {
       id
       assays {
@@ -132,24 +135,25 @@ class AssayHarmoniser:
 
         return upsert
 
-    def get_active_assay_data(self, active_sgs: Dict, sample_id: str) -> str | None:
+    def get_active_assay_data(self, active_sgs: Dict, ext_id: str) -> str | None:
         """
         Retrieves the active assay ID for a given sample ID.
 
         This method iterates over the active sequencing groups and returns the ID of the first assay
-        found for the given sample ID. It assumes that each new sequencing group has only one assay.
+        found for the given external ID. It assumes that each new sequencing group has only one assay.
         """
         for sample in active_sgs['sample']:
-            if sample_id == sample['id']:
-                for sg in sample['sequencingGroups']:
-                    # assumes new SG has only one assay per sequencing group
-                    if len(sg['assays']) > 1:
-                        raise ValueError(
-                            f'Sequencing group has more than one assay: {sg["id"]}'
-                        )
-                    assay_id = sg['assays'][0]['id']
-                    return assay_id
-
+            if ext_id == sample['externalId']:
+                # some sg's don't have any sequencing groups
+                if len(sample['sequencingGroups']) >= 1:
+                    for sg in sample['sequencingGroups']:
+                        # assumes new SG has only one assay per sequencing group
+                        if len(sg['assays']) > 1:
+                            raise ValueError(
+                                f'Sequencing group has more than one assay: {sg["id"]}'
+                            )
+                        assay_id = sg['assays'][0]['id']
+                        return assay_id
         return None
 
     def harmonise_assay_data(self, assay: Dict) -> Dict:
@@ -184,6 +188,19 @@ class AssayHarmoniser:
         harmonised_data[assay['id']] = new_assay_data
         return harmonised_data
 
+    def check_identical_assays(self, assay_list: Dict) -> bool:
+        """
+        Checks if the assays in a sequencing group are identical.
+
+        This method checks if the assays in a sequencing group are identical. It assumes that the assays are identical
+        if the metadata dictionaries are identical.
+        """
+        if len(assay_list) > 1:
+            # check if dictinories are identical
+            all_identical = all(d['meta'] == assay_list[0]['meta'] for d in assay_list)
+            return all_identical
+        return True
+
     def main(self):
         """
         Executes the main workflow of the class.
@@ -196,22 +213,42 @@ class AssayHarmoniser:
         active_response: Dict = query(SG_QUERY, variables={'active_status': True})
         inactive_response: Dict = query(SG_QUERY, variables={'active_status': False})
 
+        active_externalID = [
+            sample['externalId'] for sample in active_response['sample']
+        ]
+        inactive_externalID = [
+            sample['externalId'] for sample in inactive_response['sample']
+        ]
+
         api_calls = []
+        no_assay_sgs = []
+        # check inactive metadata
         for sample in inactive_response['sample']:
-            sample_id = sample['id']
+            ext_id = sample['externalId']
+            if len(sample['sequencingGroups']) == 0:
+                print(f'No sequencing groups for sample: {ext_id}')
+                no_assay_sgs.append(ext_id)
             for sg in sample['sequencingGroups']:
-                for assay in sg['assays']:
-                    harmonised_assay = self.harmonise_assay_data(assay)
-                    active_assay_id = self.get_active_assay_data(
-                        active_response, sample_id
-                    )
-                    api_calls.append(
-                        self.perform_upsert(str(active_assay_id), harmonised_assay)
-                    )
+                # check if assays are identical
+                all_identical = self.check_identical_assays(sg['assays'])
+                if all_identical:
+                    for assay in sg['assays']:
+                        harmonised_assay = self.harmonise_assay_data(assay)
+                        active_assay_id = self.get_active_assay_data(
+                            active_response, ext_id
+                        )
+                        if active_assay_id is None:
+                            print(f'Could not find active assay for sample: {ext_id}')
+                            continue
+                        api_calls.append(
+                            self.perform_upsert(str(active_assay_id), harmonised_assay)
+                        )
+                if not all_identical:
+                    raise ValueError(f'Assays are not identical for sample: {ext_id}')
 
         # perform assay update
-        for api_call in api_calls:
-            api_call()
+        # for api_call in api_calls:
+        #     api_call()
 
 
 if __name__ == '__main__':
