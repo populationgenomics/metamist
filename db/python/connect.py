@@ -70,20 +70,17 @@ class Connection:
 
         with audit_log_lock:
             if not self._audit_log_id:
-                cl_id = await self.connection.fetch_val(
-                    """
-                    INSERT INTO audit_log (author, on_behalf_of, ar_guid)
-                    VALUES (:author, :on_behalf_of, :ar_guid)
-                    RETURNING id
-                    """,
-                    {
-                        'author': self.author,
-                        'on_behalf_of': self.on_behalf_of,
-                        'ar_guid': self.ar_guid,
-                    },
-                )
+                # pylint: disable=import-outside-toplevel
+                from db.python.tables.audit_log import AuditLogTable
 
-                self._audit_log_id = cl_id
+                at = AuditLogTable(self)
+                self._audit_log_id = await at.create_audit_log(
+                    author=self.author,
+                    on_behalf_of=self.on_behalf_of,
+                    ar_guid=self.ar_guid,
+                    comment=None,
+                    project=self.project,
+                )
 
         return self._audit_log_id
 

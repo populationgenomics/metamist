@@ -10,6 +10,7 @@ from models.models.analysis import (
     SequencingGroupSizeModel,
 )
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
+from models.models.audit_log import AuditLogId, AuditLogInternal
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
@@ -33,7 +34,7 @@ from models.models.participant import (
     ParticipantUpsert,
     ParticipantUpsertInternal,
 )
-from models.models.project import Project
+from models.models.project import Project, ProjectId
 from models.models.sample import (
     NestedSample,
     NestedSampleInternal,

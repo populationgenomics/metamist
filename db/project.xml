@@ -864,6 +864,12 @@
 			<column name="comment" type="TEXT">
 				<constraints nullable="true" />
 			</column>
+			<column name="auth_project" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_AUDIT_LOG_PROJECT"
+					references="project(id)" />
+			</column>
 		</createTable>
 		<sql>ALTER TABLE `audit_log` ADD SYSTEM VERSIONING;</sql>
 

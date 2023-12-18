@@ -10,10 +10,10 @@ from fastapi import Request
 from strawberry.dataloader import DataLoader
 
 from api.utils import get_projectless_db_connection, group_by
-from db.python.utils import NotFoundError
 from db.python.layers import (
     AnalysisLayer,
     AssayLayer,
+    AuditLogLayer,
     FamilyLayer,
     ParticipantLayer,
     SampleLayer,
@@ -24,16 +24,18 @@ from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-from db.python.utils import GenericFilter, ProjectId
+from db.python.utils import GenericFilter, NotFoundError
 from models.models import (
     AnalysisInternal,
     AssayInternal,
     FamilyInternal,
     ParticipantInternal,
     Project,
+    ProjectId,
     SampleInternal,
     SequencingGroupInternal,
 )
+from models.models.audit_log import AuditLogInternal
 
 
 class LoaderKeys(enum.Enum):
@@ -43,6 +45,8 @@ class LoaderKeys(enum.Enum):
     """
 
     PROJECTS_FOR_IDS = 'projects_for_id'
+
+    AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
 
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
@@ -166,6 +170,19 @@ def connected_data_loader_with_params(
         return inner
 
     return connected_data_loader_caller
+
+
+@connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_IDS)
+async def load_audit_logs_by_ids(
+    audit_log_ids: list[int], connection
+) -> list[AuditLogInternal | None]:
+    """
+    DataLoader: get_audit_logs_by_ids
+    """
+    alayer = AuditLogLayer(connection)
+    logs = await alayer.get_for_ids(audit_log_ids)
+    logs_by_id = {log.id: log for log in logs}
+    return [logs_by_id.get(a) for a in audit_log_ids]
 
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)

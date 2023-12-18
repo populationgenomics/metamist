@@ -24,7 +24,7 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import ProjectId
+from models.models.project import ProjectId
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root

@@ -2,9 +2,9 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
 from db.python.utils import NotFoundError
 from models.models.family import FamilyInternal
+from models.models.project import ProjectId
 
 
 class FamilyTable(DbBase):

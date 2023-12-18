@@ -5,7 +5,6 @@ from collections import defaultdict
 from typing import Any
 
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
@@ -15,6 +14,7 @@ from db.python.utils import (
     to_db_json,
 )
 from models.models.assay import AssayInternal
+from models.models.project import ProjectId
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 

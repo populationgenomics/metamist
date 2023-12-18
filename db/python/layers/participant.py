@@ -11,9 +11,10 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import ProjectId, split_generic_terms, NoOpAenter, NotFoundError
+from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
+from models.models.project import ProjectId
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 

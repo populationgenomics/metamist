@@ -2,8 +2,9 @@ from collections import defaultdict
 from typing import Any
 
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, ProjectId, to_db_json
+from db.python.utils import NotFoundError, to_db_json
 from models.models.participant import ParticipantInternal
+from models.models.project import ProjectId
 
 
 class ParticipantTable(DbBase):
@@ -20,6 +21,7 @@ class ParticipantTable(DbBase):
             'karyotype',
             'meta',
             'project',
+            'audit_log_id',
         ]
     )
 

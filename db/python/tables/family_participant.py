@@ -2,8 +2,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
 from models.models.family import PedRowInternal
+from models.models.project import ProjectId
 
 
 class FamilyParticipantTable(DbBase):

@@ -1,5 +1,5 @@
-from collections import defaultdict
 import datetime
+from collections import defaultdict
 from typing import Any
 
 from api.utils import group_by
@@ -7,7 +7,6 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
-from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -19,6 +18,7 @@ from models.models import (
     ProportionalDateTemporalMethod,
     SequencingGroupInternal,
 )
+from models.models.project import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
 
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)

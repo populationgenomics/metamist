@@ -31,6 +31,7 @@ from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
     AssayInternal,
+    AuditLogInternal,
     FamilyInternal,
     ParticipantInternal,
     Project,
@@ -205,6 +206,27 @@ class GraphQLProject:
 
 
 @strawberry.type
+class GraphQLAuditLog:
+    """AuditLog GraphQL model"""
+
+    id: int
+    author: str
+    timestamp: datetime.datetime
+    ar_guid: str | None
+    comment: str | None
+
+    @staticmethod
+    def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
+        return GraphQLAuditLog(
+            id=audit_log.id,
+            author=audit_log.author,
+            timestamp=audit_log.timestamp,
+            ar_guid=audit_log.ar_guid,
+            comment=audit_log.comment,
+        )
+
+
+@strawberry.type
 class GraphQLAnalysis:
     """Analysis GraphQL model"""
 
@@ -297,6 +319,7 @@ class GraphQLParticipant:
     karyotype: str | None
 
     project_id: strawberry.Private[int]
+    audit_log_id: strawberry.Private[int | None]
 
     @staticmethod
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
@@ -308,6 +331,7 @@ class GraphQLParticipant:
             reported_gender=internal.reported_gender,
             karyotype=internal.karyotype,
             project_id=internal.project,
+            audit_log_id=internal.audit_log_id,
         )
 
     @strawberry.field
@@ -349,6 +373,16 @@ class GraphQLParticipant:
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
+    @strawberry.field
+    async def audit_log(
+        self, info: Info, root: 'GraphQLParticipant'
+    ) -> GraphQLAuditLog | None:
+        if root.audit_log_id is None:
+            return None
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
+        audit_log = await loader.load(root.audit_log_id)
+        return GraphQLAuditLog.from_internal(audit_log)
+
 
 @strawberry.type
 class GraphQLSample:
@@ -367,7 +401,7 @@ class GraphQLSample:
     project_id: strawberry.Private[int]
 
     @staticmethod
-    def from_internal(sample: SampleInternal):
+    def from_internal(sample: SampleInternal) -> 'GraphQLSample':
         return GraphQLSample(
             id=sample_id_format(sample.id),
             external_id=sample.external_id,

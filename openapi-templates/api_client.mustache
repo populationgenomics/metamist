@@ -68,7 +68,10 @@ class ApiClient(object):
         self.pool_threads = pool_threads
 
         self.rest_client = rest.RESTClientObject(configuration)
-        self.default_headers = {'sm-ar-guid': try_get_ar_guid()}
+        self.default_headers = {}
+        ar_guid = try_get_ar_guid()
+        if ar_guid:
+            self.default_headers['sm-ar-guid'] = ar_guid
         if header_name is not None:
             self.default_headers[header_name] = header_value
         self.cookie = cookie

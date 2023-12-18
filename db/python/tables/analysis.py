@@ -5,7 +5,6 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
@@ -15,6 +14,7 @@ from db.python.utils import (
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
+from models.models.project import ProjectId
 
 
 @dataclasses.dataclass

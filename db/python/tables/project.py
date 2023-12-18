@@ -11,11 +11,10 @@ from db.python.utils import (
     InternalError,
     NoProjectAccess,
     NotFoundError,
-    ProjectId,
     get_logger,
     to_db_json,
 )
-from models.models.project import Project
+from models.models.project import Project, ProjectId
 
 logger = get_logger()
 

@@ -1,7 +1,6 @@
 from datetime import date
 
 from db.python.connect import Connection
-from db.python.utils import NotFoundError
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.assay import AssayTable, NoOpAenter
@@ -10,11 +9,12 @@ from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
-from db.python.utils import ProjectId
+from db.python.utils import NotFoundError
+from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
-    SequencingGroupUpsertInternal,
     SequencingGroupInternalId,
+    SequencingGroupUpsertInternal,
 )
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 

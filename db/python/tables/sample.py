@@ -4,7 +4,6 @@ from datetime import date
 from typing import Any, Iterable
 
 from db.python.tables.base import DbBase
-from db.python.tables.project import ProjectId
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
@@ -12,6 +11,7 @@ from db.python.utils import (
     NotFoundError,
     to_db_json,
 )
+from models.models.project import ProjectId
 from models.models.sample import SampleInternal, sample_id_format
 
 
@@ -48,6 +48,7 @@ class SampleTable(DbBase):
         'active',
         'type',
         'project',
+        'audit_log_id',
     ]
 
     # region GETS

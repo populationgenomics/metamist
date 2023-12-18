@@ -11,9 +11,9 @@ from db.python.utils import (
     GenericMetaFilter,
     NoOpAenter,
     NotFoundError,
-    ProjectId,
     to_db_json,
 )
+from models.models.project import ProjectId
 from models.models.sequencing_group import (
     SequencingGroupInternal,
     SequencingGroupInternalId,
