@@ -272,10 +272,11 @@ RETURNING id
         """Update many participant external_ids through the {internal: external} map"""
         _query = """
         UPDATE participant
-        SET external_id = :external_id
+        SET external_id = :external_id, audit_log_id = :audit_log_id
         WHERE id = :participant_id"""
+        audit_log_id = await self.audit_log_id()
         mapped_values = [
-            {'participant_id': k, 'external_id': v}
+            {'participant_id': k, 'external_id': v, 'audit_log_id': audit_log_id}
             for k, v in internal_to_external_id.items()
         ]
         await self.connection.execute_many(_query, mapped_values)

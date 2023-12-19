@@ -1,4 +1,3 @@
-# pylint: disable=too-many-arguments
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.audit_log import AuditLogTable
 from models.models.audit_log import AuditLogId, AuditLogInternal
@@ -27,3 +26,5 @@ class AuditLogLayer(BaseLayer):
             )
 
         return logs
+
+    # don't put the create here, I don't want it to be public

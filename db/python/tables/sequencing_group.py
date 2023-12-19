@@ -363,9 +363,10 @@ class SequencingGroupTable(DbBase):
         """
         Update meta / platform on sequencing_group
         """
-        updaters = []
+        updaters = ['audit_log_id = :audit_log_id']
         values: dict[str, Any] = {
             'seqgid': sequencing_group_id,
+            'audit_log_id': await self.audit_log_id(),
         }
 
         if meta:
@@ -396,7 +397,7 @@ class SequencingGroupTable(DbBase):
         # do this so we can reuse the sequencing_group_ids
         _external_id_query = """
         UPDATE sequencing_group_external_id
-        SET nullIfInactive = NULL
+        SET nullIfInactive = NULL, audit_log_id = :audit_log_id
         WHERE sequencing_group_id = :sequencing_group_id;
         """
         await self.connection.execute(
@@ -408,7 +409,10 @@ class SequencingGroupTable(DbBase):
         )
         await self.connection.execute(
             _external_id_query,
-            {'sequencing_group_id': sequencing_group_id},
+            {
+                'sequencing_group_id': sequencing_group_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
         )
 
     async def get_type_numbers_for_project(self, project) -> dict[str, int]:

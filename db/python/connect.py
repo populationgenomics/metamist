@@ -57,7 +57,7 @@ class Connection:
         self.author: str = author
         self.on_behalf_of: str | None = on_behalf_of
         self.readonly: bool = readonly
-        self.ar_guid: str = ar_guid
+        self.ar_guid: str | None = ar_guid
 
         self._audit_log_id: int | None = None
 
@@ -71,6 +71,7 @@ class Connection:
         with audit_log_lock:
             if not self._audit_log_id:
                 # pylint: disable=import-outside-toplevel
+                # make this import here, otherwise we'd have a circular import
                 from db.python.tables.audit_log import AuditLogTable
 
                 at = AuditLogTable(self)

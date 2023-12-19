@@ -1,3 +1,5 @@
+from typing import Any
+
 from db.python.tables.base import DbBase
 from models.models.audit_log import AuditLogInternal
 from models.models.project import ProjectId
@@ -42,7 +44,8 @@ class AuditLogTable(DbBase):
         on_behalf_of: str | None,
         ar_guid: str | None,
         comment: str | None,
-        project: ProjectId,
+        project: ProjectId | None,
+        meta: dict[str, Any] | None = None,
     ) -> int:
         """
         Create a new audit log entry
@@ -50,9 +53,9 @@ class AuditLogTable(DbBase):
 
         _query = """
         INSERT INTO audit_log
-            (author, on_behalf_of, ar_guid, comment, auth_project)
+            (author, on_behalf_of, ar_guid, comment, auth_project, meta)
         VALUES
-            (:author, :on_behalf_of, :ar_guid, :comment, :project)
+            (:author, :on_behalf_of, :ar_guid, :comment, :project, :meta)
         RETURNING id
         """
         audit_log_id = await self.connection.fetch_val(
@@ -63,6 +66,7 @@ class AuditLogTable(DbBase):
                 'ar_guid': ar_guid,
                 'comment': comment,
                 'project': project,
+                'meta': meta or {},
             },
         )
 

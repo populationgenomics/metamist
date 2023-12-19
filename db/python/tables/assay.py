@@ -363,7 +363,16 @@ class AssayTable(DbBase):
                 }
 
                 if to_delete:
+                    _assay_eid_update_before_delete = """
+                    UPDATE assay_external_id
+                    SET audit_log_id = :audit_log_id
+                    WHERE assay_id = :assay_id AND name in :names
+                    """
                     _delete_query = 'DELETE FROM assay_external_id WHERE assay_id = :assay_id AND name in :names'
+                    await self.connection.execute(
+                        _assay_eid_update_before_delete,
+                        {'assay_id': assay_id, 'names': list(to_delete)}
+                    )
                     await self.connection.execute(
                         _delete_query,
                         {'assay_id': assay_id, 'names': list(to_delete)},

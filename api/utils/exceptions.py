@@ -1,5 +1,4 @@
-from db.python.utils import NotFoundError
-from db.python.utils import Forbidden
+from db.python.utils import Forbidden, NotFoundError
 
 
 def determine_code_from_error(e):

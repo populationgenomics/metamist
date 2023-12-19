@@ -870,6 +870,7 @@
 					foreignKeyName="FK_AUDIT_LOG_PROJECT"
 					references="project(id)" />
 			</column>
+			<column name="meta" type="JSON" />
 		</createTable>
 		<sql>ALTER TABLE `audit_log` ADD SYSTEM VERSIONING;</sql>
 

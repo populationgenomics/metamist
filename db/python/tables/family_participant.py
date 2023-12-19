@@ -223,11 +223,26 @@ WHERE fp.participant_id in :participant_ids
         if not participant_id or not family_id:
             return False
 
-        _query = """
-DELETE FROM family_participant
-WHERE participant_id = :participant_id
-AND family_id = :family_id
+        _update_before_delete = """
+        UPDATE family_participant
+        SET audit_log_id = :audit_log_id
+        WHERE family_id = :family_id AND participant_id = :participant_id
         """
+
+        _query = """
+        DELETE FROM family_participant
+        WHERE participant_id = :participant_id
+        AND family_id = :family_id
+        """
+
+        await self.connection.execute(
+            _update_before_delete,
+            {
+                'family_id': family_id,
+                'participant_id': participant_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
+        )
 
         await self.connection.execute(
             _query, {'family_id': family_id, 'participant_id': participant_id}

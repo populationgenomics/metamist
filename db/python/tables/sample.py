@@ -258,14 +258,18 @@ class SampleTable(DbBase):
             meta_original.get('merged_from'), sid_merge
         )
         meta: dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
-
+        audit_log_id = await self.audit_log_id()
         values: dict[str, Any] = {
             'sample': {
                 'id': id_keep,
-                'audit_log_id': await self.audit_log_id(),
+                'audit_log_id': audit_log_id,
                 'meta': to_db_json(meta),
             },
-            'ids': {'id_keep': id_keep, 'id_merge': id_merge},
+            'ids': {
+                'id_keep': id_keep,
+                'id_merge': id_merge,
+                'audit_log_id': audit_log_id,
+            },
         }
 
         _query = """
@@ -275,15 +279,20 @@ class SampleTable(DbBase):
             WHERE id = :id
         """
         _query_seqs = """
-            UPDATE sample_sequencing
-            SET sample_id = :id_keep
+            UPDATE assay
+            SET sample_id = :id_keep, audit_log_id = :audit_log_id
             WHERE sample_id = :id_merge
         """
         # TODO: merge sequencing groups I guess?
         _query_analyses = """
-            UPDATE analysis_sample
-            SET sample_id = :id_keep
+            UPDATE analysis_sequencing_group
+            SET sample_id = :id_keep, audit_log_id = :audit_log_id
             WHERE sample_id = :id_merge
+        """
+        _query_update_sample_with_audit_log = """
+            UPDATE sample
+            SET audit_log_id = :audit_log_id
+            WHERE id = :id_merge
         """
         _del_sample = """
             DELETE FROM sample
@@ -294,7 +303,13 @@ class SampleTable(DbBase):
             await self.connection.execute(_query, {**values['sample']})
             await self.connection.execute(_query_seqs, {**values['ids']})
             await self.connection.execute(_query_analyses, {**values['ids']})
-            await self.connection.execute(_del_sample, {'id_merge': id_merge})
+            await self.connection.execute(
+                _query_update_sample_with_audit_log,
+                {'id_merge': id_merge, 'audit_log_id': audit_log_id},
+            )
+            await self.connection.execute(
+                _del_sample, {'id_merge': id_merge, 'audit_log_id': audit_log_id}
+            )
 
         project, new_sample = await self.get_sample_by_id(id_keep)
         new_sample.project = project
@@ -308,9 +323,15 @@ class SampleTable(DbBase):
         Update participant IDs for many samples
         Expected len(ids) == len(participant_ids)
         """
-        _query = 'UPDATE sample SET participant_id=:participant_id WHERE id = :id'
+        _query = """
+        UPDATE sample
+        SET participant_id=:participant_id, audit_log_id = :audit_log_id
+        WHERE id = :id
+        """
+        audit_log_id = await self.audit_log_id()
         values = [
-            {'id': i, 'participant_id': pid} for i, pid in zip(ids, participant_ids)
+            {'id': i, 'participant_id': pid, 'audit_log_id': audit_log_id}
+            for i, pid in zip(ids, participant_ids)
         ]
         await self.connection.execute_many(_query, values)
 
