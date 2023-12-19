@@ -36,6 +36,24 @@ const HailBatchGrid: React.FunctionComponent<{
 }> = ({ data, filters, updateFilter, handleSort, sort, idColumn }) => {
     console.log(data)
 
+    // data contains ar_guid, batch_ids, costs
+    // sum cost per batch_id
+    const aggData = data.reduce((acc, curr) => {
+        const { batch_id, batch_name, namespace, topic, day, url, cost } = curr
+        const ar_guid = curr['ar-guid']
+        const idx = acc.findIndex((d) => d.batch_id === batch_id && topic === d.topic)
+        if (idx === -1) {
+            acc.push({ batch_id, ar_guid, batch_name, day, url, namespace, topic, cost })
+        } else {
+            // add cost to existing batch_id
+            // treat credits as cost
+            acc[idx].cost += cost // Math.abs(cost)
+        }
+        return acc
+    }, [])
+
+    console.log('aggData', aggData)
+
     const [openRows, setOpenRows] = React.useState<number[]>([])
 
     const handleToggle = (position: number) => {
@@ -55,121 +73,64 @@ const HailBatchGrid: React.FunctionComponent<{
 
     const MAIN_FIELDS: Field[] = [
         {
-            category: 'Hail Batch',
+            category: 'ar_guid',
+            title: 'AR GUID',
+        },
+        {
+            category: 'url',
             title: 'Hail Batch',
             dataMap: (data: any, value: string) => (
-                <a href={`${data.batch_url}`} rel="noopener noreferrer" target="_blank">
-                    {value}
-                </a>
+                console.log(value, 'dt:', data),
+                (
+                    <a href={`${value}`} rel="noopener noreferrer" target="_blank">
+                        {data.batch_id}
+                    </a>
+                )
             ),
         },
         {
-            category: 'GitHub',
-            title: 'GitHub',
-            width: '200px',
-            dataMap: (data: any, value: string) => (
-                <a
-                    href={`${`https://www.github.com/populationgenomics/${data.repo}/tree/${data.commit}`}`}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                >
-                    {value}
-                </a>
-            ),
-        },
-        {
-            category: 'Author',
-            title: 'Author',
-            dataMap: (data: any, value: string) => (
-                <Popup
-                    trigger={
-                        <span
-                            style={{
-                                textDecoration: 'underline',
-                                cursor: 'pointer',
-                            }}
-                            onClick={() => {
-                                const author = value
-                                if (
-                                    filters.find((f) => f.category === 'Author')?.value === author
-                                ) {
-                                    updateFilter('', 'Author')
-                                } else {
-                                    updateFilter(value, 'Author')
-                                }
-                            }}
-                        >
-                            {value}
-                        </span>
-                    }
-                    hoverable
-                    position="bottom center"
-                >
-                    {data['email']}
-                </Popup>
-            ),
-        },
-        {
-            category: 'Date',
-            title: 'Date',
-            dataMap: (data: any, value: string) => (
-                <Popup trigger={<span>{value}</span>} hoverable position="bottom center">
-                    {data['timestamp']}
-                </Popup>
-            ),
-        },
-        {
-            category: 'script',
+            category: 'batch_name',
             title: 'Script',
-            className: 'scriptField',
-            dataMap: (data: any, value: string) => (
-                <code
-                    onClick={() => handleToggle(data.position)}
-                    style={{
-                        cursor: 'pointer',
-                    }}
-                >
-                    {sanitiseValue(value)}
-                </code>
-            ),
+            // className: 'scriptField',
+            // dataMap: (data: any, value: string) => (
+            //     <code
+            //         onClick={() => handleToggle(data.position)}
+            //         style={{
+            //             cursor: 'pointer',
+            //         }}
+            //     >
+            //         {value}
+            //     </code>
+            // ),
         },
         {
-            category: 'accessLevel',
-            title: 'Access Level',
-            dataMap: (data: any, value: string) => (
-                <span
-                    style={{
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        width: '100px',
-                    }}
-                    onClick={() => {
-                        if (filters.filter((f) => f.category === 'accessLevel').length > 0) {
-                            updateFilter('', 'accessLevel')
-                        } else {
-                            updateFilter(value, 'accessLevel')
-                        }
-                    }}
-                >
-                    {value}
-                </span>
-            ),
+            category: 'day',
+            title: 'Day',
         },
-        { category: 'Image', title: 'Driver Image' },
-        { category: 'description', title: 'Description' },
-        { category: 'mode', title: 'Mode' },
+        {
+            category: 'namespace',
+            title: 'Namespace',
+        },
+        {
+            category: 'topic',
+            title: 'Topic',
+        },
+        {
+            category: 'cost',
+            title: 'Cost',
+        },
     ]
 
     const expandedRow = (log: any) =>
-        MAIN_FIELDS.map(({ category, title, width, dataMap, className }) => {
-            ;<SUITable.Cell
+        MAIN_FIELDS.map(({ category, title, width, dataMap, className }) => (
+            <SUITable.Cell
                 key={category}
-                style={{ width: width ?? '100px' }}
                 className={className}
+                // style={{ width: width ?? '100px' }}
             >
                 {dataMap ? dataMap(log, log[category]) : sanitiseValue(log[category])}
             </SUITable.Cell>
-        })
+        ))
 
     return (
         <Table celled compact sortable>
@@ -245,7 +206,7 @@ const HailBatchGrid: React.FunctionComponent<{
                 </SUITable.Row>
             </SUITable.Header>
             <SUITable.Body>
-                {data.map((log, idx) => (
+                {aggData.map((log, idx) => (
                     <React.Fragment key={idColumn ? log[idColumn] : idx}>
                         <SUITable.Row>
                             <SUITable.Cell collapsing>
@@ -258,12 +219,12 @@ const HailBatchGrid: React.FunctionComponent<{
                             {expandedRow(log)}
                         </SUITable.Row>
                         {Object.entries(log)
-                            .filter(
-                                ([c]) =>
-                                    (!MAIN_FIELDS.map(({ category }) => category).includes(c) ||
-                                        c === 'script') &&
-                                    !EXCLUDED_FIELDS.includes(c)
-                            )
+                            // .filter(
+                            //     ([c]) =>
+                            //         (!MAIN_FIELDS.map(({ category }) => category).includes(c) ||
+                            //             c === 'script') &&
+                            //         !EXCLUDED_FIELDS.includes(c)
+                            // )
                             .map(([category, value], i) => (
                                 <SUITable.Row
                                     style={{

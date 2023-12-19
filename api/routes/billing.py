@@ -1,8 +1,8 @@
 """
 Billing routes
 """
-from fastapi import APIRouter
 from async_lru import alru_cache
+from fastapi import APIRouter
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
 from api.utils.db import BqConnection, get_author

@@ -8,10 +8,10 @@ from models.models import (
     BillingTotalCostQueryModel,
 )
 from models.models.billing import (
+    BillingHailBatchCostRecord,
     BillingSource,
     BillingTimeColumn,
     BillingTimePeriods,
-    BillingHailBatchCostRecord,
 )
 
 

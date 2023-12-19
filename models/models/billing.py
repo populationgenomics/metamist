@@ -185,8 +185,9 @@ class BillingColumn(str, Enum):
         This could be record, array or struct type
         """
         return value not in (
+            BillingColumn.COST,
             BillingColumn.SERVICE,
-            BillingColumn.SKU,
+            # BillingColumn.SKU,
             BillingColumn.PROJECT,
             BillingColumn.LABELS,
             BillingColumn.SYSTEM_LABELS,

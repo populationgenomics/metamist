@@ -71,10 +71,10 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 .padStart(2, '0')}`
     )
 
-    const [data, setData] = React.useState<BillingTotalCostRecord[]>([])
+    const [data, setData] = React.useState<any>([])
 
     const [searchTxt, setSearchTxt] = React.useState<string | undefined>(
-        searchParams.get('searchBy') ?? undefined
+        searchParams.get('searchTxt') ?? undefined
     )
 
     const [filters, setFilters] = React.useState<Filter[]>([])
@@ -93,28 +93,69 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         value: item,
     }))
 
+    const [searchByType, setSearchByType] = React.useState<SearchType | undefined>(
+        SearchType[searchParams.get('searchType')] ?? undefined
+    )
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
-    const updateNav = (searchBy: string | undefined) => {
+    const updateNav = (sType: SearchType | undefined, sTxt: string | undefined) => {
         let url = `${location.pathname}`
-        if (searchBy) {
-            url += `?searchBy=${searchBy}`
-            navigate(url)
-        }
+        if (sType || sTxt) url += '?'
+
+        const params: string[] = []
+        if (sType) params.push(`searchType=${SearchType[sType]}`)
+        if (sTxt) params.push(`searchTxt=${sTxt}`)
+
+        url += params.join('&')
+        navigate(url)
     }
 
-    const getData = (query: BillingTotalCostQueryModel) => {
-        setIsLoading(true)
-        setError(undefined)
-        new BillingApi()
-            .getTotalCost(query)
-            .then((response) => {
-                setIsLoading(false)
-                setData(response.data.map((d, idx) => ({ ...d, position: idx })))
-            })
-            .catch((er) => setError(er.message))
+    const getData = (sType: SearchType, sTxt: string) => {
+        if (sType === undefined || sTxt === undefined) {
+            // Seaarch text is not large enough
+            setIsLoading(false)
+            return
+        }
+        // setIsLoading(true)
+        // setError(undefined)
+
+        if (sType === SearchType.Ar_guid) {
+            console.log('searching by Ar_guid', sType, sTxt)
+
+            new BillingApi()
+                .costByArGuid(sTxt)
+                .then((response) => {
+                    console.log(response)
+                    setIsLoading(false)
+                    setData(response.data)
+                })
+                .catch((er) => setError(er.message))
+        } else if (sType === SearchType.Batch_id) {
+            console.log('searching by Batch_id', sType, sTxt)
+
+            new BillingApi()
+                .costByBatchId(sTxt)
+                .then((response) => {
+                    console.log(response)
+                    setIsLoading(false)
+                    setData(response.data)
+                })
+                .catch((er) => setError(er.message))
+        } else {
+            console.log('searching by other', sType, sTxt)
+        }
+
+        // new BillingApi()
+        //     // .getTotalCost(query)
+        //     .costByBatchId(query)
+        //     .then((response) => {
+        //         setIsLoading(false)
+        //         setData(response.data.map((d, idx) => ({ ...d, position: idx })))
+        //     })
+        //     .catch((er) => setError(er.message))
     }
 
     const handleSort = (clickedColumn: string) => {
@@ -137,57 +178,29 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }
 
     const handleSearch = () => {
-        if (searchTxt === undefined || searchTxt.length < 6) {
+        if (searchByType === undefined || searchTxt === undefined || searchTxt.length < 6) {
             // Seaarch text is not large enough
             setIsLoading(false)
             return
         }
-        updateNav(searchTxt)
-        getData({
-            fields: [
-                BillingColumn.Topic,
-                BillingColumn.Day,
-                BillingColumn.CostCategory,
-                BillingColumn.Sku,
-                BillingColumn.ArGuid,
-                BillingColumn.Currency,
-                BillingColumn.Cost,
-                BillingColumn.InvoiceMonth,
-                BillingColumn.Dataset,
-                BillingColumn.BatchId,
-                BillingColumn.SequencingType,
-                BillingColumn.Stage,
-                BillingColumn.SequencingGroup,
-                BillingColumn.ComputeCategory,
-                BillingColumn.CromwellSubWorkflowName,
-                BillingColumn.CromwellWorkflowId,
-                BillingColumn.GoogPipelinesWorker,
-                BillingColumn.WdlTaskName,
-                BillingColumn.Namespace,
-            ],
-            start_date: start,
-            end_date: end,
-            filters: {
-                ar_guid: searchTxt,
-                batch_id: searchTxt,
-                sequencing_group: searchTxt,
-                cromwell_workflow_id: searchTxt,
-            },
-            filters_op: 'OR',
-            order_by: { cost: true },
-        })
+        getData(searchByType, searchTxt)
     }
 
     const handleSearchChange = (event: any, dt: any) => {
-        console.log(dt)
+        console.log(dt.value)
         setSearchTxt(dt.value)
+        updateNav(searchByType, dt.value)
     }
 
-    React.useEffect(() => {}, [])
+    const handleSearchTypeChange = (event: any, dt: any) => {
+        console.log(typeof dt.value, dt.value)
+        setSearchByType(SearchType[dt.value])
+        updateNav(SearchType[dt.value], searchTxt)
+    }
 
     React.useEffect(() => {
         handleSearch()
-    }, [searchTxt])
+    }, [searchTxt, searchByType])
 
     const searchCard = () => {
         return (
@@ -215,6 +228,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                                 compact
                                 options={dropdownOptions}
                                 defaultValue={dropdownOptions[0].value}
+                                onChange={handleSearchTypeChange}
                             />
                             <Button type="submit">
                                 <SearchIcon />
@@ -228,14 +242,12 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                     {' '}
                     e.g.
                     <br />
-                    ar_guid: 855a6153-033c-4398-8000-46ed74c02fe8
+                    ar_guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
                     <br />
-                    batch_id: 429518
+                    batch_id: 430604, 430605
                     <br />
-                    sequencing_group: cpg246751
-                    <br />
-                    cromwell_workflow_id: cromwell-e252f430-4143-47ec-a9c0-5f7face1b296
-                    <br />
+                    url:
+                    http://localhost:5173/billing/costByAnalysis?searchType=Ar_guid&searchTxt=f5a065d2-c51f-46b7-a920-a89b639fc4ba
                 </p>
             </Card>
         )
@@ -274,7 +286,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                     {data.map((k, i) => (
                         <SUITable.Row key={i}>
                             <SUITable.Cell>{k.cost_category}</SUITable.Cell>
-                            <SUITable.Cell>{k.sku}</SUITable.Cell>
+                            <SUITable.Cell>{k.sku.id}</SUITable.Cell>
                             <SUITable.Cell>
                                 <b>{currencyFormat(k.cost)}</b>
                             </SUITable.Cell>
@@ -357,8 +369,8 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     return (
         <>
             {searchCard()}
-            {dataDumpCard(data)}
-            {gridCard(data)}
+            {/* {dataDumpCard(data.costs)} */}
+            {gridCard(data.costs)}
         </>
     )
 }

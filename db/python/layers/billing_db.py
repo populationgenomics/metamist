@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import json
 import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -357,7 +356,7 @@ class BillingDb(BqDbBase):
         """Prepare filter string"""
         and_filters = []
         query_parameters = []
-        time_column = query.time_column.value or 'day'
+        time_column = query.time_column or 'day'
 
         and_filters.append(f'{time_column} >= TIMESTAMP(@start_date)')
         and_filters.append(f'{time_column} <= TIMESTAMP(@end_date)')
@@ -387,6 +386,8 @@ class BillingDb(BqDbBase):
             b1, b2 = '', ''
             param_type = bigquery.ScalarQueryParameter
             key = name.replace('-', '_')
+
+            print('\n\n is value list', isinstance(value, list), value)
 
             if isinstance(value, list):
                 compare = 'IN'
@@ -419,6 +420,9 @@ class BillingDb(BqDbBase):
                 filter_, query_param = construct_filter(col_name, filter_value)
                 filters.append(filter_)
                 query_parameters.append(query_param)
+
+                print('1-filters', filters)
+                print('1-query_parameters', query_parameters)
             else:
                 for label_key, label_value in filter_value.items():
                     filter_, query_param = construct_filter(
@@ -426,6 +430,9 @@ class BillingDb(BqDbBase):
                     )
                     filters.append(filter_)
                     query_parameters.append(query_param)
+
+                print('2-filters', filters)
+                print('2-query_parameters', query_parameters)
 
         if query.filters_op == 'OR':
             if filters:
@@ -439,26 +446,37 @@ class BillingDb(BqDbBase):
 
     def convert_output(self, query_job_result):
         """Convert query result to json"""
-        if not query_job_result:
+        if not query_job_result or query_job_result.result().total_rows == 0:
             # return empty list if no record found
             return []
 
-        df = query_job_result.to_dataframe()
+        records = query_job_result.result()
+
+        results = []
 
         def fix_labels(row):
             return {r['key']: r['value'] for r in row}
 
-        for col in df.columns:
-            # convert date to string
-            if df.dtypes[col] == 'dbdate':
-                df[col] = df[col].astype(str)
+        for record in records:
+            drec = dict(record)
+            if 'labels' in drec:
+                drec.update(fix_labels(drec['labels']))
 
-            # modify labels format
-            if col == 'labels':
-                df[col] = df[col].apply(fix_labels)
+            results.append(drec)
 
-        data = json.loads(df.to_json(orient='records', date_format='iso'))
-        return data
+        # df = query_job_result.to_dataframe()
+
+        # for col in df.columns:
+        #     # convert date to string
+        #     if df.dtypes[col] == 'dbdate':
+        #         df[col] = df[col].astype(str)
+
+        #     # modify labels format
+        #     if col == 'labels':
+        #         df[col] = df[col].apply(fix_labels)
+
+        # data = json.loads(df.to_json(orient='records', date_format='iso'))
+        return results
 
     # pylint: disable=too-many-locals
     async def get_total_cost(
@@ -516,6 +534,8 @@ class BillingDb(BqDbBase):
             query, view_to_use
         )
 
+        print('after prepare_filter_str', filter_str, query_parameters, view_to_use)
+
         # construct order by
         order_by_cols = []
         if query.order_by:
@@ -527,10 +547,16 @@ class BillingDb(BqDbBase):
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
         group_by = f'GROUP BY {day_grp}{grp_selected}' if query.group_by else ''
-        cost = f'SUM(cost) as cost' if query.group_by else 'cost'
+        cost = 'SUM(cost) as cost' if query.group_by else 'cost'
+
+        print('\ngroup_by', group_by)
+        print('\ngrp_selected', grp_selected)
+        print('\nfields_selected', fields_selected)
 
         _query = f"""
-        CREATE TEMP FUNCTION getLabelValue(labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING) AS (
+        CREATE TEMP FUNCTION getLabelValue(
+            labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
+        ) AS (
             (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
         );
 
@@ -559,6 +585,10 @@ class BillingDb(BqDbBase):
         job_config = bigquery.QueryJobConfig(
             query_parameters=query_parameters, labels=BQ_LABELS
         )
+        print('_query', _query)
+        print('query_parameters', query_parameters)
+        print('labels', BQ_LABELS)
+        print('job_config', job_config)
         query_job_result = self._connection.connection.query(
             _query, job_config=job_config
         )
@@ -1029,6 +1059,9 @@ class BillingDb(BqDbBase):
             ],
             labels=BQ_LABELS,
         )
+
+        print('\nar_guid', ar_guid)
+        print('\n_query', _query)
 
         query_job_result = list(
             self._connection.connection.query(_query, job_config=job_config).result()
