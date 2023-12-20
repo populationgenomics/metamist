@@ -266,7 +266,7 @@ class BillingColumn(str, Enum):
     @staticmethod
     def generate_all_title(record) -> str:
         """Generate Column as All Title"""
-        if record == BillingColumn.PROJECT:
+        if record == BillingColumn.GCP_PROJECT:
             return 'All GCP Projects'
 
         return f'All {record.title()}s'

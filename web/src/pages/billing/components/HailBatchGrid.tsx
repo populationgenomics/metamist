@@ -34,23 +34,63 @@ const HailBatchGrid: React.FunctionComponent<{
     sort: { column: string | null; direction: string | null }
     idColumn?: string
 }> = ({ data, filters, updateFilter, handleSort, sort, idColumn }) => {
-    console.log(data)
+    console.log('data', data)
 
-    // data contains ar_guid, batch_ids, costs
-    // sum cost per batch_id
-    const aggData = data.reduce((acc, curr) => {
-        const { batch_id, batch_name, namespace, topic, day, url, cost } = curr
+    const aggArGUIDData = data.reduce((acc, curr) => {
+        const { cost } = curr
         const ar_guid = curr['ar-guid']
-        const idx = acc.findIndex((d) => d.batch_id === batch_id && topic === d.topic)
-        if (idx === -1) {
-            acc.push({ batch_id, ar_guid, batch_name, day, url, namespace, topic, cost })
-        } else {
-            // add cost to existing batch_id
-            // treat credits as cost
-            acc[idx].cost += cost // Math.abs(cost)
+        const idx = acc.findIndex((d) => d.ar_guid === ar_guid)
+        if (cost >= 0) {
+            // do not include credits, should be filter out at API?
+            if (idx === -1) {
+                acc.push({ type: 'ar_guid', key: ar_guid, ar_guid, cost })
+            } else {
+                acc[idx].cost += cost
+            }
         }
         return acc
     }, [])
+
+    // data contains ar_guid, batch_ids, costs
+    // sum cost per batch_id
+    const aggBatchData = data.reduce((acc, curr) => {
+        const { batch_id, url, cost } = curr
+        const ar_guid = curr['ar-guid']
+        const idx = acc.findIndex((d) => d.batch_id === batch_id)
+        if (cost >= 0) {
+            // do not include credits, should be filter out at API?
+            if (idx === -1) {
+                acc.push({ type: 'batch_id', key: batch_id, ar_guid, batch_id, url, cost })
+            } else {
+                acc[idx].cost += cost
+            }
+        }
+        return acc
+    }, [])
+
+    const aggBatchJobData = data.reduce((acc, curr) => {
+        const { batch_id, url, cost, job_id } = curr
+        const ar_guid = curr['ar-guid']
+        const idx = acc.findIndex((d) => d.batch_id === batch_id && d.job_id === job_id)
+        if (cost >= 0) {
+            if (idx === -1) {
+                acc.push({
+                    type: 'batch_id/job_id',
+                    key: batch_id + '/' + job_id,
+                    batch_id,
+                    job_id,
+                    ar_guid,
+                    url,
+                    cost,
+                })
+            } else {
+                acc[idx].cost += cost
+            }
+        }
+        return acc
+    }, [])
+
+    const aggData = [...aggArGUIDData, ...aggBatchData, ...aggBatchJobData]
 
     console.log('aggData', aggData)
 
@@ -78,46 +118,27 @@ const HailBatchGrid: React.FunctionComponent<{
         },
         {
             category: 'url',
-            title: 'Hail Batch',
+            title: 'HAIL BATCH ID',
             dataMap: (data: any, value: string) => (
-                console.log(value, 'dt:', data),
-                (
-                    <a href={`${value}`} rel="noopener noreferrer" target="_blank">
-                        {data.batch_id}
-                    </a>
-                )
+                <a href={`${value}`} rel="noopener noreferrer" target="_blank">
+                    {data.batch_id}
+                </a>
             ),
         },
         {
-            category: 'batch_name',
-            title: 'Script',
-            // className: 'scriptField',
-            // dataMap: (data: any, value: string) => (
-            //     <code
-            //         onClick={() => handleToggle(data.position)}
-            //         style={{
-            //             cursor: 'pointer',
-            //         }}
-            //     >
-            //         {value}
-            //     </code>
-            // ),
-        },
-        {
-            category: 'day',
-            title: 'Day',
-        },
-        {
-            category: 'namespace',
-            title: 'Namespace',
-        },
-        {
-            category: 'topic',
-            title: 'Topic',
+            category: 'job_id',
+            title: 'JOB ID',
         },
         {
             category: 'cost',
-            title: 'Cost',
+            title: 'COST',
+            dataMap: (data: any, value: string) => (
+                <Popup
+                    content={data.cost}
+                    trigger={<span>${data.cost.toFixed(6)}</span>}
+                    position="top center"
+                />
+            ),
         },
     ]
 
@@ -152,7 +173,7 @@ const HailBatchGrid: React.FunctionComponent<{
                         </SUITable.HeaderCell>
                     ))}
                 </SUITable.Row>
-                <SUITable.Row>
+                {/* <SUITable.Row>
                     <SUITable.Cell
                         style={{
                             borderBottom: 'none',
@@ -185,7 +206,7 @@ const HailBatchGrid: React.FunctionComponent<{
                             />
                         </SUITable.Cell>
                     ))}
-                </SUITable.Row>
+                </SUITable.Row> */}
                 <SUITable.Row>
                     <SUITable.Cell
                         style={{

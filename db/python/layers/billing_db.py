@@ -601,7 +601,7 @@ class BillingDb(BqDbBase):
         """
         Get budget for gcp-projects
         """
-        if field != BillingColumn.PROJECT or not is_current_month:
+        if field != BillingColumn.GCP_PROJECT or not is_current_month:
             # only projects have budget and only for current month
             return {}
 
@@ -615,6 +615,8 @@ class BillingDb(BqDbBase):
         FROM t inner join `{BQ_BUDGET_VIEW}` d
         ON d.gcp_project = t.gcp_project AND d.created_at = t.last_created_at
         """
+
+        print('\n\n _query:', _query)
 
         job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
         query_job_result = list(
@@ -945,10 +947,12 @@ class BillingDb(BqDbBase):
         Get currently running cost of selected field
         """
 
+        print('field', field)
+
         # accept only Topic, Dataset or Project at this stage
         if field not in (
             BillingColumn.TOPIC,
-            BillingColumn.PROJECT,
+            BillingColumn.GCP_PROJECT,
             BillingColumn.DATASET,
             BillingColumn.STAGE,
             BillingColumn.COMPUTE_CATEGORY,

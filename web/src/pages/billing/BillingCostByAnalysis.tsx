@@ -97,30 +97,37 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         SearchType[searchParams.get('searchType')] ?? undefined
     )
 
+    console.log(
+        'searchType from',
+        searchParams.get('searchType'),
+        SearchType[searchParams.get('searchType')]
+    )
+    console.log('searchType', searchByType)
+
+    console.log('dropdownOptions', dropdownOptions)
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
     const updateNav = (sType: SearchType | undefined, sTxt: string | undefined) => {
-        let url = `${location.pathname}`
-        if (sType || sTxt) url += '?'
-
+        let url = `${location.pathname}?`
         const params: string[] = []
-        if (sType) params.push(`searchType=${SearchType[sType]}`)
-        if (sTxt) params.push(`searchTxt=${sTxt}`)
+        if (sType !== undefined) params.push(`searchType=${SearchType[sType]}`)
+        if (sTxt !== undefined) params.push(`searchTxt=${sTxt}`)
 
         url += params.join('&')
         navigate(url)
     }
 
     const getData = (sType: SearchType, sTxt: string) => {
-        if (sType === undefined || sTxt === undefined) {
+        if ((sType === undefined || sTxt === undefined) && sTxt.length < 6) {
             // Seaarch text is not large enough
             setIsLoading(false)
             return
         }
-        // setIsLoading(true)
-        // setError(undefined)
+        setIsLoading(true)
+        setError(undefined)
 
         if (sType === SearchType.Ar_guid) {
             console.log('searching by Ar_guid', sType, sTxt)
@@ -145,6 +152,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 })
                 .catch((er) => setError(er.message))
         } else {
+            setIsLoading(false)
             console.log('searching by other', sType, sTxt)
         }
 
@@ -229,6 +237,11 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                                 options={dropdownOptions}
                                 defaultValue={dropdownOptions[0].value}
                                 onChange={handleSearchTypeChange}
+                                value={
+                                    searchByType !== undefined
+                                        ? dropdownOptions[searchByType].value
+                                        : undefined
+                                }
                             />
                             <Button type="submit">
                                 <SearchIcon />
