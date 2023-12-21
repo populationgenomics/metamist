@@ -319,7 +319,7 @@ async def get_cost_by_ar_guid(
     response_model=BillingHailBatchCostRecord,
     operation_id='costByBatchId',
 )
-# @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     author: str = get_author,
     batch_id: str = None,

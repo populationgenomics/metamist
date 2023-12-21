@@ -387,8 +387,6 @@ class BillingDb(BqDbBase):
             param_type = bigquery.ScalarQueryParameter
             key = name.replace('-', '_')
 
-            print('\n\n is value list', isinstance(value, list), value)
-
             if isinstance(value, list):
                 compare = 'IN'
                 b1, b2 = 'UNNEST(', ')'
@@ -420,9 +418,6 @@ class BillingDb(BqDbBase):
                 filter_, query_param = construct_filter(col_name, filter_value)
                 filters.append(filter_)
                 query_parameters.append(query_param)
-
-                print('1-filters', filters)
-                print('1-query_parameters', query_parameters)
             else:
                 for label_key, label_value in filter_value.items():
                     filter_, query_param = construct_filter(
@@ -430,9 +425,6 @@ class BillingDb(BqDbBase):
                     )
                     filters.append(filter_)
                     query_parameters.append(query_param)
-
-                print('2-filters', filters)
-                print('2-query_parameters', query_parameters)
 
         if query.filters_op == 'OR':
             if filters:
@@ -534,8 +526,6 @@ class BillingDb(BqDbBase):
             query, view_to_use
         )
 
-        print('after prepare_filter_str', filter_str, query_parameters, view_to_use)
-
         # construct order by
         order_by_cols = []
         if query.order_by:
@@ -548,10 +538,6 @@ class BillingDb(BqDbBase):
 
         group_by = f'GROUP BY {day_grp}{grp_selected}' if query.group_by else ''
         cost = 'SUM(cost) as cost' if query.group_by else 'cost'
-
-        print('\ngroup_by', group_by)
-        print('\ngrp_selected', grp_selected)
-        print('\nfields_selected', fields_selected)
 
         _query = f"""
         CREATE TEMP FUNCTION getLabelValue(
@@ -585,10 +571,6 @@ class BillingDb(BqDbBase):
         job_config = bigquery.QueryJobConfig(
             query_parameters=query_parameters, labels=BQ_LABELS
         )
-        print('_query', _query)
-        print('query_parameters', query_parameters)
-        print('labels', BQ_LABELS)
-        print('job_config', job_config)
         query_job_result = self._connection.connection.query(
             _query, job_config=job_config
         )
@@ -615,8 +597,6 @@ class BillingDb(BqDbBase):
         FROM t inner join `{BQ_BUDGET_VIEW}` d
         ON d.gcp_project = t.gcp_project AND d.created_at = t.last_created_at
         """
-
-        print('\n\n _query:', _query)
 
         job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
         query_job_result = list(
@@ -947,8 +927,6 @@ class BillingDb(BqDbBase):
         Get currently running cost of selected field
         """
 
-        print('field', field)
-
         # accept only Topic, Dataset or Project at this stage
         if field not in (
             BillingColumn.TOPIC,
@@ -1063,9 +1041,6 @@ class BillingDb(BqDbBase):
             ],
             labels=BQ_LABELS,
         )
-
-        print('\nar_guid', ar_guid)
-        print('\n_query', _query)
 
         query_job_result = list(
             self._connection.connection.query(_query, job_config=job_config).result()
