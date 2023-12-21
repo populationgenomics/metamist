@@ -117,18 +117,51 @@ class BillingRowRecord(SMBase):
         )
 
 
+class BillingSource(str, Enum):
+    """List of billing sources"""
+
+    RAW = 'raw'
+    AGGREGATE = 'aggregate'
+    EXTENDED = 'extended'
+    BUDGET = 'budget'
+    GCP_BILLING = 'gcp_billing'
+    BATCHES = 'batches'
+
+
 class BillingColumn(str, Enum):
     """List of billing columns"""
 
-    # base view columns
+    # raw view columns
+    ID = 'id'
     TOPIC = 'topic'
-    PROJECT = 'gcp_project'
+    SERVICE = 'service'
+    SKU = 'sku'
+    USAGE_START_TIME = 'usage_start_time'
+    USAGE_END_TIME = 'usage_end_time'
+    PROJECT = 'project'
+    LABELS = 'labels'
+    SYSTEM_LABELS = 'system_labels'
+    LOCATION = 'location'
+    EXPORT_TIME = 'export_time'
+    COST = 'cost'
+    CURRENCY = 'currency'
+    CURRENCY_CONVERSION_RATE = 'currency_conversion_rate'
+    USAGE = 'usage'
+    CREDITS = 'credits'
+    INVOICE = 'invoice'
+    COST_TYPE = 'cost_type'
+    ADJUSTMENT_INFO = 'adjustment_info'
+
+    # base view columns
+    # TOPIC = 'topic'
+    # SKU = 'sku'
+    # CURRENCY = 'currency'
+    # COST = 'cost'
+    # LABELS = 'labels'
+    GCP_PROJECT = 'gcp_project'
     DAY = 'day'
     COST_CATEGORY = 'cost_category'
-    SKU = 'sku'
     AR_GUID = 'ar_guid'
-    CURRENCY = 'currency'
-    COST = 'cost'
     INVOICE_MONTH = 'invoice_month'
 
     # extended, filtered view columns
@@ -143,6 +176,74 @@ class BillingColumn(str, Enum):
     GOOG_PIPELINES_WORKER = 'goog_pipelines_worker'
     WDL_TASK_NAME = 'wdl_task_name'
     NAMESPACE = 'namespace'
+
+    @classmethod
+    def can_group_by(cls, value: 'BillingColumn') -> bool:
+        """
+        Return True if column can be grouped by
+        TODO: If any new columns are added above and cannot be in a group by, add them here
+        This could be record, array or struct type
+        """
+        return value not in (
+            BillingColumn.COST,
+            BillingColumn.SERVICE,
+            # BillingColumn.SKU,
+            BillingColumn.PROJECT,
+            BillingColumn.LABELS,
+            BillingColumn.SYSTEM_LABELS,
+            BillingColumn.LOCATION,
+            BillingColumn.USAGE,
+            BillingColumn.CREDITS,
+            BillingColumn.INVOICE,
+            BillingColumn.ADJUSTMENT_INFO,
+        )
+
+    @classmethod
+    def str_to_enum(cls, value: str) -> 'BillingColumn':
+        """Convert string to enum"""
+        str_to_enum = {v.value: v for k, v in BillingColumn.__members__.items()}
+        return str_to_enum[value]
+
+    @classmethod
+    def raw_cols(cls) -> list[str]:
+        """Return list of raw column names"""
+        return [
+            'id',
+            'topic',
+            'service',
+            'sku',
+            'usage_start_time',
+            'usage_end_time',
+            'project',
+            'labels',
+            'system_labels',
+            'location',
+            'export_time',
+            'cost',
+            'currency',
+            'currency_conversion_rate',
+            'usage',
+            'credits',
+            'invoice',
+            'cost_type',
+            'adjustment_info',
+        ]
+
+    @classmethod
+    def standard_cols(cls) -> list[str]:
+        """Return list of standard column names"""
+        return [
+            'topic',
+            'gcp_project',
+            'sku',
+            'currency',
+            'cost',
+            'labels',
+            'day',
+            'cost_category',
+            'ar_guid',
+            'invoice_month',
+        ]
 
     @classmethod
     def extended_cols(cls) -> list[str]:
@@ -165,7 +266,7 @@ class BillingColumn(str, Enum):
     @staticmethod
     def generate_all_title(record) -> str:
         """Generate Column as All Title"""
-        if record == BillingColumn.PROJECT:
+        if record == BillingColumn.GCP_PROJECT:
             return 'All GCP Projects'
 
         return f'All {record.title()}s'
@@ -181,6 +282,15 @@ class BillingTimePeriods(str, Enum):
     INVOICE_MONTH = 'invoice_month'
 
 
+class BillingTimeColumn(str, Enum):
+    """List of billing time columns"""
+
+    DAY = 'day'
+    USAGE_START_TIME = 'usage_start_time'
+    USAGE_END_TIME = 'usage_end_time'
+    EXPORT_TIME = 'export_time'
+
+
 class BillingTotalCostQueryModel(SMBase):
     """
     Used to query for billing total cost
@@ -191,13 +301,14 @@ class BillingTotalCostQueryModel(SMBase):
     fields: list[BillingColumn]
     start_date: str
     end_date: str
-    # optional, can be aggregate or gcp_billing
-    source: str | None = None
+    # optional, can be raw, aggregate or gcp_billing
+    source: BillingSource | None = None
 
     # optional
-    filters: dict[BillingColumn, str] | None = None
+    filters: dict[BillingColumn, str | list | dict] | None = None
     # optional, AND or OR
     filters_op: str | None = None
+    group_by: bool = True
 
     # order by, reverse= TRUE for DESC, FALSE for ASC
     order_by: dict[BillingColumn, bool] | None = None
@@ -205,6 +316,7 @@ class BillingTotalCostQueryModel(SMBase):
     offset: int | None = None
 
     # default to day, can be day, week, month, invoice_month
+    time_column: BillingTimeColumn | None = None
     time_periods: BillingTimePeriods | None = None
 
     def __hash__(self):
@@ -219,9 +331,10 @@ class BillingTotalCostRecord(SMBase):
     topic: str | None
     gcp_project: str | None
     cost_category: str | None
-    sku: str | None
+    sku: str | dict | None
     invoice_month: str | None
     ar_guid: str | None
+
     # extended columns
     dataset: str | None
     batch_id: str | None
@@ -319,3 +432,11 @@ class BillingCostBudgetRecord(SMBase):
             budget=record.get('budget'),
             last_loaded_day=record.get('last_loaded_day'),
         )
+
+
+class BillingHailBatchCostRecord(SMBase):
+    """Return class for the Billing Cost by batch_id/ar_guid"""
+
+    ar_guid: str | None
+    batch_ids: list[str] | None
+    costs: list[dict] | None

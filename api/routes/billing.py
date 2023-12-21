@@ -10,6 +10,7 @@ from db.python.layers.billing_layer import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
+    BillingHailBatchCostRecord,
     BillingQueryModel,
     BillingRowRecord,
     BillingTotalCostQueryModel,
@@ -297,6 +298,38 @@ async def query_billing(
     return records
 
 
+@router.get(
+    '/cost-by-ar-guid/{ar_guid}',
+    response_model=BillingHailBatchCostRecord,
+    operation_id='costByArGuid',
+)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_ar_guid(
+    author: str = get_author,
+    ar_guid: str = None,
+) -> BillingHailBatchCostRecord:
+    """Get Hail Batch costs by AR GUID"""
+    billing_layer = initialise_billing_layer(author)
+    records = await billing_layer.get_cost_by_ar_guid(ar_guid)
+    return records
+
+
+@router.get(
+    '/cost-by-batch-id/{batch_id}',
+    response_model=BillingHailBatchCostRecord,
+    operation_id='costByBatchId',
+)
+@alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_cost_by_batch_id(
+    author: str = get_author,
+    batch_id: str = None,
+) -> BillingHailBatchCostRecord:
+    """Get Hail Batch costs by Batch ID"""
+    billing_layer = initialise_billing_layer(author)
+    records = await billing_layer.get_cost_by_batch_id(batch_id)
+    return records
+
+
 @router.post(
     '/total-cost',
     response_model=list[BillingTotalCostRecord],
@@ -503,7 +536,7 @@ async def get_total_cost(
     """
     billing_layer = initialise_billing_layer(author)
     records = await billing_layer.get_total_cost(query)
-    return records
+    return [BillingTotalCostRecord.from_json(record) for record in records]
 
 
 @router.get(

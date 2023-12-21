@@ -6,7 +6,12 @@ from models.models import (
     BillingCostBudgetRecord,
     BillingRowRecord,
     BillingTotalCostQueryModel,
-    BillingTotalCostRecord,
+)
+from models.models.billing import (
+    BillingHailBatchCostRecord,
+    BillingSource,
+    BillingTimeColumn,
+    BillingTimePeriods,
 )
 
 
@@ -146,7 +151,7 @@ class BillingLayer(BqBaseLayer):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-    ) -> list[BillingTotalCostRecord] | None:
+    ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval
         """
@@ -164,3 +169,92 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.get_running_cost(field, invoice_month, source)
+
+    async def get_cost_by_ar_guid(
+        self,
+        ar_guid: str | None = None,
+    ) -> BillingHailBatchCostRecord:
+        """
+        Get Costs by AR GUID
+        """
+        billing_db = BillingDb(self.connection)
+
+        # First get all batches and the min/max day to use for the query
+        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+
+        if not batches:
+            return BillingHailBatchCostRecord(
+                ar_guid=ar_guid,
+                batch_ids=[],
+                costs=[],
+            )
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
+        )
+        records = await billing_db.get_total_cost(query)
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )
+
+    async def get_cost_by_batch_id(
+        self,
+        batch_id: str | None = None,
+    ) -> BillingHailBatchCostRecord:
+        """
+        Get Costs by Batch ID
+        """
+        billing_db = BillingDb(self.connection)
+
+        # First get all batches and the min/max day to use for the query
+        ar_guid = await billing_db.get_ar_guid_by_batch_id(batch_id)
+
+        # The get all batches for the ar_guid
+        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+
+        if not batches:
+            return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
+        )
+        records = await billing_db.get_total_cost(query)
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )
