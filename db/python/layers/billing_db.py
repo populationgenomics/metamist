@@ -39,7 +39,7 @@ def prepare_time_periods(
     query: BillingTotalCostQueryModel,
 ) -> tuple[str, str, str]:
     """Prepare Time periods grouping and parsing formulas"""
-    time_column = query.time_column.value or 'day'
+    time_column = query.time_column or 'day'
     day_parse_formula = ''
     day_field = ''
     day_grp = 'day, '
