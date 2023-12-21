@@ -18,9 +18,11 @@ const HailBatchGrid: React.FunctionComponent<{
 }> = ({ data }) => {
     // prepare aggregated data by ar_guid, batch_id, job_id and coresponding batch_resource
     const aggArGUIDData = data.reduce((acc, curr) => {
-        const { cost } = curr
+        const { cost, topic, usage_start_time, usage_end_time } = curr
         const ar_guid = curr['ar-guid']
-        const idx = acc.findIndex((d) => d.ar_guid === ar_guid)
+        const usageStartDate = new Date(usage_start_time)
+        const usageEndDate = new Date(usage_end_time)
+        const idx = acc.findIndex((d) => d.ar_guid === ar_guid && d.topic === topic)
         if (cost >= 0) {
             // do not include credits, should be filter out at API?
             if (idx === -1) {
@@ -30,10 +32,19 @@ const HailBatchGrid: React.FunctionComponent<{
                     ar_guid,
                     batch_id: ' TOTAL',
                     job_id: ' ALL JOBS',
+                    topic,
                     cost,
+                    start_time: usageStartDate,
+                    end_time: usageEndDate,
                 })
             } else {
                 acc[idx].cost += cost
+                acc[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                )
+                acc[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                )
             }
         }
         return acc
@@ -57,8 +68,19 @@ const HailBatchGrid: React.FunctionComponent<{
     }, [])
 
     const aggBatchData = data.reduce((acc, curr) => {
-        const { batch_id, url, topic, namespace, batch_name, cost } = curr
+        const {
+            batch_id,
+            url,
+            topic,
+            namespace,
+            batch_name,
+            cost,
+            usage_start_time,
+            usage_end_time,
+        } = curr
         const ar_guid = curr['ar-guid']
+        const usageStartDate = new Date(usage_start_time)
+        const usageEndDate = new Date(usage_end_time)
         const idx = acc.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
@@ -80,9 +102,17 @@ const HailBatchGrid: React.FunctionComponent<{
                     batch_name,
                     job_id: ' ALL JOBS',
                     cost,
+                    start_time: usageStartDate,
+                    end_time: usageEndDate,
                 })
             } else {
                 acc[idx].cost += cost
+                acc[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                )
+                acc[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                )
             }
         }
         return acc
@@ -121,8 +151,11 @@ const HailBatchGrid: React.FunctionComponent<{
     }, [])
 
     const aggBatchJobData = data.reduce((acc, curr) => {
-        const { batch_id, url, cost, topic, namespace, job_id } = curr
+        const { batch_id, url, cost, topic, namespace, job_id, usage_start_time, usage_end_time } =
+            curr
         const ar_guid = curr['ar-guid']
+        const usageStartDate = new Date(usage_start_time)
+        const usageEndDate = new Date(usage_end_time)
         const idx = acc.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
@@ -142,9 +175,17 @@ const HailBatchGrid: React.FunctionComponent<{
                     topic,
                     namespace,
                     cost,
+                    start_time: usageStartDate,
+                    end_time: usageEndDate,
                 })
             } else {
                 acc[idx].cost += cost
+                acc[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                )
+                acc[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                )
             }
         }
         return acc
@@ -220,6 +261,34 @@ const HailBatchGrid: React.FunctionComponent<{
         {
             category: 'job_id',
             title: 'JOB ID',
+        },
+        {
+            category: 'start_time',
+            title: 'TIME STARTED',
+            dataMap: (data: any, value: string) => {
+                const dateValue = new Date(value)
+                return <span>{isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}</span>
+            },
+        },
+        {
+            category: 'end_time',
+            title: 'TIME COMPLETED',
+            dataMap: (data: any, value: string) => {
+                const dateValue = new Date(value)
+                return <span>{isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}</span>
+            },
+        },
+        {
+            category: 'end_time',
+            title: 'DURATION',
+            dataMap: (data: any, value: string) => {
+                const duration = new Date(data.end_time.getTime() - data.start_time.getTime())
+                const seconds = Math.floor((duration / 1000) % 60)
+                const minutes = Math.floor((duration / (1000 * 60)) % 60)
+                const hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
+                const formattedDuration = `${hours}h ${minutes}m ${seconds}s`
+                return <span>{formattedDuration}</span>
+            },
         },
         {
             category: 'cost',
@@ -349,7 +418,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                             <SUITable.Cell>
                                                 <b>{title}</b>
                                             </SUITable.Cell>
-                                            <SUITable.Cell colSpan="3">{v}</SUITable.Cell>
+                                            <SUITable.Cell colSpan="5">{v}</SUITable.Cell>
                                         </SUITable.Row>
                                     )
                                 })}
@@ -361,7 +430,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                 key={`${log.key}-lbl`}
                             >
                                 <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell colSpan="4">
+                                <SUITable.Cell colSpan="6">
                                     <b>COST BREAKDOWN</b>
                                 </SUITable.Cell>
                             </SUITable.Row>
@@ -378,7 +447,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                         key={`${log.key}-${dk.batch_resource}`}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell colSpan="3">
+                                        <SUITable.Cell colSpan="5">
                                             {dk.batch_resource}
                                         </SUITable.Cell>
                                         <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>
