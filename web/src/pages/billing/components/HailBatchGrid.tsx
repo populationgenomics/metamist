@@ -418,7 +418,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                             <SUITable.Cell>
                                                 <b>{title}</b>
                                             </SUITable.Cell>
-                                            <SUITable.Cell colSpan="5">{v}</SUITable.Cell>
+                                            <SUITable.Cell colSpan="6">{v}</SUITable.Cell>
                                         </SUITable.Row>
                                     )
                                 })}
@@ -430,7 +430,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                 key={`${log.key}-lbl`}
                             >
                                 <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell colSpan="6">
+                                <SUITable.Cell colSpan="7">
                                     <b>COST BREAKDOWN</b>
                                 </SUITable.Cell>
                             </SUITable.Row>
@@ -447,7 +447,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                         key={`${log.key}-${dk.batch_resource}`}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell colSpan="5">
+                                        <SUITable.Cell colSpan="6">
                                             {dk.batch_resource}
                                         </SUITable.Cell>
                                         <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>

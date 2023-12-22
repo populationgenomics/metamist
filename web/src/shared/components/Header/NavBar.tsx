@@ -43,11 +43,6 @@ const billingPages = {
             icon: <TableRowsIcon />,
         },
         {
-            title: 'Cost By Batch',
-            url: '/billing/costByBatch',
-            icon: <TableRowsIcon />,
-        },
-        {
             title: 'Cost By Analysis',
             url: '/billing/costByAnalysis',
             icon: <TableRowsIcon />,
