@@ -102,7 +102,7 @@ class AssayTable(DbBase):
             drow = dict(row)
             project_ids.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
-            assay.external_ids = seq_eids.get(assay.id, {})
+            assay.external_ids = seq_eids.get(assay.id, {}) if assay.id else {}
             assays.append(assay)
 
         return project_ids, assays
@@ -137,7 +137,7 @@ class AssayTable(DbBase):
         return pjcts.pop(), assays.pop()
 
     async def get_assay_by_external_id(
-        self, external_sequence_id: str, project: int = None
+        self, external_sequence_id: str, project: ProjectId | None = None
     ) -> AssayInternal:
         """Get assay by EXTERNAL ID"""
         if not (project or self.project):
@@ -311,6 +311,8 @@ class AssayTable(DbBase):
                 )
             return assay_ids
 
+    # endregion INSERTS
+
     async def update_assay(
         self,
         assay_id: int,
@@ -326,7 +328,11 @@ class AssayTable(DbBase):
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            fields = {'assay_id': assay_id, 'audit_log_id': await self.audit_log_id()}
+            audit_log_id = await self.audit_log_id()
+            fields: dict[str, Any] = {
+                'assay_id': assay_id,
+                'audit_log_id': audit_log_id,
+            }
 
             updaters = ['audit_log_id = :audit_log_id']
             if meta is not None:
@@ -371,7 +377,11 @@ class AssayTable(DbBase):
                     _delete_query = 'DELETE FROM assay_external_id WHERE assay_id = :assay_id AND name in :names'
                     await self.connection.execute(
                         _assay_eid_update_before_delete,
-                        {'assay_id': assay_id, 'names': list(to_delete)}
+                        {
+                            'assay_id': assay_id,
+                            'names': list(to_delete),
+                            'audit_log_id': audit_log_id,
+                        },
                     )
                     await self.connection.execute(
                         _delete_query,
@@ -405,13 +415,13 @@ class AssayTable(DbBase):
 
     async def get_assays_by(
         self,
-        assay_ids: list[int] = None,
-        sample_ids: list[int] = None,
-        assay_types: list[str] = None,
-        assay_meta: dict[str, Any] = None,
-        sample_meta: dict[str, Any] = None,
-        external_assay_ids: list[str] = None,
-        project_ids: list[int] = None,
+        assay_ids: list[int] | None = None,
+        sample_ids: list[int] | None = None,
+        assay_types: list[str] | None = None,
+        assay_meta: dict[str, Any] | None = None,
+        sample_meta: dict[str, Any] | None = None,
+        external_assay_ids: list[str] | None = None,
+        project_ids: list[int] | None = None,
         active: bool = True,
     ) -> tuple[list[ProjectId], list[AssayInternal]]:
         """Get sequences by some criteria"""
