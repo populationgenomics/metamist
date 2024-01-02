@@ -7,6 +7,11 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
 
+enum SearchType {
+    Ar_guid,
+    Batch_id,
+}
+
 const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
@@ -27,10 +32,6 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         searchParams.get('searchTxt') ?? undefined
     )
 
-    enum SearchType {
-        Ar_guid,
-        Batch_id,
-    }
     const searchOptions: string[] = Object.keys(SearchType).filter((item) => isNaN(Number(item)))
     const dropdownOptions = searchOptions.map((item) => ({
         text: item.replaceAll('_', ' '),
@@ -130,22 +131,20 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                         onChange={handleSearchChange}
                         value={searchTxt}
                         action={{ icon: 'search' }}
-                    >
-                        <input />
-                        <Select
-                            compact
-                            options={dropdownOptions}
-                            onChange={handleSearchTypeChange}
-                            defaultValue={
-                                searchByType !== undefined
-                                    ? dropdownOptions[searchByType].value
-                                    : dropdownOptions[0].value
-                            }
-                        />
-                        <Button type="submit" onClick={handleSearchKeyPress}>
-                            <SearchIcon />
-                        </Button>
-                    </Input>
+                    />
+                    <Select
+                        compact
+                        options={dropdownOptions}
+                        onChange={handleSearchTypeChange}
+                        defaultValue={
+                            searchByType !== undefined
+                                ? dropdownOptions[searchByType].value
+                                : dropdownOptions[0].value
+                        }
+                    />
+                    <Button type="submit" onClick={handleSearchKeyPress}>
+                        <SearchIcon />
+                    </Button>
                 </Grid.Column>
             </Grid>
 

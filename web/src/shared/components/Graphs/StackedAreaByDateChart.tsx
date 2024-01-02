@@ -76,7 +76,7 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     colors,
 }) => {
     if (!data || data.length === 0) {
-        return <React.Fragment>No Data</React.Fragment>
+        return <>No Data</>
     }
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow

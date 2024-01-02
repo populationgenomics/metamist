@@ -1,10 +1,8 @@
 from db.python.layers.billing_db import BillingDb
 from db.python.layers.bq_base import BqBaseLayer
-from db.python.tables.billing import BillingFilter
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingRowRecord,
     BillingTotalCostQueryModel,
 )
 from models.models.billing import (
@@ -136,17 +134,6 @@ class BillingLayer(BqBaseLayer):
         """
         billing_db = BillingDb(self.connection)
         return await billing_db.get_extended_values('namespace')
-
-    async def query(
-        self,
-        _filter: BillingFilter,
-        limit: int = 10,
-    ) -> list[BillingRowRecord] | None:
-        """
-        Get Billing record for the given gilter
-        """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.query(_filter, limit)
 
     async def get_total_cost(
         self,

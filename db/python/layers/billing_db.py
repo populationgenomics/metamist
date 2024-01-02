@@ -1,6 +1,6 @@
 # pylint: disable=too-many-lines
 import re
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -17,17 +17,20 @@ from api.settings import (
 )
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
-from db.python.tables.billing import BillingFilter
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingRowRecord,
     BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
 from models.models.billing import BillingSource
 
+# Label added to each Billing Big Query request,
+# so we can track the cost of metamist-api BQ usage
 BQ_LABELS = {'source': 'metamist-api'}
+
+# Day Time details used in grouping and parsing formulas
+TimeGroupingDetails = namedtuple('TimeGroupingDetails', ['field', 'formula'])
 
 
 def abbrev_cost_category(cost_category: str) -> str:
@@ -37,28 +40,33 @@ def abbrev_cost_category(cost_category: str) -> str:
 
 def prepare_time_periods(
     query: BillingTotalCostQueryModel,
-) -> tuple[str, str, str]:
+) -> TimeGroupingDetails:
     """Prepare Time periods grouping and parsing formulas"""
     time_column = query.time_column or 'day'
-    day_parse_formula = ''
-    day_field = ''
-    day_grp = 'day, '
+    result = TimeGroupingDetails('', '')
 
     # Based on specified time period, add the corresponding column
     if query.time_periods == BillingTimePeriods.DAY:
-        day_field = f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day, '
-        day_parse_formula = f'PARSE_DATE("%Y-%m-%d", day) as day, '
+        result = TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day, ',
+            formula='PARSE_DATE("%Y-%m-%d", day) as day, ',
+        )
     elif query.time_periods == BillingTimePeriods.WEEK:
-        day_field = f'FORMAT_DATE("%Y%W", {time_column}) as day, '
-        day_parse_formula = f'PARSE_DATE("%Y%W", day) as day, '
+        result = TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y%W", {time_column}) as day, ',
+            formula='PARSE_DATE("%Y%W", day) as day, ',
+        )
     elif query.time_periods == BillingTimePeriods.MONTH:
-        day_field = f'FORMAT_DATE("%Y%m", {time_column}) as day, '
-        day_parse_formula = f'PARSE_DATE("%Y%m", day) as day, '
+        result = TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y%m", {time_column}) as day, ',
+            formula='PARSE_DATE("%Y%m", day) as day, ',
+        )
     elif query.time_periods == BillingTimePeriods.INVOICE_MONTH:
-        day_field = 'invoice_month as day, '
-        day_parse_formula = f'PARSE_DATE("%Y%m", day) as day, '
+        result = TimeGroupingDetails(
+            field='invoice_month as day, ', formula='PARSE_DATE("%Y%m", day) as day, '
+        )
 
-    return day_field, day_grp, day_parse_formula
+    return result
 
 
 class BillingDb(BqDbBase):
@@ -113,8 +121,6 @@ class BillingDb(BqDbBase):
         WHERE day > TIMESTAMP_ADD(
             CURRENT_TIMESTAMP(), INTERVAL @days DAY
         )
-        -- TODO put this back when reloading is fixed
-        AND NOT topic IN ('seqr', 'hail')
         ORDER BY topic ASC;
         """
 
@@ -281,77 +287,6 @@ class BillingDb(BqDbBase):
         # return empty list if no record found
         return []
 
-    async def query(
-        self,
-        filter_: BillingFilter,
-        limit: int = 10,
-    ) -> list[BillingRowRecord] | None:
-        """Get Billing record from BQ"""
-
-        # TODO: This function is not going to be used most likely
-        # get_total_cost will replace it
-
-        # cost of this BQ is 30MB on DEV,
-        # DEV is partition by day and date is required filter params,
-        # cost is aprox per query: AU$ 0.000023 per query
-
-        required_fields = [
-            filter_.date,
-        ]
-
-        if not any(required_fields):
-            raise ValueError('Must provide date to filter on')
-
-        # construct filters
-        filters = []
-        query_parameters = []
-
-        if filter_.topic:
-            filters.append('topic IN UNNEST(@topic)')
-            query_parameters.append(
-                bigquery.ArrayQueryParameter('topic', 'STRING', filter_.topic.in_),
-            )
-
-        if filter_.date:
-            filters.append('DATE_TRUNC(usage_end_time, DAY) = TIMESTAMP(@date)')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('date', 'STRING', filter_.date.eq),
-            )
-
-        if filter_.cost_category:
-            filters.append('service.description IN UNNEST(@cost_category)')
-            query_parameters.append(
-                bigquery.ArrayQueryParameter(
-                    'cost_category', 'STRING', filter_.cost_category.in_
-                ),
-            )
-
-        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
-
-        _query = f"""
-        SELECT id, topic, service, sku, usage_start_time, usage_end_time, project,
-        labels, export_time, cost, currency, currency_conversion_rate, invoice, cost_type
-        FROM `{BQ_AGGREG_RAW}`
-        {filter_str}
-        """
-        if limit:
-            _query += ' LIMIT @limit_val'
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
-            )
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=query_parameters, labels=BQ_LABELS
-        )
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-
-        if query_job_result:
-            return [BillingRowRecord.from_json(dict(row)) for row in query_job_result]
-
-        raise ValueError('No record found')
-
     def _prepare_filter_str(self, query: BillingTotalCostQueryModel, view_to_use: str):
         """Prepare filter string"""
         and_filters = []
@@ -446,13 +381,13 @@ class BillingDb(BqDbBase):
 
         results = []
 
-        def fix_labels(row):
+        def transform_labels(row):
             return {r['key']: r['value'] for r in row}
 
         for record in records:
             drec = dict(record)
             if 'labels' in drec:
-                drec.update(fix_labels(drec['labels']))
+                drec.update(transform_labels(drec['labels']))
 
             results.append(drec)
 
@@ -511,16 +446,13 @@ class BillingDb(BqDbBase):
         )
 
         # prepare grouping by time periods
-        day_parse_formula = ''
-        day_field = ''
-        day_grp = ''
+        time_group = TimeGroupingDetails('', '')
         if query.time_periods or query.time_column:
             # remove existing day column, if added to fields
             # this is to prevent duplicating various time periods in one query
             # if BillingColumn.DAY in query.fields:
             #     columns.remove(BillingColumn.DAY)
-
-            day_field, day_grp, day_parse_formula = prepare_time_periods(query)
+            time_group = prepare_time_periods(query)
 
         filter_str, query_parameters, view_to_use = self._prepare_filter_str(
             query, view_to_use
@@ -536,7 +468,7 @@ class BillingDb(BqDbBase):
 
         order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
-        group_by = f'GROUP BY {day_grp}{grp_selected}' if query.group_by else ''
+        group_by = f'GROUP BY day, {grp_selected}' if query.group_by else ''
         cost = 'SUM(cost) as cost' if query.group_by else 'cost'
 
         _query = f"""
@@ -547,13 +479,13 @@ class BillingDb(BqDbBase):
         );
 
         WITH t AS (
-            SELECT {day_field}{fields_selected}, {cost}
+            SELECT {time_group.field}{fields_selected}, {cost}
             FROM `{view_to_use}`
             {filter_str}
             {group_by}
             {order_by_str}
         )
-        SELECT {day_parse_formula}{fields_selected}, cost FROM t
+        SELECT {time_group.formula}{fields_selected}, cost FROM t
         """
 
         # append LIMIT and OFFSET if present

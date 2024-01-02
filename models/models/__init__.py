@@ -13,7 +13,6 @@ from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingRowRecord,
     BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
