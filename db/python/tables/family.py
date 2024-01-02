@@ -176,9 +176,9 @@ class FamilyTable(DbBase):
     async def update_family(
         self,
         id_: int,
-        external_id: str = None,
-        description: str = None,
-        coded_phenotype: str = None,
+        external_id: str | None = None,
+        description: str | None = None,
+        coded_phenotype: str | None = None,
     ) -> bool:
         """Update values for a family"""
         values: Dict[str, Any] = {'audit_log_id': await self.audit_log_id()}

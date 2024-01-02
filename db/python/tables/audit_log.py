@@ -1,6 +1,7 @@
 from typing import Any
 
 from db.python.tables.base import DbBase
+from db.python.utils import to_db_json
 from models.models.audit_log import AuditLogInternal
 from models.models.project import ProjectId
 
@@ -66,7 +67,7 @@ class AuditLogTable(DbBase):
                 'ar_guid': ar_guid,
                 'comment': comment,
                 'project': project,
-                'meta': meta or {},
+                'meta': to_db_json(meta or {}),
             },
         )
 
