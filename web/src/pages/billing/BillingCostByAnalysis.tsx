@@ -6,6 +6,8 @@ import SearchIcon from '@mui/icons-material/Search'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
+import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
+import generateUrl from '../../shared/utilities/generateUrl'
 
 enum SearchType {
     Ar_guid,
@@ -15,15 +17,12 @@ enum SearchType {
 const BillingCostByAnalysis: React.FunctionComponent = () => {
     const [searchParams] = useSearchParams()
 
-    const now = new Date()
-
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
 
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ??
-            `${now.getFullYear()}-${now.getMonth().toString().padStart(2, '0')}-01`
+        searchParams.get('start') ?? getMonthStartDate()
     )
 
     const [data, setData] = React.useState<any>([])
@@ -39,7 +38,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }))
 
     const [searchByType, setSearchByType] = React.useState<SearchType | undefined>(
-        SearchType[searchParams.get('searchType')] ?? undefined
+        SearchType[searchParams.get('searchType')] ?? SearchType.Ar_guid
     )
 
     // use navigate and update url params
@@ -47,12 +46,10 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     const navigate = useNavigate()
 
     const updateNav = (sType: SearchType | undefined, sTxt: string | undefined) => {
-        let url = `${location.pathname}?`
-        const params: string[] = []
-        if (sType !== undefined) params.push(`searchType=${SearchType[sType]}`)
-        if (sTxt !== undefined) params.push(`searchTxt=${sTxt}`)
-
-        url += params.join('&')
+        const url = generateUrl(location, {
+            searchType: sType,
+            searchTxt: sTxt,
+        })
         navigate(url)
     }
 

@@ -12,11 +12,11 @@ import {
 } from '../../sm-api'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import { getMonthStartDate, getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
+import generateUrl from '../../shared/utilities/generateUrl'
 
 const BillingCostByCategory: React.FunctionComponent = () => {
-    const now = new Date()
-
     const [searchParams] = useSearchParams()
 
     const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
@@ -29,16 +29,9 @@ const BillingCostByCategory: React.FunctionComponent = () => {
     const inputPeriod: string | undefined = searchParams.get('period') ?? BillingTimePeriods.Month
 
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ??
-            `${now.getFullYear() - 1}-${now.getMonth().toString().padStart(2, '0')}-01`
+        searchParams.get('start') ?? getMonthStartDate()
     )
-    const [end, setEnd] = React.useState<string>(
-        searchParams.get('end') ??
-            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
-                .getDate()
-                .toString()
-                .padStart(2, '0')}`
-    )
+    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? getMonthEndDate())
 
     const [selectedGroup, setSelectedGroup] = React.useState<string | undefined>(inputSelectedGroup)
     const [selectedCostCategory, setCostCategory] = React.useState<string | undefined>(
@@ -70,16 +63,14 @@ const BillingCostByCategory: React.FunctionComponent = () => {
         st: string,
         ed: string
     ) => {
-        let url = `${location.pathname}`
-        url += '?'
-        let params: string[] = []
-        if (grpBy) params.push(`groupBy=${grpBy}`)
-        if (grp) params.push(`group=${grp}`)
-        if (category) params.push(`costCategory=${category}`)
-        if (period) params.push(`period=${period}`)
-        if (st) params.push(`start=${st}`)
-        if (ed) params.push(`end=${ed}`)
-        url += params.join('&')
+        const url = generateUrl(location, {
+            groupBy: grpBy,
+            group: grp,
+            costCategory: category,
+            period: period,
+            start: st,
+            end: ed,
+        })
         navigate(url)
     }
 

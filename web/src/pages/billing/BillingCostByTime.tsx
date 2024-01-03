@@ -12,14 +12,14 @@ import {
 } from '../../sm-api'
 
 import { convertFieldName } from '../../shared/utilities/fieldName'
+import { getMonthStartDate, getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
 import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/StackedAreaByDateChart'
 import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
+import generateUrl from '../../shared/utilities/generateUrl'
 
 const BillingCostByTime: React.FunctionComponent = () => {
-    const now = new Date()
-
     const [searchParams] = useSearchParams()
 
     const inputGroupBy: string | undefined = searchParams.get('groupBy') ?? undefined
@@ -29,16 +29,9 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const inputSelectedData: string | undefined = searchParams.get('selectedData') ?? undefined
 
     const [start, setStart] = React.useState<string>(
-        searchParams.get('start') ??
-            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`
+        searchParams.get('start') ?? getMonthStartDate()
     )
-    const [end, setEnd] = React.useState<string>(
-        searchParams.get('end') ??
-            `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now
-                .getDate()
-                .toString()
-                .padStart(2, '0')}`
-    )
+    const [end, setEnd] = React.useState<string>(searchParams.get('end') ?? getMonthEndDate())
     const [groupBy, setGroupBy] = React.useState<BillingColumn>(
         fixedGroupBy ?? BillingColumn.GcpProject
     )
@@ -60,20 +53,16 @@ const BillingCostByTime: React.FunctionComponent = () => {
 
     const updateNav = (
         grp: string | undefined,
-        data: string | undefined,
-        start: string,
-        end: string
+        selData: string | undefined,
+        st: string,
+        ed: string
     ) => {
-        let url = `${location.pathname}`
-        if (grp || data) url += '?'
-
-        let params: string[] = []
-        if (grp) params.push(`groupBy=${grp}`)
-        if (data) params.push(`selectedData=${data}`)
-        if (start) params.push(`start=${start}`)
-        if (end) params.push(`end=${end}`)
-
-        url += params.join('&')
+        const url = generateUrl(location, {
+            groupBy: grp,
+            selectedData: selData,
+            start: st,
+            end: ed,
+        })
         navigate(url)
     }
 

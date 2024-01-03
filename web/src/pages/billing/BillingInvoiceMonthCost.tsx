@@ -8,6 +8,7 @@ import { BillingApi, BillingColumn, BillingCostBudgetRecord } from '../../sm-api
 import FieldSelector from './components/FieldSelector'
 import { convertFieldName } from '../../shared/utilities/fieldName'
 import { HorizontalStackedBarChart } from '../../shared/components/Graphs/HorizontalStackedBarChart'
+import generateUrl from '../../shared/utilities/generateUrl'
 
 const BillingCurrentCost = () => {
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
@@ -35,10 +36,10 @@ const BillingCurrentCost = () => {
     const navigate = useNavigate()
 
     const updateNav = (grp: BillingColumn, invoiceMonth: string | undefined) => {
-        let url = `${location.pathname}?groupBy=${grp}`
-        if (invoiceMonth) {
-            url += `&invoiceMonth=${invoiceMonth}`
-        }
+        const url = generateUrl(location, {
+            groupBy: grp,
+            invoiceMonth: invoiceMonth,
+        })
         navigate(url)
     }
 
