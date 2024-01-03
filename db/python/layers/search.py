@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Optional
 
-from db.python.connect import NotFoundError
+from db.python.utils import NotFoundError
 from db.python.layers.base import BaseLayer, Connection
 from db.python.tables.family import FamilyTable
 from db.python.tables.participant import ParticipantTable
@@ -28,7 +28,7 @@ class SearchLayer(BaseLayer):
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
-        self.pt = ProjectPermissionsTable(connection.connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.connection = connection
 
     @staticmethod

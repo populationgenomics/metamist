@@ -9,6 +9,7 @@ import unittest
 from functools import wraps
 from typing import Dict
 
+import databases.core
 import nest_asyncio
 from pymysql import IntegrityError
 from testcontainers.mysql import MySqlContainer
@@ -23,6 +24,7 @@ from db.python.connect import (
     SMConnections,
 )
 from db.python.tables.project import ProjectPermissionsTable
+from models.models.project import ProjectId
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
@@ -74,8 +76,10 @@ class DbTest(unittest.TestCase):
     # store connections here, so they can be created PER-CLASS
     # and don't get recreated per test.
     dbs: Dict[str, MySqlContainer] = {}
-    connections: Dict[str, Connection] = {}
+    connections: Dict[str, databases.Database] = {}
     author: str
+    project_id: ProjectId
+    project_name: str
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -127,23 +131,28 @@ class DbTest(unittest.TestCase):
                 )
                 await sm_db.connect()
                 cls.author = 'testuser'
-                connection = Connection(
-                    connection=sm_db,
-                    project=1,
-                    author=cls.author,
-                )
-                cls.connections[cls.__name__] = connection
 
+                cls.connections[cls.__name__] = sm_db
+                formed_connection = Connection(
+                    connection=sm_db,
+                    author=cls.author,
+                    readonly=False,
+                    on_behalf_of=None,
+                    ar_guid=None,
+                    project=None,
+                )
                 ppt = ProjectPermissionsTable(
-                    connection.connection, allow_full_access=True
+                    connection=formed_connection,
+                    allow_full_access=True,
                 )
                 cls.project_name = 'test'
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
                     dataset_name=cls.project_name,
-                    author='testuser',
+                    author=cls.author,
                     check_permissions=False,
                 )
+                formed_connection.project = cls.project_id
 
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
@@ -170,9 +179,17 @@ class DbTest(unittest.TestCase):
             db.stop()
 
     def setUp(self) -> None:
-        self.project_id = 1
-        self.project_name = 'test'
-        self.connection = self.connections[self.__class__.__name__]
+        self._connection = self.connections[self.__class__.__name__]
+        # create a connection on each test so we can generate a new
+        # audit_log ID for each test
+        self.connection = Connection(
+            connection=self._connection,
+            project=self.project_id,
+            author=self.author,
+            readonly=False,
+            ar_guid=None,
+            on_behalf_of=None,
+        )
 
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
@@ -202,6 +219,10 @@ class DbTest(unittest.TestCase):
         if value.errors:
             raise value.errors[0]
         return value.data
+
+    async def audit_log_id(self):
+        """Get audit_log_id for the test"""
+        return await self.connection.audit_log_id()
 
 
 class DbIsolatedTest(DbTest):

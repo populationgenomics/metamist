@@ -4,19 +4,21 @@
 Code for connecting to Postgres database
 """
 import abc
+import asyncio
 import json
 import logging
 import os
-from typing import Optional
+from threading import Lock
 
 import databases
 
 from api.settings import LOG_DATABASE_QUERIES
-from db.python.tables.project import ProjectPermissionsTable
-from db.python.utils import InternalError, NoOpAenter, NotFoundError
+from db.python.utils import InternalError
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+audit_log_lock = Lock()
 
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
@@ -28,9 +30,9 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'assay',
     'sequencing_group_assay',
     'analysis_sequencing_group',
+    'analysis_sample',
     'assay_external_id',
     'sequencing_group_external_id',
-    'analysis_sequencing_group',
     'family',
     'family_participant',
     'participant_phenotypes',
@@ -44,12 +46,44 @@ class Connection:
     def __init__(
         self,
         connection: databases.Database,
-        project: Optional[int],
+        project: int | None,
         author: str,
+        on_behalf_of: str | None,
+        readonly: bool,
+        ar_guid: str | None,
     ):
         self.connection: databases.Database = connection
-        self.project: Optional[int] = project
+        self.project: int | None = project
         self.author: str = author
+        self.on_behalf_of: str | None = on_behalf_of
+        self.readonly: bool = readonly
+        self.ar_guid: str | None = ar_guid
+
+        self._audit_log_id: int | None = None
+
+    async def audit_log_id(self):
+        """Get audit_log ID for write operations, cached per connection"""
+        if self.readonly:
+            raise InternalError(
+                'Trying to get a audit_log ID, but not a write connection'
+            )
+
+        with audit_log_lock:
+            if not self._audit_log_id:
+                # pylint: disable=import-outside-toplevel
+                # make this import here, otherwise we'd have a circular import
+                from db.python.tables.audit_log import AuditLogTable
+
+                at = AuditLogTable(self)
+                self._audit_log_id = await at.create_audit_log(
+                    author=self.author,
+                    on_behalf_of=self.on_behalf_of,
+                    ar_guid=self.ar_guid,
+                    comment=None,
+                    project=self.project,
+                )
+
+        return self._audit_log_id
 
     def assert_requires_project(self):
         """Assert the project is set, or return an exception"""
@@ -132,11 +166,7 @@ class CredentialedDatabaseConfiguration(DatabaseConfiguration):
 class SMConnections:
     """Contains useful functions for connecting to the database"""
 
-    # _connected = False
-    # _connections: Dict[str, databases.Database] = {}
-    # _admin_db: databases.Database = None
-
-    _credentials: Optional[DatabaseConfiguration] = None
+    _credentials: DatabaseConfiguration | None = None
 
     @staticmethod
     def _get_config():
@@ -175,7 +205,10 @@ class SMConnections:
         return False
 
     @staticmethod
-    async def _get_made_connection():
+    async def get_made_connection():
+        """
+        Makes a new connection to the database on each call
+        """
         credentials = SMConnections._get_config()
 
         if credentials is None:
@@ -190,70 +223,21 @@ class SMConnections:
         return conn
 
     @staticmethod
-    async def get_connection(*, author: str, project_name: str, readonly: bool):
-        """Get a db connection from a project and user"""
-        # maybe it makes sense to perform permission checks here too
-        logger.debug(f'Authenticate connection to {project_name} with {author!r}')
-
-        conn = await SMConnections._get_made_connection()
-        pt = ProjectPermissionsTable(connection=conn)
-
-        project = await pt.get_and_check_access_to_project_for_name(
-            user=author, project_name=project_name, readonly=readonly
-        )
-
-        return Connection(connection=conn, author=author, project=project.id)
-
-    @staticmethod
-    async def get_connection_no_project(author: str):
+    async def get_connection_no_project(author: str, ar_guid: str):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
 
-        conn = await SMConnections._get_made_connection()
+        conn = await SMConnections.get_made_connection()
 
         # we don't authenticate project-less connection, but rely on the
         # the endpoint to validate the resources
 
-        return Connection(connection=conn, author=author, project=None)
-
-
-class DbBase:
-    """Base class for table subclasses"""
-
-    @classmethod
-    async def from_project(cls, project, author, readonly: bool):
-        """Create the Db object from a project with user details"""
-        return cls(
-            connection=await SMConnections.get_connection(
-                project_name=project, author=author, readonly=readonly
-            ),
+        return Connection(
+            connection=conn,
+            author=author,
+            project=None,
+            on_behalf_of=None,
+            ar_guid=ar_guid,
+            readonly=False,
         )
-
-    def __init__(self, connection: Connection):
-        if connection is None:
-            raise InternalError(
-                f'No connection was provided to the table {self.__class__.__name__!r}'
-            )
-        if not isinstance(connection, Connection):
-            raise InternalError(
-                f'Expected connection type Connection, received {type(connection)}, '
-                f'did you mean to call self._connection?'
-            )
-
-        self._connection = connection
-        self.connection: databases.Database = connection.connection
-        self.author = connection.author
-        self.project = connection.project
-
-        if self.author is None:
-            raise InternalError(f'Must provide author to {self.__class__.__name__}')
-
-    # piped from the connection
-
-    @staticmethod
-    def escape_like_term(query: str):
-        """
-        Escape meaningful keys when using LIKE with a user supplied input
-        """
-        return query.replace('%', '\\%').replace('_', '\\_')

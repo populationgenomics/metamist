@@ -152,7 +152,7 @@ class TestAnalysis(DbIsolatedTest):
                 project=1,
                 meta={},
                 active=True,
-                author='testuser',
+                author=None,
             )
         ]
 

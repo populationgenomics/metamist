@@ -1,7 +1,7 @@
-from db.python.utils import ProjectId
 from models.base import SMBase
 from models.enums.search import SearchResponseType
 from models.enums.web import MetaSearchEntityPrefix
+from models.models.project import ProjectId
 
 
 class SearchResponseData(SMBase):

@@ -21,7 +21,7 @@ class TestGroupAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection, False)
 
     async def _add_group_member_direct(self, group_name):
         """
@@ -33,13 +33,13 @@ class TestGroupAccess(DbIsolatedTest):
         )
         await self.connection.connection.execute(
             """
-            INSERT INTO group_member (group_id, member, author)
-            VALUES (:group_id, :member, :author);
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id);
             """,
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'author': self.author,
+                'audit_log_id': await self.audit_log_id(),
             },
         )
 
@@ -73,7 +73,7 @@ class TestGroupAccess(DbIsolatedTest):
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
         g = str(uuid.uuid4())
-        await self.pttable.gtable.create_group(g)
+        await self.pttable.gtable.create_group(g, await self.audit_log_id())
 
         self.assertFalse(
             await self.pttable.gtable.check_if_member_in_group_name(g, 'user1')
@@ -99,7 +99,7 @@ class TestGroupAccess(DbIsolatedTest):
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
         group = str(uuid.uuid4())
-        gid = await self.pttable.gtable.create_group(group)
+        gid = await self.pttable.gtable.create_group(group, await self.audit_log_id())
         present_gids = await self.pttable.gtable.check_which_groups_member_has(
             {gid}, self.author
         )
@@ -113,10 +113,12 @@ class TestGroupAccess(DbIsolatedTest):
         await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
 
         group = str(uuid.uuid4())
-        gid = await self.pttable.gtable.create_group(group)
-        await self.pttable.gtable.set_group_members(gid, [self.author], self.author)
+        gid = await self.pttable.gtable.create_group(group, await self.audit_log_id())
+        await self.pttable.gtable.set_group_members(
+            gid, [self.author], audit_log_id=await self.audit_log_id()
+        )
         present_gids = await self.pttable.gtable.check_which_groups_member_has(
-            {gid}, self.author
+            group_ids={gid}, member=self.author
         )
         missing_gids = {gid} - present_gids
 
@@ -160,7 +162,7 @@ class TestProjectAccess(DbIsolatedTest):
         super().setUp()
 
         # specifically required to test permissions
-        self.pttable = ProjectPermissionsTable(self.connection.connection, False)
+        self.pttable = ProjectPermissionsTable(self.connection, False)
 
     async def _add_group_member_direct(self, group_name):
         """
@@ -172,13 +174,13 @@ class TestProjectAccess(DbIsolatedTest):
         )
         await self.connection.connection.execute(
             """
-            INSERT INTO group_member (group_id, member, author)
-            VALUES (:group_id, :member, :author);
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id);
             """,
             {
                 'group_id': members_admin_group,
                 'member': self.author,
-                'author': self.author,
+                'audit_log_id': await self.audit_log_id(),
             },
         )
 

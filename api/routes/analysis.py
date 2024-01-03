@@ -104,10 +104,12 @@ async def create_analysis(
 
     atable = AnalysisLayer(connection)
 
+    if analysis.author:
+        # special tracking here, if we can't catch it through the header
+        connection.on_behalf_of = analysis.author
+
     analysis_id = await atable.create_analysis(
         analysis.to_internal(),
-        # analysis-runner: usage is tracked through `on_behalf_of`
-        author=analysis.author,
     )
 
     return analysis_id
@@ -226,7 +228,7 @@ async def query_analyses(
     if not query.projects:
         raise ValueError('Must specify "projects"')
 
-    pt = ProjectPermissionsTable(connection=connection.connection)
+    pt = ProjectPermissionsTable(connection)
     projects = await pt.get_and_check_access_to_projects_for_names(
         user=connection.author, project_names=query.projects, readonly=True
     )
@@ -249,7 +251,7 @@ async def get_analysis_runner_log(
     atable = AnalysisLayer(connection)
     project_ids = None
     if project_names:
-        pt = ProjectPermissionsTable(connection=connection.connection)
+        pt = ProjectPermissionsTable(connection)
         project_ids = await pt.get_project_ids_from_names_and_user(
             connection.author, project_names, readonly=True
         )
@@ -335,7 +337,7 @@ async def get_proportionate_map(
         }
     }
     """
-    pt = ProjectPermissionsTable(connection=connection.connection)
+    pt = ProjectPermissionsTable(connection)
     project_ids = await pt.get_project_ids_from_names_and_user(
         connection.author, projects, readonly=True
     )
