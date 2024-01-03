@@ -93,10 +93,10 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
         const indexedData = stackedData.map((innerArray, outerIdx) =>
             innerArray.map((d, innerIdx) => ({ outerIdx, innerIdx, data: d }))
         )
-        const budgetData = data.reduce((acc, d) => {
-            acc[d.field] = d.budget
-            return acc
-        }, {})
+        const budgetData = {}
+        data.forEach((d) => {
+            budgetData[d.field] = d.budget
+        })
 
         const maxBudget = Math.max(...data.map((item) => item.budget))
 

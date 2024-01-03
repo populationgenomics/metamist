@@ -96,44 +96,32 @@ const BillingCostByTime: React.FunctionComponent = () => {
                 setIsLoading(false)
 
                 // calc totals per cost_category
-                const recTotals = response.data.reduce(
-                    (
-                        acc: { [key: string]: { [key: string]: number } },
-                        item: BillingTotalCostRecord
-                    ) => {
-                        const { cost_category, cost } = item
-                        if (!acc[cost_category]) {
-                            acc[cost_category] = 0
-                        }
-                        acc[cost_category] += cost
-                        return acc
-                    },
-                    {}
-                )
+                const recTotals: { [key: string]: number } = {}
+                response.data.forEach((item: BillingTotalCostRecord) => {
+                    const { cost_category, cost } = item
+                    if (!recTotals[cost_category]) {
+                        recTotals[cost_category] = 0
+                    }
+                    recTotals[cost_category] += cost
+                })
                 const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
                     Object.entries(recTotals).sort(([, a], [, b]) => b - a)
                 )
                 const rec_grps = Object.keys(sortedRecTotals)
-                const records = response.data.reduce(
-                    (
-                        acc: { [key: string]: { [key: string]: number } },
-                        item: BillingTotalCostRecord
-                    ) => {
-                        const { day, cost_category, cost } = item
-                        if (day !== undefined) {
-                            if (!acc[day]) {
-                                // initialise day structure
-                                acc[day] = {}
-                                rec_grps.forEach((k) => {
-                                    acc[day][k] = 0
-                                })
-                            }
-                            acc[day][cost_category] = cost
+                const records: { [key: string]: { [key: string]: number } } = {}
+                response.data.forEach((item: BillingTotalCostRecord) => {
+                    const { day, cost_category, cost } = item
+                    if (day !== undefined) {
+                        if (!records[day]) {
+                            // initial day structure
+                            records[day] = {}
+                            rec_grps.forEach((k) => {
+                                records[day][k] = 0
+                            })
                         }
-                        return acc
-                    },
-                    {}
-                )
+                        records[day][cost_category] = cost
+                    }
+                })
                 const no_undefined: string[] = rec_grps.filter(
                     (item): item is string => item !== undefined
                 )
@@ -154,7 +142,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
                                 .slice(index)
                                 .reduce((sum, { value }) => sum + value, 0)
 
-                            if (acc.length == maxDataPoints) {
+                            if (acc.length === maxDataPoints) {
                                 acc.push({ label: 'Rest*', value: restValue })
                             } else {
                                 acc[maxDataPoints].value += restValue

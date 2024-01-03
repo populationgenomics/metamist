@@ -121,44 +121,33 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 setIsLoading(false)
 
                 // calc totals per sku
-                const recTotals = response.data.reduce(
-                    (
-                        acc: { [key: string]: { [key: string]: number } },
-                        item: BillingTotalCostRecord
-                    ) => {
-                        const { sku, cost } = item
-                        if (!acc[sku]) {
-                            acc[sku] = 0
-                        }
-                        acc[sku] += cost
-                        return acc
-                    },
-                    {}
-                )
+                const recTotals: { [key: string]: number } = {}
+                response.data.forEach((item: BillingTotalCostRecord) => {
+                    const { sku, cost } = item
+                    if (!recTotals[sku]) {
+                        recTotals[sku] = 0
+                    }
+                    recTotals[sku] += cost
+                })
                 const sortedRecTotals: { [key: string]: number } = Object.fromEntries(
                     Object.entries(recTotals).sort(([, a], [, b]) => b - a)
                 )
                 const rec_grps = Object.keys(sortedRecTotals)
-                const records = response.data.reduce(
-                    (
-                        acc: { [key: string]: { [key: string]: number } },
-                        item: BillingTotalCostRecord
-                    ) => {
-                        const { day, sku, cost } = item
-                        if (day !== undefined) {
-                            if (!acc[day]) {
-                                // initialise day structure
-                                acc[day] = {}
-                                rec_grps.forEach((k) => {
-                                    acc[day][k] = 0
-                                })
-                            }
-                            acc[day][sku] = cost
+                const records: { [key: string]: { [key: string]: number } } = {}
+
+                response.data.forEach((item: any) => {
+                    const { day, sku, cost } = item
+                    if (day !== undefined) {
+                        if (!records[day]) {
+                            // initialise day structure
+                            records[day] = {}
+                            rec_grps.forEach((k: string) => {
+                                records[day][k] = 0
+                            })
                         }
-                        return acc
-                    },
-                    {}
-                )
+                        records[day][sku] = cost
+                    }
+                })
                 setData(
                     Object.keys(records).map((key) => ({
                         date: new Date(key),
