@@ -353,7 +353,7 @@ const BillingCurrentCost = () => {
                                         switch (k.category) {
                                             case 'field':
                                                 return (
-                                                    <SUITable.Cell>
+                                                    <SUITable.Cell className="billing-href">
                                                         <b>
                                                             <Link to={linkTo(p[k.category])}>
                                                                 {p[k.category]}

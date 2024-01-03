@@ -30,6 +30,8 @@
     --color-bg-over-budget: rgba(128, 0, 0, 0.2);
     --color-bg-half-budget: rgba(255, 165, 0, 0.2);
     --color-bg-under-budget: rgba(0, 128, 0, 0.2);
+
+    --color-text-href: rgb(65, 131, 196);
 }
 
 html[data-theme='dark-mode'] {
@@ -50,9 +52,11 @@ html[data-theme='dark-mode'] {
     --color-check-green: #659251;
     --color-table-header: rgba(0, 0, 0, 0.15);
 
-    --color-bg-over-budget: rgba(128, 0, 0, 0.2);
-    --color-bg-half-budget: rgba(255, 165, 0, 0.2);
-    --color-bg-under-budget: rgba(0, 128, 0, 0.2);
+    --color-bg-over-budget: rgba(128, 0, 0, 0.5);
+    --color-bg-half-budget: rgba(255, 165, 0, 0.5);
+    --color-bg-under-budget: rgba(0, 128, 0, 0.5);
+
+    --color-text-href: rgb(188, 188, 251);
 }
 
 /* poor man's dark mode: https://github.com/swagger-api/swagger-ui/issues/5327#issuecomment-742375520 */
@@ -279,4 +283,8 @@ html[data-theme='dark-mode'] .ui.table {
 
 .billing-under-budget {
     background-color: var(--color-bg-under-budget) !important;
+}
+
+.billing-href a {
+    color: var(--color-text-href) !important;
 }
