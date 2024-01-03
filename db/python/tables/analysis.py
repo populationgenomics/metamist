@@ -4,16 +4,17 @@ import datetime
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
 from db.python.utils import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
+    NotFoundError,
     to_db_json,
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
+from models.models.project import ProjectId
 
 
 @dataclasses.dataclass
@@ -60,7 +61,6 @@ class AnalysisTable(DbBase):
         meta: Optional[Dict[str, Any]] = None,
         output: str = None,
         active: bool = True,
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -73,13 +73,10 @@ class AnalysisTable(DbBase):
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
                 ('output', output),
-                ('author', author or self.author),
+                ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
             ]
-
-            if author is not None:
-                kv_pairs.append(('on_behalf_of', self.author))
 
             if status == AnalysisStatus.COMPLETED:
                 kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
@@ -110,11 +107,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         """Add samples to an analysis (through the linked table)"""
         _query = """
             INSERT INTO analysis_sequencing_group
-                (analysis_id, sequencing_group_id)
-            VALUES (:aid, :sid)
+                (analysis_id, sequencing_group_id, audit_log_id)
+            VALUES (:aid, :sid, :audit_log_id)
         """
 
-        values = map(lambda sid: {'aid': analysis_id, 'sid': sid}, sequencing_group_ids)
+        audit_log_id = await self.audit_log_id()
+        values = map(
+            lambda sid: {
+                'aid': analysis_id,
+                'sid': sid,
+                'audit_log_id': audit_log_id,
+            },
+            sequencing_group_ids,
+        )
         await self.connection.execute_many(_query, list(values))
 
     async def find_sgs_in_joint_call_or_es_index_up_to_date(
@@ -140,18 +145,17 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         meta: Dict[str, Any] = None,
         active: bool = None,
         output: Optional[str] = None,
-        author: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
         """
 
         fields: Dict[str, Any] = {
-            'author': self.author or author,
-            'on_behalf_of': self.author,
             'analysis_id': analysis_id,
+            'on_behalf_of': self.author,
+            'audit_log_id': await self.audit_log_id(),
         }
-        setters = ['author = :author', 'on_behalf_of = :on_behalf_of']
+        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
         if status:
             setters.append('status = :status')
             fields['status'] = status.value
@@ -497,8 +501,8 @@ ORDER BY a.timestamp_completed DESC;
             values['project_ids'] = project_ids
 
         if author:
-            wheres.append('author = :author')
-            values['author'] = author
+            wheres.append('audit_log_id = :audit_log_id')
+            values['audit_log_id'] = await self.audit_log_id()
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')

@@ -1,9 +1,10 @@
 from collections import defaultdict
-from typing import List, Optional, Set, Any, Dict
+from typing import Any, Dict, List, Optional, Set
 
-from db.python.connect import DbBase, NotFoundError
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
+from db.python.utils import NotFoundError
 from models.models.family import FamilyInternal
+from models.models.project import ProjectId
 
 
 class FamilyTable(DbBase):
@@ -47,7 +48,7 @@ class FamilyTable(DbBase):
                 JOIN family_participant
                 ON family.id = family_participant.family_id
             """
-            where.append(f'participant_id IN :pids')
+            where.append('participant_id IN :pids')
             values['pids'] = participant_ids
 
         if project or self.project:
@@ -175,13 +176,12 @@ class FamilyTable(DbBase):
     async def update_family(
         self,
         id_: int,
-        external_id: str = None,
-        description: str = None,
-        coded_phenotype: str = None,
-        author: str = None,
+        external_id: str | None = None,
+        description: str | None = None,
+        coded_phenotype: str | None = None,
     ) -> bool:
         """Update values for a family"""
-        values: Dict[str, Any] = {'author': author or self.author}
+        values: Dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
         if external_id:
             values['external_id'] = external_id
         if description:
@@ -203,7 +203,6 @@ WHERE id = :id
         external_id: str,
         description: Optional[str],
         coded_phenotype: Optional[str],
-        author: str = None,
         project: ProjectId = None,
     ) -> int:
         """
@@ -213,7 +212,7 @@ WHERE id = :id
             'external_id': external_id,
             'description': description,
             'coded_phenotype': coded_phenotype,
-            'author': author or self.author,
+            'audit_log_id': await self.audit_log_id(),
             'project': project or self.project,
         }
         keys = list(updater.keys())
@@ -235,7 +234,6 @@ RETURNING id
         descriptions: List[str],
         coded_phenotypes: List[Optional[str]],
         project: int = None,
-        author: str = None,
     ):
         """Upsert"""
         updater = [
@@ -243,7 +241,7 @@ RETURNING id
                 'external_id': eid,
                 'description': descr,
                 'coded_phenotype': cph,
-                'author': author or self.author,
+                'audit_log_id': await self.audit_log_id(),
                 'project': project or self.project,
             }
             for eid, descr, cph in zip(external_ids, descriptions, coded_phenotypes)

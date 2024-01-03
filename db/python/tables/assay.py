@@ -4,15 +4,17 @@ import re
 from collections import defaultdict
 from typing import Any
 
-from db.python.connect import DbBase, NotFoundError, NoOpAenter
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
 from db.python.utils import (
-    to_db_json,
-    GenericFilterModel,
     GenericFilter,
+    GenericFilterModel,
     GenericMetaFilter,
+    NoOpAenter,
+    NotFoundError,
+    to_db_json,
 )
 from models.models.assay import AssayInternal
+from models.models.project import ProjectId
 
 REPLACEMENT_KEY_INVALID_CHARS = re.compile(r'[^\w\d_]')
 
@@ -100,7 +102,7 @@ class AssayTable(DbBase):
             drow = dict(row)
             project_ids.add(drow.pop('project'))
             assay = AssayInternal.from_db(drow)
-            assay.external_ids = seq_eids.get(assay.id, {})
+            assay.external_ids = seq_eids.get(assay.id, {}) if assay.id else {}
             assays.append(assay)
 
         return project_ids, assays
@@ -135,7 +137,7 @@ class AssayTable(DbBase):
         return pjcts.pop(), assays.pop()
 
     async def get_assay_by_external_id(
-        self, external_sequence_id: str, project: int = None
+        self, external_sequence_id: str, project: ProjectId | None = None
     ) -> AssayInternal:
         """Get assay by EXTERNAL ID"""
         if not (project or self.project):
@@ -212,7 +214,6 @@ class AssayTable(DbBase):
         external_ids: dict[str, str] | None,
         assay_type: str,
         meta: dict[str, Any] | None,
-        author: str | None = None,
         project: int | None = None,
         open_transaction: bool = True,
     ) -> int:
@@ -241,8 +242,8 @@ class AssayTable(DbBase):
 
         _query = """\
             INSERT INTO assay
-                (sample_id, meta, type, author)
-            VALUES (:sample_id, :meta, :type, :author)
+                (sample_id, meta, type, audit_log_id)
+            VALUES (:sample_id, :meta, :type, :audit_log_id)
             RETURNING id;
         """
 
@@ -255,7 +256,7 @@ class AssayTable(DbBase):
                     'sample_id': sample_id,
                     'meta': to_db_json(meta),
                     'type': assay_type,
-                    'author': author or self.author,
+                    'audit_log_id': await self.audit_log_id(),
                 },
             )
 
@@ -269,16 +270,17 @@ class AssayTable(DbBase):
 
                 _eid_query = """
                 INSERT INTO assay_external_id
-                    (project, assay_id, external_id, name, author)
-                VALUES (:project, :assay_id, :external_id, :name, :author);
+                    (project, assay_id, external_id, name, audit_log_id)
+                VALUES (:project, :assay_id, :external_id, :name, :audit_log_id);
                 """
+                audit_log_id = await self.audit_log_id()
                 eid_values = [
                     {
                         'project': project or self.project,
                         'assay_id': id_of_new_assay,
                         'external_id': eid,
                         'name': name.lower(),
-                        'author': author or self.author,
+                        'audit_log_id': audit_log_id,
                     }
                     for name, eid in external_ids.items()
                 ]
@@ -288,7 +290,7 @@ class AssayTable(DbBase):
         return id_of_new_assay
 
     async def insert_many_assays(
-        self, assays: list[AssayInternal], author=None, open_transaction: bool = True
+        self, assays: list[AssayInternal], open_transaction: bool = True
     ):
         """Insert many sequencing, returning no IDs"""
         with_function = self.connection.transaction if open_transaction else NoOpAenter
@@ -303,12 +305,13 @@ class AssayTable(DbBase):
                         sample_id=assay.sample_id,
                         external_ids=assay.external_ids,
                         meta=assay.meta,
-                        author=author,
                         assay_type=assay.type,
                         open_transaction=False,
                     )
                 )
             return assay_ids
+
+    # endregion INSERTS
 
     async def update_assay(
         self,
@@ -320,15 +323,18 @@ class AssayTable(DbBase):
         sample_id: int | None = None,
         project: ProjectId | None = None,
         open_transaction: bool = True,
-        author=None,
     ):
         """Update an assay"""
         with_function = self.connection.transaction if open_transaction else NoOpAenter
 
         async with with_function():
-            fields = {'assay_id': assay_id, 'author': author or self.author}
+            audit_log_id = await self.audit_log_id()
+            fields: dict[str, Any] = {
+                'assay_id': assay_id,
+                'audit_log_id': audit_log_id,
+            }
 
-            updaters = ['author = :author']
+            updaters = ['audit_log_id = :audit_log_id']
             if meta is not None:
                 updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
                 fields['meta'] = to_db_json(meta)
@@ -363,7 +369,20 @@ class AssayTable(DbBase):
                 }
 
                 if to_delete:
+                    _assay_eid_update_before_delete = """
+                    UPDATE assay_external_id
+                    SET audit_log_id = :audit_log_id
+                    WHERE assay_id = :assay_id AND name in :names
+                    """
                     _delete_query = 'DELETE FROM assay_external_id WHERE assay_id = :assay_id AND name in :names'
+                    await self.connection.execute(
+                        _assay_eid_update_before_delete,
+                        {
+                            'assay_id': assay_id,
+                            'names': list(to_delete),
+                            'audit_log_id': audit_log_id,
+                        },
+                    )
                     await self.connection.execute(
                         _delete_query,
                         {'assay_id': assay_id, 'names': list(to_delete)},
@@ -375,17 +394,18 @@ class AssayTable(DbBase):
                     )
 
                     _update_query = """\
-                        INSERT INTO assay_external_id (project, assay_id, external_id, name, author)
-                            VALUES (:project, :assay_id, :external_id, :name, :author)
-                            ON DUPLICATE KEY UPDATE external_id = :external_id, author = :author
+                        INSERT INTO assay_external_id (project, assay_id, external_id, name, audit_log_id)
+                            VALUES (:project, :assay_id, :external_id, :name, :audit_log_id)
+                            ON DUPLICATE KEY UPDATE external_id = :external_id, audit_log_id = :audit_log_id
                     """
+                    audit_log_id = await self.audit_log_id()
                     values = [
                         {
                             'project': project,
                             'assay_id': assay_id,
                             'external_id': eid,
                             'name': name,
-                            'author': author or self.author,
+                            'audit_log_id': audit_log_id,
                         }
                         for name, eid in to_update.items()
                     ]
@@ -395,13 +415,13 @@ class AssayTable(DbBase):
 
     async def get_assays_by(
         self,
-        assay_ids: list[int] = None,
-        sample_ids: list[int] = None,
-        assay_types: list[str] = None,
-        assay_meta: dict[str, Any] = None,
-        sample_meta: dict[str, Any] = None,
-        external_assay_ids: list[str] = None,
-        project_ids: list[int] = None,
+        assay_ids: list[int] | None = None,
+        sample_ids: list[int] | None = None,
+        assay_types: list[str] | None = None,
+        assay_meta: dict[str, Any] | None = None,
+        sample_meta: dict[str, Any] | None = None,
+        external_assay_ids: list[str] | None = None,
+        project_ids: list[int] | None = None,
         active: bool = True,
     ) -> tuple[list[ProjectId], list[AssayInternal]]:
         """Get sequences by some criteria"""
