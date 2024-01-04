@@ -1,5 +1,9 @@
-from db.python.layers.billing_db import BillingDb
 from db.python.layers.bq_base import BqBaseLayer
+from db.python.tables.billing_ar_batch import BillingArBatchTable
+from db.python.tables.billing_daily import BillingDailyTable
+from db.python.tables.billing_daily_extended import BillingDailyExtendedTable
+from db.python.tables.billing_gcp_daily import BillingGcpDailyTable
+from db.python.tables.billing_raw import BillingRawTable
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
@@ -16,14 +20,42 @@ from models.models.billing import (
 class BillingLayer(BqBaseLayer):
     """Billing layer"""
 
+    def table_factory(
+        self, source: BillingSource, fields: list[BillingColumn] | None = None
+    ) -> (
+        BillingDailyTable
+        | BillingDailyExtendedTable
+        | BillingGcpDailyTable
+        | BillingRawTable
+    ):
+        """Get billing table object based on source and fields"""
+        if source == BillingSource.GCP_BILLING:
+            return BillingGcpDailyTable(self.connection)
+        elif source == BillingSource.RAW:
+            return BillingRawTable(self.connection)
+
+        # check if any of the fields is in the extended columns
+        if fields:
+            used_extended_cols = [
+                f
+                for f in fields
+                if f in BillingColumn.extended_cols() and BillingColumn.can_group_by(f)
+            ]
+            if used_extended_cols:
+                # there is a field from extended daily table
+                return BillingDailyExtendedTable(self.connection)
+
+        # by default look at the daily table
+        return BillingDailyTable(self.connection)
+
     async def get_gcp_projects(
         self,
     ) -> list[str] | None:
         """
         Get All GCP projects in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_gcp_projects()
+        billing_table = BillingGcpDailyTable(self.connection)
+        return await billing_table.get_gcp_projects()
 
     async def get_topics(
         self,
@@ -31,8 +63,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All topics in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_topics()
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_topics()
 
     async def get_cost_categories(
         self,
@@ -40,8 +72,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All service description / cost categories in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_cost_categories()
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_cost_categories()
 
     async def get_skus(
         self,
@@ -51,8 +83,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All SKUs in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_skus(limit, offset)
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_skus(limit, offset)
 
     async def get_datasets(
         self,
@@ -60,8 +92,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All datasets in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('dataset')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('dataset')
 
     async def get_stages(
         self,
@@ -69,8 +101,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All stages in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('stage')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('stage')
 
     async def get_sequencing_types(
         self,
@@ -78,8 +110,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All sequencing_types in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('sequencing_type')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('sequencing_type')
 
     async def get_sequencing_groups(
         self,
@@ -87,8 +119,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All sequencing_groups in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('sequencing_group')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('sequencing_group')
 
     async def get_compute_categories(
         self,
@@ -96,8 +128,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All compute_category values in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('compute_category')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('compute_category')
 
     async def get_cromwell_sub_workflow_names(
         self,
@@ -105,8 +137,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All cromwell_sub_workflow_name values in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('cromwell_sub_workflow_name')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('cromwell_sub_workflow_name')
 
     async def get_wdl_task_names(
         self,
@@ -114,8 +146,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All wdl_task_name values in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('wdl_task_name')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('wdl_task_name')
 
     async def get_invoice_months(
         self,
@@ -123,8 +155,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All invoice months in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_invoice_months()
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_invoice_months()
 
     async def get_namespaces(
         self,
@@ -132,8 +164,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All namespaces values in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('namespace')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('namespace')
 
     async def get_total_cost(
         self,
@@ -142,20 +174,20 @@ class BillingLayer(BqBaseLayer):
         """
         Get Total cost of selected fields for requested time interval
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_total_cost(query)
+        billing_table = self.table_factory(query.source, query.fields)
+        return await billing_table.get_total_cost(query)
 
     async def get_running_cost(
         self,
         field: BillingColumn,
         invoice_month: str | None = None,
-        source: str | None = None,
+        source: BillingSource | None = None,
     ) -> list[BillingCostBudgetRecord]:
         """
         Get Running costs including monthly budget
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_running_cost(field, invoice_month, source)
+        billing_table = self.table_factory(source, [field])
+        return await billing_table.get_running_cost(field, invoice_month)
 
     async def get_cost_by_ar_guid(
         self,
@@ -164,10 +196,14 @@ class BillingLayer(BqBaseLayer):
         """
         Get Costs by AR GUID
         """
-        billing_db = BillingDb(self.connection)
+        ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
         # First get all batches and the min/max day to use for the query
-        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+        (
+            start_day,
+            end_day,
+            batches,
+        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
         if not batches:
             return BillingHailBatchCostRecord(
@@ -195,7 +231,9 @@ class BillingLayer(BqBaseLayer):
             time_column=BillingTimeColumn.USAGE_END_TIME,
             time_periods=BillingTimePeriods.DAY,
         )
-        records = await billing_db.get_total_cost(query)
+
+        billing_table = self.table_factory(query.source, query.fields)
+        records = await billing_table.get_total_cost(query)
         return BillingHailBatchCostRecord(
             ar_guid=ar_guid,
             batch_ids=batches,
@@ -209,13 +247,17 @@ class BillingLayer(BqBaseLayer):
         """
         Get Costs by Batch ID
         """
-        billing_db = BillingDb(self.connection)
+        ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
         # First get all batches and the min/max day to use for the query
-        ar_guid = await billing_db.get_ar_guid_by_batch_id(batch_id)
+        ar_guid = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
 
         # The get all batches for the ar_guid
-        start_day, end_day, batches = await billing_db.get_batches_by_ar_guid(ar_guid)
+        (
+            start_day,
+            end_day,
+            batches,
+        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
         if not batches:
             return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
@@ -239,7 +281,8 @@ class BillingLayer(BqBaseLayer):
             time_column=BillingTimeColumn.USAGE_END_TIME,
             time_periods=BillingTimePeriods.DAY,
         )
-        records = await billing_db.get_total_cost(query)
+        billing_table = self.table_factory(query.source, query.fields)
+        records = await billing_table.get_total_cost(query)
         return BillingHailBatchCostRecord(
             ar_guid=ar_guid,
             batch_ids=batches,

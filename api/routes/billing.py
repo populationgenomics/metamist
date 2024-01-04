@@ -6,11 +6,12 @@ from fastapi import APIRouter
 
 from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
 from api.utils.db import BqConnection, get_author
-from db.python.layers.billing_layer import BillingLayer
+from db.python.layers.billing import BillingLayer
 from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingHailBatchCostRecord,
+    BillingSource,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -520,7 +521,7 @@ async def get_total_cost(
 async def get_running_costs(
     field: BillingColumn,
     invoice_month: str | None = None,
-    source: str | None = None,
+    source: BillingSource | None = None,
     author: str = get_author,
 ) -> list[BillingCostBudgetRecord]:
     """

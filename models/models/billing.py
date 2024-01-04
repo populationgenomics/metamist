@@ -76,6 +76,23 @@ class BillingColumn(str, Enum):
         )
 
     @classmethod
+    def is_extended_column(cls, value: 'BillingColumn') -> bool:
+        """Return True if column is extended"""
+        return value in (
+            BillingColumn.DATASET,
+            BillingColumn.BATCH_ID,
+            BillingColumn.SEQUENCING_TYPE,
+            BillingColumn.STAGE,
+            BillingColumn.SEQUENCING_GROUP,
+            BillingColumn.COMPUTE_CATEGORY,
+            BillingColumn.CROMWELL_SUB_WORKFLOW_NAME,
+            BillingColumn.CROMWELL_WORKFLOW_ID,
+            BillingColumn.GOOG_PIPELINES_WORKER,
+            BillingColumn.WDL_TASK_NAME,
+            BillingColumn.NAMESPACE,
+        )
+
+    @classmethod
     def str_to_enum(cls, value: str) -> 'BillingColumn':
         """Convert string to enum"""
         str_to_enum = {v.value: v for k, v in BillingColumn.__members__.items()}
