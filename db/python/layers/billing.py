@@ -31,7 +31,7 @@ class BillingLayer(BqBaseLayer):
         """Get billing table object based on source and fields"""
         if source == BillingSource.GCP_BILLING:
             return BillingGcpDailyTable(self.connection)
-        elif source == BillingSource.RAW:
+        if source == BillingSource.RAW:
             return BillingRawTable(self.connection)
 
         # check if any of the fields is in the extended columns

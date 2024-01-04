@@ -83,7 +83,7 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         return None
 
-    async def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
+    def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
         """prepare daily cost subquery"""
 
         # add extra filter to limit materialized view partition

@@ -103,13 +103,19 @@ class BillingBaseTable(BqDbBase):
     @abstractmethod
     def get_table_name(self):
         """Get table name"""
-        pass
+        raise NotImplementedError('Calling Abstract method directly')
 
     def _execute_query(
-        self, query: str, params: list[Any] = [], results_as_list: bool = True
+        self, query: str, params: list[Any] = None, results_as_list: bool = True
     ) -> list[Any]:
         """Execute query, add BQ labels"""
-        job_config = bigquery.QueryJobConfig(query_parameters=params, labels=BQ_LABELS)
+        if params:
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=params, labels=BQ_LABELS
+            )
+        else:
+            job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
+
         if results_as_list:
             return list(
                 self._connection.connection.query(query, job_config=job_config).result()
@@ -259,7 +265,7 @@ class BillingBaseTable(BqDbBase):
 
         return None
 
-    async def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
+    def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
         """prepare daily cost subquery"""
 
         daily_cost_field = ', day.cost as daily_cost'
