@@ -1,14 +1,14 @@
-from os import getenv
 import logging
+from os import getenv
 
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
-from db.python.connect import SMConnections, Connection
+from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
 from db.python.tables.project import ProjectPermissionsTable
 
@@ -61,22 +61,27 @@ def authenticate(
         logging.info(f'Using {default_user} as authenticated user')
         return default_user
 
-    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
+    raise HTTPException(status_code=401, detail='Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
     project: str,
+    request: Request,
     author: str = Depends(authenticate),
     ar_guid: str = Depends(get_ar_guid),
     on_behalf_of: str | None = Depends(get_on_behalf_of),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
+    meta = {'path': request.url.path}
+    if request.client:
+        meta['ip'] = request.client.host
     return await ProjectPermissionsTable.get_project_connection(
         project_name=project,
         author=author,
         readonly=False,
         ar_guid=ar_guid,
         on_behalf_of=on_behalf_of,
+        meta=meta,
     )
 
 

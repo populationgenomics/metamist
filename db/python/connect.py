@@ -51,6 +51,7 @@ class Connection:
         on_behalf_of: str | None,
         readonly: bool,
         ar_guid: str | None,
+        meta: dict[str, str] | None = None,
     ):
         self.connection: databases.Database = connection
         self.project: int | None = project
@@ -58,6 +59,7 @@ class Connection:
         self.on_behalf_of: str | None = on_behalf_of
         self.readonly: bool = readonly
         self.ar_guid: str | None = ar_guid
+        self.meta = meta
 
         self._audit_log_id: int | None = None
 
@@ -81,6 +83,7 @@ class Connection:
                     ar_guid=self.ar_guid,
                     comment=None,
                     project=self.project,
+                    meta=self.meta,
                 )
 
         return self._audit_log_id
