@@ -285,6 +285,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .attr('x', 0)
             .attr('y', -margin.top / 1.7)
             .attr('text-anchor', 'start')
+            .attr('fill', 'currentColor')
             .text(title)
 
         // set Y axis label
@@ -294,6 +295,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
             .attr('x', width / 2)
             .attr('y', height + margin.bottom)
             .attr('text-anchor', 'middle')
+            .attr('fill', 'currentColor')
             .text('AUD')
 
         if (showLegend) {
@@ -320,6 +322,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .attr('class', 'legend')
                     .attr('x', 20 + i * 150)
                     .attr('y', -(margin.top / 3.8))
+                    .attr('fill', 'currentColor')
                     .text(labels[i])
             }
 
@@ -336,6 +339,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
                     .attr('class', 'legend')
                     .attr('x', 20 + labels.length * 150)
                     .attr('y', -(margin.top / 3.8))
+                    .attr('fill', 'currentColor')
                     .text('Budget')
             }
         }
