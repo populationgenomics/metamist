@@ -332,7 +332,7 @@ class BillingBaseTable(BqDbBase):
                 query_params,
                 daily_cost_field,
                 daily_cost_join,
-            ) = await self._prepare_daily_cost_subquery(
+            ) = self._prepare_daily_cost_subquery(
                 field, query_params, last_loaded_day
             )
         else:
