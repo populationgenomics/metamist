@@ -1,4 +1,4 @@
-# pylint: disable=unused-import
+# pylint: disable=unused-import,too-many-instance-attributes
 # flake8: noqa
 """
 Code for connecting to Postgres database
@@ -51,6 +51,7 @@ class Connection:
         on_behalf_of: str | None,
         readonly: bool,
         ar_guid: str | None,
+        meta: dict[str, str] | None = None,
     ):
         self.connection: databases.Database = connection
         self.project: int | None = project
@@ -58,6 +59,7 @@ class Connection:
         self.on_behalf_of: str | None = on_behalf_of
         self.readonly: bool = readonly
         self.ar_guid: str | None = ar_guid
+        self.meta = meta
 
         self._audit_log_id: int | None = None
 
@@ -81,6 +83,7 @@ class Connection:
                     ar_guid=self.ar_guid,
                     comment=None,
                     project=self.project,
+                    meta=self.meta,
                 )
 
         return self._audit_log_id
@@ -223,7 +226,9 @@ class SMConnections:
         return conn
 
     @staticmethod
-    async def get_connection_no_project(author: str, ar_guid: str):
+    async def get_connection_no_project(
+        author: str, ar_guid: str, meta: dict[str, str]
+    ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
@@ -240,4 +245,5 @@ class SMConnections:
             on_behalf_of=None,
             ar_guid=ar_guid,
             readonly=False,
+            meta=meta,
         )
