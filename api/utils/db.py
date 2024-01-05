@@ -101,10 +101,18 @@ async def dependable_get_readonly_project_connection(
 
 
 async def dependable_get_connection(
-    author: str = Depends(authenticate), ar_guid: str = Depends(get_ar_guid)
+    request: Request,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
 ):
     """FastAPI handler for getting connection withOUT project"""
-    return await SMConnections.get_connection_no_project(author, ar_guid=ar_guid)
+    meta = {'path': request.url.path}
+    if request.client:
+        meta['ip'] = request.client.host
+
+    return await SMConnections.get_connection_no_project(
+        author, ar_guid=ar_guid, meta=meta
+    )
 
 
 async def dependable_get_bq_connection(author: str = Depends(authenticate)):

@@ -226,7 +226,9 @@ class SMConnections:
         return conn
 
     @staticmethod
-    async def get_connection_no_project(author: str, ar_guid: str):
+    async def get_connection_no_project(
+        author: str, ar_guid: str, meta: dict[str, str]
+    ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
         logger.debug(f'Authenticate no-project connection with {author!r}')
@@ -243,4 +245,5 @@ class SMConnections:
             on_behalf_of=None,
             ar_guid=ar_guid,
             readonly=False,
+            meta=meta,
         )
