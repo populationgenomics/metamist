@@ -61,6 +61,7 @@ class ProjectPermissionsTable:
         readonly: bool,
         ar_guid: str,
         on_behalf_of: str | None = None,
+        meta: dict[str, str] | None = None,
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
@@ -80,6 +81,7 @@ class ProjectPermissionsTable:
             readonly=readonly,
             on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
+            meta=meta,
         )
 
     async def audit_log_id(self):
