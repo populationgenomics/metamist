@@ -1,4 +1,4 @@
-# pylint: disable=unused-import
+# pylint: disable=unused-import,too-many-instance-attributes
 # flake8: noqa
 """
 Code for connecting to Postgres database
