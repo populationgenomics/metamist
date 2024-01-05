@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Grid, Input, Message, Select } from 'semantic-ui-react'
+import { Button, Card, Grid, Input, Message, Select, Dropdown } from 'semantic-ui-react'
 import SearchIcon from '@mui/icons-material/Search'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -37,23 +37,23 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         value: item,
     }))
 
-    const [searchByType, setSearchByType] = React.useState<SearchType | undefined>(
-        SearchType[searchParams.get('searchType')] ?? SearchType.Ar_guid
+    const [searchByType, setSearchByType] = React.useState<SearchType>(
+        SearchType[searchParams.get('searchType')] ?? SearchType[0]
     )
 
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
-    const updateNav = (sType: SearchType | undefined, sTxt: string | undefined) => {
+    const updateNav = (sType: SearchType, sTxt: string | undefined) => {
         const url = generateUrl(location, {
-            searchType: sType,
+            searchType: SearchType[sType],
             searchTxt: sTxt,
         })
         navigate(url)
     }
 
-    const getData = (sType: SearchType, sTxt: string) => {
+    const getData = (sType: SearchType | undefined | string, sTxt: string) => {
         if ((sType === undefined || sTxt === undefined) && sTxt.length < 6) {
             // Seaarch text is not large enough
             setIsLoading(false)
@@ -62,7 +62,10 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         setIsLoading(true)
         setError(undefined)
 
-        if (sType === SearchType.Ar_guid) {
+        // convert sType to enum
+        const convertedType: SearchType = SearchType[sType as keyof typeof SearchType]
+
+        if (convertedType === SearchType.Ar_guid) {
             new BillingApi()
                 .costByArGuid(sTxt)
                 .then((response) => {
@@ -70,7 +73,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                     setData(response.data)
                 })
                 .catch((er) => setError(er.message))
-        } else if (sType === SearchType.Batch_id) {
+        } else if (convertedType === SearchType.Batch_id) {
             new BillingApi()
                 .costByBatchId(sTxt)
                 .then((response) => {
@@ -97,12 +100,19 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     }
 
     const handleSearchTypeChange = (event: any, dt: any) => {
-        setSearchByType(SearchType[dt.value])
+        setSearchByType(dt.value)
     }
 
-    const handleSearchKeyPress = (event: any) => {
+    const handleSearchClick = () => {
         updateNav(searchByType, searchTxt)
         handleSearch()
+    }
+
+    const getDefaultSearchType = () => {
+        if (searchByType !== undefined) {
+            return searchByType
+        }
+        return dropdownOptions[0].value
     }
 
     React.useEffect(() => {
@@ -121,38 +131,39 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
 
             <Grid columns={2} stackable>
                 <Grid.Column width={10}>
+                    {/* There is a Dropdown inside the search Input control to select searchType */}
                     <Input
                         fluid
-                        input={{ fluid: true }}
-                        placeholder={`Search...`}
+                        input={{ fluid: false }}
+                        label={
+                            <Dropdown
+                                selection
+                                compact
+                                defaultValue={getDefaultSearchType()}
+                                options={dropdownOptions}
+                                onChange={handleSearchTypeChange}
+                            />
+                        }
+                        labelPosition="right"
+                        placeholder="Search..."
                         onChange={handleSearchChange}
                         value={searchTxt}
-                        action={{ icon: 'search' }}
                     />
-                    <Select
-                        compact
-                        options={dropdownOptions}
-                        onChange={handleSearchTypeChange}
-                        defaultValue={
-                            searchByType !== undefined
-                                ? dropdownOptions[searchByType].value
-                                : dropdownOptions[0].value
-                        }
-                    />
-                    <Button type="submit" onClick={handleSearchKeyPress}>
-                        <SearchIcon />
-                    </Button>
+                </Grid.Column>
+                <Grid.Column width={1}>
+                    <Button compact onClick={() => handleSearchClick()} icon={<SearchIcon />} />
                 </Grid.Column>
             </Grid>
 
             <br />
             <p>
                 {' '}
-                e.g.
                 <br />
-                ar_guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
+                Try these examples:
                 <br />
-                batch_id: 430604, 430605
+                Ar guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
+                <br />
+                Batch id: 430604, 430605
             </p>
         </Card>
     )
