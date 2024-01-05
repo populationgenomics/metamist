@@ -186,7 +186,7 @@ const BillingCostByCategory: React.FunctionComponent = () => {
             <Message negative onDismiss={() => setError(undefined)}>
                 {error}
                 <br />
-                <Button color="red" onClick={() => setStart(start)}>
+                <Button negative onClick={() => setStart(start)}>
                     Retry
                 </Button>
             </Message>

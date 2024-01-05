@@ -126,7 +126,7 @@ const BillingCurrentCost = () => {
             <Message negative>
                 {error}
                 <br />
-                <Button color="red" onClick={() => getCosts(groupBy, invoiceMonth)}>
+                <Button negative onClick={() => getCosts(groupBy, invoiceMonth)}>
                     Retry
                 </Button>
             </Message>
