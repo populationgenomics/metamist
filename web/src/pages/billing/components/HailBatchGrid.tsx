@@ -17,16 +17,17 @@ const HailBatchGrid: React.FunctionComponent<{
     data: any[]
 }> = ({ data }) => {
     // prepare aggregated data by ar_guid, batch_id, job_id and coresponding batch_resource
-    const aggArGUIDData = data.reduce((acc, curr) => {
+    const aggArGUIDData: any[] = []
+    data.forEach((curr) => {
         const { cost, topic, usage_start_time, usage_end_time } = curr
         const ar_guid = curr['ar-guid']
         const usageStartDate = new Date(usage_start_time)
         const usageEndDate = new Date(usage_end_time)
-        const idx = acc.findIndex((d) => d.ar_guid === ar_guid && d.topic === topic)
+        const idx = aggArGUIDData.findIndex((d) => d.ar_guid === ar_guid && d.topic === topic)
         if (cost >= 0) {
             // do not include credits, should be filter out at API?
             if (idx === -1) {
-                acc.push({
+                aggArGUIDData.push({
                     type: 'ar_guid',
                     key: ar_guid,
                     ar_guid,
@@ -38,36 +39,41 @@ const HailBatchGrid: React.FunctionComponent<{
                     end_time: usageEndDate,
                 })
             } else {
-                acc[idx].cost += cost
-                acc[idx].start_time = new Date(
-                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                aggArGUIDData[idx].cost += cost
+                aggArGUIDData[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), aggArGUIDData[idx].start_time.getTime())
                 )
-                acc[idx].end_time = new Date(
-                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                aggArGUIDData[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), aggArGUIDData[idx].end_time.getTime())
                 )
             }
         }
-        return acc
-    }, [])
+    })
 
-    const aggArGUIDResource = data.reduce((acc, curr) => {
+    const aggArGUIDResource: any[] = []
+    data.forEach((curr) => {
         const { cost, batch_resource } = curr
         const ar_guid = curr['ar-guid']
-        const idx = acc.findIndex(
+        const idx = aggArGUIDResource.findIndex(
             (d) => d.ar_guid === ar_guid && d.batch_resource === batch_resource
         )
         if (cost >= 0) {
             // do not include credits, should be filter out at API?
             if (idx === -1) {
-                acc.push({ type: 'ar_guid', key: ar_guid, ar_guid, batch_resource, cost })
+                aggArGUIDResource.push({
+                    type: 'ar_guid',
+                    key: ar_guid,
+                    ar_guid,
+                    batch_resource,
+                    cost,
+                })
             } else {
-                acc[idx].cost += cost
+                aggArGUIDResource[idx].cost += cost
             }
         }
-        return acc
-    }, [])
-
-    const aggBatchData = data.reduce((acc, curr) => {
+    })
+    const aggBatchData: any[] = []
+    data.forEach((curr) => {
         const {
             batch_id,
             url,
@@ -81,7 +87,7 @@ const HailBatchGrid: React.FunctionComponent<{
         const ar_guid = curr['ar-guid']
         const usageStartDate = new Date(usage_start_time)
         const usageEndDate = new Date(usage_end_time)
-        const idx = acc.findIndex(
+        const idx = aggBatchData.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
                 d.batch_name === batch_name &&
@@ -91,7 +97,7 @@ const HailBatchGrid: React.FunctionComponent<{
         if (cost >= 0) {
             // do not include credits, should be filter out at API?
             if (idx === -1) {
-                acc.push({
+                aggBatchData.push({
                     type: 'batch_id',
                     key: batch_id,
                     ar_guid,
@@ -106,22 +112,22 @@ const HailBatchGrid: React.FunctionComponent<{
                     end_time: usageEndDate,
                 })
             } else {
-                acc[idx].cost += cost
-                acc[idx].start_time = new Date(
-                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                aggBatchData[idx].cost += cost
+                aggBatchData[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), aggBatchData[idx].start_time.getTime())
                 )
-                acc[idx].end_time = new Date(
-                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                aggBatchData[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), aggBatchData[idx].end_time.getTime())
                 )
             }
         }
-        return acc
-    }, [])
+    })
 
-    const aggBatchResource = data.reduce((acc, curr) => {
+    const aggBatchResource: any[] = []
+    data.forEach((curr) => {
         const { batch_id, batch_resource, topic, namespace, batch_name, cost } = curr
         const ar_guid = curr['ar-guid']
-        const idx = acc.findIndex(
+        const idx = aggBatchResource.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
                 d.batch_name === batch_name &&
@@ -132,7 +138,7 @@ const HailBatchGrid: React.FunctionComponent<{
         if (cost >= 0) {
             // do not include credits, should be filter out at API?
             if (idx === -1) {
-                acc.push({
+                aggBatchResource.push({
                     type: 'batch_id',
                     key: batch_id,
                     ar_guid,
@@ -144,19 +150,19 @@ const HailBatchGrid: React.FunctionComponent<{
                     cost,
                 })
             } else {
-                acc[idx].cost += cost
+                aggBatchResource[idx].cost += cost
             }
         }
-        return acc
-    }, [])
+    })
 
-    const aggBatchJobData = data.reduce((acc, curr) => {
+    const aggBatchJobData: any[] = []
+    data.forEach((curr) => {
         const { batch_id, url, cost, topic, namespace, job_id, usage_start_time, usage_end_time } =
             curr
         const ar_guid = curr['ar-guid']
         const usageStartDate = new Date(usage_start_time)
         const usageEndDate = new Date(usage_end_time)
-        const idx = acc.findIndex(
+        const idx = aggBatchJobData.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
                 d.job_id === job_id &&
@@ -165,7 +171,7 @@ const HailBatchGrid: React.FunctionComponent<{
         )
         if (cost >= 0) {
             if (idx === -1) {
-                acc.push({
+                aggBatchJobData.push({
                     type: 'batch_id/job_id',
                     key: `${batch_id}/${job_id}`,
                     batch_id,
@@ -179,22 +185,22 @@ const HailBatchGrid: React.FunctionComponent<{
                     end_time: usageEndDate,
                 })
             } else {
-                acc[idx].cost += cost
-                acc[idx].start_time = new Date(
-                    Math.min(usageStartDate.getTime(), acc[idx].start_time.getTime())
+                aggBatchJobData[idx].cost += cost
+                aggBatchJobData[idx].start_time = new Date(
+                    Math.min(usageStartDate.getTime(), aggBatchJobData[idx].start_time.getTime())
                 )
-                acc[idx].end_time = new Date(
-                    Math.max(usageEndDate.getTime(), acc[idx].end_time.getTime())
+                aggBatchJobData[idx].end_time = new Date(
+                    Math.max(usageEndDate.getTime(), aggBatchJobData[idx].end_time.getTime())
                 )
             }
         }
-        return acc
-    }, [])
+    })
 
-    const aggBatchJobResource = data.reduce((acc, curr) => {
+    const aggBatchJobResource: any[] = []
+    data.forEach((curr) => {
         const { batch_id, batch_resource, topic, namespace, cost, job_id } = curr
         const ar_guid = curr['ar-guid']
-        const idx = acc.findIndex(
+        const idx = aggBatchJobResource.findIndex(
             (d) =>
                 d.batch_id === batch_id &&
                 d.job_id === job_id &&
@@ -204,7 +210,7 @@ const HailBatchGrid: React.FunctionComponent<{
         )
         if (cost >= 0) {
             if (idx === -1) {
-                acc.push({
+                aggBatchJobResource.push({
                     type: 'batch_id/job_id',
                     key: `${batch_id}/${job_id}`,
                     batch_id,
@@ -216,11 +222,10 @@ const HailBatchGrid: React.FunctionComponent<{
                     cost,
                 })
             } else {
-                acc[idx].cost += cost
+                aggBatchJobResource[idx].cost += cost
             }
         }
-        return acc
-    }, [])
+    })
 
     const aggData = [...aggArGUIDData, ...aggBatchData, ...aggBatchJobData]
     const aggResource = [...aggArGUIDResource, ...aggBatchResource, ...aggBatchJobResource]
@@ -279,7 +284,7 @@ const HailBatchGrid: React.FunctionComponent<{
             },
         },
         {
-            category: 'end_time',
+            category: 'duration',
             title: 'DURATION',
             dataMap: (data: any, value: string) => {
                 const duration = new Date(data.end_time.getTime() - data.start_time.getTime())
@@ -318,10 +323,10 @@ const HailBatchGrid: React.FunctionComponent<{
         },
     ]
 
-    const expandedRow = (log: any) =>
+    const expandedRow = (log: any, idx: any) =>
         MAIN_FIELDS.map(({ category, title, width, dataMap, className }) => (
             <SUITable.Cell
-                key={category}
+                key={`${category}-${idx}`}
                 className={className}
                 // style={{ width: width ?? '100px' }}
             >
@@ -354,10 +359,10 @@ const HailBatchGrid: React.FunctionComponent<{
                             backgroundColor: 'var(--color-table-header)',
                         }}
                     />
-                    {MAIN_FIELDS.map(({ category }) => (
+                    {MAIN_FIELDS.map(({ category }, i) => (
                         <SUITable.Cell
                             className="sizeRow"
-                            key={`${category}-resize`}
+                            key={`${category}-resize-${i}`}
                             style={{
                                 borderTop: 'none',
                                 backgroundColor: 'var(--color-table-header)',
@@ -393,7 +398,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                         onChange={() => handleToggle(log.key)}
                                     />
                                 </SUITable.Cell>
-                                {expandedRow(log)}
+                                {expandedRow(log, idx)}
                             </SUITable.Row>
                             {Object.entries(log)
                                 .filter(([c]) =>
