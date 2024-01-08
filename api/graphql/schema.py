@@ -237,7 +237,6 @@ class GraphQLAnalysis:
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    author: str
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -249,7 +248,6 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            author=internal.author,
         )
 
     @strawberry.field
@@ -393,7 +391,6 @@ class GraphQLSample:
     active: bool
     meta: strawberry.scalars.JSON
     type: str
-    author: str | None
 
     # keep as integers, because they're useful to reference in the fields below
     internal_id: strawberry.Private[int]
@@ -408,7 +405,6 @@ class GraphQLSample:
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
-            author=sample.author,
             # internals
             internal_id=sample.id,
             participant_id=sample.participant_id,
