@@ -8,7 +8,6 @@ import asyncio
 import json
 import logging
 import os
-from threading import Lock
 
 import databases
 
@@ -17,8 +16,6 @@ from db.python.utils import InternalError
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-audit_log_lock = Lock()
 
 TABLES_ORDERED_BY_FK_DEPS = [
     'project',
@@ -62,6 +59,7 @@ class Connection:
         self.meta = meta
 
         self._audit_log_id: int | None = None
+        self._audit_log_lock = asyncio.Lock()
 
     async def audit_log_id(self):
         """Get audit_log ID for write operations, cached per connection"""
@@ -70,7 +68,7 @@ class Connection:
                 'Trying to get a audit_log ID, but not a write connection'
             )
 
-        with audit_log_lock:
+        async with self._audit_log_lock:
             if not self._audit_log_id:
                 # pylint: disable=import-outside-toplevel
                 # make this import here, otherwise we'd have a circular import
