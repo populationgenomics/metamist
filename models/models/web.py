@@ -1,8 +1,11 @@
 # pylint: disable=too-many-instance-attributes
 import dataclasses
+from typing import Annotated
+
+from pydantic import Field
 
 from models.base import SMBase
-from models.models.participant import NestedParticipantInternal, NestedParticipant
+from models.models.participant import NestedParticipant, NestedParticipantInternal
 
 
 class WebProject(SMBase):
@@ -116,9 +119,5 @@ class ProjectSummary(SMBase):
     seqr_links: dict[str, str]
     seqr_sync_types: list[str]
 
-    links: PagingLinks | None
-
-    class Config:
-        """Config for ProjectSummaryResponse"""
-
-        fields = {'links': '_links'}
+    # paging, links gets turned into _links
+    links: Annotated[PagingLinks | None, Field(serialization_alias='_links')]
