@@ -332,9 +332,7 @@ class BillingBaseTable(BqDbBase):
                 query_params,
                 daily_cost_field,
                 daily_cost_join,
-            ) = self._prepare_daily_cost_subquery(
-                field, query_params, last_loaded_day
-            )
+            ) = self._prepare_daily_cost_subquery(field, query_params, last_loaded_day)
         else:
             # Do not calculate last 24H cost
             daily_cost_field = ', NULL as daily_cost'

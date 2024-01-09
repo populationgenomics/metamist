@@ -209,7 +209,6 @@ const BillingCurrentCost = () => {
                         fitted
                         toggle
                         checked={showAsChart}
-                        slider
                         onChange={() => setShowAsChart(!showAsChart)}
                     />
                 </Grid.Column>
@@ -341,7 +340,11 @@ const BillingCurrentCost = () => {
                             sort.direction === 'ascending' ? ['asc'] : ['desc']
                         ).map((p) => (
                             <React.Fragment key={`total - ${p.field}`}>
-                                <SUITable.Row className={`${rowColor(p)}`}>
+                                <SUITable.Row
+                                    className={`${rowColor(p)}`}
+                                    key={`total-row-${p.field}`}
+                                    id={`total-row-${p.field}`}
+                                >
                                     <SUITable.Cell collapsing>
                                         <Checkbox
                                             checked={openRows.includes(p.field)}
@@ -394,6 +397,7 @@ const BillingCurrentCost = () => {
                                                 backgroundColor: 'var(--color-bg)',
                                             }}
                                             key={`${dk.cost_category} - ${p.field}`}
+                                            id={`${dk.cost_category} - ${p.field}`}
                                         >
                                             <SUITable.Cell style={{ border: 'none' }} />
                                             <SUITable.Cell>{dk.cost_category}</SUITable.Cell>

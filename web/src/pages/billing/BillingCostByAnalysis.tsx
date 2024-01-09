@@ -134,7 +134,6 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                     {/* There is a Dropdown inside the search Input control to select searchType */}
                     <Input
                         fluid
-                        input={{ fluid: false }}
                         label={
                             <Dropdown
                                 selection

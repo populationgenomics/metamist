@@ -31,8 +31,8 @@ const HailBatchGrid: React.FunctionComponent<{
                     type: 'ar_guid',
                     key: ar_guid,
                     ar_guid,
-                    batch_id: ' TOTAL',
-                    job_id: ' ALL JOBS',
+                    batch_id: undefined,
+                    job_id: undefined,
                     topic,
                     cost,
                     start_time: usageStartDate,
@@ -106,7 +106,7 @@ const HailBatchGrid: React.FunctionComponent<{
                     topic,
                     namespace,
                     batch_name,
-                    job_id: ' ALL JOBS',
+                    job_id: undefined,
                     cost,
                     start_time: usageStartDate,
                     end_time: usageEndDate,
@@ -198,7 +198,7 @@ const HailBatchGrid: React.FunctionComponent<{
 
     const aggBatchJobResource: any[] = []
     data.forEach((curr) => {
-        const { batch_id, batch_resource, topic, namespace, cost, job_id } = curr
+        const { batch_id, batch_resource, topic, namespace, cost, job_id, job_name } = curr
         const ar_guid = curr['ar-guid']
         const idx = aggBatchJobResource.findIndex(
             (d) =>
@@ -220,6 +220,7 @@ const HailBatchGrid: React.FunctionComponent<{
                     topic,
                     namespace,
                     cost,
+                    job_name,
                 })
             } else {
                 aggBatchJobResource[idx].cost += cost
@@ -249,45 +250,67 @@ const HailBatchGrid: React.FunctionComponent<{
         }
     }
 
+    const prepareBatchUrl = (url: string, txt: string) => (
+        <a href={`${url}`} rel="noopener noreferrer" target="_blank">
+            {txt}
+        </a>
+    )
+
+    const prepareBgColor = (log: any) => {
+        if (log.batch_id === undefined) {
+            return 'var(--color-border-color)'
+        }
+        if (log.job_id === undefined) {
+            return 'var(--color-border-default)'
+        }
+        return 'var(--color-bg)'
+    }
+
     const MAIN_FIELDS: Field[] = [
         {
-            category: 'ar_guid',
-            title: 'AR GUID',
-        },
-        {
-            category: 'url',
-            title: 'HAIL BATCH',
-            dataMap: (data: any, value: string) => (
-                <a href={`${value}`} rel="noopener noreferrer" target="_blank">
-                    {data.batch_id}
-                </a>
-            ),
-        },
-        {
             category: 'job_id',
-            title: 'JOB ID',
+            title: 'ID',
+            dataMap: (dataItem: any, value: string) => {
+                if (dataItem.batch_id === undefined) {
+                    return `AR GUID: ${dataItem.ar_guid}`
+                }
+                if (dataItem.job_id === undefined) {
+                    return prepareBatchUrl(dataItem.url, `BATCH ID: ${dataItem.batch_id}`)
+                }
+                return prepareBatchUrl(dataItem.url, `JOB: ${value}`)
+            },
         },
         {
             category: 'start_time',
             title: 'TIME STARTED',
-            dataMap: (data: any, value: string) => {
+            dataMap: (dataItem: any, value: string) => {
                 const dateValue = new Date(value)
-                return <span>{isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}</span>
+                return (
+                    <span>
+                        {Number.isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}
+                    </span>
+                )
             },
         },
         {
             category: 'end_time',
             title: 'TIME COMPLETED',
-            dataMap: (data: any, value: string) => {
+            dataMap: (dataItem: any, value: string) => {
                 const dateValue = new Date(value)
-                return <span>{isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}</span>
+                return (
+                    <span>
+                        {Number.isNaN(dateValue.getTime()) ? '' : dateValue.toLocaleString()}
+                    </span>
+                )
             },
         },
         {
             category: 'duration',
             title: 'DURATION',
-            dataMap: (data: any, value: string) => {
-                const duration = new Date(data.end_time.getTime() - data.start_time.getTime())
+            dataMap: (dataItem: any, _value: string) => {
+                const duration = new Date(
+                    dataItem.end_time.getTime() - dataItem.start_time.getTime()
+                )
                 const seconds = Math.floor((duration / 1000) % 60)
                 const minutes = Math.floor((duration / (1000 * 60)) % 60)
                 const hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
@@ -298,10 +321,10 @@ const HailBatchGrid: React.FunctionComponent<{
         {
             category: 'cost',
             title: 'COST',
-            dataMap: (data: any, value: string) => (
+            dataMap: (dataItem: any, _value: string) => (
                 <Popup
-                    content={data.cost}
-                    trigger={<span>${data.cost.toFixed(4)}</span>}
+                    content={dataItem.cost}
+                    trigger={<span>${dataItem.cost.toFixed(4)}</span>}
                     position="top center"
                 />
             ),
@@ -321,15 +344,15 @@ const HailBatchGrid: React.FunctionComponent<{
             category: 'batch_name',
             title: 'NAME/SCRIPT',
         },
+        {
+            category: 'job_name',
+            title: 'NAME',
+        },
     ]
 
     const expandedRow = (log: any, idx: any) =>
-        MAIN_FIELDS.map(({ category, title, width, dataMap, className }) => (
-            <SUITable.Cell
-                key={`${category}-${idx}`}
-                className={className}
-                // style={{ width: width ?? '100px' }}
-            >
+        MAIN_FIELDS.map(({ category, dataMap, className }) => (
+            <SUITable.Cell key={`${category}-${idx}`} className={className}>
                 {dataMap ? dataMap(log, log[category]) : sanitiseValue(log[category])}
             </SUITable.Cell>
         ))
@@ -346,6 +369,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                 borderBottom: 'none',
                                 position: 'sticky',
                                 resize: 'horizontal',
+                                textAlign: 'center',
                             }}
                         >
                             {title}
@@ -390,11 +414,17 @@ const HailBatchGrid: React.FunctionComponent<{
                     })
                     .map((log, idx) => (
                         <React.Fragment key={log.key}>
-                            <SUITable.Row>
+                            <SUITable.Row
+                                className={log.job_id === undefined ? 'bold-text' : ''}
+                                style={{
+                                    backgroundColor: prepareBgColor(log),
+                                    textAlign: 'center',
+                                }}
+                            >
                                 <SUITable.Cell collapsing>
                                     <Checkbox
                                         checked={openRows.includes(log.key)}
-                                        slider
+                                        toggle
                                         onChange={() => handleToggle(log.key)}
                                     />
                                 </SUITable.Cell>
@@ -423,7 +453,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                             <SUITable.Cell>
                                                 <b>{title}</b>
                                             </SUITable.Cell>
-                                            <SUITable.Cell colSpan="6">{v}</SUITable.Cell>
+                                            <SUITable.Cell colSpan="4">{v}</SUITable.Cell>
                                         </SUITable.Row>
                                     )
                                 })}
@@ -435,7 +465,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                 key={`${log.key}-lbl`}
                             >
                                 <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell colSpan="7">
+                                <SUITable.Cell colSpan="5">
                                     <b>COST BREAKDOWN</b>
                                 </SUITable.Cell>
                             </SUITable.Row>
@@ -452,7 +482,7 @@ const HailBatchGrid: React.FunctionComponent<{
                                         key={`${log.key}-${dk.batch_resource}`}
                                     >
                                         <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell colSpan="6">
+                                        <SUITable.Cell colSpan="4">
                                             {dk.batch_resource}
                                         </SUITable.Cell>
                                         <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>

@@ -288,3 +288,7 @@ html[data-theme='dark-mode'] .ui.table {
 .billing-href a {
     color: var(--color-text-href) !important;
 }
+
+.bold-text {
+    font-weight: bold;
+}

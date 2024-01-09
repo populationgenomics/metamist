@@ -1,9 +1,9 @@
 from db.python.layers.bq_base import BqBaseLayer
-from db.python.tables.billing_ar_batch import BillingArBatchTable
-from db.python.tables.billing_daily import BillingDailyTable
-from db.python.tables.billing_daily_extended import BillingDailyExtendedTable
-from db.python.tables.billing_gcp_daily import BillingGcpDailyTable
-from db.python.tables.billing_raw import BillingRawTable
+from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
+from db.python.tables.bq.billing_daily import BillingDailyTable
+from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
+from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
+from db.python.tables.bq.billing_raw import BillingRawTable
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,

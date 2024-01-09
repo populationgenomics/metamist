@@ -40,10 +40,12 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
     }
 
     const contDiv = containerDivRef.current
-    if (contDiv) {
-        // reset svg
-        contDiv.innerHTML = ''
-    }
+    console.log('contDiv', contDiv)
+    // if (contDiv) {
+    //     // reset svg
+    //     // contDiv.innerHTML = ''
+    //     return <div ref={containerDivRef}></div>
+    // }
 
     const series = Object.keys(data[0].values)
     const seriesLength = series.length

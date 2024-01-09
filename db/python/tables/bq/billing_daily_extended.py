@@ -1,7 +1,7 @@
 from google.cloud import bigquery
 
 from api.settings import BQ_AGGREG_EXT_VIEW, BQ_DAYS_BACK_OPTIMAL
-from db.python.tables.billing_base import BillingBaseTable
+from db.python.tables.bq.billing_base import BillingBaseTable
 from models.models import BillingColumn
 
 

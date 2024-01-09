@@ -1,5 +1,5 @@
 from api.settings import BQ_AGGREG_RAW
-from db.python.tables.billing_base import BillingBaseTable
+from db.python.tables.bq.billing_base import BillingBaseTable
 
 
 class BillingRawTable(BillingBaseTable):

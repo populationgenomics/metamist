@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from google.cloud import bigquery
 
 from api.settings import BQ_BATCHES_VIEW
-from db.python.tables.billing_base import BillingBaseTable
+from db.python.tables.bq.billing_base import BillingBaseTable
 
 
 class BillingArBatchTable(BillingBaseTable):
