@@ -3,7 +3,6 @@ from enum import Enum
 
 from db.python.tables.billing import BillingFilter
 from db.python.utils import GenericFilter
-
 from models.base import SMBase
 
 
@@ -70,7 +69,7 @@ class BillingRowRecord(SMBase):
     class Config:
         """Config for BillingRowRecord Response"""
 
-        orm_mode = True
+        from_attributes = True
 
     @staticmethod
     def from_json(record):
@@ -148,7 +147,7 @@ class BillingColumn(str, Enum):
             'sequencing_type',
             'stage',
             'sequencing_group',
-            'ar_guid'
+            'ar_guid',
         ]
 
     @staticmethod

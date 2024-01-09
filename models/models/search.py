@@ -60,7 +60,7 @@ class SearchResponse(SMBase):
 class SearchItem(SMBase):
     """Summary Grid Filter Model"""
 
-    model_type: MetaSearchEntityPrefix
+    type: MetaSearchEntityPrefix
     query: str
     field: str
     is_meta: bool

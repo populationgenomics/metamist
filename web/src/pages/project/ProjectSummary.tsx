@@ -106,7 +106,7 @@ const ProjectSummaryView: React.FunctionComponent = () => {
                     }
                     const is_meta = field.startsWith('meta.')
                     const fieldName = is_meta ? field.slice(5) : field
-                    filter.push({ query: value, is_meta, model_type: category, field: fieldName })
+                    filter.push({ query: value, is_meta, type: category, field: fieldName })
                     return filter
                 },
                 [] as SearchItem[]
