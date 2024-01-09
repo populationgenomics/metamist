@@ -30,7 +30,7 @@ static_dir_exists = os.path.exists(STATIC_DIR)
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI):
+async def app_lifespan(_: FastAPI):
     """
     Context manager for the app lifecycle. This is useful for running
     code before and after the app is started. This is used by the
