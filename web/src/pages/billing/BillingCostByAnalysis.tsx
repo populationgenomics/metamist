@@ -25,11 +25,9 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         searchParams.get('start') ?? getMonthStartDate()
     )
 
-    const [data, setData] = React.useState<any>([])
+    const [data, setData] = React.useState<any>(undefined)
 
-    const [searchTxt, setSearchTxt] = React.useState<string | undefined>(
-        searchParams.get('searchTxt') ?? undefined
-    )
+    const [searchTxt, setSearchTxt] = React.useState<string>(searchParams.get('searchTxt') ?? '')
 
     const searchOptions: string[] = Object.keys(SearchType).filter((item) => isNaN(Number(item)))
     const dropdownOptions = searchOptions.map((item) => ({
@@ -119,6 +117,39 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         handleSearch()
     }, [])
 
+    const errorComponent = () => {
+        if (error) {
+            return (
+                <Message negative onDismiss={() => setError(undefined)}>
+                    {error}
+                    <br />
+                    <Button negative onClick={() => setStart(start)}>
+                        Retry
+                    </Button>
+                </Message>
+            )
+        }
+
+        // if no error return null
+        return null
+    }
+
+    const loadingComponent = () => {
+        if (isLoading) {
+            return (
+                <div>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
+                    </p>
+                </div>
+            )
+        }
+
+        // otherwise return null
+        return null
+    }
+
     const searchCard = () => (
         <Card fluid style={{ padding: '20px' }} id="billing-container">
             <h1
@@ -167,51 +198,54 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         </Card>
     )
 
-    const gridCard = (data: BillingTotalCostRecord[]) => (
+    const gridCard = (gridData: BillingTotalCostRecord[]) => (
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGrid data={data} />
+            <HailBatchGrid data={gridData} />
         </Card>
     )
 
-    if (error) {
-        return (
-            <Message negative onDismiss={() => setError(undefined)}>
-                {error}
-                <br />
-                <Button negative onClick={() => setStart(start)}>
-                    Retry
-                </Button>
-            </Message>
-        )
-    }
+    const dataComponent = () => {
+        if (data !== undefined && data.costs.length > 0) {
+            // only render grid if there are available cost data
+            return gridCard(data.costs)
+        }
 
-    if (isLoading) {
-        return (
-            <div>
-                {searchCard()}
-                <LoadingDucks />
-                <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                    <em>This query takes a while...</em>
-                </p>
-            </div>
-        )
-    }
-
-    if (data.length === 0) {
-        return (
-            <div>
-                {searchCard()}
+        // if valid search text and no data return return No data message
+        if (
+            data !== undefined &&
+            searchByType !== undefined &&
+            searchTxt !== undefined &&
+            searchTxt.length > 5
+        ) {
+            return (
                 <p style={{ textAlign: 'center', marginTop: '5px' }}>
                     <em>No data found.</em>
                 </p>
-            </div>
-        )
+            )
+        }
+
+        // otherwise prompt user to search, if not loading already
+        if (!isLoading) {
+            return (
+                <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                    <em>
+                        Enter a search term above, select type and press search button to get
+                        started.
+                    </em>
+                </p>
+            )
+        }
+
+        // otherwise do not render anything
+        return null
     }
 
     return (
         <>
             {searchCard()}
-            {gridCard(data.costs)}
+            {errorComponent()}
+            {loadingComponent()}
+            {dataComponent()}
         </>
     )
 }
