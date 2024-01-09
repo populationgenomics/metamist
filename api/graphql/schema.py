@@ -264,6 +264,14 @@ class GraphQLAnalysis:
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
 
+    @strawberry.field
+    async def audit_logs(
+        self, info: Info, root: 'GraphQLAnalysis'
+    ) -> list[GraphQLAuditLog]:
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
+        audit_logs = await loader.load(root.audit_log_id)
+        return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
+
 
 @strawberry.type
 class GraphQLFamily:

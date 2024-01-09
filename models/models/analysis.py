@@ -85,10 +85,10 @@ class AnalysisInternal(SMBase):
 class Analysis(BaseModel):
     """Model for Analysis"""
 
-    id: int | None
     type: str
     status: AnalysisStatus
-    output: str = None
+    id: int | None = None
+    output: str | None = None
     sequencing_group_ids: list[str] = []
     author: str | None = None
     timestamp_completed: str | None = None
