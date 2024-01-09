@@ -1,23 +1,23 @@
 import os
 import time
 import traceback
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException, APIRouter
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from starlette.responses import FileResponse
 
+from api import routes
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
+from api.utils import get_openapi_schema_func
+from api.utils.exceptions import determine_code_from_error
 from db.python.connect import SMConnections
 from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
-
-from api import routes
-from api.utils import get_openapi_schema_func
-from api.utils.exceptions import determine_code_from_error
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
 _VERSION = '6.6.0'
@@ -28,7 +28,25 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')
 
 static_dir_exists = os.path.exists(STATIC_DIR)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    """
+    Context manager for the app lifecycle. This is useful for running
+    code before and after the app is started. This is used by the
+    `run` command.
+    """
+    try:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.connect()
+        yield
+    finally:
+        if not SKIP_DATABASE_CONNECTION:
+            await SMConnections.disconnect()
+
+
+app = FastAPI(lifespan=app_lifespan)
+
 
 if PROFILE_REQUESTS:
     from fastapi_profiler.profiler import PyInstrumentProfilerMiddleware
@@ -60,20 +78,6 @@ class SPAStaticFiles(StaticFiles):
             # server index.html if can't find existing resource
             response = await super().get_response('index.html', scope)
         return response
-
-
-@app.on_event('startup')
-async def startup():
-    """Server is starting up, connect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.connect()
-
-
-@app.on_event('shutdown')
-async def shutdown():
-    """Shutdown server, disconnect dbs"""
-    if not SKIP_DATABASE_CONNECTION:
-        await SMConnections.disconnect()
 
 
 @app.middleware('http')
@@ -169,8 +173,9 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':
-    import uvicorn
     import logging
+
+    import uvicorn
 
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
@@ -179,6 +184,5 @@ if __name__ == '__main__':
         'api.server:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
-        # debug=True,
         reload=True,
     )
