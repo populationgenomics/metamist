@@ -565,7 +565,7 @@ class GraphQLAssay:
     id: int
     type: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON
+    external_ids: strawberry.scalars.JSON | None
 
     sample_id: strawberry.Private[int]
 
