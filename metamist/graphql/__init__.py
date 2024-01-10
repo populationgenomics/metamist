@@ -54,7 +54,7 @@ def configure_sync_client(
     if _sync_client and not force_recreate:
         return _sync_client
     
-    env = os.getenv('SM_ENVIRONMENT').lower()
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
     if env == 'local':
         transport = RequestsHTTPTransport(url=url or get_sm_url())
     else:
@@ -83,7 +83,7 @@ async def configure_async_client(
     if _async_client and not force_recreate:
         return _async_client
     
-    env = os.getenv('SM_ENVIRONMENT').lower()
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
     if env == 'local':
         transport = AIOHTTPTransport(url=url or get_sm_url())
     else:
