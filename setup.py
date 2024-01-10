@@ -29,8 +29,8 @@ setup(
     install_requires=[
         'click',
         'google-auth',
-        'google-api-core',  # dependency to google-auth that however is not
-        # pulled automatically: https://github.com/googleapis/google-auth-library-python/blob/main/setup.py#L22-L27
+        'google-api-core',  # dependency to google-auth that is not auto pulled:
+        # https://github.com/googleapis/google-auth-library-python/blob/main/setup.py#L22-L27
         'urllib3 >= 1.25.3',
         'python-dateutil',
         'requests',

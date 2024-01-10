@@ -1,0 +1,16 @@
+bump2version
+click==8.0.4
+coverage
+nest-asyncio
+pre-commit
+pylint
+testcontainers[mariadb]
+types-PyMySQL
+# backup / recovery_test
+google-cloud-secret-manager==2.8.0
+# some strawberry dependency
+strawberry-graphql[debug-server]==0.217.0
+# following required to unit test etl functions
+functions_framework
+google-cloud-bigquery
+google-cloud-pubsub
