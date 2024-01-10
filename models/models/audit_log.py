@@ -1,6 +1,5 @@
 import datetime
 import json
-from typing import Any
 
 from models.base import SMBase
 from models.models.project import ProjectId
@@ -23,10 +22,10 @@ class AuditLogInternal(SMBase):
     meta: dict | None
 
     @staticmethod
-    def from_db(d: dict[str, Any]):
+    def from_db(d: dict):
         """Take DB mapping object, and return SampleSequencing"""
         meta = {}
         if 'meta' in d:
-            meta = json.loads(d.pop('meta') or {})
+            meta = json.loads(d.pop('meta'))
 
         return AuditLogInternal(meta=meta, **d)
