@@ -53,7 +53,7 @@ def authenticate(
             x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
         )
 
-    if token:
+    if token and (getenv('SM_ENVIRONMENT').lower() != 'local'):
         return email_from_id_token(token.credentials)
 
     if default_user := get_default_user():

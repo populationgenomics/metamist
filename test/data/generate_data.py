@@ -8,6 +8,8 @@ from pathlib import Path
 from pprint import pprint
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
+from metamist.configuration import Configuration
+from metamist.api_client import ApiClient
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
@@ -47,8 +49,10 @@ query EnumsQuery {
 async def main(ped_path=default_ped_location, project='greek-myth'):
     """Doing the generation for you"""
 
-    papi = ProjectApi()
-    sapi = SampleApi()
+    conf = Configuration.get_default_copy()
+    conf.access_token = "FAKE"
+    papi = ProjectApi(ApiClient(configuration=conf))
+    sapi = SampleApi(ApiClient(configuration=conf))
 
     enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
     # analysis_types = enum_resp['enum']['analysisType']
@@ -71,11 +75,11 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         participant_eids = [line.split('\t')[1] for line in f]
 
     with open(ped_path) as f:
-        await FamilyApi().import_pedigree_async(
+        await FamilyApi(ApiClient(configuration=conf)).import_pedigree_async(
             project=project, file=f, has_header=True, create_missing_participants=True
         )
 
-    id_map = await ParticipantApi().get_participant_id_map_by_external_ids_async(
+    id_map = await ParticipantApi(ApiClient(configuration=conf)).get_participant_id_map_by_external_ids_async(
         project=project, request_body=participant_eids
     )
 
@@ -221,7 +225,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )
     )
 
-    aapi = AnalysisApi()
+    aapi = AnalysisApi(ApiClient(configuration=conf))
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
         await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])

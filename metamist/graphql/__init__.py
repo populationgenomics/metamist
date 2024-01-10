@@ -147,7 +147,8 @@ async def query_async(
         variables = {}
 
     if not client:
-        client = await configure_async_client()
+        env = os.getenv('SM_ENVIRONMENT')
+        client = await configure_async_client(auth_token="FAKE" if env == 'local' else None)
 
     response = await client.execute_async(
         _query if isinstance(_query, DocumentNode) else gql(_query),
