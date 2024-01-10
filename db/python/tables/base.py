@@ -56,17 +56,16 @@ class DbBase:
             al.id as id,
             al.author as author,
             al.on_behalf_of as on_behalf_of,
+            al.timestamp as timestamp,
             al.ar_guid as ar_guid,
             al.comment as comment,
             al.auth_project as auth_project,
             al.meta as meta
-        FROM {table} t
-        FOR SYSTEM_TIME ALL
+        FROM {table} FOR SYSTEM_TIME ALL t
         INNER JOIN audit_log al
         ON al.id = t.audit_log_id
         WHERE t.{id_field} in :ids
-
-        """
+        """.strip()
         rows = await self.connection.fetch_all(_query, {'ids': ids})
         by_id = defaultdict(list)
         for r in rows:
