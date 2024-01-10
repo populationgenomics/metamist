@@ -214,6 +214,7 @@ class GraphQLAuditLog:
     timestamp: datetime.datetime
     ar_guid: str | None
     comment: str | None
+    meta: strawberry.scalars.JSON
 
     @staticmethod
     def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
@@ -223,6 +224,7 @@ class GraphQLAuditLog:
             timestamp=audit_log.timestamp,
             ar_guid=audit_log.ar_guid,
             comment=audit_log.comment,
+            meta=audit_log.meta,
         )
 
 
@@ -268,8 +270,8 @@ class GraphQLAnalysis:
     async def audit_logs(
         self, info: Info, root: 'GraphQLAnalysis'
     ) -> list[GraphQLAuditLog]:
-        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
-        audit_logs = await loader.load(root.audit_log_id)
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
+        audit_logs = await loader.load(root.id)
         return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
 
 
