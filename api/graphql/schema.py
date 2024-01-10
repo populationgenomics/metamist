@@ -9,7 +9,6 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 """
 import datetime
 from inspect import isclass
-from pymysql import connect
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -19,20 +18,21 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.layers import (
-    AnalysisLayer,
-    CohortLayer,
-    SampleLayer,
-    SequencingGroupLayer,
-)
+
 from db.python.layers.assay import AssayLayer
+from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.cohort import CohortLayer
 from db.python.layers.family import FamilyLayer
+from db.python.layers.sample import SampleLayer
+from db.python.layers.sequencing_group import SequencingGroupLayer
+
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.cohort import CohortFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
+
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
@@ -80,7 +80,6 @@ class GraphQLCohort:
 
     id: int
     name: str
-    project: str
     description: str
     author: str
     derived_from: int | None = None
@@ -107,6 +106,12 @@ class GraphQLCohort:
         sg_layer = SequencingGroupLayer(connection)
         sequencing_groups = await sg_layer.get_sequencing_groups_by_ids(sg_ids)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sequencing_groups]
+
+    @strawberry.field()
+    async def project(self, info: Info, root: 'Cohort') -> 'GraphQLProject':
+        loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
+        project = await loader.load(root.project)
+        return GraphQLProject.from_internal(project)
 
 
 @strawberry.type
@@ -462,11 +467,16 @@ class GraphQLSample:
 
     @strawberry.field
     async def assays(
-        self, info: Info, root: 'GraphQLSample', type: GraphQLFilter[str] | None = None
+        self,
+        info: Info,
+        root: 'GraphQLSample',
+        type: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLAssay']:
         loader_assays_for_sample_ids = info.context[LoaderKeys.ASSAYS_FOR_SAMPLES]
         filter_ = AssayFilter(
             type=type.to_internal_filter() if type else None,
+            meta=meta,
         )
         assays = await loader_assays_for_sample_ids.load(
             {'id': root.internal_id, 'filter': filter_}
@@ -493,16 +503,20 @@ class GraphQLSample:
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES]
 
         _filter = SequencingGroupFilter(
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             meta=meta,
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
         )
         obj = {'id': root.internal_id, 'filter': _filter}
         sequencing_groups = await loader.load(obj)
@@ -653,7 +667,9 @@ class Query:  # entry point to graphql.
                 user=connection.author, project_names=project_names, readonly=True
             )
             project_name_map = {p.name: p.id for p in projects}
-            project_filter = project.to_internal_filter(lambda pname: project_name_map[pname])
+            project_filter = project.to_internal_filter(
+                lambda pname: project_name_map[pname]
+            )
 
         filter_ = CohortFilter(
             id=id.to_internal_filter() if id else None,

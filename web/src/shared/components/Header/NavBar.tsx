@@ -1,88 +1,294 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Popup } from 'semantic-ui-react'
+import { Menu, Dropdown, Popup } from 'semantic-ui-react'
 
 // this wasn't working, so added import to HTML
 // import 'bootstrap/dist/css/bootstrap.min.css'
+
+import ConstructionIcon from '@mui/icons-material/Construction'
+import HomeIcon from '@mui/icons-material/Home'
 import ExploreIcon from '@mui/icons-material/Explore'
-import DescriptionIcon from '@mui/icons-material/Description'
 import InsightsIcon from '@mui/icons-material/Insights'
-import BuildIcon from '@mui/icons-material/Build'
-import Searchbar from './Search'
-import MuckTheDuck from '../MuckTheDuck'
+import TableRowsIcon from '@mui/icons-material/TableRows'
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
+import DescriptionIcon from '@mui/icons-material/Description'
+import TroubleshootIcon from '@mui/icons-material/Troubleshoot'
+import CodeIcon from '@mui/icons-material/Code'
 import DarkModeTriButton from './DarkModeTriButton/DarkModeTriButton'
+
+// import { BillingApi } from '../../../sm-api'
+
+import MuckTheDuck from '../MuckTheDuck'
 import SwaggerIcon from '../SwaggerIcon'
+import { ThemeContext } from '../ThemeProvider'
+
+import Searchbar from './Search'
+
 import './NavBar.css'
 
-const NavBar: React.FunctionComponent = () => (
-    <header className="App-header">
-        <div className="header">
-            <Link className="metamist-img" to="/">
-                <MuckTheDuck height={28} style={{ marginRight: '5px' }} />
-            </Link>
+// FIXME: Billing pages API query takes a long time on load and locks up the entire application
+// so I'm commenting this query out for now until it becomes faster. See below for the useEffect
+// where this query is performed. In general, I think we should avoid making API calls in the
+// NavBar unless they are absolutely necessary.
 
-            <Link className="metamist" to="/">
-                <span className="d-none d-lg-block">METAMIST</span>
-            </Link>
+// const billingPages = {
+//     title: 'Billing',
+//     url: '/billing',
+//     icon: <AttachMoneyIcon />,
+//     submenu: [
+//         {
+//             title: 'Home',
+//             url: '/billing',
+//             icon: <HomeIcon />,
+//         },
+//         {
+//             title: 'Invoice Month Cost',
+//             url: '/billing/invoiceMonthCost',
+//             icon: <TableRowsIcon />,
+//         },
+//         {
+//             title: 'Cost By Time',
+//             url: '/billing/costByTime',
+//             icon: <TableRowsIcon />,
+//         },
+//         {
+//             title: 'Seqr Prop Map',
+//             url: '/billing/seqrPropMap',
+//             icon: <TableRowsIcon />,
+//         },
+//     ],
+// }
 
-            <Link to="/project">
-                <span className="d-none d-lg-block navbarLink">Explore</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<ExploreIcon />} hoverable position="bottom center">
-                        <h5>Explore</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/analysis-runner">
-                <span className="d-none d-lg-block navbarLink">Analysis Runner</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<InsightsIcon />} hoverable position="bottom center">
-                        <h5>Analysis Runner</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/cohort-builder">
-                <span className="d-none d-lg-block navbarLink">Cohort Builder</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<InsightsIcon />} hoverable position="bottom center">
-                        <h5>Cohort Builder</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/swagger">
-                <span className="d-none d-lg-block navbarLink">Swagger</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup
-                        trigger={<SwaggerIcon height={22} style={{ marginTop: '2px' }} />}
-                        hoverable
-                        position="bottom center"
-                    >
-                        <h5>Swagger</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <Link to="/documentation">
-                <span className="d-none d-lg-block navbarLink">Docs</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<DescriptionIcon />} hoverable position="bottom center">
-                        <h5>Docs</h5>
-                    </Popup>
-                </span>
-            </Link>
-            <a href="/graphql">
-                <span className="d-none d-lg-block navbarLink">GraphQL</span>
-                <span className="d-lg-none navbarIcon">
-                    <Popup trigger={<BuildIcon />} hoverable position="bottom center">
-                        <h5>GraphQL</h5>
-                    </Popup>
-                </span>
-            </a>
-            <div style={{ marginLeft: 'auto' }}>
-                <DarkModeTriButton />
-            </div>
-            <Searchbar />
-        </div>
-    </header>
-)
+interface MenuItemDetails {
+    title: string
+    url: string
+    icon: JSX.Element
+    external?: boolean
+    submenu?: MenuItemDetails[]
+}
+
+interface MenuItemProps {
+    index: number
+    item: MenuItemDetails
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({ index, item }) => {
+    const theme = React.useContext(ThemeContext)
+    const isDarkMode = theme.theme === 'dark-mode'
+
+    const dropdown = (i: MenuItemDetails) => (
+        <Dropdown text={i.title} key={index} simple>
+            <Dropdown.Menu id="navDrop">
+                {i.submenu &&
+                    i.submenu.map((subitem, subindex) => {
+                        if (subitem.external) {
+                            return (
+                                <Dropdown.Item id="navItem" key={subindex}>
+                                    <a href={subitem.url}>{subitem.title}</a>
+                                </Dropdown.Item>
+                            )
+                        }
+
+                        return (
+                            <Dropdown.Item as={Link} id="navItem" to={subitem.url} key={subindex}>
+                                {subitem.title}
+                            </Dropdown.Item>
+                        )
+                    })}
+            </Dropdown.Menu>
+        </Dropdown>
+    )
+
+    const popup = (child: React.ReactNode, icon: JSX.Element) => (
+        <>
+            <span className="d-none d-lg-block navbarLink">{child}</span>
+            <span className="d-lg-none navbarIcon">
+                <Popup
+                    inverted={isDarkMode}
+                    className="navPopup"
+                    trigger={icon}
+                    hoverable
+                    position="bottom center"
+                >
+                    <h5>{child}</h5>
+                </Popup>
+            </span>
+        </>
+    )
+
+    return item.submenu ? (
+        <Menu.Item className="navItem">{popup(dropdown(item), item.icon)}</Menu.Item>
+    ) : (
+        <Menu.Item as={Link} className="navItem" to={item.url} key={index}>
+            {popup(item.title, item.icon)}
+        </Menu.Item>
+    )
+}
+
+interface NavBarProps {
+    fixed?: boolean
+}
+
+const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
+    const menuItems: MenuItemDetails[] = [
+        {
+            title: 'Explore',
+            url: '/project',
+            icon: <ExploreIcon />,
+        },
+        {
+            title: 'Analysis Runner',
+            url: '/analysis-runner',
+            icon: <InsightsIcon />,
+        },
+        {
+            title: 'Cohort Builder',
+            url: '/cohort-builder',
+            icon: <ConstructionIcon />,
+        },
+        {
+            title: 'Billing',
+            url: '/billing',
+            icon: <AttachMoneyIcon />,
+            submenu: [
+                {
+                    title: 'Home',
+                    url: '/billing',
+                    icon: <HomeIcon />,
+                },
+                {
+                    title: 'Invoice Month Cost',
+                    url: '/billing/invoiceMonthCost',
+                    icon: <TableRowsIcon />,
+                },
+                {
+                    title: 'Cost By Time',
+                    url: '/billing/costByTime',
+                    icon: <TableRowsIcon />,
+                },
+                {
+                    title: 'Seqr Prop Map',
+                    url: '/billing/seqrPropMap',
+                    icon: <TableRowsIcon />,
+                },
+            ],
+        },
+        {
+            title: 'API',
+            url: '/api',
+            icon: <CodeIcon />,
+            submenu: [
+                {
+                    title: 'Swagger',
+                    url: '/swagger',
+                    icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />,
+                },
+                {
+                    title: 'GraphQL',
+                    url: '/graphql',
+                    icon: <TroubleshootIcon />,
+                    external: true,
+                },
+            ],
+        },
+        {
+            title: 'Docs',
+            url: '/documentation',
+            icon: <DescriptionIcon />,
+        },
+    ]
+    // const [menuItems, setMenuItems] = React.useState<MenuItemDetails[]>([
+    //     {
+    //         title: 'Explore',
+    //         url: '/project',
+    //         icon: <ExploreIcon />,
+    //     },
+    //     {
+    //         title: 'Analysis Runner',
+    //         url: '/analysis-runner',
+    //         icon: <InsightsIcon />,
+    //     },
+    //     {
+    //         title: 'Cohort Builder',
+    //         url: '/cohort-builder',
+    //         icon: <ConstructionIcon />,
+    //     },
+    //     {
+    //         title: 'Billing',
+    //         url: '/billing',
+    //         icon: <AttachMoneyIcon />,
+    //         submenu: [
+    //             {
+    //                 title: 'Home',
+    //                 url: '/billing',
+    //                 icon: <HomeIcon />,
+    //             },
+    //             {
+    //                 title: 'Invoice Month Cost',
+    //                 url: '/billing/invoiceMonthCost',
+    //                 icon: <TableRowsIcon />,
+    //             },
+    //             {
+    //                 title: 'Cost By Time',
+    //                 url: '/billing/costByTime',
+    //                 icon: <TableRowsIcon />,
+    //             },
+    //             {
+    //                 title: 'Seqr Prop Map',
+    //                 url: '/billing/seqrPropMap',
+    //                 icon: <TableRowsIcon />,
+    //             },
+    //         ],
+    //     },
+    //     {
+    //         title: 'Swagger',
+    //         url: '/swagger',
+    //         icon: <SwaggerIcon height={22} style={{ marginTop: '2px' }} />,
+    //     },
+    //     {
+    //         title: 'Docs',
+    //         url: '/documentation',
+    //         icon: <DescriptionIcon />,
+    //     },
+    //     {
+    //         title: 'GraphQL',
+    //         url: '/graphql',
+    //         icon: <TroubleshootIcon />,
+    //     },
+    // ])
+
+    // React.useEffect(() => {
+    //     new BillingApi().getTopics().then((response) => {
+    //         if (response.status === 200) {
+    //             setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+    //         }
+    //     })
+    // }, [])
+
+    return (
+        <header className="App-header">
+            <Menu className="header">
+                <Menu.Item as={Link} id="metamist-img" to="/">
+                    <MuckTheDuck height={28} style={{ marginRight: '5px' }} />
+                    METAMIST
+                </Menu.Item>
+
+                {menuItems.map((item, index) => (
+                    <MenuItem index={index} item={item} key={index} />
+                ))}
+
+                <Menu.Menu position="right">
+                    <Menu.Item>
+                        <DarkModeTriButton />
+                    </Menu.Item>
+
+                    <Menu.Item>
+                        <Searchbar />
+                    </Menu.Item>
+                </Menu.Menu>
+            </Menu>
+        </header>
+    )
+}
 
 export default NavBar

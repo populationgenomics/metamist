@@ -42,7 +42,9 @@ class AssayFilter(GenericFilterModel):
     type: GenericFilter | None = None
 
     def __hash__(self):  # pylint: disable=useless-super-delegation
-        return super().__hash__()
+        return hash(
+            (self.id, self.sample_id, self.external_id, self.project, self.type)
+        )
 
 
 class AssayTable(DbBase):

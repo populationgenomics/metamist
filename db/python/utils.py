@@ -80,6 +80,7 @@ class NoProjectAccess(Forbidden):
         )
 
 
+# pylint: disable=too-many-instance-attributes
 class GenericFilter(Generic[T]):
     """
     Generic filter for eq, in_ (in) and nin (not in)
@@ -92,6 +93,8 @@ class GenericFilter(Generic[T]):
     gte: T | None = None
     lt: T | None = None
     lte: T | None = None
+    contains: T | None = None
+    icontains: T | None = None
 
     def __init__(
         self,
@@ -102,6 +105,8 @@ class GenericFilter(Generic[T]):
         gte: T | None = None,
         lt: T | None = None,
         lte: T | None = None,
+        contains: T | None = None,
+        icontains: T | None = None,
     ):
         self.eq = eq
         self.in_ = in_
@@ -110,9 +115,11 @@ class GenericFilter(Generic[T]):
         self.gte = gte
         self.lt = lt
         self.lte = lte
+        self.contains = contains
+        self.icontains = icontains
 
     def __repr__(self):
-        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte']
+        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte', 'contains', 'icontains']
         inner_values = ', '.join(
             f'{k}={getattr(self, k)!r}' for k in keys if getattr(self, k) is not None
         )
@@ -129,6 +136,8 @@ class GenericFilter(Generic[T]):
                 self.gte,
                 self.lt,
                 self.lte,
+                self.contains,
+                self.icontains,
             )
         )
 
@@ -193,6 +202,14 @@ class GenericFilter(Generic[T]):
             k = self.generate_field_name(column + '_lte')
             conditionals.append(f'{column} <= :{k}')
             values[k] = self._sql_value_prep(self.lte)
+        if self.contains is not None:
+            k = self.generate_field_name(column + '_contains')
+            conditionals.append(f'{column} LIKE :{k}')
+            values[k] = self._sql_value_prep(f'%{self.contains}%')
+        if self.icontains is not None:
+            k = self.generate_field_name(column + '_icontains')
+            conditionals.append(f'LOWER({column}) LIKE LOWER(:{k})')
+            values[k] = self._sql_value_prep(f'%{self.icontains}%')
 
         return ' AND '.join(conditionals), values
 

@@ -4,7 +4,6 @@ import datetime
 
 from db.python.connect import DbBase
 from db.python.tables.project import ProjectId
-from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.cohort import Cohort
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
@@ -56,12 +55,16 @@ class CohortTable(DbBase):
         cohorts = [Cohort.from_db(dict(row)) for row in rows]
         return cohorts
 
-    async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list:
+    async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list[int]:
+        """
+        Return all sequencing group IDs for the given cohort.
+        """
+
         _query = """
         SELECT sequencing_group_id FROM cohort_sequencing_group WHERE cohort_id = :cohort_id
         """
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
-        return [row["sequencing_group_id"] for row in rows]
+        return [row['sequencing_group_id'] for row in rows]
 
     async def create_cohort(
         self,
@@ -76,34 +79,37 @@ class CohortTable(DbBase):
         Create a new cohort
         """
 
-        _query = """
-        INSERT INTO cohort (name, derived_from, author, description, project) 
-        VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
-        """
+        # Use an atomic transaction for a mult-part insert query to prevent the database being
+        # left in an incomplete state if the query fails part way through.
+        async with self.connection.transaction():
+            _query = """
+            INSERT INTO cohort (name, derived_from, author, description, project)
+            VALUES (:name, :derived_from, :author, :description, :project) RETURNING id
+            """
 
-        cohort_id = await self.connection.fetch_val(
-            _query,
-            {
-                'derived_from': derived_from,
-                'author': author,
-                'description': description,
-                'project': project,
-                'name': cohort_name,
-            },
-        )
-
-        _query = """
-        INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id) 
-        VALUES (:cohort_id, :sequencing_group_id)
-        """
-
-        for sg in sequencing_group_ids:
-            await self.connection.execute(
+            cohort_id = await self.connection.fetch_val(
                 _query,
                 {
-                    'cohort_id': cohort_id,
-                    'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                    'derived_from': derived_from,
+                    'author': author,
+                    'description': description,
+                    'project': project,
+                    'name': cohort_name,
                 },
             )
 
-        return cohort_id
+            _query = """
+            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id)
+            VALUES (:cohort_id, :sequencing_group_id)
+            """
+
+            for sg in sequencing_group_ids:
+                await self.connection.execute(
+                    _query,
+                    {
+                        'cohort_id': cohort_id,
+                        'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                    },
+                )
+
+            return cohort_id

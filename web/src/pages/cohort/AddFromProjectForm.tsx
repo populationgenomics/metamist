@@ -1,141 +1,265 @@
 import React, { useState, useContext } from 'react'
-import { Container, Form } from 'semantic-ui-react'
-import { useQuery } from '@apollo/client'
+import { Container, Form, Message } from 'semantic-ui-react'
+import { useLazyQuery } from '@apollo/client'
+import { uniq } from 'lodash'
 
 import { gql } from '../../__generated__/gql'
 import { ThemeContext } from '../../shared/components/ThemeProvider'
 import MuckError from '../../shared/components/MuckError'
 
 import SequencingGroupTable from './SequencingGroupTable'
-import { SequencingGroup } from './types'
-import { setSearchParams } from '../../sm-api/common'
+import { Project, SequencingGroup } from './types'
+import { FetchSequencingGroupsQueryVariables } from '../../__generated__/graphql'
 
-const GET_PROJECTS_QUERY = gql(`
-query VisibleProjects($activeOnly: Boolean!) {
-    myProjects {
-        id
-        name
-        sequencingGroups(activeOnly: {eq: $activeOnly}) {
-            id
-            type
-            technology
-            platform
+const GET_SEQUENCING_GROUPS_QUERY = gql(`
+query FetchSequencingGroups(
+    $project: String!,
+    $platform: String,
+    $technology: String,
+    $seqType: String,
+    $assayMeta: JSON,
+    $excludeIds: [String!]
+  ) {
+    project(name: $project) {
+      participants {
+        samples {
+          assays(meta: $assayMeta) {
+            sample {
+              sequencingGroups(
+                id: {nin: $excludeIds}
+                platform: {icontains: $platform}
+                technology: {icontains: $technology}
+                type: {contains: $seqType}
+              ) {
+                id
+                type
+                technology
+                platform
+              }
+            }
+          }
         }
+      }
     }
-}`)
+  }
+`)
+
+// NOTE: Put additional objects here to add more search fields for assay metadata
+const assayMetaSearchFields = [
+    { label: 'Batch', id: 'batch', searchVariable: 'batch' },
+    // { label: 'Emoji', id: 'emoji', searchVariable: 'emoji' },
+]
 
 interface IAddFromProjectForm {
+    projects: Project[]
     onAdd: (sequencingGroups: SequencingGroup[]) => void
 }
 
-const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ onAdd }) => {
-    const [sequencingGroups, setSequencingGroups] = useState<SequencingGroup[]>([])
-    const [searchHits, setSearchHits] = useState<SequencingGroup[]>([])
+const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) => {
+    const [selectedProject, setSelectedProject] = useState<Project>()
+    const [searchHits, setSearchHits] = useState<SequencingGroup[] | null>(null)
 
     const { theme } = useContext(ThemeContext)
     const inverted = theme === 'dark-mode'
 
     // Load all available projects and associated data for this user
-    const { loading, error, data } = useQuery(GET_PROJECTS_QUERY, {
-        variables: { activeOnly: true },
-    })
-
-    if (loading) {
-        return <div>Loading project form...</div>
-    }
-
-    if (error) {
-        return <MuckError message={error.message} />
-    }
-
-    const projectOptions: { key: any; value: any; text: any }[] | undefined = []
-    if (!loading && data?.myProjects) {
-        data.myProjects.forEach((project) => {
-            projectOptions.push({ key: project.id, value: project.id, text: project.name })
-        })
-    }
+    const [searchSquencingGroups, { loading, error }] = useLazyQuery(GET_SEQUENCING_GROUPS_QUERY)
 
     const search = () => {
-        const seqType = (document.getElementById('seq_type') as HTMLInputElement)?.value?.trim()
-        const technology = (
-            document.getElementById('technology') as HTMLInputElement
-        )?.value?.trim()
-        const platform = (document.getElementById('platform') as HTMLInputElement)?.value?.trim()
-        // const batch = (document.getElementById('batch') as HTMLInputElement)?.value?.trim()
+        const seqTypeInput = document.getElementById('seq_type') as HTMLInputElement
+        const technologyInput = document.getElementById('technology') as HTMLInputElement
+        const platformInput = document.getElementById('platform') as HTMLInputElement
+        const excludeInput = document.getElementById('exclude') as HTMLInputElement
 
-        const hits = sequencingGroups
-        setSearchHits(
-            hits.filter(
-                (sg: SequencingGroup) =>
-                    (!seqType || sg.type.toLowerCase().includes(seqType.toLowerCase())) &&
-                    (!technology ||
-                        sg.technology.toLowerCase().includes(technology.toLowerCase())) &&
-                    (!platform || sg.platform.toLowerCase().includes(platform.toLowerCase()))
-            )
-        )
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const updateSequencingGroupSelection = (_: any, d: any) => {
-        if (!data?.myProjects) {
-            setSequencingGroups([])
+        if (!selectedProject?.name) {
             return
         }
 
-        const newSequencingGroups: SequencingGroup[] = []
-        data.myProjects.forEach((project) => {
-            if (d.value.includes(project.id)) {
-                project.sequencingGroups.forEach((sg: SequencingGroup) => {
-                    newSequencingGroups.push({
+        const searchParams: FetchSequencingGroupsQueryVariables = {
+            project: selectedProject.name,
+            seqType: null,
+            technology: null,
+            platform: null,
+            excludeIds: [],
+            assayMeta: {},
+        }
+
+        if (seqTypeInput?.value) {
+            searchParams.seqType = seqTypeInput.value
+        }
+
+        if (technologyInput?.value) {
+            searchParams.technology = technologyInput.value
+        }
+
+        if (platformInput?.value) {
+            searchParams.platform = platformInput.value
+        }
+
+        if (excludeInput?.value && excludeInput.value.trim().length > 0) {
+            searchParams.excludeIds = excludeInput.value
+                .split(',')
+                .map((id) => id.trim())
+                .filter((id) => id.length > 0)
+        }
+
+        assayMetaSearchFields.forEach((field) => {
+            const input = document.getElementById(field.id) as HTMLInputElement
+            if (input?.value) {
+                searchParams.assayMeta[field.searchVariable] = input.value
+            }
+        })
+
+        searchSquencingGroups({
+            variables: {
+                project: selectedProject.name,
+                seqType: searchParams.seqType,
+                technology: searchParams.technology,
+                platform: searchParams.platform,
+                assayMeta: searchParams.assayMeta,
+                excludeIds: searchParams.excludeIds,
+            },
+            onError: () => {
+                setSearchHits(null)
+            },
+            onCompleted: (hits) => {
+                const samples = hits.project.participants.flatMap((p) => p.samples)
+                const assays = samples.flatMap((s) => s.assays)
+
+                const sgs = assays.flatMap((a) =>
+                    a.sample.sequencingGroups.map((sg) => ({
                         id: sg.id,
                         type: sg.type,
                         technology: sg.technology,
                         platform: sg.platform,
-                        project: { id: project.id, name: project.name },
-                    })
-                })
-            }
-        })
+                        project: { id: selectedProject.id, name: selectedProject.name },
+                    }))
+                )
 
-        setSequencingGroups(newSequencingGroups)
+                // Remove duplicates by merging string fields with same id
+                const merged: SequencingGroup[] = []
+                const seen = new Set()
+                sgs.forEach((sg) => {
+                    if (!seen.has(sg.id)) {
+                        merged.push(sg)
+                        seen.add(sg.id)
+                    } else {
+                        const existing = merged.find((e) => e.id === sg.id)
+                        if (existing) {
+                            existing.type = `${existing.type}|${sg.type}`
+                            existing.technology = `${existing.technology}|${sg.technology}`
+                            existing.platform = `${existing.platform}|${sg.platform}`
+                        }
+                    }
+                })
+
+                setSearchHits(
+                    merged.map((sg) => ({
+                        ...sg,
+                        type: uniq(sg.type.split('|')).sort().join(' | '),
+                        technology: uniq(sg.technology.split('|')).sort().join(' | '),
+                        platform: uniq(sg.platform.split('|')).sort().join(' | '),
+                    }))
+                )
+            },
+        })
     }
+
+    const renderTable = () => {
+        if (loading || searchHits == null) {
+            return null
+        }
+
+        if (searchHits.length === 0) {
+            return (
+                <Message warning visible>
+                    No sequencing groups found matching your query
+                </Message>
+            )
+        }
+
+        return <SequencingGroupTable sequencingGroups={searchHits} editable={false} />
+    }
+
+    const projectOptions = projects.map((project) => ({
+        key: project.id,
+        value: project.id,
+        text: project.name,
+    }))
 
     return (
         <Form inverted={inverted}>
             <h3>Project</h3>
-            <p>Include Sequencing Groups from the following projects</p>
+            <p>Include sequencing groups from the following project</p>
             <Form.Dropdown
                 placeholder="Select Projects"
                 fluid
-                multiple
                 selection
-                onChange={updateSequencingGroupSelection}
+                onChange={(_, d) => {
+                    const project = projects.find((p) => p.id === d.value)
+                    if (!project) return
+                    setSelectedProject({ id: project.id, name: project.name })
+                }}
                 options={projectOptions}
             />
 
             <p>
-                Including the Sequencing Groups which match the following criteria (leave blank to
-                include all Sequencing Groups)
+                Matching the following search criteria (leave blank to include all Sequencing
+                Groups)
             </p>
             <Container>
-                <Form.Input label="Sequencing Type" name="seq_type" id="seq_type" />
-                <Form.Input label="Technology" name="technology" id="technology" />
-                <Form.Input label="Platform" name="platform" id="platform" />
-                <Form.Input label="Assay Batch" name="batch" id="batch" />
+                <Form.Input label="Sequencing Type" id="seq_type" />
+                <Form.Input label="Technology" id="technology" />
+                <Form.Input label="Platform" id="platform" />
+                {assayMetaSearchFields.map((field) => (
+                    <Form.Input label={field.label} id={field.id} key={field.id} />
+                ))}
+                <Form.Input
+                    placeholder="CPG1,CPG2"
+                    label="Exclude Sequencing Group IDs"
+                    id="exclude"
+                />
             </Container>
             <br />
             <Form.Group>
-                <Form.Button type="button" content="Search" onClick={search} />
                 <Form.Button
                     type="button"
+                    loading={loading}
+                    disabled={selectedProject == null}
+                    content="Search"
+                    onClick={search}
+                />
+                <Form.Button
+                    type="button"
+                    disabled={
+                        loading ||
+                        error != null ||
+                        selectedProject == null ||
+                        searchHits == null ||
+                        searchHits.length === 0
+                    }
                     content="Add"
                     onClick={() => {
-                        onAdd(searchHits)
+                        if (searchHits == null) return
+                        // eslint-disable-next-line no-alert
+                        const proceed = window.confirm(
+                            'This will add all sequencing groups in the table to your Cohort. ' +
+                                'sequencing groups hidden by the interactive table search will ' +
+                                'also be added. Do you wish to continue?'
+                        )
+                        if (proceed) {
+                            onAdd(searchHits)
+                            setSearchHits(null)
+                        }
                     }}
                 />
             </Form.Group>
-            <br />
-            <SequencingGroupTable editable={false} sequencingGroups={searchHits} />
+            {error && (
+                <Message color="red">
+                    <MuckError message={error.message} />
+                </Message>
+            )}
+            {renderTable()}
         </Form>
     )
 }
