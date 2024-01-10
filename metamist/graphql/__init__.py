@@ -54,13 +54,18 @@ def configure_sync_client(
     if _sync_client and not force_recreate:
         return _sync_client
 
-    token = auth_token or get_google_identity_token(
-        target_audience=metamist.configuration.sm_url
-    )
-    transport = RequestsHTTPTransport(
-        url=url or get_sm_url(),
-        headers={'Authorization': f'Bearer {token}'},
-    )
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
+    if env == 'local':
+        transport = RequestsHTTPTransport(url=url or get_sm_url())
+    else:
+        token = auth_token or get_google_identity_token(
+            target_audience=metamist.configuration.sm_url
+        )
+        transport = RequestsHTTPTransport(
+            url=url or get_sm_url(),
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
     _sync_client = Client(
         transport=transport, schema=schema, fetch_schema_from_transport=schema is None
     )
@@ -78,13 +83,18 @@ async def configure_async_client(
     if _async_client and not force_recreate:
         return _async_client
 
-    token = auth_token or get_google_identity_token(
-        target_audience=metamist.configuration.sm_url
-    )
-    transport = AIOHTTPTransport(
-        url=url or get_sm_url(),
-        headers={'Authorization': f'Bearer {token}'},
-    )
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
+    if env == 'local':
+        transport = AIOHTTPTransport(url=url or get_sm_url())
+    else:
+        token = auth_token or get_google_identity_token(
+            target_audience=metamist.configuration.sm_url
+        )
+        transport = AIOHTTPTransport(
+            url=url or get_sm_url(),
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
     _async_client = Client(
         transport=transport, schema=schema, fetch_schema_from_transport=schema is None
     )
