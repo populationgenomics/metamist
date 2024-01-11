@@ -5,7 +5,7 @@ GraphQL utilities for Metamist, allows you to:
     - validate queries with metamist schema (by fetching the schema)
 """
 import os
-from typing import Dict, Any, Bool
+from typing import Dict, Any
 
 from gql import Client, gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
@@ -138,7 +138,7 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 # use older style typing to broaden supported Python versions
 def query(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: Bool = False
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
     """Query the metamist GraphQL API"""
     if variables is None:
@@ -160,7 +160,7 @@ def query(
 
 
 async def query_async(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: Bool = False
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
     """Asynchronously query the Metamist GraphQL API"""
     if variables is None:
