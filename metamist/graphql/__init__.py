@@ -5,11 +5,13 @@ GraphQL utilities for Metamist, allows you to:
     - validate queries with metamist schema (by fetching the schema)
 """
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Bool
 
 from gql import Client, gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.aiohttp import log as aiohttp_logger
 from gql.transport.requests import RequestsHTTPTransport
+from gql.transport.requests import log as requests_logger
 
 from cpg_utils.cloud import get_google_identity_token
 
@@ -136,25 +138,38 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 # use older style typing to broaden supported Python versions
 def query(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: Bool = False
 ) -> Dict[str, Any]:
     """Query the metamist GraphQL API"""
     if variables is None:
         variables = {}
 
+    # disable logging for gql
+    current_level = aiohttp_logger.level
+    if not log_response:
+        requests_logger.setLevel('WARNING')
+
     response = (client or configure_sync_client()).execute_sync(
         _query if isinstance(_query, DocumentNode) else gql(_query),
         variable_values=variables,
     )
+
+    if not log_response:
+        requests_logger.setLevel(current_level)
     return response
 
 
 async def query_async(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: Bool = False
 ) -> Dict[str, Any]:
     """Asynchronously query the Metamist GraphQL API"""
     if variables is None:
         variables = {}
+
+    # disable logging for gql
+    current_level = aiohttp_logger.level
+    if log_response:
+        aiohttp_logger.setLevel('WARNING')
 
     if not client:
         client = await configure_async_client()
@@ -163,4 +178,8 @@ async def query_async(
         _query if isinstance(_query, DocumentNode) else gql(_query),
         variable_values=variables,
     )
+
+    if log_response:
+        aiohttp_logger.setLevel(current_level)
+
     return response
