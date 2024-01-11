@@ -498,7 +498,7 @@ class GraphQLSequencingGroup:
             technology=internal.technology,
             platform=internal.platform,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
@@ -575,7 +575,7 @@ class GraphQLAssay:
             id=internal.id,
             type=internal.type,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             sample_id=internal.sample_id,
         )
