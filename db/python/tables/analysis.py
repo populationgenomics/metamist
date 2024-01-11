@@ -14,6 +14,7 @@ from db.python.utils import (
 )
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
+from models.models.audit_log import AuditLogInternal
 from models.models.project import ProjectId
 
 
@@ -395,7 +396,7 @@ WHERE a.id = :analysis_id
         self,
         sample_ids: list[int],
         analysis_type: str | None,
-        status: AnalysisStatus,
+        status: AnalysisStatus | None,
     ) -> tuple[set[ProjectId], list[AnalysisInternal]]:
         """
         Get relevant analyses for a sample, optional type / status filters
@@ -593,3 +594,11 @@ GROUP BY seq_type
 
         rows = await self.connection.fetch_all(_query, {'sg_ids': sg_ids})
         return {r['sg_id']: r['timestamp_completed'].date() for r in rows}
+
+    async def get_audit_log_for_analysis_ids(
+        self, analysis_ids: list[int]
+    ) -> dict[int, list[AuditLogInternal]]:
+        """
+        Get audit logs for analysis IDs
+        """
+        return await self.get_all_audit_logs_for_table('analysis', analysis_ids)

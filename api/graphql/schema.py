@@ -214,6 +214,7 @@ class GraphQLAuditLog:
     timestamp: datetime.datetime
     ar_guid: str | None
     comment: str | None
+    meta: strawberry.scalars.JSON
 
     @staticmethod
     def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
@@ -223,6 +224,7 @@ class GraphQLAuditLog:
             timestamp=audit_log.timestamp,
             ar_guid=audit_log.ar_guid,
             comment=audit_log.comment,
+            meta=audit_log.meta,
         )
 
 
@@ -237,7 +239,6 @@ class GraphQLAnalysis:
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    author: str
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -249,7 +250,6 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            author=internal.author,
         )
 
     @strawberry.field
@@ -265,6 +265,14 @@ class GraphQLAnalysis:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
+
+    @strawberry.field
+    async def audit_logs(
+        self, info: Info, root: 'GraphQLAnalysis'
+    ) -> list[GraphQLAuditLog]:
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
+        audit_logs = await loader.load(root.id)
+        return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
 
 
 @strawberry.type
@@ -393,7 +401,6 @@ class GraphQLSample:
     active: bool
     meta: strawberry.scalars.JSON
     type: str
-    author: str | None
 
     # keep as integers, because they're useful to reference in the fields below
     internal_id: strawberry.Private[int]
@@ -408,7 +415,6 @@ class GraphQLSample:
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
-            author=sample.author,
             # internals
             internal_id=sample.id,
             participant_id=sample.participant_id,

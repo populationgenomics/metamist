@@ -21,10 +21,13 @@ const GET_ANALYSIS_RUNNER_LOGS = gql(`
 query AnalysisRunnerLogs($project_name: String!) {
     project(name: $project_name) {
         analyses(type: { eq: "analysis-runner" }, status: {eq: UNKNOWN}) {
-          author
           id
           meta
           output
+          auditLogs {
+            author
+            timestamp
+          }
         }
       }
   }
@@ -80,20 +83,24 @@ const AnalysisRunnerSummary: React.FunctionComponent = () => {
         ])
     }
 
-    const flatData = data?.project.analyses.map(({ author, id, output, meta }, i) => ({
-        email: author,
-        id,
-        output,
-        ...meta,
-        position: i,
-        'Hail Batch': meta?.batch_url
-            ? meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', '')
-            : '',
-        GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
-        Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
-        Author: `${parseEmail(sanitiseValue(author))}`,
-        Image: meta?.driverImage ? `${parseDriverImage(sanitiseValue(meta?.driverImage))}` : '',
-    }))
+    const flatData = data?.project.analyses.map(({ auditLogs, id, output, meta }, i) => {
+        const author = _.orderBy(auditLogs, ['timestamp'])[0]?.author
+
+        return {
+            email: author,
+            id,
+            output,
+            ...meta,
+            position: i,
+            'Hail Batch': meta?.batch_url
+                ? meta?.batch_url.replace('https://batch.hail.populationgenomics.org.au/', '')
+                : '',
+            GitHub: `${meta?.repo}@${meta?.commit.substring(0, 7)}`,
+            Date: `${parseDate(sanitiseValue(meta?.timestamp))}`,
+            Author: `${parseEmail(sanitiseValue(author))}`,
+            Image: meta?.driverImage ? `${parseDriverImage(sanitiseValue(meta?.driverImage))}` : '',
+        }
+    })
 
     return (
         <>
