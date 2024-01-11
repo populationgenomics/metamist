@@ -13,53 +13,57 @@ interface IStackedBarChartProps {
 
 function getSeries(data: IStackedBarChartData[] | undefined) {
     if (!data || data.length === 0) {
-        return [];
+        return []
     }
 
     return Object.keys(data[0].values)
 }
 
 function alignToStartOfMonth(date: Date): Date {
-    const year = date.getFullYear();
-    const month = date.getMonth();
+    const year = date.getFullYear()
+    const month = date.getMonth()
     return new Date(Date.UTC(year, month, 1))
 }
 
 function createNewDates(lastDate: Date, differenceInDays: number): Date[] {
-    const newDates: Date[] = [];
+    const newDates: Date[] = []
     for (let i = 1; i <= 3; i++) {
-        const newDate = new Date(lastDate.getTime() + i * differenceInDays * 24 * 60 * 60 * 1000);
-        if(differenceInDays > 28) {
-            const alignedDate = alignToStartOfMonth(newDate);
+        const newDate = new Date(lastDate.getTime() + i * differenceInDays * 24 * 60 * 60 * 1000)
+        if (differenceInDays > 28) {
+            const alignedDate = alignToStartOfMonth(newDate)
             newDates.push(alignedDate)
-        }
-        else{
+        } else {
             newDates.push(newDate)
         }
     }
-    return newDates;
+    return newDates
 }
 
 function getNewDates(data: IStackedBarChartData[]) {
     // need at least 2 days to extrapolate
     if (!data || data.length < 2) {
-        return [];
+        return []
     }
 
     // Get the last date in the data array
-    const lastDate = data[data.length - 1].date;
-    const prevDate = data[data.length - 2].date;
+    const lastDate = data[data.length - 1].date
+    const prevDate = data[data.length - 2].date
 
-    const timeDifference = Math.abs(lastDate.getTime() - prevDate.getTime());
-    const differenceInDays = Math.ceil(timeDifference / (1000 * 3600 * 24));
+    const timeDifference = Math.abs(lastDate.getTime() - prevDate.getTime())
+    const differenceInDays = Math.ceil(timeDifference / (1000 * 3600 * 24))
 
     // for monthly add 3 extra days so we get the next month
-    return createNewDates(lastDate, differenceInDays > 28 ? differenceInDays + 3: differenceInDays)
+    return createNewDates(lastDate, differenceInDays > 28 ? differenceInDays + 3 : differenceInDays)
 }
 
-function prepareData(series: string[], data: IStackedBarChartData[], accumulate: boolean, newDates: Date[]) {
+function prepareData(
+    series: string[],
+    data: IStackedBarChartData[],
+    accumulate: boolean,
+    newDates: Date[]
+) {
     if (!data || data.length === 0) {
-        return [];
+        return []
     }
 
     const predictedRatio = newDates.length / data.length
@@ -71,44 +75,46 @@ function prepareData(series: string[], data: IStackedBarChartData[], accumulate:
         return {
             date,
             values: series.reduce((acc: Record<string, number>, key: string) => {
-                const values = { ...acc };
-                const interpolator = d3.interpolate(firstDateData.values[key], lastDateData.values[key]);
-                const predX = 1 + (i + 1) * predictedRatio;
-                const predictedValue = interpolator(predX);
-                values[key] = predictedValue < 0 ? lastDateData.values[key] : predictedValue;
-                return values;
+                const values = { ...acc }
+                const interpolator = d3.interpolate(
+                    firstDateData.values[key],
+                    lastDateData.values[key]
+                )
+                const predX = 1 + (i + 1) * predictedRatio
+                const predictedValue = interpolator(predX)
+                values[key] = predictedValue < 0 ? lastDateData.values[key] : predictedValue
+                return values
             }, {}),
-        };
-    });
+        }
+    })
 
     // Add the new values to the data array
     let extData = data.concat(newValues)
     extData = extData.filter((item) => item !== undefined)
 
-    return extData;
+    return extData
 }
 
 export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumulate }) => {
-
-    const svgRef = React.useRef(null);
-    const legendRef = React.useRef(null);
+    const svgRef = React.useRef(null)
+    const legendRef = React.useRef(null)
 
     const containerDivRef = React.useRef<HTMLDivElement>()
     const tooltipDivRef = React.useRef<HTMLDivElement>()
-    
+
     const colorFunc: (t: number) => string | undefined = d3.interpolateRainbow
     const margin = { top: 0, right: 10, bottom: 200, left: 100 }
     const height = 800 - margin.top - margin.bottom
     const marginLegend = 10
     const minWidth = 1900
-    
+
     const [width, setWidth] = React.useState(minWidth)
     const series = getSeries(data)
     const seriesCount = series.length
 
     React.useEffect(() => {
         if (!data || data.length === 0) {
-            return;
+            return
         }
 
         // Prepare all data structures and predicted data
@@ -117,7 +123,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
 
         // X - values
         const x_vals = combinedData.map((d) => d.date.toISOString().substring(0, 10))
-        
+
         // prepare stacked data
         let stackedData
         if (accumulate) {
@@ -192,11 +198,11 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         }
 
         // get SVG reference
-        const svg = d3.select(svgRef.current);
+        const svg = d3.select(svgRef.current)
 
         // remove prevously rendered data
-        svg.selectAll('g').remove();
-        svg.selectAll('rect').remove();
+        svg.selectAll('g').remove()
+        svg.selectAll('rect').remove()
 
         // generate bars
         const g = svg
@@ -205,7 +211,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             .enter()
             .append('g')
             .attr('fill', (d, i) => colorFunc(i / seriesCount))
-            .attr('id', (d, i) => `path${i}`);
+            .attr('id', (d, i) => `path${i}`)
 
         const rect = g
             .selectAll('rect')
@@ -224,16 +230,17 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         // x-axis & labels
         const formatX = (val: number): string => x_vals[val]
 
-        let x_labels: d3.Selection<SVGGElement, unknown, null, undefined> = svg.select<SVGGElement>('.x-axis');
+        let x_labels: d3.Selection<SVGGElement, unknown, null, undefined> =
+            svg.select<SVGGElement>('.x-axis')
 
         if (x_labels.empty()) {
             x_labels = svg
                 .append('g')
                 .attr('class', 'x-axis')
                 .attr('transform', `translate(0,${height - margin.bottom})`)
-                .call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX));
+                .call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX))
         } else {
-            x_labels.call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX));
+            x_labels.call(d3.axisBottom(x).tickSizeOuter(0).tickFormat(formatX))
         }
 
         // rotate x labels, if too many
@@ -243,33 +250,33 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
                 .attr('transform', 'rotate(-90)')
                 .attr('text-anchor', 'end')
                 .attr('dy', '-0.55em')
-                .attr('dx', '-1em');
-        }
-        else{
+                .attr('dx', '-1em')
+        } else {
             x_labels
                 .selectAll('text')
                 .attr('transform', 'rotate(0)')
                 .attr('text-anchor', 'middle')
                 .attr('dy', '0.55em')
-                .attr('dx', '0em');
+                .attr('dx', '0em')
         }
 
         // y-axis & labels
         const y = d3
             .scaleLinear()
             .domain([0, y1Max])
-            .range([height - margin.bottom, margin.top]);
+            .range([height - margin.bottom, margin.top])
 
-        let y_labels: d3.Selection<SVGGElement, unknown, null, undefined> = svg.select<SVGGElement>('.y-axis');
+        let y_labels: d3.Selection<SVGGElement, unknown, null, undefined> =
+            svg.select<SVGGElement>('.y-axis')
 
         if (y_labels.empty()) {
             y_labels = svg
                 .append('g')
                 .attr('class', 'y-axis')
                 .attr('transform', `translate(${margin.left},0)`)
-                .call(d3.axisLeft(y));
+                .call(d3.axisLeft(y))
         } else {
-            y_labels.call(d3.axisLeft(y));
+            y_labels.call(d3.axisLeft(y))
         }
 
         // animate bars
@@ -295,7 +302,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             d3.select(tg).selectAll('text').attr('font-weight', 'normal')
         }
 
-        const svgLegend = d3.select(legendRef.current);
+        const svgLegend = d3.select(legendRef.current)
 
         svgLegend
             .selectAll('g.legend')
@@ -334,8 +341,7 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             })
 
         // set all text to 2.5em
-        svg.selectAll('text')
-            .style('font-size', '2.5em')
+        svg.selectAll('text').style('font-size', '2.5em')
 
         function updateWindowWidth() {
             setWidth(containerDivRef.current?.clientWidth || 768)
@@ -344,29 +350,31 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
             updateWindowWidth()
         }
         window.addEventListener('resize', updateWindowWidth)
-
     }, [data, accumulate])
 
- return (
-    <><div ref={containerDivRef}>
-         <svg
-             ref={svgRef}
-             style={{ maxWidth: '100%', height: 'auto', verticalAlign: 'top' }}
-             height='100%' // {height}
-             viewBox={`0 0 ${minWidth} ${height}`}
-             preserveAspectRatio='xMinYMin'
-             width={width < 1000 ? '100%' : width - 410}
-         >
-         </svg>
-         <svg
-             ref={legendRef}
-             viewBox={width < 1000 ?`-50 0 450 ${50 + 20 * seriesCount}` :  `0 0 400 ${20 * seriesCount}`}
-             height='100%'
-             width='400px'
-         >
-         </svg>
-     </div>
-     <div id='chart' className='tooltip' ref={tooltipDivRef} />
-    </>
-    );
+    return (
+        <>
+            <div ref={containerDivRef}>
+                <svg
+                    ref={svgRef}
+                    style={{ maxWidth: '100%', height: 'auto', verticalAlign: 'top' }}
+                    height="100%" // {height}
+                    viewBox={`0 0 ${minWidth} ${height}`}
+                    preserveAspectRatio="xMinYMin"
+                    width={width < 1000 ? '100%' : width - 410}
+                ></svg>
+                <svg
+                    ref={legendRef}
+                    viewBox={
+                        width < 1000
+                            ? `-50 0 450 ${50 + 20 * seriesCount}`
+                            : `0 0 400 ${20 * seriesCount}`
+                    }
+                    height="100%"
+                    width="400px"
+                ></svg>
+            </div>
+            <div id="chart" className="tooltip" ref={tooltipDivRef} />
+        </>
+    )
 }
