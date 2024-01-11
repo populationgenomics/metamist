@@ -484,7 +484,7 @@ class GraphQLSequencingGroup:
     technology: str
     platform: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON | None
+    external_ids: strawberry.scalars.JSON
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
@@ -565,7 +565,7 @@ class GraphQLAssay:
     id: int
     type: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON | None
+    external_ids: strawberry.scalars.JSON
 
     sample_id: strawberry.Private[int]
 
