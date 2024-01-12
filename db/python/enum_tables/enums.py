@@ -4,7 +4,7 @@ from functools import lru_cache
 
 from async_lru import alru_cache
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 
 table_name_matcher = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
@@ -58,12 +58,14 @@ class EnumTable(DbBase):
         Insert a new type
         """
         _query = f"""
-            INSERT INTO {self._get_table_name()} (id, name)
-            VALUES (:name, :name)
-            ON DUPLICATE KEY UPDATE name = :name
+            INSERT INTO {self._get_table_name()} (id, name, audit_log_id)
+            VALUES (:name, :name, :audit_log_id)
+            ON DUPLICATE KEY UPDATE name = :name, audit_log_id = :audit_log_id
         """
 
-        await self.connection.execute(_query, {'name': value.lower()})
+        await self.connection.execute(
+            _query, {'name': value.lower(), 'audit_log_id': await self.audit_log_id()}
+        )
         # clear the cache so results are up-to-date
         self.get.cache_clear()  # pylint: disable=no-member
         return value

@@ -24,10 +24,10 @@ JSON_SCHEMA_VALIDATION_KEYWORDS = {
 
 sm_url = getenv('SM_URL')
 if not sm_url:
-    env = getenv('SM_ENVIRONMENT', 'PRODUCTION')
-    if 'local' in env.lower():
+    env = getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
+    if 'local' in env:
         sm_url = "http://localhost:8000"
-    elif 'dev' in env.lower():
+    elif 'dev' in env:
         sm_url = 'https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app'
     else:
         sm_url = 'https://sample-metadata-api-mnrpw3mdza-ts.a.run.app'
@@ -192,7 +192,7 @@ conf = {{{packageName}}}.Configuration(
                  ):
         """Constructor
         """
-        env = getenv('SM_ENVIRONMENT', 'PRODUCTION')
+        self.env = getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
         self._base_path = host or sm_url
 
         """Default Base url
@@ -491,6 +491,9 @@ conf = {{{packageName}}}.Configuration(
 
         :return: The Auth Settings information dict.
         """
+        if self.env == 'local':
+            return {}
+
         auth = {
             'HTTPBearer': {
                 'type': 'bearer',

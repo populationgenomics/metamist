@@ -1,22 +1,21 @@
-from os import getenv
 import logging
-from typing import Optional
+from os import getenv
 
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
-from db.python.connect import SMConnections, Connection
+from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
-
+from db.python.tables.project import ProjectPermissionsTable
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 
 
-def get_jwt_from_request(request: Request) -> Optional[str]:
+def get_jwt_from_request(request: Request) -> str | None:
     """
     Get google JWT value, capture it like this instead of using
         x_goog_iap_jwt_assertion = Header(None)
@@ -25,11 +24,22 @@ def get_jwt_from_request(request: Request) -> Optional[str]:
     return request.headers.get('x-goog-iap-jwt-assertion')
 
 
+def get_ar_guid(request: Request) -> str | None:
+    """Get sm-ar-guid from the headers to provide with requests"""
+    return request.headers.get('sm-ar-guid')
+
+
+def get_on_behalf_of(request: Request) -> str | None:
+    """
+    Get sm-on-behalf-of if there are requests that were performed on behalf of
+    someone else (some automated process)
+    """
+    return request.headers.get('sm-on-behalf-of')
+
+
 def authenticate(
-    token: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
-    ),
-    x_goog_iap_jwt_assertion: Optional[str] = Depends(get_jwt_from_request),
+    token: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    x_goog_iap_jwt_assertion: str | None = Depends(get_jwt_from_request),
 ) -> str:
     """
     If a token (OR Google IAP auth jwt) is provided,
@@ -51,30 +61,58 @@ def authenticate(
         logging.info(f'Using {default_user} as authenticated user')
         return default_user
 
-    raise HTTPException(status_code=401, detail=f'Not authenticated :(')
+    raise HTTPException(status_code=401, detail='Not authenticated :(')
 
 
 async def dependable_get_write_project_connection(
-    project: str, author: str = Depends(authenticate)
+    project: str,
+    request: Request,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
+    on_behalf_of: str | None = Depends(get_on_behalf_of),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
-    return await SMConnections.get_connection(
-        project_name=project, author=author, readonly=False
+    meta = {'path': request.url.path}
+    if request.client:
+        meta['ip'] = request.client.host
+    return await ProjectPermissionsTable.get_project_connection(
+        project_name=project,
+        author=author,
+        readonly=False,
+        ar_guid=ar_guid,
+        on_behalf_of=on_behalf_of,
+        meta=meta,
     )
 
 
 async def dependable_get_readonly_project_connection(
-    project: str, author: str = Depends(authenticate)
+    project: str,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
 ) -> Connection:
     """FastAPI handler for getting connection WITH project"""
-    return await SMConnections.get_connection(
-        project_name=project, author=author, readonly=True
+    return await ProjectPermissionsTable.get_project_connection(
+        project_name=project,
+        author=author,
+        readonly=True,
+        on_behalf_of=None,
+        ar_guid=ar_guid,
     )
 
 
-async def dependable_get_connection(author: str = Depends(authenticate)):
+async def dependable_get_connection(
+    request: Request,
+    author: str = Depends(authenticate),
+    ar_guid: str = Depends(get_ar_guid),
+):
     """FastAPI handler for getting connection withOUT project"""
-    return await SMConnections.get_connection_no_project(author)
+    meta = {'path': request.url.path}
+    if request.client:
+        meta['ip'] = request.client.host
+
+    return await SMConnections.get_connection_no_project(
+        author, ar_guid=ar_guid, meta=meta
+    )
 
 
 async def dependable_get_bq_connection(author: str = Depends(authenticate)):

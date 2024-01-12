@@ -3,11 +3,13 @@ from typing import Optional
 
 from models.base import SMBase
 
+ProjectId = int
+
 
 class Project(SMBase):
     """Row for project in 'project' table"""
 
-    id: Optional[int] = None
+    id: Optional[ProjectId] = None
     name: Optional[str] = None
     dataset: Optional[str] = None
     meta: Optional[dict] = None

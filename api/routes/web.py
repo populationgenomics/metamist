@@ -77,7 +77,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
     that you are a part of (automatically).
     """
     # raise ValueError("Test")
-    pt = ProjectPermissionsTable(connection.connection)
+    pt = ProjectPermissionsTable(connection)
     projects = await pt.get_projects_accessible_by_user(
         connection.author, readonly=True
     )

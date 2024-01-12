@@ -4,7 +4,6 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from db.python.connect import NoOpAenter, NotFoundError
 from db.python.layers.base import BaseLayer
 from db.python.layers.sample import SampleLayer
 from db.python.tables.family import FamilyTable
@@ -12,9 +11,10 @@ from db.python.tables.family_participant import FamilyParticipantTable
 from db.python.tables.participant import ParticipantTable
 from db.python.tables.participant_phenotype import ParticipantPhenotypeTable
 from db.python.tables.sample import SampleTable
-from db.python.utils import ProjectId, split_generic_terms
+from db.python.utils import NoOpAenter, NotFoundError, split_generic_terms
 from models.models.family import PedRowInternal
 from models.models.participant import ParticipantInternal, ParticipantUpsertInternal
+from models.models.project import ProjectId
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -571,7 +571,6 @@ class ParticipantLayer(BaseLayer):
     async def upsert_participant(
         self,
         participant: ParticipantUpsertInternal,
-        author: str = None,
         project: ProjectId = None,
         check_project_id: bool = True,
         open_transaction=True,
@@ -602,7 +601,6 @@ class ParticipantLayer(BaseLayer):
                     reported_gender=participant.reported_gender,
                     meta=participant.meta,
                     karyotype=participant.karyotype,
-                    author=author,
                 )
 
             else:
@@ -612,7 +610,6 @@ class ParticipantLayer(BaseLayer):
                     reported_gender=participant.reported_gender,
                     karyotype=participant.karyotype,
                     meta=participant.meta,
-                    author=author,
                     project=project,
                 )
 
@@ -623,7 +620,6 @@ class ParticipantLayer(BaseLayer):
 
                 await slayer.upsert_samples(
                     participant.samples,
-                    author=author,
                     project=project,
                     check_project_id=False,
                     open_transaction=False,
@@ -802,7 +798,6 @@ class ParticipantLayer(BaseLayer):
             maternal_id=maternal_id,
             affected=affected,
             notes=None,
-            author=None,
         )
 
     @staticmethod

@@ -1,5 +1,6 @@
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
+from db.python.layers.audit_log import AuditLogLayer
 from db.python.layers.base import BaseLayer
 from db.python.layers.billing import BillingLayer
 from db.python.layers.family import FamilyLayer

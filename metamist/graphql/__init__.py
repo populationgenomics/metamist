@@ -9,7 +9,9 @@ from typing import Dict, Any
 
 from gql import Client, gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.aiohttp import log as aiohttp_logger
 from gql.transport.requests import RequestsHTTPTransport
+from gql.transport.requests import log as requests_logger
 
 from cpg_utils.cloud import get_google_identity_token
 
@@ -54,13 +56,18 @@ def configure_sync_client(
     if _sync_client and not force_recreate:
         return _sync_client
 
-    token = auth_token or get_google_identity_token(
-        target_audience=metamist.configuration.sm_url
-    )
-    transport = RequestsHTTPTransport(
-        url=url or get_sm_url(),
-        headers={'Authorization': f'Bearer {token}'},
-    )
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
+    if env == 'local':
+        transport = RequestsHTTPTransport(url=url or get_sm_url())
+    else:
+        token = auth_token or get_google_identity_token(
+            target_audience=metamist.configuration.sm_url
+        )
+        transport = RequestsHTTPTransport(
+            url=url or get_sm_url(),
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
     _sync_client = Client(
         transport=transport, schema=schema, fetch_schema_from_transport=schema is None
     )
@@ -78,13 +85,18 @@ async def configure_async_client(
     if _async_client and not force_recreate:
         return _async_client
 
-    token = auth_token or get_google_identity_token(
-        target_audience=metamist.configuration.sm_url
-    )
-    transport = AIOHTTPTransport(
-        url=url or get_sm_url(),
-        headers={'Authorization': f'Bearer {token}'},
-    )
+    env = os.getenv('SM_ENVIRONMENT', 'PRODUCTION').lower()
+    if env == 'local':
+        transport = AIOHTTPTransport(url=url or get_sm_url())
+    else:
+        token = auth_token or get_google_identity_token(
+            target_audience=metamist.configuration.sm_url
+        )
+        transport = AIOHTTPTransport(
+            url=url or get_sm_url(),
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
     _async_client = Client(
         transport=transport, schema=schema, fetch_schema_from_transport=schema is None
     )
@@ -126,25 +138,38 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
 
 # use older style typing to broaden supported Python versions
 def query(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
     """Query the metamist GraphQL API"""
     if variables is None:
         variables = {}
 
+    # disable logging for gql
+    current_level = aiohttp_logger.level
+    if not log_response:
+        requests_logger.setLevel('WARNING')
+
     response = (client or configure_sync_client()).execute_sync(
         _query if isinstance(_query, DocumentNode) else gql(_query),
         variable_values=variables,
     )
+
+    if not log_response:
+        requests_logger.setLevel(current_level)
     return response
 
 
 async def query_async(
-    _query: str | DocumentNode, variables: Dict = None, client: Client = None
+    _query: str | DocumentNode, variables: Dict = None, client: Client = None, log_response: bool = False
 ) -> Dict[str, Any]:
     """Asynchronously query the Metamist GraphQL API"""
     if variables is None:
         variables = {}
+
+    # disable logging for gql
+    current_level = aiohttp_logger.level
+    if log_response:
+        aiohttp_logger.setLevel('WARNING')
 
     if not client:
         client = await configure_async_client()
@@ -153,4 +178,8 @@ async def query_async(
         _query if isinstance(_query, DocumentNode) else gql(_query),
         variable_values=variables,
     )
+
+    if log_response:
+        aiohttp_logger.setLevel(current_level)
+
     return response
