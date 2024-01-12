@@ -194,6 +194,9 @@ class BillingTotalCostQueryModel(SMBase):
     time_column: BillingTimeColumn | None = None
     time_periods: BillingTimePeriods | None = None
 
+    # optional, show the min cost, e.g. 0.01, if not set, will show all
+    min_cost: float | None = None
+
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.json())

@@ -30,9 +30,18 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
 }
 
 export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
+    // if (isLoading) {
+    //     return (
+    //         <div>
+    //             <LoadingDucks />
+    //         </div>
+    //     )
+    // }
+
     if (!data || data.length === 0) {
-        return <div>No data available</div>
+        return <>No Data</>
     }
+
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
     const duration = 250
     const containerDivRef = React.useRef<HTMLDivElement>()
@@ -104,17 +113,6 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
     if (contDiv) {
         // reset svg
         contDiv.innerHTML = ''
-
-        if (isLoading) {
-            return (
-                <div>
-                    <LoadingDucks />
-                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                        <em>This query takes a while...</em>
-                    </p>
-                </div>
-            )
-        }
 
         // construct svg
         const svg = select(contDiv)

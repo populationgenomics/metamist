@@ -177,6 +177,8 @@ const BillingCostByCategory: React.FunctionComponent = () => {
                 filters: selFilters,
                 order_by: { day: false },
                 time_periods: selectedPeriod,
+                // show only records with cost > 0.01
+                min_cost: 0.01,
             })
         }
     }, [groupBy, selectedGroup, selectedCostCategory, selectedPeriod, start, end])

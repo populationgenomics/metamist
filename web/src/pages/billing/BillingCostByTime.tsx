@@ -17,6 +17,7 @@ import { IStackedAreaByDateChartData } from '../../shared/components/Graphs/Stac
 import BillingCostByTimeTable from './components/BillingCostByTimeTable'
 import { BarChart, IData } from '../../shared/components/Graphs/BarChart'
 import { DonutChart } from '../../shared/components/Graphs/DonutChart'
+import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import generateUrl from '../../shared/utilities/generateUrl'
 
 const BillingCostByTime: React.FunctionComponent = () => {
@@ -43,6 +44,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     // Data loading
     const [isLoading, setIsLoading] = React.useState<boolean>(true)
     const [error, setError] = React.useState<string | undefined>()
+    const [message, setMessage] = React.useState<string | undefined>()
     const [groups, setGroups] = React.useState<string[]>([])
     const [data, setData] = React.useState<IStackedAreaByDateChartData[]>([])
     const [aggregatedData, setAggregatedData] = React.useState<IData[]>([])
@@ -90,6 +92,7 @@ const BillingCostByTime: React.FunctionComponent = () => {
     const getData = (query: BillingTotalCostQueryModel) => {
         setIsLoading(true)
         setError(undefined)
+        setMessage(undefined)
         new BillingApi()
             .getTotalCost(query)
             .then((response) => {
@@ -156,8 +159,125 @@ const BillingCostByTime: React.FunctionComponent = () => {
             .catch((er) => setError(er.message))
     }
 
+    const messageComponent = () => {
+        if (message) {
+            return (
+                <Message negative onDismiss={() => setError(undefined)}>
+                    {message}
+                </Message>
+            )
+        }
+        if (error) {
+            return (
+                <Message negative onDismiss={() => setError(undefined)}>
+                    {error}
+                    <br />
+                    <Button negative onClick={() => setStart(start)}>
+                        Retry
+                    </Button>
+                </Message>
+            )
+        }
+        if (isLoading) {
+            return (
+                <div>
+                    <LoadingDucks />
+                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
+                        <em>This query takes a while...</em>
+                    </p>
+                </div>
+            )
+        }
+        return null
+    }
+
+    const dataComponent = () => {
+        if (message || error || isLoading) {
+            return null
+        }
+
+        if (!message && !error && !isLoading && (!data || data.length === 0)) {
+            return (
+                <Card
+                    fluid
+                    style={{ padding: '20px', overflowX: 'scroll' }}
+                    id="billing-container-charts"
+                >
+                    No Data
+                </Card>
+            )
+        }
+
+        return (
+            <>
+                <Card
+                    fluid
+                    style={{ padding: '20px', overflowX: 'scroll' }}
+                    id="billing-container-charts"
+                >
+                    <Grid columns={2} stackable>
+                        <Grid.Column width={10} className="chart-card">
+                            <BarChart
+                                data={aggregatedData}
+                                maxSlices={groups.length}
+                                isLoading={isLoading}
+                            />
+                        </Grid.Column>
+
+                        <Grid.Column width={6} className="chart-card">
+                            <DonutChart
+                                data={aggregatedData}
+                                maxSlices={groups.length}
+                                isLoading={isLoading}
+                            />
+                        </Grid.Column>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.Column width={16} className="chart-card">
+                            <CostByTimeChart
+                                start={start}
+                                end={end}
+                                groups={groups}
+                                isLoading={isLoading}
+                                data={data}
+                            />
+                        </Grid.Column>
+                    </Grid>
+                </Card>
+                <Card
+                    fluid
+                    style={{ padding: '20px', overflowX: 'scroll' }}
+                    id="billing-container-data"
+                >
+                    <BillingCostByTimeTable
+                        heading={selectedData ?? 'All'}
+                        start={start}
+                        end={end}
+                        groups={groups}
+                        isLoading={isLoading}
+                        data={data}
+                    />
+                </Card>
+            </>
+        )
+    }
+
     React.useEffect(() => {
-        if (selectedData !== undefined && selectedData !== '' && selectedData !== null) {
+        if (
+            selectedData !== undefined &&
+            selectedData !== '' &&
+            selectedData !== null &&
+            start !== undefined &&
+            start !== '' &&
+            start !== null &&
+            end !== undefined &&
+            end !== '' &&
+            end !== null &&
+            groupBy !== undefined &&
+            groupBy !== null
+        ) {
+            // valid selection, retrieve data
             let source = BillingSource.Aggregate
             if (groupBy === BillingColumn.GcpProject) {
                 source = BillingSource.GcpBilling
@@ -180,20 +300,21 @@ const BillingCostByTime: React.FunctionComponent = () => {
                     source: source,
                 })
             }
+        } else {
+            // invalid selection,
+            setIsLoading(false)
+            setError(undefined)
+
+            if (start !== undefined || start !== null || start !== '') {
+                setMessage('Please select Start date')
+            } else if (end !== undefined || end !== null || end !== '') {
+                setMessage('Please select End date')
+            } else {
+                // generic message
+                setMessage('Please make selection')
+            }
         }
     }, [start, end, groupBy, selectedData])
-
-    if (error) {
-        return (
-            <Message negative onDismiss={() => setError(undefined)}>
-                {error}
-                <br />
-                <Button negative onClick={() => setStart(start)}>
-                    Retry
-                </Button>
-            </Message>
-        )
-    }
 
     return (
         <>
@@ -250,51 +371,11 @@ const BillingCostByTime: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
                 </Grid>
-
-                <Grid columns={2} stackable>
-                    <Grid.Column width={10} className="chart-card">
-                        <BarChart
-                            data={aggregatedData}
-                            maxSlices={groups.length}
-                            isLoading={isLoading}
-                        />
-                    </Grid.Column>
-
-                    <Grid.Column width={6} className="chart-card">
-                        <DonutChart
-                            data={aggregatedData}
-                            maxSlices={groups.length}
-                            isLoading={isLoading}
-                        />
-                    </Grid.Column>
-                </Grid>
-
-                <Grid>
-                    <Grid.Column width={16} className="chart-card">
-                        <CostByTimeChart
-                            start={start}
-                            end={end}
-                            groups={groups}
-                            isLoading={isLoading}
-                            data={data}
-                        />
-                    </Grid.Column>
-                </Grid>
             </Card>
-            <Card
-                fluid
-                style={{ padding: '20px', overflowX: 'scroll' }}
-                id="billing-container-data"
-            >
-                <BillingCostByTimeTable
-                    heading={selectedData ?? 'All'}
-                    start={start}
-                    end={end}
-                    groups={groups}
-                    isLoading={isLoading}
-                    data={data}
-                />
-            </Card>
+
+            {messageComponent()}
+
+            {dataComponent()}
         </>
     )
 }

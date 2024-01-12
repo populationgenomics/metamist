@@ -549,6 +549,13 @@ class BillingBaseTable(BqDbBase):
         SELECT {time_group.formula}{fields_selected}, cost FROM t
         """
 
+        # append min cost condition
+        if query.min_cost:
+            _query += ' WHERE cost > @min_cost'
+            query_parameters.append(
+                bigquery.ScalarQueryParameter('min_cost', 'FLOAT64', query.min_cost)
+            )
+
         # append LIMIT and OFFSET if present
         if query.limit:
             _query += ' LIMIT @limit_val'

@@ -16,8 +16,16 @@ interface BarChartProps {
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isLoading }) => {
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
+
     if (!data || data.length === 0) {
-        return <div>No data available</div>
+        return <>No Data</>
     }
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
@@ -54,17 +62,6 @@ export const BarChart: React.FC<BarChartProps> = ({ data, maxSlices, colors, isL
     if (contDiv) {
         // reset svg
         contDiv.innerHTML = ''
-
-        if (isLoading) {
-            return (
-                <div>
-                    <LoadingDucks />
-                    <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                        <em>This query takes a while...</em>
-                    </p>
-                </div>
-            )
-        }
 
         // construct svg
         const svg = select(contDiv)

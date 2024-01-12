@@ -21,7 +21,10 @@ class BillingLayer(BqBaseLayer):
     """Billing layer"""
 
     def table_factory(
-        self, source: BillingSource, fields: list[BillingColumn] | None = None
+        self,
+        source: BillingSource,
+        fields: list[BillingColumn] | None = None,
+        filters: dict[BillingColumn, str | list | dict] | None = None,
     ) -> (
         BillingDailyTable
         | BillingDailyExtendedTable
@@ -39,6 +42,17 @@ class BillingLayer(BqBaseLayer):
             used_extended_cols = [
                 f
                 for f in fields
+                if f in BillingColumn.extended_cols() and BillingColumn.can_group_by(f)
+            ]
+            if used_extended_cols:
+                # there is a field from extended daily table
+                return BillingDailyExtendedTable(self.connection)
+
+        # check if any of the filters is in the extended columns
+        if filters:
+            used_extended_cols = [
+                f
+                for f in filters
                 if f in BillingColumn.extended_cols() and BillingColumn.can_group_by(f)
             ]
             if used_extended_cols:
@@ -174,7 +188,7 @@ class BillingLayer(BqBaseLayer):
         """
         Get Total cost of selected fields for requested time interval
         """
-        billing_table = self.table_factory(query.source, query.fields)
+        billing_table = self.table_factory(query.source, query.fields, query.filters)
         return await billing_table.get_total_cost(query)
 
     async def get_running_cost(

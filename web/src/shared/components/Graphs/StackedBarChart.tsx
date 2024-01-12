@@ -352,6 +352,10 @@ export const StackedBarChart: React.FC<IStackedBarChartProps> = ({ data, accumul
         window.addEventListener('resize', updateWindowWidth)
     }, [data, accumulate])
 
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
+
     return (
         <>
             <div ref={containerDivRef}>
