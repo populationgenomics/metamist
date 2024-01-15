@@ -70,11 +70,11 @@ def add_analysis_to_metamist(gvcf_link: str, sgid: str, project_id: int):
 def main(
     project: str,
     project_id: int,
-    newly_added_samples_path: str,
+    new_samples_path: str,
     sgid_gvcf_mapping_file: str,
 ):
     # Read in the newly created samples
-    with to_path(newly_added_samples_path).open() as f:
+    with to_path(new_samples_path).open() as f:
         samples = f.read().splitlines()
 
     # Read the CSV file into a dictionary
