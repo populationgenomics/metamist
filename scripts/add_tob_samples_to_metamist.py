@@ -33,7 +33,7 @@ def add_sample_to_metamist(extID: str, project: str):
                 meta=None,
                 sample_id=None,
                 external_ids=None,
-                assays=None,
+                assays={},
             ),
         ],
         non_sequencing_assays=[
