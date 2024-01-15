@@ -1,5 +1,6 @@
 from metamist.apis import SampleApi
 from metamist.models import SampleUpsert, SequencingGroupUpsert, AssayUpsert
+from cpg_utils import to_path
 import csv
 
 import click
@@ -70,7 +71,7 @@ def main(project: str, files_path: str):
     """
     # Get list of sample IDs from bucket directory
     upsert_list = []
-    with open(files_path, 'r') as f:
+    with to_path(files_path).open() as f:
         reader = csv.reader(f)
         next(reader)  # skip the header
         for row in reader:
