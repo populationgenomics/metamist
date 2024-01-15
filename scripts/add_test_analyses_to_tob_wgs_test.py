@@ -32,10 +32,8 @@ def add_analysis_to_metamist(gvcf_link: str, sgid: str, project_id: int):
     analysis_upsert = Analysis(
         type='gvcf',
         status=AnalysisStatus('completed'),
-        id=None,
         output=gvcf_link,
         sequencing_group_ids=[sgid],
-        author=None,
         timestamp_completed=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         project=project_id,
         active=True,
