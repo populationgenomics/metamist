@@ -42,7 +42,11 @@ def add_sample_to_metamist(extID: str, project: str):
                 type='sequencing',
                 external_ids=None,
                 sample_id=None,
-                meta=None,
+                meta={
+                    'sequencing_type': 'genome',
+                    'sequencing_platform': 'illumina',
+                    'sequencing_technology': 'short-read',
+                },
             ),
         ],
     )
