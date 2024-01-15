@@ -20,7 +20,7 @@ def add_sample_to_metamist(extID: str, project: str):
         id=None,
         external_id=extID,
         meta={},
-        project=project,
+        project=8,
         type='blood',
         participant_id=None,
         active=None,
