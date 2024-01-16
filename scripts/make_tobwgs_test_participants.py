@@ -5,16 +5,11 @@ from metamist.models import (
     SequencingGroupUpsert,
     AssayUpsert,
 )
-from metamist.models import Analysis
-import csv
-from datetime import datetime
 import click
 
 from metamist.graphql import gql, query
 from cpg_utils import to_path
 
-
-new_samples_path = 'gs://cpg-tob-wgs-test/harper-hope/newly_created_samples.txt'
 
 SAMPLE_QUERY = gql(
     """
