@@ -32,6 +32,7 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_re
         job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
         create_md5(job, filepath, billing_project, driver_image)
 
+    b.run(wait=False)
 
 def create_md5(job, file, billing_project, driver_image):
     """
