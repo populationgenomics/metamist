@@ -60,7 +60,10 @@ def main(search_path: str, id_map_path: str, garvan: bool, sample_id_column):
         writer = csv.DictWriter(sys.stdout, fieldnames=FILEMAP_HEADERS, delimiter=',')
         writer.writeheader()
 
+        sample_ids_found = set()
+        sample_ids_in_manifest = set()
         for line in reader:
+            sample_ids_in_manifest.add(line[sample_id_column])
             for pair in read_pairs_by_sample_id[line[sample_id_column]]:
                 writer.writerow(
                     {
@@ -70,6 +73,10 @@ def main(search_path: str, id_map_path: str, garvan: bool, sample_id_column):
                         'Type': pair[0].seq_type.value,
                     }
                 )
+                sample_ids_found.add(line[sample_id_column])
+    
+    if no_match_samples := sample_ids_in_manifest - sample_ids_found:
+        raise ValueError(f'No matches found for samples: {no_match_samples}')
 
 
 if __name__ == '__main__':
