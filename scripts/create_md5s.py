@@ -34,6 +34,7 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_re
 
     b.run(wait=False)
 
+
 def create_md5(job, file, billing_project, driver_image):
     """
     Streams the file with gsutil and calculates the md5 checksum,
