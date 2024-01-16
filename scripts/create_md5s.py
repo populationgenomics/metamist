@@ -12,7 +12,7 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_re
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
-    billing_project = get_config()['hail']['billing_project']
+    billing_project = get_config()['workflow']['gcp_billing_project']
     driver_image = get_config()['workflow']['driver_image']
 
     bucket_name, *components = gs_dir[5:].split('/')
