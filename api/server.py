@@ -19,7 +19,7 @@ from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
 
 # This tag is automatically updated by bump2version
-_VERSION = '6.6.3'
+_VERSION = '6.6.2'
 
 logger = get_logger()
 
@@ -140,11 +140,11 @@ async def exception_handler(request: Request, e: Exception):
         cors_middleware = middlewares[0]
 
         request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore
             response.headers['Access-Control-Allow-Origin'] = '*'
         elif (
             cors_middleware
-            and request_origin in cors_middleware.options['allow_origins']
+            and request_origin in cors_middleware.options['allow_origins']  # type: ignore
         ):
             response.headers['Access-Control-Allow-Origin'] = request_origin
 
