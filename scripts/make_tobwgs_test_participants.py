@@ -55,10 +55,8 @@ def create_participant(project_id: int, extID: str, sampleID: str, sg_id: str):
                     non_sequencing_assays=[
                         AssayUpsert(
                             id=None,
-                            type=None,
-                            external_ids=None,
-                            sample_id=None,
-                            meta=None,
+                            type='sequencing',
+                            sample_id=sampleID,
                         ),
                     ],
                 ),
