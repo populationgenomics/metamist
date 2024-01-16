@@ -19,13 +19,10 @@ SAMPLE_QUERY = gql(
             externalId
             sequencingGroups {
                 id
-                analyses {
+                assays {
                     id
+                    externalIds
                     meta
-                    output
-                    status
-                    timestampCompleted
-                    type
                 }
                 }
             }
@@ -57,6 +54,11 @@ def create_participant(project_id: int, extID: str, sampleID: str, sg_id: str):
                             id=None,
                             type='sequencing',
                             sample_id=sampleID,
+                            meta={
+                                'sequencing_type': 'genome',
+                                'sequencing_platform': 'illumina',
+                                'sequencing_technology': 'short-read',
+                            },
                         ),
                     ],
                 ),
