@@ -10,8 +10,18 @@ from metamist.models import (
 )
 from cpg_utils import to_path
 import csv
-
+from collections import namedtuple
 import click
+from dataclasses import dataclass
+
+
+@dataclass
+class RowData:
+    sgid: str
+    ext_id: str
+    gvcf: str
+    gvcf_idx: str
+
 
 PARTICIPANT_QUERY = gql(
     """
@@ -25,22 +35,22 @@ PARTICIPANT_QUERY = gql(
                 id
                 externalId
                 sequencingGroups {
-                externalIds
-                id
-                meta
-                platform
-                technology
-                type
-                assays {
-                    meta
+                    externalIds
                     id
+                    meta
+                    platform
+                    technology
+                    type
+                    assays {
+                        meta
+                        id
+                        }
                     }
                 }
             }
         }
     }
-}
-"""
+    """
 )
 
 
@@ -51,41 +61,44 @@ PARTICIPANT_QUERY = gql(
     help='The name of the project to add samples to.',
 )
 @click.option(
-    '--project_id',
+    '--sample-path-mappings',
     required=True,
-    type=int,
-    help='The ID of the project to add samples to.',
+    help='''The path to a CSV file containing mappings of `main` CPG ID's, 
+            the `external_id` and `gvcf` paths. 
+            The file should have at least four columns: sgid, ext_id, gvcf, and gvcf_idx. 
+            Here's an example of what the first couple of lines might look like:
+
+            sgid,ext_id,gvcf,gvcf_idx
+            sg1,ext1,gvcf1,gvcf_idx1
+            sg2,ext2,gvcf2,gvcf_idx2
+        ''',
 )
-@click.option(
-    '--new_samples_path',
-    required=True,
-    help='The path to the file containing the newly created samples.',
-)
-def main(project: str, projectID: int, new_samples_path: str):
+def main(project: str, project_id: int, sample_path_mappings: str):
     # Read the CSV file into a dictionary
-    extID_to_row = {}
-    with to_path(new_samples_path).open() as f:
+    ext_id_to_row = {}
+    with to_path(sample_path_mappings).open() as f:
         reader = csv.reader(f)
         next(reader)  # skip the header
         for row in reader:
-            sgid, extID, gvcf, gvcf_idx = row[0], row[1], row[2], row[3]
-            extID_to_row[extID] = (sgid, gvcf, gvcf_idx)
+            data = RowData(*row[:4])
+            ext_id_to_row[data.ext_id] = data
 
     query_response = query(PARTICIPANT_QUERY, {"project": project})
+    project_id = query_response['project']['id']
     p_upserts = []
     for participant in query_response['project']['participants']:
-        if participant['externalId'] not in extID_to_row:
+        if participant['externalId'] not in ext_id_to_row:
             continue
-        extID = f"{participant['externalId']}-test"
+        ext_id = f"{participant['externalId']}-test"
         p = ParticipantUpsert(
-            external_id=extID,
+            external_id=ext_id,
             active=None,
             samples=[],
         )
         for sample in participant['samples']:
             s = SampleUpsert(
-                external_id=extID,
-                project=projectID,
+                external_id=ext_id,
+                project=project_id,
                 sequencing_groups=[],
             )
             for sg in sample['sequencingGroups']:
@@ -122,8 +135,8 @@ def main(project: str, projectID: int, new_samples_path: str):
 
     for participant in upserted_participants:
         for sample in participant['samples']:
-            old_extID = sample['externalId'][:-5]  # remove '-test' from the end
-            gvcf_path = extID_to_row[old_extID][1]  # get gvcf path from dictionary
+            old_ext_id = sample['externalId'].removesuffix('-test')
+            gvcf_path = ext_id_to_row[old_ext_id][1]  # get gvcf path from dictionary
             AnalysisApi().create_analysis(
                 project,
                 Analysis(
@@ -131,10 +144,7 @@ def main(project: str, projectID: int, new_samples_path: str):
                     status=AnalysisStatus('completed'),
                     output=gvcf_path,
                     sequencing_group_id=sample['sequencingGroups '][0]['id'],
-                    project=projectID,
                     active=True,
-                    external_id=sample['externalId'],
-                    sample=sample['id'],
                 ),
             )
 
