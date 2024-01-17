@@ -144,7 +144,8 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
     for participant in upserted_participants:
         for sample in participant['samples']:
             old_ext_id = sample['externalId'].removesuffix(f'-{suffix}')
-            gvcf_path = ext_id_to_row[old_ext_id][1]  # get gvcf path from dictionary
+            row_data = ext_id_to_row[old_ext_id]
+            gvcf_path = row_data.gvcf  # get gvcf path from dictionary
             AnalysisApi().create_analysis(
                 project,
                 Analysis(
