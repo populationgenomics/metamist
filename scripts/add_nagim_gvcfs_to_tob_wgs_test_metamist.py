@@ -10,9 +10,9 @@ from metamist.models import (
 )
 from cpg_utils import to_path
 import csv
-from collections import namedtuple
 import click
 from dataclasses import dataclass
+from pprint import pprint
 
 
 @dataclass
@@ -110,6 +110,7 @@ def main(project: str, sample_path_mappings: str, suffix: str):
                 sequencing_groups=[],
             )
             for sg in sample['sequencingGroups']:
+                pprint(sg)
                 s.sequencing_groups.append(
                     SequencingGroupUpsert(
                         type=sg['type'],
