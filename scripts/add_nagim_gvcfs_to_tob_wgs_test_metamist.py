@@ -135,7 +135,7 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
                         external_ids=None,
                         assays=[
                             AssayUpsert(
-                                type=sg['assays'][0]['type'],
+                                type=sg['type'],
                                 meta={
                                     'sequencing_type': sg['assays'][0]['meta'][
                                         'sequencing_type'
