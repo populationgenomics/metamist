@@ -74,7 +74,7 @@ PARTICIPANT_QUERY = gql(
         ''',
 )
 @click.option(
-    '--project-id-to-add-to',
+    '--project-id',
     required=True,
     type=int,
     help='''The ID of the project to add samples to.
