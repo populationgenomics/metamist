@@ -111,7 +111,7 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
             )
             for sg in sample['sequencingGroups']:
                 s.sequencing_groups.append(
-                    sg=SequencingGroupUpsert(
+                    SequencingGroupUpsert(
                         type=sg['type'],
                         technology=sg['technology'],
                         platform=sg['platform'],
