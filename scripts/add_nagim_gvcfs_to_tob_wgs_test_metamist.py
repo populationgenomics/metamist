@@ -73,7 +73,15 @@ PARTICIPANT_QUERY = gql(
             sg2,ext2,gvcf2,gvcf_idx2
         ''',
 )
-def main(project: str, project_id: int, sample_path_mappings: str):
+@click.option(
+    '--suffix',
+    required=True,
+    help='''The suffix to add to the external ID's of the participants.
+            For example, if the suffix is `test`, then the external ID's of the participants
+            will be `ext_id1-test`, `ext_id2-test`, etc.
+        ''',
+)
+def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
     # Read the CSV file into a dictionary
     ext_id_to_row = {}
     with to_path(sample_path_mappings).open() as f:
@@ -89,7 +97,7 @@ def main(project: str, project_id: int, sample_path_mappings: str):
     for participant in query_response['project']['participants']:
         if participant['externalId'] not in ext_id_to_row:
             continue
-        ext_id = f"{participant['externalId']}-test"
+        ext_id = f"{participant['externalId']}-{suffix}"
         p = ParticipantUpsert(
             external_id=ext_id,
             active=None,
