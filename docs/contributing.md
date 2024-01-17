@@ -3,9 +3,10 @@
 We love contributions from the community! This document explains how you can contribute to the project.
 
 ## How to Contribute
-#### Generate and install the python installable API
 
-After making any changes to the logic, it is worth regenerating the API with the OpenAPI Generator. 
+### Generate and install the python installable API
+
+After making any changes to the logic, it is worth regenerating the API with the OpenAPI Generator.
 
 Generating the installable APIs (Python + Typescript) involves running the server, getting the `/openapi.json`, and running `openapi-generator`.
 
@@ -16,6 +17,7 @@ The `regenerate_api.py` script does this for us in a few ways:
 3. Spins up the server itself.
 
 You can simply run:
+
 ```bash
 # this will start the api.server, so make sure you have the dependencies installed,
 python regenerate_api.py \
@@ -23,6 +25,7 @@ python regenerate_api.py \
 ```
 
 or if you prefer the Docker approach (eg: for CI), this command will build the docker container and supply it to `regenerate_api.py`:
+
 ```bash
 # SM_DOCKER is a known env variable to regenerate_api.py
 export SM_DOCKER="cpg/metamist-server:dev"
@@ -30,7 +33,8 @@ docker build --build-arg SM_ENVIRONMENT=local -t $SM_DOCKER -f deploy/api/Docker
 python regenerate_api.py
 ```
 
-#### Developing the UI
+### Developing the UI
+
 ```bash
 # Ensure you have started metamist server locally on your computer already, then in another tab open the UI.
 # This will automatically proxy request to the server.
@@ -39,6 +43,7 @@ npm install
 npm run compile
 npm start
 ```
+
 This will start a web server using Vite, running on `localhost:5173`.
 
 ### OpenAPI and Swagger

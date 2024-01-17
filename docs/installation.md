@@ -3,12 +3,10 @@
 This document provides detailed instructions on how to install the project. Follow these steps to set up the project on your local system.
 
 ## Prerequisites
-#### Mac
+
 [Homebrew](https://brew.sh) is the simplest way to install system dependencies needed for this project.
 
-
-#### Windows
-[Chocolatey](https://community.chocolatey.org/) is a good equivalent to Homebrew for package management in Windows. 
+[Chocolatey](https://community.chocolatey.org/) is a good equivalent to Homebrew for package management in Windows.
 
 ## System Requirements
 
@@ -21,7 +19,8 @@ This document provides detailed instructions on how to install the project. Foll
 - **pyenv**
 - **wget** *(optional)*
 
-#### Mac
+### Mac
+
 ```bash
 brew install nvm
 brew install java
@@ -30,11 +29,12 @@ brew install pyenv
 brew install wget
 
 # skip if you wish to install via docker
-brew install mariadb@10.8 
+brew install mariadb@10.8
 
 ```
 
-#### Windows
+### Windows
+
 ```bash
 # Assuming you have Chocolatey
 choco install nvm
@@ -45,7 +45,6 @@ choco install wget
 
 # skip if you wish to install via docker
 choco install mariadb --version=10.8.3
-
 ```
 
 ```bash
@@ -55,19 +54,20 @@ nvm install --lts
 # Once you have npm set up, install the OpenAPI generator:
 npm install @openapitools/openapi-generator-cli -g
 openapi-generator-cli version-manager set 5.3.0
-
 ```
 
 ## Installation Steps
 
-#### Creating the environment
+### Creating the environment
+
 - Python dependencies for the `metamist` API package are listed in `setup.py`.
 - Additional dev requirements are listed in `requirements-dev.txt`.
 - Packages for the sever-side code are listed in `requirements.txt`.
 
-We _STRONGLY_ encourage the use of `pyenv` for managing Python versions. Debugging and the server will run on a minimum python version of 3.10.
+We *STRONGLY* encourage the use of `pyenv` for managing Python versions. Debugging and the server will run on a minimum python version of 3.10.
 
 Use of a virtual environment to contain all requirements is highly recommended:
+
 ```bash
 virtualenv venv
 source venv/bin/activate
@@ -79,6 +79,7 @@ pip install --editable .
 ```
 
 You will also need to set the following environment variables. Adjust the paths if you installed the dependencies using an alternate means:
+
 ```bash
 # homebrew should export this on an M1 Mac
 # the intel default is /usr/local
@@ -112,7 +113,7 @@ export SM_DEV_DB_USER=sm_api # makes it easier to copy liquibase update command
 
 You can also add these to your shell config file e.g `.zshrc` or `.bashrc` for persistence to new sessions.
 
-#### Database Setup - Native Installation
+### Database Setup - Native Installation
 
 Set the following environment variables:
 
@@ -124,7 +125,7 @@ export SM_DEV_DB_PORT=3306 # default mariadb port
 export SM_DEV_DB_NAME=sm_dev;
 ```
 
-Next, create the database `sm_dev` in MariaDB. 
+Next, create the database `sm_dev` in MariaDB.
 
 > In newer versions of MariaDB, the root user is protected.
 
@@ -159,21 +160,24 @@ liquibase \
 popd
 ```
 
-#### Database Setup - Docker Installation
+### Database Setup - Docker Installation
 
 Ensure you have Docker installed or follow [this guide](https://docs.docker.com/engine/install/) to setup.
 
 Pull the image:
+
 ```bash
 docker pull mariadb:10.8.3
 ```
 
 Run the container on port 3306:
+
 ```bash
 docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:10.8.3
 ```
 
 If you have a local MySQL instance already running on port 3306, you can map the docker container to run on 3307:
+
 ```bash
 docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:10.8.3
 ```
@@ -185,6 +189,7 @@ docker exec -it mariadb-p3306 bash
 ```
 
 Set up the database with the `sm_api` user and appropriate permissions:
+
 ```bash
 mysql -u root --execute "
   CREATE DATABASE sm_dev;
@@ -215,6 +220,7 @@ popd
 ```
 
 Ensure the database port environment variable matches the mapping above:
+
 ```bash
 export SM_DEV_DB_PORT=3306 # or 3307
 ```
@@ -223,7 +229,7 @@ export SM_DEV_DB_PORT=3306 # or 3307
 
 You'll want to set the following environment variables (permanently) in your local development environment.
 
-The `SM_ENVIRONMENT`, `SM_LOCALONLY_DEFAULTUSER` and `SM_ALLOWALLACCESS` environment variables allow access to a local metamist server without providing a bearer token. 
+The `SM_ENVIRONMENT`, `SM_LOCALONLY_DEFAULTUSER` and `SM_ALLOWALLACCESS` environment variables allow access to a local metamist server without providing a bearer token.
 
 This will allow you to test the front-end components that access data. This happens automatically on the production instance through the Google identity-aware-proxy.
 
@@ -238,10 +244,13 @@ export SM_LOCALONLY_DEFAULTUSER=$(whoami)
 ```
 
 With those variables set, it is a good time to populate some test data if this is your first time running this server:
+
 ```bash
 python3 test/data/generate_data.py
 ```
+
 You can now run the server:
+
 ```bash
 # start the server
 python3 -m api.server
@@ -249,7 +258,8 @@ python3 -m api.server
 # uvicorn --port 8000 --host 0.0.0.0 api.server:app
 ```
 
-#### Running and Debugging in VS Code
+### Running and Debugging in VS Code
+
 The following `launch.json` is a good base to debug the web server in VS Code:
 
 ```json
@@ -279,13 +289,5 @@ You can now place breakpoints anywhere and debug the API with "Run API" under th
 
 
 ## Contributing
+
 See the [Contributing](contributing.md) page for instructions on how to make changes and regenerate the API.
-
-
-
-
-
-
-
-
-
