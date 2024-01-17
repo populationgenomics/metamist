@@ -43,10 +43,6 @@ PARTICIPANT_QUERY = gql(
 """
 )
 
-new_samples_path = (
-    'gs://cpg-tob-wgs-test/harper-hope/sample_nagim_test_bucket_mapping.csv'
-)
-
 
 @click.command()
 @click.option(
