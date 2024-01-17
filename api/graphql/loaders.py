@@ -47,6 +47,7 @@ class LoaderKeys(enum.Enum):
     PROJECTS_FOR_IDS = 'projects_for_id'
 
     AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
+    AUDIT_LOGS_BY_ANALYSIS_IDS = 'audit_logs_by_analysis_ids'
 
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
@@ -183,6 +184,18 @@ async def load_audit_logs_by_ids(
     logs = await alayer.get_for_ids(audit_log_ids)
     logs_by_id = {log.id: log for log in logs}
     return [logs_by_id.get(a) for a in audit_log_ids]
+
+
+@connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS)
+async def load_audit_logs_by_analysis_ids(
+    analysis_ids: list[int], connection
+) -> list[list[AuditLogInternal]]:
+    """
+    DataLoader: get_audit_logs_by_analysis_ids
+    """
+    alayer = AnalysisLayer(connection)
+    logs = await alayer.get_audit_logs_by_analysis_ids(analysis_ids)
+    return [logs.get(a) or [] for a in analysis_ids]
 
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)

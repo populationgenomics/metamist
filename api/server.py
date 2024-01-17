@@ -2,22 +2,21 @@ import os
 import time
 import traceback
 
-from fastapi import FastAPI, Request, HTTPException, APIRouter
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from starlette.responses import FileResponse
 
+from api import routes
+from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
+from api.utils import get_openapi_schema_func
+from api.utils.exceptions import determine_code_from_error
 from db.python.connect import SMConnections
 from db.python.tables.project import is_all_access
 from db.python.utils import get_logger
-
-from api import routes
-from api.utils import get_openapi_schema_func
-from api.utils.exceptions import determine_code_from_error
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
-from api.settings import PROFILE_REQUESTS, SKIP_DATABASE_CONNECTION
 
 # This tag is automatically updated by bump2version
 _VERSION = '6.6.2'
@@ -141,11 +140,11 @@ async def exception_handler(request: Request, e: Exception):
         cors_middleware = middlewares[0]
 
         request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.options['allow_origins']:
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore
             response.headers['Access-Control-Allow-Origin'] = '*'
         elif (
             cors_middleware
-            and request_origin in cors_middleware.options['allow_origins']
+            and request_origin in cors_middleware.options['allow_origins']  # type: ignore
         ):
             response.headers['Access-Control-Allow-Origin'] = request_origin
 
@@ -169,8 +168,9 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 
 
 if __name__ == '__main__':
-    import uvicorn
     import logging
+
+    import uvicorn
 
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)

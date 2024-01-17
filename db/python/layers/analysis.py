@@ -13,6 +13,7 @@ from db.python.utils import GenericFilter, get_logger
 from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
+    AuditLogInternal,
     ProportionalDateModel,
     ProportionalDateProjectModel,
     ProportionalDateTemporalMethod,
@@ -529,6 +530,10 @@ class AnalysisLayer(BaseLayer):
             by_day[es.timestamp_completed.date()].update(es.sequencing_group_ids)
 
         return by_day
+
+    async def get_audit_logs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[AuditLogInternal]]:
+        """Get audit logs for analysis IDs"""
+        return await self.at.get_audit_log_for_analysis_ids(analysis_ids)
 
     # CREATE / UPDATE
 
