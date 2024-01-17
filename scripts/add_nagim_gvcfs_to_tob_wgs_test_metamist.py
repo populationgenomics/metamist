@@ -81,7 +81,7 @@ PARTICIPANT_QUERY = gql(
             will be `ext_id1-test`, `ext_id2-test`, etc.
         ''',
 )
-def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
+def main(project: str, sample_path_mappings: str, suffix: str):
     # Read the CSV file into a dictionary
     ext_id_to_row = {}
     with to_path(sample_path_mappings).open() as f:
