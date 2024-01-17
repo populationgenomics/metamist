@@ -49,6 +49,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
 
     papi = ProjectApi()
     sapi = SampleApi()
+    aapi = AnalysisApi()
 
     enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
     # analysis_types = enum_resp['enum']['analysisType']
@@ -221,10 +222,41 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )
     )
 
-    aapi = AnalysisApi()
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
         await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
+
+    # create some fake analysis-runner entries
+    ar_entries = 20
+    print(f'Inserting {ar_entries} analysis-runner entries')
+    await asyncio.gather(
+        *(
+            aapi.create_analysis_async(
+                project,
+                Analysis(
+                    sequencing_group_ids=[],
+                    type='analysis-runner',
+                    status=AnalysisStatus('unknown'),
+                    output='gs://cpg-fake-bucket/output',
+                    meta={
+                        'timestamp': f'2022-08-{i+1}T10:00:00.0000+00:00',
+                        'accessLevel': 'standard',
+                        'repo': 'sample-metadata',
+                        'commit': '7234c13855cc15b3471d340757ce87e7441abeb9',
+                        'script': 'python3 -m <script>',
+                        'description': f'Run {i+1}',
+                        'driverImage': 'australia-southeast1-docker.pkg.dev/ar/images/image:tag',
+                        'configPath': 'gs://cpg-config/<guid>.toml',
+                        'cwd': None,
+                        'hailVersion': '0.2.126-cac7ac4164b2',
+                        'batch_url': 'https://batch.hail.populationgenomics.org.au/batches/0',
+                        'source': 'analysis-runner',
+                    },
+                ),
+            )
+            for i in range(ar_entries)
+        )
+    )
 
 
 if __name__ == '__main__':
