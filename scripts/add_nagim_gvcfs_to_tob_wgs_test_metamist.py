@@ -1,5 +1,12 @@
-from metamist.graphql import gql, query
+import csv
+from dataclasses import dataclass
+from pprint import pprint
+
+import click
+from cpg_utils import to_path
+
 from metamist.apis import ParticipantApi, AnalysisApi
+from metamist.graphql import gql, query
 from metamist.models import (
     ParticipantUpsert,
     SampleUpsert,
@@ -8,15 +15,25 @@ from metamist.models import (
     AnalysisStatus,
     Analysis,
 )
-from cpg_utils import to_path
-import csv
-import click
-from dataclasses import dataclass
-from pprint import pprint
 
 
 @dataclass
 class RowData:
+    """
+    A class used to represent a row of data.
+
+    Attributes
+    ----------
+    sgid : str
+        an identifier for the sequencing group
+    ext_id : str
+        an external identifier for the row
+    gvcf : str
+        the path to the gvcf file
+    gvcf_idx : str
+        the path to the gvcf index file
+    """
+
     sgid: str
     ext_id: str
     gvcf: str
@@ -63,40 +80,40 @@ PARTICIPANT_QUERY = gql(
 @click.option(
     '--sample-path-mappings',
     required=True,
-    help='''The path to a CSV file containing mappings of `main` CPG ID's, 
-            the `external_id` and `gvcf` paths. 
-            The file should have at least four columns: sgid, ext_id, gvcf, and gvcf_idx. 
+    help="""The path to a CSV file containing mappings of `main` CPG ID's,
+            the `external_id` and `gvcf` paths.
+            The file should have at least four columns: sgid, ext_id, gvcf, and gvcf_idx.
             Here's an example of what the first couple of lines might look like:
 
             sgid,ext_id,gvcf,gvcf_idx
             sg1,ext1,gvcf1,gvcf_idx1
             sg2,ext2,gvcf2,gvcf_idx2
-        ''',
+        """,
 )
 @click.option(
     '--project-id',
     required=True,
     type=int,
-    help='''The ID of the project to add samples to.
+    help="""The ID of the project to add samples to.
             For example: iterate over `main` project (identified by the --project flag) to get data for each sample, then create a new participant
             with the same data, but with a new external ID that has the suffix (--suffix) specified by the user.
             Then upsert these into the `test` project.
-        ''',
+        """,
 )
 @click.option(
     '--suffix',
     required=True,
-    help='''The suffix to add to the external ID's of the participants.
+    help="""The suffix to add to the external ID's of the participants.
             For example, if the suffix is `test`, then the external ID's of the participants
             will be `ext_id1-test`, `ext_id2-test`, etc.
-        ''',
+        """,
 )
 def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
-    '''
+    """
     Iterate over `main` project to get data for each sample, then create a new participant
     with the same data, but with a new external ID that has the suffix specified by the user.
     Then upsert these into the `test` project.
-    '''
+    """
     # Read the CSV file into a dictionary
     ext_id_to_row = {}
     with to_path(sample_path_mappings).open() as f:
@@ -106,8 +123,9 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
             data = RowData(*row[:4])
             ext_id_to_row[data.ext_id] = data
 
-    query_response = query(PARTICIPANT_QUERY, {"project": project})
+    query_response = query(PARTICIPANT_QUERY, {'project': project})
     p_upserts = []
+    # pylint: disable=unsubscriptable-object
     for participant in query_response['project']['participants']:
         if participant['externalId'] not in ext_id_to_row:
             continue
@@ -153,6 +171,7 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
                 )
             p.samples.append(s)
         p_upserts.append(p)
+    # pylint: enable=unsubscriptable-object
 
     upserted_participants = ParticipantApi().upsert_participants(project, p_upserts)
 
@@ -174,4 +193,6 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
 
 
 if __name__ == '__main__':
+    # pylint: disable=no-value-for-parameter
     main()
+    # pylint: enable=no-value-for-parameter
