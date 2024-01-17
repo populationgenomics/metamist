@@ -74,6 +74,16 @@ PARTICIPANT_QUERY = gql(
         ''',
 )
 @click.option(
+    '--project-id-to-add-to',
+    required=True,
+    type=int,
+    help='''The ID of the project to add samples to.
+            For example: iterate over `main` project (identified by the --project flag) to get data for each sample, then create a new participant
+            with the same data, but with a new external ID that has the suffix (--suffix) specified by the user.
+            Then upsert these into the `test` project.
+        ''',
+)
+@click.option(
     '--suffix',
     required=True,
     help='''The suffix to add to the external ID's of the participants.
@@ -81,7 +91,12 @@ PARTICIPANT_QUERY = gql(
             will be `ext_id1-test`, `ext_id2-test`, etc.
         ''',
 )
-def main(project: str, sample_path_mappings: str, suffix: str):
+def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
+    '''
+    Iterate over `main` project to get data for each sample, then create a new participant
+    with the same data, but with a new external ID that has the suffix specified by the user.
+    Then upsert these into the `test` project.
+    '''
     # Read the CSV file into a dictionary
     ext_id_to_row = {}
     with to_path(sample_path_mappings).open() as f:
@@ -92,7 +107,6 @@ def main(project: str, sample_path_mappings: str, suffix: str):
             ext_id_to_row[data.ext_id] = data
 
     query_response = query(PARTICIPANT_QUERY, {"project": project})
-    project_id = query_response['project']['id']
     p_upserts = []
     for participant in query_response['project']['participants']:
         if participant['externalId'] not in ext_id_to_row:
