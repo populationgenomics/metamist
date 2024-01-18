@@ -186,7 +186,7 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
                     type='gvcf',
                     status=AnalysisStatus('completed'),
                     output=gvcf_path,
-                    sequencing_group_id=sample['sequencingGroups '][0]['id'],
+                    sequencing_group_id=sample['sequencingGroups'][0]['id'],
                     active=True,
                 ),
             )
