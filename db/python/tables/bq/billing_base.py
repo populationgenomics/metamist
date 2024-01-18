@@ -9,6 +9,9 @@ from google.cloud import bigquery
 from api.settings import BQ_BUDGET_VIEW, BQ_DAYS_BACK_OPTIMAL
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
+from db.python.tables.bq.billing_filter import BillingFilter
+from db.python.tables.bq.function_bq_filter import FunctionBQFilter
+from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
@@ -22,7 +25,9 @@ BQ_LABELS = {'source': 'metamist-api'}
 
 
 # Day Time details used in grouping and parsing formulas
-TimeGroupingDetails = namedtuple('TimeGroupingDetails', ['field', 'formula'])
+TimeGroupingDetails = namedtuple(
+    'TimeGroupingDetails', ['field', 'formula', 'separator']
+)
 
 
 def abbrev_cost_category(cost_category: str) -> str:
@@ -35,62 +40,35 @@ def prepare_time_periods(
 ) -> TimeGroupingDetails:
     """Prepare Time periods grouping and parsing formulas"""
     time_column = query.time_column or 'day'
-    result = TimeGroupingDetails('', '')
+    result = TimeGroupingDetails('', '', '')
 
     # Based on specified time period, add the corresponding column
     if query.time_periods == BillingTimePeriods.DAY:
         result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day, ',
-            formula='PARSE_DATE("%Y-%m-%d", day) as day, ',
+            field=f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day',
+            formula='PARSE_DATE("%Y-%m-%d", day) as day',
+            separator=',',
         )
     elif query.time_periods == BillingTimePeriods.WEEK:
         result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%W", {time_column}) as day, ',
-            formula='PARSE_DATE("%Y%W", day) as day, ',
+            field=f'FORMAT_DATE("%Y%W", {time_column}) as day',
+            formula='PARSE_DATE("%Y%W", day) as day',
+            separator=',',
         )
     elif query.time_periods == BillingTimePeriods.MONTH:
         result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%m", {time_column}) as day, ',
-            formula='PARSE_DATE("%Y%m", day) as day, ',
+            field=f'FORMAT_DATE("%Y%m", {time_column}) as day',
+            formula='PARSE_DATE("%Y%m", day) as day',
+            separator=',',
         )
     elif query.time_periods == BillingTimePeriods.INVOICE_MONTH:
         result = TimeGroupingDetails(
-            field='invoice_month as day, ', formula='PARSE_DATE("%Y%m", day) as day, '
+            field='invoice_month as day',
+            formula='PARSE_DATE("%Y%m", day) as day',
+            separator=',',
         )
 
     return result
-
-
-def construct_filter(
-    name: str, value: Any, is_label: bool = False
-) -> tuple[str, bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter]:
-    """Based on Filter value, construct filter string and query parameter
-
-    Args:
-        name (str): Filter name
-        value (Any): Filter value
-        is_label (bool, optional): Is filter a label?. Defaults to False.
-
-    Returns:
-        tuple[str, bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter]
-    """
-    compare = '='
-    b1, b2 = '', ''
-    param_type = bigquery.ScalarQueryParameter
-    key = name.replace('-', '_')
-
-    if isinstance(value, list):
-        compare = 'IN'
-        b1, b2 = 'UNNEST(', ')'
-        param_type = bigquery.ArrayQueryParameter
-
-    if is_label:
-        name = f'getLabelValue(labels, "{name}")'
-
-    return (
-        f'{name} {compare} {b1}@{key}{b2}',
-        param_type(key, 'STRING', value),
-    )
 
 
 class BillingBaseTable(BqDbBase):
@@ -124,6 +102,26 @@ class BillingBaseTable(BqDbBase):
         # otherwise return as BQ iterator
         return self._connection.connection.query(query, job_config=job_config)
 
+    def _query_to_partitioned_filter(
+        self, query: BillingTotalCostQueryModel
+    ) -> BillingFilter:
+        """
+        By default views are partitioned by 'day',
+        if different then overwrite in the subclass
+        """
+        billing_filter = query.to_filter()
+
+        # initial partition filter
+        billing_filter.day = GenericBQFilter[datetime](
+            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
+            if query.start_date
+            else None,
+            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
+            if query.end_date
+            else None,
+        )
+        return billing_filter
+
     def _filter_to_optimise_query(self) -> str:
         """Filter string to optimise BQ query"""
         return 'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)'
@@ -131,67 +129,6 @@ class BillingBaseTable(BqDbBase):
     def _last_loaded_day_filter(self) -> str:
         """Last Loaded day filter string"""
         return 'day = TIMESTAMP(@last_loaded_day)'
-
-    def _prepare_time_filters(self, query: BillingTotalCostQueryModel):
-        """Prepare time filters"""
-        time_column = query.time_column or 'day'
-        time_filters = []
-        query_parameters = []
-
-        if query.start_date:
-            time_filters.append(f'{time_column} >= TIMESTAMP(@start_date)')
-            query_parameters.extend(
-                [
-                    bigquery.ScalarQueryParameter(
-                        'start_date', 'STRING', query.start_date
-                    ),
-                ]
-            )
-        if query.end_date:
-            time_filters.append(f'{time_column} <= TIMESTAMP(@end_date)')
-            query_parameters.extend(
-                [
-                    bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date),
-                ]
-            )
-
-        return time_filters, query_parameters
-
-    def _prepare_filter_str(self, query: BillingTotalCostQueryModel):
-        """Prepare filter string"""
-        and_filters, query_parameters = self._prepare_time_filters(query)
-
-        # No additional filters
-        filters = []
-        if not query.filters:
-            filter_str = 'WHERE ' + ' AND '.join(and_filters) if and_filters else ''
-            return filter_str, query_parameters
-
-        # Add each of the filters in the query
-        for filter_key, filter_value in query.filters.items():
-            col_name = str(filter_key.value)
-
-            if not isinstance(filter_value, dict):
-                filter_, query_param = construct_filter(col_name, filter_value)
-                filters.append(filter_)
-                query_parameters.append(query_param)
-            else:
-                for label_key, label_value in filter_value.items():
-                    filter_, query_param = construct_filter(
-                        label_key, label_value, True
-                    )
-                    filters.append(filter_)
-                    query_parameters.append(query_param)
-
-        if query.filters_op == 'OR':
-            if filters:
-                and_filters.append('(' + ' OR '.join(filters) + ')')
-        else:
-            # if not specified, default to AND
-            and_filters.extend(filters)
-
-        filter_str = 'WHERE ' + ' AND '.join(and_filters) if and_filters else ''
-        return filter_str, query_parameters
 
     def _convert_output(self, query_job_result):
         """Convert query result to json"""
@@ -483,70 +420,138 @@ class BillingBaseTable(BqDbBase):
 
         return results
 
-    async def get_total_cost(
-        self,
-        query: BillingTotalCostQueryModel,
-    ) -> list[dict] | None:
-        """
-        Get Total cost of selected fields for requested time interval from BQ view
-        """
-        if not query.start_date or not query.end_date or not query.fields:
-            raise ValueError('Date and Fields are required')
+    def _prepare_order_by_string(
+        self, order_by: dict[BillingColumn, bool] | None
+    ) -> str:
+        """Prepare order by string"""
+        if not order_by:
+            return ''
 
-        # Get columns to group by and check view to use
-        grp_columns = []
+        order_by_cols = []
+        for order_field, reverse in order_by.items():
+            col_name = str(order_field.value)
+            col_order = 'DESC' if reverse else 'ASC'
+            order_by_cols.append(f'{col_name} {col_order}')
+
+        return f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
+
+    def _prepare_aggregation(
+        self, query: BillingTotalCostQueryModel
+    ) -> tuple[str, str]:
+        """Prepare both fields for aggregation and group by string"""
+        # Get columns to group by
+
+        # if group by is populated, then we need to group by day as well
+        grp_columns = ['day'] if query.group_by else []
+
         for field in query.fields:
             col_name = str(field.value)
             if not BillingColumn.can_group_by(field):
                 # if the field cannot be grouped by, skip it
                 continue
 
+            # append to potential columns to group by
             grp_columns.append(col_name)
 
-        grp_selected = ','.join(grp_columns)
         fields_selected = ','.join(
             (field.value for field in query.fields if field != BillingColumn.COST)
         )
 
-        # prepare grouping by time periods
-        time_group = TimeGroupingDetails('', '')
-        if query.time_periods or query.time_column:
-            # remove existing day column, if added to fields
-            # this is to prevent duplicating various time periods in one query
-            # if BillingColumn.DAY in query.fields:
-            #     columns.remove(BillingColumn.DAY)
-            time_group = prepare_time_periods(query)
+        grp_selected = ','.join(grp_columns)
+        group_by = f'GROUP BY {grp_selected}' if query.group_by else ''
 
-        filter_str, query_parameters = self._prepare_filter_str(query)
+        return fields_selected, group_by
+
+    def _prepare_labels_function(self, query: BillingTotalCostQueryModel):
+        if not query.filters:
+            return None
+
+        if BillingColumn.LABELS in query.filters and isinstance(
+            query.filters[BillingColumn.LABELS], dict
+        ):
+            # prepare labels as function filters, parameterized both sides
+            func_filter = FunctionBQFilter(
+                name='getLabelValue',
+                implementation="""
+                    CREATE TEMP FUNCTION getLabelValue(
+                        labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
+                    ) AS (
+                        (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
+                    );
+                """,
+            )
+            func_filter.to_sql(
+                BillingColumn.LABELS,
+                query.filters[BillingColumn.LABELS],
+                query.filters_op,
+            )
+            return func_filter
+
+        # otherwise
+        return None
+
+    async def get_total_cost(
+        self,
+        query: BillingTotalCostQueryModel,
+    ) -> list[dict] | None:
+        """
+        Get Total cost of selected fields for requested time interval from BQ views
+        """
+        if not query.start_date or not query.end_date or not query.fields:
+            raise ValueError('Date and Fields are required')
+
+        # Get columns to select and to group by
+        fields_selected, group_by = self._prepare_aggregation(query)
 
         # construct order by
-        order_by_cols = []
-        if query.order_by:
-            for order_field, reverse in query.order_by.items():
-                col_name = str(order_field.value)
-                col_order = 'DESC' if reverse else 'ASC'
-                order_by_cols.append(f'{col_name} {col_order}')
+        order_by_str = self._prepare_order_by_string(query.order_by)
 
-        order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
+        # prepare grouping by time periods
+        time_group = TimeGroupingDetails('', '', '')
+        if query.time_periods or query.time_column:
+            time_group = prepare_time_periods(query)
 
-        group_by = f'GROUP BY day, {grp_selected}' if query.group_by else ''
-        cost = 'SUM(cost) as cost' if query.group_by else 'cost'
+        # overrides time specific fields with relevant time column name
+        query_filter = self._query_to_partitioned_filter(query)
+
+        # prepare where string and SQL parameters
+        where_str, sql_parameters = query_filter.to_sql()
+
+        # extract only BQ Query parameter, keys are not used in BQ SQL
+        # have to declare empty list first as linting is not happy
+        query_parameters: list[
+            bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
+        ] = []
+        query_parameters.extend(sql_parameters.values())
+
+        # prepare labels as function filters if present
+        func_filter = self._prepare_labels_function(query)
+        if func_filter:
+            # extend where_str and query_parameters
+            query_parameters.extend(func_filter.func_sql_parameters)
+
+            # now join Prepared Where with Labels Function Where
+            where_str = ' AND '.join([where_str, func_filter.func_where])
+
+        # if group by is populated, then we need SUM the cost, otherwise raw cost
+        cost_column = 'SUM(cost) as cost' if query.group_by else 'cost'
+
+        if where_str:
+            # Where is not empty, prepend with WHERE
+            where_str = f'WHERE {where_str}'
 
         _query = f"""
-        CREATE TEMP FUNCTION getLabelValue(
-            labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
-        ) AS (
-            (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
-        );
+        {func_filter.fun_implementation if func_filter else ''}
 
         WITH t AS (
-            SELECT {time_group.field}{fields_selected}, {cost}
+            SELECT {time_group.field}{time_group.separator} {fields_selected},
+                {cost_column}
             FROM `{self.get_table_name()}`
-            {filter_str}
+            {where_str}
             {group_by}
             {order_by_str}
         )
-        SELECT {time_group.formula}{fields_selected}, cost FROM t
+        SELECT {time_group.formula}{time_group.separator} {fields_selected}, cost FROM t
         """
 
         # append min cost condition

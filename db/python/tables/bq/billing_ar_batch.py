@@ -30,7 +30,7 @@ class BillingArBatchTable(BillingBaseTable):
         WHERE ar_guid = @ar_guid
         AND batch_id IS NOT NULL
         GROUP BY batch_id
-        ORDER BY 1;
+        ORDER BY batch_id;
         """
 
         query_parameters = [

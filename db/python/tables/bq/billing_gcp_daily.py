@@ -1,7 +1,11 @@
+from datetime import datetime, timedelta
+
 from google.cloud import bigquery
 
 from api.settings import BQ_DAYS_BACK_OPTIMAL, BQ_GCP_BILLING_VIEW
 from db.python.tables.bq.billing_base import BillingBaseTable
+from db.python.tables.bq.billing_filter import BillingFilter
+from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.models import BillingTotalCostQueryModel
 
 
@@ -14,50 +18,28 @@ class BillingGcpDailyTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
-    def _filter_to_optimise_query(self) -> str:
-        """Filter string to optimise BQ query
-        override base class method as gcp table has different partition field
+    def _query_to_partitioned_filter(
+        self, query: BillingTotalCostQueryModel
+    ) -> BillingFilter:
         """
-        # add extra filter to limit materialized view partition
-        # Raw BQ billing table is partitioned by part_time (when data are loaded)
-        # and not by end of usage time (day)
-        # There is a delay up to 4-5 days between part_time and day
-        # 7 days is added to be sure to get all data
-        return (
-            'part_time >= TIMESTAMP(@start_day)'
-            'AND part_time <= TIMESTAMP_ADD(TIMESTAMP(@last_day), INTERVAL 7 DAY)'
-        )
-
-    def _last_loaded_day_filter(self) -> str:
-        """Filter string to optimise BQ query
-        override base class method as gcp table has different partition field
+        add extra filter to limit materialized view partition
+        Raw BQ billing table is partitioned by part_time (when data are loaded)
+        and not by end of usage time (day)
+        There is a delay up to 4-5 days between part_time and day
+        7 days is added to be sure to get all data
         """
-        # add extra filter to limit materialized view partition
-        # Raw BQ billing table is partitioned by part_time (when data are loaded)
-        # and not by end of usage time (day)
-        # There is a delay up to 4-5 days between part_time and day
-        # 7 days is added to be sure to get all data
-        return (
-            'day = TIMESTAMP(@last_loaded_day)'
-            'AND part_time >= TIMESTAMP(@last_loaded_day)'
-            'AND part_time <= TIMESTAMP_ADD(TIMESTAMP(@last_loaded_day),INTERVAL 7 DAY)'
-        )
+        billing_filter = query.to_filter()
 
-    def _prepare_time_filters(self, query: BillingTotalCostQueryModel):
-        """Prepare time filters, append to time_filters list"""
-        time_filters, query_parameters = super()._prepare_time_filters(query)
-
-        # BQ_GCP_BILLING_VIEW view is partitioned by different field
-        # BQ has limitation, materialized view can only by partition by base table
-        # partition or its subset, in our case _PARTITIONTIME
-        # (part_time field in the view)
-        # We are querying by day,
-        # which can be up to a week behind regarding _PARTITIONTIME
-        time_filters.append('part_time >= TIMESTAMP(@start_date)')
-        time_filters.append(
-            'part_time <= TIMESTAMP_ADD(TIMESTAMP(@end_date), INTERVAL 7 DAY)'
+        # initial partition filter
+        billing_filter.part_time = GenericBQFilter[datetime](
+            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
+            if query.start_date
+            else None,
+            lte=(datetime.strptime(query.end_date, '%Y-%m-%d') + timedelta(days=7))
+            if query.end_date
+            else None,
         )
-        return time_filters, query_parameters
+        return billing_filter
 
     async def _last_loaded_day(self):
         """Get the most recent fully loaded day in db

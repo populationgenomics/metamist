@@ -31,7 +31,7 @@ const HorizontalStackedBarChart: React.FC<HorizontalStackedBarChartProps> = ({
     isLoading,
     showLegend,
 }) => {
-    if (!data || data.length === 0) {
+    if (!isLoading && (!data || data.length === 0)) {
         return <div>No data available</div>
     }
 

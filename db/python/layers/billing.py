@@ -7,13 +7,11 @@ from db.python.tables.bq.billing_raw import BillingRawTable
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingTotalCostQueryModel,
-)
-from models.models.billing import (
     BillingHailBatchCostRecord,
     BillingSource,
     BillingTimeColumn,
     BillingTimePeriods,
+    BillingTotalCostQueryModel,
 )
 
 

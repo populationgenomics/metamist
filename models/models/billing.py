@@ -1,8 +1,39 @@
 import datetime
 from enum import Enum
 
+from db.python.tables.bq.billing_filter import BillingFilter
+from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.base import SMBase
 from models.enums.billing import BillingSource, BillingTimeColumn, BillingTimePeriods
+
+
+class BillingInternal(SMBase):
+    """Model for Analysis"""
+
+    id: str | None
+    ar_guid: str | None
+    gcp_project: str | None
+    topic: str | None
+    batch_id: str | None
+    cost_category: str | None
+    cost: float | None
+    day: datetime.date | None
+
+    @staticmethod
+    def from_db(**kwargs):
+        """
+        Convert from db keys, mainly converting id to id_
+        """
+        return BillingInternal(
+            id=kwargs.get('id'),
+            ar_guid=kwargs.get('ar_guid', kwargs.get('ar-guid')),
+            gcp_project=kwargs.get('gcp_project'),
+            topic=kwargs.get('topic'),
+            batch_id=kwargs.get('batch_id'),
+            cost_category=kwargs.get('cost_category'),
+            cost=kwargs.get('cost'),
+            day=kwargs.get('day'),
+        )
 
 
 class BillingColumn(str, Enum):
@@ -95,8 +126,10 @@ class BillingColumn(str, Enum):
     @classmethod
     def str_to_enum(cls, value: str) -> 'BillingColumn':
         """Convert string to enum"""
+        # all column names have underscore in SQL, but dash in UI / stored data
+        adjusted_value = value.replace('-', '_')
         str_to_enum = {v.value: v for k, v in BillingColumn.__members__.items()}
-        return str_to_enum[value]
+        return str_to_enum[adjusted_value]
 
     @classmethod
     def raw_cols(cls) -> list[str]:
@@ -200,6 +233,19 @@ class BillingTotalCostQueryModel(SMBase):
     def __hash__(self):
         """Create hash for this object to use in caching"""
         return hash(self.json())
+
+    def to_filter(self) -> BillingFilter:
+        """
+        Convert to internal analysis filter
+        """
+        billing_filter = BillingFilter()
+        if self.filters:
+            # add filters as attributes
+            for fk, fv in self.filters.items():
+                # fk is BillColumn, fv is value
+                setattr(billing_filter, fk.value, GenericBQFilter(eq=fv))
+
+        return billing_filter
 
 
 class BillingTotalCostRecord(SMBase):

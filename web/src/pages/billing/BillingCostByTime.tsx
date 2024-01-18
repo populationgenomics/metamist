@@ -305,9 +305,15 @@ const BillingCostByTime: React.FunctionComponent = () => {
             setIsLoading(false)
             setError(undefined)
 
-            if (start !== undefined || start !== null || start !== '') {
+            if (groupBy === undefined || groupBy === null) {
+                // Group By not selected
+                setMessage('Please select Group By')
+            } else if (selectedData === undefined || selectedData === null || selectedData === '') {
+                // Top Level not selected
+                setMessage(`Please select ${groupBy}`)
+            } else if (start === undefined || start === null || start === '') {
                 setMessage('Please select Start date')
-            } else if (end !== undefined || end !== null || end !== '') {
+            } else if (end === undefined || end === null || end === '') {
                 setMessage('Please select End date')
             } else {
                 // generic message
