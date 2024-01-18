@@ -155,13 +155,9 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
                             AssayUpsert(
                                 type=sg['type'],
                                 meta={
-                                    'sequencing_type': sg['assays'][0]['meta'][
-                                        'sequencing_type'
-                                    ],
-                                    'sequencing_platform': sg['assays'][0]['meta'][
-                                        'sequencing_platform'
-                                    ],
-                                    'sequencing_technology': sg['assays'][0]['meta'][
+                                    'sequencing_type': sg['sequencing_type'],
+                                    'sequencing_platform': sg['sequencing_platform'],
+                                    'sequencing_technology': sg[
                                         'sequencing_technology'
                                     ],
                                 },
