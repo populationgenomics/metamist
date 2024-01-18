@@ -193,6 +193,4 @@ def main(project: str, project_id: int, sample_path_mappings: str, suffix: str):
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
-    main()
-    # pylint: enable=no-value-for-parameter
+    main()  # pylint: disable=no-value-for-parameter
