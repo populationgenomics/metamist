@@ -1,3 +1,5 @@
+# pylint: disable=unused-import,too-many-instance-attributes
+
 import dataclasses
 import datetime
 
@@ -44,6 +46,3 @@ class BillingFilter(GenericBQFilterModel):
     goog_pipelines_worker: GenericBQFilter[str] = None
     wdl_task_name: GenericBQFilter[str] = None
     namespace: GenericBQFilter[str] = None
-
-    def __hash__(self):
-        return super().__hash__()
