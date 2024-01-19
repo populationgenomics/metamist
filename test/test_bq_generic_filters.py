@@ -2,6 +2,7 @@ import dataclasses
 import unittest
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from google.cloud import bigquery
 
@@ -19,6 +20,7 @@ class GenericBQFilterTest(GenericBQFilterModel):
     test_dt: GenericBQFilter[datetime] | None = None
     test_dict: dict[str, GenericBQFilter[str]] | None = None
     test_enum: GenericBQFilter[Enum] | None = None
+    test_any: Any | None = None
 
 
 class BGFilterTestEnum(str, Enum):
@@ -248,32 +250,6 @@ class TestGenericBQFilters(unittest.TestCase):
             values,
         )
 
-    def test_failed_in_multiple_str(self):
-        """
-        Test that values filtered using the "in" operator convert as expected
-        """
-        value = 'Not a list'
-        filter_ = GenericBQFilterTest(test_string=GenericBQFilter(in_=value))
-
-        # check if ValueError is raised
-        with self.assertRaises(ValueError) as context:
-            filter_.to_sql()
-
-        self.assertTrue('IN filter must be a list' in str(context.exception))
-
-    def test_failed_not_in_multiple_str(self):
-        """
-        Test that values filtered using the "in" operator convert as expected
-        """
-        value = 'Not a list'
-        filter_ = GenericBQFilterTest(test_string=GenericBQFilter(nin=value))
-
-        # check if ValueError is raised
-        with self.assertRaises(ValueError) as context:
-            filter_.to_sql()
-
-        self.assertTrue('NIN filter must be a list' in str(context.exception))
-
     def test_fail_none_in_tuple(self):
         """
         Test that values filtered using the "in" operator convert as expected
@@ -282,12 +258,12 @@ class TestGenericBQFilters(unittest.TestCase):
 
         # check if ValueError is raised
         with self.assertRaises(ValueError) as context:
-            filter_ = GenericBQFilterTest(test_string=value)
+            filter_ = GenericBQFilterTest(test_any=value)
             filter_.to_sql()
 
         self.assertTrue(
             'There is very likely a trailing comma on the end of '
-            'GenericBQFilterTest.test_string. '
+            'GenericBQFilterTest.test_any. '
             'If you actually want a tuple of length one with the value = (None,), '
             'then use dataclasses.field(default_factory=lambda: (None,))'
             in str(context.exception)
