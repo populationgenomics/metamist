@@ -1,5 +1,7 @@
+# pylint: disable=protected-access
 import datetime
 import unittest
+from typing import Any
 from unittest import mock
 
 import google.cloud.bigquery as bq
@@ -9,7 +11,7 @@ from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_raw import BillingRawTable
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.utils import InternalError
-from models.models import BillingTotalCostQueryModel
+from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
 class TestBillingRawTable(unittest.TestCase):
@@ -21,7 +23,9 @@ class TestBillingRawTable(unittest.TestCase):
         # given
         start_date = '2023-01-01'
         end_date = '2024-01-01'
-        filters = {'topic': 'TEST_TOPIC'}
+        filters: dict[BillingColumn, str | list[Any] | dict[Any, Any]] = {
+            BillingColumn.TOPIC: 'TEST_TOPIC'
+        }
 
         # expected
         expected_filter = BillingFilter(

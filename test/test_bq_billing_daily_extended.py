@@ -1,6 +1,8 @@
+# pylint: disable=protected-access
 import datetime
 import unittest
 from test.testbase import run_as_sync
+from typing import Any
 from unittest import mock
 
 import google.cloud.bigquery as bq
@@ -39,7 +41,9 @@ class TestBillingGcpDailyTable(unittest.TestCase):
         # given
         start_date = '2023-01-01'
         end_date = '2024-01-01'
-        filters = {'topic': 'TEST_TOPIC'}
+        filters: dict[BillingColumn, str | list[Any] | dict[Any, Any]] = {
+            BillingColumn.TOPIC: 'TEST_TOPIC'
+        }
 
         # expected
         expected_filter = BillingFilter(
