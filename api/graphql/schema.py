@@ -762,6 +762,11 @@ class Query:
         )
         return [GraphQLProject.from_internal(p) for p in projects]
 
+    """ 
+    TODO split inot 4 or 5 different functions
+    e.g. billing_by_batch_id, billing_by_ar_guid, billing_by_topic, billing_by_gcp_project
+    """
+
     @strawberry.field
     async def billing(
         self,
