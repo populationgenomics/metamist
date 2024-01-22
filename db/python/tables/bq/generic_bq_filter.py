@@ -12,6 +12,19 @@ class GenericBQFilter(GenericFilter[T]):
     Generic BigQuery filter is BQ specific filter class, based on GenericFilter
     """
 
+    def __eq__(self, other):
+        """Equality operator"""
+        if not isinstance(other, GenericBQFilter):
+            return False
+
+        keys = ['eq', 'in_', 'nin', 'gt', 'gte', 'lt', 'lte']
+        for att in keys:
+            if getattr(self, att) != getattr(other, att):
+                return False
+
+        # all attributes are equal
+        return True
+
     def to_sql(
         self, column: str, column_name: str = None
     ) -> tuple[str, dict[str, T | list[T] | Any | list[Any]]]:
