@@ -30,8 +30,8 @@ class BGFilterTestEnum(str, Enum):
     VALUE = 'value'
 
 
-class TestGenericBQFilters(unittest.TestCase):
-    """Test generic filters SQL generation"""
+class TestGenericBQFilter(unittest.TestCase):
+    """Test generic filter SQL generation"""
 
     def test_basic_no_override(self):
         """Test that the basic filter converts to SQL as expected"""
