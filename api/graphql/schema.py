@@ -18,10 +18,8 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-from db.python.gcp_connect import BqConnection
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.layers.assay import AssayLayer
-from db.python.layers.billing import BillingLayer
 from db.python.layers.family import FamilyLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
@@ -34,9 +32,6 @@ from models.models import (
     AnalysisInternal,
     AssayInternal,
     AuditLogInternal,
-    BillingColumn,
-    BillingInternal,
-    BillingTotalCostQueryModel,
     FamilyInternal,
     ParticipantInternal,
     Project,
@@ -598,33 +593,6 @@ class GraphQLAssay:
 
 
 @strawberry.type
-class GraphQLBilling:
-    """GraphQL Billing"""
-
-    id: str | None
-    ar_guid: str | None
-    gcp_project: str | None
-    topic: str | None
-    batch_id: str | None
-    cost_category: str | None
-    day: datetime.date | None
-    cost: float | None
-
-    @staticmethod
-    def from_internal(internal: BillingInternal) -> 'GraphQLBilling':
-        return GraphQLBilling(
-            id=internal.id,
-            ar_guid=internal.ar_guid,
-            gcp_project=internal.gcp_project,
-            topic=internal.topic,
-            batch_id=internal.batch_id,
-            cost_category=internal.cost_category,
-            day=internal.day,
-            cost=internal.cost,
-        )
-
-
-@strawberry.type
 class Query:
     """GraphQL Queries"""
 
@@ -761,81 +729,6 @@ class Query:
             connection.author, readonly=True
         )
         return [GraphQLProject.from_internal(p) for p in projects]
-
-    @strawberry.field
-    async def billing(
-        self,
-        info: Info,
-        batch_id: str | None = None,
-        ar_guid: str | None = None,
-        topic: str | None = None,
-        gcp_project: str | None = None,
-        day: GraphQLFilter[datetime.datetime] | None = None,
-        cost: GraphQLFilter[float] | None = None,
-    ) -> list[GraphQLBilling]:
-        """
-        This is the first raw implementation of Billing inside GraphQL
-        """
-        # TODO check billing is enabled e.g.:
-        # if not is_billing_enabled():
-        #     raise ValueError('Billing is not enabled')
-
-        # TODO is there a better way to get the BQ connection?
-        connection = info.context['connection']
-        bg_connection = BqConnection(connection.author)
-        slayer = BillingLayer(bg_connection)
-
-        if ar_guid:
-            res = await slayer.get_cost_by_ar_guid(ar_guid)
-            if res:
-                # only show the costs
-                res = res.costs
-
-        elif batch_id:
-            res = await slayer.get_cost_by_batch_id(batch_id)
-            if res:
-                # only show the costs
-                res = res.costs
-
-        else:
-            # TODO construct fields from request.body (selected attributes)
-            # For time being, just use these fields
-            fields = [
-                BillingColumn.DAY,
-                BillingColumn.COST,
-                BillingColumn.COST_CATEGORY,
-            ]
-
-            filters = {}
-            if topic:
-                filters['topic'] = topic
-                fields.append(BillingColumn.TOPIC)
-            if gcp_project:
-                filters['gcp_project'] = gcp_project
-                fields.append(BillingColumn.GCP_PROJECT)
-
-            if day:
-                all_days_vals = day.all_values()
-                start_date = min(all_days_vals).strftime('%Y-%m-%d')
-                end_date = max(all_days_vals).strftime('%Y-%m-%d')
-            else:
-                # TODO we need to limit to small time periods to avoid huge charges
-                # If day is not selected use only current day records
-                start_date = datetime.datetime.now().strftime('%Y-%m-%d')
-                end_date = start_date
-
-            query = BillingTotalCostQueryModel(
-                fields=fields,
-                start_date=start_date,
-                end_date=end_date,
-                filters=filters,
-            )
-            res = await slayer.get_total_cost(query)
-
-        return [
-            GraphQLBilling.from_internal(BillingInternal.from_db(**dict(p)))
-            for p in res
-        ]
 
 
 schema = strawberry.Schema(
