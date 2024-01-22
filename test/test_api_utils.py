@@ -12,7 +12,9 @@ class TestApiUtils(unittest.TestCase):
     """Test API utils functions"""
 
     def test_parse_date_only_string(self):
-        """ """
+        """
+        Test parse_date_only_string function
+        """
         result_none = parse_date_only_string(None)
         self.assertEqual(None, result_none)
 
@@ -31,6 +33,9 @@ class TestApiUtils(unittest.TestCase):
         )
 
     def test_get_invoice_month_range(self):
+        """
+        Test get_invoice_month_range function
+        """
         jan_2021 = datetime.strptime('2021-01-10', '%Y-%m-%d').date()
         res_jan_2021 = get_invoice_month_range(jan_2021)
 
@@ -50,6 +55,9 @@ class TestApiUtils(unittest.TestCase):
         )
 
     def test_reformat_datetime(self):
+        """
+        Test reformat_datetime function
+        """
         in_format = '%Y-%m-%d'
         out_format = '%d/%m/%Y'
 
