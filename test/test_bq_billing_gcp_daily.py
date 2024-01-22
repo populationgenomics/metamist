@@ -143,27 +143,29 @@ class TestBillingGcpDailyTable(unittest.TestCase):
         )
 
         # expected
-        expected_daily_cost_join = """LEFT JOIN (
-            SELECT
-                cost as field,
-                cost_category,
-                SUM(cost) as cost
-            FROM
-            `TEST_TABLE_NAME`
-            WHERE day = TIMESTAMP(@last_loaded_day)
-            
-        AND part_time >= TIMESTAMP(@last_loaded_day)
-        AND part_time <= TIMESTAMP_ADD(
-            TIMESTAMP(@last_loaded_day), INTERVAL 7 DAY
+        expected_daily_cost_join = (
+            'LEFT JOIN (\n'
+            '            SELECT\n'
+            '                cost as field,\n'
+            '                cost_category,\n'
+            '                SUM(cost) as cost\n'
+            '            FROM\n'
+            '            `TEST_TABLE_NAME`\n'
+            '            WHERE day = TIMESTAMP(@last_loaded_day)\n'
+            '            \n'
+            '        AND part_time >= TIMESTAMP(@last_loaded_day)\n'
+            '        AND part_time <= TIMESTAMP_ADD(\n'
+            '            TIMESTAMP(@last_loaded_day), INTERVAL 7 DAY\n'
+            '        )\n'
+            '        \n'
+            '            GROUP BY\n'
+            '                field,\n'
+            '                cost_category\n'
+            '        ) day\n'
+            '        ON month.field = day.field\n'
+            '        AND month.cost_category = day.cost_category\n'
+            '        '
         )
-        
-            GROUP BY
-                field,
-                cost_category
-        ) day
-        ON month.field = day.field
-        AND month.cost_category = day.cost_category
-        """
 
         self.assertEqual(
             [
