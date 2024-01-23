@@ -1107,4 +1107,58 @@
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
+	<changeSet id="2024-01-23_analysis_file" author="yash.pankhania">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="file">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="path" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+					unique="true"
+				/>
+			</column>
+			<column name="basename" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="dirname" type="VARCHAR(100)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameroot" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="nameext" type="VARCHAR(25)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="checksum" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+			<column name="secondary_files" type="VARCHAR(255)">
+				<constraints
+					nullable="false"
+				/>
+			</column>
+		</createTable>
+		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
+
+		<addColumn tableName="analysis">
+			<column name="output_file_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="FK_ANALYSIS_FILE_ID"
+					references="file(id)" />
+			</column>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>
