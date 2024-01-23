@@ -1,7 +1,11 @@
+import ast
 import asyncio
 from textwrap import dedent
 import click
+import json
+import re
 from databases import Database
+from typing import Dict
 from models.models.file import FileInternal
 
 
@@ -18,7 +22,12 @@ def _get_connection_string():
 async def get_analyses_without_fileid(connection):
     """Get analyses without fileid"""
     query = dedent(
-        """SELECT id, output FROM analysis WHERE output_file_id IS NULL"""
+        """
+        SELECT a.id, a.output
+        FROM analysis a
+        LEFT JOIN file f ON f.analysis_id = a.id
+        WHERE f.analysis_id IS NULL
+        """
     )
     print('Fetching...')
     rows = await connection.fetch_all(query=query)
@@ -34,36 +43,64 @@ async def execute_many(connection, query, inserts):
     await connection.execute_many(query, inserts)
 
 
+def get_file_dict(path: str, analysis_id: int) -> Dict:
+    """Get file dict"""
+    print("Extracting file dict")
+    return {
+        "analysis_id": analysis_id,
+        "path": path,
+        "basename": FileInternal.get_basename(path),
+        "dirname": FileInternal.get_dirname(path),
+        "nameroot": FileInternal.get_nameroot(path),
+        "nameext": FileInternal.get_extension(path),
+        "checksum": FileInternal.get_checksum(path),
+        "size": FileInternal.get_size(path),
+        "secondary_files": "[]",
+    }
+    
+    
+def extract_file_paths(input_str):
+    # Check if the input string matches the JSON-like pattern
+    json_pattern = r"^\{.*\}$"
+    if re.match(json_pattern, input_str):
+        try:
+            # Attempt to parse the modified JSON string
+            pattern = r"GSPath\('([^']+)'\)"
+
+            matches = re.findall(pattern, input_str)
+            file_paths = {key: value for key, value in zip(matches[::2], matches[1::2])}
+            return file_paths
+        except json.JSONDecodeError:
+            pass  # Continue to treat as a plain file path
+
+    # Treat input as a plain file path
+    return {"plain_file_path": input_str}
+
+
 async def prepare_files(analyses):
     """Serialize files for insertion"""
     files = []
     for analysis in analyses:
-        output = analysis['output']
-        if output is None:
+        path = analysis['output']
+        if path is None:
             continue
 
-        # TODO support JSON output that has multiple file outputs instead of single file outputs
-
-        file_to_insert = FileInternal.from_path(output)
-        files.append(
-            {
-                'path': file_to_insert.path,
-                'basename': file_to_insert.basename,
-                'dirname': file_to_insert.dirname,
-                'nameroot': file_to_insert.nameroot,
-                'nameext': file_to_insert.nameext,
-                'checksum': file_to_insert.checksum,
-                'size': file_to_insert.size,
-            }
-        )
+        path_dict = extract_file_paths(path)
+        if path_dict:
+            for _, path in path_dict.items():
+                print(path)
+                files.append(
+                    get_file_dict(path=path, analysis_id=analysis['id'])
+                )
+                print("Extracted and added.")
     return files
 
 
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size, secondary_files)
-        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :secondary_files)
+        """INSERT INTO file (path, analysis_id, basename, dirname, nameroot, nameext, checksum, size, secondary_files)
+        VALUES (:path, :analysis_id, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :secondary_files)
         RETURNING id"""
     )
     print('Inserting...')
@@ -76,9 +113,9 @@ async def insert_files(connection, files):
 
 
 @click.command()
-@click.option('--dry-run/--no-dry-run', default=True)
+# @click.option('--dry-run/--no-dry-run', default=True)
 @click.option('--connection-string', default=None)
-@click.argument('author', default='sequencing-group-migration')
+# @click.argument('author', default='sequencing-group-migration')
 def main_sync(connection_string: str = None):
     """Run synchronisation"""
     asyncio.get_event_loop().run_until_complete(
@@ -92,7 +129,8 @@ async def main(connection_string: str = None):
     await connection.connect()
     async with connection.transaction():
         analyses = await get_analyses_without_fileid(connection=connection)
-        print(await prepare_files(analyses))
+        files = await prepare_files(analyses)
+        await insert_files(connection=connection, files=files)
     await connection.disconnect()
 
 

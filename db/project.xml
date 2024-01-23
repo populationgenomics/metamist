@@ -1143,17 +1143,22 @@
 			</column>
 			<column name="nameext" type="VARCHAR(25)">
 				<constraints
-					nullable="false"
+					nullable="true"
 				/>
 			</column>
 			<column name="checksum" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="size" type="BIGINT">
 				<constraints
 					nullable="false"
 				/>
 			</column>
 			<column name="secondary_files" type="VARCHAR(255)">
 				<constraints
-					nullable="false"
+					nullable="true"
 				/>
 			</column>
 		</createTable>

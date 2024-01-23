@@ -55,7 +55,7 @@ class FileInternal(SMBase):
     @staticmethod
     def get_dirname(path: str) -> str:
         """Get file dirname"""
-        return AnyPath(path).parent
+        return str(AnyPath(path).parent)
 
     @staticmethod
     def get_nameroot(path: str) -> str:
@@ -69,29 +69,18 @@ class FileInternal(SMBase):
 
     @staticmethod
     def get_checksum(path: str) -> str:
-        return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()
+        try:
+            return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()
+        except FileNotFoundError:
+            return None
 
     @staticmethod
     def get_size(path: str) -> int:
         """Get file size"""
-        return AnyPath(path).stat().st_size
-
-    @staticmethod
-    def from_path(path: str) -> 'FileInternal':
-        if not AnyPath(path).exists():
-            raise Exception(f'File {path} does not exist')
-        return FileInternal(
-            # TODO: get id from db
-            id=0,
-            analysis_id=0,
-            path=path,
-            basename=FileInternal.get_basename(path),
-            dirname=FileInternal.get_dirname(path),
-            nameroot=FileInternal.get_nameroot(path),
-            nameext=FileInternal.get_extension(path),
-            checksum=FileInternal.get_checksum(path),
-            size=FileInternal.get_size(path),
-        )
+        try:
+            return AnyPath(path).stat().st_size
+        except FileNotFoundError:
+            return 0
 
     def to_external(self):
         """Convert to external model"""
