@@ -170,6 +170,7 @@ def main(
     additional_families: set[str],
     additional_samples: set[str],
     skip_ped: bool = True,
+    embedded_ids: bool = False,
 ):
     """
     Script creates a test subset for a given project.
@@ -244,7 +245,7 @@ def main(
         samples, existing_data, upserted_participant_map, target_project, project
     )
     logger.info('Transferring analyses')
-    transfer_analyses(samples, existing_data, target_project, project)
+    transfer_analyses(samples, existing_data, target_project, project, embedded_ids)
     logger.info('Subset generation complete!')
 
 
@@ -343,7 +344,7 @@ def upsert_assays(
 
 
 def transfer_analyses(
-    samples: dict, existing_data: dict, target_project: str, project: str
+    samples: dict, existing_data: dict, target_project: str, project: str, embedded_ids: bool
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -383,6 +384,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            embedded_ids,
                         ),
                         status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
@@ -399,6 +401,7 @@ def transfer_analyses(
                             analysis['output'],
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            embedded_ids,
                         ),
                         status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
@@ -667,7 +670,30 @@ def get_random_families(
     return returned_families
 
 
-def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None):
+def rewrite_file(old_path: str, new_path: str, new_base_path: str, sid: tuple[str, str]):
+    if new_path.endswith('.cram'):
+        return f"""
+        gsutil cp {old_path!r} - |
+        samtools reheader --no-PG -c 'sed /^@RG/s/SM:{sid[0]}/SM:{sid[1]}/g' /dev/stdin |
+        gsutil cp - {new_path!r}
+        """
+    elif new_path.endswith('.crai'):
+        return f"""
+        gsutil cp {new_base_path!r} - | samtools index -o - - | gsutil cp - {new_path!r}
+        """
+    elif new_path.endswith('.md5'):
+        logger.info(f'Rewriting to {new_path}: check MD5 format')
+        return f"""
+        gsutil cp {new_base_path!r} - | md5sum | gsutil cp - {new_path!r}
+        """
+    else:
+        logger.info(f'Copying to {new_path} without any rewriting')
+        return f'gsutil cp {old_path!r} {new_path!r}'
+
+
+def copy_files_in_dict(
+    d, dataset: str, sid_replacement: tuple[str, str] = None, embedded_ids: bool = False
+):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
@@ -691,9 +717,17 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
 
         if not file_exists(new_path):
-            cmd = f'gsutil cp {old_path!r} {new_path!r}'
+            if embedded_ids and sid_replacement is not None:
+                cmd = rewrite_file(old_path, new_path, new_path, sid_replacement)
+            else:
+                cmd = f'gsutil cp {old_path!r} {new_path!r}'
+
             logger.info(f'Copying file in metadata: {cmd}')
             subprocess.run(cmd, check=False, shell=True)
+        else:
+            if embedded_ids and sid_replacement is not None and new_path.endswith('.cram'):
+                logger.error(f'IDs embedded in {new_path} not updated: already exists')
+
         extra_exts = ['.md5']
         if new_path.endswith('.vcf.gz'):
             extra_exts.append('.tbi')
@@ -701,7 +735,10 @@ def copy_files_in_dict(d, dataset: str, sid_replacement: tuple[str, str] = None)
             extra_exts.append('.crai')
         for ext in extra_exts:
             if file_exists(old_path + ext) and not file_exists(new_path + ext):
-                cmd = f'gsutil cp {old_path + ext!r} {new_path + ext!r}'
+                if embedded_ids and sid_replacement is not None:
+                    cmd = rewrite_file(old_path + ext, new_path + ext, new_path, sid_replacement)
+                else:
+                    cmd = f'gsutil cp {old_path + ext!r} {new_path + ext!r}'
                 logger.info(f'Copying extra file in metadata: {cmd}')
                 subprocess.run(cmd, check=False, shell=True)
         return new_path
@@ -758,6 +795,13 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--noninteractive', action='store_true', help='Skip interactive confirmation'
+    )
+    parser.add_argument(
+        '--no-embedded-ids',
+        action='store_true',
+        help='Update IDs embedded within files (currently for CRAM only)',
+        default=True,
+        # FIXME var='embedded_ids', action should be store_false or something
     )
     args, fail = parser.parse_known_args()
     if fail:
