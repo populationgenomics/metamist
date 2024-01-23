@@ -1113,6 +1113,13 @@
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
+			<column name="analysis_id" type="INT">
+				<constraints
+					nullable="true"
+					foreignKeyName="fk_file_analysis"
+					references="analysis(id)"
+				/>
+			</column>
 			<column name="path" type="VARCHAR(255)">
 				<constraints
 					nullable="false"
@@ -1151,14 +1158,5 @@
 			</column>
 		</createTable>
 		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
-
-		<addColumn tableName="analysis">
-			<column name="output_file_id" type="INT">
-				<constraints
-					nullable="true"
-					foreignKeyName="FK_ANALYSIS_FILE_ID"
-					references="file(id)" />
-			</column>
-		</addColumn>
 	</changeSet>
 </databaseChangeLog>
