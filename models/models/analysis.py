@@ -88,6 +88,8 @@ class Analysis(BaseModel):
     type: str
     status: AnalysisStatus
     id: int | None = None
+
+    # TODO: INNER JOIN on File to get multiple outputs
     output: str | None = None
     sequencing_group_ids: list[str] = []
     author: str | None = None
