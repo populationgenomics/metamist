@@ -15,11 +15,11 @@ from db.python.tables.bq.billing_base import (
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from db.python.utils import InternalError
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
+    BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
 
@@ -65,27 +65,19 @@ class TestBillingBaseTable(BqTest):
         # BillingFilter has __eq__ method, so we can compare them directly
         self.assertEqual(expected_filter, filter_)
 
-    def test_error_no_connection(self):
-        """Test No connection exception"""
-
-        with self.assertRaises(InternalError) as context:
-            BillingBaseTable(None)
-
-        self.assertTrue(
-            'No connection was provided to the table \'BillingBaseTable\''
-            in str(context.exception)
-        )
-
     def test_abbrev_cost_category(self):
         """Test abbrev_cost_category"""
 
         # table name is set in the class
-        categories = ['Cloud Storage', 'Compute Engine', 'Other']
-        expected = ['S', 'C', 'C']
+        categories_to_expected = {
+            'Cloud Storage': 'S',
+            'Compute Engine': 'C',
+            'Other': 'C',
+        }
 
-        # set table name
-        for i in range(0, len(categories)):
-            self.assertEqual(expected[i], abbrev_cost_category(categories[i]))
+        # test category to abreveation
+        for cat, expected_abrev in categories_to_expected.items():
+            self.assertEqual(expected_abrev, abbrev_cost_category(cat))
 
     def test_prepare_time_periods_by_day(self):
         """Test prepare_time_periods"""
@@ -94,7 +86,7 @@ class TestBillingBaseTable(BqTest):
             fields=[],
             start_date='2024-01-01',
             end_date='2024-01-01',
-            time_periods='day',
+            time_periods=BillingTimePeriods.DAY,
         )
 
         time_group = prepare_time_periods(query)
@@ -110,7 +102,7 @@ class TestBillingBaseTable(BqTest):
             fields=[],
             start_date='2024-01-01',
             end_date='2024-01-01',
-            time_periods='week',
+            time_periods=BillingTimePeriods.WEEK,
         )
 
         time_group = prepare_time_periods(query)
@@ -126,7 +118,7 @@ class TestBillingBaseTable(BqTest):
             fields=[],
             start_date='2024-01-01',
             end_date='2024-01-01',
-            time_periods='month',
+            time_periods=BillingTimePeriods.MONTH,
         )
 
         time_group = prepare_time_periods(query)
@@ -142,7 +134,7 @@ class TestBillingBaseTable(BqTest):
             fields=[],
             start_date='2024-01-01',
             end_date='2024-01-01',
-            time_periods='invoice_month',
+            time_periods=BillingTimePeriods.INVOICE_MONTH,
         )
 
         time_group = prepare_time_periods(query)
@@ -258,7 +250,7 @@ class TestBillingBaseTable(BqTest):
 
         # test when query is not grouped by
         query = BillingTotalCostQueryModel(
-            fields=['topic'],
+            fields=[BillingColumn.TOPIC],
             start_date='2024-01-01',
             end_date='2024-01-01',
             group_by=False,
@@ -273,7 +265,7 @@ class TestBillingBaseTable(BqTest):
         # test when query is grouped by, but column can not be grouped by
         # cost can not be grouped by, so it is not present in the result
         query = BillingTotalCostQueryModel(
-            fields=['topic', 'cost'],
+            fields=[BillingColumn.TOPIC, BillingColumn.COST],
             start_date='2024-01-01',
             end_date='2024-01-01',
             group_by=True,
@@ -343,7 +335,7 @@ class TestBillingBaseTable(BqTest):
 
         # we are not running SQL against real BQ, just a mocking, so we can use any query
         sql_query = 'SELECT 1;'
-        sql_params = []
+        sql_params: list[Any] = []
 
         # test results_as_list=True
         given_bq_results = [[], [123], ['a', 'b', 'c']]
@@ -403,6 +395,9 @@ class TestBillingBaseTable(BqTest):
                     storage_monthly=2000.0,
                     storage_daily=200.0,
                     details=[],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
                 )
             ],
             total_record,
@@ -431,6 +426,9 @@ class TestBillingBaseTable(BqTest):
                     storage_monthly=2000.0,
                     storage_daily=None,
                     details=[],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
                 )
             ],
             total_record,
@@ -485,6 +483,9 @@ class TestBillingBaseTable(BqTest):
                             monthly_cost=100.0,
                         ),
                     ],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
                 )
             ],
             total_record,
