@@ -1,12 +1,8 @@
 # pylint: disable=protected-access
 import datetime
-import unittest
+from test.testbqbase import BqTest
 from typing import Any
-from unittest import mock
 
-import google.cloud.bigquery as bq
-
-from db.python.gcp_connect import BqConnection
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_raw import BillingRawTable
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
@@ -14,8 +10,14 @@ from db.python.utils import InternalError
 from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
-class TestBillingRawTable(unittest.TestCase):
+class TestBillingRawTable(BqTest):
     """Test BillingRawTable and its methods"""
+
+    def setUp(self):
+        super().setUp()
+
+        # setup table object
+        self.table_obj = BillingRawTable(self.connection)
 
     def test_query_to_partitioned_filter(self):
         """Test query to partitioned filter conversion"""
@@ -61,24 +63,13 @@ class TestBillingRawTable(unittest.TestCase):
     def test_get_table_name(self):
         """Test get_table_name"""
 
-        # mock BigQuery client
-        bq_client = mock.MagicMock(spec=bq.Client)
-
-        # Mock BqConnection
-        connection = mock.MagicMock(spec=BqConnection)
-        connection.gcp_project = 'GCP_PROJECT'
-        connection.connection = bq_client
-        connection.author = 'Author'
-
-        table_obj = BillingRawTable(connection)
-
         # table name is set in the class
         given_table_name = 'TEST_BQ_AGGREG_RAW'
 
         # set table name
-        table_obj.table_name = given_table_name
+        self.table_obj.table_name = given_table_name
 
         # test get table name function
-        table_name = table_obj.get_table_name()
+        table_name = self.table_obj.get_table_name()
 
         self.assertEqual(given_table_name, table_name)

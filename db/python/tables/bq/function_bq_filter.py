@@ -27,7 +27,7 @@ class FunctionBQFilter:
 
     def __init__(self, name: str, implementation: str):
         self.func_name = name
-        self.fun_implementation = implementation
+        self.func_implementation = implementation
         # param_id is a counter for parameterised values
         self._param_id = 0
 

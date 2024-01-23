@@ -546,7 +546,7 @@ class BillingBaseTable(BqDbBase):
             where_str = f'WHERE {where_str}'
 
         _query = f"""
-        {func_filter.fun_implementation if func_filter else ''}
+        {func_filter.func_implementation if func_filter else ''}
 
         WITH t AS (
             SELECT {time_group.field}{time_group.separator} {fields_selected},

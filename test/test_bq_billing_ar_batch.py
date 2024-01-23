@@ -1,13 +1,12 @@
 # pylint: disable=protected-access
 import datetime
-import unittest
 from test.testbase import run_as_sync
+from test.testbqbase import BqTest
 from typing import Any
 from unittest import mock
 
 import google.cloud.bigquery as bq
 
-from db.python.gcp_connect import BqConnection
 from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
@@ -15,22 +14,11 @@ from db.python.utils import InternalError
 from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
-class TestBillingArBatchTable(unittest.TestCase):
+class TestBillingArBatchTable(BqTest):
     """Test BillingArBatchTable and its methods"""
 
     def setUp(self):
-        # Mockup BQ results
-        self.bq_result = mock.MagicMock(spec=bq.job.QueryJob)
-
-        # mock BigQuery client
-        self.bq_client = mock.MagicMock(spec=bq.Client)
-        self.bq_client.query.return_value = self.bq_result
-
-        # Mock BqConnection
-        self.connection = mock.MagicMock(spec=BqConnection)
-        self.connection.gcp_project = 'GCP_PROJECT'
-        self.connection.connection = self.bq_client
-        self.connection.author = 'Author'
+        super().setUp()
 
         # setup table object
         self.table_obj = BillingArBatchTable(self.connection)
