@@ -127,8 +127,8 @@ class TestFunctionBQFilter(unittest.TestCase):
         filter_.to_sql(
             BillingColumn.LABELS,
             {
-                'label_name1': datetime(2024, 1, 1).astimezone(NYC),
-                'label_name2': datetime(2024, 1, 1).astimezone(SYD),
+                'label_name1': datetime(2024, 1, 1, tzinfo=pytz.UTC).astimezone(NYC),
+                'label_name2': datetime(2024, 1, 1, tzinfo=pytz.UTC).astimezone(SYD),
             },
             'AND',
         )
@@ -137,11 +137,11 @@ class TestFunctionBQFilter(unittest.TestCase):
             [
                 bq.ScalarQueryParameter('param1', 'STRING', 'label_name1'),
                 bq.ScalarQueryParameter(
-                    'value1', 'STRING', '2023-12-31T08:00:00-05:00'
+                    'value1', 'STRING', '2023-12-31T19:00:00-05:00'
                 ),
                 bq.ScalarQueryParameter('param2', 'STRING', 'label_name2'),
                 bq.ScalarQueryParameter(
-                    'value2', 'STRING', '2024-01-01T00:00:00+11:00'
+                    'value2', 'STRING', '2024-01-01T11:00:00+11:00'
                 ),
             ],
             filter_.func_sql_parameters,
