@@ -1,67 +1,12 @@
-import dataclasses
 import unittest
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 import google.cloud.bigquery as bq
 import pytz
 
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from models.models import BillingColumn
-
-"""
-
-func_filter = FunctionBQFilter(
-                name='getLabelValue',
-                implementation="
-                    CREATE TEMP FUNCTION getLabelValue(
-                        labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
-                    ) AS (
-                        (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
-                    );
-                ",
-            )
-            func_filter.to_sql(
-                BillingColumn.LABELS,
-                query.filters[BillingColumn.LABELS],
-                query.filters_op,
-            )
-            return func_filter
-            
-            
-            func_filter = self._prepare_labels_function(query)
-        if func_filter:
-            # extend where_str and query_parameters
-            query_parameters.extend(func_filter.func_sql_parameters)
-
-            # now join Prepared Where with Labels Function Where
-            where_str = ' AND '.join([where_str, func_filter.func_where])
-            
-            
-
-for param_key, param_value in func_params.items():
-            # parameterised both param_key and param_value
-            # e.g. this is raw SQL example:
-            # getLabelValue(labels, {param_key}) = {param_value}
-            self._param_id += 1
-            key = f'param{self._param_id}'
-            val = f'value{self._param_id}'
-            # add param_key as parameterised BQ value
-            values.append(FunctionBQFilter._sql_value_prep(key, param_key))
-
-            # add param_value as parameterised BQ value
-            values.append(FunctionBQFilter._sql_value_prep(val, param_value))
-
-            # format as FUN(column_name, @param) = @value
-            conditionals.append(
-                (
-                    f'{self.func_name}({column_name.value},@{key}) = '
-                    f'{FunctionBQFilter._sql_cond_prep(val, param_value)}'
-                )
-            )
-
-"""
 
 
 class BGFunFilterTestEnum(str, Enum):
