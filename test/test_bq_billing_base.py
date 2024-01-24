@@ -1,5 +1,5 @@
 # pylint: disable=protected-access
-import datetime
+from datetime import datetime
 from test.testbase import run_as_sync
 from test.testbqbase import BqTest
 from typing import Any
@@ -22,6 +22,27 @@ from models.models import (
     BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
+
+
+# defind mockup function for _execute_query
+def mock_execute_query_one_record(query, *_args, **_kwargs):
+    """This is a mockup function for _execute_query function
+    This returns one mockup BQ query result if the query contains 'month.cost as monthly_cost'
+    """
+    if 'month.cost as monthly_cost' in query:
+        # return mockup BQ query result
+        return [
+            mock.MagicMock(
+                spec=bq.Row,
+                field='TOPIC1',
+                cost_category='Compute Engine',
+                daily_cost=123.45,
+                monthly_cost=2345.67,
+            )
+        ]
+
+    # otherwise no results
+    return []
 
 
 class TestBillingBaseTable(BqTest):
@@ -48,8 +69,8 @@ class TestBillingBaseTable(BqTest):
         # expected
         expected_filter = BillingFilter(
             day=GenericBQFilter(
-                gte=datetime.datetime(2023, 1, 1, 0, 0),
-                lte=datetime.datetime(2024, 1, 1, 0, 0),
+                gte=datetime(2023, 1, 1, 0, 0),
+                lte=datetime(2024, 1, 1, 0, 0),
             ),
             topic=GenericBQFilter(eq='TEST_TOPIC'),
         )
@@ -489,4 +510,319 @@ class TestBillingBaseTable(BqTest):
                 )
             ],
             total_record,
+        )
+
+    @run_as_sync
+    async def test_budgets_by_gcp_project(self):
+        """Test _budgets_by_gcp_project"""
+
+        # Only GCP_PROJECT and current month has budget
+        # test the else branch
+        empty_result = await self.table_obj._budgets_by_gcp_project(
+            BillingColumn.TOPIC, False
+        )
+        self.assertEqual({}, empty_result)
+
+        # GCP_PROJECT and current month, but BQ mockup setup as empty values
+        empty_result = await self.table_obj._budgets_by_gcp_project(
+            BillingColumn.GCP_PROJECT, True
+        )
+        self.assertEqual({}, empty_result)
+
+        # GCP_PROJECT and current month and Mockup set as 2 records
+        self.bq_result.result.return_value = [
+            mock.MagicMock(spec=bq.Row, gcp_project='Project1', budget=1000.0),
+            mock.MagicMock(spec=bq.Row, gcp_project='Project2', budget=2000.0),
+        ]
+
+        non_empty_result = await self.table_obj._budgets_by_gcp_project(
+            BillingColumn.GCP_PROJECT, True
+        )
+        self.assertDictEqual({'Project1': 1000.0, 'Project2': 2000.0}, non_empty_result)
+
+    @run_as_sync
+    async def test_execute_running_cost_query(self):
+        """Test _execute_running_cost_query"""
+
+        # test invalid inputs
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj._execute_running_cost_query(BillingColumn.TOPIC, None)
+
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj._execute_running_cost_query(
+                BillingColumn.TOPIC, '12345678'
+            )
+
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj._execute_running_cost_query(
+                BillingColumn.TOPIC, '1024AA'
+            )
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        # no mocked BQ results, should return as empty
+        (
+            is_current_month,
+            last_loaded_day,
+            query_job_result,
+        ) = await self.table_obj._execute_running_cost_query(
+            BillingColumn.TOPIC, '202101'
+        )
+
+        self.assertEqual(False, is_current_month)
+        self.assertEqual(None, last_loaded_day)
+        self.assertEqual([], query_job_result)
+
+        # no mocked BQ results, should return as empty
+        # use current month to test the current month branch
+        current_month_as_string = datetime.now().strftime('%Y%m')
+        (
+            is_current_month,
+            last_loaded_day,
+            query_job_result,
+        ) = await self.table_obj._execute_running_cost_query(
+            BillingColumn.TOPIC, current_month_as_string
+        )
+
+        self.assertEqual(True, is_current_month)
+        self.assertEqual(None, last_loaded_day)
+        self.assertEqual([], query_job_result)
+
+    @run_as_sync
+    async def test_append_running_cost_records(self):
+        """Test _append_running_cost_records"""
+
+        # test empty results
+        empty_results = await self.table_obj._append_running_cost_records(
+            field=BillingColumn.TOPIC,
+            is_current_month=False,
+            last_loaded_day=None,
+            total_monthly={},
+            total_daily={},
+            field_details={},
+            results=[],
+        )
+
+        self.assertEqual([], empty_results)
+
+        # prepare some input data
+        field_details: dict[str, Any] = {
+            'Project1': [],
+        }
+
+        simple_result = await self.table_obj._append_running_cost_records(
+            field=BillingColumn.GCP_PROJECT,
+            is_current_month=False,
+            last_loaded_day=None,
+            total_monthly={'C': {}, 'S': {}},
+            total_daily={'C': {}, 'S': {}},
+            field_details=field_details,
+            results=[],
+        )
+
+        self.assertEqual(
+            [
+                BillingCostBudgetRecord(
+                    field='Project1',
+                    total_monthly=0.0,
+                    compute_monthly=0.0,
+                    compute_daily=0.0,
+                    storage_monthly=0.0,
+                    storage_daily=0.0,
+                    details=[],
+                    last_loaded_day=None,
+                    total_daily=None,
+                    budget_spent=None,
+                    budget=None,
+                )
+            ],
+            simple_result,
+        )
+
+        field_details = {
+            'Project2': [
+                {
+                    'cost_group': 'C',
+                    'cost_category': 'Compute Engine',
+                    'daily_cost': 90.0,
+                    'monthly_cost': 900.0,
+                }
+            ],
+        }
+
+        detailed_result = await self.table_obj._append_running_cost_records(
+            field=BillingColumn.GCP_PROJECT,
+            is_current_month=False,
+            last_loaded_day=None,
+            total_monthly={'C': {}, 'S': {}},
+            total_daily={'C': {}, 'S': {}},
+            field_details=field_details,
+            results=[],
+        )
+
+        self.assertEqual(
+            [
+                BillingCostBudgetRecord(
+                    field='Project2',
+                    total_monthly=0.0,
+                    compute_monthly=0.0,
+                    compute_daily=0.0,
+                    storage_monthly=0.0,
+                    storage_daily=0.0,
+                    details=[
+                        BillingCostDetailsRecord(
+                            cost_group='C',
+                            cost_category='Compute Engine',
+                            daily_cost=90.0,
+                            monthly_cost=900.0,
+                        )
+                    ],
+                    last_loaded_day=None,
+                    total_daily=None,
+                    budget_spent=None,
+                    budget=None,
+                )
+            ],
+            detailed_result,
+        )
+
+    @run_as_sync
+    async def test_get_running_cost(self):
+        """Test get_running_cost"""
+
+        # test invalid outputs
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj.get_running_cost(
+                # not allowed field
+                field=BillingColumn.SKU,
+                invoice_month=None,
+            )
+
+        self.assertTrue(
+            (
+                'Invalid field only topic, dataset, gcp-project, compute_category, '
+                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
+            )
+            in str(context.exception)
+        )
+
+        # test empty cost (no BQ mockup data provided)
+        empty_results = await self.table_obj.get_running_cost(
+            field=BillingColumn.TOPIC,
+            invoice_month='202301',
+        )
+
+        self.assertEqual([], empty_results)
+
+        # mockup BQ sql query result for _execute_running_cost_query function
+        self.table_obj._execute_query = mock.MagicMock(
+            side_effect=mock_execute_query_one_record
+        )
+
+        one_record_result = await self.table_obj.get_running_cost(
+            field=BillingColumn.TOPIC,
+            invoice_month='202301',
+        )
+
+        self.assertEqual(
+            [
+                BillingCostBudgetRecord(
+                    field='All Topics',
+                    total_monthly=2345.67,
+                    total_daily=None,
+                    compute_monthly=2345.67,
+                    compute_daily=None,
+                    storage_monthly=0.0,
+                    storage_daily=None,
+                    details=[
+                        BillingCostDetailsRecord(
+                            cost_group='C',
+                            cost_category='Compute Engine',
+                            daily_cost=None,
+                            monthly_cost=2345.67,
+                        )
+                    ],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
+                ),
+                BillingCostBudgetRecord(
+                    field='TOPIC1',
+                    total_monthly=2345.67,
+                    total_daily=None,
+                    compute_monthly=2345.67,
+                    compute_daily=0.0,
+                    storage_monthly=0.0,
+                    storage_daily=0.0,
+                    details=[
+                        BillingCostDetailsRecord(
+                            cost_group='C',
+                            cost_category='Compute Engine',
+                            daily_cost=None,
+                            monthly_cost=2345.67,
+                        )
+                    ],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
+                ),
+            ],
+            one_record_result,
+        )
+
+        # use the current month to test the current month branch
+        current_month_as_string = datetime.now().strftime('%Y%m')
+
+        current_month_result = await self.table_obj.get_running_cost(
+            field=BillingColumn.TOPIC,
+            invoice_month=current_month_as_string,
+        )
+
+        self.assertEqual(
+            [
+                BillingCostBudgetRecord(
+                    field='All Topics',
+                    total_monthly=2345.67,
+                    total_daily=123.45,
+                    compute_monthly=2345.67,
+                    compute_daily=123.45,
+                    storage_monthly=0.0,
+                    storage_daily=0.0,
+                    details=[
+                        BillingCostDetailsRecord(
+                            cost_group='C',
+                            cost_category='Compute Engine',
+                            daily_cost=123.45,
+                            monthly_cost=2345.67,
+                        )
+                    ],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
+                ),
+                BillingCostBudgetRecord(
+                    field='TOPIC1',
+                    total_monthly=2345.67,
+                    total_daily=123.45,
+                    compute_monthly=2345.67,
+                    compute_daily=123.45,
+                    storage_monthly=0.0,
+                    storage_daily=0.0,
+                    details=[
+                        BillingCostDetailsRecord(
+                            cost_group='C',
+                            cost_category='Compute Engine',
+                            daily_cost=123.45,
+                            monthly_cost=2345.67,
+                        )
+                    ],
+                    budget_spent=None,
+                    budget=None,
+                    last_loaded_day=None,
+                ),
+            ],
+            current_month_result,
         )
