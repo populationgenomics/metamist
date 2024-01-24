@@ -2,8 +2,6 @@
 
 This document provides detailed instructions on how to install the project. Follow these steps to set up the project on your local system.
 
-Instructions for Windows should theoretically work but we have only tested this project to work on -nix systems. As such, we are unable to verify any discrepancies on Windows, and there could be slight variations in your setup.
-
 ## Prerequisites
 
 [Homebrew](https://brew.sh) is the simplest way to install system dependencies needed for this project.
@@ -13,7 +11,7 @@ Instructions for Windows should theoretically work but we have only tested this 
 ## System Requirements
 
 
-- **Node/NPM** (recommend using nvm)
+- **Node/NPM** (recommend using [pnpm](https://pnpm.io/motivation) for this, but you can also use [nvm](https://github.com/nvm-sh/nvm))
 - **MariaDB** (using MariaDB in docker is also good)
 - **Java** (for Liquibase / OpenAPI  Generator)
 - **Liquibase**
@@ -24,7 +22,10 @@ Instructions for Windows should theoretically work but we have only tested this 
 ### Mac
 
 ```bash
+brew install pnpm # recommended over nvm
+# OR
 brew install nvm
+
 brew install java
 brew install liquibase
 brew install pyenv
@@ -37,9 +38,14 @@ brew install mariadb@10.8
 
 ### Windows
 
+Instructions for Windows should theoretically work but we have only tested this project to work on -nix systems. As such, we are unable to verify any discrepancies on Windows, and there could be slight variations in your setup.
+
 ```bash
 # Assuming you have Chocolatey
+choco install pnpm # Recommended
+# OR
 choco install nvm
+
 choco install jdk8
 choco install liquibase
 choco install pyenv-win
@@ -47,15 +53,6 @@ choco install wget
 
 # skip if you wish to install via docker
 choco install mariadb --version=10.8.3
-```
-
-```bash
-# Install npm
-nvm install --lts
-
-# Once you have npm set up, install the OpenAPI generator:
-npm install @openapitools/openapi-generator-cli -g
-openapi-generator-cli version-manager set 5.3.0
 ```
 
 ## Installation Steps
@@ -93,19 +90,8 @@ export PATH="$HB_PREFIX/bin:$PATH:$HB_PREFIX/opt/openjdk/bin"
 # installing liquibase through brew recommendation
 export LIQUIBASE_HOME=$(brew --prefix)/opt/liquibase/libexec
 
-
-# node
-export NVM_DIR="$HOME/.nvm"
-[ -s "$HB_PREFIX/opt/nvm/nvm.sh" ] && \. "$HB_PREFIX/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm" ] && \. "$HB_PREFIX/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
-
-# openapi
-export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
-alias openapi-generator="npx @openapitools/openapi-generator-cli"
-
 # mariadb
 export PATH="$HB_PREFIX/opt/mariadb@10.8/bin:$PATH"
-
 
 # metamist config
 export SM_ENVIRONMENT=LOCAL # good default to have
@@ -113,6 +99,76 @@ export SM_DEV_DB_USER=sm_api # makes it easier to copy liquibase update command
 ```
 
 You can also add these to your shell config file e.g `.zshrc` or `.bashrc` for persistence to new sessions.
+
+#### PNPM/NVM Config
+
+Depending on your choice for using `pnpm` or `nvm` you will have to configure your shell for it.
+
+If you installed `pnpm`, you should have a similar snippet from the brew installation output:
+
+```shell
+export PNPM_HOME="/Users/$(whoami)/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+```
+
+Add this to your `.zshrc` to auto-load on next shell session.
+
+If you installed `nvm`, you will need to add lazy load since `nvm` has high load penalties.
+
+- For Oh-My-Zsh users, you can just add the `nvm` plugin to your `.zshrc` via these [instructions](https://github.com/ohmyzsh/ohmyzsh/blob/master/plugins/nvm/README.md)
+
+- If you do NOT have Oh-My-Zsh, you can use this [plugin](https://github.com/undg/zsh-nvm-lazy-load):
+
+```shell
+git clone https://github.com/undg/zsh-nvm-lazy-load $ZSH/custom/plugins/zsh-nvm
+
+#Add this to your plugins variable in the `.zshrc` file and then source the file.
+plugins=(... zsh-nvm-lazy-load)
+```
+
+Once set up, install the OpenAPI Generator:
+
+- For `pnpm`:
+
+```shell
+# Install npm via pnpm
+# This also activates the env for you, replace `use` with `add` to only install it.
+pnpm env use --global lts
+pnpm install @openapitools/openapi-generator-cli -g
+```
+
+Add this to your `.zshrc`:
+
+```shell
+# openapi
+export OPENAPI_COMMAND="pnpm dlx @openapitools/openapi-generator-cli"
+alias openapi-generator="pnpm dlx @openapitools/openapi-generator-cli"
+```
+
+- For `nvm`:
+
+```shell
+# Install npm via nvm
+nvm install --lts
+npm install @openapitools/openapi-generator-cli -g
+```
+
+Add this to your `.zshrc`:
+
+```shell
+# openapi
+export OPENAPI_COMMAND="npx @openapitools/openapi-generator-cli"
+alias openapi-generator="npx @openapitools/openapi-generator-cli"
+```
+
+Finally, set the version:
+
+```shell
+openapi-generator-cli version-manager set 5.3.0
+```
 
 ### Database Setup - Native Installation
 

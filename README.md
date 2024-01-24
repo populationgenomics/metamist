@@ -55,7 +55,7 @@ And metamist maintains two clients:
 
 ## Installation and Running Locally
 
-- [Installation](installation.md)
+- [Installation and developer setup](docs/installation.md)
 
 ## License
 
