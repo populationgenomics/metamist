@@ -1,9 +1,10 @@
+import hashlib
 from typing import Optional
+
+from cloudpathlib.anypath import AnyPath
 from pydantic import BaseModel
 
 from models.base import SMBase
-from cloudpathlib.anypath import AnyPath
-import hashlib
 
 
 class File(BaseModel):
@@ -49,28 +50,29 @@ class FileInternal(SMBase):
 
     @staticmethod
     def get_basename(path: str) -> str:
-        """Get file basename"""
-        return AnyPath(path).name
+        """Get file basename for file at given path"""
+        return AnyPath(path).name  # pylint: disable=E1101
 
     @staticmethod
     def get_dirname(path: str) -> str:
-        """Get file dirname"""
-        return str(AnyPath(path).parent)
+        """Get file dirname for file at given path"""
+        return str(AnyPath(path).parent)  # pylint: disable=E1101
 
     @staticmethod
     def get_nameroot(path: str) -> str:
-        """Get file nameroot"""
-        return AnyPath(path).stem
+        """Get file nameroot for file at given path"""
+        return AnyPath(path).stem  # pylint: disable=E1101
 
     @staticmethod
     def get_extension(path: str) -> str:
-        """Get file extension"""
-        return AnyPath(path).suffix
+        """Get file extension for file at given path"""
+        return AnyPath(path).suffix  # pylint: disable=E1101
 
     @staticmethod
     def get_checksum(path: str) -> str:
+        """Get checksum for file at given path"""
         try:
-            return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()
+            return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()  # pylint: disable=E1101
         except FileNotFoundError:
             return None
 
@@ -78,7 +80,7 @@ class FileInternal(SMBase):
     def get_size(path: str) -> int:
         """Get file size"""
         try:
-            return AnyPath(path).stat().st_size
+            return AnyPath(path).stat().st_size  # pylint: disable=E1101
         except FileNotFoundError:
             return 0
 

@@ -1,11 +1,12 @@
-import ast
 import asyncio
-from textwrap import dedent
-import click
 import json
 import re
-from databases import Database
+from textwrap import dedent
 from typing import Dict
+
+import click
+from databases import Database
+
 from models.models.file import FileInternal
 
 
@@ -45,36 +46,37 @@ async def execute_many(connection, query, inserts):
 
 def get_file_dict(path: str, analysis_id: int) -> Dict:
     """Get file dict"""
-    print("Extracting file dict")
+    print('Extracting file dict')
     return {
-        "analysis_id": analysis_id,
-        "path": path,
-        "basename": FileInternal.get_basename(path),
-        "dirname": FileInternal.get_dirname(path),
-        "nameroot": FileInternal.get_nameroot(path),
-        "nameext": FileInternal.get_extension(path),
-        "checksum": FileInternal.get_checksum(path),
-        "size": FileInternal.get_size(path),
-        "secondary_files": "[]",
+        'analysis_id': analysis_id,
+        'path': path,
+        'basename': FileInternal.get_basename(path),
+        'dirname': FileInternal.get_dirname(path),
+        'nameroot': FileInternal.get_nameroot(path),
+        'nameext': FileInternal.get_extension(path),
+        'checksum': FileInternal.get_checksum(path),
+        'size': FileInternal.get_size(path),
+        'secondary_files': '[]',
     }
-    
-    
+
+
 def extract_file_paths(input_str):
+    """Extract file paths from JSON-like string as well as plain strings into a dict"""
     # Check if the input string matches the JSON-like pattern
-    json_pattern = r"^\{.*\}$"
+    json_pattern = r'^\{.*\}$'
     if re.match(json_pattern, input_str):
         try:
             # Attempt to parse the modified JSON string
             pattern = r"GSPath\('([^']+)'\)"
 
             matches = re.findall(pattern, input_str)
-            file_paths = {key: value for key, value in zip(matches[::2], matches[1::2])}
+            file_paths = dict(zip(matches[::2], matches[1::2]))
             return file_paths
         except json.JSONDecodeError:
             pass  # Continue to treat as a plain file path
 
     # Treat input as a plain file path
-    return {"plain_file_path": input_str}
+    return {'plain_file_path': input_str}
 
 
 async def prepare_files(analyses):
@@ -92,7 +94,7 @@ async def prepare_files(analyses):
                 files.append(
                     get_file_dict(path=path, analysis_id=analysis['id'])
                 )
-                print("Extracted and added.")
+                print('Extracted and added.')
     return files
 
 
