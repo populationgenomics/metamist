@@ -30,13 +30,13 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
 }
 
 export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
-    // if (isLoading) {
-    //     return (
-    //         <div>
-    //             <LoadingDucks />
-    //         </div>
-    //     )
-    // }
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
 
     if (!data || data.length === 0) {
         return <>No Data</>

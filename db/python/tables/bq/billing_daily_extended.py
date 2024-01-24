@@ -1,7 +1,8 @@
-from google.cloud import bigquery
-
-from api.settings import BQ_AGGREG_EXT_VIEW, BQ_DAYS_BACK_OPTIMAL
-from db.python.tables.bq.billing_base import BillingBaseTable
+from api.settings import BQ_AGGREG_EXT_VIEW
+from db.python.tables.bq.billing_base import (
+    BillingBaseTable,
+    time_optimisation_parameter,
+)
 from models.models import BillingColumn
 
 
@@ -39,7 +40,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 

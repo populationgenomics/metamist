@@ -87,7 +87,7 @@ class GenericBQFilter(GenericFilter[T]):
                 key, 'STRING', ','.join([str(v) for v in value])
             )
         if isinstance(value, Enum):
-            return bigquery.ScalarQueryParameter(key, 'STRING', value.value)
+            return GenericBQFilter._sql_value_prep(key, value.value)
         if isinstance(value, int):
             return bigquery.ScalarQueryParameter(key, 'INT64', value)
         if isinstance(value, float):
