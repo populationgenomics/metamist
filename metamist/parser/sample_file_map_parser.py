@@ -16,6 +16,9 @@ SAMPLE_ID_COL_NAME = 'sample_id'
 READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
 CHECKSUM_COL_NAME = 'checksum'
+SEQ_FACILITY_COL_NAME = 'sequencing_facility'
+LIBRARY_TYPE_COL_NAME = 'library_type'
+READ_LENGTH_COL_NAME = 'read_length'
 
 KeyMap = {
     PARTICIPANT_COL_NAME: [
@@ -96,6 +99,9 @@ class SampleFileMapParser(GenericMetadataParser):
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
+            seq_facility_column=SEQ_FACILITY_COL_NAME,
+            library_type_column=LIBRARY_TYPE_COL_NAME,
+            read_length_column=READ_LENGTH_COL_NAME,
             default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             default_sequencing_technology=default_sequencing_technology,

@@ -93,6 +93,9 @@ class GenericMetadataParser(GenericParser):
         seq_type_column: Optional[str] = None,
         seq_technology_column: Optional[str] = None,
         seq_platform_column: Optional[str] = None,
+        seq_facility_column: Optional[str] = None,
+        library_type_column: Optional[str] = None,
+        read_length_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
         seq_meta_column: Optional[str] = None,
@@ -131,6 +134,9 @@ class GenericMetadataParser(GenericParser):
         self.seq_type_column = seq_type_column
         self.seq_technology_column = seq_technology_column
         self.seq_platform_column = seq_platform_column
+        self.seq_facility_column = seq_facility_column
+        self.library_type_column = library_type_column
+        self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
         self.default_reference_assembly_location = default_reference_assembly_location
 
@@ -205,7 +211,28 @@ class GenericMetadataParser(GenericParser):
             value = 'exome'
         elif 'mt' in value:
             value = 'mtseq'
+        elif 'polya' in value:
+            value = 'polyarna'
+        elif 'total' in value:
+            value = 'totalrna'
+        elif 'single' in value:
+            value = 'singlecellrna'
 
+        return str(value)
+    
+    def get_sequencing_facility(self, row: SingleRow) -> str:
+        """Get sequencing facility from row"""
+        value = row.get(self.seq_facility_column, None)
+        return str(value)
+    
+    def get_library_type(self, row: SingleRow) -> str:
+        """Get library type from row"""
+        value = row.get(self.library_type_column, None)
+        return str(value)
+    
+    def get_read_length(self, row: SingleRow) -> str:
+        """Get read length from row"""
+        value = row.get(self.read_length_column, None)
         return str(value)
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
@@ -668,6 +695,8 @@ class GenericMetadataParser(GenericParser):
                     },
                 )
             )
+        
+        sequencing_group.meta = await self.get_sequencing_group_meta_from_assays(assays)
 
         return assays
 

@@ -83,6 +83,8 @@ SUPPORTED_FILE_TYPE = Literal['reads', 'variants']
 SUPPORTED_READ_TYPES = Literal['fastq', 'bam', 'cram']
 SUPPORTED_VARIANT_TYPES = Literal['gvcf', 'vcf']
 
+RNA_SEQ_TYPES = ['polyarna', 'totalrna', 'singlecellrna']
+
 QUERY_MATCH_PARTICIPANTS = gql(
     """
 query GetParticipantEidMapQuery($project: String!) {
@@ -558,6 +560,7 @@ class GenericParser(
                     # mark for removal
                     sequencing_group.assays = None
                     continue
+                sequencing_group.meta = self.get_seq_group_meta_from_assays(chunked_assays)
                 sequencing_group.assays = chunked_assays
                 assays.extend(chunked_assays)
                 sequencing_group.analyses = analyses
@@ -997,6 +1000,20 @@ class GenericParser(
         From a sequencing_group (list of rows with some common seq fields),
         return list[ParsedAssay] (does not have to equal number of rows).
         """
+        
+    def get_sequencing_group_meta_from_assays(self, assays: list[ParsedAssay]) -> dict:
+        """
+        From a list of assays, get any relevant sequencing group meta
+        """
+        meta = {}
+        for assay in assays:
+            if assay['type'] not in RNA_SEQ_TYPES:
+                continue
+            if assay['meta'].get('reads', []) and len(assay['meta'].get('reads', [])) % 2 == 0:
+                meta['end_type'] = 'paired'
+            else:
+                meta['end_type'] = 'single'
+            
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
