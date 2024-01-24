@@ -11,7 +11,7 @@ from models.models.file import FileInternal
 
 
 def _get_connection_string():
-    from db.python.connect import CredentialedDatabaseConfiguration
+    from db.python.connect import CredentialedDatabaseConfiguration  # pylint: disable=C0415
 
     config = CredentialedDatabaseConfiguration.dev_config()
 
