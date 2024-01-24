@@ -24,13 +24,14 @@ from models.models import (
 )
 
 
-# defind mockup function for _execute_query
-def mock_execute_query_one_record(query, *_args, **_kwargs):
-    """This is a mockup function for _execute_query function
-    This returns one mockup BQ query result if the query contains 'month.cost as monthly_cost'
+def mock_execute_query(query, *_args, **_kwargs):
+    """
+    This is a mockup function for _execute_query function
+    This returns one mockup BQ query result for various SQL queries
+    This is used in a few tests
     """
     if 'month.cost as monthly_cost' in query:
-        # return mockup BQ query result
+        # return mockup BQ query result as list of rows
         return [
             mock.MagicMock(
                 spec=bq.Row,
@@ -40,6 +41,25 @@ def mock_execute_query_one_record(query, *_args, **_kwargs):
                 monthly_cost=2345.67,
             )
         ]
+
+    if 'last_loaded_day' in query:
+        # mockup BQ query result for last_loaded_day as list of rows
+        return [
+            mock.MagicMock(spec=bq.Row, last_loaded_day='2024-01-01 00:00:00+00:00')
+        ]
+
+    if 'SELECT PARSE_DATE("%Y%m", day) as day, topic, cost FROM t' in query:
+        # mockup BQ query result topic cost by invoice month, return row iterator
+        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
+        mock_rows.total_rows = 3
+        mock_rows.__iter__.return_value = [
+            {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.10},
+            {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.20},
+            {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.30},
+        ]
+        mock_result = mock.MagicMock(spec=bq.job.QueryJob)
+        mock_result.result.return_value = mock_rows
+        return mock_result
 
     # otherwise no results
     return []
@@ -718,9 +738,7 @@ class TestBillingBaseTable(BqTest):
         self.assertEqual([], empty_results)
 
         # mockup BQ sql query result for _execute_running_cost_query function
-        self.table_obj._execute_query = mock.MagicMock(
-            side_effect=mock_execute_query_one_record
-        )
+        self.table_obj._execute_query = mock.MagicMock(side_effect=mock_execute_query)
 
         one_record_result = await self.table_obj.get_running_cost(
             field=BillingColumn.TOPIC,
@@ -801,7 +819,7 @@ class TestBillingBaseTable(BqTest):
                     ],
                     budget_spent=None,
                     budget=None,
-                    last_loaded_day=None,
+                    last_loaded_day='Jan 01',
                 ),
                 BillingCostBudgetRecord(
                     field='TOPIC1',
@@ -821,8 +839,47 @@ class TestBillingBaseTable(BqTest):
                     ],
                     budget_spent=None,
                     budget=None,
-                    last_loaded_day=None,
+                    last_loaded_day='Jan 01',
                 ),
             ],
             current_month_result,
+        )
+
+    @run_as_sync
+    async def test_get_total_cost(self):
+        """Test get_total_cost"""
+
+        # test invalid input
+        query = BillingTotalCostQueryModel(
+            fields=[], start_date='2023-01-01', end_date='2024-01-01'
+        )
+
+        with self.assertRaises(ValueError) as context:
+            await self.table_obj.get_total_cost(query)
+
+        self.assertTrue('Date and Fields are required' in str(context.exception))
+
+        # test empty results
+        query = BillingTotalCostQueryModel(
+            fields=[BillingColumn.TOPIC],
+            start_date='2023-01-01',
+            end_date='2024-01-01',
+            time_periods=BillingTimePeriods.INVOICE_MONTH,
+        )
+
+        # no BQ mockup data setup, returns empty list
+        empty_results = await self.table_obj.get_total_cost(query)
+        self.assertEqual([], empty_results)
+
+        # mockup BQ sql query result for _execute_query to return 3 records.
+        # implementation is inside mock_execute_query function
+        self.table_obj._execute_query = mock.MagicMock(side_effect=mock_execute_query)
+        results = await self.table_obj.get_total_cost(query)
+        self.assertEqual(
+            [
+                {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.1},
+                {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.2},
+                {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.3},
+            ],
+            results,
         )
