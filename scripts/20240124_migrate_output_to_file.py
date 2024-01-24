@@ -7,11 +7,12 @@ from typing import Dict
 import click
 from databases import Database
 
-from models.models.file import FileInternal
+from models.models.file import File
 
 
 def _get_connection_string():
-    from db.python.connect import CredentialedDatabaseConfiguration  # pylint: disable=C0415
+    from db.python.connect import \
+        CredentialedDatabaseConfiguration  # pylint: disable=C0415
 
     config = CredentialedDatabaseConfiguration.dev_config()
 
@@ -44,18 +45,18 @@ async def execute_many(connection, query, inserts):
     await connection.execute_many(query, inserts)
 
 
-def get_file_dict(path: str, analysis_id: int) -> Dict:
+def get_file_info(path: str, analysis_id: int) -> Dict:
     """Get file dict"""
     print('Extracting file dict')
     return {
         'analysis_id': analysis_id,
         'path': path,
-        'basename': FileInternal.get_basename(path),
-        'dirname': FileInternal.get_dirname(path),
-        'nameroot': FileInternal.get_nameroot(path),
-        'nameext': FileInternal.get_extension(path),
-        'checksum': FileInternal.get_checksum(path),
-        'size': FileInternal.get_size(path),
+        'basename': File.get_basename(path),
+        'dirname': File.get_dirname(path),
+        'nameroot': File.get_nameroot(path),
+        'nameext': File.get_extension(path),
+        'checksum': File.get_checksum(path),
+        'size': File.get_size(path),
         'secondary_files': '[]',
     }
 
@@ -92,7 +93,7 @@ async def prepare_files(analyses):
             for _, path in path_dict.items():
                 print(path)
                 files.append(
-                    get_file_dict(path=path, analysis_id=analysis['id'])
+                    get_file_info(path=path, analysis_id=analysis['id'])
                 )
                 print('Extracted and added.')
     return files

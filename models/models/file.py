@@ -1,41 +1,11 @@
 import hashlib
-from typing import Optional
 
 from cloudpathlib.anypath import AnyPath
-from pydantic import BaseModel
 
 from models.base import SMBase
 
 
-class File(BaseModel):
-    """File model for external use"""
-
-    id: int
-    analysis_id: int
-    path: str
-    basename: str
-    dirname: str
-    nameroot: str
-    nameext: Optional[str]
-    checksum: Optional[str]
-    size: int
-
-    def to_internal(self):
-        """Convert to internal model"""
-        return FileInternal(
-            id=self.id,
-            analysis_id=self.analysis_id,
-            path=self.path,
-            basename=self.basename,
-            dirname=self.dirname,
-            nameroot=self.nameroot,
-            nameext=self.nameext,
-            checksum=self.checksum,
-            size=self.size,
-        )
-
-
-class FileInternal(SMBase):
+class File(SMBase):
     """File model for internal use"""
 
     id: int
@@ -47,6 +17,35 @@ class FileInternal(SMBase):
     nameext: str | None
     checksum: str | None
     size: int
+    secondary_files: list[str] = []
+
+    @staticmethod
+    def from_db(**kwargs):
+        """
+        Convert from db keys, mainly converting id to id_
+        """
+        analysis_id = kwargs.get('analysis_id')
+        path = kwargs.get('path')
+        basename = kwargs.get('basename')
+        dirname = kwargs.get('dirname')
+        nameroot = kwargs.get('nameroot')
+        nameext = kwargs.get('nameext')
+        checksum = kwargs.get('checksum')
+        size = kwargs.get('size')
+        secondary_files = kwargs.get('secondary_files')
+
+        return File(
+            id=kwargs.pop('id'),
+            analysis_id=analysis_id,
+            path=path,
+            basename=basename,
+            dirname=dirname,
+            nameroot=nameroot,
+            nameext=nameext,
+            checksum=checksum,
+            size=size,
+            secondary_files=secondary_files,
+        )
 
     @staticmethod
     def get_basename(path: str) -> str:
@@ -83,17 +82,3 @@ class FileInternal(SMBase):
             return AnyPath(path).stat().st_size  # pylint: disable=E1101
         except FileNotFoundError:
             return 0
-
-    def to_external(self):
-        """Convert to external model"""
-        return File(
-            id=self.id,
-            analysis_id=self.analysis_id,
-            path=self.path,
-            basename=self.basename,
-            dirname=self.dirname,
-            nameroot=self.nameroot,
-            nameext=self.nameext,
-            checksum=self.checksum,
-            size=self.size,
-        )
