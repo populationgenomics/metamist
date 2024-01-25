@@ -42,6 +42,15 @@ class BillingGcpDailyTable(BillingBaseTable):
             if query.end_date
             else None,
         )
+        # add day filter after partition filter is applied
+        billing_filter.day = GenericBQFilter[datetime](
+            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
+            if query.start_date
+            else None,
+            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
+            if query.end_date
+            else None,
+        )
         return billing_filter
 
     async def _last_loaded_day(self):
