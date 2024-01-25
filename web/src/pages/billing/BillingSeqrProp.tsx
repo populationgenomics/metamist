@@ -2,27 +2,23 @@ import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Grid, Card, Input } from 'semantic-ui-react'
 import SeqrProportionalMapGraph from './components/SeqrProportionalMapGraph'
+import { getMonthEndDate } from '../../shared/utilities/monthStartEndDate'
+import generateUrl from '../../shared/utilities/generateUrl'
 
 const BillingSeqrProp: React.FunctionComponent = () => {
     const now = new Date()
     const [start, setStart] = React.useState<string>(`${now.getFullYear()}-01-01`)
-    const [end, setEnd] = React.useState<string>(
-        `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
-    )
+    const [end, setEnd] = React.useState<string>(getMonthEndDate())
 
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
 
-    const updateNav = (start: string, end: string) => {
-        let url = `${location.pathname}`
-        if (start || end) url += '?'
-
-        let params: string[] = []
-        if (start) params.push(`start=${start}`)
-        if (end) params.push(`end=${end}`)
-
-        url += params.join('&')
+    const updateNav = (st: string, ed: string) => {
+        const url = generateUrl(location, {
+            start: st,
+            end: ed,
+        })
         navigate(url)
     }
 

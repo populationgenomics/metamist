@@ -15,7 +15,11 @@ from models.models.billing import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingRowRecord,
+    BillingHailBatchCostRecord,
+    BillingInternal,
+    BillingSource,
+    BillingTimeColumn,
+    BillingTimePeriods,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
