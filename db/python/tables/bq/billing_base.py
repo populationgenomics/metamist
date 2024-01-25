@@ -12,11 +12,11 @@ from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from models.enums import BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
 
