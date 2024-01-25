@@ -1,5 +1,6 @@
-import json
 from typing import Any
+
+import orjson
 
 from models.base import OpenApiGenNoneType, SMBase
 from models.utils.sample_id_format import sample_id_format, sample_id_transform_to_raw
@@ -31,7 +32,7 @@ class AssayInternal(SMBase):
             if isinstance(meta, bytes):
                 meta = meta.decode()
             if isinstance(meta, str):
-                meta = json.loads(meta)
+                meta = orjson.loads(meta)  # pylint: disable=maybe-no-member
         return AssayInternal(meta=meta, **d)
 
     def to_external(self):

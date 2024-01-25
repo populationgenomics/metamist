@@ -1,10 +1,11 @@
 # pylint: disable=too-many-locals, too-many-instance-attributes
 import asyncio
 import itertools
-import json
 import re
 from collections import defaultdict
 from datetime import date
+
+import orjson
 
 from api.utils import group_by
 from db.python.layers.base import BaseLayer
@@ -15,15 +16,10 @@ from db.python.tables.assay import AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from models.models import (
-    AssayInternal,
-    FamilySimpleInternal,
-    NestedParticipantInternal,
-    NestedSampleInternal,
-    NestedSequencingGroupInternal,
-    SearchItem,
-    parse_sql_bool,
-)
+from models.models import (AssayInternal, FamilySimpleInternal,
+                           NestedParticipantInternal, NestedSampleInternal,
+                           NestedSequencingGroupInternal, SearchItem,
+                           parse_sql_bool)
 from models.models.web import ProjectSummaryInternal, WebProject
 
 
@@ -109,7 +105,7 @@ class WebDb(DbBase):
             AssayInternal(
                 id=seq['id'],
                 type=seq['type'],
-                meta=json.loads(seq['meta']),
+                meta=orjson.loads(seq['meta']),  # pylint: disable=maybe-no-member
                 sample_id=seq['sample_id'],
             )
             for seq in assay_rows
@@ -148,7 +144,7 @@ class WebDb(DbBase):
             sg_id_to_sample_id[sg_id] = row['sample_id']
             sg_by_id[sg_id] = NestedSequencingGroupInternal(
                 id=sg_id,
-                meta=json.loads(row['meta']),
+                meta=orjson.loads(row['meta']),  # pylint: disable=maybe-no-member
                 type=row['type'],
                 technology=row['technology'],
                 platform=row['platform'],
@@ -186,7 +182,7 @@ class WebDb(DbBase):
                 id=s['id'],
                 external_id=s['external_id'],
                 type=s['type'],
-                meta=json.loads(s['meta']) or {},
+                meta=orjson.loads(s['meta']) or {},  # pylint: disable=maybe-no-member
                 created_date=str(sample_id_start_times.get(s['id'], '')),
                 sequencing_groups=sg_models_by_sample_id.get(s['id'], []),
                 non_sequencing_assays=filtered_assay_models_by_sid.get(s['id'], []),
@@ -443,7 +439,7 @@ WHERE fp.participant_id in :pids
                     NestedParticipantInternal(
                         id=p['id'],
                         external_id=p['external_id'],
-                        meta=json.loads(p['meta']),
+                        meta=orjson.loads(p['meta']),  # pylint: disable=maybe-no-member
                         families=pid_to_families.get(p['id'], []),
                         samples=list(smodels_by_pid.get(p['id'])),
                         reported_sex=p['reported_sex'],

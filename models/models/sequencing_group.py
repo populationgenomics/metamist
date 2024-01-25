@@ -1,4 +1,4 @@
-import json
+import orjson
 
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
@@ -49,7 +49,7 @@ class SequencingGroupInternal(SMBase):
         """From database model"""
         meta = kwargs.pop('meta')
         if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+            meta = orjson.loads(meta)  # pylint: disable=maybe-no-member
 
         _archived = kwargs.pop('archived', None)
         if _archived is not None:

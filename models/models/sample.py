@@ -1,4 +1,4 @@
-import json
+import orjson
 
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
@@ -37,7 +37,7 @@ class SampleInternal(SMBase):
             if isinstance(meta, bytes):
                 meta = meta.decode()
             if isinstance(meta, str):
-                meta = json.loads(meta)
+                meta = orjson.loads(meta)  # pylint: disable=maybe-no-member
 
         return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
 
