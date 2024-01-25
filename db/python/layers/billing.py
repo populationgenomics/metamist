@@ -4,13 +4,11 @@ from db.python.tables.bq.billing_daily import BillingDailyTable
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
 from db.python.tables.bq.billing_raw import BillingRawTable
+from models.enums import BillingSource, BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingHailBatchCostRecord,
-    BillingSource,
-    BillingTimeColumn,
-    BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
 
