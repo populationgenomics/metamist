@@ -16,10 +16,15 @@ from db.python.tables.assay import AssayTable
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sequencing_group import SequencingGroupTable
-from models.models import (AssayInternal, FamilySimpleInternal,
-                           NestedParticipantInternal, NestedSampleInternal,
-                           NestedSequencingGroupInternal, SearchItem,
-                           parse_sql_bool)
+from models.models import (
+    AssayInternal,
+    FamilySimpleInternal,
+    NestedParticipantInternal,
+    NestedSampleInternal,
+    NestedSequencingGroupInternal,
+    SearchItem,
+    parse_sql_bool,
+)
 from models.models.web import ProjectSummaryInternal, WebProject
 
 
