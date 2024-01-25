@@ -76,7 +76,7 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     colors,
 }) => {
     if (!data || data.length === 0) {
-        return <React.Fragment />
+        return <>No Data</>
     }
 
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
@@ -133,6 +133,10 @@ export const StackedAreaByDateChart: React.FC<IStackedAreaByDateChartProps> = ({
     const xScale = scaleTime()
         .domain(extent(data, (d) => d.date)) // date is a string, will this take a date object? Yes :)
         .range([0, width - margin.left - margin.right])
+
+    if (stackedData.length === 0) {
+        return <React.Fragment>No Data</React.Fragment>
+    }
 
     // use last stackData value to calculate max Y axis point
     const diffX = stackedData[stackedData.length - 1].flatMap((val) => val[1])
