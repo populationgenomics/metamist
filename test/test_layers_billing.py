@@ -1,18 +1,8 @@
 # pylint: disable=protected-access
-import datetime
 from test.testbase import run_as_sync
 from test.testbqbase import BqTest
-from typing import Any
-from unittest import mock
-
-import google.cloud.bigquery as bq
 
 from db.python.layers.billing import BillingLayer
-from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
-from db.python.tables.bq.billing_filter import BillingFilter
-from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from db.python.utils import InternalError
-from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
 class TestBillingLayer(BqTest):
