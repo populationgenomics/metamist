@@ -111,6 +111,7 @@ class ExistingCohortParser(GenericMetadataParser):
         batch_number,
         include_participant_column,
         allow_missing_files,
+        sequencing_type,
     ):
         if include_participant_column:
             participant_column = Columns.PARTICIPANT_COLUMN
@@ -131,6 +132,7 @@ class ExistingCohortParser(GenericMetadataParser):
             assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
             allow_extra_files_in_search_path=True,
+            default_sequencing_type=sequencing_type,
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -210,6 +212,12 @@ class ExistingCohortParser(GenericMetadataParser):
     '--project',
     help='The metamist project to import manifest into',
 )
+@click.option(
+    '--sequencing-type',
+    type=click.Choice(['genome', 'exome']),
+    required=True,
+    help='Sequencing type: genome or exome',
+)
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
@@ -236,6 +244,7 @@ async def main(
     dry_run=False,
     include_participant_column=False,
     allow_missing_files=False,
+    sequencing_type: str = 'genome',
 ):
     """Run script from CLI arguments"""
 
@@ -245,6 +254,7 @@ async def main(
         batch_number=batch_number,
         include_participant_column=include_participant_column,
         allow_missing_files=allow_missing_files,
+        sequencing_type=sequencing_type,
     )
 
     for manifest_path in manifests:
