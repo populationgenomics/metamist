@@ -287,8 +287,8 @@ class TestExistingCohortParser(DbIsolatedTest):
         self.assertEqual(len(read_filenames), 0)
 
     @run_as_sync
-    async def test_exome_sequencing_type(self):
-        """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome' or 'exome'"""
+    async def test_genome_sequencing_type(self):
+        """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome''"""
 
         # Test with 'genome'
         parser = ExistingCohortParser(
@@ -300,6 +300,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             sequencing_type='genome',
         )
         self.assertEqual(parser.default_sequencing_type, 'genome')
+
+    @run_as_sync
+    async def test_exome_sequencing_type(self):
+        """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'exome'"""
 
         # Test with 'exome'
         parser = ExistingCohortParser(
