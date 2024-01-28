@@ -45,6 +45,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             search_locations=[],
             project=self.project_name,
             allow_missing_files=False,
+            sequencing_type='genome',
         )
 
         parser.filename_map = {
@@ -116,6 +117,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             search_locations=[],
             project=self.project_name,
             allow_missing_files=False,
+            sequencing_type='genome',
         )
 
         parser.filename_map = {
@@ -217,6 +219,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             search_locations=[],
             project=self.project_name,
             allow_missing_files=False,
+            sequencing_type='genome',
         )
 
         parser.filename_map = {
@@ -248,6 +251,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             search_locations=[],
             project=self.project_name,
             allow_missing_files=False,
+            sequencing_type='genome',
         )
         parser.filename_map = {}
 
@@ -268,6 +272,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             search_locations=[],
             project=self.project_name,
             allow_missing_files=True,
+            sequencing_type='genome',
         )
         parser.filename_map = {}
 
