@@ -285,3 +285,29 @@ class TestExistingCohortParser(DbIsolatedTest):
         self.assertIn('No read files found for ', cm.output[0])
 
         self.assertEqual(len(read_filenames), 0)
+
+    @run_as_sync
+    async def test_exome_sequencing_type(self):
+        """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome' or 'exome'"""
+
+        # Test with 'genome'
+        parser = ExistingCohortParser(
+            include_participant_column=False,
+            batch_number='M01',
+            search_locations=[],
+            project=self.project_name,
+            allow_missing_files=True,
+            sequencing_type='genome',
+        )
+        self.assertEqual(parser.default_sequencing_type, 'genome')
+
+        # Test with 'exome'
+        parser = ExistingCohortParser(
+            include_participant_column=False,
+            batch_number='M01',
+            search_locations=[],
+            project=self.project_name,
+            allow_missing_files=True,
+            sequencing_type='exome',
+        )
+        self.assertEqual(parser.default_sequencing_type, 'exome')
