@@ -12,7 +12,7 @@ from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from models.enums import BillingTimePeriods
+from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
@@ -44,26 +44,26 @@ def prepare_time_periods(
     query: BillingTotalCostQueryModel,
 ) -> TimeGroupingDetails:
     """Prepare Time periods grouping and parsing formulas"""
-    time_column = query.time_column or BillingTimePeriods.DAY
+    time_column: BillingTimeColumn = query.time_column or BillingTimeColumn.DAY
 
     # Based on specified time period, add the corresponding column
     if query.time_periods == BillingTimePeriods.DAY:
         return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day',
+            field=f'FORMAT_DATE("%Y-%m-%d", {time_column.value}) as day',
             formula='PARSE_DATE("%Y-%m-%d", day) as day',
             separator=',',
         )
 
     if query.time_periods == BillingTimePeriods.WEEK:
         return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%W", {time_column}) as day',
+            field=f'FORMAT_DATE("%Y%W", {time_column.value}) as day',
             formula='PARSE_DATE("%Y%W", day) as day',
             separator=',',
         )
 
     if query.time_periods == BillingTimePeriods.MONTH:
         return TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%m", {time_column}) as day',
+            field=f'FORMAT_DATE("%Y%m", {time_column.value}) as day',
             formula='PARSE_DATE("%Y%m", day) as day',
             separator=',',
         )
