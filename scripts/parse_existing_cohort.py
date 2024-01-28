@@ -215,7 +215,6 @@ class ExistingCohortParser(GenericMetadataParser):
 @click.option(
     '--sequencing-type',
     type=click.Choice(['genome', 'exome']),
-    required=True,
     help='Sequencing type: genome or exome',
 )
 @click.option('--search-location', 'search_locations', multiple=True)
