@@ -96,7 +96,7 @@ class DbTest(unittest.TestCase):
             logger = logging.getLogger()
             try:
                 set_all_access(True)
-                db = MySqlContainer('mariadb:10.8.3')
+                db = MySqlContainer('mariadb:11.2.2')
                 port_to_expose = find_free_port()
                 # override the default port to map the container to
                 db.with_bind_ports(db.port_to_expose, port_to_expose)
