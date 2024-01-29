@@ -19,11 +19,8 @@ def prepare_bq_query_from_dict_field(
             raise ValueError(f'Filter {field_name} must be a GenericFilter')
         if '"' in key:
             raise ValueError('Meta key contains " character, which is not allowed')
-<<<<<<< HEAD
-=======
         if "'" in key:
             raise ValueError("Meta key contains ' character, which is not allowed")
->>>>>>> dev
         fconditionals, fvalues = value.to_sql(
             f"JSON_EXTRACT({column_name}, '$.{key}')",
             column_name=f'{column_name}_{key}',

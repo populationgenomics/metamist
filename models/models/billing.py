@@ -135,27 +135,6 @@ class BillingColumn(str, Enum):
     def raw_cols(cls) -> list[str]:
         """Return list of raw column names"""
         return [
-<<<<<<< HEAD
-            'id',
-            'topic',
-            'service',
-            'sku',
-            'usage_start_time',
-            'usage_end_time',
-            'project',
-            'labels',
-            'system_labels',
-            'location',
-            'export_time',
-            'cost',
-            'currency',
-            'currency_conversion_rate',
-            'usage',
-            'credits',
-            'invoice',
-            'cost_type',
-            'adjustment_info',
-=======
             BillingColumn.ID.value,
             BillingColumn.TOPIC.value,
             BillingColumn.SERVICE.value,
@@ -175,25 +154,12 @@ class BillingColumn(str, Enum):
             BillingColumn.INVOICE.value,
             BillingColumn.COST_TYPE.value,
             BillingColumn.ADJUSTMENT_INFO.value,
->>>>>>> dev
         ]
 
     @classmethod
     def standard_cols(cls) -> list[str]:
         """Return list of standard column names"""
         return [
-<<<<<<< HEAD
-            'topic',
-            'gcp_project',
-            'sku',
-            'currency',
-            'cost',
-            'labels',
-            'day',
-            'cost_category',
-            'ar_guid',
-            'invoice_month',
-=======
             BillingColumn.TOPIC.value,
             BillingColumn.GCP_PROJECT.value,
             BillingColumn.SKU.value,
@@ -204,27 +170,12 @@ class BillingColumn(str, Enum):
             BillingColumn.COST_CATEGORY.value,
             BillingColumn.AR_GUID.value,
             BillingColumn.INVOICE_MONTH.value,
->>>>>>> dev
         ]
 
     @classmethod
     def extended_cols(cls) -> list[str]:
         """Return list of extended column names"""
         return [
-<<<<<<< HEAD
-            'dataset',
-            'batch_id',
-            'sequencing_type',
-            'stage',
-            'sequencing_group',
-            'ar_guid',
-            'compute_category',
-            'cromwell_sub_workflow_name',
-            'cromwell_workflow_id',
-            'goog_pipelines_worker',
-            'wdl_task_name',
-            'namespace',
-=======
             BillingColumn.DATASET.value,
             BillingColumn.BATCH_ID.value,
             BillingColumn.SEQUENCING_TYPE.value,
@@ -237,7 +188,6 @@ class BillingColumn(str, Enum):
             BillingColumn.GOOG_PIPELINES_WORKER.value,
             BillingColumn.WDL_TASK_NAME.value,
             BillingColumn.NAMESPACE.value,
->>>>>>> dev
         ]
 
     @staticmethod

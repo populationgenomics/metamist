@@ -12,7 +12,6 @@ class GenericBQFilter(GenericFilter[T]):
     Generic BigQuery filter is BQ specific filter class, based on GenericFilter
     """
 
-<<<<<<< HEAD
     def __eq__(self, other):
         """Equality operator"""
         if not isinstance(other, GenericBQFilter):
@@ -26,8 +25,6 @@ class GenericBQFilter(GenericFilter[T]):
         # all attributes are equal
         return True
 
-=======
->>>>>>> dev
     def to_sql(
         self, column: str, column_name: str = None
     ) -> tuple[str, dict[str, T | list[T] | Any | list[Any]]]:
@@ -54,25 +51,17 @@ class GenericBQFilter(GenericFilter[T]):
                 values[k] = self._sql_value_prep(k, self.in_[0])
             else:
                 k = self.generate_field_name(_column_name + '_in')
-<<<<<<< HEAD
                 conditionals.append(
                     f'{column} IN UNNEST({self._sql_cond_prep(k, self.in_)})'
                 )
-=======
-                conditionals.append(f'{column} IN ({self._sql_cond_prep(k, self.in_)})')
->>>>>>> dev
                 values[k] = self._sql_value_prep(k, self.in_)
         if self.nin is not None:
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
             k = self.generate_field_name(column + '_nin')
-<<<<<<< HEAD
             conditionals.append(
                 f'{column} NOT IN UNNEST({self._sql_cond_prep(k, self.nin)})'
             )
-=======
-            conditionals.append(f'{column} NOT IN ({self._sql_cond_prep(k, self.nin)})')
->>>>>>> dev
             values[k] = self._sql_value_prep(k, self.nin)
         if self.gt is not None:
             k = self.generate_field_name(column + '_gt')
@@ -111,7 +100,6 @@ class GenericBQFilter(GenericFilter[T]):
         Overrides the default _sql_value_prep to handle BQ parameters
         """
         if isinstance(value, list):
-<<<<<<< HEAD
             if value and isinstance(value[0], int):
                 return bigquery.ArrayQueryParameter(key, 'INT64', value)
             if value and isinstance(value[0], float):
@@ -121,14 +109,7 @@ class GenericBQFilter(GenericFilter[T]):
             return bigquery.ArrayQueryParameter(key, 'STRING', [str(v) for v in value])
 
         if isinstance(value, Enum):
-            return bigquery.ScalarQueryParameter(key, 'STRING', value.value)
-=======
-            return bigquery.ArrayQueryParameter(
-                key, 'STRING', ','.join([str(v) for v in value])
-            )
-        if isinstance(value, Enum):
             return GenericBQFilter._sql_value_prep(key, value.value)
->>>>>>> dev
         if isinstance(value, int):
             return bigquery.ScalarQueryParameter(key, 'INT64', value)
         if isinstance(value, float):

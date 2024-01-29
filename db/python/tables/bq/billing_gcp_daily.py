@@ -1,15 +1,5 @@
 from datetime import datetime, timedelta
-<<<<<<< HEAD
 from typing import Any
-
-from google.cloud import bigquery
-
-from api.settings import BQ_DAYS_BACK_OPTIMAL, BQ_GCP_BILLING_VIEW
-from db.python.tables.bq.billing_base import BillingBaseTable
-from db.python.tables.bq.billing_filter import BillingFilter
-from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from models.models import BillingColumn, BillingTotalCostQueryModel
-=======
 
 from google.cloud import bigquery
 
@@ -20,8 +10,7 @@ from db.python.tables.bq.billing_base import (
 )
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from models.models import BillingTotalCostQueryModel
->>>>>>> dev
+from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
 class BillingGcpDailyTable(BillingBaseTable):
@@ -33,14 +22,9 @@ class BillingGcpDailyTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
-<<<<<<< HEAD
     @staticmethod
     def _query_to_partitioned_filter(
         query: BillingTotalCostQueryModel,
-=======
-    def _query_to_partitioned_filter(
-        self, query: BillingTotalCostQueryModel
->>>>>>> dev
     ) -> BillingFilter:
         """
         add extra filter to limit materialized view partition
@@ -60,8 +44,6 @@ class BillingGcpDailyTable(BillingBaseTable):
             if query.end_date
             else None,
         )
-<<<<<<< HEAD
-=======
         # add day filter after partition filter is applied
         billing_filter.day = GenericBQFilter[datetime](
             gte=datetime.strptime(query.start_date, '%Y-%m-%d')
@@ -71,7 +53,6 @@ class BillingGcpDailyTable(BillingBaseTable):
             if query.end_date
             else None,
         )
->>>>>>> dev
         return billing_filter
 
     async def _last_loaded_day(self):
@@ -89,11 +70,7 @@ class BillingGcpDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-<<<<<<< HEAD
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
-=======
             time_optimisation_parameter(),
->>>>>>> dev
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 
@@ -102,13 +79,9 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         return None
 
-<<<<<<< HEAD
     def _prepare_daily_cost_subquery(
         self, field: BillingColumn, query_params: list[Any], last_loaded_day: str
     ):
-=======
-    def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
->>>>>>> dev
         """prepare daily cost subquery"""
 
         # add extra filter to limit materialized view partition
@@ -164,11 +137,7 @@ class BillingGcpDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-<<<<<<< HEAD
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
-=======
             time_optimisation_parameter(),
->>>>>>> dev
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 

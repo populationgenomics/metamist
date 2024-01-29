@@ -27,22 +27,14 @@ class FunctionBQFilter:
 
     def __init__(self, name: str, implementation: str):
         self.func_name = name
-<<<<<<< HEAD
         self.func_implementation = implementation
-=======
-        self.fun_implementation = implementation
->>>>>>> dev
         # param_id is a counter for parameterised values
         self._param_id = 0
 
     def to_sql(
         self,
         column_name: BillingColumn,
-<<<<<<< HEAD
         func_params: str | list[Any] | dict[Any, Any] | None = None,
-=======
-        func_params: str | list[Any] | dict[Any, Any],
->>>>>>> dev
         func_operator: str = None,
     ) -> tuple[str, list[bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter]]:
         """
@@ -105,23 +97,15 @@ class FunctionBQFilter:
     def _sql_value_prep(key: str, value: Any) -> bigquery.ScalarQueryParameter:
         """ """
         if isinstance(value, Enum):
-<<<<<<< HEAD
-            return bigquery.ScalarQueryParameter(key, 'STRING', value.value)
-=======
             return FunctionBQFilter._sql_value_prep(key, value.value)
->>>>>>> dev
         if isinstance(value, int):
             return bigquery.ScalarQueryParameter(key, 'INT64', value)
         if isinstance(value, float):
             return bigquery.ScalarQueryParameter(key, 'FLOAT64', value)
         if isinstance(value, datetime):
-<<<<<<< HEAD
             return bigquery.ScalarQueryParameter(
                 key, 'STRING', value.isoformat(timespec='seconds')
             )
-=======
-            return bigquery.ScalarQueryParameter(key, 'STRING', value)
->>>>>>> dev
 
         # otherwise as string parameter
         return bigquery.ScalarQueryParameter(key, 'STRING', value)

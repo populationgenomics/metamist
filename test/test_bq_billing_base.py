@@ -15,11 +15,11 @@ from db.python.tables.bq.billing_base import (
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from models.enums import BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
     BillingCostDetailsRecord,
-    BillingTimePeriods,
     BillingTotalCostQueryModel,
 )
 
