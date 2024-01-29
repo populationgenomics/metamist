@@ -135,6 +135,7 @@ class BillingColumn(str, Enum):
     def raw_cols(cls) -> list[str]:
         """Return list of raw column names"""
         return [
+<<<<<<< HEAD
             'id',
             'topic',
             'service',
@@ -154,12 +155,34 @@ class BillingColumn(str, Enum):
             'invoice',
             'cost_type',
             'adjustment_info',
+=======
+            BillingColumn.ID.value,
+            BillingColumn.TOPIC.value,
+            BillingColumn.SERVICE.value,
+            BillingColumn.SKU.value,
+            BillingColumn.USAGE_START_TIME.value,
+            BillingColumn.USAGE_END_TIME.value,
+            BillingColumn.PROJECT.value,
+            BillingColumn.LABELS.value,
+            BillingColumn.SYSTEM_LABELS.value,
+            BillingColumn.LOCATION.value,
+            BillingColumn.EXPORT_TIME.value,
+            BillingColumn.COST.value,
+            BillingColumn.CURRENCY.value,
+            BillingColumn.CURRENCY_CONVERSION_RATE.value,
+            BillingColumn.USAGE.value,
+            BillingColumn.CREDITS.value,
+            BillingColumn.INVOICE.value,
+            BillingColumn.COST_TYPE.value,
+            BillingColumn.ADJUSTMENT_INFO.value,
+>>>>>>> dev
         ]
 
     @classmethod
     def standard_cols(cls) -> list[str]:
         """Return list of standard column names"""
         return [
+<<<<<<< HEAD
             'topic',
             'gcp_project',
             'sku',
@@ -170,12 +193,25 @@ class BillingColumn(str, Enum):
             'cost_category',
             'ar_guid',
             'invoice_month',
+=======
+            BillingColumn.TOPIC.value,
+            BillingColumn.GCP_PROJECT.value,
+            BillingColumn.SKU.value,
+            BillingColumn.CURRENCY.value,
+            BillingColumn.COST.value,
+            BillingColumn.LABELS.value,
+            BillingColumn.DAY.value,
+            BillingColumn.COST_CATEGORY.value,
+            BillingColumn.AR_GUID.value,
+            BillingColumn.INVOICE_MONTH.value,
+>>>>>>> dev
         ]
 
     @classmethod
     def extended_cols(cls) -> list[str]:
         """Return list of extended column names"""
         return [
+<<<<<<< HEAD
             'dataset',
             'batch_id',
             'sequencing_type',
@@ -188,6 +224,20 @@ class BillingColumn(str, Enum):
             'goog_pipelines_worker',
             'wdl_task_name',
             'namespace',
+=======
+            BillingColumn.DATASET.value,
+            BillingColumn.BATCH_ID.value,
+            BillingColumn.SEQUENCING_TYPE.value,
+            BillingColumn.STAGE.value,
+            BillingColumn.SEQUENCING_GROUP.value,
+            BillingColumn.AR_GUID.value,
+            BillingColumn.COMPUTE_CATEGORY.value,
+            BillingColumn.CROMWELL_SUB_WORKFLOW_NAME.value,
+            BillingColumn.CROMWELL_WORKFLOW_ID.value,
+            BillingColumn.GOOG_PIPELINES_WORKER.value,
+            BillingColumn.WDL_TASK_NAME.value,
+            BillingColumn.NAMESPACE.value,
+>>>>>>> dev
         ]
 
     @staticmethod

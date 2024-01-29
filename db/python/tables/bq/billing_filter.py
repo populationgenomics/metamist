@@ -2,7 +2,10 @@
 
 import dataclasses
 import datetime
+<<<<<<< HEAD
 from typing import Any
+=======
+>>>>>>> dev
 
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.tables.bq.generic_bq_filter_model import GenericBQFilterModel
@@ -47,6 +50,7 @@ class BillingFilter(GenericBQFilterModel):
     goog_pipelines_worker: GenericBQFilter[str] = None
     wdl_task_name: GenericBQFilter[str] = None
     namespace: GenericBQFilter[str] = None
+<<<<<<< HEAD
 
     def __eq__(self, other: Any) -> bool:
         """Equality operator"""
@@ -61,3 +65,5 @@ class BillingFilter(GenericBQFilterModel):
 
         # all attributes are equal
         return True
+=======
+>>>>>>> dev

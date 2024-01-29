@@ -30,6 +30,7 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
 }
 
 export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
+<<<<<<< HEAD
     // if (isLoading) {
     //     return (
     //         <div>
@@ -42,6 +43,20 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
         return <>No Data</>
     }
 
+=======
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
+
+    if (!data || data.length === 0) {
+        return <>No Data</>
+    }
+
+>>>>>>> dev
     const colorFunc: (t: number) => string | undefined = colors ?? interpolateRainbow
     const duration = 250
     const containerDivRef = React.useRef<HTMLDivElement>()

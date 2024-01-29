@@ -25,6 +25,17 @@ function alignToStartOfMonth(date: Date): Date {
     return new Date(Date.UTC(year, month, 1))
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Creates an array of three new dates, each incremented by a specified number of days from the given last date.
+ * If the difference in days is greater than 28, the dates are aligned to the start of their respective months.
+ *
+ * @param lastDate - The last date from which the new dates will be calculated.
+ * @param differenceInDays - The number of days to increment for each new date.
+ * @returns An array of three new Date objects.
+ */
+>>>>>>> dev
 function createNewDates(lastDate: Date, differenceInDays: number): Date[] {
     const newDates: Date[] = []
     for (let i = 1; i <= 3; i++) {

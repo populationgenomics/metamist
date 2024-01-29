@@ -16,9 +16,14 @@ class BillingRawTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
+<<<<<<< HEAD
     @staticmethod
     def _query_to_partitioned_filter(
         query: BillingTotalCostQueryModel,
+=======
+    def _query_to_partitioned_filter(
+        self, query: BillingTotalCostQueryModel
+>>>>>>> dev
     ) -> BillingFilter:
         """
         Raw BQ billing table is partitioned by usage_end_time

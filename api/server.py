@@ -140,11 +140,11 @@ async def exception_handler(request: Request, e: Exception):
         cors_middleware = middlewares[0]
 
         request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore[attr-defined]
+        if cors_middleware and '*' in cors_middleware.options['allow_origins']:  # type: ignore
             response.headers['Access-Control-Allow-Origin'] = '*'
         elif (
             cors_middleware
-            and request_origin in cors_middleware.options['allow_origins']  # type: ignore[attr-defined]
+            and request_origin in cors_middleware.options['allow_origins']  # type: ignore
         ):
             response.headers['Access-Control-Allow-Origin'] = request_origin
 
