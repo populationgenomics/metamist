@@ -24,7 +24,7 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler())
 
 
-def get_gcp_project_names():
+def get_gcp_project_names() -> dict[str, str]:
     """
     Returns list of projects active SM_GCP_BQ_AGGREG_VIEW.
     SM_GCP_BQ_AGGREG_VIEW is aggregated by day so it is not expensive to do
@@ -36,7 +36,7 @@ def get_gcp_project_names():
     but gcp_project name is 'seqr-123456'
     """
     query = f"""
-    SELECT DISTINCT gcp_project FROM `{SM_GCP_BQ_AGGREG_VIEW}` 
+    SELECT DISTINCT gcp_project FROM `{SM_GCP_BQ_AGGREG_VIEW}`
     WHERE gcp_project IS NOT NULL
     """
     logger.info(f'Executing {query}')
@@ -64,40 +64,42 @@ def get_gcp_project_names():
     return projects
 
 
-def extract_budget_updates(folder_path: str, project_name: str):
+def extract_budget_updates(folder_path: str, project_name: str) -> dict[datetime, int]:
     """
     Execute cmd on the path and return the output.
     """
+    budget_records: dict[datetime, int] = {}
+
     cmd = f'cd {folder_path}; git log -L2,+1:"{project_name}/budgets.yaml" --pretty="format:%ci"'
     logger.info(f'Executing {cmd}')
     output = os.popen(cmd).read()
     logger.info(f'Output: {output}')
     if not output:
         logger.warning(f'Failed to get git history for {project_name}')
-        return
+        return budget_records
 
     lines = output.split('\n')
     # loop through lines in the reverse order
     # and look for the first line that has a date or
     # contains string monthly_budget
-    budget_records = {}
     last_budget_value = None
     for line in reversed(lines):
         if '+  monthly_budget' in line:
             logger.info(f'Found monthly_budget for {project_name}')
             # line is in the format '+  monthly_budget: XYZ'
-            last_budget_value = line.split(':')[1].strip()
+            last_budget_value = int(line.split(':')[1].strip())
 
-        elif re.match(r'\d{4}-\d{2}-\d{2}', line):
+        elif last_budget_value and re.match(r'\d{4}-\d{2}-\d{2}', line):
             logger.info(f'Found date {line} for {project_name}')
             # 2023-03-02 10:30:32 +1100
             dt = datetime.strptime(line.strip(), '%Y-%m-%d %H:%M:%S %z')
             budget_records[dt.astimezone(timezone.utc)] = last_budget_value
+            last_budget_value = None
 
     return budget_records
 
 
-def get_bq_budgets():
+def get_bq_budgets() -> dict[str, dict[datetime, int]]:
     """
     Get all the budget records from BQ table.
     """
@@ -108,7 +110,7 @@ def get_bq_budgets():
         query,
     )
     results = query_job.result()
-    bq_budgets = {}
+    bq_budgets: dict[str, dict[datetime, int]] = {}
     for row in results:
         project_name = row['gcp_project']
         date = row['created_at']
@@ -125,7 +127,7 @@ def process(folder_path: str):
     logger.info(f'Processing {folder_path}')
     gcp_project_names = get_gcp_project_names()
     project_budgets = {}
-    for root, dirs, files in os.walk(folder_path):
+    for root, _dirs, files in os.walk(folder_path):
         if 'budgets.yaml' in files:
             logger.info(f'Found budgets.yaml in {root}')
             # extract the project name from the path, e.g. /Users/xyz/cpg-infrastructure-private/xyz
@@ -150,7 +152,7 @@ def process(folder_path: str):
     logger.info(f'Checking against BQ table {SM_GCP_BQ_BUDGET_VIEW}')
     bq_budgets = get_bq_budgets()
     # now compare the two
-    missing_records = {}
+    missing_records: dict[str, dict[datetime, int]] = {}
     for project_name, budget_records in project_budgets.items():
         bq_project_budgets = bq_budgets.get(project_name, {})
 
@@ -197,7 +199,7 @@ def main():
     parser.add_argument(
         '-p',
         '--cpg_infra_path',
-        help="Path to cpg-infrastructure-private folder",
+        help='Path to cpg-infrastructure-private folder',
         type=str,
     )
     args = parser.parse_args()
