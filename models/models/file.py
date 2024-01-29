@@ -1,11 +1,15 @@
 import hashlib
+from typing import Generator
+import json
+from collections import defaultdict
 
 from cloudpathlib.anypath import AnyPath
+from pydantic import BaseModel
 
 from models.base import SMBase
 
 
-class File(SMBase):
+class FileInternal(SMBase):
     """File model for internal use"""
 
     id: int
@@ -17,6 +21,7 @@ class File(SMBase):
     nameext: str | None
     checksum: str | None
     size: int
+    json_path: str | None = None
     secondary_files: list[str] = []
 
     @staticmethod
@@ -32,6 +37,7 @@ class File(SMBase):
         nameext = kwargs.get('nameext')
         checksum = kwargs.get('checksum')
         size = kwargs.get('size')
+        json_path = kwargs.get('json_path')
         secondary_files = kwargs.get('secondary_files')
 
         return File(
@@ -44,7 +50,25 @@ class File(SMBase):
             nameext=nameext,
             checksum=checksum,
             size=size,
+            json_path=json_path,
             secondary_files=secondary_files,
+        )
+
+    def to_external(self):
+        """
+        Convert to external model
+        """
+        return File(
+            id=self.id,
+            analysis_id=self.analysis_id,
+            path=self.path,
+            basename=self.basename,
+            dirname=self.dirname,
+            nameroot=self.nameroot,
+            nameext=self.nameext,
+            checksum=self.checksum,
+            size=self.size,
+            secondary_files=self.secondary_files,
         )
 
     @staticmethod
@@ -82,3 +106,80 @@ class File(SMBase):
             return AnyPath(path).stat().st_size  # pylint: disable=E1101
         except FileNotFoundError:
             return 0
+
+    @staticmethod
+    def find_files_from_dict(json_dict: dict, path=None) -> Generator[tuple[str, dict], None, None]:
+        """Retrieve filepaths from a dict of outputs"""
+        if not path:
+            path = []
+
+        if isinstance(json_dict, dict):
+            for key, value in json_dict.items():
+                if isinstance(value, dict):
+                    # If the value is a dictionary, continue the recursion
+                    yield from FileInternal.find_files_from_dict(value, path + [key])
+                else:
+                    # Found a leaf, yield the path and the value
+                    yield path, json_dict
+        else:
+            # If the input is not a dictionary, just return the value
+            yield path, json_dict
+
+    @staticmethod
+    def reconstruct_json(data) -> dict:
+        """Reconstruct a JSON object from a list of paths and values"""
+        root: dict = defaultdict(dict)
+        for path_str, content_str in data:
+            # Split the path into components and parse the JSON content
+            path = path_str.split('.')
+
+            try:
+                content = json.loads(content_str)
+            except json.JSONDecodeError:
+                print(f'Error parsing JSON: {content_str}')
+
+            # Navigate down the tree to the correct position, creating dictionaries as needed
+            current = root
+            for key in path[:-1]:
+                current = current.setdefault(key, {})
+
+            if path[-1] in current:
+                current[path[-1]].update(content)
+            else:
+                current[path[-1]] = content
+
+        return root
+
+
+class File(BaseModel):
+    """File model for external use"""
+
+    id: int
+    analysis_id: int
+    path: str
+    basename: str
+    dirname: AnyPath
+    nameroot: str
+    nameext: str | None
+    checksum: str | None
+    size: int
+    json_path: str | None = None
+    secondary_files: list[str] = []
+
+    def to_internal(self):
+        """
+        Convert to internal model
+        """
+        return FileInternal(
+            id=self.id,
+            analysis_id=self.analysis_id,
+            path=self.path,
+            basename=self.basename,
+            dirname=self.dirname,
+            nameroot=self.nameroot,
+            nameext=self.nameext,
+            checksum=self.checksum,
+            size=self.size,
+            json_path=self.json_path,
+            secondary_files=self.secondary_files,
+        )

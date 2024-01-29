@@ -7,7 +7,7 @@ from typing import Dict
 import click
 from databases import Database
 
-from models.models.file import File
+from models.models.file import FileInternal
 
 
 def _get_connection_string():
@@ -27,8 +27,9 @@ async def get_analyses_without_fileid(connection):
         """
         SELECT a.id, a.output
         FROM analysis a
-        LEFT JOIN file f ON f.analysis_id = a.id
-        WHERE f.analysis_id IS NULL
+        LEFT JOIN analysis_file af ON af.analysis_id = a.id
+        LEFT JOIN file f ON f.id = af.file_id
+        WHERE f.id IS NULL
         """
     )
     print('Fetching...')
@@ -38,25 +39,22 @@ async def get_analyses_without_fileid(connection):
     return rows
 
 
-async def execute_many(connection, query, inserts):
-    """Executes many inserts"""
-    print(f'Inserting {len(inserts)} with query: {query}')
-
-    await connection.execute_many(query, inserts)
+async def execute(connection, query, inserts):
+    """Executes inserts"""
+    await connection.execute(query, inserts)
 
 
-def get_file_info(path: str, analysis_id: int) -> Dict:
+def get_file_info(path: str) -> Dict:
     """Get file dict"""
     print('Extracting file dict')
     return {
-        'analysis_id': analysis_id,
         'path': path,
-        'basename': File.get_basename(path),
-        'dirname': File.get_dirname(path),
-        'nameroot': File.get_nameroot(path),
-        'nameext': File.get_extension(path),
-        'checksum': File.get_checksum(path),
-        'size': File.get_size(path),
+        'basename': FileInternal.get_basename(path),
+        'dirname': FileInternal.get_dirname(path),
+        'nameroot': FileInternal.get_nameroot(path),
+        'nameext': FileInternal.get_extension(path),
+        'checksum': FileInternal.get_checksum(path),
+        'size': FileInternal.get_size(path),
         'secondary_files': '[]',
     }
 
@@ -92,9 +90,10 @@ async def prepare_files(analyses):
         if path_dict:
             for _, path in path_dict.items():
                 print(path)
-                files.append(
-                    get_file_info(path=path, analysis_id=analysis['id'])
-                )
+                files.append((
+                    analysis['id'],
+                    get_file_info(path=path)
+                ))
                 print('Extracted and added.')
     return files
 
@@ -102,16 +101,26 @@ async def prepare_files(analyses):
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, analysis_id, basename, dirname, nameroot, nameext, checksum, size, secondary_files)
-        VALUES (:path, :analysis_id, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :secondary_files)
+        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size, secondary_files)
+        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :secondary_files)
         RETURNING id"""
     )
-    print('Inserting...')
-    await execute_many(
-        connection=connection,
-        query=query,
-        inserts=files,
+    af_query = dedent(
+        """
+        INSERT INTO analysis_file (analysis_id, file_id) VALUES (:analysis_id, :file_id)
+        """
     )
+    for analysis_id, file in files:
+        print('Inserting...')
+        file_id = await connection.fetch_val(
+            query,
+            file,
+        )
+        await execute(
+            connection=connection,
+            query=af_query,
+            inserts={'analysis_id': analysis_id, 'file_id': file_id},
+        )
     print(f'Inserted {len(files)} files')
 
 

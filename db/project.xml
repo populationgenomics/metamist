@@ -1113,13 +1113,6 @@
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
-			<column name="analysis_id" type="INT">
-				<constraints
-					nullable="true"
-					foreignKeyName="fk_file_analysis"
-					references="analysis(id)"
-				/>
-			</column>
 			<column name="path" type="VARCHAR(255)">
 				<constraints
 					nullable="false"
@@ -1159,6 +1152,22 @@
 			<column name="secondary_files" type="VARCHAR(255)">
 				<constraints
 					nullable="true"
+				/>
+			</column>
+		</createTable>
+		<createTable tableName="analysis_file">
+			<column name="analysis_id" type="INT">
+				<constraints
+				nullable="false"
+				foreignKeyName="FK_ANALYSIS_FILE_ANALYSIS_ID"
+				references="analysis(id)"
+				/>
+			</column>
+			<column name="file_id" type="INT">
+				<constraints
+				nullable="false"
+				foreignKeyName="FK_ANALYSIS_FILE_FILE_ID"
+				references="file(id)"
 				/>
 			</column>
 		</createTable>
