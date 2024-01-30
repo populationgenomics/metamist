@@ -87,7 +87,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             if (typeof a === 'object' && a.type === 'inc') {
                 return 1
             }
-            return 0    // works both on Safari and Firefox, any other value will break one of them
+            return 0 // works both on Safari and Firefox, any other value will break one of them
         })
     const data_ready = pieFnc(data)
     const innerRadius = radius / 1.75 // inner radius of pie, in pixels (non-zero for donut)
