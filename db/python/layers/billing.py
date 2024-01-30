@@ -18,7 +18,7 @@ class BillingLayer(BqBaseLayer):
 
     def table_factory(
         self,
-        source: BillingSource,
+        source: BillingSource | None = None,
         fields: list[BillingColumn] | None = None,
         filters: dict[BillingColumn, str | list | dict] | None = None,
     ) -> (
@@ -262,12 +262,16 @@ class BillingLayer(BqBaseLayer):
         # First get all batches and the min/max day to use for the query
         ar_guid = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
 
+        print('ar_guid', ar_guid)
+
         # The get all batches for the ar_guid
         (
             start_day,
             end_day,
             batches,
         ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+
+        print('batches', batches)
 
         if not batches:
             return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])

@@ -1,7 +1,7 @@
 import unittest
 from typing import Any
+from unittest import mock
 
-# from unittest import mock
 import google.cloud.bigquery as bq
 
 from db.python.gcp_connect import BqConnection
@@ -27,14 +27,14 @@ class BqTest(unittest.TestCase):
         super().setUp()
 
         # Mockup BQ results
-        self.bq_result = unittest.mock.MagicMock(spec=bq.job.QueryJob)
+        self.bq_result = mock.MagicMock(spec=bq.job.QueryJob)
 
         # mock BigQuery client
-        self.bq_client = unittest.mock.MagicMock(spec=bq.Client)
+        self.bq_client = mock.MagicMock(spec=bq.Client)
         self.bq_client.query.return_value = self.bq_result
 
         # Mock BqConnection
-        self.connection = unittest.mock.MagicMock(spec=BqConnection)
+        self.connection = mock.MagicMock(spec=BqConnection)
         self.connection.gcp_project = self.gcp_project
         self.connection.connection = self.bq_client
         self.connection.author = self.author

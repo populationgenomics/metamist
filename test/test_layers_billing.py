@@ -1,12 +1,62 @@
 # pylint: disable=protected-access
+import datetime
 from test.testbase import run_as_sync
 from test.testbqbase import BqTest
+from unittest import mock
+
+import google.cloud.bigquery as bq
 
 from db.python.layers.billing import BillingLayer
+from models.enums import BillingSource
+from models.models import (
+    BillingColumn,
+    BillingHailBatchCostRecord,
+    BillingTotalCostQueryModel,
+)
 
 
 class TestBillingLayer(BqTest):
     """Test BillingLayer and its methods"""
+
+    def test_table_factory(self):
+        """Test table_factory"""
+
+        layer = BillingLayer(self.connection)
+
+        # test BillingSource types
+        table_obj = layer.table_factory()
+        self.assertEqual('BillingDailyTable', table_obj.__class__.__name__)
+
+        table_obj = layer.table_factory(source=BillingSource.GCP_BILLING)
+        self.assertEqual('BillingGcpDailyTable', table_obj.__class__.__name__)
+
+        table_obj = layer.table_factory(source=BillingSource.RAW)
+        self.assertEqual('BillingRawTable', table_obj.__class__.__name__)
+
+        table_obj = layer.table_factory(source=BillingSource.AGGREGATE)
+        self.assertEqual('BillingDailyTable', table_obj.__class__.__name__)
+
+        # base columns
+        table_obj = layer.table_factory(
+            source=BillingSource.AGGREGATE, fields=[BillingColumn.TOPIC]
+        )
+        self.assertEqual('BillingDailyTable', table_obj.__class__.__name__)
+
+        table_obj = layer.table_factory(
+            source=BillingSource.AGGREGATE, filters={BillingColumn.TOPIC: 'TOPIC1'}
+        )
+        self.assertEqual('BillingDailyTable', table_obj.__class__.__name__)
+
+        # columns from extended view
+        table_obj = layer.table_factory(
+            source=BillingSource.AGGREGATE, fields=[BillingColumn.AR_GUID]
+        )
+        self.assertEqual('BillingDailyExtendedTable', table_obj.__class__.__name__)
+
+        table_obj = layer.table_factory(
+            source=BillingSource.AGGREGATE, filters={BillingColumn.AR_GUID: 'AR_GUID1'}
+        )
+        self.assertEqual('BillingDailyExtendedTable', table_obj.__class__.__name__)
 
     @run_as_sync
     async def test_get_gcp_projects(self):
@@ -254,3 +304,167 @@ class TestBillingLayer(BqTest):
 
         records = await layer.get_namespaces()
         self.assertEqual(['NAME1', 'NAME2'], records)
+
+    @run_as_sync
+    async def test_get_total_cost(self):
+        """Test get_total_cost"""
+
+        layer = BillingLayer(self.connection)
+
+        # test inparams exceptions:
+        query = BillingTotalCostQueryModel(fields=[], start_date='', end_date='')
+
+        with self.assertRaises(ValueError) as context:
+            await layer.get_total_cost(query)
+
+        self.assertTrue('Date and Fields are required' in str(context.exception))
+
+        # test with no muckup data, should be empty
+        query = BillingTotalCostQueryModel(
+            fields=[BillingColumn.TOPIC], start_date='2024-01-01', end_date='2024-01-03'
+        )
+        records = await layer.get_total_cost(query)
+        self.assertEqual([], records)
+
+        # get_total_cost with mockup data is tested in test/test_bq_billing_base.py
+        # BillingLayer is just wrapper for BQ tables
+
+    @run_as_sync
+    async def test_get_running_cost(self):
+        """Test get_running_cost"""
+
+        layer = BillingLayer(self.connection)
+
+        # test inparams exceptions:
+        with self.assertRaises(ValueError) as context:
+            await layer.get_running_cost(
+                field=BillingColumn.TOPIC, invoice_month=None, source=None
+            )
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            await layer.get_running_cost(
+                field=BillingColumn.TOPIC, invoice_month='2024', source=None
+            )
+        self.assertTrue('Invalid invoice month' in str(context.exception))
+
+        # test with no muckup data, should be empty
+        records = await layer.get_running_cost(
+            field=BillingColumn.TOPIC, invoice_month='202401', source=None
+        )
+        self.assertEqual([], records)
+
+        # get_running_cost with mockup data is tested in test/test_bq_billing_base.py
+        # BillingLayer is just wrapper for BQ tables
+
+    @run_as_sync
+    async def test_get_cost_by_ar_guid(self):
+        """Test get_cost_by_ar_guid"""
+
+        layer = BillingLayer(self.connection)
+
+        # ar_guid as None, return empty results
+        records = await layer.get_cost_by_ar_guid(ar_guid=None)
+
+        # return empty record
+        self.assertEqual(
+            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
+        )
+
+        # dummy ar_guid, no mockup data, return empty results
+        dummy_ar_guid = '12345678'
+        records = await layer.get_cost_by_ar_guid(ar_guid=dummy_ar_guid)
+
+        # return empty record
+        self.assertEqual(
+            BillingHailBatchCostRecord(ar_guid=dummy_ar_guid, batch_ids=[], costs=[]),
+            records,
+        )
+
+        # dummy ar_guid, mockup batch_id
+
+        # mock BigQuery result
+        given_start_day = datetime.datetime(2023, 1, 1, 0, 0)
+        given_end_day = datetime.datetime(2023, 1, 1, 2, 3)
+        dummy_batch_id = '12345'
+
+        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
+        mock_rows.total_rows = 1
+        mock_rows.__iter__.return_value = [
+            mock.MagicMock(
+                spec=bq.Row,
+                batch_id=dummy_batch_id,
+                start_day=given_start_day,
+                end_day=given_end_day,
+            ),
+        ]
+        self.bq_result.result.return_value = mock_rows
+
+        records = await layer.get_cost_by_ar_guid(ar_guid=dummy_ar_guid)
+        # returns ar_guid, batch_id and empty cost as those were not mocked up
+        # we do not need to test cost calculation here,
+        # as those are tested in test/test_bq_billing_base.py
+        self.assertEqual(
+            BillingHailBatchCostRecord(
+                ar_guid=dummy_ar_guid, batch_ids=[dummy_batch_id], costs=[{}]
+            ),
+            records,
+        )
+
+    @run_as_sync
+    async def test_get_cost_by_batch_id(self):
+        """Test get_cost_by_batch_id"""
+
+        layer = BillingLayer(self.connection)
+
+        # ar_guid as None, return empty results
+        records = await layer.get_cost_by_batch_id(batch_id=None)
+
+        # return empty record
+        self.assertEqual(
+            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
+        )
+
+        # dummy ar_guid, no mockup data, return empty results
+        dummy_batch_id = '12345'
+        records = await layer.get_cost_by_batch_id(batch_id=dummy_batch_id)
+
+        # return empty record
+        self.assertEqual(
+            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]),
+            records,
+        )
+
+        # dummy batch_id, mockup ar_guid
+
+        # mock BigQuery result
+        given_start_day = datetime.datetime(2023, 1, 1, 0, 0)
+        given_end_day = datetime.datetime(2023, 1, 1, 2, 3)
+        dummy_batch_id = '12345'
+        dummy_ar_guid = '12345678'
+
+        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
+        mock_rows.total_rows = 1
+        mock_rows.__iter__.return_value = [
+            mock.MagicMock(
+                spec=bq.Row,
+                ar_guid=dummy_ar_guid,
+                batch_id=dummy_batch_id,
+                start_day=given_start_day,
+                end_day=given_end_day,
+                # mockup __getitem__ to return dummy_ar_guid
+                __getitem__=mock.MagicMock(return_value=dummy_ar_guid),
+            ),
+        ]
+        self.bq_result.result.return_value = mock_rows
+
+        records = await layer.get_cost_by_batch_id(batch_id=dummy_batch_id)
+        # returns ar_guid, batch_id and empty cost as those were not mocked up
+        # we do not need to test cost calculation here,
+        # as those are tested in test/test_bq_billing_base.py
+        self.assertEqual(
+            BillingHailBatchCostRecord(
+                ar_guid=dummy_ar_guid, batch_ids=[dummy_batch_id], costs=[{}]
+            ),
+            records,
+        )
