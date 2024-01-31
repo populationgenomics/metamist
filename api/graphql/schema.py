@@ -39,6 +39,7 @@ from models.models import (
     AnalysisInternal,
     AssayInternal,
     Cohort,
+    AuditLogInternal,
     FamilyInternal,
     ParticipantInternal,
     Project,
@@ -279,6 +280,29 @@ class GraphQLProject:
 
 
 @strawberry.type
+class GraphQLAuditLog:
+    """AuditLog GraphQL model"""
+
+    id: int
+    author: str
+    timestamp: datetime.datetime
+    ar_guid: str | None
+    comment: str | None
+    meta: strawberry.scalars.JSON
+
+    @staticmethod
+    def from_internal(audit_log: AuditLogInternal) -> 'GraphQLAuditLog':
+        return GraphQLAuditLog(
+            id=audit_log.id,
+            author=audit_log.author,
+            timestamp=audit_log.timestamp,
+            ar_guid=audit_log.ar_guid,
+            comment=audit_log.comment,
+            meta=audit_log.meta,
+        )
+
+
+@strawberry.type
 class GraphQLAnalysis:
     """Analysis GraphQL model"""
 
@@ -289,7 +313,6 @@ class GraphQLAnalysis:
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    author: str
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -301,7 +324,6 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            author=internal.author,
         )
 
     @strawberry.field
@@ -317,6 +339,14 @@ class GraphQLAnalysis:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
+
+    @strawberry.field
+    async def audit_logs(
+        self, info: Info, root: 'GraphQLAnalysis'
+    ) -> list[GraphQLAuditLog]:
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS]
+        audit_logs = await loader.load(root.id)
+        return [GraphQLAuditLog.from_internal(audit_log) for audit_log in audit_logs]
 
 
 @strawberry.type
@@ -371,6 +401,7 @@ class GraphQLParticipant:
     karyotype: str | None
 
     project_id: strawberry.Private[int]
+    audit_log_id: strawberry.Private[int | None]
 
     @staticmethod
     def from_internal(internal: ParticipantInternal) -> 'GraphQLParticipant':
@@ -382,6 +413,7 @@ class GraphQLParticipant:
             reported_gender=internal.reported_gender,
             karyotype=internal.karyotype,
             project_id=internal.project,
+            audit_log_id=internal.audit_log_id,
         )
 
     @strawberry.field
@@ -423,6 +455,16 @@ class GraphQLParticipant:
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
 
+    @strawberry.field
+    async def audit_log(
+        self, info: Info, root: 'GraphQLParticipant'
+    ) -> GraphQLAuditLog | None:
+        if root.audit_log_id is None:
+            return None
+        loader = info.context[LoaderKeys.AUDIT_LOGS_BY_IDS]
+        audit_log = await loader.load(root.audit_log_id)
+        return GraphQLAuditLog.from_internal(audit_log)
+
 
 @strawberry.type
 class GraphQLSample:
@@ -433,7 +475,6 @@ class GraphQLSample:
     active: bool
     meta: strawberry.scalars.JSON
     type: str
-    author: str | None
 
     # keep as integers, because they're useful to reference in the fields below
     internal_id: strawberry.Private[int]
@@ -441,14 +482,13 @@ class GraphQLSample:
     project_id: strawberry.Private[int]
 
     @staticmethod
-    def from_internal(sample: SampleInternal):
+    def from_internal(sample: SampleInternal) -> 'GraphQLSample':
         return GraphQLSample(
             id=sample_id_format(sample.id),
             external_id=sample.external_id,
             active=sample.active,
             meta=sample.meta,
             type=sample.type,
-            author=sample.author,
             # internals
             internal_id=sample.id,
             participant_id=sample.participant_id,
@@ -533,21 +573,20 @@ class GraphQLSequencingGroup:
     technology: str
     platform: str
     meta: strawberry.scalars.JSON
-    external_ids: strawberry.scalars.JSON | None
+    external_ids: strawberry.scalars.JSON
 
     internal_id: strawberry.Private[int]
     sample_id: strawberry.Private[int]
 
     @staticmethod
     def from_internal(internal: SequencingGroupInternal) -> 'GraphQLSequencingGroup':
-        # print(internal)
         return GraphQLSequencingGroup(
             id=sequencing_group_id_format(internal.id),
             type=internal.type,
             technology=internal.technology,
             platform=internal.platform,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             internal_id=internal.id,
             sample_id=internal.sample_id,
@@ -574,7 +613,7 @@ class GraphQLSequencingGroup:
         loader = info.context[LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
         project_id_map = {}
         if project:
-            ptable = ProjectPermissionsTable(connection.connection)
+            ptable = ProjectPermissionsTable(connection)
             project_ids = project.all_values()
             projects = await ptable.get_and_check_access_to_projects_for_names(
                 user=connection.author, project_names=project_ids, readonly=True
@@ -625,7 +664,7 @@ class GraphQLAssay:
             id=internal.id,
             type=internal.type,
             meta=internal.meta,
-            external_ids=internal.external_ids,
+            external_ids=internal.external_ids or {},
             # internal
             sample_id=internal.sample_id,
         )
@@ -685,7 +724,7 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     async def project(self, info: Info, name: str) -> GraphQLProject:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         project = await ptable.get_and_check_access_to_project_for_name(
             user=connection.author, project_name=name, readonly=True
         )
@@ -704,7 +743,7 @@ class Query:  # entry point to graphql.
         active: GraphQLFilter[bool] | None = None,
     ) -> list[GraphQLSample]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         slayer = SampleLayer(connection)
 
         if not id and not project:
@@ -757,7 +796,7 @@ class Query:  # entry point to graphql.
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         if not (project or sample_id or id):
             raise ValueError('Must filter by project, sample or id')
 
@@ -823,7 +862,7 @@ class Query:  # entry point to graphql.
     @strawberry.field
     async def my_projects(self, info: Info) -> list[GraphQLProject]:
         connection = info.context['connection']
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         projects = await ptable.get_projects_accessible_by_user(
             connection.author, readonly=True
         )

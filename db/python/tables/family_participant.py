@@ -1,9 +1,9 @@
 from collections import defaultdict
-from typing import Tuple, List, Dict, Optional, Set, Any
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from db.python.connect import DbBase
-from db.python.tables.project import ProjectId
+from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
+from models.models.project import ProjectId
 
 
 class FamilyParticipantTable(DbBase):
@@ -21,7 +21,6 @@ class FamilyParticipantTable(DbBase):
         maternal_id: int,
         affected: int,
         notes: str = None,
-        author=None,
     ) -> Tuple[int, int]:
         """
         Create a new sample, and add it to database
@@ -33,7 +32,7 @@ class FamilyParticipantTable(DbBase):
             'maternal_participant_id': maternal_id,
             'affected': affected,
             'notes': notes,
-            'author': author or self.author,
+            'audit_log_id': await self.audit_log_id(),
         }
         keys = list(updater.keys())
         str_keys = ', '.join(keys)
@@ -52,7 +51,6 @@ VALUES
     async def create_rows(
         self,
         rows: list[PedRowInternal],
-        author=None,
     ):
         """
         Create many rows, dictionaries must have keys:
@@ -76,7 +74,7 @@ VALUES
                 'maternal_participant_id': row.maternal_id,
                 'affected': row.affected,
                 'notes': row.notes,
-                'author': author or self.author,
+                'audit_log_id': await self.audit_log_id(),
             }
 
             remapped_ds_by_keys[tuple(sorted(d.keys()))].append(d)
@@ -225,11 +223,26 @@ WHERE fp.participant_id in :participant_ids
         if not participant_id or not family_id:
             return False
 
-        _query = """
-DELETE FROM family_participant
-WHERE participant_id = :participant_id
-AND family_id = :family_id
+        _update_before_delete = """
+        UPDATE family_participant
+        SET audit_log_id = :audit_log_id
+        WHERE family_id = :family_id AND participant_id = :participant_id
         """
+
+        _query = """
+        DELETE FROM family_participant
+        WHERE participant_id = :participant_id
+        AND family_id = :family_id
+        """
+
+        await self.connection.execute(
+            _update_before_delete,
+            {
+                'family_id': family_id,
+                'participant_id': participant_id,
+                'audit_log_id': await self.audit_log_id(),
+            },
+        )
 
         await self.connection.execute(
             _query, {'family_id': family_id, 'participant_id': participant_id}

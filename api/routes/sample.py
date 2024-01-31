@@ -130,7 +130,7 @@ async def get_samples(
     """
     st = SampleLayer(connection)
 
-    pt = ProjectPermissionsTable(connection.connection)
+    pt = ProjectPermissionsTable(connection)
     pids: list[int] | None = None
     if project_ids:
         pids = await pt.get_project_ids_from_names_and_user(

@@ -37,7 +37,7 @@ class SequencingGroupInternal(SMBase):
     platform: str | None = None
     meta: dict[str, str] | None = None
     sample_id: int | None = None
-    external_ids: dict[str, str] | None = None
+    external_ids: dict[str, str] | None = {}
     archived: bool | None = None
 
     project: int | None = None

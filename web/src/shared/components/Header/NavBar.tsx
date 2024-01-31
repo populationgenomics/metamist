@@ -26,10 +26,43 @@ import Searchbar from './Search'
 
 import './NavBar.css'
 
-// FIXME: Billing pages API query takes a long time on load and locks up the entire application
-// so I'm commenting this query out for now until it becomes faster. See below for the useEffect
-// where this query is performed. In general, I think we should avoid making API calls in the
-// NavBar unless they are absolutely necessary.
+const billingPages = {
+    title: 'Billing',
+    url: '/billing',
+    icon: <AttachMoneyIcon />,
+    submenu: [
+        {
+            title: 'Home',
+            url: '/billing',
+            icon: <HomeIcon />,
+        },
+        {
+            title: 'Invoice Month Cost',
+            url: '/billing/invoiceMonthCost',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost By Time',
+            url: '/billing/costByTime',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost By Analysis',
+            url: '/billing/costByAnalysis',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Cost By Category',
+            url: '/billing/costByCategory',
+            icon: <TableRowsIcon />,
+        },
+        {
+            title: 'Seqr Prop Map',
+            url: '/billing/seqrPropMap',
+            icon: <TableRowsIcon />,
+        },
+    ],
+}
 
 // const billingPages = {
 //     title: 'Billing',
@@ -257,13 +290,13 @@ const NavBar: React.FC<NavBarProps> = ({ fixed }) => {
     //     },
     // ])
 
-    // React.useEffect(() => {
-    //     new BillingApi().getTopics().then((response) => {
-    //         if (response.status === 200) {
-    //             setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
-    //         }
-    //     })
-    // }, [])
+    React.useEffect(() => {
+        new BillingApi().isBillingEnabled().then((response) => {
+            if (response.status === 200 && response.data === true) {
+                setMenuItems([...menuItems.slice(0, 2), billingPages, ...menuItems.slice(2)])
+            }
+        })
+    }, [])
 
     return (
         <header className="App-header">

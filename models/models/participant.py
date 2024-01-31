@@ -1,8 +1,8 @@
 import json
 
-from db.python.utils import ProjectId
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
+from models.models.project import ProjectId
 from models.models.sample import (
     NestedSample,
     NestedSampleInternal,
@@ -21,6 +21,8 @@ class ParticipantInternal(SMBase):
     reported_gender: str | None = None
     karyotype: str | None = None
     meta: dict
+
+    audit_log_id: int | None = None
 
     @classmethod
     def from_db(cls, data: dict):

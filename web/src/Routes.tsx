@@ -6,7 +6,9 @@ import {
     BillingHome,
     BillingSeqrProp,
     BillingCostByTime,
+    BillingCostByAnalysis,
     BillingInvoiceMonthCost,
+    BillingCostByCategory,
 } from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
@@ -39,7 +41,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
         <Route
             path="/analysis-runner/:projectName?"
             element={
@@ -56,6 +57,22 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <BillingCostByTime />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByAnalysis"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByAnalysis />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByCategory"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByCategory />
                 </ErrorBoundary>
             }
         />

@@ -276,7 +276,7 @@ def transfer_samples_sgs_assays(
             type=sample_type or None,
             meta=(copy_files_in_dict(s['meta'], project) or {}),
             participant_id=existing_pid,
-            sequencing_groups=upsert_sequencing_groups(s, existing_data),
+            sequencing_groups=upsert_sequencing_groups(s, existing_data, project),
             id=existing_sid,
         )
 
@@ -289,7 +289,7 @@ def transfer_samples_sgs_assays(
 
 
 def upsert_sequencing_groups(
-    sample: dict, existing_data: dict
+    sample: dict, existing_data: dict, project: str
 ) -> list[SequencingGroupUpsert]:
     """Create SG Upsert Objects for a sample"""
     sgs_to_upsert: list[SequencingGroupUpsert] = []
@@ -306,7 +306,7 @@ def upsert_sequencing_groups(
             technology=sg.get('technology'),
             type=sg.get('type'),
             assays=upsert_assays(
-                sg, existing_sgid, existing_data, sample.get('externalId')
+                sg, existing_sgid, existing_data, sample.get('externalId'), project
             ),
         )
         sgs_to_upsert.append(sg_upsert)
@@ -315,7 +315,11 @@ def upsert_sequencing_groups(
 
 
 def upsert_assays(
-    sg: dict, existing_sgid: str | None, existing_data: dict, sample_external_id
+    sg: dict,
+    existing_sgid: str | None,
+    existing_data: dict,
+    sample_external_id,
+    project: str,
 ) -> list[AssayUpsert]:
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
@@ -325,17 +329,14 @@ def upsert_assays(
         # Check if assay exists
         if existing_sgid:
             _existing_assay = get_existing_assay(
-                existing_data,
-                sample_external_id,
-                existing_sgid,
-                assay
+                existing_data, sample_external_id, existing_sgid, assay
             )
         existing_assay_id = _existing_assay.get('id') if _existing_assay else None
         assay_upsert = AssayUpsert(
             type=assay.get('type'),
             id=existing_assay_id,
             external_ids=assay.get('externalIds') or {},
-            meta=assay.get('meta'),
+            meta=copy_files_in_dict(assay.get('meta'), project),
         )
 
         assays_to_upsert.append(assay_upsert)

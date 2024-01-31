@@ -5,16 +5,16 @@ from async_lru import alru_cache
 from databases import Database
 
 from api.settings import is_all_access
+from db.python.connect import Connection, SMConnections
 from db.python.utils import (
     Forbidden,
     InternalError,
     NoProjectAccess,
     NotFoundError,
-    ProjectId,
     get_logger,
     to_db_json,
 )
-from models.models.project import Project
+from models.models.project import Project, ProjectId
 
 logger = get_logger()
 
@@ -38,14 +38,61 @@ class ProjectPermissionsTable:
             return f'{project_name}-read'
         return f'{project_name}-write'
 
-    def __init__(self, connection: Database, allow_full_access=None):
-        if not isinstance(connection, Database):
+    def __init__(
+        self,
+        connection: Connection | None,
+        allow_full_access: bool | None = None,
+        database_connection: Database | None = None,
+    ):
+        self._connection = connection
+        if not database_connection and not connection:
             raise ValueError(
-                f'Invalid type connection, expected Database, got {type(connection)}, '
-                'did you forget to call connection.connection?'
+                'Must call project permissions table with either a direct '
+                'database_connection or a fully formed connection'
             )
-        self.connection: Database = connection
-        self.gtable = GroupTable(connection, allow_full_access=allow_full_access)
+        self.connection: Database = database_connection or connection.connection
+        self.gtable = GroupTable(self.connection, allow_full_access=allow_full_access)
+
+    @staticmethod
+    async def get_project_connection(
+        *,
+        author: str,
+        project_name: str,
+        readonly: bool,
+        ar_guid: str,
+        on_behalf_of: str | None = None,
+        meta: dict[str, str] | None = None,
+    ):
+        """Get a db connection from a project and user"""
+        # maybe it makes sense to perform permission checks here too
+        logger.debug(f'Authenticate connection to {project_name} with {author!r}')
+
+        conn = await SMConnections.get_made_connection()
+        pt = ProjectPermissionsTable(connection=None, database_connection=conn)
+
+        project = await pt.get_and_check_access_to_project_for_name(
+            user=author, project_name=project_name, readonly=readonly
+        )
+
+        return Connection(
+            connection=conn,
+            author=author,
+            project=project.id,
+            readonly=readonly,
+            on_behalf_of=on_behalf_of,
+            ar_guid=ar_guid,
+            meta=meta,
+        )
+
+    async def audit_log_id(self):
+        """
+        Generate (or return) a audit_log_id by inserting a row into the database
+        """
+        if not self._connection:
+            raise ValueError(
+                'Cannot call audit_log_id without a fully formed connection'
+            )
+        return await self._connection.audit_log_id()
 
     # region UNPROTECTED_GETS
 
@@ -310,21 +357,24 @@ class ProjectPermissionsTable:
             await self.check_project_creator_permissions(author)
 
         async with self.connection.transaction():
+            audit_log_id = await self.audit_log_id()
             read_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=True)
+                self.get_project_group_name(project_name, readonly=True),
+                audit_log_id=audit_log_id,
             )
             write_group_id = await self.gtable.create_group(
-                self.get_project_group_name(project_name, readonly=False)
+                self.get_project_group_name(project_name, readonly=False),
+                audit_log_id=audit_log_id,
             )
 
             _query = """\
-    INSERT INTO project (name, dataset, author, read_group_id, write_group_id)
-    VALUES (:name, :dataset, :author, :read_group_id, :write_group_id)
+    INSERT INTO project (name, dataset, audit_log_id, read_group_id, write_group_id)
+    VALUES (:name, :dataset, :audit_log_id, :read_group_id, :write_group_id)
     RETURNING ID"""
             values = {
                 'name': project_name,
                 'dataset': dataset_name,
-                'author': author,
+                'audit_log_id': await self.audit_log_id(),
                 'read_group_id': read_group_id,
                 'write_group_id': write_group_id,
             }
@@ -342,9 +392,12 @@ class ProjectPermissionsTable:
 
         meta = update.get('meta')
 
-        fields: Dict[str, Any] = {'author': author, 'name': project_name}
+        fields: Dict[str, Any] = {
+            'audit_log_id': await self.audit_log_id(),
+            'name': project_name,
+        }
 
-        setters = ['author = :author']
+        setters = ['audit_log_id = :audit_log_id']
 
         if meta is not None and len(meta) > 0:
             fields['meta'] = to_db_json(meta)
@@ -388,6 +441,16 @@ DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
     SELECT sg.id FROM sequencing_group sg
     INNER JOIN sample ON sample.id = sg.sample_id
     WHERE sample.project = :project
+);
+DELETE FROM analysis_sample WHERE sample_id in (
+    SELECT s.id FROM sample s
+    WHERE s.project = :project
+);
+DELETE FROM analysis_sequencing_group WHERE analysis_id in (
+    SELECT id FROM analysis WHERE project = :project
+);
+DELETE FROM analysis_sample WHERE analysis_id in (
+    SELECT id FROM analysis WHERE project = :project
 );
 DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
 DELETE FROM sequencing_group WHERE sample_id IN (
@@ -433,7 +496,9 @@ DELETE FROM analysis WHERE project = :project;
                 f'User {author} does not have permission to add members to group {group_name}'
             )
         group_id = await self.gtable.get_group_name_from_id(group_name)
-        await self.gtable.set_group_members(group_id, members, author=author)
+        await self.gtable.set_group_members(
+            group_id, members, audit_log_id=await self.audit_log_id()
+        )
 
     # endregion CREATE / UPDATE
 
@@ -563,16 +628,20 @@ class GroupTable:
         )
         return set(r['gid'] for r in results)
 
-    async def create_group(self, name: str) -> int:
+    async def create_group(self, name: str, audit_log_id: int) -> int:
         """Create a new group"""
         _query = """
-            INSERT INTO `group` (name)
-            VALUES (:name)
+            INSERT INTO `group` (name, audit_log_id)
+            VALUES (:name, :audit_log_id)
             RETURNING id
         """
-        return await self.connection.fetch_val(_query, {'name': name})
+        return await self.connection.fetch_val(
+            _query, {'name': name, 'audit_log_id': audit_log_id}
+        )
 
-    async def set_group_members(self, group_id: int, members: list[str], author: str):
+    async def set_group_members(
+        self, group_id: int, members: list[str], audit_log_id: int
+    ):
         """
         Set group members for a group (by id)
         """
@@ -585,11 +654,15 @@ class GroupTable:
         )
         await self.connection.execute_many(
             """
-            INSERT INTO group_member (group_id, member, author)
-            VALUES (:group_id, :member, :author)
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id)
             """,
             [
-                {'group_id': group_id, 'member': member, 'author': author}
+                {
+                    'group_id': group_id,
+                    'member': member,
+                    'audit_log_id': audit_log_id,
+                }
                 for member in members
             ],
         )

@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Any, Generic, Sequence, TypeVar
 
 T = TypeVar('T')
-ProjectId = int
 
 levels_map = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING}
 
