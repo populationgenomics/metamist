@@ -11,6 +11,8 @@ from models.models import (
     BillingTotalCostRecord,
 )
 
+TEST_API_BILLING_USER = 'test_user'
+
 
 class TestApiBilling(unittest.TestCase):
     """
@@ -54,7 +56,9 @@ class TestApiBilling(unittest.TestCase):
         )
         mock_is_billing_enabled.return_value = True
         mock_get_cost_by_ar_guid.return_value = mockup_record
-        records = await billing.get_cost_by_ar_guid(ar_guid, author=None)
+        records = await billing.get_cost_by_ar_guid(
+            ar_guid, author=TEST_API_BILLING_USER
+        )
         self.assertEqual(mockup_record, records)
 
     @run_as_sync
@@ -73,7 +77,9 @@ class TestApiBilling(unittest.TestCase):
         )
         mock_is_billing_enabled.return_value = True
         mock_get_cost_by_batch_id.return_value = mockup_record
-        records = await billing.get_cost_by_batch_id(batch_id, author=None)
+        records = await billing.get_cost_by_batch_id(
+            batch_id, author=TEST_API_BILLING_USER
+        )
         self.assertEqual(mockup_record, records)
 
     @run_as_sync
@@ -88,7 +94,7 @@ class TestApiBilling(unittest.TestCase):
         expected = [BillingTotalCostRecord.from_json(r) for r in mockup_record]
         mock_is_billing_enabled.return_value = True
         mock_get_total_cost.return_value = mockup_record
-        records = await billing.get_total_cost(query, author=None)
+        records = await billing.get_total_cost(query, author=TEST_API_BILLING_USER)
         self.assertEqual(expected, records)
 
     @run_as_sync
@@ -111,7 +117,10 @@ class TestApiBilling(unittest.TestCase):
         mock_is_billing_enabled.return_value = True
         mock_get_running_cost.return_value = mockup_record
         records = await billing.get_running_costs(
-            field=BillingColumn.TOPIC, invoice_month=None, source=None, author=None
+            field=BillingColumn.TOPIC,
+            invoice_month=None,
+            source=None,
+            author=TEST_API_BILLING_USER,
         )
         self.assertEqual(mockup_record, records)
 
@@ -121,7 +130,7 @@ class TestApiBilling(unittest.TestCase):
     ):
         """
         Common wrapper for all API calls, to avoid code duplication
-        API function is called with author=None
+        API function is called with author=TEST_API_BILLING_USER
         get_author function will be tested separately
         We only testing if routes are calling layer functions and
         returning data it received
@@ -129,7 +138,7 @@ class TestApiBilling(unittest.TestCase):
         mockup_records = ['RECORD1', 'RECORD2']
         mock_is_billing_enabled.return_value = True
         mock_layer_function.return_value = mockup_records
-        records = await api_function(author=None)
+        records = await api_function(author=TEST_API_BILLING_USER)
         self.assertEqual(mockup_records, records)
 
     @run_as_sync
