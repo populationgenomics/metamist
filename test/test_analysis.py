@@ -153,7 +153,7 @@ class TestAnalysis(DbIsolatedTest):
                 meta={},
                 active=True,
                 author=None,
-            )
+            ).copy(update={'output_files': []})
         ]
 
         self.assertEqual(analyses, expected)

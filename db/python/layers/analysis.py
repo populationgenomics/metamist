@@ -555,7 +555,8 @@ class AnalysisLayer(BaseLayer):
             project=project,
         )
 
-        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
+        if analysis.output:
+            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
 
         return new_analysis_id
 
