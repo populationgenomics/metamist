@@ -18,6 +18,7 @@ SEQ_TYPE_COL_NAME = 'type'
 CHECKSUM_COL_NAME = 'checksum'
 SEQ_FACILITY_COL_NAME = 'sequencing_facility'
 LIBRARY_TYPE_COL_NAME = 'library_type'
+ASSAY_END_TYPE_COL_NAME = 'end_type'
 READ_LENGTH_COL_NAME = 'read_length'
 
 KeyMap = {
@@ -88,6 +89,9 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sample_type='blood',
         default_sequencing_technology='short-read',
         default_sequencing_platform='illumina',
+        default_library_type: str | None=None,
+        default_assay_end_type: str | None=None,
+        default_assay_read_length: str | None=None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
     ):
@@ -101,10 +105,14 @@ class SampleFileMapParser(GenericMetadataParser):
             seq_type_column=SEQ_TYPE_COL_NAME,
             seq_facility_column=SEQ_FACILITY_COL_NAME,
             library_type_column=LIBRARY_TYPE_COL_NAME,
+            end_type_column=ASSAY_END_TYPE_COL_NAME,
             read_length_column=READ_LENGTH_COL_NAME,
             default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
             default_sequencing_technology=default_sequencing_technology,
+            default_library_type=default_library_type, 
+            default_assay_end_type=default_assay_end_type,
+            default_assay_read_length=default_assay_read_length,
             default_reference_assembly_location=default_reference_assembly_location,
             participant_meta_map={},
             sample_meta_map={},

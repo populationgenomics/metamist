@@ -95,6 +95,7 @@ class GenericMetadataParser(GenericParser):
         seq_platform_column: Optional[str] = None,
         seq_facility_column: Optional[str] = None,
         library_type_column: Optional[str] = None,
+        end_type_column: Optional[str] = None,
         read_length_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
@@ -136,6 +137,7 @@ class GenericMetadataParser(GenericParser):
         self.seq_platform_column = seq_platform_column
         self.seq_facility_column = seq_facility_column
         self.library_type_column = library_type_column
+        self.end_type_column = end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
         self.default_reference_assembly_location = default_reference_assembly_location
@@ -230,7 +232,12 @@ class GenericMetadataParser(GenericParser):
         value = row.get(self.library_type_column, None)
         return str(value)
     
-    def get_read_length(self, row: SingleRow) -> str:
+    def get_assay_end_type(self, row: SingleRow) -> str:
+        """Get assay end type from row"""
+        value = row.get(self.end_type_column, None)
+        return str(value)
+    
+    def get_assay_read_length(self, row: SingleRow) -> str:
         """Get read length from row"""
         value = row.get(self.read_length_column, None)
         return str(value)
@@ -672,6 +679,12 @@ class GenericMetadataParser(GenericParser):
 
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
+            
+        if sequencing_group.sequencing_type in ['polyarna', 'totalrna', 'singlecellrna']:
+            rows=sequencing_group.rows
+            collapsed_assay_meta['library_type'] = self.get_library_type(rows[0])
+            collapsed_assay_meta['end_type'] = self.get_assay_end_type(rows[0])
+            collapsed_assay_meta['read_length'] = self.get_assay_read_length(rows[0])
 
         for read in reads[reads_type]:
             assays.append(

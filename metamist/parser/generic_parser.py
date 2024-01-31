@@ -410,6 +410,9 @@ class GenericParser(
         default_sequencing_type='genome',
         default_sequencing_technology='short-read',
         default_sequencing_platform: str | None = None,
+        default_library_type: str | None=None,
+        default_assay_end_type: str | None=None,
+        default_assay_read_length: str | None=None,
         default_sample_type=None,
         default_analysis_type='qc',
         default_analysis_status='completed',
@@ -435,6 +438,9 @@ class GenericParser(
         self.default_sequencing_type: str = default_sequencing_type
         self.default_sequencing_technology: str = default_sequencing_technology
         self.default_sequencing_platform: Optional[str] = default_sequencing_platform
+        self.default_library_type: Optional[str] = default_library_type
+        self.default_assay_end_type: Optional[str] = default_assay_end_type
+        self.default_assay_read_length: Optional[str] = default_assay_read_length
         self.default_sample_type: Optional[str] = default_sample_type
         self.default_analysis_type: str = default_analysis_type
         self.default_analysis_status: str = default_analysis_status
@@ -1007,13 +1013,17 @@ class GenericParser(
         """
         meta = {}
         for assay in assays:
-            if assay['type'] not in RNA_SEQ_TYPES:
+            if assay['meta'].get('type') not in RNA_SEQ_TYPES:
                 continue
+            if assay['meta'].get('library_type'):
+                meta['library_type'] = assay['meta']['library_type']
             if assay['meta'].get('reads', []) and len(assay['meta'].get('reads', [])) % 2 == 0:
                 meta['end_type'] = 'paired'
             else:
                 meta['end_type'] = 'single'
-            
+            if assay['meta'].get('read_length'):
+                meta['read_length'] = assay['meta']['read_length']
+        return meta
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row"""
