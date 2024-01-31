@@ -55,7 +55,7 @@ def get_file_info(path: str) -> Dict:
         'nameext': FileInternal.get_extension(path),
         'checksum': FileInternal.get_checksum(path),
         'size': FileInternal.get_size(path),
-        'secondary_files': '[]',
+        'json_structure': '',
     }
 
 
@@ -101,8 +101,8 @@ async def prepare_files(analyses):
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size, secondary_files)
-        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :secondary_files)
+        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size, json_structure)
+        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :json_structure)
         RETURNING id"""
     )
     af_query = dedent(

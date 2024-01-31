@@ -27,7 +27,8 @@ from models.models.family import (
     PedRowInternal,
 )
 from models.models.file import (
-    File
+    File,
+    FileInternal
 )
 from models.models.participant import (
     NestedParticipant,

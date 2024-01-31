@@ -3,7 +3,7 @@ import json
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from models.base import SMBase
 from models.enums import AnalysisStatus
@@ -15,6 +15,7 @@ from models.utils.sequencing_group_id_format import (
 
 class AnalysisInternal(SMBase):
     """Model for Analysis"""
+    model_config = ConfigDict(extra='allow')
 
     id: int | None = None
     type: str

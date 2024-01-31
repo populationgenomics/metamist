@@ -15,6 +15,7 @@ from db.python.utils import (
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
 from models.models.audit_log import AuditLogInternal
+from models.models.file import FileInternal
 from models.models.project import ProjectId
 
 
@@ -73,7 +74,7 @@ class AnalysisTable(DbBase):
                 ('type', analysis_type),
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
-                ('output', output),
+                ('output', output),  # can keep for now but will be deprecated eventually as a column
                 ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
@@ -226,14 +227,35 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         rows = await self.connection.fetch_all(_query, values)
         retvals: Dict[int, AnalysisInternal] = {}
+        analysis_ids: list = []
         for row in rows:
             key = row['id']
+            analysis_ids.append(key)
             if key in retvals:
                 retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
             else:
                 retvals[key] = AnalysisInternal.from_db(**dict(row))
 
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
+        for analysis_id, analysis in retvals.items():
+            retvals[analysis_id] = analysis.copy(update={'output_files': analysis_outputs_by_aid.get(analysis_id, [])})
         return list(retvals.values())
+
+    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[FileInternal]]:
+        """Fetches all output files for a list of analysis IDs"""
+
+        _query = """
+        SELECT af.analysis_id, f.*
+        FROM analysis_file af
+        INNER JOIN file f ON af.file_id = f.id
+        WHERE af.analysis_id IN :analysis_ids
+        """
+        rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+        analysis_files: dict[int, list[FileInternal]] = defaultdict(list)
+        for row in rows:
+            analysis_files[row['analysis_id']].append(FileInternal.from_db(**dict(row)))
+
+        return analysis_files
 
     async def get_latest_complete_analysis_for_type(
         self,

@@ -1,8 +1,10 @@
 import hashlib
-from typing import Generator
 import json
 from collections import defaultdict
+from typing import Any, Generator, Union
 
+import cloudpathlib.exceptions as cloudpathlib_exceptions
+import google.api_core.exceptions as google_exceptions
 from cloudpathlib.anypath import AnyPath
 from pydantic import BaseModel
 
@@ -13,23 +15,23 @@ class FileInternal(SMBase):
     """File model for internal use"""
 
     id: int
-    analysis_id: int
     path: str
     basename: str
-    dirname: AnyPath
+    dirname: str
     nameroot: str
     nameext: str | None
     checksum: str | None
     size: int
+    meta: str | None = None
+    # exists: bool = False
     json_path: str | None = None
-    secondary_files: list[str] = []
+    # secondary_files: list[str] | None = []
 
     @staticmethod
     def from_db(**kwargs):
         """
         Convert from db keys, mainly converting id to id_
         """
-        analysis_id = kwargs.get('analysis_id')
         path = kwargs.get('path')
         basename = kwargs.get('basename')
         dirname = kwargs.get('dirname')
@@ -37,12 +39,13 @@ class FileInternal(SMBase):
         nameext = kwargs.get('nameext')
         checksum = kwargs.get('checksum')
         size = kwargs.get('size')
+        meta = kwargs.get('meta')
+        # exists = kwargs.get('exists')
         json_path = kwargs.get('json_path')
-        secondary_files = kwargs.get('secondary_files')
+        # secondary_files = kwargs.get('secondary_files')
 
         return File(
             id=kwargs.pop('id'),
-            analysis_id=analysis_id,
             path=path,
             basename=basename,
             dirname=dirname,
@@ -50,8 +53,10 @@ class FileInternal(SMBase):
             nameext=nameext,
             checksum=checksum,
             size=size,
+            meta=meta,
+            # exists=exists,
             json_path=json_path,
-            secondary_files=secondary_files,
+            # secondary_files=secondary_files,
         )
 
     def to_external(self):
@@ -60,7 +65,6 @@ class FileInternal(SMBase):
         """
         return File(
             id=self.id,
-            analysis_id=self.analysis_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -68,7 +72,10 @@ class FileInternal(SMBase):
             nameext=self.nameext,
             checksum=self.checksum,
             size=self.size,
-            secondary_files=self.secondary_files,
+            meta=self.meta,
+            # exists=self.exists,
+            json_path=self.json_path,
+            # secondary_files=self.secondary_files,
         )
 
     @staticmethod
@@ -94,9 +101,11 @@ class FileInternal(SMBase):
     @staticmethod
     def get_checksum(path: str) -> str:
         """Get checksum for file at given path"""
+        if FileInternal.get_extension(path) == '.mt':
+            return None
         try:
             return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()  # pylint: disable=E1101
-        except FileNotFoundError:
+        except (google_exceptions.NotFound, FileNotFoundError):
             return None
 
     @staticmethod
@@ -104,50 +113,64 @@ class FileInternal(SMBase):
         """Get file size"""
         try:
             return AnyPath(path).stat().st_size  # pylint: disable=E1101
-        except FileNotFoundError:
+        except (google_exceptions.NotFound, cloudpathlib_exceptions.NoStatError, FileNotFoundError):
             return 0
 
     @staticmethod
-    def find_files_from_dict(json_dict: dict, path=None) -> Generator[tuple[str, dict], None, None]:
+    def find_files_from_dict(json_dict: Union[dict, str], json_path=None) -> Generator[tuple[Any, Any], None, None]:
         """Retrieve filepaths from a dict of outputs"""
-        if not path:
-            path = []
+        if isinstance(json_dict, str):
+            try:
+                json_dict = json.loads(json_dict)
+            except json.JSONDecodeError:
+                print(f'Error parsing JSON: {json_dict}')
+
+        if not json_path:
+            json_path = []
 
         if isinstance(json_dict, dict):
             for key, value in json_dict.items():
                 if isinstance(value, dict):
                     # If the value is a dictionary, continue the recursion
-                    yield from FileInternal.find_files_from_dict(value, path + [key])
+                    yield from FileInternal.find_files_from_dict(value, json_path + [key])
                 else:
-                    # Found a leaf, yield the path and the value
-                    yield path, json_dict
+                    # Found a leaf, yield the json_path and the value dict containing file_path
+                    yield json_path, json_dict
         else:
             # If the input is not a dictionary, just return the value
-            yield path, json_dict
+            yield json_path, json_dict  # type: ignore[misc]
 
     @staticmethod
-    def reconstruct_json(data) -> dict:
+    def reconstruct_json(data: list) -> list | dict:
         """Reconstruct a JSON object from a list of paths and values"""
-        root: dict = defaultdict(dict)
-        for path_str, content_str in data:
-            # Split the path into components and parse the JSON content
-            path = path_str.split('.')
 
-            try:
-                content = json.loads(content_str)
-            except json.JSONDecodeError:
-                print(f'Error parsing JSON: {content_str}')
+        # TODO change to dict once new input structure is in place
+        root: list = []
+        for file in data:
+            file_root: dict = defaultdict(dict)
+            fields = FileInternal.__fields__.keys()  # type:ignore[attr-defined]
+            for field in fields:
+                file_root[field] = getattr(file, field)
 
-            # Navigate down the tree to the correct position, creating dictionaries as needed
-            current = root
-            for key in path[:-1]:
-                current = current.setdefault(key, {})
+            # if file.json_structure:
+            #     # Split the path into components and parse the JSON content
+            #     path = file.json_path.split('.')
+            #     try:
+            #         content = json.loads(file_root)
+            #     except json.JSONDecodeError:
+            #         print(f'Error parsing JSON: {file_root}')
 
-            if path[-1] in current:
-                current[path[-1]].update(content)
-            else:
-                current[path[-1]] = content
+            #     # Navigate down the tree to the correct position, creating dictionaries as needed
+            #     current = root
+            #     for key in path[:-1]:
+            #         current = current.setdefault(key, [])
 
+            #     if path[-1] in current:
+            #         current[path[-1]].append(content)
+            #     else:
+            #         current[path[-1]] = content
+            # else:
+            root.append(file_root)
         return root
 
 
@@ -155,16 +178,17 @@ class File(BaseModel):
     """File model for external use"""
 
     id: int
-    analysis_id: int
     path: str
     basename: str
-    dirname: AnyPath
+    dirname: str
     nameroot: str
     nameext: str | None
     checksum: str | None
     size: int
+    meta: str | None = None
+    # exists: bool = False
     json_path: str | None = None
-    secondary_files: list[str] = []
+    # secondary_files: list[str] | None = []
 
     def to_internal(self):
         """
@@ -172,7 +196,6 @@ class File(BaseModel):
         """
         return FileInternal(
             id=self.id,
-            analysis_id=self.analysis_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -180,6 +203,8 @@ class File(BaseModel):
             nameext=self.nameext,
             checksum=self.checksum,
             size=self.size,
+            meta=self.meta,
+            # exists=self.exists,
             json_path=self.json_path,
-            secondary_files=self.secondary_files,
+            # secondary_files=self.secondary_files,
         )

@@ -1149,7 +1149,12 @@
 					nullable="false"
 				/>
 			</column>
-			<column name="secondary_files" type="VARCHAR(255)">
+			<column name="meta" type="VARCHAR(255)">
+				<constraints
+					nullable="true"
+				/>
+			</column>
+			<column name="json_structure" type="VARCHAR(255)">
 				<constraints
 					nullable="true"
 				/>
@@ -1171,6 +1176,10 @@
 				/>
 			</column>
 		</createTable>
+		<addPrimaryKey columnNames="analysis_id, file_id"
+			constraintName="PK_ANALYSIS_FILE"
+			tableName="analysis_file"
+			validate="true"/>
 		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 </databaseChangeLog>

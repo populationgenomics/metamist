@@ -7,6 +7,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
+from db.python.tables.file import FileTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -48,6 +49,7 @@ class AnalysisLayer(BaseLayer):
 
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
+        self.ft = FileTable(connection)
 
     # GETS
 
@@ -543,7 +545,7 @@ class AnalysisLayer(BaseLayer):
         project: ProjectId = None,
     ) -> int:
         """Create a new analysis"""
-        return await self.at.create_analysis(
+        new_analysis_id = await self.at.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
@@ -552,6 +554,10 @@ class AnalysisLayer(BaseLayer):
             active=analysis.active,
             project=project,
         )
+
+        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
+
+        return new_analysis_id
 
     async def add_sequencing_groups_to_analysis(
         self, analysis_id: int, sequencing_group_ids: list[int], check_project_id=True
@@ -590,6 +596,8 @@ class AnalysisLayer(BaseLayer):
             meta=meta,
             output=output,
         )
+
+        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
 
     async def get_analysis_runner_log(
         self,
