@@ -1181,5 +1181,6 @@
 			tableName="analysis_file"
 			validate="true"/>
 		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_file` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 </databaseChangeLog>
