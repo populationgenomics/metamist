@@ -2,7 +2,7 @@
 import dataclasses
 import datetime
 
-from db.python.connect import DbBase
+from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.cohort import Cohort
