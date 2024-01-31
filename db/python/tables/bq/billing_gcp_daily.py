@@ -2,8 +2,11 @@ from datetime import datetime, timedelta
 
 from google.cloud import bigquery
 
-from api.settings import BQ_DAYS_BACK_OPTIMAL, BQ_GCP_BILLING_VIEW
-from db.python.tables.bq.billing_base import BillingBaseTable
+from api.settings import BQ_GCP_BILLING_VIEW
+from db.python.tables.bq.billing_base import (
+    BillingBaseTable,
+    time_optimisation_parameter,
+)
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from models.models import BillingTotalCostQueryModel
@@ -39,6 +42,15 @@ class BillingGcpDailyTable(BillingBaseTable):
             if query.end_date
             else None,
         )
+        # add day filter after partition filter is applied
+        billing_filter.day = GenericBQFilter[datetime](
+            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
+            if query.start_date
+            else None,
+            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
+            if query.end_date
+            else None,
+        )
         return billing_filter
 
     async def _last_loaded_day(self):
@@ -56,7 +68,7 @@ class BillingGcpDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 
@@ -121,7 +133,7 @@ class BillingGcpDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 

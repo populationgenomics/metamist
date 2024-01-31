@@ -398,6 +398,7 @@ const HailBatchGrid: React.FunctionComponent<{
             <SUITable.Body>
                 {combinedData
                     .sort((a, b) => {
+                        // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
                         if (a.batch_id < b.batch_id) {
                             return -1
                         }

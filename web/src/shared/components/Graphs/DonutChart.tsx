@@ -30,13 +30,13 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
 }
 
 export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
-    // if (isLoading) {
-    //     return (
-    //         <div>
-    //             <LoadingDucks />
-    //         </div>
-    //     )
-    // }
+    if (isLoading) {
+        return (
+            <div>
+                <LoadingDucks />
+            </div>
+        )
+    }
 
     if (!data || data.length === 0) {
         return <>No Data</>
@@ -79,14 +79,15 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
     const margin = 15
     const radius = Math.min(width, height) / 2 - margin
 
-    // keep order of the slices
+    // keep order of the slices, declare custom sort function to keep order of slices as passed in
+    // by default pie function starts from index 1 and sorts by value
     const pieFnc = pie()
         .value((d) => d.value)
         .sort((a) => {
             if (typeof a === 'object' && a.type === 'inc') {
                 return 1
             }
-            return -1
+            return 0 // works both on Safari and Firefox, any other value will break one of them
         })
     const data_ready = pieFnc(data)
     const innerRadius = radius / 1.75 // inner radius of pie, in pixels (non-zero for donut)

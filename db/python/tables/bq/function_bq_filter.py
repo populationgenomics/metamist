@@ -97,7 +97,7 @@ class FunctionBQFilter:
     def _sql_value_prep(key: str, value: Any) -> bigquery.ScalarQueryParameter:
         """ """
         if isinstance(value, Enum):
-            return bigquery.ScalarQueryParameter(key, 'STRING', value.value)
+            return FunctionBQFilter._sql_value_prep(key, value.value)
         if isinstance(value, int):
             return bigquery.ScalarQueryParameter(key, 'INT64', value)
         if isinstance(value, float):

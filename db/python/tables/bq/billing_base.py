@@ -12,10 +12,11 @@ from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.function_bq_filter import FunctionBQFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
+from models.enums import BillingTimeColumn, BillingTimePeriods
 from models.models import (
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingTimePeriods,
+    BillingCostDetailsRecord,
     BillingTotalCostQueryModel,
 )
 
@@ -29,46 +30,60 @@ TimeGroupingDetails = namedtuple(
     'TimeGroupingDetails', ['field', 'formula', 'separator']
 )
 
+# constants to abbrevate (S)tores and (C)ompute
+STORAGE = 'S'
+COMPUTE = 'C'
+
 
 def abbrev_cost_category(cost_category: str) -> str:
     """abbreviate cost category"""
-    return 'S' if cost_category == 'Cloud Storage' else 'C'
+    return STORAGE if cost_category == 'Cloud Storage' else COMPUTE
 
 
 def prepare_time_periods(
     query: BillingTotalCostQueryModel,
 ) -> TimeGroupingDetails:
     """Prepare Time periods grouping and parsing formulas"""
-    time_column = query.time_column or 'day'
-    result = TimeGroupingDetails('', '', '')
+    time_column: BillingTimeColumn = query.time_column or BillingTimeColumn.DAY
 
     # Based on specified time period, add the corresponding column
     if query.time_periods == BillingTimePeriods.DAY:
-        result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y-%m-%d", {time_column}) as day',
+        return TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y-%m-%d", {time_column.value}) as day',
             formula='PARSE_DATE("%Y-%m-%d", day) as day',
             separator=',',
         )
-    elif query.time_periods == BillingTimePeriods.WEEK:
-        result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%W", {time_column}) as day',
+
+    if query.time_periods == BillingTimePeriods.WEEK:
+        return TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y%W", {time_column.value}) as day',
             formula='PARSE_DATE("%Y%W", day) as day',
             separator=',',
         )
-    elif query.time_periods == BillingTimePeriods.MONTH:
-        result = TimeGroupingDetails(
-            field=f'FORMAT_DATE("%Y%m", {time_column}) as day',
+
+    if query.time_periods == BillingTimePeriods.MONTH:
+        return TimeGroupingDetails(
+            field=f'FORMAT_DATE("%Y%m", {time_column.value}) as day',
             formula='PARSE_DATE("%Y%m", day) as day',
             separator=',',
         )
-    elif query.time_periods == BillingTimePeriods.INVOICE_MONTH:
-        result = TimeGroupingDetails(
+
+    if query.time_periods == BillingTimePeriods.INVOICE_MONTH:
+        return TimeGroupingDetails(
             field='invoice_month as day',
             formula='PARSE_DATE("%Y%m", day) as day',
             separator=',',
         )
 
-    return result
+    return TimeGroupingDetails('', '', '')
+
+
+def time_optimisation_parameter() -> bigquery.ScalarQueryParameter:
+    """
+    BQ tables and views are partitioned by day, to avoid full scans
+    we need to limit the amount of data scanned
+    """
+    return bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL))
 
 
 class BillingBaseTable(BqDbBase):
@@ -165,7 +180,7 @@ class BillingBaseTable(BqDbBase):
         WITH t AS (
             SELECT gcp_project, MAX(created_at) as last_created_at
             FROM `{BQ_BUDGET_VIEW}`
-            GROUP BY 1
+            GROUP BY gcp_project
         )
         SELECT t.gcp_project, d.budget
         FROM t inner join `{BQ_BUDGET_VIEW}` d
@@ -193,7 +208,7 @@ class BillingBaseTable(BqDbBase):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 
@@ -328,38 +343,36 @@ class BillingBaseTable(BqDbBase):
         all_details = []
         for cat, mth_cost in total_monthly_category.items():
             all_details.append(
-                {
-                    'cost_group': abbrev_cost_category(cat),
-                    'cost_category': cat,
-                    'daily_cost': total_daily_category[cat]
-                    if is_current_month
-                    else None,
-                    'monthly_cost': mth_cost,
-                }
+                BillingCostDetailsRecord(
+                    cost_group=abbrev_cost_category(cat),
+                    cost_category=cat,
+                    daily_cost=total_daily_category[cat] if is_current_month else None,
+                    monthly_cost=mth_cost,
+                )
             )
 
         # add total row: compute + storage
         results.append(
-            BillingCostBudgetRecord.from_json(
-                {
-                    'field': f'{BillingColumn.generate_all_title(field)}',
-                    'total_monthly': (
-                        total_monthly['C']['ALL'] + total_monthly['S']['ALL']
-                    ),
-                    'total_daily': (total_daily['C']['ALL'] + total_daily['S']['ALL'])
-                    if is_current_month
-                    else None,
-                    'compute_monthly': total_monthly['C']['ALL'],
-                    'compute_daily': (total_daily['C']['ALL'])
-                    if is_current_month
-                    else None,
-                    'storage_monthly': total_monthly['S']['ALL'],
-                    'storage_daily': (total_daily['S']['ALL'])
-                    if is_current_month
-                    else None,
-                    'details': all_details,
-                    'last_loaded_day': last_loaded_day,
-                }
+            BillingCostBudgetRecord(
+                field=f'{BillingColumn.generate_all_title(field)}',
+                total_monthly=(
+                    total_monthly[COMPUTE]['ALL'] + total_monthly[STORAGE]['ALL']
+                ),
+                total_daily=(total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
+                if is_current_month
+                else None,
+                compute_monthly=total_monthly[COMPUTE]['ALL'],
+                compute_daily=(total_daily[COMPUTE]['ALL'])
+                if is_current_month
+                else None,
+                storage_monthly=total_monthly[STORAGE]['ALL'],
+                storage_daily=(total_daily[STORAGE]['ALL'])
+                if is_current_month
+                else None,
+                details=all_details,
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=last_loaded_day,
             )
         )
 
@@ -385,13 +398,17 @@ class BillingBaseTable(BqDbBase):
 
         # add rows by field
         for key, details in field_details.items():
-            compute_daily = total_daily['C'][key] if key in total_daily['C'] else 0
-            storage_daily = total_daily['S'][key] if key in total_daily['S'] else 0
+            compute_daily = (
+                total_daily[COMPUTE][key] if key in total_daily[COMPUTE] else 0
+            )
+            storage_daily = (
+                total_daily[STORAGE][key] if key in total_daily[STORAGE] else 0
+            )
             compute_monthly = (
-                total_monthly['C'][key] if key in total_monthly['C'] else 0
+                total_monthly[COMPUTE][key] if key in total_monthly[COMPUTE] else 0
             )
             storage_monthly = (
-                total_monthly['S'][key] if key in total_monthly['S'] else 0
+                total_monthly[STORAGE][key] if key in total_monthly[STORAGE] else 0
             )
             monthly = compute_monthly + storage_monthly
             budget_monthly = budgets_per_gcp_project.get(key)

@@ -12,24 +12,25 @@ def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_re
     if not gs_dir.startswith('gs://'):
         raise ValueError(f'Expected GS directory, got: {gs_dir}')
 
-    billing_project = get_config()['hail']['billing_project']
+    billing_project = get_config()['workflow']['gcp_billing_project']
     driver_image = get_config()['workflow']['driver_image']
 
     bucket_name, *components = gs_dir[5:].split('/')
 
     client = storage.Client()
-    blobs = client.list_blobs(bucket_name, prefix='/'.join(components))
+    bucket = client.bucket(bucket_name, user_project=billing_project)
+    blobs = bucket.list_blobs(prefix='/'.join(components))
     files: set[str] = {f'gs://{bucket_name}/{blob.name}' for blob in blobs}
-    for obj in files:
-        if obj.endswith('.md5') or obj.endswith(skip_filetypes):
+    for filepath in files:
+        if filepath.endswith('.md5') or filepath.endswith(skip_filetypes):
             continue
-        if f'{obj}.md5' in files and not force_recreate:
-            print(f'{obj}.md5 already exists, skipping')
+        if f'{filepath}.md5' in files and not force_recreate:
+            print(f'{filepath}.md5 already exists, skipping')
             continue
 
-        print('Creating md5 for', obj)
-        job = b.new_job(f'Create {os.path.basename(obj)}.md5')
-        create_md5(job, obj, billing_project, driver_image)
+        print('Creating md5 for', filepath)
+        job = b.new_job(f'Create {os.path.basename(filepath)}.md5')
+        create_md5(job, filepath, billing_project, driver_image)
 
     b.run(wait=False)
 
@@ -46,7 +47,7 @@ def create_md5(job, file, billing_project, driver_image):
         f"""\
     set -euxo pipefail
     gcloud -q auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-    gsutil cat {file} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
+    gsutil -u {billing_project} cat {file} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
     gsutil -u {billing_project} cp /tmp/uploaded.md5 {md5}
     """
     )

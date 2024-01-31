@@ -1,7 +1,10 @@
 from google.cloud import bigquery
 
-from api.settings import BQ_AGGREG_VIEW, BQ_DAYS_BACK_OPTIMAL
-from db.python.tables.bq.billing_base import BillingBaseTable
+from api.settings import BQ_AGGREG_VIEW
+from db.python.tables.bq.billing_base import (
+    BillingBaseTable,
+    time_optimisation_parameter,
+)
 
 
 class BillingDailyTable(BillingBaseTable):
@@ -31,7 +34,7 @@ class BillingDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 
@@ -42,12 +45,13 @@ class BillingDailyTable(BillingBaseTable):
         return []
 
     async def get_invoice_months(self):
-        """Get all invoice months in database"""
+        """Get all invoice months in database
+        Aggregated views contain invoice_month field
+        """
 
         _query = f"""
-        SELECT DISTINCT FORMAT_DATE("%Y%m", day) as invoice_month
+        SELECT DISTINCT invoice_month
         FROM `{self.table_name}`
-        WHERE EXTRACT(day from day) = 1
         ORDER BY invoice_month DESC;
         """
 
@@ -76,7 +80,7 @@ class BillingDailyTable(BillingBaseTable):
         """
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
         ]
         query_job_result = self._execute_query(_query, query_parameters)
 
@@ -114,7 +118,7 @@ class BillingDailyTable(BillingBaseTable):
             _query += ' OFFSET @offset_val'
 
         query_parameters = [
-            bigquery.ScalarQueryParameter('days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)),
+            time_optimisation_parameter(),
             bigquery.ScalarQueryParameter('limit_val', 'INT64', limit),
             bigquery.ScalarQueryParameter('offset_val', 'INT64', offset),
         ]
