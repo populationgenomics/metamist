@@ -738,6 +738,7 @@ class Query:  # entry point to graphql.
         samples = await slayer.query(filter_)
         return [GraphQLSample.from_internal(sample) for sample in samples]
 
+    # pylint: disable=too-many-arguments
     @strawberry.field
     async def sequencing_groups(
         self,
@@ -749,6 +750,10 @@ class Query:  # entry point to graphql.
         technology: GraphQLFilter[str] | None = None,
         platform: GraphQLFilter[str] | None = None,
         active_only: GraphQLFilter[bool] | None = None,
+        created_on: GraphQLFilter[datetime.date] | None = None,
+        assay_meta: GraphQLMetaFilter | None = None,
+        has_cram: bool | None = None,
+        has_gvcf: bool | None = None,
     ) -> list[GraphQLSequencingGroup]:
         connection = info.context['connection']
         sglayer = SequencingGroupLayer(connection)
@@ -766,21 +771,33 @@ class Query:  # entry point to graphql.
             project_id_map = {p.name: p.id for p in projects}
 
         filter_ = SequencingGroupFilter(
-            project=project.to_internal_filter(lambda val: project_id_map[val])
-            if project
-            else None,
-            sample_id=sample_id.to_internal_filter(sample_id_transform_to_raw)
-            if sample_id
-            else None,
-            id=id.to_internal_filter(sequencing_group_id_transform_to_raw)
-            if id
-            else None,
+            project=(
+                project.to_internal_filter(lambda val: project_id_map[val])
+                if project
+                else None
+            ),
+            sample_id=(
+                sample_id.to_internal_filter(sample_id_transform_to_raw)
+                if sample_id
+                else None
+            ),
+            id=(
+                id.to_internal_filter(sequencing_group_id_transform_to_raw)
+                if id
+                else None
+            ),
             type=type.to_internal_filter() if type else None,
             technology=technology.to_internal_filter() if technology else None,
             platform=platform.to_internal_filter() if platform else None,
-            active_only=active_only.to_internal_filter()
-            if active_only
-            else GenericFilter(eq=True),
+            active_only=(
+                active_only.to_internal_filter()
+                if active_only
+                else GenericFilter(eq=True)
+            ),
+            created_on=created_on.to_internal_filter() if created_on else None,
+            assay_meta=assay_meta,
+            has_cram=has_cram,
+            has_gvcf=has_gvcf,
         )
         sgs = await sglayer.query(filter_)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]

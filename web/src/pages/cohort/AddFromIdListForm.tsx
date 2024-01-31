@@ -16,6 +16,9 @@ query FetchSequencingGroupsById($ids: [String!]!) {
       type
       technology
       platform
+      assays {
+        meta
+      }
       sample {
         project {
           id
@@ -50,7 +53,16 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
             return
         }
 
-        const ids = element.value.trim().split(',')
+        const ids = element.value
+            .trim()
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => !!id)
+
+        if (ids.length === 0) {
+            return
+        }
+
         fetchSequencingGroups({
             variables: { ids },
             onError: () => {
@@ -60,6 +72,7 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
                 setSequencingGroups(
                     hits.sequencingGroups.map((sg) => ({
                         ...sg,
+                        assayMeta: (sg?.assays ?? []).map((a) => a.meta),
                         project: sg.sample.project,
                     }))
                 ),

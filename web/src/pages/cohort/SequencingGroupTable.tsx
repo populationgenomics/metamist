@@ -26,8 +26,12 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
     const [searchTerms, setSearchTerms] = useState<{ column: string; term: string }[]>([])
 
     const setSortInformation = (column: string) => {
+        if (column === sortColumn) {
+            setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending')
+            return
+        }
+        setSortDirection('descending')
         setSortColumn(column)
-        setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending')
     }
 
     const setSearchInformation = (column: string, term: string) => {
@@ -48,7 +52,7 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const value: any = sg[column]
+            const value: any = column === 'assayMeta' ? JSON.stringify(sg[column]) : sg[column]
             return value.toString().toLowerCase().includes(term.toLowerCase())
         })
     })
@@ -57,11 +61,12 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
     sortedRows = sortDirection === 'ascending' ? sortedRows : sortedRows.reverse()
 
     const tableColumns = [
-        { key: 'id', name: 'ID' },
-        { key: 'project', name: 'Project' },
-        { key: 'type', name: 'Type' },
-        { key: 'technology', name: 'Technology' },
-        { key: 'platform', name: 'Platform' },
+        { key: 'id', name: 'ID', filterable: true, sortable: true, minWidth: 100 },
+        { key: 'project', name: 'Project', filterable: true, sortable: true, minWidth: 100 },
+        { key: 'type', name: 'Type', filterable: true, sortable: true, minWidth: 50 },
+        { key: 'technology', name: 'Technology', filterable: true, sortable: true, minWidth: 100 },
+        { key: 'platform', name: 'Platform', filterable: true, sortable: true, minWidth: 150 },
+        { key: 'assayMeta', name: 'Assay Meta', filterable: true, sortable: false, minWidth: 300 },
     ]
 
     const renderTableBody = () => {
@@ -76,7 +81,7 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
         if (!sequencingGroups.length) {
             return (
                 <Table.Row>
-                    <Table.Cell colSpan={5}>{emptyMessage}</Table.Cell>
+                    <Table.Cell colSpan={6}>{emptyMessage}</Table.Cell>
                 </Table.Row>
             )
         }
@@ -95,13 +100,18 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
                 <Table.Cell>{sg.type}</Table.Cell>
                 <Table.Cell>{sg.technology}</Table.Cell>
                 <Table.Cell>{sg.platform}</Table.Cell>
+                <Table.Cell>
+                    <div>
+                        <pre>{JSON.stringify(sg.assayMeta, null, 2)}</pre>
+                    </div>
+                </Table.Cell>
             </Table.Row>
         ))
     }
 
     return (
         <div style={{ maxHeight: height, overflowY: 'scroll' }}>
-            <Table sortable celled selectable>
+            <Table sortable celled selectable compact>
                 <Table.Header
                     inverted
                     style={{
@@ -116,18 +126,43 @@ const SequencingGroupTable: React.FC<ISequencingGroupTableProps> = ({
                         {tableColumns.map((column) => (
                             <Table.HeaderCell
                                 key={column.key}
-                                sorted={sortColumn === column.key ? sortDirection : undefined}
+                                onClick={(e: any) =>
+                                    e.target.tagName !== 'INPUT' &&
+                                    column.sortable &&
+                                    setSortInformation(column.key)
+                                }
                             >
-                                <div onClick={() => setSortInformation(column.key)}>
-                                    {column.name}
-                                </div>
-                                <Input
-                                    size="mini"
-                                    onKeyUp={(e: any) =>
-                                        setSearchInformation(column.key, e.target.value)
-                                    }
-                                    placeholder="search..."
-                                />
+                                <span style={{ minWidth: column.minWidth }}>
+                                    <div>
+                                        {column.name}
+                                        {column.sortable && sortColumn === column.key && (
+                                            <Icon
+                                                name={
+                                                    sortDirection === 'ascending'
+                                                        ? 'caret up'
+                                                        : 'caret down'
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        {column.filterable && (
+                                            <Input
+                                                size="mini"
+                                                style={{
+                                                    width:
+                                                        column.key === 'assayMeta'
+                                                            ? '90%'
+                                                            : undefined,
+                                                }}
+                                                onKeyUp={(e: any) => {
+                                                    setSearchInformation(column.key, e.target.value)
+                                                }}
+                                                placeholder="search..."
+                                            />
+                                        )}
+                                    </div>
+                                </span>
                             </Table.HeaderCell>
                         ))}
                     </Table.Row>

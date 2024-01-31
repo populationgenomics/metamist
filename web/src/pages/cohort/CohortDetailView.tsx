@@ -22,6 +22,9 @@ query CohortDetailView($id: Int!) {
       type
       technology
       platform
+      assays {
+        meta
+      }
       sample {
         project {
             id
@@ -92,6 +95,7 @@ const CohortDetailView: React.FC = () => {
                     technology: sg.technology,
                     platform: sg.platform,
                     project: sg.sample.project,
+                    assayMeta: (sg.assays ?? []).map((a) => a.meta),
                 }))}
                 editable={false}
             />
