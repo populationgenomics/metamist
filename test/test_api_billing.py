@@ -1,5 +1,6 @@
-import unittest
+# pylint: disable=protected-access
 from test.testbase import run_as_sync
+from test.testbqbase import BqTest
 from unittest.mock import patch
 
 from api.routes import billing
@@ -14,7 +15,7 @@ from models.models import (
 TEST_API_BILLING_USER = 'test_user'
 
 
-class TestApiBilling(unittest.TestCase):
+class TestApiBilling(BqTest):
     """
     Test API Billing routes
     Billing routes are only calling layer functions and returning data it received
@@ -42,10 +43,11 @@ class TestApiBilling(unittest.TestCase):
         self.assertTrue('Billing is not enabled' in str(context.exception))
 
     @run_as_sync
+    @patch('api.routes.billing._get_billing_layer_from')
     @patch('api.routes.billing.is_billing_enabled')
     @patch('db.python.layers.billing.BillingLayer.get_cost_by_ar_guid')
     async def test_get_cost_by_ar_guid(
-        self, mock_get_cost_by_ar_guid, mock_is_billing_enabled
+        self, mock_get_cost_by_ar_guid, mock_is_billing_enabled, mock_get_billing_layer
     ):
         """
         Test get_cost_by_ar_guid function
@@ -54,6 +56,7 @@ class TestApiBilling(unittest.TestCase):
         mockup_record = BillingHailBatchCostRecord(
             ar_guid=ar_guid, batch_ids=None, costs=None
         )
+        mock_get_billing_layer.return_value = self.layer
         mock_is_billing_enabled.return_value = True
         mock_get_cost_by_ar_guid.return_value = mockup_record
         records = await billing.get_cost_by_ar_guid(
@@ -62,10 +65,11 @@ class TestApiBilling(unittest.TestCase):
         self.assertEqual(mockup_record, records)
 
     @run_as_sync
+    @patch('api.routes.billing._get_billing_layer_from')
     @patch('api.routes.billing.is_billing_enabled')
     @patch('db.python.layers.billing.BillingLayer.get_cost_by_batch_id')
     async def test_get_cost_by_batch_id(
-        self, mock_get_cost_by_batch_id, mock_is_billing_enabled
+        self, mock_get_cost_by_batch_id, mock_is_billing_enabled, mock_get_billing_layer
     ):
         """
         Test get_cost_by_batch_id function
@@ -75,6 +79,7 @@ class TestApiBilling(unittest.TestCase):
         mockup_record = BillingHailBatchCostRecord(
             ar_guid=ar_guid, batch_ids=[batch_id], costs=None
         )
+        mock_get_billing_layer.return_value = self.layer
         mock_is_billing_enabled.return_value = True
         mock_get_cost_by_batch_id.return_value = mockup_record
         records = await billing.get_cost_by_batch_id(
@@ -83,25 +88,30 @@ class TestApiBilling(unittest.TestCase):
         self.assertEqual(mockup_record, records)
 
     @run_as_sync
+    @patch('api.routes.billing._get_billing_layer_from')
     @patch('api.routes.billing.is_billing_enabled')
     @patch('db.python.layers.billing.BillingLayer.get_total_cost')
-    async def test_get_total_cost(self, mock_get_total_cost, mock_is_billing_enabled):
+    async def test_get_total_cost(
+        self, mock_get_total_cost, mock_is_billing_enabled, mock_get_billing_layer
+    ):
         """
         Test get_total_cost function
         """
         query = BillingTotalCostQueryModel(fields=[], start_date='', end_date='')
         mockup_record = [{'cost': 123.45}, {'cost': 123}]
         expected = [BillingTotalCostRecord.from_json(r) for r in mockup_record]
+        mock_get_billing_layer.return_value = self.layer
         mock_is_billing_enabled.return_value = True
         mock_get_total_cost.return_value = mockup_record
         records = await billing.get_total_cost(query, author=TEST_API_BILLING_USER)
         self.assertEqual(expected, records)
 
     @run_as_sync
+    @patch('api.routes.billing._get_billing_layer_from')
     @patch('api.routes.billing.is_billing_enabled')
     @patch('db.python.layers.billing.BillingLayer.get_running_cost')
     async def test_get_running_cost(
-        self, mock_get_running_cost, mock_is_billing_enabled
+        self, mock_get_running_cost, mock_is_billing_enabled, mock_get_billing_layer
     ):
         """
         Test get_running_cost function
@@ -114,6 +124,7 @@ class TestApiBilling(unittest.TestCase):
                 {'field': 'TOPIC2', 'total_monthly': 123, 'details': []}
             ),
         ]
+        mock_get_billing_layer.return_value = self.layer
         mock_is_billing_enabled.return_value = True
         mock_get_running_cost.return_value = mockup_record
         records = await billing.get_running_costs(
@@ -124,9 +135,14 @@ class TestApiBilling(unittest.TestCase):
         )
         self.assertEqual(mockup_record, records)
 
+    @patch('api.routes.billing._get_billing_layer_from')
     @patch('api.routes.billing.is_billing_enabled')
     async def call_api_function(
-        self, api_function, mock_layer_function, mock_is_billing_enabled=None
+        self,
+        api_function,
+        mock_layer_function,
+        mock_is_billing_enabled=None,
+        mock_get_billing_layer=None,
     ):
         """
         Common wrapper for all API calls, to avoid code duplication
@@ -135,6 +151,7 @@ class TestApiBilling(unittest.TestCase):
         We only testing if routes are calling layer functions and
         returning data it received
         """
+        mock_get_billing_layer.return_value = self.layer
         mockup_records = ['RECORD1', 'RECORD2']
         mock_is_billing_enabled.return_value = True
         mock_layer_function.return_value = mockup_records

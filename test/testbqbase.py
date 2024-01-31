@@ -5,6 +5,7 @@ from unittest import mock
 import google.cloud.bigquery as bq
 
 from db.python.gcp_connect import BqConnection
+from db.python.layers.billing import BillingLayer
 
 
 class BqTest(unittest.TestCase):
@@ -38,6 +39,9 @@ class BqTest(unittest.TestCase):
         self.connection.gcp_project = self.gcp_project
         self.connection.connection = self.bq_client
         self.connection.author = self.author
+
+        # Mockup BillingLayer
+        self.layer = BillingLayer(self.connection)
 
         # overwrite table object in inhereted tests:
         self.table_obj = None
