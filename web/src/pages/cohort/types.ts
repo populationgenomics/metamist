@@ -4,6 +4,7 @@ export interface SequencingGroup {
   technology: string
   platform: string
   project: { id: number; name: string }
+  assayMeta: object[]
 }
 
 export interface Project {
