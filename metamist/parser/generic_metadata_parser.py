@@ -684,8 +684,8 @@ class GenericMetadataParser(GenericParser):
         if sequencing_group.sequencing_type in ['polyarna', 'totalrna', 'singlecellrna']:
             rows = sequencing_group.rows
             collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
-            collapsed_assay_meta['library_type'] = self.get_sequencing_library(rows[0])
-            collapsed_assay_meta['end_type'] = self.get_read_end_type(rows[0])
+            collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
+            collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
             collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
 
         for read in reads[reads_type]:

@@ -1058,7 +1058,7 @@ class GenericParser(
         for assay in assays:
             if assay.meta.get('sequencing_type') not in RNA_SEQ_TYPES:
                 continue
-            for key in ('sequencing_facility', 'library_type', 'read_end_type', 'read_length'):
+            for key in ('sequencing_facility', 'sequencing_library', 'read_end_type', 'read_length'):
                 if assay.meta.get(key):
                     meta[key] = assay.meta[key]
         return meta
