@@ -94,8 +94,8 @@ class GenericMetadataParser(GenericParser):
         seq_technology_column: Optional[str] = None,
         seq_platform_column: Optional[str] = None,
         seq_facility_column: Optional[str] = None,
-        library_type_column: Optional[str] = None,
-        end_type_column: Optional[str] = None,
+        seq_library_column: Optional[str] = None,
+        read_end_type_column: Optional[str] = None,
         read_length_column: Optional[str] = None,
         gvcf_column: Optional[str] = None,
         meta_column: Optional[str] = None,
@@ -103,8 +103,8 @@ class GenericMetadataParser(GenericParser):
         batch_number: Optional[str] = None,
         reference_assembly_location_column: Optional[str] = None,
         default_reference_assembly_location: Optional[str] = None,
-        default_sequencing_type='genome',
         default_sample_type=None,
+        default_sequencing_type='genome',
         default_sequencing_technology='short-read',
         default_sequencing_platform='illumina',
         allow_extra_files_in_search_path=False,
@@ -136,8 +136,8 @@ class GenericMetadataParser(GenericParser):
         self.seq_technology_column = seq_technology_column
         self.seq_platform_column = seq_platform_column
         self.seq_facility_column = seq_facility_column
-        self.library_type_column = library_type_column
-        self.end_type_column = end_type_column
+        self.seq_library_column = seq_library_column
+        self.read_end_type_column = read_end_type_column
         self.read_length_column = read_length_column
         self.reference_assembly_location_column = reference_assembly_location_column
         self.default_reference_assembly_location = default_reference_assembly_location
@@ -213,7 +213,7 @@ class GenericMetadataParser(GenericParser):
             value = 'exome'
         elif 'mt' in value:
             value = 'mtseq'
-        elif 'polya' in value:
+        elif 'polya' in value or 'mrna' in value:
             value = 'polyarna'
         elif 'total' in value:
             value = 'totalrna'
@@ -221,23 +221,23 @@ class GenericMetadataParser(GenericParser):
             value = 'singlecellrna'
 
         return str(value)
-    
+
     def get_sequencing_facility(self, row: SingleRow) -> str:
         """Get sequencing facility from row"""
         value = row.get(self.seq_facility_column, None)
         return str(value)
-    
-    def get_library_type(self, row: SingleRow) -> str:
-        """Get library type from row"""
-        value = row.get(self.library_type_column, None)
+
+    def get_sequencing_library(self, row: SingleRow) -> str:
+        """Get sequencing library from row"""
+        value = row.get(self.seq_library_column, None)
         return str(value)
-    
-    def get_assay_end_type(self, row: SingleRow) -> str:
-        """Get assay end type from row"""
-        value = row.get(self.end_type_column, None)
+
+    def get_read_end_type(self, row: SingleRow) -> str:
+        """Get read end type from row"""
+        value = row.get(self.read_end_type_column, None)
         return str(value)
-    
-    def get_assay_read_length(self, row: SingleRow) -> str:
+
+    def get_read_length(self, row: SingleRow) -> str:
         """Get read length from row"""
         value = row.get(self.read_length_column, None)
         return str(value)
@@ -547,9 +547,10 @@ class GenericMetadataParser(GenericParser):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
-    async def get_sequencing_group_meta(
+    async def get_sequencing_group_meta_from_variant_files(  # Unused as of 2024-02-01
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
+        """Get sequencing group metadata from variant (vcf) files"""
         meta: dict[str, Any] = {}
 
         if not sequencing_group.sample.external_sid:
@@ -679,12 +680,13 @@ class GenericMetadataParser(GenericParser):
 
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
-            
+
         if sequencing_group.sequencing_type in ['polyarna', 'totalrna', 'singlecellrna']:
-            rows=sequencing_group.rows
-            collapsed_assay_meta['library_type'] = self.get_library_type(rows[0])
-            collapsed_assay_meta['end_type'] = self.get_assay_end_type(rows[0])
-            collapsed_assay_meta['read_length'] = self.get_assay_read_length(rows[0])
+            rows = sequencing_group.rows
+            collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
+            collapsed_assay_meta['library_type'] = self.get_sequencing_library(rows[0])
+            collapsed_assay_meta['end_type'] = self.get_read_end_type(rows[0])
+            collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
 
         for read in reads[reads_type]:
             assays.append(
@@ -708,8 +710,8 @@ class GenericMetadataParser(GenericParser):
                     },
                 )
             )
-        
-        sequencing_group.meta = await self.get_sequencing_group_meta_from_assays(assays)
+
+        sequencing_group.meta = self.get_sequencing_group_meta_from_assays(assays)
 
         return assays
 
