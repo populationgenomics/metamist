@@ -1,6 +1,6 @@
 {{>partial_header}}
 
-import json
+import orjson
 import atexit
 import mimetypes
 from multiprocessing.pool import ThreadPool
@@ -333,7 +333,7 @@ class ApiClient(object):
 
         # fetch data from response object
         try:
-            received_data = json.loads(response.data)
+            received_data = orjson.loads(response.data)  # pylint: disable=maybe-no-member
         except ValueError:
             received_data = response.data
 

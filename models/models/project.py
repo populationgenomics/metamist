@@ -1,5 +1,6 @@
-import json
 from typing import Optional
+
+import orjson
 
 from models.base import SMBase
 
@@ -20,5 +21,5 @@ class Project(SMBase):
     def from_db(kwargs):
         """From DB row, with db keys"""
         kwargs = dict(kwargs)
-        kwargs['meta'] = json.loads(kwargs['meta']) if kwargs.get('meta') else {}
+        kwargs['meta'] = orjson.loads(kwargs['meta']) if kwargs.get('meta') else {}  # pylint: disable=maybe-no-member
         return Project(**kwargs)

@@ -38,6 +38,7 @@ setup(
         # for get id-token
         'cpg-utils >= 4.9.4',
         'gql[aiohttp,requests]',
+        'orjson==3.9.12',
     ],
     entry_points={
         'metamist_parser': [

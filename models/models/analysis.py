@@ -1,9 +1,9 @@
 import enum
-import json
 from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
+import orjson
 
 from models.base import SMBase
 from models.enums import AnalysisStatus
@@ -38,7 +38,7 @@ class AnalysisInternal(SMBase):
         meta = kwargs.get('meta')
 
         if meta and isinstance(meta, str):
-            meta = json.loads(meta)
+            meta = orjson.loads(meta)  # pylint: disable=maybe-no-member
 
         if timestamp_completed and isinstance(timestamp_completed, str):
             timestamp_completed = datetime.fromisoformat(timestamp_completed)

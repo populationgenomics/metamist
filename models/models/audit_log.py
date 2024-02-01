@@ -1,5 +1,6 @@
 import datetime
-import json
+
+import orjson
 
 from models.base import SMBase
 from models.models.project import ProjectId
@@ -26,6 +27,6 @@ class AuditLogInternal(SMBase):
         """Take DB mapping object, and return SampleSequencing"""
         meta = {}
         if 'meta' in d:
-            meta = json.loads(d.pop('meta'))
+            meta = orjson.loads(d.pop('meta'))  # pylint: disable=maybe-no-member
 
         return AuditLogInternal(meta=meta, **d)

@@ -1,4 +1,4 @@
-import json
+import orjson
 
 from models.base import OpenApiGenNoneType, SMBase
 from models.models.family import FamilySimple, FamilySimpleInternal
@@ -28,7 +28,7 @@ class ParticipantInternal(SMBase):
     def from_db(cls, data: dict):
         """Convert from db keys, mainly converting parsing meta"""
         if 'meta' in data and isinstance(data['meta'], str):
-            data['meta'] = json.loads(data['meta'])
+            data['meta'] = orjson.loads(data['meta'])  # pylint: disable=maybe-no-member
 
         return ParticipantInternal(**data)
 
