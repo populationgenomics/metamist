@@ -739,7 +739,7 @@ class GenericParser(
         for sg in sequencing_groups:
             sequencing_group_counts[str(sg.sequencing_type)] += 1
 
-        str_seq_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
+        str_assay_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
         str_seqg_count = ', '.join(
             f'{k}={v}' for k, v in sequencing_group_counts.items()
         )
@@ -747,7 +747,7 @@ class GenericParser(
         message = f"""\
                 {self.project}: {header}
 
-                Assays count: {str_seq_count}
+                Assays count: {str_assay_count}
                 Sequencing group count: {str_seqg_count}
 
                 Adding {summary['participants']['insert']} participants
