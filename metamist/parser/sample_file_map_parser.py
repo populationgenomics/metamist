@@ -17,7 +17,7 @@ READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
 CHECKSUM_COL_NAME = 'checksum'
 SEQ_FACILITY_COL_NAME = 'sequencing_facility'
-LIBRARY_TYPE_COL_NAME = 'sequencing_library'
+SEQ_LIBRARY_COL_NAME = 'sequencing_library'
 READ_END_TYPE_COL_NAME = 'read_end_type'
 READ_LENGTH_COL_NAME = 'read_length'
 
@@ -36,7 +36,7 @@ KeyMap = {
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
     SEQ_FACILITY_COL_NAME: ['facility', 'sequencing facility', 'sequencing_facility'],
-    LIBRARY_TYPE_COL_NAME: ['library', 'library_prep', 'library prep', 'library type', 'library_type', 'sequencing_library', 'sequencing library'],
+    SEQ_LIBRARY_COL_NAME: ['library', 'library_prep', 'library prep', 'library type', 'library_type', 'sequencing_library', 'sequencing library'],
     READ_END_TYPE_COL_NAME: ['read_end_type', 'read end type', 'read_end_types', 'read end types', 'end type', 'end_type', 'end_types', 'end types'],
     READ_LENGTH_COL_NAME: ['length', 'read length', 'read_length', 'read lengths', 'read_lengths'],
     CHECKSUM_COL_NAME: ['md5', 'checksum'],
@@ -120,7 +120,7 @@ class SampleFileMapParser(GenericMetadataParser):
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
             seq_facility_column=SEQ_FACILITY_COL_NAME,
-            library_type_column=LIBRARY_TYPE_COL_NAME,
+            seq_library_column=SEQ_LIBRARY_COL_NAME,
             read_end_type_column=READ_END_TYPE_COL_NAME,
             read_length_column=READ_LENGTH_COL_NAME,
             default_sample_type=default_sample_type,
