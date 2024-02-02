@@ -46,7 +46,7 @@ const ProjectsAdmin = () => {
             <Message negative>
                 {error}
                 <br />
-                <Button color="red" onClick={() => getProjects()}>
+                <Button negative onClick={() => getProjects()}>
                     Retry
                 </Button>
             </Message>

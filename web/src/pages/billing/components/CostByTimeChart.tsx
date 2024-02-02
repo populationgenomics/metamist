@@ -26,9 +26,6 @@ const CostByTimeChart: React.FunctionComponent<ICostByTimeChartProps> = ({
         return (
             <div>
                 <LoadingDucks />
-                <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                    <em>This query takes a while...</em>
-                </p>
             </div>
         )
     }
