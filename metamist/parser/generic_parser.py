@@ -601,7 +601,7 @@ class GenericParser(
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
             self.prepare_detail(samples)
-            return message
+            return summary, (participants if participants else samples)
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
@@ -625,7 +625,6 @@ class GenericParser(
             logger.info(json.dumps(result, indent=2))
         else:
             self.prepare_detail(samples)
-        return 'Done'
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
