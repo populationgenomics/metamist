@@ -107,6 +107,10 @@ class GenericMetadataParser(GenericParser):
         default_sequencing_type='genome',
         default_sequencing_technology='short-read',
         default_sequencing_platform='illumina',
+        default_sequencing_facility: Optional[str] = None,
+        default_sequencing_library: Optional[str] = None,
+        default_read_end_type: Optional[str] = None,
+        default_read_length: Optional[str] = None,
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -114,10 +118,14 @@ class GenericMetadataParser(GenericParser):
             path_prefix=None,
             search_paths=search_locations,
             project=project,
-            default_sequencing_type=default_sequencing_type,
             default_sample_type=default_sample_type,
+            default_sequencing_type=default_sequencing_type,
             default_sequencing_technology=default_sequencing_technology,
             default_sequencing_platform=default_sequencing_platform,
+            default_sequencing_facility=default_sequencing_facility,
+            default_sequencing_library=default_sequencing_library,
+            default_read_end_type=default_read_end_type,
+            default_read_length=default_read_length,
             **kwargs,
         )
 
@@ -224,23 +232,35 @@ class GenericMetadataParser(GenericParser):
 
     def get_sequencing_facility(self, row: SingleRow) -> str:
         """Get sequencing facility from row"""
-        value = row.get(self.seq_facility_column, None)
-        return str(value)
+        value = (
+            row.get(self.seq_facility_column, None) or self.default_sequencing_facility
+        )
+        value = str(value) if value else None
+        return value
 
     def get_sequencing_library(self, row: SingleRow) -> str:
         """Get sequencing library from row"""
-        value = row.get(self.seq_library_column, None)
-        return str(value)
+        value = (
+            row.get(self.seq_library_column, None) or self.default_sequencing_library
+        )
+        value = str(value) if value else None
+        return value
 
     def get_read_end_type(self, row: SingleRow) -> str:
         """Get read end type from row"""
-        value = row.get(self.read_end_type_column, None)
-        return str(value)
+        value = (
+            row.get(self.read_end_type_column, None) or self.default_read_end_type
+        )
+        value = str(value).lower() if value else None
+        return value
 
     def get_read_length(self, row: SingleRow) -> str:
         """Get read length from row"""
-        value = row.get(self.read_length_column, None)
-        return str(value)
+        value = (
+            row.get(self.read_length_column, None) or self.default_read_length
+        )
+        value = str(value) if value else None
+        return value
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
         """Get external assay ID from row. Needs to be implemented per parser.
@@ -681,12 +701,26 @@ class GenericMetadataParser(GenericParser):
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
 
-        if sequencing_group.sequencing_type in ['polyarna', 'totalrna', 'singlecellrna']:
-            rows = sequencing_group.rows
+        if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
+            rows = sequencing_group.rows  # Exome and RNA require sequencing facility and library
             collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
             collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
-            collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
-            collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
+            if sequencing_group.sequencing_type == 'exome' and not all(collapsed_assay_meta.values()):
+                raise ValueError(
+                    f'Not all required fields were set for exome sample {sample.external_sid}:\n'
+                    f'{collapsed_assay_meta}\n'
+                    f'Use the default value arguments if they are not present in the manifest.'
+                )
+            if sequencing_group.sequencing_type != 'exome':  # RNA requires read end type and length as well
+                collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
+                collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
+                # if any of the above fields are not set for an RNA assay, raise an error
+                if not all(collapsed_assay_meta.values()):
+                    raise ValueError(
+                        f'Not all required fields were set for RNA sample {sample.external_sid}:\n'
+                        f'{collapsed_assay_meta}\n'
+                        f'Use the default value arguments if they are not present in the manifest.'
+                    )
 
         for read in reads[reads_type]:
             assays.append(
@@ -696,8 +730,8 @@ class GenericMetadataParser(GenericParser):
                     # as we grab all reads, and then determine assay
                     # grouping from there.
                     rows=sequencing_group.rows,
-                    internal_seq_id=None,
-                    external_seq_ids={},
+                    internal_assay_id=None,
+                    external_assay_ids={},
                     # unfortunately hard to break them up by row in the current format
                     # assay_status=self.get_assay_status(rows),
                     assay_type='sequencing',

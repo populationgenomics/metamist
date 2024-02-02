@@ -26,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
 )
+from tabulate import tabulate
 
 from cloudpathlib import AnyPath
 
@@ -294,7 +295,7 @@ class ParsedSequencingGroup:
             technology=self.sequencing_technology,
             platform=self.sequencing_platform,
             meta=self.meta,
-            assays=[sq.to_sm() for sq in self.assays or []],
+            assays=[a.to_sm() for a in self.assays or []],
             id=self.internal_seqgroup_id,
         )
 
@@ -306,16 +307,16 @@ class ParsedAssay:
         self,
         group: ParsedSequencingGroup,
         rows: GroupedRow,
-        internal_seq_id: int | None,
-        external_seq_ids: dict[str, str],
+        internal_assay_id: int | None,
+        external_assay_ids: dict[str, str],
         assay_type: str | None,
         meta: dict[str, Any] | None,
     ):
         self.sequencing_group = group
         self.rows = rows
 
-        self.internal_id = internal_seq_id
-        self.external_ids = external_seq_ids
+        self.internal_id = internal_assay_id
+        self.external_ids = external_assay_ids
         self.assay_type = assay_type
         self.meta = meta
 
@@ -411,9 +412,9 @@ class GenericParser(
         default_sequencing_technology: str = 'short-read',
         default_sequencing_platform: str = None,
         default_sequencing_facility: str = None,
-        default_library_type: str = None,
-        default_assay_end_type: str = None,
-        default_assay_read_length: str = None,
+        default_sequencing_library: str = None,
+        default_read_end_type: str = None,
+        default_read_length: str = None,
         default_sample_type: str = None,
         default_analysis_type: str = None,
         default_analysis_status: str = None,
@@ -440,9 +441,9 @@ class GenericParser(
         self.default_sequencing_technology: str = default_sequencing_technology
         self.default_sequencing_platform: Optional[str] = default_sequencing_platform
         self.default_sequencing_facility: Optional[str] = default_sequencing_facility
-        self.default_sequencing_library: Optional[str] = default_library_type
-        self.default_read_end_type: Optional[str] = default_assay_end_type
-        self.default_read_length: Optional[str] = default_assay_read_length
+        self.default_sequencing_library: Optional[str] = default_sequencing_library
+        self.default_read_end_type: Optional[str] = default_read_end_type
+        self.default_read_length: Optional[str] = default_read_length
         self.default_sample_type: Optional[str] = default_sample_type
         self.default_analysis_type: Optional[str] = default_analysis_type
         self.default_analysis_status: Optional[str] = default_analysis_status
@@ -600,7 +601,7 @@ class GenericParser(
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
             self.prepare_detail(samples)
-            return summary
+            return message
 
         if confirm:
             resp = str(input(message + '\n\nConfirm (y): '))
@@ -624,7 +625,7 @@ class GenericParser(
             logger.info(json.dumps(result, indent=2))
         else:
             self.prepare_detail(samples)
-            return summary
+        return 'Done'
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
         """
@@ -685,21 +686,16 @@ class GenericParser(
 
         return summary
 
-    def prepare_detail(
-        self,
-        samples: list[ParsedSample],
-    ):
-        """
-        Print all samples and their sequencing groups that will be inserted / updated
-        """
-        sample_participants = {sample.external_sid : sample.participant.external_pid for sample in samples}
-        sample_sequencing_groups = {sample.external_sid : sample.sequencing_groups for sample in samples}
+    def prepare_detail(self, samples):
+        """Uses tabulate to print a detailed summary of the samples being inserted / updated"""
+        sample_participants = {sample.external_sid: sample.participant.external_pid for sample in samples}
+        sample_sequencing_groups = {sample.external_sid: sample.sequencing_groups for sample in samples}
 
         details = []
         for sample, participant in sample_participants.items():
             for sg in sample_sequencing_groups[sample]:
                 sg_details = {
-                    'Participant': None,
+                    'Participant': '',
                     'Sample': sample,
                     'Sequencing Type': sg.sequencing_type,
                     'Assays': sum(1 for a in sg.assays if not a.internal_id),
@@ -709,10 +705,9 @@ class GenericParser(
                 details.append(sg_details)
 
         headers = ['Participant', 'Sample', 'Sequencing Type', 'Assays']
-        print('\t'.join(headers))
-        for detail in details:
-            values = [str(detail.get(header, '')) for header in headers]
-        print('\t'.join(values))
+        table = list(list(detail.values()) for detail in details)
+
+        print(tabulate(table, headers=headers, tablefmt='grid'))
 
     def prepare_message(
         self,
@@ -734,8 +729,8 @@ class GenericParser(
 
         assays_count: dict[str, int] = defaultdict(int)
         sequencing_group_counts: dict[str, int] = defaultdict(int)
-        for s in assays:
-            assays_count[str(s.assay_type)] += 1
+        for a in assays:
+            assays_count[str(a.meta.get('sequencing_type'))] += 1
         for sg in sequencing_groups:
             sequencing_group_counts[str(sg.sequencing_type)] += 1
 
@@ -745,6 +740,8 @@ class GenericParser(
         )
 
         message = f"""\
+
+
                 {self.project}: {header}
 
                 Assays count: {str_assay_count}
@@ -1056,10 +1053,14 @@ class GenericParser(
         """
         meta = {}
         for assay in assays:
-            if assay.meta.get('sequencing_type') not in RNA_SEQ_TYPES:
+            if assay.meta.get('sequencing_type') == 'exome':
+                keys = ('sequencing_facility', 'sequencing_library')
+            elif assay.meta.get('sequencing_type') in RNA_SEQ_TYPES:
+                keys = ('sequencing_facility', 'sequencing_library', 'read_end_type', 'read_length')
+            else:
                 continue
-            for key in ('sequencing_facility', 'sequencing_library', 'read_end_type', 'read_length'):
-                if assay.meta.get(key):
+            for key in keys:
+                if assay.meta.get(key) is not None:
                     meta[key] = assay.meta[key]
         return meta
 

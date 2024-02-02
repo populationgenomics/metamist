@@ -110,6 +110,7 @@ class SampleFileMapParser(GenericMetadataParser):
         default_read_length: str = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
+        verbose=True,
     ):
         super().__init__(
             search_locations=search_locations,
@@ -138,6 +139,7 @@ class SampleFileMapParser(GenericMetadataParser):
             qc_meta_map={},
             allow_extra_files_in_search_path=allow_extra_files_in_search_path,
             key_map=KeyMap,
+            verbose=verbose,
         )
 
     def get_sample_id(self, row: SingleRow) -> str:
@@ -194,6 +196,7 @@ class SampleFileMapParser(GenericMetadataParser):
 @click.option(
     '--dry-run', is_flag=True, help='Just prepare the run, without comitting it'
 )
+@click.option('--verbose', '-v', is_flag=True, help='Verbose output')
 @click.argument('manifests', nargs=-1)
 @run_as_sync
 async def main(  # pylint: disable=too-many-arguments
@@ -211,6 +214,7 @@ async def main(  # pylint: disable=too-many-arguments
     allow_extra_files_in_search_path=False,
     confirm=False,
     dry_run=False,
+    verbose=False,
 ):
     """Run script from CLI arguments"""
     if not manifests:
@@ -232,6 +236,7 @@ async def main(  # pylint: disable=too-many-arguments
         default_reference_assembly_location=default_reference_assembly,
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
+        verbose=verbose,
     )
     for manifest in manifests:
         logger.info(f'Importing {manifest}')
