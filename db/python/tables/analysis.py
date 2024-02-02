@@ -61,7 +61,7 @@ class AnalysisTable(DbBase):
         status: AnalysisStatus,
         sequencing_group_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
-        output: str = None,
+        outputs: str = None,
         active: bool = True,
         project: ProjectId = None,
     ) -> int:
@@ -74,7 +74,7 @@ class AnalysisTable(DbBase):
                 ('type', analysis_type),
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
-                ('output', output),  # can keep for now but will be deprecated eventually as a column
+                ('output', outputs),  # can keep for now but will be deprecated eventually as a column
                 ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
@@ -146,7 +146,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         status: AnalysisStatus,
         meta: Dict[str, Any] = None,
         active: bool = None,
-        output: Optional[str] = None,
+        outputs: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -170,8 +170,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
             fields['timestamp_completed'] = datetime.datetime.utcnow()
             setters.append('timestamp_completed = :timestamp_completed')
 
-        if output:
-            fields['output'] = output
+        if outputs:
+            fields['output'] = outputs
             setters.append('output = :output')
 
         if meta is not None and len(meta) > 0:
@@ -227,18 +227,15 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         rows = await self.connection.fetch_all(_query, values)
         retvals: Dict[int, AnalysisInternal] = {}
-        analysis_ids: list = []
+        analysis_ids: list = [row['id'] for row in rows]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         for row in rows:
             key = row['id']
-            analysis_ids.append(key)
             if key in retvals:
                 retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
             else:
-                retvals[key] = AnalysisInternal.from_db(**dict(row))
-
-        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        for analysis_id, analysis in retvals.items():
-            retvals[analysis_id] = analysis.copy(update={'output_files': analysis_outputs_by_aid.get(analysis_id, [])})
+                # Pydantic doesn't allow item assignment on the model
+                retvals[key] = AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(key, [])})
         return list(retvals.values())
 
     async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[FileInternal]]:

@@ -240,7 +240,7 @@ class GraphQLAnalysis:
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    output_files: strawberry.scalars.JSON
+    outputs: strawberry.scalars.JSON
 
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
@@ -252,7 +252,7 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            output_files=FileInternal.reconstruct_json(internal.output_files),
+            outputs=FileInternal.reconstruct_json(internal.outputs),
         )
 
     @strawberry.field

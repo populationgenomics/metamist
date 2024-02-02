@@ -1154,33 +1154,38 @@
 					nullable="true"
 				/>
 			</column>
+		</createTable>
+		<createTable tableName="analysis_outputs">
+			<column name="analysis_id" type="INT">
+				<constraints
+				nullable="false"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_ANALYSIS_ID"
+				references="analysis(id)"
+				/>
+			</column>
+			<column name="file_id" type="INT">
+				<constraints
+				nullable="true"
+				foreignKeyName="FK_ANALYSIS_OUTPUTS_FILE_ID"
+				references="file(id)"
+				/>
+			</column>
+			<column name="output" type="VARCHAR(255)">
+				<constraints
+				nullable="true"
+				/>
+			</column>
 			<column name="json_structure" type="VARCHAR(255)">
 				<constraints
 					nullable="true"
 				/>
 			</column>
 		</createTable>
-		<createTable tableName="analysis_file">
-			<column name="analysis_id" type="INT">
-				<constraints
-				nullable="false"
-				foreignKeyName="FK_ANALYSIS_FILE_ANALYSIS_ID"
-				references="analysis(id)"
-				/>
-			</column>
-			<column name="file_id" type="INT">
-				<constraints
-				nullable="false"
-				foreignKeyName="FK_ANALYSIS_FILE_FILE_ID"
-				references="file(id)"
-				/>
-			</column>
-		</createTable>
-		<addPrimaryKey columnNames="analysis_id, file_id"
-			constraintName="PK_ANALYSIS_FILE"
-			tableName="analysis_file"
+		<addPrimaryKey columnNames="analysis_id, file_id, output"
+			constraintName="PK_ANALYSIS_FILE_OUTPUT"
+			tableName="analysis_outputs"
 			validate="true"/>
 		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
-		<sql>ALTER TABLE `analysis_file` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
 	</changeSet>
 </databaseChangeLog>

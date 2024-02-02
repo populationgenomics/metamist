@@ -56,7 +56,7 @@ class AnalysisUpdateModel(BaseModel):
     """Update analysis model"""
 
     status: AnalysisStatus
-    output: str | None = None
+    outputs: str | None = None
     meta: dict[str, Any] | None = None
     active: bool | None = None
 
@@ -73,7 +73,7 @@ class AnalysisQueryModel(BaseModel):
     type: str | None = None
     status: AnalysisStatus | None = None
     meta: dict[str, Any] | None = None
-    output: str | None = None
+    outputs: str | None = None
     active: bool | None = None
 
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
@@ -124,7 +124,7 @@ async def update_analysis(
     """Update status of analysis"""
     atable = AnalysisLayer(connection)
     await atable.update_analysis(
-        analysis_id, status=analysis.status, output=analysis.output, meta=analysis.meta
+        analysis_id, status=analysis.status, outputs=analysis.outputs, meta=analysis.meta
     )
     return True
 

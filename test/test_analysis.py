@@ -147,13 +147,13 @@ class TestAnalysis(DbIsolatedTest):
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
                 sequencing_group_ids=[],
-                output=None,
+                outputs=None,
                 timestamp_completed=None,
                 project=1,
                 meta={},
                 active=True,
                 author=None,
-            ).copy(update={'output_files': []})
+            ).copy(update={'outputs': []})
         ]
 
         self.assertEqual(analyses, expected)

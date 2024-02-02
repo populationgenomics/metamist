@@ -55,7 +55,6 @@ def get_file_info(path: str) -> Dict:
         'nameext': FileInternal.get_extension(path),
         'checksum': FileInternal.get_checksum(path),
         'size': FileInternal.get_size(path),
-        'json_structure': '',
     }
 
 
@@ -101,13 +100,13 @@ async def prepare_files(analyses):
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size, json_structure)
-        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size, :json_structure)
+        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size)
+        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size)
         RETURNING id"""
     )
     af_query = dedent(
         """
-        INSERT INTO analysis_file (analysis_id, file_id) VALUES (:analysis_id, :file_id)
+        INSERT INTO analysis_file (analysis_id, file_id, output, json_structure) VALUES (:analysis_id, :file_id, :output, :json_structure)
         """
     )
     for analysis_id, file in files:
@@ -116,10 +115,14 @@ async def insert_files(connection, files):
             query,
             file,
         )
+        if not file_id:
+            join_inserts = {'analysis_id': analysis_id, 'file_id': None, 'output': file.get('path'), 'json_structure': None}
+        else:
+            join_inserts = {'analysis_id': analysis_id, 'file_id': file_id, 'output': file.get('path'), 'json_structure': None}
         await execute(
             connection=connection,
             query=af_query,
-            inserts={'analysis_id': analysis_id, 'file_id': file_id},
+            inserts=join_inserts,
         )
     print(f'Inserted {len(files)} files')
 

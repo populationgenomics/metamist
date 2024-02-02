@@ -550,13 +550,13 @@ class AnalysisLayer(BaseLayer):
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
             meta=analysis.meta,
-            output=analysis.output,
+            outputs=analysis.outputs,
             active=analysis.active,
             project=project,
         )
 
-        if analysis.output:
-            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
+        if analysis.outputs:
+            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.outputs)
 
         return new_analysis_id
 
@@ -579,7 +579,7 @@ class AnalysisLayer(BaseLayer):
         analysis_id: int,
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
-        output: str | None = None,
+        outputs: str | None = None,
         check_project_id=True,
     ):
         """
@@ -595,10 +595,10 @@ class AnalysisLayer(BaseLayer):
             analysis_id=analysis_id,
             status=status,
             meta=meta,
-            output=output,
+            outputs=outputs,
         )
 
-        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
+        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
 
     async def get_analysis_runner_log(
         self,

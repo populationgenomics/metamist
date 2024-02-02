@@ -1,11 +1,12 @@
-import hashlib
 import json
 from collections import defaultdict
 from typing import Any, Generator, Union
 
 import cloudpathlib.exceptions as cloudpathlib_exceptions
 import google.api_core.exceptions as google_exceptions
-from cloudpathlib.anypath import AnyPath
+from google.cloud import storage
+from cloudpathlib import AnyPath, GSPath
+from cloudpathlib.exceptions import AnyPathTypeError
 from pydantic import BaseModel
 
 from models.base import SMBase
@@ -23,8 +24,7 @@ class FileInternal(SMBase):
     checksum: str | None
     size: int
     meta: str | None = None
-    # exists: bool = False
-    json_path: str | None = None
+    # exists: bool = False # make it optional
     # secondary_files: list[str] | None = []
 
     @staticmethod
@@ -41,7 +41,6 @@ class FileInternal(SMBase):
         size = kwargs.get('size')
         meta = kwargs.get('meta')
         # exists = kwargs.get('exists')
-        json_path = kwargs.get('json_path')
         # secondary_files = kwargs.get('secondary_files')
 
         return File(
@@ -55,7 +54,6 @@ class FileInternal(SMBase):
             size=size,
             meta=meta,
             # exists=exists,
-            json_path=json_path,
             # secondary_files=secondary_files,
         )
 
@@ -74,7 +72,6 @@ class FileInternal(SMBase):
             size=self.size,
             meta=self.meta,
             # exists=self.exists,
-            json_path=self.json_path,
             # secondary_files=self.secondary_files,
         )
 
@@ -98,15 +95,23 @@ class FileInternal(SMBase):
         """Get file extension for file at given path"""
         return AnyPath(path).suffix  # pylint: disable=E1101
 
+    # TODO use async
     @staticmethod
     def get_checksum(path: str) -> str:
         """Get checksum for file at given path"""
         if FileInternal.get_extension(path) == '.mt':
             return None
-        try:
-            return hashlib.sha256(AnyPath(path).read_bytes()).hexdigest()  # pylint: disable=E1101
-        except (google_exceptions.NotFound, FileNotFoundError):
-            return None
+
+        # TODO replace md5 with crc32c
+        if isinstance(AnyPath(path), GSPath):
+            try:
+                storage_client = storage.Client()
+                bucket = storage_client.bucket(AnyPath(path).bucket)  # pylint: disable=E1101
+                blob = bucket.blob(AnyPath(path).name)  # pylint: disable=E1101
+                return blob.md5_hash
+            except (google_exceptions.NotFound, FileNotFoundError, AnyPathTypeError):
+                return None
+        return None
 
     @staticmethod
     def get_size(path: str) -> int:
@@ -187,7 +192,6 @@ class File(BaseModel):
     size: int
     meta: str | None = None
     # exists: bool = False
-    json_path: str | None = None
     # secondary_files: list[str] | None = []
 
     def to_internal(self):
@@ -205,6 +209,5 @@ class File(BaseModel):
             size=self.size,
             meta=self.meta,
             # exists=self.exists,
-            json_path=self.json_path,
             # secondary_files=self.secondary_files,
         )

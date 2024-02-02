@@ -20,7 +20,7 @@ class AnalysisInternal(SMBase):
     id: int | None = None
     type: str
     status: AnalysisStatus
-    output: str = None
+    outputs: str = None
     sequencing_group_ids: list[int] = []
     timestamp_completed: datetime | None = None
     project: int | None = None
@@ -53,7 +53,7 @@ class AnalysisInternal(SMBase):
             type=analysis_type,
             status=AnalysisStatus(status),
             sequencing_group_ids=sequencing_group_ids or [],
-            output=kwargs.pop('output', []),
+            outputs=kwargs.pop('outputs', []),
             timestamp_completed=timestamp_completed,
             project=kwargs.get('project'),
             meta=meta,
@@ -72,7 +72,7 @@ class AnalysisInternal(SMBase):
             sequencing_group_ids=sequencing_group_id_format_list(
                 self.sequencing_group_ids
             ),
-            output=self.output,
+            outputs=self.outputs,
             timestamp_completed=self.timestamp_completed.isoformat()
             if self.timestamp_completed
             else None,
@@ -90,8 +90,7 @@ class Analysis(BaseModel):
     status: AnalysisStatus
     id: int | None = None
 
-    # TODO: INNER JOIN on File to get multiple outputs
-    output: str | None = None
+    outputs: str | None = None
     sequencing_group_ids: list[str] = []
     author: str | None = None
     timestamp_completed: str | None = None
@@ -110,7 +109,7 @@ class Analysis(BaseModel):
             sequencing_group_ids=sequencing_group_id_transform_to_raw_list(
                 self.sequencing_group_ids
             ),
-            output=self.output,
+            outputs=self.outputs,
             # don't allow this to be set
             timestamp_completed=None,
             project=self.project,
