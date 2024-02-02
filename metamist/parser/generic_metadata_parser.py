@@ -702,15 +702,9 @@ class GenericMetadataParser(GenericParser):
             collapsed_assay_meta['batch'] = self.batch_number
 
         if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
-            rows = sequencing_group.rows  # Exome and RNA require sequencing facility and library
+            rows = sequencing_group.rows  # Exome and RNA should have sequencing facility and library
             collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
             collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
-            if sequencing_group.sequencing_type == 'exome' and not all(collapsed_assay_meta.values()):
-                raise ValueError(
-                    f'Not all required fields were set for exome sample {sample.external_sid}:\n'
-                    f'{collapsed_assay_meta}\n'
-                    f'Use the default value arguments if they are not present in the manifest.'
-                )
             if sequencing_group.sequencing_type != 'exome':  # RNA requires read end type and length as well
                 collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
                 collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])

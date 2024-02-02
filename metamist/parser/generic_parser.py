@@ -417,7 +417,7 @@ class GenericParser(
         default_read_length: str = None,
         default_sample_type: str = None,
         default_analysis_type: str = None,
-        default_analysis_status: str = None,
+        default_analysis_status: str = 'completed',
         key_map: Dict[str, str] = None,
         required_keys: Set[str] = None,
         ignore_extra_keys=False,
@@ -685,9 +685,11 @@ class GenericParser(
 
         return summary
 
-    def prepare_detail(self, samples):
+    def prepare_detail(self, samples: list[ParsedSample]):
         """Uses tabulate to print a detailed summary of the samples being inserted / updated"""
-        sample_participants = {sample.external_sid: sample.participant.external_pid for sample in samples}
+        sample_participants = {}
+        for sample in samples:
+            sample_participants[sample.external_sid] = sample.participant.external_pid if sample.participant else None
         sample_sequencing_groups = {sample.external_sid: sample.sequencing_groups for sample in samples}
 
         details = []
