@@ -120,9 +120,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
         return (
             <div>
                 <LoadingDucks />
-                <p style={{ textAlign: 'center', marginTop: '5px' }}>
-                    <em>This query takes a while...</em>
-                </p>
             </div>
         )
     }
@@ -161,11 +158,13 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
             ).map((p) => (
                 <React.Fragment key={p.date.toISOString()}>
                     <SUITable.Row>
-                        <SUITable.Cell collapsing>
+                        <SUITable.Cell collapsing key={`Date - ${p.date.toISOString()}`}>
                             <b>{p.date.toLocaleDateString()}</b>
                         </SUITable.Cell>
                         {headerFields().map((k) => (
-                            <SUITable.Cell>{currencyFormat(p.values[k.category])}</SUITable.Cell>
+                            <SUITable.Cell key={`${p.date.toISOString()} - ${k.category}`}>
+                                {currencyFormat(p.values[k.category])}
+                            </SUITable.Cell>
                         ))}
                     </SUITable.Row>
                 </React.Fragment>
@@ -187,7 +186,6 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                                 fitted
                                 toggle
                                 checked={expandCompute}
-                                slider
                                 onChange={() => setExpandCompute(!expandCompute)}
                             />
                         </SUITable.HeaderCell>
@@ -227,7 +225,7 @@ const BillingCostByTimeTable: React.FC<IBillingCostByTimeTableProps> = ({
                             <b>All Time Total</b>
                         </SUITable.Cell>
                         {headerFields().map((k) => (
-                            <SUITable.Cell>
+                            <SUITable.Cell key={`Total ${k.category}`}>
                                 <b>
                                     {currencyFormat(
                                         internalData.reduce(
