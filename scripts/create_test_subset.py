@@ -18,6 +18,7 @@ import random
 import subprocess
 from argparse import ArgumentParser
 from collections import Counter
+from typing import Tuple
 
 from google.cloud import storage
 
@@ -142,6 +143,9 @@ SG_ID_QUERY = gql(
                 externalId
                 sequencingGroups {
                     id
+                    type
+                    platform
+                    technology
                 }
             }
         }
@@ -159,6 +163,17 @@ PARTICIPANT_QUERY = gql(
             }
         }
     }
+    """
+)
+
+PARTICIPANT_SAMPLE_QUERY = gql(
+    """
+    query ($project: String!, $peid: String!) {
+        sample(project: {eq: $project}, externalId: {eq: $peid}) {
+            id
+            externalId
+            }
+        }
     """
 )
 
@@ -240,11 +255,18 @@ def main(
 
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
-    transfer_samples_sgs_assays(
+    old_sid_to_new_sid, sequencing_group_ids_from_sample = transfer_samples_sgs_assays(
         samples, existing_data, upserted_participant_map, target_project, project
     )
     logger.info('Transferring analyses')
-    transfer_analyses(samples, existing_data, target_project, project)
+    transfer_analyses(
+        samples,
+        existing_data,
+        target_project,
+        project,
+        old_sid_to_new_sid,
+        sequencing_group_ids_from_sample,
+    )
     logger.info('Subset generation complete!')
 
 
@@ -260,7 +282,19 @@ def transfer_samples_sgs_assays(
     test project.
     """
     logger.info(f'Transferring {len(samples)} samples')
+    sequencing_group_ids_from_sample: dict[
+        Tuple[str, str], dict[Tuple[str, str, str], str]
+    ] = {}
+    old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
+        old_exid_old_sid = (s['externalId'], s['id'])
+        if old_exid_old_sid not in sequencing_group_ids_from_sample:
+            sequencing_group_ids_from_sample[old_exid_old_sid] = {}
+        for sg in s['sequencingGroups']:
+            sequencing_group_ids_from_sample[old_exid_old_sid][
+                (sg['type'], sg['platform'], sg['technology'])
+            ] = sg['id']
+
         sample_type = None if s['type'] == 'None' else s['type']
         existing_sid: str | None = None
         existing_sample = get_existing_sample(existing_data, s['externalId'])
@@ -282,10 +316,13 @@ def transfer_samples_sgs_assays(
 
         logger.info(f'Processing sample {s["id"]}')
         logger.info('Creating test sample entry')
-        sapi.create_sample(
+        new_sample_id = sapi.create_sample(
             project=target_project,
             sample_upsert=sample_upsert,
         )
+        old_sid_to_new_sid[s['id']] = new_sample_id
+
+    return old_sid_to_new_sid, sequencing_group_ids_from_sample
 
 
 def upsert_sequencing_groups(
@@ -344,7 +381,12 @@ def upsert_assays(
 
 
 def transfer_analyses(
-    samples: dict, existing_data: dict, target_project: str, project: str
+    samples: dict,
+    existing_data: dict,
+    target_project: str,
+    project: str,
+    old_sid_to_new_sid: dict[str, str],
+    sequencing_group_ids_from_sample: dict[tuple, dict[tuple, str]],
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -359,6 +401,19 @@ def transfer_analyses(
         new_sg_map[s.get('externalId')] = sg_ids
 
     for s in samples:
+        if s['id'] in old_sid_to_new_sid:
+            ext_id_old_sample_id = (s['externalId'], s['id'])
+            for new_sample in new_sg_data['project']['samples']:  # pylint: disable=E1136
+                for new_sg in new_sample['sequencingGroups']:
+                    new_sg_id = sequencing_group_ids_from_sample[
+                        ext_id_old_sample_id
+                    ].get(
+                        (new_sg['type'], new_sg['platform'], new_sg['technology']), None
+                    )
+                    if new_sg_id is None:
+                        raise ValueError(
+                            'No new sequencing group matches old sequencing group'
+                        )
         for sg in s['sequencingGroups']:
             existing_sg = get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
@@ -401,8 +456,10 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
-                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        status=AnalysisStatus(
+                            analysis['status'].lower().replace('_', '-')
+                        ),
+                        sequencing_group_ids=[new_sg_id],
                         meta=analysis['meta'],
                     )
 
