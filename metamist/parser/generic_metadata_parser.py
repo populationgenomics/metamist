@@ -110,7 +110,7 @@ class GenericMetadataParser(GenericParser):
         default_sequencing_facility: Optional[str] = None,
         default_sequencing_library: Optional[str] = None,
         default_read_end_type: Optional[str] = None,
-        default_read_length: Optional[str] = None,
+        default_read_length: Optional[str | int] = None,
         allow_extra_files_in_search_path=False,
         **kwargs,
     ):
@@ -254,12 +254,12 @@ class GenericMetadataParser(GenericParser):
         value = str(value).lower() if value else None
         return value
 
-    def get_read_length(self, row: SingleRow) -> str:
+    def get_read_length(self, row: SingleRow) -> int:
         """Get read length from row"""
         value = (
             row.get(self.read_length_column, None) or self.default_read_length
         )
-        value = str(value) if value else None
+        value = int(value) if value else None
         return value
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
@@ -567,7 +567,7 @@ class GenericMetadataParser(GenericParser):
         """Get participant-metadata from rows then set it in the ParticipantMetaGroup"""
         return self.collapse_arbitrary_meta(self.participant_meta_map, rows)
 
-    async def get_sequencing_group_meta_from_variant_files(  # Unused as of 2024-02-01
+    async def get_sequencing_group_meta(
         self, sequencing_group: ParsedSequencingGroup
     ) -> dict:
         """Get sequencing group metadata from variant (vcf) files"""
@@ -608,7 +608,7 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_assays_from_group(
+    async def get_assays_from_group(  # pylint: disable=too-many-branches
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
         """Get assays from assay group + rows"""
@@ -702,10 +702,14 @@ class GenericMetadataParser(GenericParser):
             collapsed_assay_meta['batch'] = self.batch_number
 
         if sequencing_group.sequencing_type in ['exome', 'polyarna', 'totalrna', 'singlecellrna']:
-            rows = sequencing_group.rows  # Exome and RNA should have sequencing facility and library
-            collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
-            collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
-            if sequencing_group.sequencing_type != 'exome':  # RNA requires read end type and length as well
+            rows = sequencing_group.rows
+            # Exome / RNA should have facility and library, allow missing for exomes - for now
+            if self.get_sequencing_facility(rows[0]):
+                collapsed_assay_meta['sequencing_facility'] = self.get_sequencing_facility(rows[0])
+            if self.get_sequencing_library(rows[0]):
+                collapsed_assay_meta['sequencing_library'] = self.get_sequencing_library(rows[0])
+            # RNA requires read end type and length as well
+            if sequencing_group.sequencing_type != 'exome':
                 collapsed_assay_meta['read_end_type'] = self.get_read_end_type(rows[0])
                 collapsed_assay_meta['read_length'] = self.get_read_length(rows[0])
                 # if any of the above fields are not set for an RNA assay, raise an error
@@ -738,8 +742,8 @@ class GenericMetadataParser(GenericParser):
                     },
                 )
             )
-
-        sequencing_group.meta = self.get_sequencing_group_meta_from_assays(assays)
+        if not sequencing_group.meta:
+            sequencing_group.meta = self.get_sequencing_group_meta_from_assays(assays)
 
         return assays
 

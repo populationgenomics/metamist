@@ -414,7 +414,7 @@ class GenericParser(
         default_sequencing_facility: str = None,
         default_sequencing_library: str = None,
         default_read_end_type: str = None,
-        default_read_length: str = None,
+        default_read_length: str | int = None,
         default_sample_type: str = None,
         default_analysis_type: str = None,
         default_analysis_status: str = 'completed',
@@ -576,7 +576,6 @@ class GenericParser(
                     # mark for removal
                     sequencing_group.assays = None
                     continue
-                sequencing_group.meta = self.get_sequencing_group_meta_from_assays(chunked_assays)
                 sequencing_group.assays = chunked_assays
                 assays.extend(chunked_assays)
                 sequencing_group.analyses = analyses

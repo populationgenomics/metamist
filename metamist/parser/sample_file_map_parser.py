@@ -107,7 +107,7 @@ class SampleFileMapParser(GenericMetadataParser):
         default_sequencing_facility: str = None,
         default_sequencing_library: str = None,
         default_read_end_type: str = None,
-        default_read_length: str = None,
+        default_read_length: str | int = None,
         allow_extra_files_in_search_path=False,
         default_reference_assembly_location: str | None = None,
         verbose=True,
