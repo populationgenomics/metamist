@@ -70,9 +70,15 @@ def extract_budget_updates(folder_path: str, project_name: str) -> dict[datetime
     """
     budget_records: dict[datetime, int] = {}
 
-    cmd = f'cd {folder_path}; git log -L2,+1:"{project_name}/budgets.yaml" --pretty="format:%ci"'
+    cmd = f'git log -L2,+1:"{project_name}/budgets.yaml" --pretty="format:%ci"'
     logger.info(f'Executing {cmd}')
+    # save the current directory
+    cwd = os.getcwd()
+    # change the directory to the folder_path and execute the command
+    os.chdir(folder_path)
     output = os.popen(cmd).read()
+    # change back to the original directory
+    os.chdir(cwd)
     logger.info(f'Output: {output}')
     if not output:
         logger.warning(f'Failed to get git history for {project_name}')
