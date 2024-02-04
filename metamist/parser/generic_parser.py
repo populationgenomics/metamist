@@ -210,7 +210,6 @@ class ParsedParticipant:
         self.karyotype = karyotype
         self.meta = meta
 
-        self.external_family_id: str = None
         self.samples: list[ParsedSample] = []
 
     def to_sm(self) -> ParticipantUpsert:
