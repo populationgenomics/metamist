@@ -1,13 +1,12 @@
 # pylint: disable=no-member
-import os
 import logging
-from typing import Iterable, Callable, TypeVar
+import os
 from collections import defaultdict
 from datetime import datetime
+from typing import Callable, Iterable, TypeVar
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
-
 
 # type declarations for GroupBy
 T = TypeVar('T')

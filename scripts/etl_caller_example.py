@@ -7,11 +7,12 @@ Requires:
     pip install requests google-auth requests urllib3
 """
 import os
-import requests
-import google.oauth2.id_token
+
 import google.auth.transport.requests
-from urllib3 import Retry
+import google.oauth2.id_token
+import requests
 from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 
 URL = 'https://metamist-etl-mnrpw3mdza-ts.a.run.app'
 TYPE = 'NAME_OF_EXTERNAL_PARTY/v1'

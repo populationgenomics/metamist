@@ -8,13 +8,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import click
 
-from metamist.parser.generic_parser import (
+from metamist.parser.generic_parser import (  # noqa
     GenericParser,
     GroupedRow,
     ParsedAnalysis,
     ParsedAssay,
     ParsedSequencingGroup,
-    # noqa
     SingleRow,
     run_as_sync,
 )

@@ -1,11 +1,11 @@
+# noqa: B006
+
 import unittest
 import unittest.mock
 from collections import namedtuple
 from test.testbase import run_as_sync
 
 from metamist.audit.generic_auditor import GenericAuditor
-
-# noqa: B006
 
 
 class TestGenericAuditor(unittest.TestCase):

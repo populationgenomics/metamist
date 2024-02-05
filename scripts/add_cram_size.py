@@ -3,22 +3,21 @@
 This script goes through all CRAMS in sample-metadata, gets the size,
 and updates the meta['size'] attribute on the analysis.
 """
-import re
+import asyncio
 import logging
 import os
-import asyncio
+import re
 from typing import Dict, List
 
-from google.cloud import storage
 from google.api_core.exceptions import NotFound
+from google.cloud import storage
 
 from api.utils import group_by
-
 from metamist.apis import AnalysisApi, ProjectApi
 from metamist.model.analysis_query_model import AnalysisQueryModel
-from metamist.model.analysis_update_model import AnalysisUpdateModel
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.model.analysis_type import AnalysisType
+from metamist.model.analysis_update_model import AnalysisUpdateModel
 from metamist.parser.generic_parser import chunk
 
 logger = logging.getLogger(__name__)
