@@ -1,18 +1,17 @@
 from fastapi import APIRouter, Body
 
 from api.utils.db import (
-    get_project_write_connection,
-    get_project_readonly_connection,
     Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
     get_projectless_db_connection,
 )
 from db.python.layers.sample import SampleLayer
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.sample import SampleUpsert
-from models.utils.sample_id_format import (
-    # Sample,
-    sample_id_transform_to_raw,
+from models.utils.sample_id_format import (  # Sample,
     sample_id_format,
+    sample_id_transform_to_raw,
     sample_id_transform_to_raw_list,
 )
 

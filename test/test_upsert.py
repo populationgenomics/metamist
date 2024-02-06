@@ -1,12 +1,10 @@
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from db.python.layers.participant import (
-    ParticipantLayer,
-)
+from db.python.layers.participant import ParticipantLayer
+from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sample import SampleUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
-from models.models.assay import AssayUpsertInternal
 
 default_assay_meta = {
     'sequencing_type': 'genome',

@@ -9,11 +9,8 @@ from typing import Any
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
-
-from google.cloud import pubsub_v1  # type: ignore
-
 import pkg_resources
-
+from google.cloud import pubsub_v1  # type: ignore
 
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 BIGQUERY_LOG_TABLE = os.getenv('BIGQUERY_LOG_TABLE')

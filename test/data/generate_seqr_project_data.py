@@ -7,9 +7,8 @@ import logging
 import random
 import sys
 import tempfile
-
 from pprint import pprint
-from typing import Set, List
+from typing import List, Set
 
 from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
 from metamist.graphql import gql, query_async

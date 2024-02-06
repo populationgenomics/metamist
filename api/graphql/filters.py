@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Callable, Any
+from typing import Any, Callable, Generic, TypeVar
 
 import strawberry
 

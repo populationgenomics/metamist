@@ -1,8 +1,9 @@
 import os
 
 import click
-from cpg_utils.hail_batch import get_batch, get_config, copy_common_env
 from google.cloud import storage
+
+from cpg_utils.hail_batch import copy_common_env, get_batch, get_config
 
 
 def create_md5s_for_files_in_directory(skip_filetypes: tuple[str, str], force_recreate: bool, gs_dir):
