@@ -19,6 +19,7 @@ import subprocess
 from argparse import ArgumentParser
 from collections import Counter
 from typing import Tuple
+from typing import Any
 
 from google.cloud import storage
 
@@ -212,7 +213,9 @@ def main(
     logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
-    additional_samples.update(random.sample(list(all_sids - additional_samples), samples_n))
+    additional_samples.update(
+        random.sample(list(all_sids - additional_samples), samples_n)
+    )
 
     # 4. Query all the samples from the selected sgs
     logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
@@ -279,19 +282,19 @@ def transfer_samples_sgs_assays(
 ):
     """
     Transfer samples, sequencing groups, and assays from the original project to the
-    test project.
+    test project. Also creates a mapping from sample identifiers to their associated
+    sequencing groups (sample_to_sg_attribute_map).
     """
     logger.info(f'Transferring {len(samples)} samples')
-    sequencing_group_ids_from_sample: dict[
-        Tuple[str, str], dict[Tuple[str, str, str], str]
-    ] = {}
+    SequencingGroupAttributes = dict[Tuple[str, str, str], str]
+    sample_to_sg_attribute_map: dict[Tuple[str, str], SequencingGroupAttributes] = {}
     old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
         exid_old_sid = (s['externalId'], s['id'])
-        if exid_old_sid not in sequencing_group_ids_from_sample:
-            sequencing_group_ids_from_sample[exid_old_sid] = {}
+        if exid_old_sid not in sample_to_sg_attribute_map:
+            sample_to_sg_attribute_map[exid_old_sid] = {}
         for sg in s['sequencingGroups']:
-            sequencing_group_ids_from_sample[exid_old_sid][
+            sample_to_sg_attribute_map[exid_old_sid][
                 (sg['type'], sg['platform'], sg['technology'])
             ] = sg['id']
 
@@ -379,30 +382,49 @@ def upsert_assays(
         assays_to_upsert.append(assay_upsert)
     return assays_to_upsert
 
-def get_new_sg_id(sid: str, 
-                  new_sg_attributes: tuple[str, str, str],
-                  samples: dict, 
-                  old_sid_to_new_sid: dict[str, str], 
-                  new_sg_map: dict[str, list[str]], 
-                  sequencing_group_ids_from_sample: dict[tuple, dict[tuple, str]],
-                  new_sg_data: dict[dict, list[dict]]):
+
+def get_new_sg_id(
+    sid: str,
+    new_sg_attributes: tuple[str, str, str],
+    old_sid_to_new_sid: dict[str, str],
+    sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
+    new_sg_data: dict[str, dict[str, Any]],
+):
     """
-    This function will return the new sequencing group id.
+    Returns the new sequencing group id for a given sample id and sequencing group attributes.
+    Args:
+        sid (str): The sample id to search for.
+        new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
+        old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
+        sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (peid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
+        new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
     """
     if sid in old_sid_to_new_sid:
         old_sid = sid
         for new_sample in new_sg_data['project']['samples']:  # pylint: disable=E1136
-            if new_sample['id'] == old_sid_to_new_sid[old_sid]: #  if new sample maps to old sample
+            if (
+                new_sample['id'] == old_sid_to_new_sid[old_sid]
+            ):  # If new sample maps to old sample
                 for new_sg in new_sample['sequencingGroups']:
-                    sample_key = (new_sample['externalId'], old_sid)
-                    sg_attribute_key = (new_sg['type'], new_sg['platform'], new_sg['technology'])
-                    if sequencing_group_ids_from_sample[sample_key].get(new_sg_attributes) and new_sg_attributes == sg_attribute_key:
+                    peid_sid_key = (new_sample['externalId'], old_sid)
+                    sg_attribute_key = (
+                        new_sg['type'],
+                        new_sg['platform'],
+                        new_sg['technology'],
+                    )
+                    if (
+                        sample_to_sg_attribute_map[peid_sid_key].get(new_sg_attributes)
+                        and new_sg_attributes == sg_attribute_key
+                    ):
                         new_sg_id = new_sg['id']
                         return [new_sg_id]
-                    else:
-                        continue
+                    # continue to next sg in new_sample
+                    continue
 
-    return ValueError(f"Sample {sid} not found in old_sid_to_new_sid")
+    return ValueError(
+        f'Old sample {sid} not found in mapping of old to new sample ids.'
+    )
+
 
 def transfer_analyses(
     samples: dict,
@@ -452,7 +474,9 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
+                        status=AnalysisStatus(
+                            analysis['status'].lower().replace('_', '-')
+                        ),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -471,8 +495,12 @@ def transfer_analyses(
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
                         ),
-                        sequencing_group_ids=get_new_sg_id(s['id'], new_sg_attributes,
-                            samples, old_sid_to_new_sid, new_sg_map, sequencing_group_ids_from_sample, new_sg_data
+                        sequencing_group_ids=get_new_sg_id(
+                            s['id'],
+                            new_sg_attributes,
+                            old_sid_to_new_sid,
+                            sample_to_sg_attribute_map,
+                            new_sg_data,
                         ),
                         meta=analysis['meta'],
                     )
@@ -525,7 +553,9 @@ def get_existing_assay(
     """
     if sg := get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id):
         for assay in sg.get('assays', []):
-            if assay.get('type') == original_assay.get('type') and assay.get('meta') == original_assay.get('meta'):
+            if assay.get('type') == original_assay.get('type') and assay.get(
+                'meta'
+            ) == original_assay.get('meta'):
                 return assay
 
     return None
@@ -656,7 +686,8 @@ def transfer_participants(
     existing_participants = papi.get_participants(target_project)
 
     target_project_pid_map = {
-        participant['external_id']: participant['id'] for participant in existing_participants
+        participant['external_id']: participant['id']
+        for participant in existing_participants
     }
 
     participants_to_transfer = []
@@ -685,9 +716,9 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        external_to_internal_participant_id_map[
-            participant['external_id']
-        ] = participant['id']
+        external_to_internal_participant_id_map[participant['external_id']] = (
+            participant['id']
+        )
     return external_to_internal_participant_id_map
 
 
