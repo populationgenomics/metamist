@@ -255,7 +255,7 @@ def main(
 
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
-    old_sid_to_new_sid, sequencing_group_ids_from_sample = transfer_samples_sgs_assays(
+    old_sid_to_new_sid, sample_to_sg_attribute_map = transfer_samples_sgs_assays(
         samples, existing_data, upserted_participant_map, target_project, project
     )
     logger.info('Transferring analyses')
@@ -265,7 +265,7 @@ def main(
         target_project,
         project,
         old_sid_to_new_sid,
-        sequencing_group_ids_from_sample,
+        sample_to_sg_attribute_map,
     )
     logger.info('Subset generation complete!')
 
@@ -322,7 +322,7 @@ def transfer_samples_sgs_assays(
         )
         old_sid_to_new_sid[s['id']] = new_sample_id
 
-    return old_sid_to_new_sid, sequencing_group_ids_from_sample
+    return old_sid_to_new_sid, sample_to_sg_attribute_map
 
 
 def upsert_sequencing_groups(
@@ -410,7 +410,7 @@ def transfer_analyses(
     target_project: str,
     project: str,
     old_sid_to_new_sid: dict[str, str],
-    sequencing_group_ids_from_sample: dict[tuple, dict[tuple, str]],
+    sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
 ):
     """
     This function will transfer the analyses from the original project to the test project.
