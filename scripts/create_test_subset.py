@@ -212,7 +212,7 @@ def main(
     logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
-    additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
+    additional_samples.update(random.sample(list(all_sids - additional_samples), samples_n))
 
     # 4. Query all the samples from the selected sgs
     logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
@@ -287,11 +287,11 @@ def transfer_samples_sgs_assays(
     ] = {}
     old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
-        old_exid_old_sid = (s['externalId'], s['id'])
-        if old_exid_old_sid not in sequencing_group_ids_from_sample:
-            sequencing_group_ids_from_sample[old_exid_old_sid] = {}
+        exid_old_sid = (s['externalId'], s['id'])
+        if exid_old_sid not in sequencing_group_ids_from_sample:
+            sequencing_group_ids_from_sample[exid_old_sid] = {}
         for sg in s['sequencingGroups']:
-            sequencing_group_ids_from_sample[old_exid_old_sid][
+            sequencing_group_ids_from_sample[exid_old_sid][
                 (sg['type'], sg['platform'], sg['technology'])
             ] = sg['id']
 
@@ -379,6 +379,30 @@ def upsert_assays(
         assays_to_upsert.append(assay_upsert)
     return assays_to_upsert
 
+def get_new_sg_id(sid: str, 
+                  new_sg_attributes: tuple[str, str, str],
+                  samples: dict, 
+                  old_sid_to_new_sid: dict[str, str], 
+                  new_sg_map: dict[str, list[str]], 
+                  sequencing_group_ids_from_sample: dict[tuple, dict[tuple, str]],
+                  new_sg_data: dict[dict, list[dict]]):
+    """
+    This function will return the new sequencing group id.
+    """
+    if sid in old_sid_to_new_sid:
+        old_sid = sid
+        for new_sample in new_sg_data['project']['samples']:  # pylint: disable=E1136
+            if new_sample['id'] == old_sid_to_new_sid[old_sid]: #  if new sample maps to old sample
+                for new_sg in new_sample['sequencingGroups']:
+                    sample_key = (new_sample['externalId'], old_sid)
+                    sg_attribute_key = (new_sg['type'], new_sg['platform'], new_sg['technology'])
+                    if sequencing_group_ids_from_sample[sample_key].get(new_sg_attributes) and new_sg_attributes == sg_attribute_key:
+                        new_sg_id = new_sg['id']
+                        return [new_sg_id]
+                    else:
+                        continue
+
+    return ValueError(f"Sample {sid} not found in old_sid_to_new_sid")
 
 def transfer_analyses(
     samples: dict,
@@ -401,20 +425,8 @@ def transfer_analyses(
         new_sg_map[s.get('externalId')] = sg_ids
 
     for s in samples:
-        if s['id'] in old_sid_to_new_sid:
-            ext_id_old_sample_id = (s['externalId'], s['id'])
-            for new_sample in new_sg_data['project']['samples']:  # pylint: disable=E1136
-                for new_sg in new_sample['sequencingGroups']:
-                    new_sg_id = sequencing_group_ids_from_sample[
-                        ext_id_old_sample_id
-                    ].get(
-                        (new_sg['type'], new_sg['platform'], new_sg['technology']), None
-                    )
-                    if new_sg_id is None:
-                        raise ValueError(
-                            'No new sequencing group matches old sequencing group'
-                        )
         for sg in s['sequencingGroups']:
+            new_sg_attributes = sg.get('type'), sg.get('platform'), sg.get('technology')
             existing_sg = get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
@@ -459,7 +471,9 @@ def transfer_analyses(
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
                         ),
-                        sequencing_group_ids=[new_sg_id],
+                        sequencing_group_ids=get_new_sg_id(s['id'], new_sg_attributes,
+                            samples, old_sid_to_new_sid, new_sg_map, sequencing_group_ids_from_sample, new_sg_data
+                        ),
                         meta=analysis['meta'],
                     )
 
