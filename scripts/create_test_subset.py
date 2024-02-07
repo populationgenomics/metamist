@@ -21,17 +21,16 @@ from collections import Counter
 
 from google.cloud import storage
 
-from metamist.apis import AnalysisApi, AssayApi, SampleApi, FamilyApi, ParticipantApi
+from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
-    AssayUpsert,
-    SampleUpsert,
     Analysis,
     AnalysisStatus,
     AnalysisUpdateModel,
+    AssayUpsert,
+    SampleUpsert,
     SequencingGroupUpsert,
 )
-
 
 logger = logging.getLogger(__file__)
 logging.basicConfig(format='%(levelname)s (%(name)s %(lineno)s): %(message)s')
@@ -102,6 +101,7 @@ EXISTING_DATA_QUERY = gql(
                     type
                     assays {
                         id
+                        meta
                         type
                     }
                     analyses {
@@ -115,7 +115,7 @@ EXISTING_DATA_QUERY = gql(
     """
 )
 
-QUERY_FAMILY_SGID = gql(
+QUERY_FAMILY_SAMPLES = gql(
     """
     query FamilyQuery($project: String!) {
         project(name: $project) {
@@ -128,7 +128,6 @@ QUERY_FAMILY_SGID = gql(
                     }
                 }
             }
-
         }
     }
 """
@@ -191,11 +190,11 @@ def main(
             get_sids_for_families(project, families_n, additional_families)
         )
 
-    # 2. Get all sids in project.
-    logger.info(f'Querying all sids in {project}')
+    # 2. Get all sample IDs and their SG IDs in project.
+    logger.info(f'Querying all samples in {project}')
     sid_output = query(SG_ID_QUERY, variables={'project': project})
     all_sids = {sid['id'] for sid in sid_output.get('project').get('samples')}
-    logger.info(f'Found {len(all_sids)} sids in {project}')
+    logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
     additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
@@ -277,7 +276,7 @@ def transfer_samples_sgs_assays(
             type=sample_type or None,
             meta=(copy_files_in_dict(s['meta'], project) or {}),
             participant_id=existing_pid,
-            sequencing_groups=upsert_sequencing_groups(s, existing_data),
+            sequencing_groups=upsert_sequencing_groups(s, existing_data, project),
             id=existing_sid,
         )
 
@@ -290,7 +289,7 @@ def transfer_samples_sgs_assays(
 
 
 def upsert_sequencing_groups(
-    sample: dict, existing_data: dict
+    sample: dict, existing_data: dict, project: str
 ) -> list[SequencingGroupUpsert]:
     """Create SG Upsert Objects for a sample"""
     sgs_to_upsert: list[SequencingGroupUpsert] = []
@@ -307,7 +306,7 @@ def upsert_sequencing_groups(
             technology=sg.get('technology'),
             type=sg.get('type'),
             assays=upsert_assays(
-                sg, existing_sgid, existing_data, sample.get('externalId')
+                sg, existing_sgid, existing_data, sample.get('externalId'), project
             ),
         )
         sgs_to_upsert.append(sg_upsert)
@@ -316,7 +315,11 @@ def upsert_sequencing_groups(
 
 
 def upsert_assays(
-    sg: dict, existing_sgid: str | None, existing_data: dict, sample_external_id
+    sg: dict,
+    existing_sgid: str | None,
+    existing_data: dict,
+    sample_external_id,
+    project: str,
 ) -> list[AssayUpsert]:
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
@@ -326,17 +329,14 @@ def upsert_assays(
         # Check if assay exists
         if existing_sgid:
             _existing_assay = get_existing_assay(
-                existing_data,
-                sample_external_id,
-                existing_sgid,
-                assay.get('type'),
+                existing_data, sample_external_id, existing_sgid, assay
             )
         existing_assay_id = _existing_assay.get('id') if _existing_assay else None
         assay_upsert = AssayUpsert(
             type=assay.get('type'),
             id=existing_assay_id,
             external_ids=assay.get('externalIds') or {},
-            meta=assay.get('meta'),
+            meta=copy_files_in_dict(assay.get('meta'), project),
         )
 
         assays_to_upsert.append(assay_upsert)
@@ -385,7 +385,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -401,7 +401,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower()),
+                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -445,7 +445,7 @@ def get_existing_sg(
 
 
 def get_existing_assay(
-    data: dict, sample_id: str, sg_id: str, assay_type: str
+    data: dict, sample_id: str, sg_id: str, original_assay: dict
 ) -> dict | None:
     """
     Find assay in main data for this sample
@@ -454,7 +454,7 @@ def get_existing_assay(
     """
     if sg := get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id):
         for assay in sg.get('assays', []):
-            if assay.get('type') == assay_type:
+            if assay.get('type') == original_assay.get('type') and assay.get('meta') == original_assay.get('meta'):
                 return assay
 
     return None
@@ -480,7 +480,7 @@ def get_sids_for_families(
 ) -> set[str]:
     """Returns specific samples to be included in the test project."""
 
-    family_sgid_output = query(QUERY_FAMILY_SGID, {'project': project})
+    family_sgid_output = query(QUERY_FAMILY_SAMPLES, {'project': project})
 
     all_family_sgids = family_sgid_output.get('project', {}).get('families', [])
     assert all_family_sgids, 'No families returned in GQL result'
@@ -584,14 +584,16 @@ def transfer_participants(
     """Transfers relevant participants between projects"""
     existing_participants = papi.get_participants(target_project)
 
-    target_project_epids = [
-        participant['external_id'] for participant in existing_participants
-    ]
+    target_project_pid_map = {
+        participant['external_id']: participant['id'] for participant in existing_participants
+    }
 
     participants_to_transfer = []
     for participant in participant_data:
-        if participant['externalId'] not in target_project_epids:
+        if participant['externalId'] in target_project_pid_map:
             # Participants with id field will be updated & those without will be inserted
+            participant['id'] = target_project_pid_map[participant['externalId']]
+        else:
             del participant['id']
         transfer_participant = {
             'external_id': participant['externalId'],

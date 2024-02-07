@@ -4,18 +4,16 @@ from datetime import date
 
 from fastapi import APIRouter
 from fastapi.params import Query
-from starlette.responses import StreamingResponse, JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
-    get_project_write_connection,
-    get_project_readonly_connection,
     Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
 )
 from api.utils.export import ExportType
-from db.python.layers.participant import (
-    ParticipantLayer,
-)
+from db.python.layers.participant import ParticipantLayer
 from models.models.participant import ParticipantUpsert
 from models.models.sample import sample_id_format
 

@@ -8,7 +8,6 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw,
 )
 
-
 SequencingGroupInternalId = int
 SequencingGroupExternalId = str
 
@@ -37,7 +36,7 @@ class SequencingGroupInternal(SMBase):
     platform: str | None = None
     meta: dict[str, str] | None = None
     sample_id: int | None = None
-    external_ids: dict[str, str] | None = None
+    external_ids: dict[str, str] | None = {}
     archived: bool | None = None
 
     project: int | None = None

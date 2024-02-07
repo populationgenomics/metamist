@@ -12,6 +12,7 @@ import aiohttp
 import slack_sdk
 import slack_sdk.errors
 from cloudpathlib import AnyPath
+
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (
@@ -29,7 +30,7 @@ from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
-from db.python.tables.project import Project, ProjectPermissionsTable
+from db.python.tables.project import Project
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 
@@ -122,8 +123,7 @@ class SeqrLayer(BaseLayer):
             raise ValueError('Seqr synchronisation is not configured in metamist')
 
         token = self.generate_seqr_auth_token()
-        pptable = ProjectPermissionsTable(connection=self.connection.connection)
-        project = await pptable.get_and_check_access_to_project_for_id(
+        project = await self.ptable.get_and_check_access_to_project_for_id(
             self.connection.author,
             project_id=self.connection.project,
             readonly=True,

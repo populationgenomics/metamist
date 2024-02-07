@@ -30,6 +30,11 @@ input CSV files that should be discarded.
 Additionally, the reads-column is not provided for existing-cohort csvs.
 This information is derived from the fluidX id pulled from the filename.
 
+Additional Options:
+--allow-missing-files:
+Set this flag to parse manifests with missing data and generate warnings instead of raising errors.
+This allows the script to proceed even if some data is missing.
+
 """
 
 import csv
@@ -105,11 +110,15 @@ class ExistingCohortParser(GenericMetadataParser):
         search_locations,
         batch_number,
         include_participant_column,
+        allow_missing_files,
+        sequencing_type,
     ):
         if include_participant_column:
             participant_column = Columns.PARTICIPANT_COLUMN
         else:
             participant_column = Columns.EXTERNAL_ID
+
+        self.allow_missing_files = allow_missing_files
 
         super().__init__(
             project=project,
@@ -123,6 +132,7 @@ class ExistingCohortParser(GenericMetadataParser):
             assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
             allow_extra_files_in_search_path=True,
+            default_sequencing_type=sequencing_type,
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -134,7 +144,9 @@ class ExistingCohortParser(GenericMetadataParser):
         return reader
 
     async def get_read_filenames(
-        self, sample_id: Optional[str], row: SingleRow
+        self,
+        sample_id: Optional[str],
+        row: SingleRow,
     ) -> List[str]:
         """
         We don't have fastq urls in a manifest, so overriding this method to take
@@ -149,7 +161,11 @@ class ExistingCohortParser(GenericMetadataParser):
         ]
 
         if not read_filenames:
-            raise ValueError(f'No read files found for {sample_id}')
+            if not self.allow_missing_files:
+                raise ValueError(f'No read files found for {sample_id}')
+
+            logger.warning(f'No read files found for {sample_id}')
+
         return read_filenames
 
     def get_assay_id(self, row: GroupedRow) -> Optional[dict[str, str]]:
@@ -196,6 +212,11 @@ class ExistingCohortParser(GenericMetadataParser):
     '--project',
     help='The metamist project to import manifest into',
 )
+@click.option(
+    '--sequencing-type',
+    type=click.Choice(['genome', 'exome']),
+    help='Sequencing type: genome or exome',
+)
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
@@ -204,6 +225,12 @@ class ExistingCohortParser(GenericMetadataParser):
 @click.option('--dry-run', 'dry_run', is_flag=True)
 @click.option(
     '--include-participant-column', 'include_participant_column', is_flag=True
+)
+@click.option(
+    '--allow-missing-files',
+    'allow_missing_files',
+    is_flag=True,
+    help='Set this flag to parse/ingest sequencing groups with missing reads',
 )
 @click.argument('manifests', nargs=-1)
 @run_as_sync
@@ -215,6 +242,8 @@ async def main(
     confirm=True,
     dry_run=False,
     include_participant_column=False,
+    allow_missing_files=False,
+    sequencing_type: str = 'genome',
 ):
     """Run script from CLI arguments"""
 
@@ -223,6 +252,8 @@ async def main(
         search_locations=search_locations,
         batch_number=batch_number,
         include_participant_column=include_participant_column,
+        allow_missing_files=allow_missing_files,
+        sequencing_type=sequencing_type,
     )
 
     for manifest_path in manifests:

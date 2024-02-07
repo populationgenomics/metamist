@@ -2,6 +2,14 @@ import * as React from 'react'
 
 import SwaggerUI from 'swagger-ui-react'
 import { Routes as Switch, Route } from 'react-router-dom'
+import {
+    BillingHome,
+    BillingSeqrProp,
+    BillingCostByTime,
+    BillingCostByAnalysis,
+    BillingInvoiceMonthCost,
+    BillingCostByCategory,
+} from './pages/billing'
 import DocumentationArticle from './pages/docs/Documentation'
 import SampleView from './pages/sample/SampleView'
 import FamilyView from './pages/family/FamilyView'
@@ -9,14 +17,28 @@ import ProjectSummaryView from './pages/project/ProjectSummary'
 import ProjectsAdmin from './pages/admin/ProjectsAdmin'
 import ErrorBoundary from './shared/utilities/errorBoundary'
 import AnalysisRunnerSummary from './pages/project/AnalysisRunnerView/AnalysisRunnerSummary'
-import BillingDashboard from './pages/billing/BillingDashboard'
 
 const Routes: React.FunctionComponent = () => (
     <Switch>
-        <Route path="/documentation/:id?" element={<DocumentationArticle />} />
+        <Route path="/" element={<DocumentationArticle articleid="index" />} />
 
-        <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
-
+        <Route path="admin" element={<ProjectsAdmin />} />
+        <Route
+            path="/project/:projectName?/:page?"
+            element={
+                <ErrorBoundary>
+                    <ProjectSummaryView />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="project/:projectName/participant/:participantName"
+            element={
+                <ErrorBoundary>
+                    <SampleView />
+                </ErrorBoundary>
+            }
+        />
         <Route
             path="/analysis-runner/:projectName?"
             element={
@@ -26,18 +48,44 @@ const Routes: React.FunctionComponent = () => (
             }
         />
 
+        <Route path="/billing/" element={<BillingHome />} />
+        <Route path="/billing/invoiceMonthCost" element={<BillingInvoiceMonthCost />} />
         <Route
-            path="/project/:projectName?/:page?"
+            path="/billing/costByTime"
             element={
                 <ErrorBoundary>
-                    <ProjectSummaryView />
+                    <BillingCostByTime />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByAnalysis"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByAnalysis />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/costByCategory"
+            element={
+                <ErrorBoundary>
+                    <BillingCostByCategory />
+                </ErrorBoundary>
+            }
+        />
+        <Route
+            path="/billing/seqrPropMap"
+            element={
+                <ErrorBoundary>
+                    <BillingSeqrProp />
                 </ErrorBoundary>
             }
         />
 
-        <Route path="admin" element={<ProjectsAdmin />} />
+        <Route path="/swagger" element={<SwaggerUI url="/openapi.json" tryItOutEnabled={true} />} />
 
-        <Route path="/" element={<DocumentationArticle articleid="index" />} />
+        <Route path="/documentation/:id?" element={<DocumentationArticle />} />
 
         <Route
             path="sample/:sampleName/:sequencingGroupName?"
@@ -53,24 +101,6 @@ const Routes: React.FunctionComponent = () => (
             element={
                 <ErrorBoundary>
                     <FamilyView />
-                </ErrorBoundary>
-            }
-        />
-
-        <Route
-            path="project/:projectName/participant/:participantName"
-            element={
-                <ErrorBoundary>
-                    <SampleView />
-                </ErrorBoundary>
-            }
-        />
-
-        <Route
-            path="billing"
-            element={
-                <ErrorBoundary>
-                    <BillingDashboard />
                 </ErrorBoundary>
             }
         />

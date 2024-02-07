@@ -4,20 +4,19 @@ Report assay files in the main-upload bucket that can be deleted, ingested,
 and sequencing groups that have no aligned CRAM.
 """
 
-from datetime import datetime
-import sys
+import asyncio
 import logging
 import os
-import asyncio
+import sys
+from datetime import datetime
 from functools import cache
+
 import click
 
 from cpg_utils.config import get_config
 
-
 from metamist.audit.generic_auditor import GenericAuditor
 from metamist.graphql import gql, query
-
 
 FASTQ_EXTENSIONS = ('.fq.gz', '.fastq.gz', '.fq', '.fastq')
 BAM_EXTENSIONS = ('.bam',)

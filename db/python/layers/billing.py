@@ -1,28 +1,71 @@
-from google.cloud import bigquery
-
-from models.models import (
-    BillingRowRecord,
-    BillingTotalCostRecord,
-    BillingTotalCostQueryModel,
-    BillingColumn,
-)
-
-from db.python.gcp_connect import BqDbBase
 from db.python.layers.bq_base import BqBaseLayer
-from db.python.tables.billing import BillingFilter
-
-from api.settings import BQ_GCP_BILLING_PROJECT, BQ_DAYS_BACK_OPTIMAL
-
-# TODO update beore merging into DEV
-BQ_AGGREG_VIEW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost-dev'
-BQ_AGGREG_RAW = f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate-dev'
-BQ_AGGREG_EXT_VIEW = (
-    f'{BQ_GCP_BILLING_PROJECT}.billing_aggregate.aggregate_daily_cost_extended-dev'
+from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
+from db.python.tables.bq.billing_daily import BillingDailyTable
+from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
+from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
+from db.python.tables.bq.billing_raw import BillingRawTable
+from models.enums import BillingSource, BillingTimeColumn, BillingTimePeriods
+from models.models import (
+    BillingColumn,
+    BillingCostBudgetRecord,
+    BillingHailBatchCostRecord,
+    BillingTotalCostQueryModel,
 )
 
 
 class BillingLayer(BqBaseLayer):
     """Billing layer"""
+
+    def table_factory(
+        self,
+        source: BillingSource,
+        fields: list[BillingColumn] | None = None,
+        filters: dict[BillingColumn, str | list | dict] | None = None,
+    ) -> (
+        BillingDailyTable
+        | BillingDailyExtendedTable
+        | BillingGcpDailyTable
+        | BillingRawTable
+    ):
+        """Get billing table object based on source and fields"""
+        if source == BillingSource.GCP_BILLING:
+            return BillingGcpDailyTable(self.connection)
+        if source == BillingSource.RAW:
+            return BillingRawTable(self.connection)
+
+        # check if any of the fields is in the extended columns
+        if fields:
+            used_extended_cols = [
+                f
+                for f in fields
+                if f in BillingColumn.extended_cols() and BillingColumn.can_group_by(f)
+            ]
+            if used_extended_cols:
+                # there is a field from extended daily table
+                return BillingDailyExtendedTable(self.connection)
+
+        # check if any of the filters is in the extended columns
+        if filters:
+            used_extended_cols = [
+                f
+                for f in filters
+                if f in BillingColumn.extended_cols() and BillingColumn.can_group_by(f)
+            ]
+            if used_extended_cols:
+                # there is a field from extended daily table
+                return BillingDailyExtendedTable(self.connection)
+
+        # by default look at the daily table
+        return BillingDailyTable(self.connection)
+
+    async def get_gcp_projects(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All GCP projects in database
+        """
+        billing_table = BillingGcpDailyTable(self.connection)
+        return await billing_table.get_gcp_projects()
 
     async def get_topics(
         self,
@@ -30,8 +73,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All topics in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_topics()
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_topics()
 
     async def get_cost_categories(
         self,
@@ -39,8 +82,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All service description / cost categories in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_cost_categories()
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_cost_categories()
 
     async def get_skus(
         self,
@@ -50,8 +93,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All SKUs in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_skus(limit, offset)
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_skus(limit, offset)
 
     async def get_datasets(
         self,
@@ -59,8 +102,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All datasets in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('dataset')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('dataset')
 
     async def get_stages(
         self,
@@ -68,8 +111,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All stages in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('stage')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('stage')
 
     async def get_sequencing_types(
         self,
@@ -77,8 +120,8 @@ class BillingLayer(BqBaseLayer):
         """
         Get All sequencing_types in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('sequencing_type')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('sequencing_type')
 
     async def get_sequencing_groups(
         self,
@@ -86,341 +129,172 @@ class BillingLayer(BqBaseLayer):
         """
         Get All sequencing_groups in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_extended_values('sequencing_group')
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('sequencing_group')
 
-    async def query(
+    async def get_compute_categories(
         self,
-        _filter: BillingFilter,
-        limit: int = 10,
-    ) -> list[BillingRowRecord] | None:
+    ) -> list[str] | None:
         """
-        Get Billing record for the given gilter
+        Get All compute_category values in database
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.query(_filter, limit)
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('compute_category')
+
+    async def get_cromwell_sub_workflow_names(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All cromwell_sub_workflow_name values in database
+        """
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('cromwell_sub_workflow_name')
+
+    async def get_wdl_task_names(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All wdl_task_name values in database
+        """
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('wdl_task_name')
+
+    async def get_invoice_months(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All invoice months in database
+        """
+        billing_table = BillingDailyTable(self.connection)
+        return await billing_table.get_invoice_months()
+
+    async def get_namespaces(
+        self,
+    ) -> list[str] | None:
+        """
+        Get All namespaces values in database
+        """
+        billing_table = BillingDailyExtendedTable(self.connection)
+        return await billing_table.get_extended_values('namespace')
 
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-    ) -> list[BillingTotalCostRecord] | None:
+    ) -> list[dict] | None:
         """
         Get Total cost of selected fields for requested time interval
         """
-        billing_db = BillingDb(self.connection)
-        return await billing_db.get_total_cost(query)
+        billing_table = self.table_factory(query.source, query.fields, query.filters)
+        return await billing_table.get_total_cost(query)
 
-
-class BillingDb(BqDbBase):
-    """Db layer for billing related routes"""
-
-    async def get_topics(self):
-        """Get all topics in database"""
-
-        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
-        _query = f"""
-        SELECT DISTINCT topic
-        FROM `{BQ_AGGREG_VIEW}`
-        WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL @days DAY
-        )
-        ORDER BY topic ASC;
-        """
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter(
-                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
-                ),
-            ]
-        )
-
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-        if query_job_result:
-            return [str(dict(row)['topic']) for row in query_job_result]
-
-        # return empty list if no record found
-        return []
-
-    async def get_cost_categories(self):
-        """Get all service description in database"""
-
-        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
-        _query = f"""
-        SELECT DISTINCT cost_category
-        FROM `{BQ_AGGREG_VIEW}`
-        WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL @days DAY
-        )
-        ORDER BY cost_category ASC;
-        """
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter(
-                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
-                ),
-            ]
-        )
-
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-        if query_job_result:
-            return [str(dict(row)['cost_category']) for row in query_job_result]
-
-        # return empty list if no record found
-        return []
-
-    async def get_skus(
+    async def get_running_cost(
         self,
-        limit: int | None = None,
-        offset: int | None = None,
-    ):
-        """Get all SKUs in database"""
-
-        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
-        _query = f"""
-        SELECT DISTINCT sku
-        FROM `{BQ_AGGREG_VIEW}`
-        WHERE day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL @days DAY
-        )
-        ORDER BY sku ASC
+        field: BillingColumn,
+        invoice_month: str | None = None,
+        source: BillingSource | None = None,
+    ) -> list[BillingCostBudgetRecord]:
         """
-
-        # append LIMIT and OFFSET if present
-        if limit:
-            _query += ' LIMIT @limit_val'
-        if offset:
-            _query += ' OFFSET @offset_val'
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter(
-                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
-                ),
-                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit),
-                bigquery.ScalarQueryParameter('offset_val', 'INT64', offset),
-            ]
-        )
-
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-        if query_job_result:
-            return [str(dict(row)['sku']) for row in query_job_result]
-
-        # return empty list if no record found
-        return []
-
-    async def get_extended_values(self, field: str):
+        Get Running costs including monthly budget
         """
-        Get all extended values in database,
-        e.g. dataset, stage, sequencing_type or sequencing_group
-        """
+        billing_table = self.table_factory(source, [field])
+        return await billing_table.get_running_cost(field, invoice_month)
 
-        # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
-        _query = f"""
-        SELECT DISTINCT {field}
-        FROM `{BQ_AGGREG_EXT_VIEW}`
-        WHERE {field} IS NOT NULL
-        AND day > TIMESTAMP_ADD(
-            CURRENT_TIMESTAMP(), INTERVAL @days DAY
-        )
-        ORDER BY 1 ASC;
-        """
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter(
-                    'days', 'INT64', -int(BQ_DAYS_BACK_OPTIMAL)
-                ),
-            ]
-        )
-
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-        if query_job_result:
-            return [str(dict(row)[field]) for row in query_job_result]
-
-        # return empty list if no record found
-        return []
-
-    async def query(
+    async def get_cost_by_ar_guid(
         self,
-        filter_: BillingFilter,
-        limit: int = 10,
-    ) -> list[BillingRowRecord] | None:
-        """Get Billing record from BQ"""
-
-        # TODO: THis function is not going to be used most likely
-        # get_total_cost will replace it
-
-        # cost of this BQ is 30MB on DEV,
-        # DEV is partition by day and date is required filter params,
-        # cost is aprox per query: AU$ 0.000023 per query
-
-        required_fields = [
-            filter_.date,
-        ]
-
-        if not any(required_fields):
-            raise ValueError('Must provide date to filter on')
-
-        # construct filters
-        filters = []
-        query_parameters = []
-
-        if filter_.topic:
-            filters.append('topic IN UNNEST(@topic)')
-            query_parameters.append(
-                bigquery.ArrayQueryParameter('topic', 'STRING', filter_.topic.in_),
-            )
-
-        if filter_.date:
-            filters.append('DATE_TRUNC(usage_end_time, DAY) = TIMESTAMP(@date)')
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('date', 'STRING', filter_.date.eq),
-            )
-
-        if filter_.cost_category:
-            filters.append('service.description IN UNNEST(@cost_category)')
-            query_parameters.append(
-                bigquery.ArrayQueryParameter(
-                    'cost_category', 'STRING', filter_.cost_category.in_
-                ),
-            )
-
-        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
-
-        _query = f"""
-        SELECT id, topic, service, sku, usage_start_time, usage_end_time, project,
-        labels, export_time, cost, currency, currency_conversion_rate, invoice, cost_type
-        FROM `{BQ_AGGREG_RAW}`
-        {filter_str}
+        ar_guid: str | None = None,
+    ) -> BillingHailBatchCostRecord:
         """
-        if limit:
-            _query += ' LIMIT @limit_val'
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('limit_val', 'INT64', limit)
-            )
-
-        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
-        )
-
-        if query_job_result:
-            return [BillingRowRecord.from_json(dict(row)) for row in query_job_result]
-
-        raise ValueError('No record found')
-
-    async def get_total_cost(
-        self,
-        query: BillingTotalCostQueryModel,
-    ) -> list[BillingTotalCostRecord] | None:
+        Get Costs by AR GUID
         """
-        Get Total cost of selected fields for requested time interval from BQ view
-        """
-        if not query.start_date or not query.end_date or not query.fields:
-            raise ValueError('Date and Fields are required')
+        ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
-        extended_cols = BillingColumn.extended_cols()
-
-        # by default look at the normal view
-        view_to_use = BQ_AGGREG_VIEW
-
-        columns = []
-        for field in query.fields:
-            col_name = str(field.value)
-            if col_name == 'cost':
-                # skip the cost field as it will be always present
-                continue
-
-            if col_name in extended_cols:
-                # if one of the extended columns is needed, the view has to be extended
-                view_to_use = BQ_AGGREG_EXT_VIEW
-
-            columns.append(col_name)
-
-        fields_selected = ','.join(columns)
-
-        # construct filters
-        filters = []
-        query_parameters = []
-
-        filters.append('day >= TIMESTAMP(@start_date)')
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('start_date', 'STRING', query.start_date)
-        )
-
-        filters.append('day <= TIMESTAMP(@end_date)')
-        query_parameters.append(
-            bigquery.ScalarQueryParameter('end_date', 'STRING', query.end_date)
-        )
-
-        if query.filters:
-            for filter_key, filter_value in query.filters.items():
-                col_name = str(filter_key.value)
-                filters.append(f'{col_name} = @{col_name}')
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(col_name, 'STRING', filter_value)
-                )
-                if col_name in extended_cols:
-                    # if one of the extended columns is needed,
-                    # the view has to be extended
-                    view_to_use = BQ_AGGREG_EXT_VIEW
-
-        filter_str = 'WHERE ' + ' AND '.join(filters) if filters else ''
-
-        # construct order by
-        order_by_cols = []
-        if query.order_by:
-            for order_field, reverse in query.order_by.items():
-                col_name = str(order_field.value)
-                col_order = 'DESC' if reverse else 'ASC'
-                order_by_cols.append(f'{col_name} {col_order}')
-
-        order_by_str = f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
-
-        _query = f"""
-        SELECT * FROM
+        # First get all batches and the min/max day to use for the query
         (
-            SELECT {fields_selected}, SUM(cost) as cost
-            FROM `{view_to_use}`
-            {filter_str}
-            GROUP BY {fields_selected}
+            start_day,
+            end_day,
+            batches,
+        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
+        if not batches:
+            return BillingHailBatchCostRecord(
+                ar_guid=ar_guid,
+                batch_ids=[],
+                costs=[],
+            )
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
         )
-        WHERE cost > 0.01
-        {order_by_str}
+
+        billing_table = self.table_factory(query.source, query.fields)
+        records = await billing_table.get_total_cost(query)
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )
+
+    async def get_cost_by_batch_id(
+        self,
+        batch_id: str | None = None,
+    ) -> BillingHailBatchCostRecord:
         """
+        Get Costs by Batch ID
+        """
+        ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
-        # append LIMIT and OFFSET if present
-        if query.limit:
-            _query += ' LIMIT @limit_val'
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('limit_val', 'INT64', query.limit)
-            )
-        if query.offset:
-            _query += ' OFFSET @offset_val'
-            query_parameters.append(
-                bigquery.ScalarQueryParameter('offset_val', 'INT64', query.offset)
-            )
+        # First get all batches and the min/max day to use for the query
+        ar_guid = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
 
-        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
-        query_job_result = list(
-            self._connection.connection.query(_query, job_config=job_config).result()
+        # The get all batches for the ar_guid
+        (
+            start_day,
+            end_day,
+            batches,
+        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+
+        if not batches:
+            return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
+
+        # Then get the costs for the given AR GUID/batches from the main table
+        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+
+        query = BillingTotalCostQueryModel(
+            fields=all_cols,
+            source=BillingSource.RAW,
+            start_date=start_day.strftime('%Y-%m-%d'),
+            end_date=end_day.strftime('%Y-%m-%d'),
+            filters={
+                BillingColumn.LABELS: {
+                    'batch_id': batches,
+                    'ar-guid': ar_guid,
+                }
+            },
+            filters_op='OR',
+            group_by=False,
+            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_periods=BillingTimePeriods.DAY,
         )
-
-        if query_job_result:
-            return [
-                BillingTotalCostRecord.from_json(dict(row)) for row in query_job_result
-            ]
-
-        # return empty list if no record found
-        return []
+        billing_table = self.table_factory(query.source, query.fields)
+        records = await billing_table.get_total_cost(query)
+        return BillingHailBatchCostRecord(
+            ar_guid=ar_guid,
+            batch_ids=batches,
+            costs=records,
+        )
