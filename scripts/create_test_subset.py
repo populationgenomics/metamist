@@ -18,8 +18,7 @@ import random
 import subprocess
 from argparse import ArgumentParser
 from collections import Counter
-from typing import Tuple
-from typing import Any
+from typing import Any, Tuple
 
 from google.cloud import storage
 
