@@ -1,10 +1,10 @@
 # pylint: disable=too-many-arguments
 from typing import Any
 
-from db.python.utils import NoOpAenter
 from db.python.layers.base import BaseLayer, Connection
-from db.python.tables.assay import AssayTable, AssayFilter
+from db.python.tables.assay import AssayFilter, AssayTable
 from db.python.tables.sample import SampleTable
+from db.python.utils import NoOpAenter
 from models.models.assay import AssayInternal, AssayUpsertInternal
 
 

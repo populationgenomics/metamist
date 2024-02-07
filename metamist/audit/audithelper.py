@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 from cloudpathlib import AnyPath
+
 from cpg_utils.cloud import get_path_components_from_gcp_path
 
 from metamist.parser.cloudhelper import CloudHelper

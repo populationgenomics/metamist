@@ -9,11 +9,9 @@ If there are multiple mappings to the same field, the value is compared to the v
 """
 from typing import Dict
 
-from metamist.graphql import gql, query
-
 from metamist.apis import AssayApi
+from metamist.graphql import gql, query
 from metamist.models import AssayUpsert
-
 
 SG_QUERY = gql(
     """

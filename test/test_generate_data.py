@@ -1,7 +1,8 @@
 import unittest
 from test.data.generate_data import QUERY_ENUMS, QUERY_SG_ID
-from metamist.graphql import validate, configure_sync_client
+
 from api.graphql.schema import schema  # type: ignore
+from metamist.graphql import configure_sync_client, validate
 
 
 class ValidateGenerateDataQueries(unittest.TestCase):

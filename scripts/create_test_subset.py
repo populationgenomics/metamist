@@ -23,14 +23,14 @@ from typing import Any
 
 from google.cloud import storage
 
-from metamist.apis import AnalysisApi, AssayApi, SampleApi, FamilyApi, ParticipantApi
+from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
-    AssayUpsert,
-    SampleUpsert,
     Analysis,
     AnalysisStatus,
     AnalysisUpdateModel,
+    AssayUpsert,
+    SampleUpsert,
     SequencingGroupUpsert,
 )
 

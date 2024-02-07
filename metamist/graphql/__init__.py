@@ -5,21 +5,21 @@ GraphQL utilities for Metamist, allows you to:
     - validate queries with metamist schema (by fetching the schema)
 """
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
-from gql import Client, gql as gql_constructor
+from gql import Client
+from gql import gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as aiohttp_logger
 from gql.transport.requests import RequestsHTTPTransport
 from gql.transport.requests import log as requests_logger
 
-from cpg_utils.cloud import get_google_identity_token
-
 # this does not import itself, it imports the module
 from graphql import DocumentNode  # type: ignore
 
-import metamist.configuration
+from cpg_utils.cloud import get_google_identity_token
 
+import metamist.configuration
 
 _sync_client: Client | None = None
 _async_client: Client | None = None
