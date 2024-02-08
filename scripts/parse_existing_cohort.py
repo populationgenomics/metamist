@@ -240,7 +240,7 @@ async def main(
     project: str,
     search_locations: List[str],
     batch_number: Optional[str],
-    sequencing_type:str,
+    sequencing_type: str,
     confirm=True,
     dry_run=False,
     include_participant_column=False,
