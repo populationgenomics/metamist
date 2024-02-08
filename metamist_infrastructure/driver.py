@@ -642,10 +642,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_log_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    'NOTIFICATION_PUBSUB_TOPIC': self.etl_slack_notification_topic.id
-                    if self.etl_slack_notification_topic
-                    else '',
-                    'SM_ENVIRONMENT': self.config.metamist.etl_environment,
+                    'NOTIFICATION_PUBSUB_TOPIC': (
+                        self.etl_slack_notification_topic.id
+                        if self.etl_slack_notification_topic
+                        else ''
+                    ),
+                    'SM_ENVIRONMENT': self.config.metamist.environment,
                     'DEFAULT_LOAD_CONFIG': json.dumps(
                         self.config.metamist.etl_parser_default_config
                     ),
