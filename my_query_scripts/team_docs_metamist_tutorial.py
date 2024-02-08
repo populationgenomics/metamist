@@ -105,7 +105,7 @@ def main(project: str, sgids: list[str]):
         # this pulls the image path from the portion of the config
         # populated by the images repository
         j.image(image_path('fastqe'))
-        j.storage('1Gi')
+        j.storage('40Gi')
 
         # read data into the batch tmp resource location
         file_1 = b.read_input(files[0])
