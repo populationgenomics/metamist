@@ -360,7 +360,21 @@ class ParsedAnalysis:
             output=self.output,
             sequencing_group_ids=[self.sequencing_group.internal_seqgroup_id],
         )
-
+class DefaultSequencing:
+    def __init__(
+        self,
+        type: str = 'genome',
+        technology: str = 'short-read',
+        platform: str = None,
+        facility: str = None,
+        library: str = None,
+    ):
+        self.type = type
+        self.technology = technology
+        self.platform = platform
+        self.facility = facility
+        self.library = library
+    
 
 def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     """
@@ -407,11 +421,7 @@ class GenericParser(
         path_prefix: Optional[str],
         search_paths: list[str],
         project: str,
-        default_sequencing_type: str = 'genome',
-        default_sequencing_technology: str = 'short-read',
-        default_sequencing_platform: str = None,
-        default_sequencing_facility: str = None,
-        default_sequencing_library: str = None,
+        default_sequencing: DefaultSequencing,
         default_read_end_type: str = None,
         default_read_length: str | int = None,
         default_sample_type: str = None,
@@ -436,11 +446,7 @@ class GenericParser(
 
         self.project = project
 
-        self.default_sequencing_type: str = default_sequencing_type
-        self.default_sequencing_technology: str = default_sequencing_technology
-        self.default_sequencing_platform: Optional[str] = default_sequencing_platform
-        self.default_sequencing_facility: Optional[str] = default_sequencing_facility
-        self.default_sequencing_library: Optional[str] = default_sequencing_library
+        self.default_sequencing = default_sequencing
         self.default_read_end_type: Optional[str] = default_read_end_type
         self.default_read_length: Optional[str] = default_read_length
         self.default_sample_type: Optional[str] = default_sample_type
@@ -694,13 +700,11 @@ class GenericParser(
         for sample, participant in sample_participants.items():
             for sg in sample_sequencing_groups[sample]:
                 sg_details = {
-                    'Participant': '',
+                    'Participant': participant if participant else '',
                     'Sample': sample,
                     'Sequencing Type': sg.sequencing_type,
                     'Assays': sum(1 for a in sg.assays if not a.internal_id),
                 }
-                if participant:
-                    sg_details['Participant'] = participant
                 details.append(sg_details)
 
         headers = ['Participant', 'Sample', 'Sequencing Type', 'Assays']
@@ -1079,23 +1083,23 @@ class GenericParser(
 
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get sequence types from row"""
-        return self.default_sequencing_type
+        return self.default_sequencing.type
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get sequencing technology from row"""
-        return self.default_sequencing_technology
+        return self.default_sequencing.technology
 
     def get_sequencing_platform(self, row: SingleRow) -> str | None:
         """Get sequencing platform from row"""
-        return self.default_sequencing_platform
+        return self.default_sequencing.platform
 
     def get_sequencing_facility(self, row: SingleRow) -> str | None:
         """Get sequencing facility from row"""
-        return self.default_sequencing_facility
+        return self.default_sequencing.facility
 
     def get_sequencing_library(self, row: SingleRow) -> str | None:
         """Get library type from row"""
-        return self.default_sequencing_library
+        return self.default_sequencing.library
 
     def get_read_end_type(self, row: SingleRow) -> str | None:
         """Get read end type from row"""

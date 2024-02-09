@@ -9,10 +9,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import click
 
 from metamist.parser.generic_parser import (
+    DefaultSequencing,
     GenericParser,
     GroupedRow,
     ParsedAnalysis,
     ParsedAssay,
+    ParsedSample,
     ParsedSequencingGroup,
     # noqa
     SingleRow,
@@ -104,11 +106,9 @@ class GenericMetadataParser(GenericParser):
         reference_assembly_location_column: Optional[str] = None,
         default_reference_assembly_location: Optional[str] = None,
         default_sample_type=None,
-        default_sequencing_type='genome',
-        default_sequencing_technology='short-read',
-        default_sequencing_platform='illumina',
-        default_sequencing_facility: Optional[str] = None,
-        default_sequencing_library: Optional[str] = None,
+        default_sequencing=DefaultSequencing(
+            type='genome', technology='short-read', platform='illumina'
+        ),
         default_read_end_type: Optional[str] = None,
         default_read_length: Optional[str | int] = None,
         allow_extra_files_in_search_path=False,
@@ -119,11 +119,7 @@ class GenericMetadataParser(GenericParser):
             search_paths=search_locations,
             project=project,
             default_sample_type=default_sample_type,
-            default_sequencing_type=default_sequencing_type,
-            default_sequencing_technology=default_sequencing_technology,
-            default_sequencing_platform=default_sequencing_platform,
-            default_sequencing_facility=default_sequencing_facility,
-            default_sequencing_library=default_sequencing_library,
+            default_sequencing=default_sequencing,
             default_read_end_type=default_read_end_type,
             default_read_length=default_read_length,
             **kwargs,
@@ -185,14 +181,14 @@ class GenericMetadataParser(GenericParser):
         if isinstance(row, dict):
             return [self.get_sequencing_type(row)]
         return [
-            str(r.get(self.seq_type_column, self.default_sequencing_type)) for r in row
+            str(r.get(self.seq_type_column, self.default_sequencing.type)) for r in row
         ]
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get assay technology for single row"""
         value = (
             row.get(self.seq_technology_column, None)
-            or self.default_sequencing_technology
+            or self.default_sequencing.technology
         )
         value = value.lower()
 
@@ -204,7 +200,7 @@ class GenericMetadataParser(GenericParser):
     def get_sequencing_platform(self, row: SingleRow) -> str:
         """Get sequencing platform for single row"""
         value = (
-            row.get(self.seq_platform_column, None) or self.default_sequencing_platform
+            row.get(self.seq_platform_column, None) or self.default_sequencing.platform
         )
         value = value.lower()
 
@@ -212,7 +208,7 @@ class GenericMetadataParser(GenericParser):
 
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get assay type from row"""
-        value = row.get(self.seq_type_column, None) or self.default_sequencing_type
+        value = row.get(self.seq_type_column, None) or self.default_sequencing.type
         value = value.lower()
 
         if value == 'wgs':
@@ -233,7 +229,7 @@ class GenericMetadataParser(GenericParser):
     def get_sequencing_facility(self, row: SingleRow) -> str:
         """Get sequencing facility from row"""
         value = (
-            row.get(self.seq_facility_column, None) or self.default_sequencing_facility
+            row.get(self.seq_facility_column, None) or self.default_sequencing.facility
         )
         value = str(value) if value else None
         return value
@@ -241,7 +237,7 @@ class GenericMetadataParser(GenericParser):
     def get_sequencing_library(self, row: SingleRow) -> str:
         """Get sequencing library from row"""
         value = (
-            row.get(self.seq_library_column, None) or self.default_sequencing_library
+            row.get(self.seq_library_column, None) or self.default_sequencing.library
         )
         value = str(value) if value else None
         return value
@@ -607,6 +603,54 @@ class GenericMetadataParser(GenericParser):
                 meta['vcf_type'] = 'vcf'
 
         return meta
+    
+    async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> Tuple[List[str], List[str]]:
+        """Get read filenames and checksums from rows."""
+        read_filenames: List[str] = []
+        read_checksums: List[str] = []
+        reference_assemblies: set[str] = set()
+        for r in rows:
+            _rfilenames = await self.get_read_filenames(sample_id=sample_id, row=r)
+            read_filenames.extend(_rfilenames)
+            if self.checksum_column and self.checksum_column in r:
+                checksums = await self.get_checksums_from_row(sample_id, r, _rfilenames)
+                if not checksums:
+                    checksums = [None] * len(_rfilenames)
+                read_checksums.extend(checksums)
+            if self.reference_assembly_location_column:
+                ref = r.get(self.reference_assembly_location_column)
+                if ref:
+                    reference_assemblies.add(ref)
+        return read_filenames, read_checksums, reference_assemblies
+    
+    async def parse_cram_assays(self, sample: ParsedSample, reference_assemblies: set[str]) -> dict[str, Any]:
+        """Parse CRAM assays"""
+        if len(reference_assemblies) > 1:
+            # sorted for consistent testing
+            str_ref_assemblies = ', '.join(sorted(reference_assemblies))
+            raise ValueError(
+                f'Multiple reference assemblies were defined for {sample.external_sid}: {str_ref_assemblies}'
+            )
+        if len(reference_assemblies) == 1:
+            ref = next(iter(reference_assemblies))
+        else:
+            ref = self.default_reference_assembly_location
+            if not ref:
+                raise ValueError(
+                    f'Reads type for {sample.external_sid!r} is CRAM, but a reference '
+                    f'is not defined, please set the default reference assembly path'
+                )
+
+        ref_fp = self.file_path(ref)
+        secondary_files = (
+            await self.create_secondary_file_objects_by_potential_pattern(
+                ref_fp, ['.fai']
+            )
+        )
+        cram_reference = await self.create_file_object(
+            ref_fp, secondary_files=secondary_files
+        )
+        return {'reference_assembly' : cram_reference}
 
     async def get_assays_from_group(  # pylint: disable=too-many-branches
         self, sequencing_group: ParsedSequencingGroup
@@ -622,27 +666,9 @@ class GenericMetadataParser(GenericParser):
 
         assays = []
 
-        read_filenames: List[str] = []
-        read_checksums: List[str] = []
-        reference_assemblies: set[str] = set()
-
-        for r in rows:
-            _rfilenames = await self.get_read_filenames(
-                sample_id=sample.external_sid, row=r
-            )
-            read_filenames.extend(_rfilenames)
-            if self.checksum_column and self.checksum_column in r:
-                checksums = await self.get_checksums_from_row(
-                    sample.external_sid, r, _rfilenames
-                )
-                if not checksums:
-                    checksums = [None] * len(_rfilenames)
-                read_checksums.extend(checksums)
-
-            if self.reference_assembly_location_column:
-                ref = r.get(self.reference_assembly_location_column)
-                if ref:
-                    reference_assemblies.add(ref)
+        read_filenames, read_checksums, reference_assemblies = await self.get_read_and_ref_files_and_checksums(
+            sample.external_sid, rows
+        )
 
         # strip in case collaborator put "file1, file2"
         full_read_filenames: List[str] = []
@@ -670,33 +696,9 @@ class GenericMetadataParser(GenericParser):
         # collapsed_assay_meta['reads'] = reads[reads_type]
 
         if reads_type == 'cram':
-            if len(reference_assemblies) > 1:
-                # sorted for consistent testing
-                str_ref_assemblies = ', '.join(sorted(reference_assemblies))
-                raise ValueError(
-                    f'Multiple reference assemblies were defined for {sample.external_sid}: {str_ref_assemblies}'
-                )
-            if len(reference_assemblies) == 1:
-                ref = next(iter(reference_assemblies))
-            else:
-                ref = self.default_reference_assembly_location
-
-                if not ref:
-                    raise ValueError(
-                        f'Reads type for {sample.external_sid!r} is CRAM, but a reference '
-                        f'is not defined, please set the default reference assembly path'
-                    )
-
-            ref_fp = self.file_path(ref)
-            secondary_files = (
-                await self.create_secondary_file_objects_by_potential_pattern(
-                    ref_fp, ['.fai']
-                )
+            collapsed_assay_meta.update(
+                await self.parse_cram_assays(sample, reference_assemblies)
             )
-            cram_reference = await self.create_file_object(
-                ref_fp, secondary_files=secondary_files
-            )
-            collapsed_assay_meta['reference_assembly'] = cram_reference
 
         if self.batch_number is not None:
             collapsed_assay_meta['batch'] = self.batch_number
@@ -916,7 +918,9 @@ async def main(
         reported_gender_column=reported_gender_column,
         karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_assay_type,
+        default_sequencing=DefaultSequencing(
+            type='genome', technology='short-read', platform='illumina'
+        ),
         search_locations=search_path,
     )
     for manifest in manifests:

@@ -6,6 +6,7 @@ from typing import List
 import click
 
 from metamist.parser.generic_metadata_parser import (
+    DefaultSequencing,
     GenericMetadataParser,
     run_as_sync,
 )
@@ -96,16 +97,14 @@ logger.setLevel(logging.INFO)
 class SampleFileMapParser(GenericMetadataParser):
     """Parser for SampleFileMap"""
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         search_locations: List[str],
         project: str,
         default_sample_type='blood',
-        default_sequencing_type='genome',
-        default_sequencing_technology='short-read',
-        default_sequencing_platform='illumina',
-        default_sequencing_facility: str = None,
-        default_sequencing_library: str = None,
+        default_sequencing=DefaultSequencing(
+            type='genome', technology='short-read', platform='illumina'
+        ),
         default_read_end_type: str = None,
         default_read_length: str | int = None,
         allow_extra_files_in_search_path=False,
@@ -125,11 +124,7 @@ class SampleFileMapParser(GenericMetadataParser):
             read_end_type_column=READ_END_TYPE_COL_NAME,
             read_length_column=READ_LENGTH_COL_NAME,
             default_sample_type=default_sample_type,
-            default_sequencing_type=default_sequencing_type,
-            default_sequencing_technology=default_sequencing_technology,
-            default_sequencing_platform=default_sequencing_platform,
-            default_sequencing_facility=default_sequencing_facility,
-            default_sequencing_library=default_sequencing_library,
+            default_sequencing=default_sequencing,
             default_read_end_type=default_read_end_type,
             default_read_length=default_read_length,
             default_reference_assembly_location=default_reference_assembly_location,
@@ -206,6 +201,7 @@ async def main(  # pylint: disable=too-many-arguments
     default_sample_type='blood',
     default_sequencing_type='genome',
     default_sequencing_technology='short-read',
+    default_sequencing_platform='illumina',
     default_sequencing_facility: str = None,
     default_sequencing_library: str = None,
     default_read_end_type: str = None,
@@ -227,10 +223,13 @@ async def main(  # pylint: disable=too-many-arguments
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequencing_type,
-        default_sequencing_technology=default_sequencing_technology,
-        default_sequencing_facility=default_sequencing_facility,
-        default_sequencing_library=default_sequencing_library,
+        default_sequencing=DefaultSequencing(
+            type=default_sequencing_type,
+            technology=default_sequencing_technology,
+            platform=default_sequencing_platform,
+            facility=default_sequencing_facility,
+            library=default_sequencing_library,
+        ),
         default_read_end_type=default_read_end_type,
         default_read_length=default_read_length,
         default_reference_assembly_location=default_reference_assembly,
