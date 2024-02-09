@@ -77,6 +77,7 @@ def create_analysis_entry(
             type='web',
             status=AnalysisStatus('completed'),
             meta={'display_url': display_url},
+            sequencing_group_ids=[sgid],
             output=output_path,
             active=active,
         ),
