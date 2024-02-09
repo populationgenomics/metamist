@@ -66,7 +66,7 @@ def create_analysis_entry(
         project = f'{project}-test'
     output_prefix = get_config()['workflow']['output_prefix']
     output_path = os.path.join(
-        get_config()['storage']['default']['web'], output_prefix, sgid, '.html'
+        get_config()['storage']['default']['web'], output_prefix, f'{sgid}.html'
     )
     display_url = os.path.join(
         get_config()['storage']['default']['web_url'], output_prefix, f'{sgid}.html'
