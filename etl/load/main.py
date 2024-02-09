@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import os
+from functools import lru_cache
 from typing import Any, Literal
 
 import flask
@@ -21,8 +22,15 @@ BIGQUERY_LOG_TABLE = os.getenv('BIGQUERY_LOG_TABLE')
 NOTIFICATION_PUBSUB_TOPIC = os.getenv('NOTIFICATION_PUBSUB_TOPIC')
 ETL_ACCESSOR_CONFIG_SECRET = os.getenv('CONFIGURATION_SECRET')
 
-BQ_CLIENT = bq.Client()
-SECRET_MANAGER = secretmanager.SecretManagerServiceClient()
+
+@lru_cache
+def get_bq_client():
+    return bq.Client()
+
+
+@lru_cache
+def get_secret_manager():
+    return secretmanager.SecretManagerServiceClient()
 
 
 class ParsingStatus:
@@ -34,11 +42,12 @@ class ParsingStatus:
     FAILED = 'FAILED'
 
 
+@lru_cache
 def get_accessor_config() -> dict:
     """
     Read the secret from the full secret path: ETL_ACCESSOR_CONFIG_SECRET
     """
-    response = SECRET_MANAGER.access_secret_version(
+    response = get_secret_manager().access_secret_version(
         request={'name': ETL_ACCESSOR_CONFIG_SECRET}
     )
     return json.loads(response.payload.data.decode('UTF-8'))
@@ -211,9 +220,11 @@ def etl_load(request: flask.Request):
         bq.ScalarQueryParameter('request_id', 'STRING', request_id),
     ]
 
+    bq_client = get_bq_client()
+
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
-    query_job_result = BQ_CLIENT.query(query, job_config=job_config).result()
+    query_job_result = bq_client.query(query, job_config=job_config).result()
 
     if query_job_result.total_rows == 0:
         # Request ID not found
@@ -233,7 +244,7 @@ def etl_load(request: flask.Request):
     bq_job_result = list(query_job_result)[0]
 
     (status, parsing_result, uploaded_record) = process_rows(
-        bq_job_result, delivery_attempt, request_id, BQ_CLIENT
+        bq_job_result, delivery_attempt, request_id, bq_client
     )
 
     # return success
@@ -373,4 +384,6 @@ def prepare_parser_map() -> dict[str, type[GenericParser]]:
         parser_short_name, parser_version = parser_cls.get_info()
         parser_map[f'{parser_short_name}/{parser_version}'] = parser_cls
 
+    return parser_map
+    return parser_map
     return parser_map
