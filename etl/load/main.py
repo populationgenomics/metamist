@@ -24,12 +24,12 @@ ETL_ACCESSOR_CONFIG_SECRET = os.getenv('CONFIGURATION_SECRET')
 
 
 @lru_cache
-def get_bq_client():
+def _get_bq_client():
     return bq.Client()
 
 
 @lru_cache
-def get_secret_manager():
+def _get_secret_manager():
     return secretmanager.SecretManagerServiceClient()
 
 
@@ -47,7 +47,7 @@ def get_accessor_config() -> dict:
     """
     Read the secret from the full secret path: ETL_ACCESSOR_CONFIG_SECRET
     """
-    response = get_secret_manager().access_secret_version(
+    response = _get_secret_manager().access_secret_version(
         request={'name': ETL_ACCESSOR_CONFIG_SECRET}
     )
     return json.loads(response.payload.data.decode('UTF-8'))
@@ -220,7 +220,7 @@ def etl_load(request: flask.Request):
         bq.ScalarQueryParameter('request_id', 'STRING', request_id),
     ]
 
-    bq_client = get_bq_client()
+    bq_client = _get_bq_client()
 
     job_config = bq.QueryJobConfig()
     job_config.query_parameters = query_params
@@ -384,6 +384,4 @@ def prepare_parser_map() -> dict[str, type[GenericParser]]:
         parser_short_name, parser_version = parser_cls.get_info()
         parser_map[f'{parser_short_name}/{parser_version}'] = parser_cls
 
-    return parser_map
-    return parser_map
     return parser_map
