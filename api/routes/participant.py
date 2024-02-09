@@ -117,26 +117,28 @@ async def update_many_participant_external_ids(
 )
 async def get_external_participant_id_to_sequencing_group_id(
     project: str,
+    sequencing_type: str = None,
     export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
     """
-    Get csv / tsv export of external_participant_id to internal_sample_id
+    Get csv / tsv export of external_participant_id to sequencing_group_id
 
-    Get a map of {external_participant_id} -> {internal_sample_id}
-    useful to matching joint-called samples in the matrix table to the participant
+    Get a map of {external_participant_id} -> {sequencing_group_id}
+    useful to matching joint-called sequencing groups in the matrix table to the participant
 
     Return a list not dictionary, because dict could lose
     participants with multiple samples.
 
+    :param sequencing_type: Leave empty to get all sequencing types
     :param flip_columns: Set to True when exporting for seqr
     """
     player = ParticipantLayer(connection)
     # this wants project ID (connection.project)
     assert connection.project
     m = await player.get_external_participant_id_to_internal_sequencing_group_id_map(
-        project=connection.project
+        project=connection.project, sequencing_type=sequencing_type
     )
 
     rows = [[pid, sequencing_group_id_format(sgid)] for pid, sgid in m]
@@ -152,6 +154,8 @@ async def get_external_participant_id_to_sequencing_group_id(
 
     ext = export_type.get_extension()
     filename = f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    if sequencing_type:
+        filename = f'{project}-{sequencing_type}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
         # stream the whole file at once, because it's all in memory anyway
         iter([output.getvalue()]),
