@@ -15,7 +15,6 @@ from api.utils.db import (
 from api.utils.export import ExportType
 from db.python.layers.participant import ParticipantLayer
 from models.models.participant import ParticipantUpsert
-from models.models.sample import sample_id_format
 from models.models.sequencing_group import sequencing_group_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
