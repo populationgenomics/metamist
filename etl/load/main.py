@@ -4,13 +4,15 @@ import datetime
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Literal
 
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
 import pkg_resources
-from google.cloud import pubsub_v1, secretmanager  # type: ignore
+from google.cloud import pubsub_v1, secretmanager
+
+from metamist.parser.generic_parser import GenericParser  # type: ignore
 
 # strip whitespace, newlines and '/' for template matching
 STRIP_CHARS = '/ \n'
@@ -91,7 +93,7 @@ def process_rows(
     record_data = row_json.get('data', row_json)
 
     (parser_obj, err_msg) = get_parser_instance(
-        submitting_user=submitting_user, source_type=source_type, init_params=config
+        submitting_user=submitting_user, request_type=source_type, init_params=config
     )
 
     if parser_obj:
@@ -292,50 +294,65 @@ def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
 
 
 def get_parser_instance(
-    submitting_user: str, source_type: str | None, init_params: dict | None
+    submitting_user: str, request_type: str | None, init_params: dict
 ) -> tuple[object | None, str | None]:
     """Extract parser name from source_type
 
     Args:
-        source_type (str | None): _description_
+        parser_type (str | None): The name of the config.etl.accessors.name to match
 
     Returns:
         object | None: _description_
     """
-    if not source_type:
-        return None, 'Empty source_type'
+    if not request_type:
+        return None, f'No "type" was provided on the request from {submitting_user}'
 
     # check that submitting_user has access to parser
-    accessor_config = get_accessor_config()
+
+    accessor_config: dict[
+        str,
+        list[
+            dict[
+                Literal['name']
+                | Literal['parser_name']
+                | Literal['default_parameters'],
+                Any,
+            ]
+        ],
+    ] = get_accessor_config()
+
     if submitting_user not in accessor_config:
         return None, (
             f'Submitting user {submitting_user} is not allowed to access any parsers'
         )
 
-    found_parser = next(
+    # find the config
+    etl_accessor_config = next(
         (
-            parser
-            for parser in accessor_config[submitting_user]
-            if parser['name'].strip(STRIP_CHARS) == source_type.strip(STRIP_CHARS)
+            accessor_config
+            for accessor_config in accessor_config[submitting_user]
+            if accessor_config['name'].strip(STRIP_CHARS)
+            == request_type.strip(STRIP_CHARS)
         ),
         None,
     )
-    if not found_parser:
+    if not etl_accessor_config:
         return None, (
-            f'Submitting user {submitting_user} is not allowed to access {source_type}'
+            f'Submitting user {submitting_user} is not allowed to access {request_type}'
         )
 
-    init_params.update(found_parser.get('default_parameters', {}))
-    _resolved_source_type = (found_parser.get('type_override') or source_type).strip(
+    parser_name = (etl_accessor_config.get('parser_name') or request_type).strip(
         STRIP_CHARS
     )
 
+    init_params.update(etl_accessor_config.get('default_parameters', {}))
+
     parser_map = prepare_parser_map()
 
-    parser_class_ = parser_map.get(_resolved_source_type, None)
+    parser_class_ = parser_map.get(parser_name, None)
     if not parser_class_:
         # class not found
-        return None, f'Parser for {_resolved_source_type} not found'
+        return None, f'Parser for {parser_name} not found'
 
     try:
         parser_obj = parser_class_(**(init_params or {}))
@@ -346,7 +363,7 @@ def get_parser_instance(
     return parser_obj, None
 
 
-def prepare_parser_map() -> dict:
+def prepare_parser_map() -> dict[str, type[GenericParser]]:
     """Prepare parser map
     loop through metamist_parser entry points and create map of parsers
     """
