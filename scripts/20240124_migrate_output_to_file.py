@@ -27,14 +27,14 @@ async def get_analyses_without_fileid(connection):
         """
         SELECT a.id, a.output
         FROM analysis a
-        LEFT JOIN analysis_file af ON af.analysis_id = a.id
-        LEFT JOIN file f ON f.id = af.file_id
-        WHERE f.id IS NULL
+        LEFT JOIN analysis_outputs ao ON ao.analysis_id = a.id
+        LEFT JOIN file f ON f.id = ao.file_id
+        WHERE f.id IS NULL AND ao.output IS NULL
         """
     )
     print('Fetching...')
     rows = await connection.fetch_all(query=query)
-    print(f'Found {len(rows)} analyses without fileid')
+    print(f'Found {len(rows)} analyses without file_id and output fields set.')
 
     return rows
 
@@ -44,7 +44,7 @@ async def execute(connection, query, inserts):
     await connection.execute(query, inserts)
 
 
-def get_file_info(path: str) -> Dict:
+async def get_file_info(path: str) -> Dict:
     """Get file dict"""
     print('Extracting file dict')
     return {
@@ -53,7 +53,8 @@ def get_file_info(path: str) -> Dict:
         'dirname': FileInternal.get_dirname(path),
         'nameroot': FileInternal.get_nameroot(path),
         'nameext': FileInternal.get_extension(path),
-        'checksum': FileInternal.get_checksum(path),
+        'file_checksum': await FileInternal.get_checksum(path),
+        'valid': await FileInternal.validate_path(path),
         'size': FileInternal.get_size(path),
     }
 
@@ -71,7 +72,7 @@ def extract_file_paths(input_str):
             file_paths = dict(zip(matches[::2], matches[1::2]))
             return file_paths
         except json.JSONDecodeError:
-            pass  # Continue to treat as a plain file path
+            print('JSON Error')
 
     # Treat input as a plain file path
     return {'plain_file_path': input_str}
@@ -80,18 +81,22 @@ def extract_file_paths(input_str):
 async def prepare_files(analyses):
     """Serialize files for insertion"""
     files = []
+    print(f'Preparing files...{len(analyses)} analyses to process.')
     for analysis in analyses:
         path = analysis['output']
         if path is None:
+            print('Path is None')
             continue
 
         path_dict = extract_file_paths(path)
+        print(path_dict)
         if path_dict:
+            print('Found path dict')
             for _, path in path_dict.items():
                 print(path)
                 files.append((
                     analysis['id'],
-                    get_file_info(path=path)
+                    await get_file_info(path=path)
                 ))
                 print('Extracted and added.')
     return files
@@ -100,13 +105,13 @@ async def prepare_files(analyses):
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, basename, dirname, nameroot, nameext, checksum, size)
-        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :checksum, :size)
+        """INSERT INTO file (path, basename, dirname, nameroot, nameext, file_checksum, size, valid)
+        VALUES (:path, :basename, :dirname, :nameroot, :nameext, :file_checksum, :size, :valid)
         RETURNING id"""
     )
     af_query = dedent(
         """
-        INSERT INTO analysis_file (analysis_id, file_id, output, json_structure) VALUES (:analysis_id, :file_id, :output, :json_structure)
+        INSERT INTO analysis_outputs (analysis_id, file_id, output, json_structure) VALUES (:analysis_id, :file_id, :output, :json_structure)
         """
     )
     for analysis_id, file in files:
@@ -118,7 +123,7 @@ async def insert_files(connection, files):
         if not file_id:
             join_inserts = {'analysis_id': analysis_id, 'file_id': None, 'output': file.get('path'), 'json_structure': None}
         else:
-            join_inserts = {'analysis_id': analysis_id, 'file_id': file_id, 'output': file.get('path'), 'json_structure': None}
+            join_inserts = {'analysis_id': analysis_id, 'file_id': file_id, 'output': None, 'json_structure': None}
         await execute(
             connection=connection,
             query=af_query,

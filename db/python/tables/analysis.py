@@ -2,7 +2,7 @@
 import dataclasses
 import datetime
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from db.python.tables.base import DbBase
 from db.python.utils import (
@@ -61,7 +61,6 @@ class AnalysisTable(DbBase):
         status: AnalysisStatus,
         sequencing_group_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
-        outputs: str = None,
         active: bool = True,
         project: ProjectId = None,
     ) -> int:
@@ -74,7 +73,6 @@ class AnalysisTable(DbBase):
                 ('type', analysis_type),
                 ('status', status.value),
                 ('meta', to_db_json(meta or {})),
-                ('output', outputs),  # can keep for now but will be deprecated eventually as a column
                 ('audit_log_id', await self.audit_log_id()),
                 ('project', project or self.project),
                 ('active', active if active is not None else True),
@@ -146,7 +144,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         status: AnalysisStatus,
         meta: Dict[str, Any] = None,
         active: bool = None,
-        outputs: Optional[str] = None,
     ):
         """
         Update the status of an analysis, set timestamp_completed if relevant
@@ -169,10 +166,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         if status == AnalysisStatus.COMPLETED:
             fields['timestamp_completed'] = datetime.datetime.utcnow()
             setters.append('timestamp_completed = :timestamp_completed')
-
-        if outputs:
-            fields['output'] = outputs
-            setters.append('output = :output')
 
         if meta is not None and len(meta) > 0:
             fields['meta'] = to_db_json(meta)
@@ -217,7 +210,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         _query = f"""
         SELECT a.id as id, a.type as type, a.status as status,
-                a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+                a_sg.sequencing_group_id as sequencing_group_id,
                 a.project as project, a.timestamp_completed as timestamp_completed,
                 a.active as active, a.meta as meta, a.author as author
         FROM analysis a
@@ -238,21 +231,48 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 retvals[key] = AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(key, [])})
         return list(retvals.values())
 
-    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[FileInternal]]:
+    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[Union[Tuple[FileInternal, str], str]]]:
         """Fetches all output files for a list of analysis IDs"""
 
         _query = """
-        SELECT af.analysis_id, f.*
-        FROM analysis_file af
-        INNER JOIN file f ON af.file_id = f.id
-        WHERE af.analysis_id IN :analysis_ids
+        SELECT ao.analysis_id, f.*, ao.json_structure, ao.output
+        FROM analysis_outputs ao
+        LEFT JOIN file f ON ao.file_id = f.id
+        WHERE ao.analysis_id IN :analysis_ids
         """
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
-        analysis_files: dict[int, list[FileInternal]] = defaultdict(list)
+        analysis_files: dict[int, list[Union[Tuple[FileInternal, str], str]]] = defaultdict(list)
+
+        # Need to add a check for existence of file_id in the row
+        parent_ids = [row['id'] for row in rows if row['id'] is not None]
+        secondary_files: dict = {}
+        if parent_ids:
+            secondary_files = await self.get_secondary_files_for_file_output(parent_ids)
+
         for row in rows:
-            analysis_files[row['analysis_id']].append(FileInternal.from_db(**dict(row)))
+            # Return a tuple of (FileInternal, json_structure) if file_id is not None, else just the output
+            analysis_files[row['analysis_id']].append((
+                FileInternal.from_db(**dict(row)).copy(update={
+                    'secondary_files': secondary_files.get(row['id'], []) if secondary_files else []
+                    }),
+                row['json_structure']) if row['id'] else row['output'])
 
         return analysis_files
+
+    async def get_secondary_files_for_file_output(self, parent_file_ids: list[int]) -> dict[int, list[FileInternal]]:
+        """Fetches all secondary files for a list of parent files"""
+
+        _query = """
+        SELECT f.*
+        FROM file f
+        WHERE f.parent_id IN :parent_file_ids
+        """
+        rows = await self.connection.fetch_all(_query, {'parent_file_ids': parent_file_ids})
+        secondary_files: dict[int, list[FileInternal]] = defaultdict(list)
+        for row in rows:
+            secondary_files[row['parent_id']].append(FileInternal.from_db(**dict(row)))
+
+        return secondary_files
 
     async def get_latest_complete_analysis_for_type(
         self,
@@ -276,7 +296,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         _query = f"""
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_sg.sample_id as sample_id,
+        a_sg.sample_id as sample_id,
         a.project as project, a.timestamp_completed as timestamp_completed,
         a.meta as meta
 FROM analysis_sequencing_group a_sg
@@ -291,7 +311,9 @@ WHERE a.id = (
         rows = await self.connection.fetch_all(_query, values)
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
-        a = AnalysisInternal.from_db(**dict(rows[0]))
+        analysis_ids: list = [row['id'] for row in rows[0]]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
+        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'outputs': analysis_outputs_by_aid.get(rows[0]['id'], [])})
         # .from_db maps 'sample_id' -> sample_ids
         for row in rows[1:]:
             a.sample_ids.append(row['sample_id'])
@@ -328,7 +350,7 @@ WHERE s.project = :project AND
         """
         _query = """
 SELECT a.id as id, a.type as type, a.status as status,
-        a.output as output, a_sg.sequencing_group_id as sequencing_group_id,
+        a_sg.sequencing_group_id as sequencing_group_id,
         a.project as project, a.meta as meta
 FROM analysis_sequencing_group a_sg
 INNER JOIN analysis a ON a_sg.analysis_id = a.id
@@ -338,10 +360,12 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
             _query, {'project': project or self.project}
         )
         analysis_by_id = {}
+        analysis_ids: list = [row['id'] for row in rows]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
+                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(aid, [])})
             else:
                 analysis_by_id[aid].sample_ids.append(row['sequencing_group_id'])
 
@@ -353,7 +377,7 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         """Get the latest complete analysis for samples (one per sample)"""
         _query = """
 SELECT
-    a.id AS id, a.type as type, a.status as status, a.output as output,
+    a.id AS id, a.type as type, a.status as status,
     a.project as project, a_sg.sequencing_group_id as sample_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
@@ -376,11 +400,13 @@ ORDER BY a.timestamp_completed DESC
         rows = await self.connection.fetch_all(_query, values)
         seen_sequencing_group_ids = set()
         analyses: List[AnalysisInternal] = []
+        analysis_ids: list = [row['id'] for row in rows]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         for row in rows:
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
             seen_sequencing_group_ids.add(row['sequencing_group_id'])
-            analyses.append(AnalysisInternal.from_db(**dict(row)))
+            analyses.append(AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(row['id'], [])}))
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -392,7 +418,7 @@ ORDER BY a.timestamp_completed DESC
         _query = """
 SELECT
     a.id as id, a.type as type, a.status as status,
-    a.output as output, a.project as project,
+    a.project as project,
     a_sg.sequencing_group_id as sequencing_group_id,
     a.timestamp_completed as timestamp_completed, a.meta as meta
 FROM analysis a
@@ -404,8 +430,9 @@ WHERE a.id = :analysis_id
             raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
 
         project = rows[0]['project']
-
-        a = AnalysisInternal.from_db(**dict(rows[0]))
+        analysis_ids: list = [row['id'] for row in rows[0]]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
+        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'outputs': analysis_outputs_by_aid.get(rows[0], [])})
         for row in rows[1:]:
             a.sample_ids.append(row['sequencing_group_id'])
 
@@ -436,7 +463,7 @@ WHERE a.id = :analysis_id
         _query = f"""
     SELECT
         a.id as id, a.type as type, a.status as status,
-        a.output as output, a.project as project,
+        a.project as project,
         a_sg.sequencing_group_id as sequencing_group_id,
         a.timestamp_completed as timestamp_completed, a.meta as meta
     FROM analysis a
@@ -447,10 +474,12 @@ WHERE a.id = :analysis_id
         rows = await self.connection.fetch_all(_query, values)
         analyses = {}
         projects: set[ProjectId] = set()
+        analysis_ids: list = [row['id'] for row in rows]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         for a in rows:
             a_id = a['id']
             if a_id not in analyses:
-                analyses[a_id] = AnalysisInternal.from_db(**dict(a))
+                analyses[a_id] = AnalysisInternal.from_db(**dict(a)).copy(update={'outputs': analysis_outputs_by_aid.get(a_id, [])})
                 projects.add(a['project'])
 
             analyses[a_id].sample_ids.append(a['sample_id'])
@@ -487,7 +516,7 @@ WHERE a.id = :analysis_id
             values['pids'] = list(participant_ids)
 
         _query = f"""
-SELECT p.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
+SELECT p.external_id as participant_id, sg.id as sequencing_group_id
 FROM analysis a
 INNER JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
 INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
@@ -499,8 +528,10 @@ ORDER BY a.timestamp_completed DESC;
 """
 
         rows = await self.connection.fetch_all(_query, values)
+        analysis_ids: list = [row['id'] for row in rows[0]]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         # many per analysis
-        return [dict(d) for d in rows]
+        return [dict(d).update({'outputs': analysis_outputs_by_aid.get(d['id'], [])}) for d in rows]
 
     async def get_analysis_runner_log(
         self,
@@ -516,6 +547,7 @@ ORDER BY a.timestamp_completed DESC;
             "type = 'analysis-runner'",
             'active',
         ]
+        joins = []
         if project_ids:
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
@@ -525,14 +557,19 @@ ORDER BY a.timestamp_completed DESC;
             values['audit_log_id'] = await self.audit_log_id()
 
         if output_dir:
-            wheres.append('(output = :output OR output LIKE :output_like)')
+            joins.append('LEFT JOIN analysis_outputs ao ON analysis.id = ao.analysis_id',)
+            joins.append('LEFT JOIN file f ON ao.file_id = f.id')
+            wheres.append('(f.path = :output OR ao.output LIKE :output_like)')
             values['output'] = output_dir
             values['output_like'] = f'%{output_dir}'
 
         wheres_str = ' AND '.join(wheres)
-        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        joins_str = ' '.join(joins)
+        _query = f'SELECT * FROM analysis {joins_str} WHERE {wheres_str}'
         rows = await self.connection.fetch_all(_query, values)
-        return [AnalysisInternal.from_db(**dict(r)) for r in rows]
+        analysis_ids: list = [row['id'] for row in rows]
+        analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
+        return [AnalysisInternal.from_db(**dict(r)).copy(update={'outputs': analysis_outputs_by_aid.get(r['id'], [])}) for r in rows]
 
     # region STATS
 

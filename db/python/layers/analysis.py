@@ -550,7 +550,6 @@ class AnalysisLayer(BaseLayer):
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
             meta=analysis.meta,
-            outputs=analysis.outputs,
             active=analysis.active,
             project=project,
         )
@@ -595,7 +594,6 @@ class AnalysisLayer(BaseLayer):
             analysis_id=analysis_id,
             status=status,
             meta=meta,
-            outputs=outputs,
         )
 
         await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)

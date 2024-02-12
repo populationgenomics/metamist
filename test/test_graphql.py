@@ -203,7 +203,7 @@ query MyQuery($project: String!) {
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 meta={},
-                outputs='some-output',
+                outputs={'basename': 'some-output'},
             )
         )
 

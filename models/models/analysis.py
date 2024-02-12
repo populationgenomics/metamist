@@ -20,7 +20,7 @@ class AnalysisInternal(SMBase):
     id: int | None = None
     type: str
     status: AnalysisStatus
-    outputs: str = None
+    outputs: dict | None = {}
     sequencing_group_ids: list[int] = []
     timestamp_completed: datetime | None = None
     project: int | None = None
@@ -90,7 +90,7 @@ class Analysis(BaseModel):
     status: AnalysisStatus
     id: int | None = None
 
-    outputs: str | None = None
+    outputs: dict | None = {}
     sequencing_group_ids: list[str] = []
     author: str | None = None
     timestamp_completed: str | None = None

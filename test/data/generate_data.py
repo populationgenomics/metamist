@@ -168,10 +168,67 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
 
     analyses_to_insert = [
         Analysis(
+            sequencing_group_ids=random.sample(
+                sequencing_group_ids, len(sequencing_group_ids) // 2
+            ),
+            type='es-index',
+            status=AnalysisStatus('completed'),
+            outputs={
+                'qc_results': {
+                    'basename': 'gs://sm-dev-test/file1.txt'
+                    },
+                'cram': {
+                    'basename': 'gs://sm-dev-test/file1.cram'
+                },
+                'qc': {
+                    'cram': {
+                        'basename': 'gs://sm-dev-test/file2.cram',
+                        'secondaryFiles':
+                            {
+                                'cram_ext': {
+                                    'basename': 'gs://sm-dev-test/file2.cram.ext'
+                                },
+                                'cram_meta': {
+                                    'basename': 'gs://sm-dev-test/file2.cram.meta'
+                                }
+                            }
+                    },
+                    'aggregate': {
+                        'cram': {
+                            'basename': 'gs://sm-dev-test/file3.cram',
+                            'secondaryFiles': {
+                                    'cram_ext': {
+                                        'basename': 'gs://sm-dev-test/file3.cram.ext'
+                                    },
+                                    'cram_meta': {
+                                        'basename': 'gs://sm-dev-test/file3.cram.meta'
+                                    }
+                                }
+                        },
+                        'qc': {
+                            'basename': 'gs://sm-dev-test/file1.qc',
+                            'secondaryFiles': {
+                                'qc_ext': {
+                                    'basename': 'gs://sm-dev-test/file1.qc.ext'
+                                },
+                                'qc_meta': {
+                                    'basename': 'gs://sm-dev-test/file1.qc.meta'
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            meta={},
+        )
+    ]
+
+    analyses_to_insert.extend([
+        Analysis(
             sequencing_group_ids=[s],
             type='cram',
             status=AnalysisStatus('completed'),
-            output=f'FAKE://greek-myth/crams/{s}.cram',
+            outputs={'basename': f'FAKE://greek-myth/crams/{s}.cram'},
             timestamp_completed=(
                 datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 15))
             ).isoformat(),
@@ -182,7 +239,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             },
         )
         for s in sequencing_group_ids
-    ]
+    ])
 
     analyses_to_insert.extend(
         [
@@ -190,7 +247,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                 sample_ids=[],
                 type='analysis-runner',
                 status=AnalysisStatus('completed'),
-                output=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
+                outputs={'basename': f'FAKE://greek-myth-test/joint-calling/{s}.joint'},
                 active=True,
                 meta={
                     'accessLevel': 'full',
@@ -217,7 +274,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
             ),
             type='es-index',
             status=AnalysisStatus('completed'),
-            output=f'FAKE::greek-myth-genome-{datetime.date.today()}',
+            outputs={'basename': f'FAKE::greek-myth-genome-{datetime.date.today()}'},
             meta={},
         )
     )
@@ -237,7 +294,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                     sequencing_group_ids=[],
                     type='analysis-runner',
                     status=AnalysisStatus('unknown'),
-                    output='gs://cpg-fake-bucket/output',
+                    outputs={'basename': 'gs://cpg-fake-bucket/output'},
                     meta={
                         'timestamp': f'2022-08-{i+1}T10:00:00.0000+00:00',
                         'accessLevel': 'standard',
