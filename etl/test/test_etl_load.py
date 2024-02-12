@@ -1,44 +1,17 @@
 import base64
 import json
-from test.testbase import run_as_sync
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import etl.load.main
 from metamist.parser.generic_metadata_parser import GenericMetadataParser
 
-ETL_SAMPLE_RECORD_3 ={
-    'config': {
-        'search_locations': [],
-        'project': 'milo-dev',
-        'participant_column': 'individual_id',
-        'sample_name_column': 'sample_id',
-        'seq_type_column': 'sequencing_type',
-        'default_sequencing_type': 'sequencing_type',
-        'default_sample_type': 'blood',
-        'default_sequencing_technology': 'short-read',
-        'sample_meta_map': {
-            'collection_centre': 'centre',
-            'collection_date': 'collection_date',
-            'collection_specimen': 'specimen',
-        },
-        'participant_meta_map': {},
-        'assay_meta_map': {},
-        'qc_meta_map': {},
-    },
-    'data': {
-        'sample_id': '123456',
-        'external_id': 'AAA000000',
-        'individual_id': '678',
-        'sequencing_type': 'exome',
-        'collection_centre': 'ABCDEF',
-        'collection_date': '2023-08-05T01:39:28.611476',
-        'collection_specimen': 'blood',
-    },
-}
-
 
 class TestGetParserInstance(GenericMetadataParser):
+    """
+    A very basic parser for testing purposes.
+    """
+
     def __init__(
         self,
         project: str,
@@ -69,10 +42,6 @@ class TestGetParserInstance(GenericMetadataParser):
 class TestEtlLoad(TestCase):
     """Test etl cloud functions"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-
     @staticmethod
     def get_query_job_result(
         mock_bq,
@@ -80,6 +49,7 @@ class TestEtlLoad(TestCase):
         body: str | None = None,
         submitting_user: str | None = None,
     ):
+        """Helper function to mock the bigquery response for etl_load tests"""
 
         query_job_result = MagicMock(args={}, spec=['__iter__', '__next__'])
 
@@ -97,9 +67,8 @@ class TestEtlLoad(TestCase):
 
         mock_bq.return_value.query.return_value.result.return_value = query_job_result
 
-    @run_as_sync
     @patch('etl.load.main._get_bq_client', autospec=True)
-    async def test_etl_load_not_found_record(self, mock_bq):
+    def test_etl_load_not_found_record(self, mock_bq):
         """
         Test etl load, where the bigquery record is not found
         """
@@ -124,30 +93,19 @@ class TestEtlLoad(TestCase):
 
     @patch('etl.load.main._get_bq_client', autospec=True)
     @patch('etl.load.main.get_parser_instance')
-    @patch('etl.load.main.call_parser')
-    def test_etl_load_found_record_simple_payload(
-        self, mock_call_parser, mock_get_parser_instance, mock_bq
+    def test_etl_load_found_record_simple_payload_with_not_found_parser(
+        self, mock_get_parser_instance, mock_bq
     ):
         """Test etl load simple payload"""
 
-        ETL_SAMPLE_RECORD_2 = json.dumps(
-            {
-                'sample_id': '123456',
-                'external_id': 'AAA000000',
-                'individual_id': '678',
-                'sequencing_type': 'exome',
-                'collection_centre': 'ABCDEF',
-                'collection_date': '2023-08-05T01:39:28.611476',
-                'collection_specimen': 'blood',
-            }
-        )
+        record = {'sample': '12345'}
 
         # mock the bigquery response
         self.get_query_job_result(
             mock_bq,
             request_type='/bbv/v1',
             submitting_user='user@mail.com',
-            body=ETL_SAMPLE_RECORD_2,
+            body=json.dumps(record),
         )
 
         # we test the parsing functionality below
@@ -167,7 +125,7 @@ class TestEtlLoad(TestCase):
             response,
             {
                 'id': '1234567890',
-                'record': json.loads(ETL_SAMPLE_RECORD_2),
+                'record': record,
                 'result': 'Error: Parser for /bbv/v1 not found when parsing record with id: 1234567890',
                 'success': False,
             },
@@ -205,12 +163,17 @@ class TestEtlLoad(TestCase):
 
         request.get_json.return_value = pubsub_payload_example
 
+        record = {
+            'config': {'project': 'test'},
+            'data': {'sample': '123456'},
+        }
+
         # mock the bigquery response
         self.get_query_job_result(
             mock_bq=mock_bq,
             request_type='/gmp/v1',
             submitting_user='user@mail.com',
-            body=json.dumps(ETL_SAMPLE_RECORD_3),
+            body=json.dumps(record),
         )
 
         mock_get_parser_instance.return_value = (TestGetParserInstance, None)
@@ -223,7 +186,7 @@ class TestEtlLoad(TestCase):
             response,
             {
                 'id': '6dc4b9ae-74ee-42ee-9298-b0a51d5c6836',
-                'record': ETL_SAMPLE_RECORD_3,
+                'record': record,
                 'result': '',
                 'success': True,
             },
@@ -240,7 +203,7 @@ class TestEtlLoad(TestCase):
             'user@test.com': [
                 {
                     'name': 'test/v1',
-                    'default_parameters': {'project': 'test'},
+                    'default_parameters': {},
                     # 'parser_name': 'test',
                 }
             ]
@@ -254,14 +217,14 @@ class TestEtlLoad(TestCase):
             submitting_user='user@test.com',
             # note the leading slash should be stripped
             request_type='/test/v1',
-            init_params={'project': 'to_override'},
+            init_params={'project': 'not-overriden'},
         )
         self.assertIsNotNone(parser)
         self.assertIsInstance(parser, TestGetParserInstance)
 
         # do this assert for static analysis
         assert isinstance(parser, TestGetParserInstance)
-        self.assertEqual(parser.project, 'test')
+        self.assertEqual(parser.project, 'not-overriden')
 
     @patch('etl.load.main.get_accessor_config')
     @patch('etl.load.main.prepare_parser_map')
