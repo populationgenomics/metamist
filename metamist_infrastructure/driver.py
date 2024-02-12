@@ -1,3 +1,4 @@
+# pylint: disable=R0904
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -59,20 +60,22 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     @cached_property
     def _svc_cloudresourcemanager(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-cloudresourcemanager-service',
             service='cloudresourcemanager.googleapis.com',
             disable_on_destroy=False,
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
         )
 
     @cached_property
     def _svc_iam(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-iam-service',
             service='iam.googleapis.com',
             disable_on_destroy=False,
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.resource.ResourceOptions(
                 depends_on=[self._svc_cloudresourcemanager]
             ),
@@ -80,47 +83,65 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     @cached_property
     def _svc_functions(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-cloudfunctions-service',
             service='cloudfunctions.googleapis.com',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             disable_on_destroy=False,
         )
 
     @cached_property
     def _svc_pubsub(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-pubsub-service',
             service='pubsub.googleapis.com',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             disable_on_destroy=False,
         )
 
     @cached_property
     def _svc_scheduler(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-cloudscheduler-service',
             service='cloudscheduler.googleapis.com',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             disable_on_destroy=False,
         )
 
     @cached_property
     def _svc_build(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-cloudbuild-service',
             service='cloudbuild.googleapis.com',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             disable_on_destroy=False,
         )
 
     @cached_property
     def _svc_bigquery(self):
+        assert self.config.metamist
         return gcp.projects.Service(
             'metamist-bigquery-service',
             service='bigquery.googleapis.com',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             disable_on_destroy=False,
+        )
+
+    @cached_property
+    def _svc_secretmanager(self):
+        assert self.config.metamist
+        return gcp.projects.Service(
+            'metamist-secretmanager-service',
+            service='secretmanager.googleapis.com',
+            disable_on_destroy=False,
+            opts=pulumi.resource.ResourceOptions(
+                depends_on=[self._svc_cloudresourcemanager]
+            ),
+            project=self.config.metamist.gcp.project,
         )
 
     @cached_property
@@ -129,11 +150,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         We will store the source code to the Cloud Function
         in a Google Cloud Storage bucket.
         """
+        assert self.config.gcp
+        assert self.config.metamist
         return gcp.storage.Bucket(
             'metamist-source-bucket',
             name=f'{self.config.gcp.dataset_storage_prefix}metamist-source-bucket',
             location=self.config.gcp.region,
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             uniform_bucket_level_access=True,
         )
 
@@ -141,10 +164,11 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Service account for cloud function
         """
+        assert self.config.metamist
         return gcp.serviceaccount.Account(
             f'metamist-etl-{f_name}service-account',
             account_id=f'metamist-etl-{f_name}sa',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.ResourceOptions(
                 depends_on=[self._svc_iam],
             ),
@@ -166,28 +190,101 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         return self._etl_function_account('extract-')
 
     @cached_property
-    def etl_accessors(self):
+    def etl_accessors(self) -> dict[str, gcp.serviceaccount.Account]:
         """Service account to run endpoint + ingestion as"""
+        assert self.config.metamist
+        assert self.config.metamist.etl
+        assert self.config.metamist.etl.accessors
         return {
             name: gcp.serviceaccount.Account(
                 f'metamist-etl-accessor-{name}',
                 account_id=f'metamist-etl-{name}',
-                project=self.config.sample_metadata.gcp.project,
+                project=self.config.metamist.gcp.project,
                 opts=pulumi.ResourceOptions(
                     depends_on=[self._svc_iam],
                 ),
             )
-            for name in self.config.sample_metadata.etl_accessors
+            # keys only
+            for name in self.config.metamist.etl.accessors
         }
+
+    @cached_property
+    def etl_configuration_secret(self):
+        """
+        Get the secret for the etl-accessor-configuration
+        Nothing is secret, just an easy k-v store
+        """
+        assert self.config.gcp
+        assert self.config.metamist
+
+        return gcp.secretmanager.Secret(
+            'metamist-etl-accessor-configuration-secret',
+            secret_id='accessor-configuration',
+            replication=gcp.secretmanager.SecretReplicationArgs(
+                user_managed=gcp.secretmanager.SecretReplicationUserManagedArgs(
+                    replicas=[
+                        gcp.secretmanager.SecretReplicationUserManagedReplicaArgs(
+                            location=self.config.gcp.region,
+                        ),
+                    ],
+                ),
+            ),
+            opts=pulumi.resource.ResourceOptions(depends_on=[self._svc_secretmanager]),
+            project=self.config.metamist.gcp.project,
+        )
+
+    @cached_property
+    def etl_configuration_secret_version(self):
+        """Get the versioned secret, that contains the latest configuration"""
+        assert self.config.metamist
+        assert self.config.metamist.etl
+        assert self.config.metamist.etl.accessors
+
+        etl_accessor_config = {
+            k: v.to_dict() for k, v in self.config.metamist.etl.accessors.items()
+        }
+
+        def map_accessors_to_new_body(arg):
+            accessors: dict[str, str] = dict(arg)
+            # dict[gcp.serviceaccount.Account: dict[str, ]]
+            remapped = {accessors[k]: v for k, v in etl_accessor_config.items()}
+            return json.dumps(remapped)
+
+        etl_accessors_emails: dict[str, pulumi.Output[str]] = {
+            k: v.email for k, v in self.etl_accessors.items()
+        }
+        remapped_with_id = pulumi.Output.all(**etl_accessors_emails).apply(
+            map_accessors_to_new_body
+        )
+        return gcp.secretmanager.SecretVersion(
+            'metamist-etl-accessor-configuration',
+            secret=self.etl_configuration_secret.id,
+            secret_data=remapped_with_id,
+        )
+
+    def _setup_etl_configuration_secret_value(self):
+        # allow etl-runner to access secret
+        assert self.config.metamist
+
+        gcp.secretmanager.SecretIamMember(
+            'metamist-etl-accessor-configuration-access',
+            project=self.config.metamist.gcp.project,
+            secret_id=self.etl_configuration_secret.id,
+            role='role/secretmanager.secretAccessor',
+            member=pulumi.Output.concat(
+                'serviceAccount:', self.etl_load_service_account.email
+            ),
+        )
 
     @cached_property
     def etl_pubsub_topic(self):
         """
         Pubsub topic to trigger the etl function
         """
+        assert self.config.metamist
         return gcp.pubsub.Topic(
             'metamist-etl-topic',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.ResourceOptions(depends_on=[self._svc_pubsub]),
         )
 
@@ -196,16 +293,17 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Pubsub dead_letters topic to capture failed jobs
         """
+        assert self.config.metamist
         topic = gcp.pubsub.Topic(
             'metamist-etl-dead-letters-topic',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.ResourceOptions(depends_on=[self._svc_pubsub]),
         )
 
         # give publisher permission to service account
         gcp.pubsub.TopicIAMPolicy(
             'metamist-etl-dead-letters-topic-iam-policy',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             topic=topic.name,
             policy_data=self.prepare_service_account_policy_data(
                 'roles/pubsub.publisher'
@@ -220,6 +318,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         Pubsub push_subscription to topic,
         new messages to topic triggeres load process
         """
+        assert self.config.metamist
+
         subscription = gcp.pubsub.Subscription(
             'metamist-etl-subscription',
             topic=self.etl_pubsub_topic.name,
@@ -237,7 +337,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     'x-goog-version': 'v1',
                 },
             ),
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.ResourceOptions(
                 depends_on=[
                     self._svc_pubsub,
@@ -249,7 +349,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # give subscriber permission to service account
         gcp.pubsub.SubscriptionIAMPolicy(
             'metamist-etl-pubsub-topic-subscription-policy',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             subscription=subscription.name,
             policy_data=self.prepare_service_account_policy_data(
                 'roles/pubsub.subscriber'
@@ -263,10 +363,12 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Dead letter subscription
         """
+        assert self.config.metamist
+
         return gcp.pubsub.Subscription(
             'metamist-etl-dead-letter-subscription',
             topic=self.etl_pubsub_dead_letters_topic.name,
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             ack_deadline_seconds=20,
         )
 
@@ -275,6 +377,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Bigquery dataset to contain the bigquery table
         """
+        assert self.config.gcp
+        assert self.config.metamist
         return gcp.bigquery.Dataset(
             'metamist-etl-bigquery-dataset',
             dataset_id='metamist',
@@ -285,7 +389,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             labels={
                 'project': 'metamist',
             },
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             opts=pulumi.ResourceOptions(
                 depends_on=[self._svc_bigquery],
             ),
@@ -293,6 +397,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
     def _setup_bq_table(self, schema_file_name: Path, table_id: str, name_suffix: str):
         """Setup Bigquery table"""
+        assert self.config.metamist
+
         with open(schema_file_name) as f:
             schema = f.read()
 
@@ -302,7 +408,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             labels={'project': 'metamist'},
             schema=schema,
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             # docs say: Note: On newer versions of the provider,
             # you must explicitly set
             deletion_protection=False,
@@ -333,7 +439,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         We need to give this account the ability to publish and read the topic
         """
-        # get project
         project = gcp.organizations.get_project()
 
         return gcp.organizations.get_iam_policy(
@@ -345,7 +450,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                             'serviceAccount:service-',
                             project.number,
                             '@gcp-sa-pubsub.iam.gserviceaccount.com',
-                        )
+                        )  # type: ignore
                     ],
                 )
             ]
@@ -355,17 +460,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         setup_etl
         """
+        assert self.config.metamist
+
         # give the etl_load/extract service_accounts ability to read/write to bq table
         gcp.bigquery.DatasetAccess(
             'metamist-etl-bq-dataset-extract-service-access',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             role='WRITER',
             user_by_email=self.etl_extract_service_account.email,
         )
         gcp.bigquery.DatasetAccess(
             'metamist-etl-bq-dataset-load-service-access',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             dataset_id=self.etl_bigquery_dataset.dataset_id,
             role='WRITER',
             user_by_email=self.etl_load_service_account.email,
@@ -373,7 +480,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # give the etl_load_service_account ability to execute bigquery jobs
         gcp.projects.IAMMember(
             'metamist-etl-bq-job-user-role',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             role='roles/bigquery.jobUser',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_load_service_account.email
@@ -382,7 +489,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # give the etl_extract_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-extract-editor-role',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             role='roles/editor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_extract_service_account.email
@@ -391,7 +498,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         # give the etl_load_service_account ability to push to pub/sub
         gcp.projects.IAMMember(
             'metamist-etl-load-editor-role',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             role='roles/editor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_load_service_account.email
@@ -409,7 +516,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         )
         gcp.projects.IAMMember(
             'metamist-etl-robot-service-agent-role',
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             role='roles/run.serviceAgent',
             member=robot_account,
         )
@@ -418,6 +525,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         self._setup_etl_pubsub()
 
         self._setup_metamist_etl_accessors()
+        self._setup_etl_configuration_secret_value()
 
     def _setup_etl_functions(self):
         """
@@ -500,6 +608,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Driver function to setup the etl cloud function
         """
+        assert self.config.gcp
+        assert self.config.metamist
+        assert self.config.metamist.etl
 
         path_to_func_folder = ETL_FOLDER / f_name
 
@@ -512,7 +623,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 'requirements.txt': append_private_repositories_to_requirements(
                     filename=f'{str(path_to_func_folder.absolute())}/requirements.txt',
                     private_repo_url=private_repo_url,
-                    private_repos=self.config.sample_metadata.etl_private_repo_packages,
+                    private_repos=self.config.metamist.etl.private_repo_packages,
                 ),
             }
             archive = archive_folder(
@@ -542,6 +653,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 runtime='python311',
                 entry_point=f'etl_{f_name}',
                 environment_variables={},
+                # this one is set on an output, so specifying it keeps the function
+                # from being updated, or appearing to update
+                docker_repository=f'projects/{self.config.metamist.gcp.project}/locations/australia-southeast1/repositories/gcf-artifacts',
                 source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceArgs(
                     storage_source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceStorageSourceArgs(
                         bucket=self.source_bucket.name,
@@ -553,7 +667,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 max_instance_count=1,  # Keep max instances to 1 to avoid racing conditions
                 min_instance_count=0,
                 available_memory='2Gi',
-                available_cpu=1,
+                available_cpu='1',
                 timeout_seconds=540,
                 environment_variables={
                     # format: 'project.dataset.table_id
@@ -572,19 +686,19 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                         self.etl_bigquery_log_table.table_id,
                     ),
                     'PUBSUB_TOPIC': self.etl_pubsub_topic.id,
-                    'NOTIFICATION_PUBSUB_TOPIC': self.etl_slack_notification_topic.id
-                    if self.etl_slack_notification_topic
-                    else '',
-                    'SM_ENVIRONMENT': self.config.sample_metadata.etl_environment,
-                    'DEFAULT_LOAD_CONFIG': json.dumps(
-                        self.config.sample_metadata.etl_parser_default_config
+                    'NOTIFICATION_PUBSUB_TOPIC': (
+                        self.etl_slack_notification_topic.id
+                        if self.etl_slack_notification_topic
+                        else ''
                     ),
-                },
+                    'SM_ENVIRONMENT': self.config.metamist.etl.environment,
+                    'CONFIGURATION_SECRET': self.etl_configuration_secret_version.id,
+                },  # type: ignore
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
                 service_account_email=sa.email,
             ),
-            project=self.config.sample_metadata.gcp.project,
+            project=self.config.metamist.gcp.project,
             location=self.config.gcp.region,
             opts=pulumi.ResourceOptions(
                 depends_on=[
@@ -622,15 +736,20 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """
         Setup Slack notification
         """
+        assert self.config.gcp
+        assert self.config.metamist
+        assert self.config.metamist.slack_channel
+        assert self.config.billing
+        assert self.config.billing.aggregator
 
         slack_config = SlackNotificationConfig(
-            project_name=self.config.sample_metadata.gcp.project,
+            project_name=self.config.metamist.gcp.project,
             location=self.config.gcp.region,
             service_account=self.etl_service_account,  # can be some other account
             source_bucket=self.source_bucket,
             slack_secret_project_id=self.config.billing.gcp.project_id,
             slack_token_secret_name=self.config.billing.aggregator.slack_token_secret_name,
-            slack_channel_name=self.config.sample_metadata.slack_channel,
+            slack_channel_name=self.config.metamist.slack_channel,
         )
 
         notification = SlackNotification(
