@@ -80,7 +80,7 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
 
 def process_rows(
     bq_row: bq.table.Row,
-    delivery_attempt: int,
+    delivery_attempt: int | None,
     request_id: str,
     bq_client: bq.Client,
 ) -> tuple[str, Any, Any]:
@@ -91,7 +91,7 @@ def process_rows(
     # source_type should be in the format /ParserName/Version e.g.: /bbv/v1
 
     row_json = json.loads(bq_row.body)
-    submitting_user = row_json['submitting_user']
+    submitting_user = bq_row.submitting_user
 
     # get config from payload and merge with the default
     config = {}
@@ -226,7 +226,7 @@ def etl_load(request: flask.Request):
     job_config.query_parameters = query_params
     query_job_result = bq_client.query(query, job_config=job_config).result()
 
-    if query_job_result.total_rows == 0:
+    if not query_job_result.total_rows or query_job_result.total_rows == 0:
         # Request ID not found
         return {
             'success': False,
@@ -306,7 +306,7 @@ def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
 
 def get_parser_instance(
     submitting_user: str, request_type: str | None, init_params: dict
-) -> tuple[object | None, str | None]:
+) -> tuple[GenericParser | None, str | None]:
     """Extract parser name from source_type
 
     Args:
@@ -363,7 +363,15 @@ def get_parser_instance(
     parser_class_ = parser_map.get(parser_name, None)
     if not parser_class_:
         # class not found
-        return None, f'Parser for {parser_name} not found'
+        if request_type.strip(STRIP_CHARS) != parser_name:
+            return None, (
+                f'Submitting user {submitting_user} could not find parser for '
+                f'request type {request_type}, for parser: {parser_name}'
+            )
+        return (
+            None,
+            f'Submitting user {submitting_user} could not find parser for {request_type}',
+        )
 
     try:
         parser_obj = parser_class_(**(init_params or {}))
