@@ -216,6 +216,7 @@ class ExistingCohortParser(GenericMetadataParser):
     '--sequencing-type',
     type=click.Choice(['genome', 'exome']),
     help='Sequencing type: genome or exome',
+    default='genome',
 )
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(
@@ -239,11 +240,11 @@ async def main(
     project: str,
     search_locations: List[str],
     batch_number: Optional[str],
+    sequencing_type: str,
     confirm=True,
     dry_run=False,
     include_participant_column=False,
     allow_missing_files=False,
-    sequencing_type: str = 'genome',
 ):
     """Run script from CLI arguments"""
 
