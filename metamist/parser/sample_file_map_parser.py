@@ -5,10 +5,7 @@ from typing import List
 
 import click
 
-from metamist.parser.generic_metadata_parser import (
-    GenericMetadataParser,
-    run_as_sync,
-)
+from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
 from metamist.parser.generic_parser import SingleRow
 
 PARTICIPANT_COL_NAME = 'individual_id'

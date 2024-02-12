@@ -13,16 +13,18 @@ And the field name containing the delete paths will be
 """
 
 import csv
-from datetime import datetime
 import logging
 import os
 import sys
-import click
-from google.cloud import storage
-from cloudpathlib import CloudPath, AnyPath
-from cpg_utils.config import get_config
-from metamist.audit.audithelper import AuditHelper
+from datetime import datetime
 
+import click
+from cloudpathlib import AnyPath, CloudPath
+from google.cloud import storage
+
+from cpg_utils.config import get_config
+
+from metamist.audit.audithelper import AuditHelper
 
 CLIENT = storage.Client()
 

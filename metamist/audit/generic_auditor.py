@@ -1,13 +1,14 @@
-from collections import defaultdict, namedtuple
-from functools import cache
 import logging
 import os
-from typing import Any
+from collections import defaultdict, namedtuple
 from datetime import datetime
+from functools import cache
+from typing import Any
 
 from gql.transport.requests import log as requests_logger
+
 from metamist.audit.audithelper import AuditHelper
-from metamist.graphql import query_async, gql
+from metamist.graphql import gql, query_async
 
 ANALYSIS_TYPES_QUERY = gql(
     """

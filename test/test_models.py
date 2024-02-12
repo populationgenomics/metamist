@@ -3,8 +3,8 @@ from unittest import TestCase
 from models.models import (
     ParticipantUpsert,
     ParticipantUpsertInternal,
-    SampleUpsertInternal,
     SampleUpsert,
+    SampleUpsertInternal,
 )
 from models.utils.sample_id_format import sample_id_format
 
