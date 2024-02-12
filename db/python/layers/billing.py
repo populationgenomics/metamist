@@ -1,3 +1,5 @@
+from typing import Any
+
 from db.python.layers.bq_base import BqBaseLayer
 from db.python.tables.bq.billing_ar_batch import BillingArBatchTable
 from db.python.tables.bq.billing_daily import BillingDailyTable
@@ -32,6 +34,8 @@ class BillingLayer(BqBaseLayer):
             return BillingGcpDailyTable(self.connection)
         if source == BillingSource.RAW:
             return BillingRawTable(self.connection)
+        if source == BillingSource.EXTENDED:
+            return BillingDailyExtendedTable(self.connection)
 
         # check if any of the fields is in the extended columns
         if fields:
@@ -202,7 +206,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_ar_guid(
         self,
         ar_guid: str | None = None,
-    ) -> BillingHailBatchCostRecord:
+    ) -> list[dict]:  # BillingHailBatchCostRecord:
         """
         Get Costs by AR GUID
         """
@@ -225,20 +229,25 @@ class BillingLayer(BqBaseLayer):
         # Then get the costs for the given AR GUID/batches from the main table
         all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
 
+        all_cols.append(BillingColumn.AR_GUID.value)
+
+        if ar_guid is None:
+            filters = {
+                'batch_id': batches,
+            }
+        else:
+            filters = {
+                'ar_guid': ar_guid,
+            }
+
         query = BillingTotalCostQueryModel(
             fields=all_cols,
-            source=BillingSource.RAW,
+            source=BillingSource.EXTENDED,
             start_date=start_day.strftime('%Y-%m-%d'),
             end_date=end_day.strftime('%Y-%m-%d'),
-            filters={
-                BillingColumn.LABELS: {
-                    'batch_id': batches,
-                    'ar-guid': ar_guid,
-                }
-            },
-            filters_op='OR',
+            filters=filters,
             group_by=False,
-            time_column=BillingTimeColumn.USAGE_END_TIME,
+            time_column=BillingTimeColumn.DAY,
             time_periods=BillingTimePeriods.DAY,
         )
 
@@ -253,7 +262,7 @@ class BillingLayer(BqBaseLayer):
     async def get_cost_by_batch_id(
         self,
         batch_id: str | None = None,
-    ) -> BillingHailBatchCostRecord:
+    ) -> list[Any]:  # BillingHailBatchCostRecord:
         """
         Get Costs by Batch ID
         """
@@ -269,32 +278,44 @@ class BillingLayer(BqBaseLayer):
             batches,
         ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
-        if not batches:
-            return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
+        # if not batches:
+        #     return BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
 
-        # Then get the costs for the given AR GUID/batches from the main table
-        all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
+        # # Then get the costs for the given AR GUID/batches from the main table
+        # all_cols = [BillingColumn.str_to_enum(v) for v in BillingColumn.raw_cols()]
 
-        query = BillingTotalCostQueryModel(
-            fields=all_cols,
-            source=BillingSource.RAW,
-            start_date=start_day.strftime('%Y-%m-%d'),
-            end_date=end_day.strftime('%Y-%m-%d'),
-            filters={
-                BillingColumn.LABELS: {
-                    'batch_id': batches,
-                    'ar-guid': ar_guid,
-                }
-            },
-            filters_op='OR',
-            group_by=False,
-            time_column=BillingTimeColumn.USAGE_END_TIME,
-            time_periods=BillingTimePeriods.DAY,
+        # all_cols.append(BillingColumn.AR_GUID.value)
+        # all_cols.append(BillingColumn.BATCH_ID.value)
+
+        # if ar_guid is None:
+        #     filters = {
+        #         'batch_id': batches,
+        #     }
+        # else:
+        #     filters = {
+        #         'ar_guid': ar_guid,
+        #     }
+
+        # query = BillingTotalCostQueryModel(
+        #     fields=all_cols,
+        #     source=BillingSource.EXTENDED,
+        #     start_date=start_day.strftime('%Y-%m-%d'),
+        #     end_date=end_day.strftime('%Y-%m-%d'),
+        #     filters=filters,
+        #     group_by=False,
+        #     time_column=BillingTimeColumn.DAY,
+        #     time_periods=BillingTimePeriods.DAY,
+        # )
+        # billing_table = self.table_factory(query.source, query.fields)
+        # records = await billing_table.get_total_cost(query)
+        # return BillingHailBatchCostRecord(
+        #     ar_guid=ar_guid,
+        #     batch_ids=batches,
+        #     costs=records,
+        # )
+        billing_table = self.table_factory(BillingSource.EXTENDED)
+
+        results = await billing_table.get_batch_cost_details(
+            start_day, end_day, batches, ar_guid
         )
-        billing_table = self.table_factory(query.source, query.fields)
-        records = await billing_table.get_total_cost(query)
-        return BillingHailBatchCostRecord(
-            ar_guid=ar_guid,
-            batch_ids=batches,
-            costs=records,
-        )
+        return results

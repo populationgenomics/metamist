@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
+import HailBatchGridTemp from './components/HailBatchGridTemp'
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
 
@@ -198,16 +199,27 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         </Card>
     )
 
+    // const gridCard = (gridData: BillingTotalCostRecord[]) => (
+    //     <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+    //         <HailBatchGrid data={gridData} />
+    //     </Card>
+    // )
+
     const gridCard = (gridData: BillingTotalCostRecord[]) => (
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGrid data={gridData} />
+            <HailBatchGridTemp data={gridData} />
         </Card>
     )
 
     const dataComponent = () => {
-        if (data !== undefined && data.costs.length > 0) {
+        // if (data !== undefined && data.costs.length > 0) {
+        //     // only render grid if there are available cost data
+        //     return gridCard(data.costs)
+        // }
+
+        if (data !== undefined && data.length > 0) {
             // only render grid if there are available cost data
-            return gridCard(data.costs)
+            return gridCard(data)
         }
 
         // if valid search text and no data return return No data message

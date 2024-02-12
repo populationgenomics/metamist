@@ -1,6 +1,9 @@
 """
 Billing routes
 """
+
+from typing import Any
+
 from async_lru import alru_cache
 from fastapi import APIRouter
 
@@ -289,14 +292,14 @@ async def get_cost_by_ar_guid(
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=BillingHailBatchCostRecord,
+    response_model=list[Any],  # BillingHailBatchCostRecord,
     operation_id='costByBatchId',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     batch_id: str,
     author: str = get_author,
-) -> BillingHailBatchCostRecord:
+) -> list[Any]:  # BillingHailBatchCostRecord:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)

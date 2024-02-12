@@ -109,6 +109,9 @@ class BillingBaseTable(BqDbBase):
         else:
             job_config = bigquery.QueryJobConfig(labels=BQ_LABELS)
 
+        print('query', query)
+        print('params', params)
+
         if results_as_list:
             return list(
                 self._connection.connection.query(query, job_config=job_config).result()
@@ -128,12 +131,16 @@ class BillingBaseTable(BqDbBase):
 
         # initial partition filter
         billing_filter.day = GenericBQFilter[datetime](
-            gte=datetime.strptime(query.start_date, '%Y-%m-%d')
-            if query.start_date
-            else None,
-            lte=datetime.strptime(query.end_date, '%Y-%m-%d')
-            if query.end_date
-            else None,
+            gte=(
+                datetime.strptime(query.start_date, '%Y-%m-%d')
+                if query.start_date
+                else None
+            ),
+            lte=(
+                datetime.strptime(query.end_date, '%Y-%m-%d')
+                if query.end_date
+                else None
+            ),
         )
         return billing_filter
 
@@ -358,17 +365,19 @@ class BillingBaseTable(BqDbBase):
                 total_monthly=(
                     total_monthly[COMPUTE]['ALL'] + total_monthly[STORAGE]['ALL']
                 ),
-                total_daily=(total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
-                if is_current_month
-                else None,
+                total_daily=(
+                    (total_daily[COMPUTE]['ALL'] + total_daily[STORAGE]['ALL'])
+                    if is_current_month
+                    else None
+                ),
                 compute_monthly=total_monthly[COMPUTE]['ALL'],
-                compute_daily=(total_daily[COMPUTE]['ALL'])
-                if is_current_month
-                else None,
+                compute_daily=(
+                    (total_daily[COMPUTE]['ALL']) if is_current_month else None
+                ),
                 storage_monthly=total_monthly[STORAGE]['ALL'],
-                storage_daily=(total_daily[STORAGE]['ALL'])
-                if is_current_month
-                else None,
+                storage_daily=(
+                    (total_daily[STORAGE]['ALL']) if is_current_month else None
+                ),
                 details=all_details,
                 budget_spent=None,
                 budget=None,
@@ -418,17 +427,19 @@ class BillingBaseTable(BqDbBase):
                     {
                         'field': key,
                         'total_monthly': monthly,
-                        'total_daily': (compute_daily + storage_daily)
-                        if is_current_month
-                        else None,
+                        'total_daily': (
+                            (compute_daily + storage_daily)
+                            if is_current_month
+                            else None
+                        ),
                         'compute_monthly': compute_monthly,
                         'compute_daily': compute_daily,
                         'storage_monthly': storage_monthly,
                         'storage_daily': storage_daily,
                         'details': details,
-                        'budget_spent': 100 * monthly / budget_monthly
-                        if budget_monthly
-                        else None,
+                        'budget_spent': (
+                            100 * monthly / budget_monthly if budget_monthly else None
+                        ),
                         'budget': budget_monthly,
                         'last_loaded_day': last_loaded_day,
                     }
