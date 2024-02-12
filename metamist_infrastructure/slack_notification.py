@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
+
 from cpg_infra.utils import archive_folder
 from cpg_utils.cloud import read_secret
 

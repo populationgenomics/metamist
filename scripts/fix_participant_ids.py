@@ -2,7 +2,9 @@
 Small script to update external participant IDs
 """
 import json
+
 import click
+
 from metamist.apis import ParticipantApi
 
 

@@ -3,19 +3,13 @@
 from fastapi import APIRouter
 
 from api.utils import get_project_readonly_connection
-from api.utils.db import (
-    Connection,
-    get_projectless_db_connection,
-)
+from api.utils.db import Connection, get_projectless_db_connection
+from db.python.layers.assay import AssayLayer
 from db.python.tables.assay import AssayFilter
 from db.python.tables.project import ProjectPermissionsTable
-from db.python.layers.assay import (
-    AssayLayer,
-)
 from db.python.utils import GenericFilter
 from models.models.assay import AssayUpsert
 from models.utils.sample_id_format import sample_id_transform_to_raw_list
-
 
 router = APIRouter(prefix='/assay', tags=['assay'])
 

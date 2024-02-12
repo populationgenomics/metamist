@@ -1,7 +1,6 @@
 import csv
 from typing import Optional
 
-
 EXTENSION_TO_DELIM_MAP = {
     '.csv': ',',
     '.tsv': '\t',

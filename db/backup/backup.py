@@ -8,9 +8,7 @@ import subprocess
 from datetime import datetime
 from typing import Literal
 
-from google.cloud import storage
-from google.cloud import logging
-from google.cloud import secretmanager
+from google.cloud import logging, secretmanager, storage
 
 STORAGE_CLIENT = storage.Client()
 LOGGING_CLIENT = logging.Client()

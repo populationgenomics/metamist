@@ -1,7 +1,8 @@
-from typing import Type
 from inspect import isclass
+from typing import Type
 
 from fastapi import APIRouter
+
 from api.utils.db import get_projectless_db_connection
 from db.python import enum_tables
 from db.python.enum_tables.enums import EnumTable

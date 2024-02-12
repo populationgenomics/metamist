@@ -1,6 +1,7 @@
 from typing import Iterable
-from api.settings import SEQUENCING_GROUP_PREFIX, SEQUENCING_GROUP_CHECKSUM_OFFSET
-from models.utils.luhn import luhn_is_valid, luhn_compute
+
+from api.settings import SEQUENCING_GROUP_CHECKSUM_OFFSET, SEQUENCING_GROUP_PREFIX
+from models.utils.luhn import luhn_compute, luhn_is_valid
 
 
 def sequencing_group_id_transform_to_raw_list(

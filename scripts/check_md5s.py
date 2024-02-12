@@ -2,8 +2,9 @@ import os
 from typing import Set
 
 import click
-import hailtop.batch as hb
 from google.cloud import storage
+
+import hailtop.batch as hb
 
 DRIVER_IMAGE = 'australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:8cc869505251c8396fefef01c42225a7b7930a97-hail-0.2.73.devc6f6f09cec08'
 
