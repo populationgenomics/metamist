@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
-
 from cpg_infra.plugin import CpgInfrastructurePlugin
 from cpg_infra.utils import archive_folder
 
@@ -270,7 +269,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-accessor-configuration-access',
             project=self.config.metamist.gcp.project,
             secret_id=self.etl_configuration_secret.id,
-            role='role/secretmanager.secretAccessor',
+            role='roles/secretmanager.secretAccessor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_load_service_account.email
             ),
