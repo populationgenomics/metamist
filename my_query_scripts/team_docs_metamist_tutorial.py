@@ -125,7 +125,7 @@ def main(project: str, sgids: list[str], last_name: str):
         )
         j2 = b.new_python_job(f'Register analysis output for {sg}')
         j2.image(get_config()['workflow']['driver_image'])
-        j2.call(create_analysis_entry, sg)
+        j2.call(create_analysis_entry, sg, last_name)
         j2.depends_on(j)
         # read the output out into GCP
         # The helper method output_path() will create a new path based on the current project,
