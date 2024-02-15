@@ -84,7 +84,7 @@ def create_analysis_entry(
     )
 
 
-def main(project: str, sgids: list[str]):
+def main(project: str, sgids: list[str], last_name: str):
     # region: metadata queries
     # This section is all executed prior to the workflow being scheduled,
     # so we have access to all variables
@@ -135,7 +135,7 @@ def main(project: str, sgids: list[str]):
         # output_path('this_file.txt')
         # -> gs://cpg-my-dataset-test/my_output/this_file.txt
         b.write_output(
-            j.out_fastqe, output_path(f'{sg}.html', category='web')
+            j.out_fastqe, output_path(f'{sg}-{last_name}.html', category='web')
         )  # category='web' writes it to the web bucket
     b.run(wait=False)
 
@@ -149,8 +149,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sgids', nargs='+', help='Sequencing group IDs', required=True
     )
+    parser.add_argument(
+        '--last-name', help='Last name', required=True
+    )
     args, fails = parser.parse_known_args()
 
     if fails:
         raise ValueError(f'Failed to parse arguments: {fails}')
-    main(project=args.project, sgids=args.sgids)
+    main(project=args.project, sgids=args.sgids, last_name=args.last_name)
