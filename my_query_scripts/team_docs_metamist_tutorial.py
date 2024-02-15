@@ -53,6 +53,7 @@ def get_assays(project: str, sgids: list) -> list[str]:
 
 def create_analysis_entry(
     sgid: str,
+    last_name: str,
     active: bool = True,
 ):
     from cpg_utils import to_path
@@ -66,10 +67,10 @@ def create_analysis_entry(
         project = f'{project}-test'
     output_prefix = get_config()['workflow']['output_prefix']
     output_path = os.path.join(
-        get_config()['storage']['default']['web'], output_prefix, f'{sgid}.html'
+        get_config()['storage']['default']['web'], output_prefix, f'{sgid}-{last_name}.html'
     )
     display_url = os.path.join(
-        get_config()['storage']['default']['web_url'], output_prefix, f'{sgid}.html'
+        get_config()['storage']['default']['web_url'], output_prefix, f'{sgid}-{last_name}.html'
     )
     AnalysisApi().create_analysis(
         project=f'{project}',
