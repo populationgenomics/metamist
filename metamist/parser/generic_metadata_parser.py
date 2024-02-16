@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import click
 
-from metamist.parser.generic_parser import (
+from metamist.parser.generic_parser import (  # noqa
     DefaultSequencing,
     GenericParser,
     GroupedRow,
@@ -16,7 +16,6 @@ from metamist.parser.generic_parser import (
     ParsedAssay,
     ParsedSample,
     ParsedSequencingGroup,
-    # noqa
     SingleRow,
     run_as_sync,
 )
@@ -652,7 +651,7 @@ class GenericMetadataParser(GenericParser):
         )
         return {'reference_assembly' : cram_reference}
 
-    async def get_assays_from_group(  # pylint: disable=too-many-branches
+    async def get_assays_from_group(
         self, sequencing_group: ParsedSequencingGroup
     ) -> list[ParsedAssay]:
         """Get assays from assay group + rows"""

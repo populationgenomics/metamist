@@ -5,12 +5,8 @@ from typing import List
 
 import click
 
-from metamist.parser.generic_metadata_parser import (
-    DefaultSequencing,
-    GenericMetadataParser,
-    run_as_sync,
-)
-from metamist.parser.generic_parser import SingleRow
+from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
+from metamist.parser.generic_parser import DefaultSequencing, SingleRow
 
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'

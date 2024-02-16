@@ -734,13 +734,16 @@ class GenericParser(
             header = f'Processing samples: {external_sample_ids}'
 
         assays_count: dict[str, int] = defaultdict(int)
+        assays_types_count: dict[str, int] = defaultdict(int)
         sequencing_group_counts: dict[str, int] = defaultdict(int)
         for a in assays:
             assays_count[str(a.meta.get('sequencing_type'))] += 1
+            assays_types_count[str(a.assay_type)] += 1
         for sg in sequencing_groups:
             sequencing_group_counts[str(sg.sequencing_type)] += 1
 
         str_assay_count = ', '.join(f'{k}={v}' for k, v in assays_count.items())
+        str_assay_types_count = ', '.join(f'{k}={v}' for k, v in assays_types_count.items())
         str_seqg_count = ', '.join(
             f'{k}={v}' for k, v in sequencing_group_counts.items()
         )
@@ -751,6 +754,7 @@ class GenericParser(
                 {self.project}: {header}
 
                 Assays count: {str_assay_count}
+                Assays types count: {str_assay_types_count}
                 Sequencing group count: {str_seqg_count}
 
                 Adding {summary['participants']['insert']} participants
