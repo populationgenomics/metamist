@@ -6,7 +6,6 @@ from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel
 from models.models.cohort import Cohort
-from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -70,7 +69,7 @@ class CohortTable(DbBase):
         self,
         project: int,
         cohort_name: str,
-        sequencing_group_ids: list[str],
+        sequencing_group_ids: list[int],
         author: str,
         description: str,
         derived_from: int | None = None,
@@ -108,7 +107,7 @@ class CohortTable(DbBase):
                     _query,
                     {
                         'cohort_id': cohort_id,
-                        'sequencing_group_id': sequencing_group_id_transform_to_raw(sg),
+                        'sequencing_group_id': sg,
                     },
                 )
 

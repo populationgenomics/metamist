@@ -4,8 +4,12 @@ from db.python.tables.analysis import AnalysisTable
 from db.python.tables.cohort import CohortFilter, CohortTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
+from db.python.tables.sequencing_group import SequencingGroupTable
 from db.python.utils import get_logger
 from models.models.cohort import Cohort
+from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.utils import GenericFilter
 
 logger = get_logger()
 
@@ -19,8 +23,8 @@ class CohortLayer(BaseLayer):
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
         self.ct = CohortTable(connection)
-
-    # GETS
+        self.sgt = SequencingGroupTable(connection)
+        self.sglayer = SequencingGroupLayer(self.connection)
 
     async def query(self, filter_: CohortFilter) -> list[Cohort]:
         """Query Cohorts"""
@@ -32,8 +36,6 @@ class CohortLayer(BaseLayer):
         Get the sequencing group IDs for the given cohort.
         """
         return await self.ct.get_cohort_sequencing_group_ids(cohort_id)
-
-    # PUTS
 
     async def create_cohort(
         self,
@@ -55,6 +57,37 @@ class CohortLayer(BaseLayer):
             description=description,
             author=author,
             derived_from=derived_from,
+        )
+
+        return cohort_id
+
+    async def create_cohort_from_criteria(
+            self,
+            project_to_write: ProjectId,
+            projects_to_pull: list[ProjectId],
+            author: str,
+            description: str,
+            cohort_name: str,
+    ):
+        """
+        Create a new cohort from the given parameters. Returns the newly created cohort_id.
+        """
+
+        # 1. Pull SG's based on criteria
+        sgs = await self.sglayer.query(
+            SequencingGroupFilter(
+                project=GenericFilter(in_=projects_to_pull)
+            )
+        )
+        print(sgs)
+
+        # 2. Create Cohort
+        cohort_id = await self.ct.create_cohort(
+            project=project_to_write,
+            cohort_name=cohort_name,
+            sequencing_group_ids=[sg.id for sg in sgs],
+            description=description,
+            author=author,
         )
 
         return cohort_id
