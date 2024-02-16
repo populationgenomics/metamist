@@ -26,9 +26,9 @@ from typing import (
     TypeVar,
     Union,
 )
-from tabulate import tabulate
 
 from cloudpathlib import AnyPath
+from tabulate import tabulate
 
 from metamist.apis import AnalysisApi, AssayApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query_async

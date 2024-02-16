@@ -49,7 +49,7 @@ from metamist.parser.generic_metadata_parser import (
     SingleRow,
     run_as_sync,
 )
-from metamist.parser.generic_parser import DefaultSequencing, READS_EXTENSIONS
+from metamist.parser.generic_parser import READS_EXTENSIONS, DefaultSequencing
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())

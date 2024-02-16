@@ -6,7 +6,11 @@ from typing import List
 import click
 
 from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
-from metamist.parser.generic_parser import DefaultSequencing, ParsedSample, ParsedSequencingGroup
+from metamist.parser.generic_parser import (
+    DefaultSequencing,
+    ParsedSample,
+    ParsedSequencingGroup,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
