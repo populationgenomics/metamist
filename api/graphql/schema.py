@@ -697,7 +697,7 @@ class Query:  # entry point to graphql.
         connection = info.context['connection']
         clayer = CohortLayer(connection)
 
-        ptable = ProjectPermissionsTable(connection.connection)
+        ptable = ProjectPermissionsTable(connection)
         project_name_map: dict[str, int] = {}
         project_filter = None
         if project:
