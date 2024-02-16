@@ -1,18 +1,18 @@
 from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from api.utils.db import (
-    get_project_readonly_connection,
     Connection,
-    get_projectless_db_connection,
+    get_project_readonly_connection,
     get_project_write_connection,
+    get_projectless_db_connection,
 )
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from models.utils.sample_id_format import sample_id_format
-from models.utils.sequencing_group_id_format import (
-    # Sample,
+from models.utils.sequencing_group_id_format import (  # Sample,
     sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw,
 )

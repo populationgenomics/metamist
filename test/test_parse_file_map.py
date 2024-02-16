@@ -1,6 +1,6 @@
 from io import StringIO
-from unittest.mock import patch
 from test.testbase import DbIsolatedTest, run_as_sync
+from unittest.mock import patch
 
 from metamist.parser.generic_parser import DefaultSequencing, ParsedParticipant
 from metamist.parser.sample_file_map_parser import SampleFileMapParser

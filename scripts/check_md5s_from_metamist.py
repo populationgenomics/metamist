@@ -1,14 +1,16 @@
-from collections import namedtuple
 import math
 import os
+from collections import namedtuple
 from shlex import quote
 
 import click
-import hailtop.batch as hb
-from cpg_utils.hail_batch import remote_tmpdir
-from cpg_utils.config import get_config
 
-from metamist.apis import SampleApi, AssayApi
+import hailtop.batch as hb
+
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import remote_tmpdir
+
+from metamist.apis import AssayApi, SampleApi
 
 LocationTuple = namedtuple(
     'LocationTuple', ['cpg_sample_id', 'location', 'checksum', 'size']

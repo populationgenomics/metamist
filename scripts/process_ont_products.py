@@ -11,10 +11,7 @@ from metamist.apis import AnalysisApi, SampleApi, SequencingGroupApi
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.parser.cloudhelper import CloudHelper
-from metamist.parser.generic_metadata_parser import (
-    GenericMetadataParser,
-    run_as_sync,
-)
+from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
 from metamist.parser.generic_parser import CustomDictReader, chunk
 
 OntAnalysesPreparer = namedtuple(
