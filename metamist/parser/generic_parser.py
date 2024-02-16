@@ -360,21 +360,24 @@ class ParsedAnalysis:
             output=self.output,
             sequencing_group_ids=[self.sequencing_group.internal_seqgroup_id],
         )
+
+
 class DefaultSequencing:
+    """Groups default sequencing information"""
     def __init__(
         self,
-        type: str = 'genome',
+        seq_type: str = 'genome',  # seq_type because `type` is a built-in
         technology: str = 'short-read',
-        platform: str = None,
+        platform: str = 'illumina',
         facility: str = None,
         library: str = None,
     ):
-        self.type = type
+        self.seq_type = seq_type
         self.technology = technology
         self.platform = platform
         self.facility = facility
         self.library = library
-    
+
 
 def chunk(iterable: Iterable[T], chunk_size=50) -> Iterator[List[T]]:
     """
@@ -421,10 +424,10 @@ class GenericParser(
         path_prefix: Optional[str],
         search_paths: list[str],
         project: str,
-        default_sequencing: DefaultSequencing,
+        default_sample_type: str = None,
+        default_sequencing: DefaultSequencing = DefaultSequencing(),
         default_read_end_type: str = None,
         default_read_length: str | int = None,
-        default_sample_type: str = None,
         default_analysis_type: str = None,
         default_analysis_status: str = 'completed',
         key_map: Dict[str, str] = None,
@@ -1083,7 +1086,7 @@ class GenericParser(
 
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get sequence types from row"""
-        return self.default_sequencing.type
+        return self.default_sequencing.seq_type
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
         """Get sequencing technology from row"""

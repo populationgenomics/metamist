@@ -103,7 +103,7 @@ class SampleFileMapParser(GenericMetadataParser):
         project: str,
         default_sample_type='blood',
         default_sequencing=DefaultSequencing(
-            type='genome', technology='short-read', platform='illumina'
+            seq_type='genome', technology='short-read', platform='illumina'
         ),
         default_read_end_type: str = None,
         default_read_length: str | int = None,
@@ -180,7 +180,7 @@ class SampleFileMapParser(GenericMetadataParser):
     help='Search path to search for files within',
 )
 @click.option(
-    '--allow-extra-files-in-search_path',
+    '--allow-extra-files-in-search-path',
     is_flag=True,
     help='By default, this parser will fail if there are crams, bams, fastqs '
     'in the search path that are not covered by the sample map.',
@@ -216,15 +216,15 @@ async def main(  # pylint: disable=too-many-arguments
     if not manifests:
         raise ValueError('Expected at least 1 manifest')
 
-    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
-    if extra_seach_paths:
-        search_path = list(set(search_path).union(set(extra_seach_paths)))
+    extra_search_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_search_paths:
+        search_path = list(set(search_path).union(set(extra_search_paths)))
 
     parser = SampleFileMapParser(
         project=project,
         default_sample_type=default_sample_type,
         default_sequencing=DefaultSequencing(
-            type=default_sequencing_type,
+            seq_type=default_sequencing_type,
             technology=default_sequencing_technology,
             platform=default_sequencing_platform,
             facility=default_sequencing_facility,

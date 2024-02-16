@@ -2,7 +2,7 @@ from io import StringIO
 from unittest.mock import patch
 from test.testbase import DbIsolatedTest, run_as_sync
 
-from metamist.parser.generic_parser import ParsedParticipant
+from metamist.parser.generic_parser import DefaultSequencing, ParsedParticipant
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 
@@ -25,7 +25,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             project=self.project_name,
-            default_sequencing_technology='short-read',
+            default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -91,7 +91,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             project=self.project_name,
-            default_sequencing_technology='short-read',
+            default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -314,8 +314,10 @@ class TestSampleMapParser(DbIsolatedTest):
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
             project=self.project_name,
-            default_sequencing_facility='VCGS',
-            default_sequencing_library='TSStrmRNA',
+            default_sequencing=DefaultSequencing(
+                facility='VCGS',
+                library='TSStrmRNA'
+            ),
             default_read_end_type='paired',
             default_read_length=151
         )

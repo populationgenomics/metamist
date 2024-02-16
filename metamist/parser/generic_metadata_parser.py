@@ -107,7 +107,7 @@ class GenericMetadataParser(GenericParser):
         default_reference_assembly_location: Optional[str] = None,
         default_sample_type=None,
         default_sequencing=DefaultSequencing(
-            type='genome', technology='short-read', platform='illumina'
+            seq_type='genome', technology='short-read', platform='illumina'
         ),
         default_read_end_type: Optional[str] = None,
         default_read_length: Optional[str | int] = None,
@@ -181,7 +181,7 @@ class GenericMetadataParser(GenericParser):
         if isinstance(row, dict):
             return [self.get_sequencing_type(row)]
         return [
-            str(r.get(self.seq_type_column, self.default_sequencing.type)) for r in row
+            str(r.get(self.seq_type_column, self.default_sequencing.seq_type)) for r in row
         ]
 
     def get_sequencing_technology(self, row: SingleRow) -> str:
@@ -208,8 +208,8 @@ class GenericMetadataParser(GenericParser):
 
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get assay type from row"""
-        value = row.get(self.seq_type_column, None) or self.default_sequencing.type
-        value = value.lower()
+        value = row.get(self.seq_type_column, None) or self.default_sequencing.seq_type
+        value = value.lower() if value else ''
 
         if value == 'wgs':
             value = 'genome'
@@ -603,7 +603,7 @@ class GenericMetadataParser(GenericParser):
                 meta['vcf_type'] = 'vcf'
 
         return meta
-    
+
     async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> Tuple[List[str], List[str]]:
         """Get read filenames and checksums from rows."""
         read_filenames: List[str] = []
@@ -622,7 +622,7 @@ class GenericMetadataParser(GenericParser):
                 if ref:
                     reference_assemblies.add(ref)
         return read_filenames, read_checksums, reference_assemblies
-    
+
     async def parse_cram_assays(self, sample: ParsedSample, reference_assemblies: set[str]) -> dict[str, Any]:
         """Parse CRAM assays"""
         if len(reference_assemblies) > 1:
@@ -882,9 +882,9 @@ async def main(
     if not manifests:
         raise ValueError('Expected at least 1 manifest')
 
-    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
-    if extra_seach_paths:
-        search_path = list(set(search_path).union(set(extra_seach_paths)))
+    extra_search_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_search_paths:
+        search_path = list(set(search_path).union(set(extra_search_paths)))
 
     participant_meta_map: Dict[Any, Any] = {}
     sample_meta_map: Dict[Any, Any] = {}
@@ -919,7 +919,7 @@ async def main(
         karyotype_column=karyotype_column,
         default_sample_type=default_sample_type,
         default_sequencing=DefaultSequencing(
-            type='genome', technology='short-read', platform='illumina'
+            seq_type='genome', technology='short-read', platform='illumina'
         ),
         search_locations=search_path,
     )
