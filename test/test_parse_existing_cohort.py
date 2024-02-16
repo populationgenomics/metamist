@@ -299,7 +299,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             allow_missing_files=True,
             sequencing_type='genome',
         )
-        self.assertEqual(parser.default_sequencing_type, 'genome')
+        self.assertEqual(parser.default_sequencing.seq_type, 'genome')
 
     @run_as_sync
     async def test_exome_sequencing_type(self):
@@ -314,7 +314,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             allow_missing_files=True,
             sequencing_type='exome',
         )
-        self.assertEqual(parser.default_sequencing_type, 'exome')
+        self.assertEqual(parser.default_sequencing.seq_type, 'exome')
 
     @run_as_sync
     @patch('metamist.parser.generic_parser.query_async')

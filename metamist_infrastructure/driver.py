@@ -270,7 +270,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             'metamist-etl-accessor-configuration-access',
             project=self.config.metamist.gcp.project,
             secret_id=self.etl_configuration_secret.id,
-            role='role/secretmanager.secretAccessor',
+            role='roles/secretmanager.secretAccessor',
             member=pulumi.Output.concat(
                 'serviceAccount:', self.etl_load_service_account.email
             ),
