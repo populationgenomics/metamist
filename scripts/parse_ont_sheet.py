@@ -6,7 +6,11 @@ from typing import List
 import click
 
 from metamist.parser.generic_metadata_parser import GenericMetadataParser, run_as_sync
-from metamist.parser.generic_parser import ParsedSample, ParsedSequencingGroup
+from metamist.parser.generic_parser import (
+    DefaultSequencing,
+    ParsedSample,
+    ParsedSequencingGroup,
+)
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -37,10 +41,12 @@ class OntParser(GenericMetadataParser):
         self,
         search_locations: List[str],
         project: str,
-        default_sequencing_type='genome',
-        default_sequencing_technology='long-read',
-        default_sequencing_platform='oxford-nanopore',
         default_sample_type='blood',
+        default_sequencing=DefaultSequencing(
+            seq_type='genome',
+            technology='long-read',
+            platform='oxford-nanopore',
+        ),
         allow_extra_files_in_search_path=False,
     ):
         sequence_meta_map = {
@@ -66,9 +72,7 @@ class OntParser(GenericMetadataParser):
             sample_name_column=Columns.SAMPLE_ID,
             reads_column=Columns.PASS_FASTQ_FILENAME,
             default_sample_type=default_sample_type,
-            default_sequencing_type=default_sequencing_type,
-            default_sequencing_technology=default_sequencing_technology,
-            default_sequencing_platform=default_sequencing_platform,
+            default_sequencing=default_sequencing,
             participant_meta_map={},
             sample_meta_map={},
             assay_meta_map=sequence_meta_map,
@@ -93,8 +97,8 @@ class OntParser(GenericMetadataParser):
         """
         return [fastqs]
 
-    async def group_assays(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
-        sequencing_groups = await super().group_assays(sample)
+    async def get_sample_sequencing_groups(self, sample: ParsedSample) -> list[ParsedSequencingGroup]:
+        sequencing_groups = await super().get_sample_sequencing_groups(sample)
 
         for sequencing_group in sequencing_groups:
             failed_fastqs: list[str] = []
@@ -128,7 +132,7 @@ class OntParser(GenericMetadataParser):
     help='The metamist project to import manifest into',
 )
 @click.option('--default-sample-type', default='blood')
-@click.option('--default-sequence-type', default='genome')
+@click.option('--default-sequencing-type', default='genome')
 @click.option('--default-sequencing-technology', default='long-read')
 @click.option('--default-sequencing-platform', default='oxford-nanopore')
 @click.option(
@@ -167,16 +171,18 @@ async def main(
     if not manifests:
         raise ValueError('Expected at least 1 manifest')
 
-    extra_seach_paths = [m for m in manifests if m.startswith('gs://')]
-    if extra_seach_paths:
-        search_path = list(set(search_path).union(set(extra_seach_paths)))
+    extra_search_paths = [m for m in manifests if m.startswith('gs://')]
+    if extra_search_paths:
+        search_path = list(set(search_path).union(set(extra_search_paths)))
 
     parser = OntParser(
         project=project,
         default_sample_type=default_sample_type,
-        default_sequencing_type=default_sequencing_type,
-        default_sequencing_platform=default_sequencing_platform,
-        default_sequencing_technology=default_sequencing_technology,
+        default_sequencing=DefaultSequencing(
+            seq_type=default_sequencing_type,
+            technology=default_sequencing_technology,
+            platform=default_sequencing_platform,
+        ),
         search_locations=search_path,
         allow_extra_files_in_search_path=allow_extra_files_in_search_path,
     )

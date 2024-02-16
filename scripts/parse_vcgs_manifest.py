@@ -114,14 +114,14 @@ class VcgsManifestParser(GenericMetadataParser):
             types = [types]
         if len(types) <= 0:
             if (
-                self.default_sequencing_type is None
-                or self.default_sequencing_type.lower() == 'none'
+                self.default_sequencing.seq_type is None
+                or self.default_sequencing.seq_type.lower() == 'none'
             ):
                 raise ValueError(
                     f"Couldn't detect sequence type for sample {sample_id}, and "
                     'no default was available.'
                 )
-            return SequenceType(self.default_sequencing_type)
+            return SequenceType(self.default_sequencing.seq_type)
         if len(types) > 1:
             raise ValueError(
                 f'Multiple library types for same sample {sample_id}, '
