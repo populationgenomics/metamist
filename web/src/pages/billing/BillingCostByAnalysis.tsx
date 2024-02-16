@@ -7,6 +7,8 @@ import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
 import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
 import HailBatchGridTemp from './components/HailBatchGridTemp'
+import HailBatchGridTempVirtuoso from './components/HailBatchGridTempVirtouso'
+
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
 
@@ -207,7 +209,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
 
     const gridCard = (gridData: BillingTotalCostRecord[]) => (
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGridTemp data={gridData} />
+            <HailBatchGridTempVirtuoso data={gridData} />
         </Card>
     )
 

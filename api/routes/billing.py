@@ -2,8 +2,6 @@
 Billing routes
 """
 
-from typing import Any
-
 from async_lru import alru_cache
 from fastapi import APIRouter
 
@@ -12,9 +10,9 @@ from api.utils.db import BqConnection, get_author
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import (
+    BillingBatchCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingHailBatchCostRecord,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -276,14 +274,14 @@ async def get_namespaces(
 
 @router.get(
     '/cost-by-ar-guid/{ar_guid}',
-    response_model=BillingHailBatchCostRecord,
+    response_model=list[BillingBatchCostRecord],  # BillingHailBatchCostRecord,
     operation_id='costByArGuid',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_ar_guid(
     ar_guid: str,
     author: str = get_author,
-) -> BillingHailBatchCostRecord:
+) -> list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
@@ -292,14 +290,14 @@ async def get_cost_by_ar_guid(
 
 @router.get(
     '/cost-by-batch-id/{batch_id}',
-    response_model=list[Any],  # BillingHailBatchCostRecord,
+    response_model=list[BillingBatchCostRecord],  # BillingHailBatchCostRecord,
     operation_id='costByBatchId',
 )
 @alru_cache(maxsize=10, ttl=BILLING_CACHE_RESPONSE_TTL)
 async def get_cost_by_batch_id(
     batch_id: str,
     author: str = get_author,
-) -> list[Any]:  # BillingHailBatchCostRecord:
+) -> list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)

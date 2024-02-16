@@ -1,7 +1,5 @@
 from datetime import datetime
-from typing import Any
 
-import rapidjson
 from google.cloud import bigquery
 
 from api.settings import BQ_AGGREG_EXT_VIEW
@@ -9,7 +7,7 @@ from db.python.tables.bq.billing_base import (
     BillingBaseTable,
     time_optimisation_parameter,
 )
-from models.models import BillingColumn
+from models.models import BillingBatchCostRecord, BillingColumn
 
 
 class BillingDailyExtendedTable(BillingBaseTable):
@@ -62,115 +60,156 @@ class BillingDailyExtendedTable(BillingBaseTable):
         end_time: datetime,
         batch_ids: list[str] | None,
         ar_guid: str | None,
-    ) -> list[Any]:
-        """ """
-        # get all batch details f
+    ) -> list[BillingBatchCostRecord]:
+        """
+        Get all batch details for given time range and batch_ids or ar_guid
+        """
         query_parameters = [
             bigquery.ScalarQueryParameter('start_time', 'TIMESTAMP', start_time),
             bigquery.ScalarQueryParameter('end_time', 'TIMESTAMP', end_time),
         ]
 
-        if batch_ids:
-            condition = 'batch_id in (@batch_ids)'
-            query_parameters.append(
-                bigquery.ScalarQueryParameter(
-                    'batch_ids', 'STRING', ','.join([f"'{b}'" for b in batch_ids])
-                )
-            )
-
-        else:
+        if ar_guid:
             condition = 'ar_guid = @ar_guid'
             query_parameters.append(
                 bigquery.ScalarQueryParameter('ar_guid', 'STRING', ar_guid)
             )
-
-        condition = "batch_id IN ('432380', '432376')"
+        elif batch_ids:
+            condition = 'batch_id in UNNEST(@batch_ids)'
+            query_parameters.append(
+                bigquery.ArrayQueryParameter('batch_ids', 'STRING', batch_ids)
+            )
+        else:
+            raise ValueError('Either ar_guid or batch_ids must be provided')
 
         _query = f"""
             with d as (
-                SELECT topic, ar_guid, batch_id, CAST(job_id AS INT) job_id, sku, cost,
+                SELECT topic, ar_guid, namespace,
+                compute_category, batch_id, CAST(job_id AS INT) job_id,
+                cromwell_workflow_id, cromwell_sub_workflow_name, wdl_task_name,
+                sku, cost,
                 usage_start_time, usage_end_time,
-                namespace, JSON_VALUE(PARSE_JSON(labels), '$.batch_name') as batch_name
-                --, labels
-                FROM `billing-admin-290403.billing_aggregate.aggregate_daily_extended`
+                labels
+                FROM `{self.table_name}`
                         WHERE day >= @start_time
                         AND day <= @end_time
                         AND {condition}
             )
             , batch_jobs_cnt as (
-                -- sum al jobs first
+                -- count all jobs first
                 SELECT  batch_id,
                 COUNT(DISTINCT job_id) as jobs
                 FROM d
+                WHERE batch_id IS NOT NULL
                 GROUP BY batch_id
-            )
-            , jtop as (
-                -- sum al jobs first
-                SELECT  d.batch_id, job_id,
-                SUM(cost) as cost
-                FROM d inner join batch_jobs_cnt ON batch_jobs_cnt.batch_id = d.batch_id
-                WHERE batch_jobs_cnt.jobs > 10
-                GROUP BY d.batch_id, job_id
-                ORDER BY cost DESC
-                LIMIT 20
-            )
-            , j as (
-                -- show all jobs if under 10, otherwised only the most costly
-                SELECT  topic, ar_guid, d.batch_id, namespace, job_id, sku,
-                MIN(usage_start_time) as usage_start_time,
-                MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
-                FROM d inner join batch_jobs_cnt ON batch_jobs_cnt.batch_id = d.batch_id
-                WHERE batch_jobs_cnt.jobs <= 10
-                GROUP BY topic, ar_guid, d.batch_id, namespace, job_id, sku
             )
             , t as (
             -- ar_guid
-                SELECT  topic, ar_guid, NULL as batch_id, NULL as namespace, NULL as batch_name, NULL as job_id, sku,
+                SELECT  topic, ar_guid, NULL as namespace, compute_category,
+                NULL as batch_id, NULL as job_id,
+                NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
+                sku,
                 NULL as jobs,
                 MIN(usage_start_time) as usage_start_time,
                 MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
-                --, MAX(labels) as labels
+                , MAX(labels) as labels
                 FROM d
-                GROUP BY topic, ar_guid, sku
+                GROUP BY topic, ar_guid, compute_category, sku
             UNION ALL
             -- batch_id
-                SELECT  topic, ar_guid, d.batch_id, namespace, batch_name, NULL as job_id, sku,
+                SELECT  topic, ar_guid, namespace, compute_category,
+                d.batch_id, NULL as job_id,
+                NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
+                sku,
                 batch_jobs_cnt.jobs as jobs,
                 MIN(usage_start_time) as usage_start_time,
                 MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
-                --, MAX(labels) as labels
-                FROM d INNER JOIN batch_jobs_cnt ON d.batch_id = batch_jobs_cnt.batch_id
-                GROUP BY topic, ar_guid, batch_id, batch_name, namespace, sku, jobs
+                , MAX(labels) as labels
+                FROM d
+                INNER JOIN batch_jobs_cnt ON d.batch_id = batch_jobs_cnt.batch_id
+                WHERE d.batch_id IS NOT NULL
+                GROUP BY topic, ar_guid, batch_id, compute_category, namespace, sku, jobs
             UNION ALL
             -- job_id
-              SELECT topic, ar_guid, batch_id, namespace, NULL AS batch_name, job_id, sku, NULL AS jobs, usage_start_time,usage_end_time,cost
-              from j
-            UNION ALL
-            -- job_id onlly top 10
-                SELECT  topic, ar_guid, d.batch_id, namespace, batch_name, d.job_id, sku,
+                SELECT  topic, ar_guid, namespace, compute_category,
+                d.batch_id, job_id,
+                NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
+                sku,
                 NULL as jobs,
                 MIN(usage_start_time) as usage_start_time,
-                MAX(usage_end_time) as usage_end_time, SUM(d.cost) as cost
-                --, MAX(labels) as labels
-                FROM d INNER JOIN jtop ON d.batch_id = jtop.batch_id AND d.job_id = jtop.job_id
-                GROUP BY topic, ar_guid, batch_id, batch_name, namespace, d.job_id, sku
+                MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
+                , MAX(labels) as labels
+                FROM d
+                WHERE job_id IS NOT NULL
+                GROUP BY topic, ar_guid, d.batch_id, namespace, compute_category, job_id, sku
+
+            UNION ALL
+            -- cromwell-workflow-id
+                SELECT  topic, ar_guid, namespace, compute_category,
+                NULL as batch_id, NULL as job_id,
+                cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
+                sku,
+                NULL as jobs,
+                MIN(usage_start_time) as usage_start_time,
+                MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
+                , MAX(labels) as labels
+                FROM d
+                WHERE cromwell_workflow_id IS NOT NULL
+                GROUP BY topic, ar_guid, compute_category, namespace, cromwell_workflow_id, sku
+            UNION ALL
+            -- cromwell-sub-workflow-id
+                SELECT  topic, ar_guid, namespace, compute_category,
+                NULL as batch_id, NULL as job_id,
+                NULL as cromwell_workflow_id, cromwell_sub_workflow_name, NULL as wdl_task_name,
+                sku,
+                NULL as jobs,
+                MIN(usage_start_time) as usage_start_time,
+                MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
+                , MAX(labels) as labels
+                FROM d
+                WHERE cromwell_sub_workflow_name IS NOT NULL
+                GROUP BY topic, ar_guid, compute_category, namespace, cromwell_sub_workflow_name, sku
+            UNION ALL
+            -- wdl-task-name
+                SELECT  topic, ar_guid, namespace, compute_category,
+                NULL as batch_id, NULL as job_id,
+                NULL cromwell_workflow_id, NULL as cromwell_sub_workflow_name, wdl_task_name,
+                sku,
+                NULL as jobs,
+                MIN(usage_start_time) as usage_start_time,
+                MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
+                , MAX(labels) as labels
+                FROM d
+                WHERE wdl_task_name IS NOT NULL
+                GROUP BY topic, ar_guid, compute_category, namespace, wdl_task_name, sku
             )
-            SELECT topic, ar_guid, batch_id, namespace, batch_name, job_id, jobs,
+            -- final aggregation
+            SELECT  topic, ar_guid, namespace, compute_category,
+            batch_id, job_id,
+            cromwell_workflow_id, cromwell_sub_workflow_name, wdl_task_name,
+            jobs,
             MIN(usage_start_time) as start_time,
             MAX(usage_end_time) as end_time,
             SUM(cost) as cost,
             ARRAY_AGG(STRUCT(
                 sku, cost
             )) as details
-            --, MAX(labels) as labels
+            , MAX(labels) as labels
             FROM t
-            GROUP BY topic, ar_guid, batch_id, namespace, batch_name, job_id, jobs
-            ORDER BY topic, ar_guid, batch_id, job_id
+            WHERE cost != 0 -- do not want to include empty cost records
+
+            GROUP BY topic, ar_guid, batch_id, namespace, compute_category, job_id, jobs,
+            cromwell_workflow_id, cromwell_sub_workflow_name, wdl_task_name
+
+            ORDER BY topic, ar_guid, batch_id, job_id, cromwell_workflow_id,
+            cromwell_sub_workflow_name, wdl_task_name
         """
         query_job_result = self._execute_query(_query, query_parameters, False)
 
         if query_job_result:
-            return [dict(row) for row in query_job_result]
+            return [
+                BillingBatchCostRecord.from_json(dict(row)) for row in query_job_result
+            ]
 
         # return empty list if no record found
         return []
