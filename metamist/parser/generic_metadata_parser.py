@@ -4,7 +4,7 @@ import logging
 import re
 import shlex
 from functools import reduce
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import click
 
@@ -208,7 +208,7 @@ class GenericMetadataParser(GenericParser):
     def get_sequencing_type(self, row: SingleRow) -> str:
         """Get assay type from row"""
         value = row.get(self.seq_type_column, None) or self.default_sequencing.seq_type
-        value = value.lower() if value else ''
+        value = value.lower()
 
         if value == 'wgs':
             value = 'genome'
@@ -603,7 +603,8 @@ class GenericMetadataParser(GenericParser):
 
         return meta
 
-    async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> Tuple[List[str], List[str]]:
+    async def get_read_and_ref_files_and_checksums(self, sample_id: str, rows: GroupedRow) -> (
+            Tuple[List[str], List[str], Set[str]]):
         """Get read filenames and checksums from rows."""
         read_filenames: List[str] = []
         read_checksums: List[str] = []
