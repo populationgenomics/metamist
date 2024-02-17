@@ -17,6 +17,7 @@ from strawberry.types import Info
 
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
+from api.graphql.mutations import Mutation
 from db.python import enum_tables
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
 from db.python.layers.assay import AssayLayer
@@ -732,6 +733,6 @@ class Query:
 
 
 schema = strawberry.Schema(
-    query=Query, mutation=None, extensions=[QueryDepthLimiter(max_depth=10)]
+    query=Query, mutation=Mutation, extensions=[QueryDepthLimiter(max_depth=10)]
 )
 MetamistGraphQLRouter = GraphQLRouter(schema, graphiql=True, context_getter=get_context)
