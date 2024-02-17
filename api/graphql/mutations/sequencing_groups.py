@@ -8,9 +8,7 @@ from models.utils.sequencing_group_id_format import (  # Sample,
 
 
 @strawberry.type
-class Mutation:
-    """Mutation class"""
-
+class SequencingGroupsMutations:
     @strawberry.mutation
     async def update_sequencing_group(
         self,
