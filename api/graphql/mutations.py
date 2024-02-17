@@ -1,15 +1,4 @@
-
 import strawberry
-from typing import Any
-
-from pydantic import BaseModel
-
-from api.utils.db import (
-    Connection,
-    get_project_readonly_connection,
-    get_project_write_connection,
-    get_projectless_db_connection,
-)
 
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.models.sequencing_group import SequencingGroupUpsertInternal
@@ -20,6 +9,8 @@ from models.utils.sequencing_group_id_format import (  # Sample,
 
 @strawberry.type
 class Mutation:
+    """Mutation class"""
+
     @strawberry.mutation
     async def update_sequencing_group(
         self,
