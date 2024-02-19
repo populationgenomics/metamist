@@ -166,6 +166,7 @@ PARTICIPANT_QUERY = gql(
     """
 )
 
+
 def main(
     project: str,
     samples_n: int,
@@ -398,11 +399,11 @@ def get_new_sg_id(
                                                {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG88888', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
                                                {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG77777', 'type': 'genome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
                                                {'id': 'XPG66666', 'externalId': 'HG00022', 'sequencingGroups': [{'id': 'CPG66666', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
-        
+
         new_sg_attributes = ('exome', 'Illumina', 'short-read')
-        
+
         The new_sg_attributes maps the newly created sequencing group to the ('externalId', 'old_sample_id') of the specific sample of the participant it was created from.
-        
+
     """
     if old_sid in old_sid_to_new_sid:
         if not isinstance(new_sg_data.get('project', {}).get('samples'), list):
@@ -455,6 +456,16 @@ def transfer_analyses(
     for s in samples:
         for sg in s['sequencingGroups']:
             new_sg_attributes = sg.get('type'), sg.get('platform'), sg.get('technology')
+            new_sequencing_group_id = get_new_sg_id(
+                s['id'],
+                new_sg_attributes,
+                old_sid_to_new_sid,
+                sample_to_sg_attribute_map,
+                new_sg_data,
+            )
+            assert (
+                len(new_sequencing_group_id) == 1
+            ), f'Expected 1 new sequencing group id, got {len(new_sequencing_group_id)}'
             existing_sg = get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
@@ -501,13 +512,7 @@ def transfer_analyses(
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
                         ),
-                        sequencing_group_ids=get_new_sg_id(
-                            s['id'],
-                            new_sg_attributes,
-                            old_sid_to_new_sid,
-                            sample_to_sg_attribute_map,
-                            new_sg_data,
-                        ),
+                        sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
 
