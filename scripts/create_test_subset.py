@@ -383,6 +383,26 @@ def get_new_sg_id(
         old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
         sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (peid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
         new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
+
+
+        Example:
+        old_sid = 'XPG11111'
+        old_sid_to_new_sid = {'XPG11111': 'XPG22222',
+                              'XPG33333': 'XPG44444',
+                              'XPG55555': 'XPG66666',
+        sample_to_sg_attribute_map = {('HG00011', 'XPG11111'): {('exome', 'Illumina', 'short-read'): 'CPG11111',
+                                      ('HG00011', 'XPG33333'): {('exome', 'Illumina', 'short-read'): 'CPG22222', # same participant, different sample to above
+                                                                ('genome', 'Illumina', 'short-read'): 'CPG33333'} # same participant, same sample, different sequencing group to above
+                                      ('HG00022', 'XPG55555'): {('exome', 'Illumina', 'short-read'): 'CPG44444'} # different participant
+        new_sg_data = {'project': {'samples': [{'id': 'XPG22222', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG99999', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}],
+                                               {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG88888', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG77777', 'type': 'genome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPG66666', 'externalId': 'HG00022', 'sequencingGroups': [{'id': 'CPG66666', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+        
+        new_sg_attributes = ('exome', 'Illumina', 'short-read')
+        
+        The new_sg_attributes maps the newly created sequencing group to the ('externalId', 'old_sample_id') of the specific sample of the participant it was created from.
+        
     """
     if old_sid in old_sid_to_new_sid:
         if not isinstance(new_sg_data.get('project', {}).get('samples'), list):
