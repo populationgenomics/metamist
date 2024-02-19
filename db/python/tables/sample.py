@@ -147,7 +147,7 @@ class SampleTable(DbBase):
 
     async def insert_sample(
         self,
-        external_id: str,
+        external_ids: dict[str, str],
         sample_type: str,
         active: bool,
         meta: dict | None,
@@ -158,13 +158,16 @@ class SampleTable(DbBase):
         Create a new sample, and add it to database
         """
 
+        primary_external_id = 'foo'  # FIXME
+
+        audit_log_id = await self.audit_log_id()
         kv_pairs = [
-            ('external_id', external_id),
+            ('external_id', primary_external_id),
             ('participant_id', participant_id),
             ('meta', to_db_json(meta or {})),
             ('type', sample_type),
             ('active', active),
-            ('audit_log_id', await self.audit_log_id()),
+            ('audit_log_id', audit_log_id),
             ('project', project or self.project),
         ]
 
@@ -182,6 +185,25 @@ class SampleTable(DbBase):
             dict(kv_pairs),
         )
 
+        if not external_ids:
+            raise ValueError('Sample must have at least one external_id')
+
+        eid_query = """
+        INSERT INTO sample_external_id (project, sample_id, external_id, name, audit_log_id)
+        VALUES (:project, :sample_id, :external_id, :name, :audit_log_id)
+        """
+        eid_values = [
+            {
+                'project': project or self.project,
+                'sample_id': id_of_new_sample,
+                'external_id': eid,
+                'name': name.lower(),
+                'audit_log_id': audit_log_id,
+            }
+            for name, eid in external_ids.items()
+        ]
+        await self.connection.execute_many(eid_query, eid_values)
+
         return id_of_new_sample
 
     async def update_sample(
@@ -189,13 +211,14 @@ class SampleTable(DbBase):
         id_: int,
         meta: dict | None,
         participant_id: int | None,
-        external_id: str | None,
+        external_ids: dict[str, str] | None,
         type_: str | None,
         active: bool = None,
     ):
         """Update a single sample"""
 
-        values: dict[str, Any] = {'audit_log_id': await self.audit_log_id()}
+        audit_log_id = await self.audit_log_id()
+        values: dict[str, Any] = {'audit_log_id': audit_log_id}
         fields = [
             'audit_log_id = :audit_log_id',
         ]
@@ -203,9 +226,46 @@ class SampleTable(DbBase):
             values['participant_id'] = participant_id
             fields.append('participant_id = :participant_id')
 
-        if external_id:
-            values['external_id'] = external_id
+        if external_ids:
+            primary_external_id = 'foo'  # FIXME
+
+            values['external_id'] = primary_external_id
             fields.append('external_id = :external_id')
+
+        if external_ids:
+            to_delete = [k.lower() for k, v in external_ids.items() if v is None]
+            to_update = {k.lower(): v for k, v in external_ids.items() if v is not None}
+
+            if to_delete:
+                # Set audit_log_id to this transaction before deleting the rows
+                audit_update_query = """
+                UPDATE sample_external_id
+                SET audit_log_id = :audit_log_id
+                WHERE sample_id = :sample_id AND name IN :names
+                """
+                await self.connection.execute(audit_update_query, {'sample_id': id_, 'names': to_delete, 'audit_log_id': audit_log_id})
+
+                delete_query = """
+                DELETE FROM sample_external_id WHERE sample_id = :sample_id AND name IN :names
+                """
+                await self.connection.execute(delete_query, {'sample_id': id_, 'names': to_delete})
+
+            if to_update:
+                update_query = """
+                INSERT INTO sample_external_id (project, sample_id, external_id, name, audit_log_id)
+                VALUES (:project, :sample_id, :external_id, :name, :audit_log_id)
+                """
+                eid_values = [
+                    {
+                        'project': self.project,  # FIXME check where to get project
+                        'sample_id': id_,
+                        'external_id': eid,
+                        'name': name,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for name, eid in external_ids.items()
+                ]
+                await self.connection.execute_many(update_query, eid_values)
 
         if type_:
             values['type'] = type_

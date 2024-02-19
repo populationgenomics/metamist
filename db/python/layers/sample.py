@@ -231,7 +231,7 @@ class SampleLayer(BaseLayer):
         async with with_function():
             if not sample.id:
                 sample.id = await self.st.insert_sample(
-                    external_id=sample.external_id,
+                    external_ids=sample.external_ids,
                     sample_type=sample.type,
                     active=True,
                     meta=sample.meta,
@@ -242,7 +242,7 @@ class SampleLayer(BaseLayer):
                 # Otherwise update
                 await self.st.update_sample(
                     id_=sample.id,  # type: ignore
-                    external_id=sample.external_id,
+                    external_ids=sample.external_ids,
                     meta=sample.meta,
                     participant_id=sample.participant_id,
                     type_=sample.type,
