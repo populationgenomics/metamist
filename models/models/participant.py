@@ -26,9 +26,10 @@ class ParticipantInternal(SMBase):
 
     @classmethod
     def from_db(cls, data: dict):
-        """Convert from db keys, mainly converting parsing meta"""
-        if 'meta' in data and isinstance(data['meta'], str):
-            data['meta'] = json.loads(data['meta'])
+        """Convert from db keys, mainly converting JSON-encoded fields"""
+        for key in ['external_ids', 'meta']:
+            if key in data and isinstance(data[key], str):
+                data[key] = json.loads(data[key])
 
         return ParticipantInternal(**data)
 

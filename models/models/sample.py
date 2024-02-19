@@ -39,6 +39,9 @@ class SampleInternal(SMBase):
             if isinstance(meta, str):
                 meta = json.loads(meta)
 
+        if 'external_ids' in d and isinstance(d['external_ids'], str):
+            d['external_ids'] = json.loads(d['external_ids'])
+
         return SampleInternal(id=_id, type=str(type_), meta=meta, active=active, **d)
 
     def to_external(self):

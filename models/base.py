@@ -6,6 +6,10 @@ from pydantic.main import BaseModel
 OpenApiGenNoneType = bytes | None
 
 
+# The primary {sample,participant}_external_id entry, previously {sample,participant}.external_id
+PRIMARY_EXTERNAL_ORG = ''
+
+
 class SMBase(BaseModel):
     """Base object for all models"""
 
