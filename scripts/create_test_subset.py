@@ -166,18 +166,6 @@ PARTICIPANT_QUERY = gql(
     """
 )
 
-PARTICIPANT_SAMPLE_QUERY = gql(
-    """
-    query ($project: String!, $peid: String!) {
-        sample(project: {eq: $project}, externalId: {eq: $peid}) {
-            id
-            externalId
-            }
-        }
-    """
-)
-
-
 def main(
     project: str,
     samples_n: int,
@@ -212,9 +200,7 @@ def main(
     logger.info(f'Found {len(all_sids)} sample ids in {project}')
 
     # 3. Randomly select from the remaining sgs
-    additional_samples.update(
-        random.sample(list(all_sids - additional_samples), samples_n)
-    )
+    additional_samples.update(random.sample(all_sids - additional_samples, samples_n))
 
     # 4. Query all the samples from the selected sgs
     logger.info(f'Transfering {len(additional_samples)} samples. Querying metadata.')
@@ -383,7 +369,7 @@ def upsert_assays(
 
 
 def get_new_sg_id(
-    sid: str,
+    old_sid: str,
     new_sg_attributes: tuple[str, str, str],
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
@@ -398,9 +384,10 @@ def get_new_sg_id(
         sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (peid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
         new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
     """
-    if sid in old_sid_to_new_sid:
-        old_sid = sid
-        for new_sample in new_sg_data['project']['samples']:  # pylint: disable=E1136
+    if old_sid in old_sid_to_new_sid:
+        if not isinstance(new_sg_data.get('project', {}).get('samples'), list):
+            raise TypeError("'samples' must be a list")
+        for new_sample in new_sg_data['project']['samples']:
             if (
                 new_sample['id'] == old_sid_to_new_sid[old_sid]
             ):  # If new sample maps to old sample
@@ -421,7 +408,7 @@ def get_new_sg_id(
                     continue
 
     return ValueError(
-        f'Old sample {sid} not found in mapping of old to new sample ids.'
+        f'Old sample {old_sid} not found in mapping of old to new sample ids.'
     )
 
 
