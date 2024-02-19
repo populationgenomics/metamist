@@ -2,7 +2,7 @@ from io import StringIO
 from test.testbase import DbIsolatedTest, run_as_sync
 from unittest.mock import patch
 
-from metamist.parser.generic_parser import ParsedParticipant
+from metamist.parser.generic_parser import DefaultSequencing, ParsedParticipant
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
 
@@ -25,7 +25,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             project=self.project_name,
-            default_sequencing_technology='short-read',
+            default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -91,7 +91,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             project=self.project_name,
-            default_sequencing_technology='short-read',
+            default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
         parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
@@ -148,7 +148,7 @@ class TestSampleMapParser(DbIsolatedTest):
         self.maxDiff = None
 
         self.assertDictEqual({}, participants[0].samples[0].meta)
-        expected_sequence1_reads = [
+        expected_assay1_reads = [
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
                 'basename': '<sample-id>.filename-R1.fastq.gz',
@@ -168,11 +168,11 @@ class TestSampleMapParser(DbIsolatedTest):
         ]
 
         self.assertListEqual(
-            expected_sequence1_reads,
+            expected_assay1_reads,
             participants[0].samples[0].sequencing_groups[0].assays[0].meta['reads'],
         )
 
-        expected_sequence2_reads = [
+        expected_assay2_reads = [
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id2>.filename-R1.fastq.gz',
                 'basename': '<sample-id2>.filename-R1.fastq.gz',
@@ -191,6 +191,164 @@ class TestSampleMapParser(DbIsolatedTest):
             },
         ]
         self.assertListEqual(
-            expected_sequence2_reads,
+            expected_assay2_reads,
             participants[1].samples[0].sequencing_groups[0].assays[0].meta['reads'],
+        )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_valid_rna_rows(self, mock_graphql_query):
+        """
+        Test importing a single row of rna data
+        """
+
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
+        rows = [
+            'Sample ID\tFilenames\tType\tfacility\tlibrary\tend_type\tread_length',
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna\tVCGS\tTSStrmRNA\tpaired\t151',
+            '<sample-id2>\t<sample-id2>.filename-R1.fastq.gz\ttotalrna\tVCGS\tTSStrtRNA\tpaired\t151',
+            '<sample-id2>\t<sample-id2>.filename-R2.fastq.gz\ttotalrna\tVCGS\tTSStrtRNA\tpaired\t151',
+        ]
+
+        parser = SampleFileMapParser(
+            search_locations=[],
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+        )
+        fs = [
+            '<sample-id>.filename-R1.fastq.gz',
+            '<sample-id>.filename-R2.fastq.gz',
+            '<sample-id2>.filename-R1.fastq.gz',
+            '<sample-id2>.filename-R2.fastq.gz',
+        ]
+        parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
+        parser.skip_checking_gcs_objects = True
+
+        file_contents = '\n'.join(rows)
+        summary, samples = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        self.assertEqual(0, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(2, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(2, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
+        self.maxDiff = None
+
+        self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
+        expected_sg1_meta = {
+            'sequencing_facility': 'VCGS',
+            'sequencing_library': 'TSStrmRNA',
+            'read_end_type': 'paired',
+            'read_length': 151
+        }
+        self.assertDictEqual(
+            expected_sg1_meta,
+            samples[0].sequencing_groups[0].meta,
+        )
+
+        self.assertEqual('totalrna', samples[1].sequencing_groups[0].sequencing_type)
+        expected_sg2_meta = {
+            'sequencing_facility': 'VCGS',
+            'sequencing_library': 'TSStrtRNA',
+            'read_end_type': 'paired',
+            'read_length': 151
+        }
+        self.assertDictEqual(
+            expected_sg2_meta,
+            samples[1].sequencing_groups[0].meta,
+        )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_invalid_rna_row(self, mock_graphql_query):
+        """
+        Test importing a single row of rna data
+        """
+
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
+        rows = [
+            'Sample ID\tFilenames\tType',
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna'
+        ]
+
+        parser = SampleFileMapParser(
+            search_locations=[],
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+        )
+        fs = [
+            '<sample-id>.filename-R1.fastq.gz',
+            '<sample-id>.filename-R2.fastq.gz',
+        ]
+        parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
+        parser.skip_checking_gcs_objects = True
+
+        file_contents = '\n'.join(rows)
+        with self.assertRaises(
+                ValueError
+        ):
+            _, _ = await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rna_row_with_default_field_values(self, mock_graphql_query):
+        """
+        Test importing a single row of rna data
+        """
+
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
+        rows = [
+            'Sample ID\tFilenames\tType',
+            '<sample-id>\t<sample-id>.filename-R1.fastq.gz,<sample-id>.filename-R2.fastq.gz\tpolyarna'
+        ]
+
+        parser = SampleFileMapParser(
+            search_locations=[],
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+            default_sequencing=DefaultSequencing(
+                facility='VCGS',
+                library='TSStrmRNA'
+            ),
+            default_read_end_type='paired',
+            default_read_length=151
+        )
+        fs = [
+            '<sample-id>.filename-R1.fastq.gz',
+            '<sample-id>.filename-R2.fastq.gz',
+        ]
+        parser.filename_map = {k: 'gs://BUCKET/FAKE/' + k for k in fs}
+        parser.skip_checking_gcs_objects = True
+
+        file_contents = '\n'.join(rows)
+        summary, samples = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        self.assertEqual(0, summary['participants']['insert'])
+        self.assertEqual(0, summary['participants']['update'])
+        self.assertEqual(1, summary['samples']['insert'])
+        self.assertEqual(0, summary['samples']['update'])
+        self.assertEqual(1, summary['assays']['insert'])
+        self.assertEqual(0, summary['assays']['update'])
+        self.maxDiff = None
+
+        self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
+        expected_sg1_meta = {
+            'sequencing_facility': 'VCGS',
+            'sequencing_library': 'TSStrmRNA',
+            'read_end_type': 'paired',
+            'read_length': 151
+        }
+        self.assertDictEqual(
+            expected_sg1_meta,
+            samples[0].sequencing_groups[0].meta,
         )
