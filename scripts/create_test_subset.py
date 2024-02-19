@@ -387,18 +387,18 @@ def get_new_sg_id(
 
 
         Example:
-        old_sid = 'XPG11111'
-        old_sid_to_new_sid = {'XPG11111': 'XPG22222',
-                              'XPG33333': 'XPG44444',
-                              'XPG55555': 'XPG66666',
-        sample_to_sg_attribute_map = {('HG00011', 'XPG11111'): {('exome', 'Illumina', 'short-read'): 'CPG11111',
-                                      ('HG00011', 'XPG33333'): {('exome', 'Illumina', 'short-read'): 'CPG22222', # same participant, different sample to above
-                                                                ('genome', 'Illumina', 'short-read'): 'CPG33333'} # same participant, same sample, different sequencing group to above
-                                      ('HG00022', 'XPG55555'): {('exome', 'Illumina', 'short-read'): 'CPG44444'} # different participant
-        new_sg_data = {'project': {'samples': [{'id': 'XPG22222', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG99999', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}],
-                                               {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG88888', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
-                                               {'id': 'XPG44444', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPG77777', 'type': 'genome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
-                                               {'id': 'XPG66666', 'externalId': 'HG00022', 'sequencingGroups': [{'id': 'CPG66666', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+        old_sid = 'XPGAAAAA'
+        old_sid_to_new_sid = {'XPGAAAAA': 'XPGBBBBB',
+                              'XPGCCCCC': 'XPGDDDDD',
+                              'XPGEEEEE': 'XPGFFFFF',
+        sample_to_sg_attribute_map = {('HG00011', 'XPGAAAAA'): {('exome', 'Illumina', 'short-read'): 'CPGAAAAA',
+                                      ('HG00011', 'XPGCCCCC'): {('exome', 'Illumina', 'short-read'): 'CPGBBBBB', # same participant, different sample to above
+                                                                ('genome', 'Illumina', 'short-read'): 'CPGCCCCC'} # same participant, same sample, different sequencing group to above
+                                      ('HG00022', 'XPGEEEEE'): {('exome', 'Illumina', 'short-read'): 'CPGDDDDD'} # different participant
+        new_sg_data = {'project': {'samples': [{'id': 'XPGBBBBB', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGZZZZZ', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}],
+                                               {'id': 'XPGDDDDD', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGYYYYY', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPGDDDDD', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGXXXXX', 'type': 'genome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPGFFFFF', 'externalId': 'HG00022', 'sequencingGroups': [{'id': 'CPGWWWWW', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
 
         new_sg_attributes = ('exome', 'Illumina', 'short-read')
 
