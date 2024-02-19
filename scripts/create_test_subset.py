@@ -276,7 +276,7 @@ def transfer_samples_sgs_assays(
     sample_to_sg_attribute_map: dict[Tuple[str, str], SequencingGroupAttributes] = {}
     old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
-        exid_old_sid = (s['externalId'], s['id'])
+        exid_old_sid = (s['participant']['externalId'], s['id'])
         if exid_old_sid not in sample_to_sg_attribute_map:
             sample_to_sg_attribute_map[exid_old_sid] = {}
         for sg in s['sequencingGroups']:
