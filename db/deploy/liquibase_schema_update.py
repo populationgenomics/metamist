@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+
 from google.cloud import logging, secretmanager
 from typing_extensions import Literal
 
@@ -11,7 +12,7 @@ SECRET_PROJECT = 'sample-metadata'
 SECRET_NAME = 'mariadb-liquibase-credentials'
 
 
-def read_db_credentials() -> dict[Literal['username', 'password'], str]:
+def read_db_credentials() -> dict[Literal['username', 'password', 'hostname'], str]:
     """Get database credentials from Secret Manager."""
     try:
         secret_path = SECRET_CLIENT.secret_version_path(SECRET_PROJECT, SECRET_NAME, 'latest')
@@ -36,12 +37,12 @@ def run_liquibase_update():
 
     # Construct the Liquibase command
     liquibase_cmd = [
-        "./liquibase/liquibase",
-        "--changeLogFile=project.xml",
-        f"--url=jdbc:mariadb://{db_hostname}/{db_name}",
-        "--driver=org.mariadb.jdbc.Driver",
-        "--classpath=mariadb-java-client-3.0.3.jar",
-        "update"
+        './liquibase/liquibase',
+        '--changeLogFile=project.xml',
+        f'--url=jdbc:mariadb://{db_hostname}/{db_name}',
+        '--driver=org.mariadb.jdbc.Driver',
+        '--classpath=mariadb-java-client-3.0.3.jar',
+        'update'
     ]
 
     try:
