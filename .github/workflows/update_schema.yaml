@@ -1,0 +1,43 @@
+name: Deploy Liquibase Schema
+
+on:
+  workflow_dispatch:
+    branches:
+      - main
+
+jobs:
+  deploy-schema:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: "temurin"
+        java-version: "17"
+
+    - name: Download Liquibase
+      run: |
+        curl -L https://github.com/liquibase/liquibase/releases/download/v4.26.0/liquibase-4.26.0.zip -o liquibase.zip
+        unzip liquibase.zip -d liquibase
+
+    - name: Download MariaDB JDBC Driver
+      run: |
+        wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
+
+    - name: Run Liquibase Migration
+      env:
+        DATABASE_URL: jdbc:mariadb://${{ secrets.DATABASE_URL }}
+        DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+        DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+      run: |
+        ./liquibase/liquibase \
+            --changeLogFile=db/project.xml \
+            --url=${{ env.DATABASE_URL }} \
+            --driver=org.mariadb.jdbc.Driver \
+            --classpath=./mariadb-java-client-3.0.3.jar \
+            --username=${{ env.DATABASE_USERNAME }} \
+            --password=${{ env.DATABASE_PASSWORD }} \
+            update
