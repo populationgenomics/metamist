@@ -1,43 +1,55 @@
-name: Deploy Liquibase Schema
+name: Liquibase Schema Update via Cloud Run
 
 on:
   workflow_dispatch:
-    branches:
-      - main
+    inputs:
+      dbName:
+        description: 'Database Instance'
+        required: true
+        type: choice
+        options:
+        - production
+        - development
 
 jobs:
-  deploy-schema:
+  deploy:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Java
-      uses: actions/setup-java@v3
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
       with:
-        distribution: "temurin"
-        java-version: "17"
+        workload_identity_provider: "projects/774248915715/locations/global/workloadIdentityPools/gh-deploy-pool/providers/gh-provider"
+        service_account: "sample-metadata-deploy@sample-metadata.iam.gserviceaccount.com"
 
-    - name: Download Liquibase
-      run: |
-        curl -L https://github.com/liquibase/liquibase/releases/download/v4.26.0/liquibase-4.26.0.zip -o liquibase.zip
-        unzip liquibase.zip -d liquibase
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
 
-    - name: Download MariaDB JDBC Driver
-      run: |
-        wget https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.0.3/mariadb-java-client-3.0.3.jar
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: ./db  # Set the context to the db directory to include project.xml
+        file: ./deploy/Dockerfile
+        push: true
+        tags: gcr.io/sample-metadata/liquibase-job:latest
+        build-args: |
+          DB_NAME=${{ github.event.inputs.dbName }}
 
-    - name: Run Liquibase Migration
-      env:
-        DATABASE_URL: jdbc:mariadb://${{ secrets.DATABASE_URL }}
-        DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
-        DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
-      run: |
-        ./liquibase/liquibase \
-            --changeLogFile=db/project.xml \
-            --url=${{ env.DATABASE_URL }} \
-            --driver=org.mariadb.jdbc.Driver \
-            --classpath=./mariadb-java-client-3.0.3.jar \
-            --username=${{ env.DATABASE_USERNAME }} \
-            --password=${{ env.DATABASE_PASSWORD }} \
-            update
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v0.7.0
+      with:
+        service: liquibase-job
+        image: gcr.io/sample-metadata/liquibase-job:latest
+        region: australia-southeast1
+        command: |
+          gcloud run deploy liquibase-job \
+            --image=gcr.io/sample-metadata/liquibase-job:latest \
+            --update-env-vars=DB_NAME=${{ github.event.inputs.dbName }}
+
+    - name: Cleanup
+      if: always()
+      uses: google-github-actions/delete-gcr@v0.4.0
+      with:
+        image: gcr.io/sample-metadata/liquibase-job:latest
