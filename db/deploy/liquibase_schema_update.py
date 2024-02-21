@@ -10,6 +10,8 @@ SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
 LOGGING_CLIENT = logging.Client()
 SECRET_PROJECT = 'sample-metadata'
 SECRET_NAME = 'mariadb-liquibase-credentials'
+log_name = 'liquibase_log'
+logger = LOGGING_CLIENT.logger(log_name)
 
 
 def read_db_credentials() -> dict[Literal['username', 'password', 'hostname'], str]:
@@ -18,15 +20,14 @@ def read_db_credentials() -> dict[Literal['username', 'password', 'hostname'], s
         secret_path = SECRET_CLIENT.secret_version_path(SECRET_PROJECT, SECRET_NAME, 'latest')
         response = SECRET_CLIENT.access_secret_version(request={'name': secret_path})
         return json.loads(response.payload.data.decode('UTF-8'))
-    except Exception as e:
-        raise Exception(f'Could not access database credentials: {e}') from e
+    except json.JSONDecodeError as e:
+        text = f'Failed to parse credentials from secrets: {e}\n'
+        logger.log_text(text, severity='ERROR')
+        raise ValueError(text) from e
 
 
 def run_liquibase_update():
     """Run the Liquibase update command."""
-
-    log_name = 'liquibase_log'
-    logger = LOGGING_CLIENT.logger(log_name)
 
     # Fetch the credentials
     credentials = read_db_credentials()
