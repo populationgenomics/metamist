@@ -1,10 +1,18 @@
 import * as React from 'react'
 import { Table as SUITable, Popup, Checkbox } from 'semantic-ui-react'
 import _ from 'lodash'
-import Table from '../../../shared/components/Table'
+// import Table from '../../../shared/components/Table'
 import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'
 import { TableVirtuoso } from 'react-virtuoso'
+
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Paper from "@mui/material/Paper";
+
 
 interface Field {
     category: string
@@ -13,6 +21,8 @@ interface Field {
     className?: string
     dataMap?: (data: any, value: string) => any
 }
+
+const hailBatchUrl = 'https://batch.hail.populationgenomics.org.au/batches'
 
 const HailBatchGridTempVirtuoso: React.FunctionComponent<{
     data: any[]
@@ -34,9 +44,9 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
         }
     }
 
-    const prepareBatchUrl = (url: string, txt: string) => (
-        <a href={`${url}`} rel="noopener noreferrer" target="_blank">
-            {txt}
+    const prepareBatchUrl = (batch_id: string) => (
+        <a href={`${hailBatchUrl}/${batch_id}`} rel="noopener noreferrer" target="_blank">
+            BATCH ID: {batch_id}
         </a>
     )
 
@@ -57,9 +67,9 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
             dataMap: (dataItem: any, value: string) => {
                 if (dataItem.batch_id !== undefined && dataItem.batch_id !== null) {
                     if (dataItem.job_id !== undefined && dataItem.job_id !== null) {
-                        return prepareBatchUrl(dataItem.url, `JOB: ${value}`)
+                        return `JOB: ${value}`
                     }
-                    return prepareBatchUrl(dataItem.url, `BATCH ID: ${dataItem.batch_id}`)
+                    return prepareBatchUrl(dataItem.batch_id)
                 }
 
                 if (dataItem.wdl_task_name !== undefined && dataItem.wdl_task_name !== null) {
@@ -157,133 +167,199 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
             category: 'job_name',
             title: 'NAME',
         },
+        {
+            category: 'stage',
+            title: 'STAGE',
+        },
+        {
+            category: 'tool',
+            title: 'TOOL',
+        },
+        {
+            category: 'sequencing_type',
+            title: 'SEQUENCING TYPE',
+        }
     ]
 
-    const expandedRow = (log: any, idx: any) =>
+    const expandedRow = (item: any, idx: any) =>
         MAIN_FIELDS.map(({ category, dataMap, className }) => (
-            <SUITable.Cell key={`${category}-${idx}`} className={className}>
-                {dataMap ? dataMap(log, log[category]) : sanitiseValue(log[category])}
+            <SUITable.Cell key={`${category}-${idx}`} className={className} style={{width: 350}}>
+                {dataMap ? dataMap(item, item[category]) : sanitiseValue(item[category])}
             </SUITable.Cell>
         ))
 
+    const ExpandableRow = ({ item, ...props }) => {
+        const index = props['data-index'];
+        return ( 
+            <React.Fragment key={index}>
+                <TableRow {...props}
+                    className={item.job_id === null ? 'bold-text' : ''}
+                    style={{
+                        backgroundColor: prepareBgColor(item),
+                        textAlign: 'center',
+                    }}
+                >
+
+                <SUITable.Cell style={{width: 50}}>
+                <Checkbox
+                        checked={openRows.includes(index)}
+                        toggle
+                        onChange={() => handleToggle(index)}
+                    />
+                </SUITable.Cell>
+                {expandedRow(item, index)}
+                </TableRow>
+
+                {Object.entries(item)
+                    .filter(([c]) =>
+                        DETAIL_FIELDS.map(({ category }) => category).includes(c)
+                    )
+                    .map(([k, v]) => {
+                        if (v === null) {
+                            return null; // Exclude rows with null value
+                        }
+                        const detailField = DETAIL_FIELDS.find(
+                            ({ category }) => category === k
+                        )
+                        const title = detailField ? detailField.title : k
+                        return (
+                            <SUITable.Row
+                                style={{
+                                    display: openRows.includes(index) ? 'table-row' : 'none',
+                                    backgroundColor: 'var(--color-bg)',
+                                }}
+                                key={`${index}-detail-${k}`}
+                            >
+                                <SUITable.Cell style={{ border: 'none' }} />
+                                <SUITable.Cell>
+                                    <b>{title}</b>
+                                </SUITable.Cell>
+                                <SUITable.Cell colSpan="4">{v}</SUITable.Cell>
+                            </SUITable.Row>
+                        )
+                    })}
+                    <SUITable.Row
+                        style={{
+                            display: openRows.includes(index) ? 'table-row' : 'none',
+                            backgroundColor: 'var(--color-bg)',
+                        }}
+                        key={`${index}-lbl`}
+                    >
+                        <SUITable.Cell style={{ border: 'none' }} />
+                        <SUITable.Cell colSpan="5">
+                            <b>COST BREAKDOWN</b>
+                        </SUITable.Cell>
+                    </SUITable.Row>
+
+                    {typeof item === 'object' &&
+                        'details' in item &&
+                        _.orderBy(item?.details, ['cost'], ['desc']).map((dk) => (
+                            <SUITable.Row
+                                style={{
+                                    display: openRows.includes(index) ? 'table-row' : 'none',
+                                    backgroundColor: 'var(--color-bg)',
+                                }}
+                                key={`${index}-${dk.sku}`}
+                            >
+                                <SUITable.Cell style={{ border: 'none' }} />
+                                <SUITable.Cell colSpan="4">{dk.sku}</SUITable.Cell>
+                                <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>
+                            </SUITable.Row>
+                        ))}
+            </React.Fragment>
+        )
+    }
+
+
+        
+        const TableComponents = {
+        Scroller: React.forwardRef((props, ref) => (
+            <TableContainer component={Paper} {...props} ref={ref} />
+        )),
+        Table: (props) => <Table {...props} style={{ borderCollapse: "separate" }} />,
+        TableHead: TableHead,
+        TableRow: ExpandableRow, 
+        TableBody: React.forwardRef((props, ref) => (
+            <TableBody {...props} ref={ref} />
+        ))
+        };
+    
     return (
         <TableVirtuoso
-            style={{ height: 400 }}
-            data={combinedData}
+            style={{ height: 600 }}
             useWindowScroll
-            fixedHeaderContent={(index, user) => (
-                <SUITable.Header>
-                    <SUITable.Row>
-                        <SUITable.HeaderCell style={{ borderBottom: 'none' }} />
-                        {MAIN_FIELDS.map(({ category, title }, i) => (
-                            <SUITable.HeaderCell
-                                key={`${category}-${i}`}
-                                style={{
-                                    borderBottom: 'none',
-                                    position: 'sticky',
-                                    resize: 'horizontal',
-                                    textAlign: 'center',
-                                }}
-                            >
-                                {title}
-                            </SUITable.HeaderCell>
-                        ))}
-                    </SUITable.Row>
-                    <SUITable.Row>
-                        <SUITable.Cell
-                            style={{
-                                borderTop: 'none',
-                                backgroundColor: 'var(--color-table-header)',
-                            }}
-                        />
-                        {MAIN_FIELDS.map(({ category }, i) => (
-                            <SUITable.Cell
-                                className="sizeRow"
-                                key={`${category}-resize-${i}`}
-                                style={{
-                                    borderTop: 'none',
-                                    backgroundColor: 'var(--color-table-header)',
-                                }}
-                            ></SUITable.Cell>
-                        ))}
-                    </SUITable.Row>
-                </SUITable.Header>
+            class='ui celled table compact'
+            data={combinedData .sort((a, b) => {
+                // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
+                if (a.ar_guid < b.ar_guid) {
+                    return -1
+                }
+                if (a.ar_guid > b.ar_guid) {
+                    return 1
+                }
+                if (a.batch_id < b.batch_id) {
+                    return -1
+                }
+                if (a.batch_id > b.batch_id) {
+                    return 1
+                }
+                if (a.job_id < b.job_id) {
+                    return -1
+                }
+                if (a.job_id > b.job_id) {
+                    return 1
+                }
+                // if (a.cost < b.cost) {
+                //     return 1
+                // }
+                // if (a.cost > b.cost) {
+                //     return -1
+                // }
+
+
+                if (a.wdl_task_name < b.wdl_task_name) {
+                    return -1
+                }
+                if (a.wdl_task_name > b.wdl_task_name) {
+                    return 1
+                }
+                if (a.cromwell_sub_workflow_name < b.cromwell_sub_workflow_name) {
+                    return -1
+                }
+                if (a.cromwell_sub_workflow_name > b.cromwell_sub_workflow_name) {
+                    return 1
+                }
+                if (a.cromwell_workflow_id < b.cromwell_workflow_id) {
+                    return -1
+                }
+                if (a.cromwell_workflow_id > b.cromwell_workflow_id) {
+                    return 1
+                }
+
+                return 0
+            })}
+            components={TableComponents}
+            fixedHeaderContent={() => (
+                <SUITable.Row style={{ z_index: 999}}>
+                    <SUITable.HeaderCell style={{ width: 50 }} />
+                    {MAIN_FIELDS.map(({ category, title }, i) => (
+                        <SUITable.HeaderCell
+                        key={`${category}-${i}`}
+                        style={{
+                            borderBottom: 'none',
+                            position: 'sticky',
+                            resize: 'horizontal',
+                            textAlign: 'center',
+                        }}
+                        >
+                            {title}
+                        </SUITable.HeaderCell>
+                    ))}
+                </SUITable.Row>
+    
             )}
-            itemContent={(idx, log) => {
-                return (
-                    <React.Fragment key={idx}>
-                        <SUITable.Row
-                            className={
-                                log.job_id === undefined || log.job_id === null ? 'bold-text' : ''
-                            }
-                            style={{
-                                backgroundColor: prepareBgColor(log),
-                                textAlign: 'center',
-                            }}
-                        >
-                            <SUITable.Cell collapsing>
-                                <Checkbox
-                                    checked={openRows.includes(idx)}
-                                    toggle
-                                    onChange={() => handleToggle(idx)}
-                                />
-                            </SUITable.Cell>
-                            {expandedRow(log, idx)}
-                        </SUITable.Row>
-                        {Object.entries(log)
-                            .filter(([c]) =>
-                                DETAIL_FIELDS.map(({ category }) => category).includes(c)
-                            )
-                            .map(([k, v]) => {
-                                const detailField = DETAIL_FIELDS.find(
-                                    ({ category }) => category === k
-                                )
-                                const title = detailField ? detailField.title : k
-                                return (
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(idx) ? 'table-row' : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${idx}-detail-${k}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell>
-                                            <b>{title}</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell colSpan="4">{v}</SUITable.Cell>
-                                    </SUITable.Row>
-                                )
-                            })}
-                        <SUITable.Row
-                            style={{
-                                display: openRows.includes(idx) ? 'table-row' : 'none',
-                                backgroundColor: 'var(--color-bg)',
-                            }}
-                            key={`${idx}-lbl`}
-                        >
-                            <SUITable.Cell style={{ border: 'none' }} />
-                            <SUITable.Cell colSpan="5">
-                                <b>COST BREAKDOWN</b>
-                            </SUITable.Cell>
-                        </SUITable.Row>
-                        {typeof log === 'object' &&
-                            'details' in log &&
-                            _.orderBy(log?.details, ['cost'], ['desc']).map((dk) => (
-                                <SUITable.Row
-                                    style={{
-                                        display: openRows.includes(idx) ? 'table-row' : 'none',
-                                        backgroundColor: 'var(--color-bg)',
-                                    }}
-                                    key={`${idx}-${dk.sku}`}
-                                >
-                                    <SUITable.Cell style={{ border: 'none' }} />
-                                    <SUITable.Cell colSpan="4">{dk.sku}</SUITable.Cell>
-                                    <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>
-                                </SUITable.Row>
-                            ))}
-                    </React.Fragment>
-                )
+            context={{
+                combinedData,
             }}
         />
     )
