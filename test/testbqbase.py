@@ -11,9 +11,6 @@ from db.python.layers.billing import BillingLayer
 class BqTest(unittest.TestCase):
     """Base class for Big Query integration tests"""
 
-    # store connections here, so they can be created PER-CLASS
-    # and don't get recreated per test.
-
     # author and grp_project are not used in the BQ tests, but are required
     # so some dummy values are preset
     author: str = 'Author'

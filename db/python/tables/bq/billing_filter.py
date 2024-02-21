@@ -56,7 +56,7 @@ class BillingFilter(GenericBQFilterModel):
 
         # compare all attributes
         for att in self.__dict__:
-            if not getattr(self, att).__eq__(getattr(other, att)):
+            if getattr(self, att) != getattr(other, att):
                 return False
 
         # all attributes are equal

@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 
 from api.utils.dates import (
     get_invoice_month_range,
@@ -41,7 +41,7 @@ class TestApiUtils(unittest.TestCase):
 
         # there is 3 (INVOICE_DAY_DIFF) days difference between invoice month st and end
         self.assertEqual(
-            (datetime(2020, 12, 29).date(), datetime(2021, 2, 3).date()),
+            (date(2020, 12, 29), date(2021, 2, 3)),
             res_jan_2021,
         )
 
@@ -50,7 +50,7 @@ class TestApiUtils(unittest.TestCase):
 
         # there is 3 (INVOICE_DAY_DIFF) days difference between invoice month st and end
         self.assertEqual(
-            (datetime(2021, 11, 28).date(), datetime(2022, 1, 3).date()),
+            (date(2021, 11, 28), date(2022, 1, 3)),
             res_dec_2021,
         )
 
