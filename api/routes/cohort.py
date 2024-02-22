@@ -8,6 +8,10 @@ from db.python.layers.cohort import CohortLayer
 
 from db.python.tables.project import ProjectPermissionsTable
 
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_transform_to_raw_list,
+)
+
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 
 
@@ -23,31 +27,10 @@ class CohortCriteria(BaseModel):
     """Represents the expected JSON body of the create cohort request"""
 
     projects: list[str]
-
-
-@router.post('/{project}/', operation_id='createCohort')
-async def create_cohort(
-    cohort: CohortBody,
-    connection: Connection = get_project_write_connection,
-) -> dict[str, Any]:
-    """
-    Create a cohort with the given name and sample/sequencing group IDs.
-    """
-    cohortlayer = CohortLayer(connection)
-
-    if not connection.project:
-        raise ValueError('A cohort must belong to a project')
-
-    cohort_id = await cohortlayer.create_cohort(
-        project=connection.project,
-        cohort_name=cohort.name,
-        derived_from=cohort.derived_from,
-        description=cohort.description,
-        author=connection.author,
-        sequencing_group_ids=cohort.sequencing_group_ids,
-    )
-
-    return {'cohort_id': cohort_id}
+    sg_ids_internal: list[str] | None = None
+    sg_technology: list[str] | None = None
+    sg_platform: list[str] | None = None
+    sg_type: list[str] | None = None
 
 
 @router.post('/{project}/cohort', operation_id='createCohortFromCriteria')
@@ -76,6 +59,10 @@ async def create_cohort_from_criteria(
         description=cohort_spec.description,
         author=connection.author,
         cohort_name=cohort_spec.name,
+        sg_ids_internal=sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal),
+        sg_technology=cohort_criteria.sg_technology,
+        sg_platform=cohort_criteria.sg_platform,
+        sg_type=cohort_criteria.sg_type,
     )
 
     return {'cohort_id': cohort_id}

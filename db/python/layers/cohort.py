@@ -37,30 +37,6 @@ class CohortLayer(BaseLayer):
         """
         return await self.ct.get_cohort_sequencing_group_ids(cohort_id)
 
-    async def create_cohort(
-        self,
-        project: ProjectId,
-        cohort_name: str,
-        sequencing_group_ids: list[str],
-        author: str,
-        description: str,
-        derived_from: int | None = None,
-    ) -> int:
-        """
-        Create a new cohort from the given parameters. Returns the newly created cohort_id.
-        """
-
-        cohort_id = await self.ct.create_cohort(
-            project=project,
-            cohort_name=cohort_name,
-            sequencing_group_ids=sequencing_group_ids,
-            description=description,
-            author=author,
-            derived_from=derived_from,
-        )
-
-        return cohort_id
-
     async def create_cohort_from_criteria(
             self,
             project_to_write: ProjectId,
@@ -68,15 +44,24 @@ class CohortLayer(BaseLayer):
             author: str,
             description: str,
             cohort_name: str,
+            sg_ids_internal: list[int] | None = None,
+            sg_technology: list[str] | None = None,
+            sg_platform: list[str] | None = None,
+            sg_type: list[str] | None = None,
     ):
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
 
         # 1. Pull SG's based on criteria
+
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
-                project=GenericFilter(in_=projects_to_pull)
+                project=GenericFilter(in_=projects_to_pull),
+                id=GenericFilter(in_=sg_ids_internal) if sg_ids_internal else None,
+                technology=GenericFilter(in_=sg_technology) if sg_technology else None,
+                platform=GenericFilter(in_=sg_platform) if sg_platform else None,
+                type=GenericFilter(in_=sg_type) if sg_type else None,
             )
         )
         print(sgs)
