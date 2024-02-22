@@ -236,19 +236,19 @@ class GraphQLAnalysis:
     id: int
     type: str
     status: strawberry.enum(AnalysisStatus)
-    # output: str | None
+    output: str | None
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
 
-    outputs: strawberry.scalars.JSON
     @staticmethod
+    outputs: strawberry.scalars.JSON
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
         return GraphQLAnalysis(
             id=internal.id,
             type=internal.type,
             status=internal.status,
-            # output=internal.output,
+            output=internal.output,
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
