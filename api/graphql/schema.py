@@ -236,13 +236,13 @@ class GraphQLAnalysis:
     id: int
     type: str
     status: strawberry.enum(AnalysisStatus)
-    output: str | None
+    # output: str | None
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
 
-    @staticmethod
     outputs: strawberry.scalars.JSON
+    @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
         return GraphQLAnalysis(
             id=internal.id,
@@ -259,6 +259,7 @@ class GraphQLAnalysis:
     async def sequencing_groups(
         self, info: Info, root: 'GraphQLAnalysis'
     ) -> list['GraphQLSequencingGroup']:
+
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS]
         sgs = await loader.load(root.id)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
