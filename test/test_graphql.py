@@ -213,7 +213,7 @@ query MyQuery($sg_id: String!, $project: String!) {
     analyses(project: {eq: $project}) {
       id
       meta
-      output
+      outputs
     }
   }
 }"""
@@ -229,7 +229,7 @@ query MyQuery($sg_id: String!, $project: String!) {
         analyses = resp['sequencingGroups'][0]['analyses']
         self.assertIn('id', analyses[0])
         self.assertIn('meta', analyses[0])
-        self.assertIn('output', analyses[0])
+        self.assertIn('outputs', analyses[0])
 
     @run_as_sync
     async def test_participant_phenotypes(self):

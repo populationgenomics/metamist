@@ -1,7 +1,8 @@
 from collections import defaultdict
 from typing import Any
-from google.cloud import storage
+
 from cloudpathlib import AnyPath, GSPath
+from google.cloud import storage
 from pydantic import BaseModel
 
 from models.base import SMBase

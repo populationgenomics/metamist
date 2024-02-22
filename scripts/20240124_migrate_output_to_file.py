@@ -7,12 +7,12 @@ from typing import Dict
 import click
 from databases import Database
 
+from db.python.connect import CredentialedDatabaseConfiguration  # pylint: disable=C0415
 from models.models.file import FileInternal
 
 
 def _get_connection_string():
-    from db.python.connect import \
-        CredentialedDatabaseConfiguration  # pylint: disable=C0415
+    """Get connection string"""
 
     config = CredentialedDatabaseConfiguration.dev_config()
 

@@ -430,7 +430,7 @@ WHERE a.id = :analysis_id
             raise NotFoundError(f"Couldn't find analysis with id = {analysis_id}")
 
         project = rows[0]['project']
-        analysis_ids: list = [row['id'] for row in rows[0]]
+        analysis_ids: list = [rows[0]['id']]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'outputs': analysis_outputs_by_aid.get(rows[0], [])})
         for row in rows[1:]:

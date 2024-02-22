@@ -442,7 +442,7 @@ DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
     INNER JOIN sample ON sample.id = sg.sample_id
     WHERE sample.project = :project
 );
-DELETE FROM analysis_file WHERE analysis_id in (
+DELETE FROM analysis_outputs WHERE analysis_id in (
     SELECT id FROM analysis WHERE project = :project
 );
 DELETE FROM analysis_sample WHERE sample_id in (

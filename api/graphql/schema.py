@@ -33,8 +33,8 @@ from models.models import (
     AssayInternal,
     AuditLogInternal,
     FamilyInternal,
-    FileInternal,
     ParticipantInternal,
+    FileInternal,
     Project,
     SampleInternal,
     SequencingGroupInternal,
@@ -240,8 +240,8 @@ class GraphQLAnalysis:
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
-    outputs: strawberry.scalars.JSON
 
+    outputs: strawberry.scalars.JSON
     @staticmethod
     def from_internal(internal: AnalysisInternal) -> 'GraphQLAnalysis':
         return GraphQLAnalysis(
@@ -252,7 +252,6 @@ class GraphQLAnalysis:
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-            outputs=FileInternal.reconstruct_json(internal.outputs),
         )
 
     @strawberry.field
