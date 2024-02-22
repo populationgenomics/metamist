@@ -33,8 +33,8 @@ from models.models import (
     AssayInternal,
     AuditLogInternal,
     FamilyInternal,
-    ParticipantInternal,
     FileInternal,
+    ParticipantInternal,
     Project,
     SampleInternal,
     SequencingGroupInternal,
@@ -236,7 +236,6 @@ class GraphQLAnalysis:
     id: int
     type: str
     status: strawberry.enum(AnalysisStatus)
-    # output: str | None
     timestamp_completed: datetime.datetime | None = None
     active: bool
     meta: strawberry.scalars.JSON
@@ -248,17 +247,17 @@ class GraphQLAnalysis:
             id=internal.id,
             type=internal.type,
             status=internal.status,
-            # output=internal.output,
             timestamp_completed=internal.timestamp_completed,
             active=internal.active,
             meta=internal.meta,
-        )
             outputs=FileInternal.reconstruct_json(internal.outputs),
+        )
 
     @strawberry.field
     async def sequencing_groups(
         self, info: Info, root: 'GraphQLAnalysis'
     ) -> list['GraphQLSequencingGroup']:
+
         loader = info.context[LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS]
         sgs = await loader.load(root.id)
         return [GraphQLSequencingGroup.from_internal(sg) for sg in sgs]
