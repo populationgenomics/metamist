@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Any
 
 from google.cloud import bigquery
 
@@ -9,7 +10,7 @@ from db.python.tables.bq.billing_base import (
 )
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
-from models.models import BillingTotalCostQueryModel
+from models.models import BillingColumn, BillingTotalCostQueryModel
 
 
 class BillingGcpDailyTable(BillingBaseTable):
@@ -21,8 +22,9 @@ class BillingGcpDailyTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
+    @staticmethod
     def _query_to_partitioned_filter(
-        self, query: BillingTotalCostQueryModel
+        query: BillingTotalCostQueryModel,
     ) -> BillingFilter:
         """
         add extra filter to limit materialized view partition
@@ -77,7 +79,9 @@ class BillingGcpDailyTable(BillingBaseTable):
 
         return None
 
-    def _prepare_daily_cost_subquery(self, field, query_params, last_loaded_day):
+    def _prepare_daily_cost_subquery(
+        self, field: BillingColumn, query_params: list[Any], last_loaded_day: str
+    ):
         """prepare daily cost subquery"""
 
         # add extra filter to limit materialized view partition

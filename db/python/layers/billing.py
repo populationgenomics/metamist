@@ -18,7 +18,7 @@ class BillingLayer(BqBaseLayer):
 
     def table_factory(
         self,
-        source: BillingSource,
+        source: BillingSource | None = None,
         fields: list[BillingColumn] | None = None,
         filters: dict[BillingColumn, str | list | dict] | None = None,
     ) -> (
