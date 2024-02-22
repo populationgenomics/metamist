@@ -16,8 +16,6 @@ TEST_API_BILLING_USER = 'test_user'
 
 # make billing enabled by default
 patch('api.routes.billing.is_billing_enabled', return_value=True)
-
-
 class TestApiBilling(BqTest):
     """
     Test API Billing routes
