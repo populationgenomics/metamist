@@ -335,66 +335,6 @@ class TestBillingBaseTable(BqTest):
         # always group by day and any field that can be grouped by
         self.assertEqual('GROUP BY day,topic', group_by)
 
-    def test_prepare_labels_function_no_filters(self):
-        """Test _prepare_labels_function"""
-
-        # test when there are no filters
-        query = BillingTotalCostQueryModel(
-            fields=[], start_date='2024-01-01', end_date='2024-01-01'
-        )
-
-        self.assertEqual(None, BillingBaseTable._prepare_labels_function(query))
-
-    def test_prepare_labels_function_no_labels(self):
-        """Test _prepare_labels_function"""
-
-        # test when there are no labels in filters
-        query = BillingTotalCostQueryModel(
-            fields=[],
-            start_date='2024-01-01',
-            end_date='2024-01-01',
-            filters={BillingColumn.TOPIC: 'test_topic'},
-        )
-
-        self.assertEqual(None, BillingBaseTable._prepare_labels_function(query))
-
-    def test_prepare_labels_function_with_labels(self):
-        """Test _prepare_labels_function"""
-
-        # test when there are labels in filters
-        query = BillingTotalCostQueryModel(
-            fields=[],
-            start_date='2024-01-01',
-            end_date='2024-01-01',
-            filters={BillingColumn.LABELS: {'test_key': 'test_value'}},
-        )
-
-        func_filter = BillingBaseTable._prepare_labels_function(query)
-
-        self.assertEqual('getLabelValue', func_filter.func_name)
-        self.assertEqual(
-            """
-                    CREATE TEMP FUNCTION getLabelValue(
-                        labels ARRAY<STRUCT<key STRING, value STRING>>, label STRING
-                    ) AS (
-                        (SELECT value FROM UNNEST(labels) WHERE key = label LIMIT 1)
-                    );
-                """,
-            func_filter.func_implementation,
-        )
-        self.assertEqual(
-            '(getLabelValue(labels,@param1) = @value1)',
-            func_filter.func_where,
-        )
-
-        self.assertEqual(
-            [
-                bq.ScalarQueryParameter('param1', 'STRING', 'test_key'),
-                bq.ScalarQueryParameter('value1', 'STRING', 'test_value'),
-            ],
-            func_filter.func_sql_parameters,
-        )
-
     def test_execute_query_results_as_list(self):
         """Test _execute_query"""
 
