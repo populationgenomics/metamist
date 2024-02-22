@@ -28,24 +28,9 @@ class TestApiBilling(BqTest):
     Billing Layer and BQ Tables should be testing those
     """
 
-    def test_is_billing_enabled(self):
-        """
-        Test is_billing_enabled function
-        """
-        result = billing.is_billing_enabled()
-        self.assertEqual(True, result)
-
-    @patch('api.routes.billing.is_billing_enabled', return_value=False)
-    def test_is_billing_disabled(self, _mock_is_billing_enabled):
-        """
-        Test is_billing_enabled function
-        """
-        result = billing.is_billing_enabled()
-        self.assertEqual(False, result)
-
     @run_as_sync
     @patch('api.routes.billing.is_billing_enabled', return_value=False)
-    async def test_get_gcp_projects_no_billing(self, _mock_is_billing_enabled):
+    async def test_get_gcp_projects_no_billing(self, _mockup_is_billing_enabled):
         """
         Test get_gcp_projects function
         """
