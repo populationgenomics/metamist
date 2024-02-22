@@ -14,8 +14,7 @@ from models.models import (
 
 TEST_API_BILLING_USER = 'test_user'
 
-# make billing enabled by default
-patch('api.routes.billing.is_billing_enabled', return_value=True)
+
 class TestApiBilling(BqTest):
     """
     Test API Billing routes
@@ -26,11 +25,19 @@ class TestApiBilling(BqTest):
     Billing Layer and BQ Tables should be testing those
     """
 
+    def setUp(self):
+        super().setUp()
+
+        # make billing enabled by default for all the calls
+        patcher = patch('api.routes.billing.is_billing_enabled', return_value=True)
+        self.mockup_is_billing_enabled = patcher.start()
+
     @run_as_sync
     @patch('api.routes.billing.is_billing_enabled', return_value=False)
     async def test_get_gcp_projects_no_billing(self, _mockup_is_billing_enabled):
         """
         Test get_gcp_projects function
+        This function should raise ValueError if billing is not enabled
         """
         with self.assertRaises(ValueError) as context:
             await billing.get_gcp_projects('test_user')
