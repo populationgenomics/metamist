@@ -23,7 +23,7 @@ query AnalysisRunnerLogs($project_name: String!) {
         analyses(type: { eq: "analysis-runner" }, status: {eq: UNKNOWN}) {
           id
           meta
-          output
+          outputs
           auditLogs {
             author
             timestamp
