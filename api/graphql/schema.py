@@ -253,6 +253,7 @@ class GraphQLAnalysis:
             active=internal.active,
             meta=internal.meta,
         )
+            outputs=FileInternal.reconstruct_json(internal.outputs),
 
     @strawberry.field
     async def sequencing_groups(
