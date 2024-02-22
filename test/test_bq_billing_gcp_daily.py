@@ -2,6 +2,7 @@
 import datetime
 from test.testbase import run_as_sync
 from test.testbqbase import BqTest
+from textwrap import dedent
 from typing import Any
 from unittest import mock
 
@@ -35,6 +36,10 @@ class TestBillingGcpDailyTable(BqTest):
 
         # expected
         expected_filter = BillingFilter(
+            day=GenericBQFilter(
+                gte=datetime.datetime(2023, 1, 1, 0, 0),
+                lte=datetime.datetime(2024, 1, 1, 0, 0),
+            ),
             part_time=GenericBQFilter(
                 gte=datetime.datetime(2023, 1, 1, 0, 0),
                 lte=datetime.datetime(2024, 1, 8, 0, 0),  # 7 days added
@@ -131,29 +136,27 @@ class TestBillingGcpDailyTable(BqTest):
         )
 
         # expected
-        expected_daily_cost_join = (
-            'LEFT JOIN (\n'
-            '            SELECT\n'
-            '                cost as field,\n'
-            '                cost_category,\n'
-            '                SUM(cost) as cost\n'
-            '            FROM\n'
-            '            `TEST_TABLE_NAME`\n'
-            '            WHERE day = TIMESTAMP(@last_loaded_day)\n'
-            '            \n'
-            '        AND part_time >= TIMESTAMP(@last_loaded_day)\n'
-            '        AND part_time <= TIMESTAMP_ADD(\n'
-            '            TIMESTAMP(@last_loaded_day), INTERVAL 7 DAY\n'
-            '        )\n'
-            '        \n'
-            '            GROUP BY\n'
-            '                field,\n'
-            '                cost_category\n'
-            '        ) day\n'
-            '        ON month.field = day.field\n'
-            '        AND month.cost_category = day.cost_category\n'
-            '        '
+        expected_daily_cost_join = """LEFT JOIN (
+            SELECT
+                cost as field,
+                cost_category,
+                SUM(cost) as cost
+            FROM
+            `TEST_TABLE_NAME`
+            WHERE day = TIMESTAMP(@last_loaded_day)
+
+        AND part_time >= TIMESTAMP(@last_loaded_day)
+        AND part_time <= TIMESTAMP_ADD(
+            TIMESTAMP(@last_loaded_day), INTERVAL 7 DAY
         )
+
+            GROUP BY
+                field,
+                cost_category
+        ) day
+        ON month.field = day.field
+        AND month.cost_category = day.cost_category
+        """
 
         self.assertEqual(
             [
@@ -164,7 +167,7 @@ class TestBillingGcpDailyTable(BqTest):
             query_params,
         )
         self.assertEqual(', day.cost as daily_cost', daily_cost_field)
-        self.assertEqual(expected_daily_cost_join, daily_cost_join)
+        self.assertEqual(dedent(expected_daily_cost_join), dedent(daily_cost_join))
 
     @run_as_sync
     async def test_get_gcp_projects_return_empty_list(self):

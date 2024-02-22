@@ -30,52 +30,45 @@ def mock_execute_query_running_cost(query, *_args, **_kwargs):
     This returns one mockup BQ query result
     for 2 different SQL queries used by get_running_cost API point
     Those 2 queries are:
-    1. query to get aggregated monthly cost
-    2. query to get last loaded day
+    1. query to get last loaded day
+    2. query to get aggregated monthly/daily cost
     """
-    if 'month.cost as monthly_cost' in query:
-        # This is the 1st query to get aggregated monthly cost
-        # return mockup BQ query result as list of rows
-        return [
-            mock.MagicMock(
-                spec=bq.Row,
-                field='TOPIC1',
-                cost_category='Compute Engine',
-                daily_cost=123.45,
-                monthly_cost=2345.67,
-            )
-        ]
-
-    if 'last_loaded_day' in query:
-        # This is the 2nd query to get last loaded day
+    if ' as last_loaded_day' in query:
+        # This is the 1st query to get last loaded day
         # mockup BQ query result for last_loaded_day as list of rows
         return [
             mock.MagicMock(spec=bq.Row, last_loaded_day='2024-01-01 00:00:00+00:00')
         ]
 
-    return []
+    # This is the 2nd query to get aggregated monthly cost
+    # return mockup BQ query result as list of rows
+    return [
+        mock.MagicMock(
+            spec=bq.Row,
+            field='TOPIC1',
+            cost_category='Compute Engine',
+            daily_cost=123.45,
+            monthly_cost=2345.67,
+        )
+    ]
 
 
-def mock_execute_query_get_total_cost(query, *_args, **_kwargs):
+def mock_execute_query_get_total_cost(_query, *_args, **_kwargs):
     """
     This is a mockup function for _execute_query function
     This returns one mockup BQ query result
     """
-
-    if 'SELECT PARSE_DATE("%Y%m", day) as day, topic, cost FROM t' in query:
-        # mockup BQ query result topic cost by invoice month, return row iterator
-        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
-        mock_rows.total_rows = 3
-        mock_rows.__iter__.return_value = [
-            {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.10},
-            {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.20},
-            {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.30},
-        ]
-        mock_result = mock.MagicMock(spec=bq.job.QueryJob)
-        mock_result.result.return_value = mock_rows
-        return mock_result
-
-    return []
+    # mockup BQ query result topic cost by invoice month, return row iterator
+    mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
+    mock_rows.total_rows = 3
+    mock_rows.__iter__.return_value = [
+        {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.10},
+        {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.20},
+        {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.30},
+    ]
+    mock_result = mock.MagicMock(spec=bq.job.QueryJob)
+    mock_result.result.return_value = mock_rows
+    return mock_result
 
 
 class TestBillingBaseTable(BqTest):
