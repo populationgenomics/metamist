@@ -1,4 +1,5 @@
 import datetime
+import warnings
 from collections import defaultdict
 from typing import Any
 
@@ -554,7 +555,13 @@ class AnalysisLayer(BaseLayer):
             project=project,
         )
 
-        if analysis.outputs:
+        # TODO deprecate the output field
+        if analysis.output:
+            warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
+
+            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
+
+        elif analysis.outputs:
             await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.outputs)
 
         return new_analysis_id
@@ -578,6 +585,7 @@ class AnalysisLayer(BaseLayer):
         analysis_id: int,
         status: AnalysisStatus,
         meta: dict[str, Any] = None,
+        output: str | None = None,
         outputs: str | None = None,
         check_project_id=True,
     ):
@@ -596,7 +604,11 @@ class AnalysisLayer(BaseLayer):
             meta=meta,
         )
 
-        await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
+        if output:
+            warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
+            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
+        elif outputs:
+            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
 
     async def get_analysis_runner_log(
         self,

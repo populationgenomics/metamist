@@ -1,8 +1,7 @@
-from collections import defaultdict
 from typing import Any
 
 from cloudpathlib import AnyPath, GSPath
-from google.cloud import storage
+from google.cloud.storage import Client
 from pydantic import BaseModel
 
 from models.base import SMBase
@@ -69,60 +68,35 @@ class FileInternal(SMBase):
         )
 
     @staticmethod
-    async def validate_path(path: str) -> bool:
-        """Validate file at given path"""
+    async def get_file_info(file_obj: AnyPath | GSPath, client: Client) -> dict | None:
+        """Get file info for file at given path"""
         try:
-            file_obj = AnyPath(path)
-            return isinstance(file_obj, GSPath) and file_obj.exists()  # pylint: disable=E1101
+            file_checksum = None
+            valid = False
+            size = 0
+            # try:
+            if isinstance(file_obj, GSPath) and client:
+                bucket = client.get_bucket(file_obj.bucket)  # pylint: disable=E1101
+                blob = bucket.get_blob(file_obj.name)  # pylint: disable=E1101
+                if file_obj.suffix != '.mt':
+                    file_checksum = blob.crc32c  # pylint: disable=E1101
+                valid = True
+                size = blob.size  # pylint: disable=E1101
+
+            return {
+                'basename': file_obj.name,  # pylint: disable=E1101
+                'dirname': str(file_obj.parent),  # pylint: disable=E1101
+                'nameroot': file_obj.stem,  # pylint: disable=E1101
+                'nameext': file_obj.suffix,  # pylint: disable=E1101
+                'checksum': file_checksum,
+                'size': size,  # pylint: disable=E1101
+                'valid': valid,
+            }
         except (FileNotFoundError, ValueError):
-            return False
-
-    @staticmethod
-    def get_basename(path: str) -> str:
-        """Get file basename for file at given path"""
-        return AnyPath(path).name  # pylint: disable=E1101
-
-    @staticmethod
-    def get_dirname(path: str) -> str:
-        """Get file dirname for file at given path"""
-        return str(AnyPath(path).parent)  # pylint: disable=E1101
-
-    @staticmethod
-    def get_nameroot(path: str) -> str:
-        """Get file nameroot for file at given path"""
-        return AnyPath(path).stem  # pylint: disable=E1101
-
-    @staticmethod
-    def get_extension(path: str) -> str:
-        """Get file extension for file at given path"""
-        return AnyPath(path).suffix  # pylint: disable=E1101
-
-    @staticmethod
-    async def get_checksum(path: str) -> str:
-        """Get checksum for file at given path"""
-        if FileInternal.get_extension(path) == '.mt':
             return None
 
-        # try:
-        if isinstance(AnyPath(path), GSPath):
-            # get crc32c checksum for gs file
-            client = storage.Client()
-            bucket = client.get_bucket(AnyPath(path).bucket)  # pylint: disable=E1101
-            blob = bucket.get_blob(AnyPath(path).name)  # pylint: disable=E1101
-            return blob.crc32c  # pylint: disable=E1101
-            # except (google_exceptions.NotFound, FileNotFoundError, AnyPathTypeError):
-        return None
-
     @staticmethod
-    def get_size(path: str) -> int:
-        """Get file size"""
-        # try:
-        return AnyPath(path).stat().st_size  # pylint: disable=E1101
-        # except (google_exceptions.NotFound, cloudpathlib_exceptions.NoStatError, FileNotFoundError):
-        #     return 0
-
-    @staticmethod
-    def reconstruct_json(data: list) -> list | dict:
+    def reconstruct_json(data: list) -> dict[str, Any]:
         """_summary_
 
         Args:
@@ -130,11 +104,11 @@ class FileInternal(SMBase):
                 analysis_outputs table
 
         Returns:
-            list | dict: Should return the JSON structure based on the input data.
+            dict: Should return the JSON structure based on the input data.
         """
         root: dict = {}
         for file in data:
-            file_root: dict = defaultdict(dict)
+            file_root: dict = {}
 
             # Check if the file is a tuple or a string
             # If it's a tuple, it's a file object and a json structure

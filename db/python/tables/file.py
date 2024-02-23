@@ -1,6 +1,9 @@
 from textwrap import dedent
 from typing import Optional, Union
 
+from cloudpathlib import AnyPath
+from google.cloud.storage import Client
+
 from db.python.tables.base import DbBase
 from models.models.file import FileInternal
 
@@ -29,24 +32,27 @@ class FileTable(DbBase):
         self,
         path: str,
         parent_id: Optional[int] = None,
+        client: Optional[Client] = None
     ) -> int | None:
         """
         Create a new file, and add it to database
         """
+        file_obj = AnyPath(path)
 
-        file_obj = await FileInternal.validate_path(path)
-        if not file_obj:
+        file_info = await FileInternal.get_file_info(file_obj=file_obj, client=client)
+
+        if not file_info or not file_info.get('valid', False):
             return None
 
         kv_pairs = [
             ('path', path),
-            ('basename', FileInternal.get_basename(path)),
-            ('dirname', FileInternal.get_dirname(path)),
-            ('nameroot', FileInternal.get_nameroot(path)),
-            ('nameext', FileInternal.get_extension(path)),
-            ('file_checksum', await FileInternal.get_checksum(path)),
-            ('size', FileInternal.get_size(path)),
-            ('valid', file_obj),
+            ('basename', file_info['basename']),
+            ('dirname', file_info['dirname']),
+            ('nameroot', file_info['nameroot']),
+            ('nameext', file_info['nameext']),
+            ('file_checksum', file_info['checksum']),
+            ('size', file_info['size']),
+            ('valid', file_info['valid']),
             ('parent_id', parent_id)
         ]
 
@@ -63,13 +69,6 @@ class FileTable(DbBase):
                 _query,
                 dict(kv_pairs),
             )
-
-        # _query = dedent(f"""INSERT INTO file ({cs_keys}) VALUES ({cs_id_keys}) RETURNING id""")
-
-        # id_of_new_file = await self.connection.fetch_val(
-        #     _query,
-        #     dict(kv_pairs),
-        # )
 
         return id_of_new_file
 
@@ -96,10 +95,12 @@ class FileTable(DbBase):
         files = await self.find_files_from_dict(json_dict=json_dict)
         file_ids : list[int] = []
 
+        client = Client()
+
         async with self.connection.transaction():
             if 'main_files' in files:
                 for primary_file in files['main_files']:
-                    parent_file_id = await self.create_or_update_output_file(path=primary_file['basename'])
+                    parent_file_id = await self.create_or_update_output_file(path=primary_file['basename'], client=client)
                     await self.add_output_file_to_analysis(
                         analysis_id,
                         parent_file_id,
@@ -110,9 +111,10 @@ class FileTable(DbBase):
                         secondary_files = files['secondary_files_grouped']
                         if primary_file['basename'] in secondary_files:
                             for secondary_file in secondary_files[primary_file['basename']]:
-                                await self.create_or_update_output_file(path=secondary_file, parent_id=parent_file_id)
+                                await self.create_or_update_output_file(path=secondary_file, parent_id=parent_file_id, client=client)
                         file_ids.append(parent_file_id)
 
+        client.close()
         # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
         _update_query = dedent("""
             DELETE ao FROM analysis_outputs ao

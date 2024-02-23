@@ -203,7 +203,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 'type': 'a.type',
                 'status': 'a.status',
                 'meta': 'a.meta',
-                'output': 'a.output',
                 'active': 'a.active',
             },
         )
@@ -228,10 +227,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 retvals[key].sequencing_group_ids.append(row['sequencing_group_id'])
             else:
                 # Pydantic doesn't allow item assignment on the model
-                retvals[key] = AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(key, [])})
+                # TODO: Deprecate `output` eventually
+                retvals[key] = AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(key, []), 'outputs': analysis_outputs_by_aid.get(key, [])})
         return list(retvals.values())
 
-    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[Union[Tuple[FileInternal, str], str]]]:
+    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, dict[str, Any]]:
         """Fetches all output files for a list of analysis IDs"""
 
         _query = """
@@ -257,7 +257,12 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                     }),
                 row['json_structure']) if row['id'] else row['output'])
 
-        return analysis_files
+        analysis_output_files: dict[int, dict[str, Any]] = defaultdict(dict)
+
+        for a_id, files in analysis_files.items():
+            analysis_output_files[a_id] = FileInternal.reconstruct_json(files)
+
+        return analysis_output_files
 
     async def get_secondary_files_for_file_output(self, parent_file_ids: list[int]) -> dict[int, list[FileInternal]]:
         """Fetches all secondary files for a list of parent files"""

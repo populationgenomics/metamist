@@ -5,7 +5,9 @@ from textwrap import dedent
 from typing import Dict
 
 import click
+from cloudpathlib import AnyPath
 from databases import Database
+from google.cloud.storage import Client
 
 from db.python.connect import CredentialedDatabaseConfiguration  # pylint: disable=C0415
 from models.models.file import FileInternal
@@ -44,18 +46,25 @@ async def execute(connection, query, inserts):
     await connection.execute(query, inserts)
 
 
-async def get_file_info(path: str) -> Dict:
+async def get_file_info(path: str, client: Client) -> Dict:
     """Get file dict"""
     print('Extracting file dict')
+    file_obj = AnyPath(path)
+
+    file_info = await FileInternal.get_file_info(file_obj=file_obj, client=client)
+
+    if not file_info:
+        return None
+
     return {
         'path': path,
-        'basename': FileInternal.get_basename(path),
-        'dirname': FileInternal.get_dirname(path),
-        'nameroot': FileInternal.get_nameroot(path),
-        'nameext': FileInternal.get_extension(path),
-        'file_checksum': await FileInternal.get_checksum(path),
-        'valid': await FileInternal.validate_path(path),
-        'size': FileInternal.get_size(path),
+        'basename': file_info['basename'],
+        'dirname': file_info['dirname'],
+        'nameroot': file_info['nameroot'],
+        'nameext': file_info['nameext'],
+        'file_checksum': file_info['checksum'],
+        'valid': file_info['valid'],
+        'size': file_info['size'],
     }
 
 
@@ -81,6 +90,7 @@ def extract_file_paths(input_str):
 async def prepare_files(analyses):
     """Serialize files for insertion"""
     files = []
+    client = Client()
     print(f'Preparing files...{len(analyses)} analyses to process.')
     for analysis in analyses:
         path = analysis['output']
@@ -96,7 +106,7 @@ async def prepare_files(analyses):
                 print(path)
                 files.append((
                     analysis['id'],
-                    await get_file_info(path=path)
+                    await get_file_info(path=path, client=client)
                 ))
                 print('Extracted and added.')
     return files

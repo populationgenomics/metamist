@@ -294,7 +294,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                     sequencing_group_ids=[],
                     type='analysis-runner',
                     status=AnalysisStatus('unknown'),
-                    outputs={'basename': 'gs://cpg-fake-bucket/output'},
+                    outputs={'basename': 'FAKE://cpg-fake-bucket/output'},
                     meta={
                         'timestamp': f'2022-08-{i+1}T10:00:00.0000+00:00',
                         'accessLevel': 'standard',

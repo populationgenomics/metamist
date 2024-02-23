@@ -147,13 +147,497 @@ class TestAnalysis(DbIsolatedTest):
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
                 sequencing_group_ids=[],
+                output=None,
                 outputs=None,
                 timestamp_completed=None,
                 project=1,
                 meta={},
                 active=True,
                 author=None,
-            ).copy(update={'outputs': []})
+            ).copy(update={'output': [], 'outputs': []})
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_analysis_output_str(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        with output file as a string via `output` field
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+                output='RANDOM_OUTPUT_STRING'
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                id=GenericFilter(eq=a_id),
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                output={
+                    'output': [
+                        'RANDOM_OUTPUT_STRING'
+                        ]
+                    },
+                outputs={
+                    'output': [
+                        'RANDOM_OUTPUT_STRING'
+                        ]
+                    },
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_analysis_outputs_str(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        with output file as a string via `outputs` field
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+                outputs='RANDOM_OUTPUT_STRING'
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                id=GenericFilter(eq=a_id),
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                output={
+                    'output': [
+                        'RANDOM_OUTPUT_STRING'
+                        ]
+                    },
+                outputs={
+                    'output': [
+                        'RANDOM_OUTPUT_STRING'
+                        ]
+                    },
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author=None,
+            )
+        ]
+
+        self.assertEqual(analyses, expected)
+
+    @run_as_sync
+    async def test_analysis_output_files_json(self):
+        """
+        Test adding an analysis of type ANALYSIS_RUNNER
+        with output files as a dict/json via `outputs` field
+        """
+
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                meta={},
+                outputs={
+                    'qc_results': {
+                        'basename': 'gs://sm-dev-test/file1.txt'
+                        },
+                    'cram': {
+                        'basename': 'gs://sm-dev-test/file1.cram'
+                    },
+                    'qc': {
+                        'cram': {
+                            'basename': 'gs://sm-dev-test/file2.cram',
+                            'secondaryFiles':
+                                {
+                                    'cram_ext': {
+                                        'basename': 'gs://sm-dev-test/file2.cram.ext'
+                                    },
+                                    'cram_meta': {
+                                        'basename': 'gs://sm-dev-test/file2.cram.meta'
+                                    }
+                                }
+                        },
+                        'aggregate': {
+                            'cram': {
+                                'basename': 'gs://sm-dev-test/file3.cram',
+                                'secondaryFiles': {
+                                        'cram_ext': {
+                                            'basename': 'gs://sm-dev-test/file3.cram.ext'
+                                        },
+                                        'cram_meta': {
+                                            'basename': 'gs://sm-dev-test/file3.cram.meta'
+                                        }
+                                    }
+                            },
+                            'qc': {
+                                'basename': 'gs://sm-dev-test/file1.qc',
+                                'secondaryFiles': {
+                                    'qc_ext': {
+                                        'basename': 'gs://sm-dev-test/file1.qc.ext'
+                                    },
+                                    'qc_meta': {
+                                        'basename': 'gs://sm-dev-test/file1.qc.meta'
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            )
+        )
+
+        analyses = await self.al.query(
+            AnalysisFilter(
+                id=GenericFilter(eq=a_id),
+            )
+        )
+        expected = [
+            AnalysisInternal(
+                id=a_id,
+                type='analysis-runner',
+                status=AnalysisStatus.UNKNOWN,
+                sequencing_group_ids=[],
+                output={
+                    'qc_results': {
+                        'id': 1,
+                        'path': 'gs://sm-dev-test/file1.txt',
+                        'basename': 'file1.txt',
+                        'dirname': 'gs://sm-dev-test',
+                        'nameroot': 'file1',
+                        'nameext': '.txt',
+                        'file_checksum': 'DG+fhg==',
+                        'size': 19,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': []
+                    },
+                    'cram': {
+                        'id': 2,
+                        'path': 'gs://sm-dev-test/file1.cram',
+                        'basename': 'file1.cram',
+                        'dirname': 'gs://sm-dev-test',
+                        'nameroot': 'file1',
+                        'nameext': '.cram',
+                        'file_checksum': 'sl7SXw==',
+                        'size': 20,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': []
+                    },
+                    'qc': {
+                        'cram': {
+                            'id': 3,
+                            'path': 'gs://sm-dev-test/file2.cram',
+                            'basename': 'file2.cram',
+                            'dirname': 'gs://sm-dev-test',
+                            'nameroot': 'file2',
+                            'nameext': '.cram',
+                            'file_checksum': 'sl7SXw==',
+                            'size': 20,
+                            'meta': None,
+                            'valid': True,
+                            'secondary_files': [
+                                {
+                                    'id': 4,
+                                    'path': 'gs://sm-dev-test/file2.cram.ext',
+                                    'basename': 'file2.cram.ext',
+                                    'dirname': 'gs://sm-dev-test',
+                                    'nameroot': 'file2.cram',
+                                    'nameext': '.ext',
+                                    'file_checksum': 'gb1EbA==',
+                                    'size': 21,
+                                    'meta': None,
+                                    'valid': True,
+                                    'secondary_files': None
+                                },
+                                {
+                                    'id': 5,
+                                    'path': 'gs://sm-dev-test/file2.cram.meta',
+                                    'basename': 'file2.cram.meta',
+                                    'dirname': 'gs://sm-dev-test',
+                                    'nameroot': 'file2.cram',
+                                    'nameext': '.meta',
+                                    'file_checksum': 'af/YSw==',
+                                    'size': 17,
+                                    'meta': None,
+                                    'valid': True,
+                                    'secondary_files': None
+                                }
+                            ]
+                        },
+                        'aggregate': {
+                            'cram': {
+                                'id': 6,
+                                'path': 'gs://sm-dev-test/file3.cram',
+                                'basename': 'file3.cram',
+                                'dirname': 'gs://sm-dev-test',
+                                'nameroot': 'file3',
+                                'nameext': '.cram',
+                                'file_checksum': 'sl7SXw==',
+                                'size': 20,
+                                'meta': None,
+                                'valid': True,
+                                'secondary_files': [
+                                    {
+                                        'id': 7,
+                                        'path': 'gs://sm-dev-test/file3.cram.ext',
+                                        'basename': 'file3.cram.ext',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file3.cram',
+                                        'nameext': '.ext',
+                                        'file_checksum': 'HU8n6w==',
+                                        'size': 16,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    },
+                                    {
+                                        'id': 8,
+                                        'path': 'gs://sm-dev-test/file3.cram.meta',
+                                        'basename': 'file3.cram.meta',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file3.cram',
+                                        'nameext': '.meta',
+                                        'file_checksum': 'af/YSw==',
+                                        'size': 17,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    }
+                                ]
+                            },
+                            'qc': {
+                                'id': 9,
+                                'path': 'gs://sm-dev-test/file1.qc',
+                                'basename': 'file1.qc',
+                                'dirname': 'gs://sm-dev-test',
+                                'nameroot': 'file1',
+                                'nameext': '.qc',
+                                'file_checksum': 'uZe/hQ==',
+                                'size': 15,
+                                'meta': None,
+                                'valid': True,
+                                'secondary_files': [
+                                    {
+                                        'id': 10,
+                                        'path': 'gs://sm-dev-test/file1.qc.ext',
+                                        'basename': 'file1.qc.ext',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file1.qc',
+                                        'nameext': '.ext',
+                                        'file_checksum': '/18MDg==',
+                                        'size': 14,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    },
+                                    {
+                                        'id': 11,
+                                        'path': 'gs://sm-dev-test/file1.qc.meta',
+                                        'basename': 'file1.qc.meta',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file1.qc',
+                                        'nameext': '.meta',
+                                        'file_checksum': 'v9x0Zg==',
+                                        'size': 15,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                outputs={
+                    'qc_results': {
+                        'id': 1,
+                        'path': 'gs://sm-dev-test/file1.txt',
+                        'basename': 'file1.txt',
+                        'dirname': 'gs://sm-dev-test',
+                        'nameroot': 'file1',
+                        'nameext': '.txt',
+                        'file_checksum': 'DG+fhg==',
+                        'size': 19,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': []
+                    },
+                    'cram': {
+                        'id': 2,
+                        'path': 'gs://sm-dev-test/file1.cram',
+                        'basename': 'file1.cram',
+                        'dirname': 'gs://sm-dev-test',
+                        'nameroot': 'file1',
+                        'nameext': '.cram',
+                        'file_checksum': 'sl7SXw==',
+                        'size': 20,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': []
+                    },
+                    'qc': {
+                        'cram': {
+                            'id': 3,
+                            'path': 'gs://sm-dev-test/file2.cram',
+                            'basename': 'file2.cram',
+                            'dirname': 'gs://sm-dev-test',
+                            'nameroot': 'file2',
+                            'nameext': '.cram',
+                            'file_checksum': 'sl7SXw==',
+                            'size': 20,
+                            'meta': None,
+                            'valid': True,
+                            'secondary_files': [
+                                {
+                                    'id': 4,
+                                    'path': 'gs://sm-dev-test/file2.cram.ext',
+                                    'basename': 'file2.cram.ext',
+                                    'dirname': 'gs://sm-dev-test',
+                                    'nameroot': 'file2.cram',
+                                    'nameext': '.ext',
+                                    'file_checksum': 'gb1EbA==',
+                                    'size': 21,
+                                    'meta': None,
+                                    'valid': True,
+                                    'secondary_files': None
+                                },
+                                {
+                                    'id': 5,
+                                    'path': 'gs://sm-dev-test/file2.cram.meta',
+                                    'basename': 'file2.cram.meta',
+                                    'dirname': 'gs://sm-dev-test',
+                                    'nameroot': 'file2.cram',
+                                    'nameext': '.meta',
+                                    'file_checksum': 'af/YSw==',
+                                    'size': 17,
+                                    'meta': None,
+                                    'valid': True,
+                                    'secondary_files': None
+                                }
+                            ]
+                        },
+                        'aggregate': {
+                            'cram': {
+                                'id': 6,
+                                'path': 'gs://sm-dev-test/file3.cram',
+                                'basename': 'file3.cram',
+                                'dirname': 'gs://sm-dev-test',
+                                'nameroot': 'file3',
+                                'nameext': '.cram',
+                                'file_checksum': 'sl7SXw==',
+                                'size': 20,
+                                'meta': None,
+                                'valid': True,
+                                'secondary_files': [
+                                    {
+                                        'id': 7,
+                                        'path': 'gs://sm-dev-test/file3.cram.ext',
+                                        'basename': 'file3.cram.ext',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file3.cram',
+                                        'nameext': '.ext',
+                                        'file_checksum': 'HU8n6w==',
+                                        'size': 16,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    },
+                                    {
+                                        'id': 8,
+                                        'path': 'gs://sm-dev-test/file3.cram.meta',
+                                        'basename': 'file3.cram.meta',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file3.cram',
+                                        'nameext': '.meta',
+                                        'file_checksum': 'af/YSw==',
+                                        'size': 17,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    }
+                                ]
+                            },
+                            'qc': {
+                                'id': 9,
+                                'path': 'gs://sm-dev-test/file1.qc',
+                                'basename': 'file1.qc',
+                                'dirname': 'gs://sm-dev-test',
+                                'nameroot': 'file1',
+                                'nameext': '.qc',
+                                'file_checksum': 'uZe/hQ==',
+                                'size': 15,
+                                'meta': None,
+                                'valid': True,
+                                'secondary_files': [
+                                    {
+                                        'id': 10,
+                                        'path': 'gs://sm-dev-test/file1.qc.ext',
+                                        'basename': 'file1.qc.ext',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file1.qc',
+                                        'nameext': '.ext',
+                                        'file_checksum': '/18MDg==',
+                                        'size': 14,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    },
+                                    {
+                                        'id': 11,
+                                        'path': 'gs://sm-dev-test/file1.qc.meta',
+                                        'basename': 'file1.qc.meta',
+                                        'dirname': 'gs://sm-dev-test',
+                                        'nameroot': 'file1.qc',
+                                        'nameext': '.meta',
+                                        'file_checksum': 'v9x0Zg==',
+                                        'size': 15,
+                                        'meta': None,
+                                        'valid': True,
+                                        'secondary_files': None
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                timestamp_completed=None,
+                project=1,
+                meta={},
+                active=True,
+                author=None,
+            )
         ]
 
         self.assertEqual(analyses, expected)

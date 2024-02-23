@@ -45,7 +45,7 @@ class AnalysisModel(BaseModel):
     type: str
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
-    output: str | None = None
+    outputs: str | None = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)
