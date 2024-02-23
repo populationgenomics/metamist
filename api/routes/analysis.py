@@ -79,19 +79,25 @@ class AnalysisQueryModel(BaseModel):
     def to_filter(self, project_id_map: dict[str, int]) -> AnalysisFilter:
         """Convert to internal analysis filter"""
         return AnalysisFilter(
-            sample_id=GenericFilter(
-                in_=sample_id_transform_to_raw_list(self.sample_ids)
-            )
-            if self.sample_ids
-            else None,
-            sequencing_group_id=GenericFilter(
-                in_=sequencing_group_id_transform_to_raw_list(self.sequencing_group_ids)
-            )
-            if self.sequencing_group_ids
-            else None,
-            project=GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
-            if self.projects
-            else None,
+            sample_id=(
+                GenericFilter(in_=sample_id_transform_to_raw_list(self.sample_ids))
+                if self.sample_ids
+                else None
+            ),
+            sequencing_group_id=(
+                GenericFilter(
+                    in_=sequencing_group_id_transform_to_raw_list(
+                        self.sequencing_group_ids
+                    )
+                )
+                if self.sequencing_group_ids
+                else None
+            ),
+            project=(
+                GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
+                if self.projects
+                else None
+            ),
             type=GenericFilter(eq=self.type) if self.type else None,
         )
 
@@ -243,6 +249,7 @@ async def get_analysis_runner_log(
     project_names: list[str] = Query(None),  # type: ignore
     author: str = None,
     output_dir: str = None,
+    ar_guid: str = None,
     connection: Connection = get_projectless_db_connection,
 ) -> list[AnalysisInternal]:
     """
@@ -257,7 +264,7 @@ async def get_analysis_runner_log(
         )
 
     results = await atable.get_analysis_runner_log(
-        project_ids=project_ids, author=author, output_dir=output_dir
+        project_ids=project_ids, author=author, output_dir=output_dir, ar_guid=ar_guid
     )
     return [a.to_external() for a in results]
 
