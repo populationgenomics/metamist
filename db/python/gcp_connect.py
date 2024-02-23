@@ -1,6 +1,7 @@
 """
 Code for connecting to Big Query database
 """
+
 import logging
 import os
 
@@ -23,6 +24,8 @@ class BqConnection:
         self.gcp_project = os.getenv('METAMIST_GCP_PROJECT')
         self.connection: bq.Client = bq.Client(project=self.gcp_project)
         self.author: str = author
+        # initialise cost of the query
+        self.cost = 0
 
     @staticmethod
     async def get_connection_no_project(author: str):

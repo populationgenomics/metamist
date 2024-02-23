@@ -112,13 +112,21 @@ class BillingBaseTable(BqDbBase):
         print('query', query)
         print('params', params)
 
+        # dry run to calulate the costs:
+        job_config.dry_run = True
+        job_config.use_query_cache = False
+        query_job = self._connection.connection.query(query, job_config=job_config)
+        self._connection.cost += (query_job.total_bytes_processed / 1024**4) * 6.25
+
+        # now execute the query
+        job_config.dry_run = False
+        job_config.use_query_cache = True
+        query_job = self._connection.connection.query(query, job_config=job_config)
         if results_as_list:
-            return list(
-                self._connection.connection.query(query, job_config=job_config).result()
-            )
+            return list(query_job.result())
 
         # otherwise return as BQ iterator
-        return self._connection.connection.query(query, job_config=job_config)
+        return query_job
 
     def _query_to_partitioned_filter(
         self, query: BillingTotalCostQueryModel

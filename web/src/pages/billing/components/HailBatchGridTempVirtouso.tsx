@@ -6,13 +6,12 @@ import sanitiseValue from '../../../shared/utilities/sanitiseValue'
 import '../../project/AnalysisRunnerView/AnalysisGrid.css'
 import { TableVirtuoso } from 'react-virtuoso'
 
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
-
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import Paper from '@mui/material/Paper'
 
 interface Field {
     category: string
@@ -182,49 +181,45 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
         {
             category: 'sequencing_type',
             title: 'SEQUENCING TYPE',
-        }
+        },
     ]
 
     const expandedRow = (item: any, idx: any) =>
         MAIN_FIELDS.map(({ category, dataMap, className }) => (
-            <SUITable.Cell key={`${category}-${idx}`} className={className} style={{width: 350}}>
+            <SUITable.Cell key={`${category}-${idx}`} className={className} style={{ width: 350 }}>
                 {dataMap ? dataMap(item, item[category]) : sanitiseValue(item[category])}
             </SUITable.Cell>
         ))
 
     const ExpandableRow = ({ item, ...props }) => {
-        const index = props['data-index'];
-        return ( 
+        const index = props['data-index']
+        return (
             <React.Fragment key={index}>
-                <TableRow {...props}
+                <TableRow
+                    {...props}
                     className={item.job_id === null ? 'bold-text' : ''}
                     style={{
                         backgroundColor: prepareBgColor(item),
                         textAlign: 'center',
                     }}
                 >
-
-                <SUITable.Cell style={{width: 50}}>
-                <Checkbox
-                        checked={openRows.includes(index)}
-                        toggle
-                        onChange={() => handleToggle(index)}
-                    />
-                </SUITable.Cell>
-                {expandedRow(item, index)}
+                    <SUITable.Cell style={{ width: 50 }}>
+                        <Checkbox
+                            checked={openRows.includes(index)}
+                            toggle
+                            onChange={() => handleToggle(index)}
+                        />
+                    </SUITable.Cell>
+                    {expandedRow(item, index)}
                 </TableRow>
 
                 {Object.entries(item)
-                    .filter(([c]) =>
-                        DETAIL_FIELDS.map(({ category }) => category).includes(c)
-                    )
+                    .filter(([c]) => DETAIL_FIELDS.map(({ category }) => category).includes(c))
                     .map(([k, v]) => {
                         if (v === null) {
-                            return null; // Exclude rows with null value
+                            return null // Exclude rows with null value
                         }
-                        const detailField = DETAIL_FIELDS.find(
-                            ({ category }) => category === k
-                        )
+                        const detailField = DETAIL_FIELDS.find(({ category }) => category === k)
                         const title = detailField ? detailField.title : k
                         return (
                             <SUITable.Row
@@ -242,58 +237,54 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
                             </SUITable.Row>
                         )
                     })}
-                    <SUITable.Row
-                        style={{
-                            display: openRows.includes(index) ? 'table-row' : 'none',
-                            backgroundColor: 'var(--color-bg)',
-                        }}
-                        key={`${index}-lbl`}
-                    >
-                        <SUITable.Cell style={{ border: 'none' }} />
-                        <SUITable.Cell colSpan="5">
-                            <b>COST BREAKDOWN</b>
-                        </SUITable.Cell>
-                    </SUITable.Row>
+                <SUITable.Row
+                    style={{
+                        display: openRows.includes(index) ? 'table-row' : 'none',
+                        backgroundColor: 'var(--color-bg)',
+                    }}
+                    key={`${index}-lbl`}
+                >
+                    <SUITable.Cell style={{ border: 'none' }} />
+                    <SUITable.Cell colSpan="5">
+                        <b>COST BREAKDOWN</b>
+                    </SUITable.Cell>
+                </SUITable.Row>
 
-                    {typeof item === 'object' &&
-                        'details' in item &&
-                        _.orderBy(item?.details, ['cost'], ['desc']).map((dk) => (
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(index) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${index}-${dk.sku}`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell colSpan="4">{dk.sku}</SUITable.Cell>
-                                <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>
-                            </SUITable.Row>
-                        ))}
+                {typeof item === 'object' &&
+                    'details' in item &&
+                    _.orderBy(item?.details, ['cost'], ['desc']).map((dk) => (
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(index) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${index}-${dk.sku}`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell colSpan="4">{dk.sku}</SUITable.Cell>
+                            <SUITable.Cell>${dk.cost.toFixed(4)}</SUITable.Cell>
+                        </SUITable.Row>
+                    ))}
             </React.Fragment>
         )
     }
 
-
-        
-        const TableComponents = {
+    const TableComponents = {
         Scroller: React.forwardRef((props, ref) => (
             <TableContainer component={Paper} {...props} ref={ref} />
         )),
-        Table: (props) => <Table {...props} style={{ borderCollapse: "separate" }} />,
+        Table: (props) => <Table {...props} style={{ borderCollapse: 'separate' }} />,
         TableHead: TableHead,
-        TableRow: ExpandableRow, 
-        TableBody: React.forwardRef((props, ref) => (
-            <TableBody {...props} ref={ref} />
-        ))
-        };
-    
+        TableRow: ExpandableRow,
+        TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
+    }
+
     return (
         <TableVirtuoso
             style={{ height: 600 }}
             useWindowScroll
-            class='ui celled table compact'
-            data={combinedData .sort((a, b) => {
+            class="ui celled table compact"
+            data={combinedData.sort((a, b) => {
                 // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
                 if (a.ar_guid < b.ar_guid) {
                     return -1
@@ -320,7 +311,6 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
                 //     return -1
                 // }
 
-
                 if (a.wdl_task_name < b.wdl_task_name) {
                     return -1
                 }
@@ -344,23 +334,22 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
             })}
             components={TableComponents}
             fixedHeaderContent={() => (
-                <SUITable.Row style={{ z_index: 999}}>
+                <SUITable.Row style={{ z_index: 999 }}>
                     <SUITable.HeaderCell style={{ width: 50 }} />
                     {MAIN_FIELDS.map(({ category, title }, i) => (
                         <SUITable.HeaderCell
-                        key={`${category}-${i}`}
-                        style={{
-                            borderBottom: 'none',
-                            position: 'sticky',
-                            resize: 'horizontal',
-                            textAlign: 'center',
-                        }}
+                            key={`${category}-${i}`}
+                            style={{
+                                borderBottom: 'none',
+                                position: 'sticky',
+                                resize: 'horizontal',
+                                textAlign: 'center',
+                            }}
                         >
                             {title}
                         </SUITable.HeaderCell>
                     ))}
                 </SUITable.Row>
-    
             )}
             context={{
                 combinedData,
