@@ -503,8 +503,8 @@ ORDER BY a.timestamp_completed DESC;
             values['project_ids'] = project_ids
 
         if author:
-            wheres.append('audit_log_id = :audit_log_id')
-            values['audit_log_id'] = await self.audit_log_id()
+            wheres.append('author = :author')
+            values['author'] = author
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')
