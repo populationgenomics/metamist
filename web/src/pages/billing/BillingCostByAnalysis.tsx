@@ -196,7 +196,9 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
                 <br />
                 Ar guid: f5a065d2-c51f-46b7-a920-a89b639fc4ba
                 <br />
-                Batch id: 430604, 430605
+                Batch id: 430604, 430605, 
+                <br/>
+                433599, ec3f961f-7e16-4fb0-a3e3-9fc93006ab42, a449eea5-7150-441a-9ffe-bd71587c3fe2
             </p>
         </Card>
     )

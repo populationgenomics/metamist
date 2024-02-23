@@ -148,6 +148,10 @@ const HailBatchGridTempVirtuoso: React.FunctionComponent<{
 
     const DETAIL_FIELDS: Field[] = [
         {
+            category: 'compute_category',
+            title: 'COMPUTE CATEGORY',
+        },
+        {
             category: 'topic',
             title: 'TOPIC',
         },

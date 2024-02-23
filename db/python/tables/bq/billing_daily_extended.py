@@ -105,7 +105,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
             )
             , t as (
             -- ar_guid
-                SELECT  topic, ar_guid, NULL as namespace, compute_category,
+                SELECT topic, ar_guid, NULL as namespace, MAX(compute_category) as compute_category,
                 NULL as batch_id, NULL as job_id,
                 NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
                 sku,
@@ -114,10 +114,10 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 MAX(usage_end_time) as usage_end_time, SUM(cost) as cost
                 , MAX(labels) as labels
                 FROM d
-                GROUP BY topic, ar_guid, compute_category, sku
+                GROUP BY topic, ar_guid, sku
             UNION ALL
             -- batch_id
-                SELECT  topic, ar_guid, namespace, compute_category,
+                SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
                 d.batch_id, NULL as job_id,
                 NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
                 sku,
@@ -128,10 +128,10 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 FROM d
                 INNER JOIN batch_jobs_cnt ON d.batch_id = batch_jobs_cnt.batch_id
                 WHERE d.batch_id IS NOT NULL
-                GROUP BY topic, ar_guid, batch_id, compute_category, namespace, sku, jobs
+                GROUP BY topic, ar_guid, batch_id, namespace, sku, jobs
             UNION ALL
             -- job_id
-                SELECT  topic, ar_guid, namespace, compute_category,
+                SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
                 d.batch_id, job_id,
                 NULL as cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
                 sku,
@@ -141,11 +141,11 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 , MAX(labels) as labels
                 FROM d
                 WHERE job_id IS NOT NULL
-                GROUP BY topic, ar_guid, d.batch_id, namespace, compute_category, job_id, sku
+                GROUP BY topic, ar_guid, d.batch_id, namespace, job_id, sku
 
             UNION ALL
             -- cromwell-workflow-id
-                SELECT  topic, ar_guid, namespace, compute_category,
+                SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
                 NULL as batch_id, NULL as job_id,
                 cromwell_workflow_id, NULL as cromwell_sub_workflow_name, NULL as wdl_task_name,
                 sku,
@@ -155,10 +155,10 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 , MAX(labels) as labels
                 FROM d
                 WHERE cromwell_workflow_id IS NOT NULL
-                GROUP BY topic, ar_guid, compute_category, namespace, cromwell_workflow_id, sku
+                GROUP BY topic, ar_guid, namespace, cromwell_workflow_id, sku
             UNION ALL
             -- cromwell-sub-workflow-id
-                SELECT  topic, ar_guid, namespace, compute_category,
+                SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
                 NULL as batch_id, NULL as job_id,
                 NULL as cromwell_workflow_id, cromwell_sub_workflow_name, NULL as wdl_task_name,
                 sku,
@@ -168,10 +168,10 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 , MAX(labels) as labels
                 FROM d
                 WHERE cromwell_sub_workflow_name IS NOT NULL
-                GROUP BY topic, ar_guid, compute_category, namespace, cromwell_sub_workflow_name, sku
+                GROUP BY topic, ar_guid, namespace, cromwell_sub_workflow_name, sku
             UNION ALL
             -- wdl-task-name
-                SELECT  topic, ar_guid, namespace, compute_category,
+                SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
                 NULL as batch_id, NULL as job_id,
                 NULL cromwell_workflow_id, NULL as cromwell_sub_workflow_name, wdl_task_name,
                 sku,
@@ -181,10 +181,10 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 , MAX(labels) as labels
                 FROM d
                 WHERE wdl_task_name IS NOT NULL
-                GROUP BY topic, ar_guid, compute_category, namespace, wdl_task_name, sku
+                GROUP BY topic, ar_guid, namespace, wdl_task_name, sku
             )
             -- final aggregation
-            SELECT  topic, ar_guid, namespace, compute_category,
+            SELECT  topic, ar_guid, namespace, MAX(compute_category) as compute_category,
             batch_id, job_id,
             cromwell_workflow_id, cromwell_sub_workflow_name, wdl_task_name,
             jobs,
@@ -198,7 +198,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
             FROM t
             WHERE cost != 0 -- do not want to include empty cost records
 
-            GROUP BY topic, ar_guid, batch_id, namespace, compute_category, job_id, jobs,
+            GROUP BY topic, ar_guid, batch_id, namespace, job_id, jobs,
             cromwell_workflow_id, cromwell_sub_workflow_name, wdl_task_name
 
             ORDER BY topic, ar_guid, batch_id, job_id, cromwell_workflow_id,
