@@ -169,7 +169,7 @@ const AddFromProjectForm: React.FC<IAddFromProjectForm> = ({ projects, onAdd }) 
         if (searchHits.length === 0) {
             return (
                 <Message warning visible>
-                    No sequencing groups found matching your query
+                    No sequencing groups found matching your query!
                 </Message>
             )
         }
