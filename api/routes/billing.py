@@ -283,7 +283,7 @@ async def get_namespaces(
 async def get_cost_by_ar_guid(
     ar_guid: str,
     author: str = get_author,
-) -> list[BillingBatchCostRecord]:
+) -> JSONResponse:  # list[BillingBatchCostRecord]:
     """Get Hail Batch costs by AR GUID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_ar_guid(ar_guid)
@@ -301,7 +301,7 @@ async def get_cost_by_ar_guid(
 async def get_cost_by_batch_id(
     batch_id: str,
     author: str = get_author,
-) -> list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
+) -> JSONResponse:  # list[BillingBatchCostRecord]:  # BillingHailBatchCostRecord:
     """Get Hail Batch costs by Batch ID"""
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_batch_id(batch_id)
@@ -542,5 +542,4 @@ async def get_running_costs(
 
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_running_cost(field, invoice_month, source)
-    return records
     return records

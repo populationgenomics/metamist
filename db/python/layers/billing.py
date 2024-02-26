@@ -220,7 +220,8 @@ class BillingLayer(BqBaseLayer):
         if not batches:
             return []
 
-        billing_table = self.table_factory(BillingSource.EXTENDED)
+        # billing_table = self.table_factory(BillingSource.EXTENDED)
+        billing_table = BillingDailyExtendedTable(self.connection)
         results = await billing_table.get_batch_cost_details(
             start_day, end_day, batches, ar_guid
         )
@@ -250,7 +251,8 @@ class BillingLayer(BqBaseLayer):
                 []
             )  # BillingHailBatchCostRecord(ar_guid=ar_guid, batch_ids=[], costs=[])
 
-        billing_table = self.table_factory(BillingSource.EXTENDED)
+        # billing_table = self.table_factory(BillingSource.EXTENDED)
+        billing_table = BillingDailyExtendedTable(self.connection)
         results = await billing_table.get_batch_cost_details(
             start_day, end_day, batches, ar_guid
         )
