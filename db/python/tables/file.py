@@ -1,7 +1,9 @@
+import os
 from textwrap import dedent
 from typing import Optional, Union
 
-from cloudpathlib import AnyPath
+from cloudpathlib import AnyPath, GSClient
+from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Client
 
 from db.python.tables.base import DbBase
@@ -15,19 +17,6 @@ class FileTable(DbBase):
 
     table_name = 'file'
 
-    async def create_analysis_output_file(
-        self,
-        path: str,
-        analysis_id: int,
-        json_structure: Optional[str]
-    ) -> int:
-        """Create a new file, and add it to an analysis via the join table"""
-
-        id_of_new_file = await self.create_or_update_output_file(path=path)
-        await self.add_output_file_to_analysis(analysis_id=analysis_id, file_id=id_of_new_file, json_structure=json_structure)
-
-        return id_of_new_file
-
     async def create_or_update_output_file(
         self,
         path: str,
@@ -37,7 +26,7 @@ class FileTable(DbBase):
         """
         Create a new file, and add it to database
         """
-        file_obj = AnyPath(path)
+        file_obj = AnyPath(path, client=GSClient(storage_client=client))
 
         file_info = await FileInternal.get_file_info(file_obj=file_obj, client=client)
 
@@ -95,7 +84,16 @@ class FileTable(DbBase):
         files = await self.find_files_from_dict(json_dict=json_dict)
         file_ids : list[int] = []
 
-        client = Client()
+        if os.environ.get('SM_ENVIRONMENT').lower() in ('development', 'local'):
+            client = Client(
+                credentials=AnonymousCredentials(),
+                project='test',
+                # Alternatively instead of using the global env STORAGE_EMULATOR_HOST. You can define it here.
+                # This will set this client object to point to the local google cloud storage.
+                client_options={'api_endpoint': 'http://localhost:4443'},
+            )
+        else:
+            client = Client()
 
         async with self.connection.transaction():
             if 'main_files' in files:

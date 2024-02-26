@@ -1,5 +1,8 @@
 # pylint: disable=invalid-overridden-method
+import os
 from test.testbase import DbIsolatedTest, run_as_sync
+
+from testcontainers.core.container import DockerContainer
 
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -18,6 +21,17 @@ from models.models import (
 
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
+
+    gcs: DockerContainer
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Convert the relative path to an absolute path
+        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+        gcs = DockerContainer('fsouza/fake-gcs-server').with_bind_ports(4443, 4443).with_volume_mapping(absolute_path, '/data',).with_command('-scheme http')
+        gcs.start()
+        cls.gcs = gcs
 
     @run_as_sync
     async def setUp(self) -> None:
@@ -75,6 +89,12 @@ class TestAnalysis(DbIsolatedTest):
         self.sample_id = sample.id
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id
         self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls.gcs:
+            cls.gcs.stop()
+        super().tearDownClass()
 
     @run_as_sync
     async def test_get_analysis_by_id(self):
@@ -270,44 +290,44 @@ class TestAnalysis(DbIsolatedTest):
                 meta={},
                 outputs={
                     'qc_results': {
-                        'basename': 'gs://sm-dev-test/file1.txt'
+                        'basename': 'gs://fakegcs/file1.txt'
                         },
                     'cram': {
-                        'basename': 'gs://sm-dev-test/file1.cram'
+                        'basename': 'gs://fakegcs/file1.cram'
                     },
                     'qc': {
                         'cram': {
-                            'basename': 'gs://sm-dev-test/file2.cram',
+                            'basename': 'gs://fakegcs/file2.cram',
                             'secondaryFiles':
                                 {
                                     'cram_ext': {
-                                        'basename': 'gs://sm-dev-test/file2.cram.ext'
+                                        'basename': 'gs://fakegcs/file2.cram.ext'
                                     },
                                     'cram_meta': {
-                                        'basename': 'gs://sm-dev-test/file2.cram.meta'
+                                        'basename': 'gs://fakegcs/file2.cram.meta'
                                     }
                                 }
                         },
                         'aggregate': {
                             'cram': {
-                                'basename': 'gs://sm-dev-test/file3.cram',
+                                'basename': 'gs://fakegcs/file3.cram',
                                 'secondaryFiles': {
                                         'cram_ext': {
-                                            'basename': 'gs://sm-dev-test/file3.cram.ext'
+                                            'basename': 'gs://fakegcs/file3.cram.ext'
                                         },
                                         'cram_meta': {
-                                            'basename': 'gs://sm-dev-test/file3.cram.meta'
+                                            'basename': 'gs://fakegcs/file3.cram.meta'
                                         }
                                     }
                             },
                             'qc': {
-                                'basename': 'gs://sm-dev-test/file1.qc',
+                                'basename': 'gs://fakegcs/file1.qc',
                                 'secondaryFiles': {
                                     'qc_ext': {
-                                        'basename': 'gs://sm-dev-test/file1.qc.ext'
+                                        'basename': 'gs://fakegcs/file1.qc.ext'
                                     },
                                     'qc_meta': {
-                                        'basename': 'gs://sm-dev-test/file1.qc.meta'
+                                        'basename': 'gs://fakegcs/file1.qc.meta'
                                     }
                                 }
                             },
@@ -331,9 +351,9 @@ class TestAnalysis(DbIsolatedTest):
                 output={
                     'qc_results': {
                         'id': 1,
-                        'path': 'gs://sm-dev-test/file1.txt',
+                        'path': 'gs://fakegcs/file1.txt',
                         'basename': 'file1.txt',
-                        'dirname': 'gs://sm-dev-test',
+                        'dirname': 'gs://fakegcs',
                         'nameroot': 'file1',
                         'nameext': '.txt',
                         'file_checksum': 'DG+fhg==',
@@ -344,9 +364,9 @@ class TestAnalysis(DbIsolatedTest):
                     },
                     'cram': {
                         'id': 2,
-                        'path': 'gs://sm-dev-test/file1.cram',
+                        'path': 'gs://fakegcs/file1.cram',
                         'basename': 'file1.cram',
-                        'dirname': 'gs://sm-dev-test',
+                        'dirname': 'gs://fakegcs',
                         'nameroot': 'file1',
                         'nameext': '.cram',
                         'file_checksum': 'sl7SXw==',
@@ -358,9 +378,9 @@ class TestAnalysis(DbIsolatedTest):
                     'qc': {
                         'cram': {
                             'id': 3,
-                            'path': 'gs://sm-dev-test/file2.cram',
+                            'path': 'gs://fakegcs/file2.cram',
                             'basename': 'file2.cram',
-                            'dirname': 'gs://sm-dev-test',
+                            'dirname': 'gs://fakegcs',
                             'nameroot': 'file2',
                             'nameext': '.cram',
                             'file_checksum': 'sl7SXw==',
@@ -370,9 +390,9 @@ class TestAnalysis(DbIsolatedTest):
                             'secondary_files': [
                                 {
                                     'id': 4,
-                                    'path': 'gs://sm-dev-test/file2.cram.ext',
+                                    'path': 'gs://fakegcs/file2.cram.ext',
                                     'basename': 'file2.cram.ext',
-                                    'dirname': 'gs://sm-dev-test',
+                                    'dirname': 'gs://fakegcs',
                                     'nameroot': 'file2.cram',
                                     'nameext': '.ext',
                                     'file_checksum': 'gb1EbA==',
@@ -383,9 +403,9 @@ class TestAnalysis(DbIsolatedTest):
                                 },
                                 {
                                     'id': 5,
-                                    'path': 'gs://sm-dev-test/file2.cram.meta',
+                                    'path': 'gs://fakegcs/file2.cram.meta',
                                     'basename': 'file2.cram.meta',
-                                    'dirname': 'gs://sm-dev-test',
+                                    'dirname': 'gs://fakegcs',
                                     'nameroot': 'file2.cram',
                                     'nameext': '.meta',
                                     'file_checksum': 'af/YSw==',
@@ -399,9 +419,9 @@ class TestAnalysis(DbIsolatedTest):
                         'aggregate': {
                             'cram': {
                                 'id': 6,
-                                'path': 'gs://sm-dev-test/file3.cram',
+                                'path': 'gs://fakegcs/file3.cram',
                                 'basename': 'file3.cram',
-                                'dirname': 'gs://sm-dev-test',
+                                'dirname': 'gs://fakegcs',
                                 'nameroot': 'file3',
                                 'nameext': '.cram',
                                 'file_checksum': 'sl7SXw==',
@@ -411,9 +431,9 @@ class TestAnalysis(DbIsolatedTest):
                                 'secondary_files': [
                                     {
                                         'id': 7,
-                                        'path': 'gs://sm-dev-test/file3.cram.ext',
+                                        'path': 'gs://fakegcs/file3.cram.ext',
                                         'basename': 'file3.cram.ext',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file3.cram',
                                         'nameext': '.ext',
                                         'file_checksum': 'HU8n6w==',
@@ -424,9 +444,9 @@ class TestAnalysis(DbIsolatedTest):
                                     },
                                     {
                                         'id': 8,
-                                        'path': 'gs://sm-dev-test/file3.cram.meta',
+                                        'path': 'gs://fakegcs/file3.cram.meta',
                                         'basename': 'file3.cram.meta',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file3.cram',
                                         'nameext': '.meta',
                                         'file_checksum': 'af/YSw==',
@@ -439,9 +459,9 @@ class TestAnalysis(DbIsolatedTest):
                             },
                             'qc': {
                                 'id': 9,
-                                'path': 'gs://sm-dev-test/file1.qc',
+                                'path': 'gs://fakegcs/file1.qc',
                                 'basename': 'file1.qc',
-                                'dirname': 'gs://sm-dev-test',
+                                'dirname': 'gs://fakegcs',
                                 'nameroot': 'file1',
                                 'nameext': '.qc',
                                 'file_checksum': 'uZe/hQ==',
@@ -451,9 +471,9 @@ class TestAnalysis(DbIsolatedTest):
                                 'secondary_files': [
                                     {
                                         'id': 10,
-                                        'path': 'gs://sm-dev-test/file1.qc.ext',
+                                        'path': 'gs://fakegcs/file1.qc.ext',
                                         'basename': 'file1.qc.ext',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file1.qc',
                                         'nameext': '.ext',
                                         'file_checksum': '/18MDg==',
@@ -464,9 +484,9 @@ class TestAnalysis(DbIsolatedTest):
                                     },
                                     {
                                         'id': 11,
-                                        'path': 'gs://sm-dev-test/file1.qc.meta',
+                                        'path': 'gs://fakegcs/file1.qc.meta',
                                         'basename': 'file1.qc.meta',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file1.qc',
                                         'nameext': '.meta',
                                         'file_checksum': 'v9x0Zg==',
@@ -483,9 +503,9 @@ class TestAnalysis(DbIsolatedTest):
                 outputs={
                     'qc_results': {
                         'id': 1,
-                        'path': 'gs://sm-dev-test/file1.txt',
+                        'path': 'gs://fakegcs/file1.txt',
                         'basename': 'file1.txt',
-                        'dirname': 'gs://sm-dev-test',
+                        'dirname': 'gs://fakegcs',
                         'nameroot': 'file1',
                         'nameext': '.txt',
                         'file_checksum': 'DG+fhg==',
@@ -496,9 +516,9 @@ class TestAnalysis(DbIsolatedTest):
                     },
                     'cram': {
                         'id': 2,
-                        'path': 'gs://sm-dev-test/file1.cram',
+                        'path': 'gs://fakegcs/file1.cram',
                         'basename': 'file1.cram',
-                        'dirname': 'gs://sm-dev-test',
+                        'dirname': 'gs://fakegcs',
                         'nameroot': 'file1',
                         'nameext': '.cram',
                         'file_checksum': 'sl7SXw==',
@@ -510,9 +530,9 @@ class TestAnalysis(DbIsolatedTest):
                     'qc': {
                         'cram': {
                             'id': 3,
-                            'path': 'gs://sm-dev-test/file2.cram',
+                            'path': 'gs://fakegcs/file2.cram',
                             'basename': 'file2.cram',
-                            'dirname': 'gs://sm-dev-test',
+                            'dirname': 'gs://fakegcs',
                             'nameroot': 'file2',
                             'nameext': '.cram',
                             'file_checksum': 'sl7SXw==',
@@ -522,9 +542,9 @@ class TestAnalysis(DbIsolatedTest):
                             'secondary_files': [
                                 {
                                     'id': 4,
-                                    'path': 'gs://sm-dev-test/file2.cram.ext',
+                                    'path': 'gs://fakegcs/file2.cram.ext',
                                     'basename': 'file2.cram.ext',
-                                    'dirname': 'gs://sm-dev-test',
+                                    'dirname': 'gs://fakegcs',
                                     'nameroot': 'file2.cram',
                                     'nameext': '.ext',
                                     'file_checksum': 'gb1EbA==',
@@ -535,9 +555,9 @@ class TestAnalysis(DbIsolatedTest):
                                 },
                                 {
                                     'id': 5,
-                                    'path': 'gs://sm-dev-test/file2.cram.meta',
+                                    'path': 'gs://fakegcs/file2.cram.meta',
                                     'basename': 'file2.cram.meta',
-                                    'dirname': 'gs://sm-dev-test',
+                                    'dirname': 'gs://fakegcs',
                                     'nameroot': 'file2.cram',
                                     'nameext': '.meta',
                                     'file_checksum': 'af/YSw==',
@@ -551,9 +571,9 @@ class TestAnalysis(DbIsolatedTest):
                         'aggregate': {
                             'cram': {
                                 'id': 6,
-                                'path': 'gs://sm-dev-test/file3.cram',
+                                'path': 'gs://fakegcs/file3.cram',
                                 'basename': 'file3.cram',
-                                'dirname': 'gs://sm-dev-test',
+                                'dirname': 'gs://fakegcs',
                                 'nameroot': 'file3',
                                 'nameext': '.cram',
                                 'file_checksum': 'sl7SXw==',
@@ -563,9 +583,9 @@ class TestAnalysis(DbIsolatedTest):
                                 'secondary_files': [
                                     {
                                         'id': 7,
-                                        'path': 'gs://sm-dev-test/file3.cram.ext',
+                                        'path': 'gs://fakegcs/file3.cram.ext',
                                         'basename': 'file3.cram.ext',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file3.cram',
                                         'nameext': '.ext',
                                         'file_checksum': 'HU8n6w==',
@@ -576,9 +596,9 @@ class TestAnalysis(DbIsolatedTest):
                                     },
                                     {
                                         'id': 8,
-                                        'path': 'gs://sm-dev-test/file3.cram.meta',
+                                        'path': 'gs://fakegcs/file3.cram.meta',
                                         'basename': 'file3.cram.meta',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file3.cram',
                                         'nameext': '.meta',
                                         'file_checksum': 'af/YSw==',
@@ -591,9 +611,9 @@ class TestAnalysis(DbIsolatedTest):
                             },
                             'qc': {
                                 'id': 9,
-                                'path': 'gs://sm-dev-test/file1.qc',
+                                'path': 'gs://fakegcs/file1.qc',
                                 'basename': 'file1.qc',
-                                'dirname': 'gs://sm-dev-test',
+                                'dirname': 'gs://fakegcs',
                                 'nameroot': 'file1',
                                 'nameext': '.qc',
                                 'file_checksum': 'uZe/hQ==',
@@ -603,9 +623,9 @@ class TestAnalysis(DbIsolatedTest):
                                 'secondary_files': [
                                     {
                                         'id': 10,
-                                        'path': 'gs://sm-dev-test/file1.qc.ext',
+                                        'path': 'gs://fakegcs/file1.qc.ext',
                                         'basename': 'file1.qc.ext',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file1.qc',
                                         'nameext': '.ext',
                                         'file_checksum': '/18MDg==',
@@ -616,9 +636,9 @@ class TestAnalysis(DbIsolatedTest):
                                     },
                                     {
                                         'id': 11,
-                                        'path': 'gs://sm-dev-test/file1.qc.meta',
+                                        'path': 'gs://fakegcs/file1.qc.meta',
                                         'basename': 'file1.qc.meta',
-                                        'dirname': 'gs://sm-dev-test',
+                                        'dirname': 'gs://fakegcs',
                                         'nameroot': 'file1.qc',
                                         'nameext': '.meta',
                                         'file_checksum': 'v9x0Zg==',

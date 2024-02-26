@@ -154,6 +154,12 @@ class DbTest(unittest.TestCase):
                 )
                 formed_connection.project = cls.project_id
 
+                # # Convert the relative path to an absolute path
+                # absolute_path = os.path.abspath("./data/fakegcs")
+                # gcs = DockerContainer('fsouza/fake-gcs-server').with_bind_ports(4443, 4443).with_volume_mapping(absolute_path, "/data",).with_command('-scheme http')
+                # gcs.start()
+                # cls.gcs = gcs
+
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
                 if e.stderr:
@@ -177,6 +183,9 @@ class DbTest(unittest.TestCase):
         if db:
             db.exec(f'DROP DATABASE {db.MYSQL_DATABASE};')
             db.stop()
+
+        # gcs = cls.gcs
+        # gcs.stop()
 
     def setUp(self) -> None:
         self._connection = self.connections[self.__class__.__name__]

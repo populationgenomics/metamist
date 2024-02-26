@@ -77,7 +77,7 @@ class FileInternal(SMBase):
             # try:
             if isinstance(file_obj, GSPath) and client:
                 bucket = client.get_bucket(file_obj.bucket)  # pylint: disable=E1101
-                blob = bucket.get_blob(file_obj.name)  # pylint: disable=E1101
+                blob = bucket.get_blob(file_obj.blob)  # pylint: disable=E1101
                 if file_obj.suffix != '.mt':
                     file_checksum = blob.crc32c  # pylint: disable=E1101
                 valid = True

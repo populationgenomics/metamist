@@ -241,26 +241,31 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         WHERE ao.analysis_id IN :analysis_ids
         """
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
+
+        # Preparing to accumulate analysis files
         analysis_files: dict[int, list[Union[Tuple[FileInternal, str], str]]] = defaultdict(list)
 
-        # Need to add a check for existence of file_id in the row
+        # Extracting parent IDs with a guard for None values
         parent_ids = [row['id'] for row in rows if row['id'] is not None]
-        secondary_files: dict = {}
-        if parent_ids:
-            secondary_files = await self.get_secondary_files_for_file_output(parent_ids)
+
+        # Fetching secondary files only if there are parent IDs to look up
+        secondary_files = await self.get_secondary_files_for_file_output(parent_ids) if parent_ids else {}
 
         for row in rows:
-            # Return a tuple of (FileInternal, json_structure) if file_id is not None, else just the output
-            analysis_files[row['analysis_id']].append((
-                FileInternal.from_db(**dict(row)).copy(update={
-                    'secondary_files': secondary_files.get(row['id'], []) if secondary_files else []
-                    }),
-                row['json_structure']) if row['id'] else row['output'])
+            file_id = row['id']
+            if file_id:
+                # Building FileInternal object with secondary files if available
+                file_internal = FileInternal.from_db(**dict(row))
+                file_internal_with_secondary = file_internal.copy(update={
+                    'secondary_files': secondary_files.get(file_id, [])
+                })
+                analysis_files[row['analysis_id']].append((file_internal_with_secondary, row['json_structure']))
+            else:
+                # If no file_id, just append the output
+                analysis_files[row['analysis_id']].append(row['output'])
 
-        analysis_output_files: dict[int, dict[str, Any]] = defaultdict(dict)
-
-        for a_id, files in analysis_files.items():
-            analysis_output_files[a_id] = FileInternal.reconstruct_json(files)
+        # Transforming analysis_files into the desired output format
+        analysis_output_files = {a_id: FileInternal.reconstruct_json(files) for a_id, files in analysis_files.items()}
 
         return analysis_output_files
 
@@ -272,10 +277,18 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         FROM file f
         WHERE f.parent_id IN :parent_file_ids
         """
+        # Ensure parent_file_ids is a list to prevent SQL injection and errors
+        if not isinstance(parent_file_ids, list):
+            raise ValueError('parent_file_ids must be a list of integers')
+
+        # Fetching rows from the database
         rows = await self.connection.fetch_all(_query, {'parent_file_ids': parent_file_ids})
-        secondary_files: dict[int, list[FileInternal]] = defaultdict(list)
+
+        # Accumulating secondary files
+        secondary_files: Dict[int, List[FileInternal]] = defaultdict(list)
         for row in rows:
-            secondary_files[row['parent_id']].append(FileInternal.from_db(**dict(row)))
+            secondary_file = FileInternal.from_db(**dict(row))
+            secondary_files[row['parent_id']].append(secondary_file)
 
         return secondary_files
 
