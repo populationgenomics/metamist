@@ -1,19 +1,19 @@
 # pylint: disable=invalid-name
-import io
-import csv
 import codecs
+import csv
+import io
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, UploadFile, File, Query
+from fastapi import APIRouter, File, Query, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
+    Connection,
     get_project_readonly_connection,
     get_project_write_connection,
-    Connection,
 )
 from api.utils.export import ExportType
 from api.utils.extensions import guess_delimiter_by_upload_file_obj

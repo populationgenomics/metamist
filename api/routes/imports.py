@@ -1,15 +1,15 @@
-import csv
 import codecs
+import csv
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, File, UploadFile
 
-from db.python.layers.participant import (
-    ParticipantLayer,
-    ExtraParticipantImporterHandler,
-)
+from api.utils.db import Connection, get_project_write_connection
 from api.utils.extensions import guess_delimiter_by_upload_file_obj
-from api.utils.db import get_project_write_connection, Connection
+from db.python.layers.participant import (
+    ExtraParticipantImporterHandler,
+    ParticipantLayer,
+)
 
 router = APIRouter(prefix='/import', tags=['import'])
 

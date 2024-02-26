@@ -1,15 +1,17 @@
 from datetime import date
 
 from test.testbase import DbIsolatedTest, run_as_sync
-from db.python.utils import GenericFilter
+
+from db.python.layers import SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.layers import SequencingGroupLayer, SampleLayer, AnalysisLayer
 from models.enums.analysis import AnalysisStatus
+from db.python.utils import GenericFilter
 from models.models import (
-    SequencingGroupUpsertInternal,
     AssayUpsertInternal,
     SampleUpsertInternal,
     AnalysisInternal,
+    SequencingGroupUpsertInternal,
 )
 
 

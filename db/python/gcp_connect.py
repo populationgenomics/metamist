@@ -6,6 +6,7 @@ import os
 
 import google.cloud.bigquery as bq
 from google.cloud import pubsub_v1
+
 from db.python.utils import InternalError
 
 logging.basicConfig(level=logging.DEBUG)

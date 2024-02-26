@@ -4,20 +4,18 @@ from datetime import date
 
 from fastapi import APIRouter
 from fastapi.params import Query
-from starlette.responses import StreamingResponse, JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 
 from api.utils import get_projectless_db_connection
 from api.utils.db import (
-    get_project_write_connection,
-    get_project_readonly_connection,
     Connection,
+    get_project_readonly_connection,
+    get_project_write_connection,
 )
 from api.utils.export import ExportType
-from db.python.layers.participant import (
-    ParticipantLayer,
-)
+from db.python.layers.participant import ParticipantLayer
 from models.models.participant import ParticipantUpsert
-from models.models.sample import sample_id_format
+from models.models.sequencing_group import sequencing_group_id_format
 
 router = APIRouter(prefix='/participant', tags=['participant'])
 
@@ -113,35 +111,37 @@ async def update_many_participant_external_ids(
 
 
 @router.get(
-    '/{project}/external-pid-to-internal-sample-id',
-    operation_id='getExternalParticipantIdToInternalSampleId',
+    '/{project}/external-pid-to-sg-id',
+    operation_id='getExternalParticipantIdToSequencingGroupId',
     tags=['seqr'],
 )
-async def get_external_participant_id_to_internal_sample_id(
+async def get_external_participant_id_to_sequencing_group_id(
     project: str,
+    sequencing_type: str = None,
     export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
     connection: Connection = get_project_readonly_connection,
 ):
     """
-    Get csv / tsv export of external_participant_id to internal_sample_id
+    Get csv / tsv export of external_participant_id to sequencing_group_id
 
-    Get a map of {external_participant_id} -> {internal_sample_id}
-    useful to matching joint-called samples in the matrix table to the participant
+    Get a map of {external_participant_id} -> {sequencing_group_id}
+    useful to matching joint-called sequencing groups in the matrix table to the participant
 
     Return a list not dictionary, because dict could lose
     participants with multiple samples.
 
+    :param sequencing_type: Leave empty to get all sequencing types
     :param flip_columns: Set to True when exporting for seqr
     """
     player = ParticipantLayer(connection)
     # this wants project ID (connection.project)
     assert connection.project
     m = await player.get_external_participant_id_to_internal_sequencing_group_id_map(
-        project=connection.project
+        project=connection.project, sequencing_type=sequencing_type
     )
 
-    rows = [[pid, sample_id_format(sid)] for pid, sid in m]
+    rows = [[pid, sequencing_group_id_format(sgid)] for pid, sgid in m]
     if flip_columns:
         rows = [r[::-1] for r in rows]
 
@@ -153,7 +153,9 @@ async def get_external_participant_id_to_internal_sample_id(
     writer.writerows(rows)
 
     ext = export_type.get_extension()
-    filename = f'{project}-participant-to-sample-map-{date.today().isoformat()}{ext}'
+    filename = f'{project}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
+    if sequencing_type:
+        filename = f'{project}-{sequencing_type}-participant-to-sequencing-group-map-{date.today().isoformat()}{ext}'
     return StreamingResponse(
         # stream the whole file at once, because it's all in memory anyway
         iter([output.getvalue()]),

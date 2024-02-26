@@ -5,17 +5,17 @@ It will drop the local mysql database after each run.
 
 """
 
-import unittest
-import subprocess
 import json
 import os
-from typing import Tuple, Optional
+import subprocess
+import unittest
 from collections import namedtuple
+from typing import Optional, Tuple
+
 import google.cloud.secretmanager
 import mysql.connector
 from parameterized import parameterized
 from restore import pull_latest_backup, restore
-
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'

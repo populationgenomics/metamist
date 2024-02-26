@@ -18,17 +18,18 @@ import random
 import subprocess
 from argparse import ArgumentParser
 from collections import Counter
+from typing import Any, Tuple
 
 from google.cloud import storage
 
-from metamist.apis import AnalysisApi, AssayApi, SampleApi, FamilyApi, ParticipantApi
+from metamist.apis import AnalysisApi, AssayApi, FamilyApi, ParticipantApi, SampleApi
 from metamist.graphql import gql, query
 from metamist.models import (
-    AssayUpsert,
-    SampleUpsert,
     Analysis,
     AnalysisStatus,
     AnalysisUpdateModel,
+    AssayUpsert,
+    SampleUpsert,
     SequencingGroupUpsert,
 )
 
@@ -142,6 +143,9 @@ SG_ID_QUERY = gql(
                 externalId
                 sequencingGroups {
                     id
+                    type
+                    platform
+                    technology
                 }
             }
         }
@@ -240,11 +244,18 @@ def main(
 
     logger.info('Transferring samples, sequencing groups, and assays')
     samples = original_project_subset_data.get('project').get('samples')
-    transfer_samples_sgs_assays(
+    old_sid_to_new_sid, sample_to_sg_attribute_map = transfer_samples_sgs_assays(
         samples, existing_data, upserted_participant_map, target_project, project
     )
     logger.info('Transferring analyses')
-    transfer_analyses(samples, existing_data, target_project, project)
+    transfer_analyses(
+        samples,
+        existing_data,
+        target_project,
+        project,
+        old_sid_to_new_sid,
+        sample_to_sg_attribute_map,
+    )
     logger.info('Subset generation complete!')
 
 
@@ -257,10 +268,22 @@ def transfer_samples_sgs_assays(
 ):
     """
     Transfer samples, sequencing groups, and assays from the original project to the
-    test project.
+    test project. Also creates a mapping from sample identifiers to their associated
+    sequencing groups (sample_to_sg_attribute_map).
     """
     logger.info(f'Transferring {len(samples)} samples')
+    SequencingGroupAttributes = dict[Tuple[str, str, str], str]
+    sample_to_sg_attribute_map: dict[Tuple[str, str], SequencingGroupAttributes] = {}
+    old_sid_to_new_sid: dict[str, str] = {}
     for s in samples:
+        exid_old_sid = (s['participant']['externalId'], s['id'])
+        if exid_old_sid not in sample_to_sg_attribute_map:
+            sample_to_sg_attribute_map[exid_old_sid] = {}
+        for sg in s['sequencingGroups']:
+            sample_to_sg_attribute_map[exid_old_sid][
+                (sg['type'], sg['platform'], sg['technology'])
+            ] = sg['id']
+
         sample_type = None if s['type'] == 'None' else s['type']
         existing_sid: str | None = None
         existing_sample = get_existing_sample(existing_data, s['externalId'])
@@ -282,10 +305,13 @@ def transfer_samples_sgs_assays(
 
         logger.info(f'Processing sample {s["id"]}')
         logger.info('Creating test sample entry')
-        sapi.create_sample(
+        new_sample_id = sapi.create_sample(
             project=target_project,
             sample_upsert=sample_upsert,
         )
+        old_sid_to_new_sid[s['id']] = new_sample_id
+
+    return old_sid_to_new_sid, sample_to_sg_attribute_map
 
 
 def upsert_sequencing_groups(
@@ -343,8 +369,77 @@ def upsert_assays(
     return assays_to_upsert
 
 
+def get_new_sg_id(
+    old_sid: str,
+    new_sg_attributes: tuple[str, str, str],
+    old_sid_to_new_sid: dict[str, str],
+    sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
+    new_sg_data: dict[str, dict[str, Any]],
+):
+    """
+    Returns the new sequencing group id for a given sample id and sequencing group attributes.
+    Args:
+        sid (str): The sample id to search for.
+        new_sg_attributes (tuple[str, str, str]): The attributes of the sequencing group to search for.
+        old_sid_to_new_sid (dict[str, str]): A map from old sample ids to new sample ids.
+        sample_to_sg_attribute_map (dict[tuple, dict[tuple, str]]): A map from (peid, sid) keys to a map of sequencing group attribute keys to old sequencing group ids.
+        new_sg_data (dict[dict, Any]): The data containing the new samples and their sequencing groups.
+
+
+        Example:
+        old_sid = 'XPGAAAAA'
+        old_sid_to_new_sid = {'XPGAAAAA': 'XPGBBBBB',
+                              'XPGCCCCC': 'XPGDDDDD',
+                              'XPGEEEEE': 'XPGFFFFF',
+        sample_to_sg_attribute_map = {('HG00011', 'XPGAAAAA'): {('exome', 'Illumina', 'short-read'): 'CPGAAAAA',
+                                      ('HG00011', 'XPGCCCCC'): {('exome', 'Illumina', 'short-read'): 'CPGBBBBB', # same participant, different sample to above
+                                                                ('genome', 'Illumina', 'short-read'): 'CPGCCCCC'} # same participant, same sample, different sequencing group to above
+                                      ('HG00022', 'XPGEEEEE'): {('exome', 'Illumina', 'short-read'): 'CPGDDDDD'} # different participant
+        new_sg_data = {'project': {'samples': [{'id': 'XPGBBBBB', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGZZZZZ', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}],
+                                               {'id': 'XPGDDDDD', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGYYYYY', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPGDDDDD', 'externalId': 'HG00011', 'sequencingGroups': [{'id': 'CPGXXXXX', 'type': 'genome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+                                               {'id': 'XPGFFFFF', 'externalId': 'HG00022', 'sequencingGroups': [{'id': 'CPGWWWWW', 'type': 'exome', 'platform': 'Illumina', 'technology': 'short-read'}]}}
+
+        new_sg_attributes = ('exome', 'Illumina', 'short-read')
+
+        The new_sg_attributes maps the newly created sequencing group to the ('externalId', 'old_sample_id') of the specific sample of the participant it was created from.
+
+    """
+    if old_sid in old_sid_to_new_sid:
+        if not isinstance(new_sg_data.get('project', {}).get('samples'), list):
+            raise TypeError("'samples' must be a list")
+        for new_sample in new_sg_data['project']['samples']:
+            if (
+                new_sample['id'] == old_sid_to_new_sid[old_sid]
+            ):  # If new sample maps to old sample
+                for new_sg in new_sample['sequencingGroups']:
+                    peid_sid_key = (new_sample['externalId'], old_sid)
+                    sg_attribute_key = (
+                        new_sg['type'],
+                        new_sg['platform'],
+                        new_sg['technology'],
+                    )
+                    if (
+                        sample_to_sg_attribute_map[peid_sid_key].get(new_sg_attributes)
+                        and new_sg_attributes == sg_attribute_key
+                    ):
+                        new_sg_id = new_sg['id']
+                        return [new_sg_id]
+                    # continue to next sg in new_sample
+                    continue
+
+    return ValueError(
+        f'Old sample {old_sid} not found in mapping of old to new sample ids.'
+    )
+
+
 def transfer_analyses(
-    samples: dict, existing_data: dict, target_project: str, project: str
+    samples: dict,
+    existing_data: dict,
+    target_project: str,
+    project: str,
+    old_sid_to_new_sid: dict[str, str],
+    sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
 ):
     """
     This function will transfer the analyses from the original project to the test project.
@@ -360,6 +455,17 @@ def transfer_analyses(
 
     for s in samples:
         for sg in s['sequencingGroups']:
+            new_sg_attributes = sg.get('type'), sg.get('platform'), sg.get('technology')
+            new_sequencing_group_id = get_new_sg_id(
+                s['id'],
+                new_sg_attributes,
+                old_sid_to_new_sid,
+                sample_to_sg_attribute_map,
+                new_sg_data,
+            )
+            assert (
+                len(new_sequencing_group_id) == 1
+            ), f'Expected 1 new sequencing group id, got {len(new_sequencing_group_id)}'
             existing_sg = get_existing_sg(
                 existing_data, s.get('externalId'), sg.get('type')
             )
@@ -385,7 +491,9 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
+                        status=AnalysisStatus(
+                            analysis['status'].lower().replace('_', '-')
+                        ),
                         sequencing_group_ids=new_sg_map[s['externalId']],
                         meta=analysis['meta'],
                     )
@@ -401,8 +509,10 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sg_map[s['externalId']][0]),
                         ),
-                        status=AnalysisStatus(analysis['status'].lower().replace('_', '-')),
-                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        status=AnalysisStatus(
+                            analysis['status'].lower().replace('_', '-')
+                        ),
+                        sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
 
@@ -454,7 +564,9 @@ def get_existing_assay(
     """
     if sg := get_existing_sg(existing_data=data, sample_id=sample_id, sg_id=sg_id):
         for assay in sg.get('assays', []):
-            if assay.get('type') == original_assay.get('type') and assay.get('meta') == original_assay.get('meta'):
+            if assay.get('type') == original_assay.get('type') and assay.get(
+                'meta'
+            ) == original_assay.get('meta'):
                 return assay
 
     return None
@@ -585,7 +697,8 @@ def transfer_participants(
     existing_participants = papi.get_participants(target_project)
 
     target_project_pid_map = {
-        participant['external_id']: participant['id'] for participant in existing_participants
+        participant['external_id']: participant['id']
+        for participant in existing_participants
     }
 
     participants_to_transfer = []
@@ -614,9 +727,9 @@ def transfer_participants(
     external_to_internal_participant_id_map: dict[str, int] = {}
 
     for participant in upserted_participants:
-        external_to_internal_participant_id_map[
-            participant['external_id']
-        ] = participant['id']
+        external_to_internal_participant_id_map[participant['external_id']] = (
+            participant['id']
+        )
     return external_to_internal_participant_id_map
 
 

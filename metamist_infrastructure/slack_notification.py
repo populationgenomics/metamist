@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pulumi
 import pulumi_gcp as gcp
+
 from cpg_infra.utils import archive_folder
 from cpg_utils.cloud import read_secret
 
@@ -80,7 +81,7 @@ class SlackNotification:
         self,
         slack_config: SlackNotificationConfig,
         topic_name: str,  # e.g. 'metamist-etl-notification'
-        func_to_monitor: list | None,
+        func_to_monitor: list[str],
         notification_type: SlackNotificationType,
         depends_on: list | None,
     ):
@@ -175,6 +176,9 @@ class SlackNotification:
                 runtime='python311',
                 entry_point='etl_notify',
                 environment_variables={},
+                # this one is set on an output, so specifying it keeps the function
+                # from being updated, or appearing to update
+                docker_repository=f'projects/{self.config.project_name}/locations/australia-southeast1/repositories/gcf-artifacts',
                 source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceArgs(
                     storage_source=gcp.cloudfunctionsv2.FunctionBuildConfigSourceStorageSourceArgs(
                         bucket=self.config.source_bucket.name,
@@ -186,7 +190,7 @@ class SlackNotification:
                 max_instance_count=1,  # Keep max instances to 1 to avoid racing conditions
                 min_instance_count=0,
                 available_memory='2Gi',
-                available_cpu=1,
+                available_cpu='1',
                 timeout_seconds=540,
                 environment_variables={
                     'SLACK_BOT_TOKEN': read_secret(
@@ -196,7 +200,7 @@ class SlackNotification:
                         fail_gracefully=False,
                     ),
                     'SLACK_CHANNEL': self.config.slack_channel_name,
-                },
+                },  # type: ignore
                 ingress_settings='ALLOW_ALL',
                 all_traffic_on_latest_revision=True,
                 service_account_email=self.config.service_account.email,

@@ -9,6 +9,7 @@ import os
 from typing import NamedTuple
 
 from cpg_infra.config import CPGInfrastructureConfig
+
 from metamist_infrastructure import MetamistInfrastructure
 
 GCP_PROJECT = os.getenv('METAMIST_INFRA_GCP_PROJECT')

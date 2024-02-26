@@ -117,8 +117,9 @@ class BillingBaseTable(BqDbBase):
         # otherwise return as BQ iterator
         return self._connection.connection.query(query, job_config=job_config)
 
+    @staticmethod
     def _query_to_partitioned_filter(
-        self, query: BillingTotalCostQueryModel
+        query: BillingTotalCostQueryModel,
     ) -> BillingFilter:
         """
         By default views are partitioned by 'day',
@@ -137,15 +138,18 @@ class BillingBaseTable(BqDbBase):
         )
         return billing_filter
 
-    def _filter_to_optimise_query(self) -> str:
+    @staticmethod
+    def _filter_to_optimise_query() -> str:
         """Filter string to optimise BQ query"""
         return 'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)'
 
-    def _last_loaded_day_filter(self) -> str:
+    @staticmethod
+    def _last_loaded_day_filter() -> str:
         """Last Loaded day filter string"""
         return 'day = TIMESTAMP(@last_loaded_day)'
 
-    def _convert_output(self, query_job_result):
+    @staticmethod
+    def _convert_output(query_job_result):
         """Convert query result to json"""
         if not query_job_result or query_job_result.result().total_rows == 0:
             # return empty list if no record found
@@ -325,8 +329,8 @@ class BillingBaseTable(BqDbBase):
             self._execute_query(_query, query_params),
         )
 
+    @staticmethod
     async def _append_total_running_cost(
-        self,
         field: BillingColumn,
         is_current_month: bool,
         last_loaded_day: str | None,
@@ -437,9 +441,8 @@ class BillingBaseTable(BqDbBase):
 
         return results
 
-    def _prepare_order_by_string(
-        self, order_by: dict[BillingColumn, bool] | None
-    ) -> str:
+    @staticmethod
+    def _prepare_order_by_string(order_by: dict[BillingColumn, bool] | None) -> str:
         """Prepare order by string"""
         if not order_by:
             return ''
@@ -452,9 +455,8 @@ class BillingBaseTable(BqDbBase):
 
         return f'ORDER BY {",".join(order_by_cols)}' if order_by_cols else ''
 
-    def _prepare_aggregation(
-        self, query: BillingTotalCostQueryModel
-    ) -> tuple[str, str]:
+    @staticmethod
+    def _prepare_aggregation(query: BillingTotalCostQueryModel) -> tuple[str, str]:
         """Prepare both fields for aggregation and group by string"""
         # Get columns to group by
 
@@ -479,7 +481,8 @@ class BillingBaseTable(BqDbBase):
 
         return fields_selected, group_by
 
-    def _prepare_labels_function(self, query: BillingTotalCostQueryModel):
+    @staticmethod
+    def _prepare_labels_function(query: BillingTotalCostQueryModel):
         if not query.filters:
             return None
 
@@ -558,7 +561,7 @@ class BillingBaseTable(BqDbBase):
             where_str = f'WHERE {where_str}'
 
         _query = f"""
-        {func_filter.fun_implementation if func_filter else ''}
+        {func_filter.func_implementation if func_filter else ''}
 
         WITH t AS (
             SELECT {time_group.field}{time_group.separator} {fields_selected},
