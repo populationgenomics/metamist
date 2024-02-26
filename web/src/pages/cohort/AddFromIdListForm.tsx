@@ -96,7 +96,7 @@ const AddFromIdListForm: React.FC<IAddFromIdListForm> = ({ onAdd }) => {
         if (sequencingGroups.length === 0) {
             return (
                 <Message warning visible>
-                    No sequencing groups found matching your query
+                    No sequencing groups found matching your query!
                 </Message>
             )
         }
