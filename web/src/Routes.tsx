@@ -104,7 +104,6 @@ const Routes: React.FunctionComponent = () => (
                 </ErrorBoundary>
             }
         />
-
     </Switch>
 )
 
