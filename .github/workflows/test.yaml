@@ -66,6 +66,7 @@ jobs:
       - name: "Run unit tests"
         id: runtests
         run: |
+          export SM_ENVIRONMENT=local
           coverage run -m unittest discover -p 'test*.py' -s '.'
           rc=$?
           coverage xml
