@@ -2,7 +2,7 @@ from typing import Any
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud.storage import Client
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from models.base import SMBase
 
@@ -22,11 +22,30 @@ class FileInternal(SMBase):
     valid: bool = False
     secondary_files: list[dict[str, Any]] | None = None
 
+    @validator('valid', pre=True, always=True)
+    def ensure_bool(cls, value):  # pylint: disable=no-self-argument
+        """
+        Custom validator for the 'valid' field to ensure it is always treated as a boolean.
+
+        Args:
+            value: The input value for the 'valid' field.
+
+        Returns:
+            The validated (and possibly converted) boolean value.
+        """
+        if isinstance(value, int):
+            # Explicitly convert integer 0/1 to False/True
+            return bool(value)
+        # For all other cases, return the value as-is and let Pydantic handle it.
+        # Pydantic will raise an error if the value cannot be coerced into a boolean.
+        return value
+
     @staticmethod
     def from_db(**kwargs):
         """
         Convert from db keys, mainly converting id to id_
         """
+
         return FileInternal(
             id=kwargs.pop('id'),
             path=kwargs.get('path'),
@@ -37,7 +56,7 @@ class FileInternal(SMBase):
             file_checksum=kwargs.get('file_checksum'),
             size=kwargs.get('size'),
             meta=kwargs.get('meta'),
-            valid=kwargs.get('valid', False),
+            valid=kwargs.get('valid'),
         )
 
     def to_external(self):
