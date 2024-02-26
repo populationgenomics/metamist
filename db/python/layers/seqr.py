@@ -43,6 +43,22 @@ from models.utils.sequencing_group_id_format import (
 
 SEQUENCING_GROUPS_TO_IGNORE = {22735, 22739}
 
+DATASET_TYPE_SNV_INDEL_CALLS = 'SNV_INDEL'
+DATASET_TYPE_SV_CALLS = 'SV'
+DATASET_TYPE_MITO_CALLS = 'MITO'
+
+ES_INDEX_DATASET_TYPES = {
+    'Haplotypecaller': DATASET_TYPE_SNV_INDEL_CALLS,
+    'SV_Caller': DATASET_TYPE_SV_CALLS,
+    'Mitochondria_Caller': DATASET_TYPE_MITO_CALLS,
+}
+
+ES_INDEX_STAGES = {
+    DATASET_TYPE_SNV_INDEL_CALLS: 'MtToEs',
+    DATASET_TYPE_SV_CALLS: 'MtToEsSv',
+    DATASET_TYPE_MITO_CALLS: 'MtToEsMito',
+}
+
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
 _url_family_sync = '/api/project/sa/{projectGuid}/families/sync'
@@ -114,6 +130,7 @@ class SeqrLayer(BaseLayer):
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
         sync_es_index: bool = True,
+        es_index_type: str = 'Haplotypecaller',
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
         post_slack_notification: bool = True,
@@ -206,6 +223,7 @@ class SeqrLayer(BaseLayer):
                     self.update_es_index(
                         sequencing_type=sequencing_type,
                         sequencing_group_ids=sequencing_group_ids,
+                        es_index_type=es_index_type,
                         **params,
                     )
                 )
@@ -359,6 +377,7 @@ class SeqrLayer(BaseLayer):
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
+        es_index_type: str,
         sequencing_type: str,
         project_guid,
         headers,
@@ -398,7 +417,8 @@ class SeqrLayer(BaseLayer):
                 project=GenericFilter(eq=self.connection.project),
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-                meta={'sequencing_type': GenericFilter(eq=sequencing_type)},
+                meta={'sequencing_type': GenericFilter(eq=sequencing_type),
+                      'stage': GenericFilter(eq=ES_INDEX_STAGES[ES_INDEX_DATASET_TYPES[es_index_type]])},
             )
         )
 
@@ -448,7 +468,7 @@ class SeqrLayer(BaseLayer):
             req1_url,
             json={
                 'elasticsearchIndex': es_index,
-                'datasetType': 'VARIANTS',
+                'datasetType': ES_INDEX_DATASET_TYPES[es_index_type],
                 'mappingFilePath': fn_path,
                 'ignoreExtraSamplesInCallset': True,
             },

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import _ from 'lodash'
-import { Button, CheckboxProps, Form, Message, Modal } from 'semantic-ui-react'
+import { Button, CheckboxProps, DropdownProps, Form, Message, Modal } from 'semantic-ui-react'
 import { WebApi } from '../../sm-api'
 import MuckTheDuck from '../../shared/components/MuckTheDuck'
 
@@ -14,6 +14,7 @@ interface SeqrSyncFormOptions {
     syncIndividualMetadata?: boolean
     syncIndividuals?: boolean
     syncEsIndex?: boolean
+    esIndexType: string
     syncSavedVariants?: boolean
     syncCramMap?: boolean
     postSlackNotification?: boolean
@@ -30,6 +31,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncIndividualMetadata: true,
         syncIndividuals: true,
         syncEsIndex: true,
+        esIndexType: 'Haplotypecaller',
         syncSavedVariants: true,
         syncCramMap: true,
         postSlackNotification: true,
@@ -45,6 +47,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             .syncSeqrProject(
                 seqType,
                 project,
+                syncOptions.esIndexType,
                 syncOptions.syncFamilies,
                 syncOptions.syncIndividualMetadata,
                 syncOptions.syncIndividuals,
@@ -73,8 +76,18 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             })
     }
 
-    const updateStateFromForm = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) =>
-        setSyncOptions({ ...syncOptions, [data.id || '']: data.checked })
+    const updateStateFromCheckbox = (e: React.FormEvent<HTMLInputElement>, data: CheckboxProps) => {
+        const value = data.checked
+        setSyncOptions({ ...syncOptions, [data.id || '']: value })
+    }
+
+    const updateStateFromDropdown = (
+        e: React.SyntheticEvent<HTMLElement, Event>,
+        data: DropdownProps
+    ) => {
+        const value = (data as any).value
+        setSyncOptions({ ...syncOptions, [data.id || '']: value })
+    }
 
     return (
         <>
@@ -101,38 +114,57 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                         <Form.Checkbox
                             id="syncIndividuals"
                             checked={syncOptions.syncIndividuals}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Sync pedigree"
                         />
                         <Form.Checkbox
                             id="syncFamilies"
                             checked={syncOptions.syncFamilies}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Sync families"
                         />
                         <Form.Checkbox
                             id="syncIndividualMetadata"
                             checked={syncOptions.syncIndividualMetadata}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Sync individuals metadata"
                         />
                         <Form.Checkbox
                             id="syncEsIndex"
                             checked={syncOptions.syncEsIndex}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Sync elastic-search index"
+                        />
+                        <Form.Dropdown
+                            id="esIndexType"
+                            options={[
+                                {
+                                    key: 'Haplotypecaller',
+                                    text: 'Haplotypecaller',
+                                    value: 'Haplotypecaller',
+                                },
+                                { key: 'SV_Caller', text: 'SV_Caller', value: 'SV_Caller' },
+                                {
+                                    key: 'Mitochondria_Caller',
+                                    text: 'Mitochondria_Caller',
+                                    value: 'Mitochondria_Caller',
+                                },
+                            ]}
+                            value={syncOptions.esIndexType}
+                            onChange={updateStateFromDropdown}
+                            label="ES index type"
                         />
                         <Form.Checkbox
                             id="syncCramMap"
                             checked={syncOptions.syncCramMap}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Sync CRAMs"
                         />
                         <br />
                         <Form.Checkbox
                             id="postSlackNotification"
                             checked={syncOptions.postSlackNotification}
-                            onChange={updateStateFromForm}
+                            onChange={updateStateFromCheckbox}
                             label="Post slack notification"
                         />
 
