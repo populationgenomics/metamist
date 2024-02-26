@@ -46,6 +46,7 @@ class CohortLayer(BaseLayer):
             description: str,
             cohort_name: str,
             sg_ids_internal: list[int] | None = None,
+            excluded_sgs_internal: list[int] | None = None,
             sg_technology: list[str] | None = None,
             sg_platform: list[str] | None = None,
             sg_type: list[str] | None = None,
@@ -55,11 +56,19 @@ class CohortLayer(BaseLayer):
         """
 
         # 1. Pull SG's based on criteria
+        if sg_ids_internal and excluded_sgs_internal:
+            sg_id_filter = GenericFilter(in_=sg_ids_internal, nin=excluded_sgs_internal)
+        elif sg_ids_internal:
+            sg_id_filter = GenericFilter(in_=sg_ids_internal)
+        elif excluded_sgs_internal:
+            sg_id_filter = GenericFilter(nin=excluded_sgs_internal)
+        else:
+            sg_id_filter = None    
 
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
                 project=GenericFilter(in_=projects_to_pull),
-                id=GenericFilter(in_=sg_ids_internal) if sg_ids_internal else None,
+                id=sg_id_filter,
                 technology=GenericFilter(in_=sg_technology) if sg_technology else None,
                 platform=GenericFilter(in_=sg_platform) if sg_platform else None,
                 type=GenericFilter(in_=sg_type) if sg_type else None,

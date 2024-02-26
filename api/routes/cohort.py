@@ -28,6 +28,7 @@ class CohortCriteria(BaseModel):
 
     projects: list[str]
     sg_ids_internal: list[str] | None = None
+    excluded_sgs_internal: list[str] | None = None
     sg_technology: list[str] | None = None
     sg_platform: list[str] | None = None
     sg_type: list[str] | None = None
@@ -60,6 +61,7 @@ async def create_cohort_from_criteria(
         author=connection.author,
         cohort_name=cohort_spec.name,
         sg_ids_internal=sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal),
+        exlude_sg_ids_internal=sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal),
         sg_technology=cohort_criteria.sg_technology,
         sg_platform=cohort_criteria.sg_platform,
         sg_type=cohort_criteria.sg_type,
