@@ -1126,4 +1126,20 @@
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
+	<changeSet id="2024-04-27_custom-cohorts" author="vivian.bakiris">
+		<createTable tableName="cohort_template">
+			<column name="id" type="INT" autoIncrement="true">
+				<constraints primaryKey="true" nullable="false" />
+			</column>
+			<column name="name" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="criteria" type="JSON">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
 </databaseChangeLog>
