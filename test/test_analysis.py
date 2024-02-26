@@ -1,7 +1,9 @@
 # pylint: disable=invalid-overridden-method
+import logging
 import os
 from test.testbase import DbIsolatedTest, run_as_sync
 
+import requests
 from testcontainers.core.container import DockerContainer
 
 from db.python.layers.analysis import AnalysisLayer
@@ -281,6 +283,9 @@ class TestAnalysis(DbIsolatedTest):
         Test adding an analysis of type ANALYSIS_RUNNER
         with output files as a dict/json via `outputs` field
         """
+
+        logger = logging.getLogger()
+        logger.info(requests.get('http://0.0.0.0:4443/storage/v1/b/fakegcs/o', timeout=10).text)
 
         a_id = await self.al.create_analysis(
             AnalysisInternal(

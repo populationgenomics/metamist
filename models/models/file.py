@@ -4,7 +4,7 @@ from cloudpathlib import AnyPath, GSPath
 from google.cloud.storage import Client
 from pydantic import BaseModel
 
-from models.base import SMBase
+from models.base import SMBase, parse_sql_bool
 
 
 class FileInternal(SMBase):
@@ -27,27 +27,18 @@ class FileInternal(SMBase):
         """
         Convert from db keys, mainly converting id to id_
         """
-        path = kwargs.get('path')
-        basename = kwargs.get('basename')
-        dirname = kwargs.get('dirname')
-        nameroot = kwargs.get('nameroot')
-        nameext = kwargs.get('nameext')
-        file_checksum = kwargs.get('file_checksum')
-        size = kwargs.get('size')
-        meta = kwargs.get('meta')
-        valid = kwargs.get('valid')
 
-        return File(
+        return FileInternal(
             id=kwargs.pop('id'),
-            path=path,
-            basename=basename,
-            dirname=dirname,
-            nameroot=nameroot,
-            nameext=nameext,
-            file_checksum=file_checksum,
-            size=size,
-            meta=meta,
-            valid=valid,
+            path=kwargs.get('path'),
+            basename=kwargs.get('basename'),
+            dirname=kwargs.get('dirname'),
+            nameroot=kwargs.get('nameroot'),
+            nameext=kwargs.get('nameext'),
+            file_checksum=kwargs.get('file_checksum'),
+            size=kwargs.get('size'),
+            meta=kwargs.get('meta'),
+            valid=parse_sql_bool(kwargs.get('valid')),
         )
 
     def to_external(self):
