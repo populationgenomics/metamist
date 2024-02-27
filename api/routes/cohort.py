@@ -4,34 +4,16 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from api.utils.db import Connection, get_project_write_connection
-from db.python.layers.cohort import CohortLayer
 
+from db.python.layers.cohort import CohortLayer
 from db.python.tables.project import ProjectPermissionsTable
 
+from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_transform_to_raw_list,
 )
 
 router = APIRouter(prefix='/cohort', tags=['cohort'])
-
-
-class CohortBody(BaseModel):
-    """Represents the expected JSON body of the create cohort request"""
-
-    name: str
-    description: str
-    derived_from: int | None = None
-
-
-class CohortCriteria(BaseModel):
-    """Represents the expected JSON body of the create cohort request"""
-
-    projects: list[str]
-    sg_ids_internal: list[str] | None = None
-    excluded_sgs_internal: list[str] | None = None
-    sg_technology: list[str] | None = None
-    sg_platform: list[str] | None = None
-    sg_type: list[str] | None = None
 
 
 @router.post('/{project}/cohort', operation_id='createCohortFromCriteria')
@@ -68,3 +50,22 @@ async def create_cohort_from_criteria(
     )
 
     return {'cohort_id': cohort_id}
+
+
+@router.post('/{project}/cohort_template', operation_id='createCohortTemplate')
+async def create_cohort_template(
+    template: CohortTemplate,
+    connection: Connection = get_project_write_connection,
+) -> dict[str, Any]:
+    """
+    Create a cohort template with the given name and sample/sequencing group IDs.
+    """
+    cohortlayer = CohortLayer(connection)
+
+    if not connection.project:
+        raise ValueError('A cohort template must belong to a project')
+    
+    return await cohortlayer.create_cohort_template(
+        cohort_template=template,
+    )
+

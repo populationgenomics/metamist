@@ -12,6 +12,8 @@ from db.python.tables.sequencing_group import SequencingGroupTable, SequencingGr
 
 from db.python.utils import GenericFilter, get_logger
 
+from models.models.cohort import CohortTemplate
+
 logger = get_logger()
 
 
@@ -37,6 +39,22 @@ class CohortLayer(BaseLayer):
         Get the sequencing group IDs for the given cohort.
         """
         return await self.ct.get_cohort_sequencing_group_ids(cohort_id)
+    
+    async def create_cohort_template(
+            self,
+            cohort_template: CohortTemplate,
+
+    ):
+        """
+        Create new cohort template
+        """
+
+        return await self.ct.create_cohort_template(
+            name=cohort_template.name,
+            description=cohort_template.description,
+            criteria=dict(cohort_template.criteria),
+        )
+    
 
     async def create_cohort_from_criteria(
             self,
