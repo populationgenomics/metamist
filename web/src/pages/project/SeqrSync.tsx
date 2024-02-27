@@ -14,7 +14,7 @@ interface SeqrSyncFormOptions {
     syncIndividualMetadata?: boolean
     syncIndividuals?: boolean
     syncEsIndex?: boolean
-    esIndexType: string
+    esIndexTypes: string[]
     syncSavedVariants?: boolean
     syncCramMap?: boolean
     postSlackNotification?: boolean
@@ -31,7 +31,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         syncIndividualMetadata: true,
         syncIndividuals: true,
         syncEsIndex: true,
-        esIndexType: 'Haplotypecaller',
+        esIndexTypes: ['Haplotypecaller'],
         syncSavedVariants: true,
         syncCramMap: true,
         postSlackNotification: true,
@@ -47,7 +47,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
             .syncSeqrProject(
                 seqType,
                 project,
-                syncOptions.esIndexType,
+                syncOptions.esIndexTypes,
                 syncOptions.syncFamilies,
                 syncOptions.syncIndividualMetadata,
                 syncOptions.syncIndividuals,
@@ -85,7 +85,9 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
         e: React.SyntheticEvent<HTMLElement, Event>,
         data: DropdownProps
     ) => {
-        const value = (data as any).value
+        const value = Array.isArray((data as any).value)
+            ? (data as any).value
+            : [(data as any).value]
         setSyncOptions({ ...syncOptions, [data.id || '']: value })
     }
 
@@ -136,7 +138,7 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                             label="Sync elastic-search index"
                         />
                         <Form.Dropdown
-                            id="esIndexType"
+                            id="esIndexTypes"
                             options={[
                                 {
                                     key: 'Haplotypecaller',
@@ -150,9 +152,11 @@ const SeqrSync: React.FunctionComponent<SeqrSyncProps> = ({ syncTypes, project }
                                     value: 'Mitochondria_Caller',
                                 },
                             ]}
-                            value={syncOptions.esIndexType}
+                            value={syncOptions.esIndexTypes}
                             onChange={updateStateFromDropdown}
                             label="ES index type"
+                            multiple
+                            selection
                         />
                         <Form.Checkbox
                             id="syncCramMap"

@@ -102,7 +102,7 @@ async def search_by_keyword(keyword: str, connection=get_projectless_db_connecti
 )
 async def sync_seqr_project(
     sequencing_type: str,
-    es_index_type: str,
+    es_index_types: list[str],
     sync_families: bool = True,
     sync_individual_metadata: bool = True,
     sync_individuals: bool = True,
@@ -114,7 +114,7 @@ async def sync_seqr_project(
 ):
     """
     Sync a metamist project with its seqr project (for a specific sequence type)
-    es_index_types: Haplotypecaller, SV_Caller, Mitochondria_Caller
+    es_index_types: list of any of 'Haplotypecaller', 'SV_Caller', 'Mitochondria_Caller'
     """
     seqr = SeqrLayer(connection)
     try:
@@ -124,7 +124,7 @@ async def sync_seqr_project(
             sync_individual_metadata=sync_individual_metadata,
             sync_individuals=sync_individuals,
             sync_es_index=sync_es_index,
-            es_index_type=es_index_type,
+            es_index_types=es_index_types,
             sync_saved_variants=sync_saved_variants,
             sync_cram_map=sync_cram_map,
             post_slack_notification=post_slack_notification,
