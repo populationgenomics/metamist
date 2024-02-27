@@ -15,3 +15,5 @@ strawberry-graphql[debug-server]==0.206.0
 functions_framework
 google-cloud-bigquery
 google-cloud-pubsub
+# following required to unit test some billing functions
+pytz

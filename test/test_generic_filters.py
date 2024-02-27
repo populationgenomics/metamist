@@ -53,3 +53,54 @@ class TestGenericFilters(unittest.TestCase):
 
         self.assertEqual('test_int IN :test_int_in', sql)
         self.assertDictEqual({'test_int_in': value}, values)
+
+    def test_gt_single(self):
+        """
+        Test that a single value filtered using the "gt" operator
+        """
+        filter_ = GenericFilterTest(test_int=GenericFilter(gt=123))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_int > :test_int_gt', sql)
+        self.assertDictEqual({'test_int_gt': 123}, values)
+
+    def test_gte_single(self):
+        """
+        Test that a single value filtered using the "gte" operator
+        """
+        filter_ = GenericFilterTest(test_int=GenericFilter(gte=123))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_int >= :test_int_gte', sql)
+        self.assertDictEqual({'test_int_gte': 123}, values)
+
+    def test_lt_single(self):
+        """
+        Test that a single value filtered using the "lt" operator
+        """
+        filter_ = GenericFilterTest(test_int=GenericFilter(lt=123))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_int < :test_int_lt', sql)
+        self.assertDictEqual({'test_int_lt': 123}, values)
+
+    def test_lte_single(self):
+        """
+        Test that a single value filtered using the "lte" operator
+        """
+        filter_ = GenericFilterTest(test_int=GenericFilter(lte=123))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_int <= :test_int_lte', sql)
+        self.assertDictEqual({'test_int_lte': 123}, values)
+
+    def test_not_in_multiple(self):
+        """
+        Test that values filtered using the "nin" operator convert as expected
+        """
+        value = [1, 2]
+        filter_ = GenericFilterTest(test_int=GenericFilter(nin=value))
+        sql, values = filter_.to_sql()
+
+        self.assertEqual('test_int NOT IN :test_int_nin', sql)
+        self.assertDictEqual({'test_int_nin': value}, values)

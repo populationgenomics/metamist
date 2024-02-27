@@ -56,7 +56,7 @@ async def get_all_sequencing_group_ids_by_sample_by_type(
     }
 
 
-@router.get('/project/{sequencing_group_id}', operation_id='updateSequencingGroup')
+@router.patch('/project/{sequencing_group_id}', operation_id='updateSequencingGroup')
 async def update_sequencing_group(
     sequencing_group_id: str,
     sequencing_group: SequencingGroupMetaUpdateModel,

@@ -49,7 +49,7 @@ from metamist.parser.generic_metadata_parser import (
     SingleRow,
     run_as_sync,
 )
-from metamist.parser.generic_parser import READS_EXTENSIONS
+from metamist.parser.generic_parser import READS_EXTENSIONS, DefaultSequencing
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -132,7 +132,9 @@ class ExistingCohortParser(GenericMetadataParser):
             assay_meta_map=Columns.sequence_meta_map(),
             batch_number=batch_number,
             allow_extra_files_in_search_path=True,
-            default_sequencing_type=sequencing_type,
+            default_sequencing=DefaultSequencing(
+                seq_type=sequencing_type,
+            )
         )
 
     def _get_dict_reader(self, file_pointer, delimiter: str):
@@ -216,6 +218,7 @@ class ExistingCohortParser(GenericMetadataParser):
     '--sequencing-type',
     type=click.Choice(['genome', 'exome']),
     help='Sequencing type: genome or exome',
+    default='genome',
 )
 @click.option('--search-location', 'search_locations', multiple=True)
 @click.option(
@@ -239,11 +242,11 @@ async def main(
     project: str,
     search_locations: List[str],
     batch_number: Optional[str],
+    sequencing_type: str,
     confirm=True,
     dry_run=False,
     include_participant_column=False,
     allow_missing_files=False,
-    sequencing_type: str = 'genome',
 ):
     """Run script from CLI arguments"""
 
