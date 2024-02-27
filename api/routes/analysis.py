@@ -247,7 +247,7 @@ async def query_analyses(
 @router.get('/analysis-runner', operation_id='getAnalysisRunnerLog')
 async def get_analysis_runner_log(
     project_names: list[str] = Query(None),  # type: ignore
-    author: str = None,
+    # author: str = None, # not implemented yet, uncomment when we do
     output_dir: str = None,
     ar_guid: str = None,
     connection: Connection = get_projectless_db_connection,
@@ -264,7 +264,10 @@ async def get_analysis_runner_log(
         )
 
     results = await atable.get_analysis_runner_log(
-        project_ids=project_ids, author=author, output_dir=output_dir, ar_guid=ar_guid
+        project_ids=project_ids,
+        # author=author,
+        output_dir=output_dir,
+        ar_guid=ar_guid,
     )
     return [a.to_external() for a in results]
 

@@ -596,7 +596,7 @@ class AnalysisLayer(BaseLayer):
     async def get_analysis_runner_log(
         self,
         project_ids: list[int] = None,
-        author: str = None,
+        # author: str = None,
         output_dir: str = None,
         ar_guid: str = None,
     ) -> list[AnalysisInternal]:
@@ -604,5 +604,8 @@ class AnalysisLayer(BaseLayer):
         Get log for the analysis-runner, useful for checking this history of analysis
         """
         return await self.at.get_analysis_runner_log(
-            project_ids, author=author, output_dir=output_dir, ar_guid=ar_guid
+            project_ids,
+            # author=author,
+            output_dir=output_dir,
+            ar_guid=ar_guid,
         )

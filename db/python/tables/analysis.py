@@ -486,7 +486,7 @@ ORDER BY a.timestamp_completed DESC;
     async def get_analysis_runner_log(
         self,
         project_ids: List[int] = None,
-        author: str = None,
+        # author: str = None,
         output_dir: str = None,
         ar_guid: str = None,
     ) -> List[AnalysisInternal]:
@@ -501,10 +501,6 @@ ORDER BY a.timestamp_completed DESC;
         if project_ids:
             wheres.append('project in :project_ids')
             values['project_ids'] = project_ids
-
-        if author:
-            wheres.append('author = :author')
-            values['author'] = author
 
         if output_dir:
             wheres.append('(output = :output OR output LIKE :output_like)')
