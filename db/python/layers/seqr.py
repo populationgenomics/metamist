@@ -130,7 +130,7 @@ class SeqrLayer(BaseLayer):
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
         sync_es_index: bool = True,
-        es_index_type: str = 'Haplotypecaller',
+        es_index_types: list[str] = None,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
         post_slack_notification: bool = True,
@@ -223,7 +223,7 @@ class SeqrLayer(BaseLayer):
                     self.update_es_index(
                         sequencing_type=sequencing_type,
                         sequencing_group_ids=sequencing_group_ids,
-                        es_index_type=es_index_type,
+                        es_index_types=es_index_types,
                         **params,
                     )
                 )
@@ -377,7 +377,7 @@ class SeqrLayer(BaseLayer):
     async def update_es_index(
         self,
         session: aiohttp.ClientSession,
-        es_index_type: str,
+        es_index_types: list[str],
         sequencing_type: str,
         project_guid,
         headers,
@@ -411,72 +411,75 @@ class SeqrLayer(BaseLayer):
         fn_path = os.path.join(SEQR_MAP_LOCATION, filename)
         # pylint: disable=no-member
 
-        alayer = AnalysisLayer(connection=self.connection)
-        es_index_analyses = await alayer.query(
-            AnalysisFilter(
-                project=GenericFilter(eq=self.connection.project),
-                type=GenericFilter(eq='es-index'),
-                status=GenericFilter(eq=AnalysisStatus.COMPLETED),
-                meta={'sequencing_type': GenericFilter(eq=sequencing_type),
-                      'stage': GenericFilter(eq=ES_INDEX_STAGES[ES_INDEX_DATASET_TYPES[es_index_type]])},
-            )
-        )
-
-        es_index_analyses = sorted(
-            es_index_analyses,
-            key=lambda el: el.timestamp_completed,
-        )
-
-        if len(es_index_analyses) == 0:
-            return ['No ES index to synchronise']
-
         with AnyPath(fn_path).open('w+') as f:  # type: ignore
             f.write('\n'.join(rows_to_write))
 
-        es_index = es_index_analyses[-1].output
-
-        messages = []
-
-        if sequencing_group_ids:
-            sequencing_groups_in_new_index = set(
-                es_index_analyses[-1].sequencing_group_ids
+        alayer = AnalysisLayer(connection=self.connection)
+        for es_index_type in es_index_types:
+            es_index_analyses = await alayer.query(
+                AnalysisFilter(
+                    project=GenericFilter(eq=self.connection.project),
+                    type=GenericFilter(eq='es-index'),
+                    status=GenericFilter(eq=AnalysisStatus.COMPLETED),
+                    meta={
+                        'sequencing_type': GenericFilter(eq=sequencing_type),
+                        'stage': GenericFilter(eq=ES_INDEX_STAGES[ES_INDEX_DATASET_TYPES[es_index_type]])
+                    },
+                )
             )
 
-            if len(es_index_analyses) > 1:
-                sequencing_groups_in_old_index = set(
-                    es_index_analyses[-2].sequencing_group_ids
+            es_index_analyses = sorted(
+                es_index_analyses,
+                key=lambda el: el.timestamp_completed,
+            )
+
+            if len(es_index_analyses) == 0:
+                return ['No ES index to synchronise']
+
+            es_index = es_index_analyses[-1].output
+
+            messages = []
+
+            if sequencing_group_ids:
+                sequencing_groups_in_new_index = set(
+                    es_index_analyses[-1].sequencing_group_ids
                 )
-                sequencing_groups_diff = sequencing_group_id_format_list(
-                    sequencing_groups_in_new_index - sequencing_groups_in_old_index
+
+                if len(es_index_analyses) > 1:
+                    sequencing_groups_in_old_index = set(
+                        es_index_analyses[-2].sequencing_group_ids
+                    )
+                    sequencing_groups_diff = sequencing_group_id_format_list(
+                        sequencing_groups_in_new_index - sequencing_groups_in_old_index
+                    )
+                    if sequencing_groups_diff:
+                        messages.append(
+                            'Samples added to index: ' + ', '.join(sequencing_groups_diff),
+                        )
+
+                sg_ids_missing_from_index = sequencing_group_id_format_list(
+                    sequencing_group_ids - sequencing_groups_in_new_index
                 )
-                if sequencing_groups_diff:
+                if sg_ids_missing_from_index:
                     messages.append(
-                        'Samples added to index: ' + ', '.join(sequencing_groups_diff),
+                        'Sequencing groups missing from index: '
+                        + ', '.join(sg_ids_missing_from_index),
                     )
 
-            sg_ids_missing_from_index = sequencing_group_id_format_list(
-                sequencing_group_ids - sequencing_groups_in_new_index
+            req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
+            resp_1 = await session.post(
+                req1_url,
+                json={
+                    'elasticsearchIndex': es_index,
+                    'datasetType': ES_INDEX_DATASET_TYPES[es_index_type],
+                    'mappingFilePath': fn_path,
+                    'ignoreExtraSamplesInCallset': True,
+                },
+                headers=headers,
             )
-            if sg_ids_missing_from_index:
-                messages.append(
-                    'Sequencing groups missing from index: '
-                    + ', '.join(sg_ids_missing_from_index),
-                )
+            resp_1.raise_for_status()
 
-        req1_url = SEQR_URL + _url_update_es_index.format(projectGuid=project_guid)
-        resp_1 = await session.post(
-            req1_url,
-            json={
-                'elasticsearchIndex': es_index,
-                'datasetType': ES_INDEX_DATASET_TYPES[es_index_type],
-                'mappingFilePath': fn_path,
-                'ignoreExtraSamplesInCallset': True,
-            },
-            headers=headers,
-        )
-        resp_1.raise_for_status()
-
-        messages.append(f'Updated ES index {es_index}')
+            messages.append(f'Updated ES index {es_index}')
 
         return messages
 
