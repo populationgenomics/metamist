@@ -10,7 +10,7 @@ from databases import Database
 from google.cloud.storage import Client
 
 from db.python.connect import CredentialedDatabaseConfiguration  # pylint: disable=C0415
-from models.models.file import FileInternal
+from models.models.output_file import OutputFileInternal
 
 
 def _get_connection_string():
@@ -51,7 +51,7 @@ async def get_file_info(path: str, client: Client) -> Dict:
     print('Extracting file dict')
     file_obj = AnyPath(path)
 
-    file_info = await FileInternal.get_file_info(file_obj=file_obj, client=client)
+    file_info = await OutputFileInternal.get_file_info(file_obj=file_obj, client=client)
 
     if not file_info:
         return None

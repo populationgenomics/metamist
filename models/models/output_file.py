@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud.storage import Client
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from models.base import SMBase, parse_sql_bool
 
 
-class FileInternal(SMBase):
+class OutputFileInternal(SMBase):
     """File model for internal use"""
 
     id: int
@@ -15,10 +15,10 @@ class FileInternal(SMBase):
     basename: str
     dirname: str
     nameroot: str
-    nameext: str | None
-    file_checksum: str | None
+    nameext: Optional[str]
+    file_checksum: Optional[str]
     size: int
-    meta: str | None = None
+    meta: Optional[str] = None
     valid: bool = False
     secondary_files: list[dict[str, Any]] | None = None
 
@@ -28,7 +28,7 @@ class FileInternal(SMBase):
         Convert from db keys, mainly converting id to id_
         """
 
-        return FileInternal(
+        return OutputFileInternal(
             id=kwargs.pop('id'),
             path=kwargs.get('path'),
             basename=kwargs.get('basename'),
@@ -45,7 +45,7 @@ class FileInternal(SMBase):
         """
         Convert to external model
         """
-        return File(
+        return OutputFile(
             id=self.id,
             path=self.path,
             basename=self.basename,
@@ -91,7 +91,7 @@ class FileInternal(SMBase):
         """_summary_
 
         Args:
-            data (list): A tuple of (FileInternal, json_structure) if file_id is not None, else just the output string based on the
+            data (list): A tuple of (OutputFileInternal, json_structure) if file_id is not None, else just the output string based on the
                 analysis_outputs table
 
         Returns:
@@ -108,7 +108,7 @@ class FileInternal(SMBase):
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.dict()
-                fields = FileInternal.__fields__.keys()  # type:ignore[attr-defined]
+                fields = OutputFileInternal.__fields__.keys()  # type:ignore[attr-defined]
                 for field in fields:
                     file_root[field] = file_obj.get(field)
 
@@ -141,7 +141,7 @@ class FileInternal(SMBase):
         return root
 
 
-class File(BaseModel):
+class OutputFile(BaseModel):
     """File model for external use"""
 
     id: int
@@ -149,10 +149,10 @@ class File(BaseModel):
     basename: str
     dirname: str
     nameroot: str
-    nameext: str | None
-    file_checksum: str | None
+    nameext: Optional[str]
+    file_checksum: Optional[str]
     size: int
-    meta: str | None = None
+    meta: Optional[str] = None
     valid: bool = False
     secondary_files: list[dict[str, Any]] | None = None
 
@@ -160,7 +160,7 @@ class File(BaseModel):
         """
         Convert to internal model
         """
-        return FileInternal(
+        return OutputFileInternal(
             id=self.id,
             path=self.path,
             basename=self.basename,

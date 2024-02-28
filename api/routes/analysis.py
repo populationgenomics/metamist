@@ -1,7 +1,7 @@
 import csv
 import io
 from datetime import date
-from typing import Any
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter
 from fastapi.params import Body, Query
@@ -45,7 +45,7 @@ class AnalysisModel(BaseModel):
     type: str
     status: AnalysisStatus
     meta: dict[str, Any] | None = None
-    outputs: str | None = None
+    outputs: Optional[Union[str, dict]] = None
     active: bool = True
     # please don't use this, unless you're the analysis-runner,
     # the usage is tracked ... (Ծ_Ծ)

@@ -15,7 +15,7 @@ from db.python.utils import (
 from models.enums import AnalysisStatus
 from models.models.analysis import AnalysisInternal
 from models.models.audit_log import AuditLogInternal
-from models.models.file import FileInternal
+from models.models.output_file import OutputFileInternal
 from models.models.project import ProjectId
 
 
@@ -243,7 +243,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
 
         # Preparing to accumulate analysis files
-        analysis_files: dict[int, Union[list[Tuple[FileInternal, str]], str]] = defaultdict(list)
+        analysis_files: dict[int, Union[list[Tuple[OutputFileInternal, str]], str]] = defaultdict(list)
 
         # Extracting parent IDs with a guard for None values
         parent_ids = [row['id'] for row in rows if row['id'] is not None]
@@ -254,8 +254,8 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         for row in rows:
             file_id = row['id']
             if file_id:
-                # Building FileInternal object with secondary files if available
-                file_internal = FileInternal.from_db(**dict(row))
+                # Building OutputFileInternal object with secondary files if available
+                file_internal = OutputFileInternal.from_db(**dict(row))
                 file_internal_with_secondary = file_internal.copy(update={
                     'secondary_files': secondary_files.get(file_id, [])
                 })
@@ -266,11 +266,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 analysis_files[row['analysis_id']] = row['output']
 
         # Transforming analysis_files into the desired output format
-        analysis_output_files = {a_id: FileInternal.reconstruct_json(files) for a_id, files in analysis_files.items()}
+        analysis_output_files = {a_id: OutputFileInternal.reconstruct_json(files) for a_id, files in analysis_files.items()}
 
         return analysis_output_files
 
-    async def get_secondary_files_for_file_output(self, parent_file_ids: list[int]) -> dict[int, list[FileInternal]]:
+    async def get_secondary_files_for_file_output(self, parent_file_ids: list[int]) -> dict[int, list[OutputFileInternal]]:
         """Fetches all secondary files for a list of parent files"""
 
         _query = """
@@ -286,9 +286,9 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         rows = await self.connection.fetch_all(_query, {'parent_file_ids': parent_file_ids})
 
         # Accumulating secondary files
-        secondary_files: Dict[int, List[FileInternal]] = defaultdict(list)
+        secondary_files: Dict[int, List[OutputFileInternal]] = defaultdict(list)
         for row in rows:
-            secondary_file = FileInternal.from_db(**dict(row))
+            secondary_file = OutputFileInternal.from_db(**dict(row))
             secondary_files[row['parent_id']].append(secondary_file)
 
         return secondary_files
@@ -332,7 +332,9 @@ WHERE a.id = (
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
         analysis_ids: list = [row['id'] for row in rows[0]]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'output': analysis_outputs_by_aid.get(rows[0]['id'], []), 'outputs': analysis_outputs_by_aid.get(rows[0]['id'], [])})
+        a = AnalysisInternal.from_db(**dict(rows[0]))
+        a.output = analysis_outputs_by_aid.get(rows[0]['id'], [])
+        a.outputs = analysis_outputs_by_aid.get(rows[0]['id'], [])
         # .from_db maps 'sample_id' -> sample_ids
         for row in rows[1:]:
             a.sample_ids.append(row['sample_id'])
@@ -384,7 +386,9 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(aid, []), 'outputs': analysis_outputs_by_aid.get(aid, [])})
+                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row))
+                analysis_by_id[aid].output = analysis_outputs_by_aid.get(aid, [])
+                analysis_by_id[aid].outputs = analysis_outputs_by_aid.get(aid, [])
             else:
                 analysis_by_id[aid].sample_ids.append(row['sequencing_group_id'])
 
@@ -425,7 +429,10 @@ ORDER BY a.timestamp_completed DESC
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
             seen_sequencing_group_ids.add(row['sequencing_group_id'])
-            analyses.append(AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(row['id'], []), 'outputs': analysis_outputs_by_aid.get(row['id'], [])}))
+            analysis = AnalysisInternal.from_db(**dict(row))
+            analysis.output = analysis_outputs_by_aid.get(row['id'], [])
+            analysis.outputs = analysis_outputs_by_aid.get(row['id'], [])
+            analyses.append(analysis)
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -451,7 +458,9 @@ WHERE a.id = :analysis_id
         project = rows[0]['project']
         analysis_ids: list = [rows[0]['id']]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'output': analysis_outputs_by_aid.get(rows[0], []), 'outputs': analysis_outputs_by_aid.get(rows[0], [])})
+        a = AnalysisInternal.from_db(**dict(rows[0]))
+        a.output = analysis_outputs_by_aid.get(rows[0], [])
+        a.outputs = analysis_outputs_by_aid.get(rows[0], [])
         for row in rows[1:]:
             a.sample_ids.append(row['sequencing_group_id'])
 
@@ -495,13 +504,15 @@ WHERE a.id = :analysis_id
         projects: set[ProjectId] = set()
         analysis_ids: list = [row['id'] for row in rows]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        for a in rows:
-            a_id = a['id']
+        for row in rows:
+            a_id = row['id']
             if a_id not in analyses:
-                analyses[a_id] = AnalysisInternal.from_db(**dict(a)).copy(update={'output': analysis_outputs_by_aid.get(a_id, []), 'outputs': analysis_outputs_by_aid.get(a_id, [])})
-                projects.add(a['project'])
+                analyses[a_id] = AnalysisInternal.from_db(**dict(row))
+                analyses[a_id].output = analysis_outputs_by_aid.get(a_id, [])
+                analyses[a_id].outputs = analysis_outputs_by_aid.get(a_id, [])
+                projects.add(row['project'])
 
-            analyses[a_id].sample_ids.append(a['sample_id'])
+            analyses[a_id].sample_ids.append(row['sample_id'])
 
         return projects, list(analyses.values())
 
@@ -550,7 +561,7 @@ ORDER BY a.timestamp_completed DESC;
         analysis_ids: list = [row['id'] for row in rows[0]]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
         # many per analysis
-        return [dict(d).update({'outputs': analysis_outputs_by_aid.get(d['id'], [])}) for d in rows]
+        return [dict(d).update({'output': analysis_outputs_by_aid.get(d['id'], []), 'outputs': analysis_outputs_by_aid.get(d['id'], [])}) for d in rows]
 
     async def get_analysis_runner_log(
         self,
@@ -588,7 +599,13 @@ ORDER BY a.timestamp_completed DESC;
         rows = await self.connection.fetch_all(_query, values)
         analysis_ids: list = [row['id'] for row in rows]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        return [AnalysisInternal.from_db(**dict(r)).copy(update={'outputs': analysis_outputs_by_aid.get(r['id'], [])}) for r in rows]
+        analyses: List[AnalysisInternal] = []
+        for row in rows:
+            analysis = AnalysisInternal.from_db(**dict(row))
+            analysis.output = analysis_outputs_by_aid.get(row['id'], [])
+            analysis.outputs = analysis_outputs_by_aid.get(row['id'], [])
+            analyses.append(analysis)
+        return analyses
 
     # region STATS
 

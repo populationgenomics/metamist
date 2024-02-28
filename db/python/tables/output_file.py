@@ -7,10 +7,10 @@ from google.auth.credentials import AnonymousCredentials
 from google.cloud.storage import Client
 
 from db.python.tables.base import DbBase
-from models.models.file import FileInternal
+from models.models.output_file import OutputFileInternal
 
 
-class FileTable(DbBase):
+class OutputFileTable(DbBase):
     """
     Capture Analysis table operations and queries
     """
@@ -28,7 +28,7 @@ class FileTable(DbBase):
         """
         file_obj = AnyPath(path, client=GSClient(storage_client=client))
 
-        file_info = await FileInternal.get_file_info(file_obj=file_obj, client=client)
+        file_info = await OutputFileInternal.get_file_info(file_obj=file_obj, client=client)
 
         if not file_info or not file_info.get('valid', False):
             return None

@@ -1,7 +1,7 @@
 import enum
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,17 +17,17 @@ class AnalysisInternal(SMBase):
     """Model for Analysis"""
     model_config = ConfigDict(extra='allow')
 
-    id: int | None = None
+    id: Optional[int] = None
     type: str
     status: AnalysisStatus
-    output: str | dict | None = None
-    outputs: str | dict | None = {}
+    output: Optional[Union[str, dict]] = None
+    outputs: Optional[Union[str, dict]] = {}
     sequencing_group_ids: list[int] = []
-    timestamp_completed: datetime | None = None
-    project: int | None = None
-    active: bool | None = None
+    timestamp_completed: Optional[datetime] = None
+    project: Optional[int] = None
+    active: Optional[bool] = None
     meta: dict[str, Any] = {}
-    author: str | None = None
+    author: Optional[str] = None
 
     @staticmethod
     def from_db(**kwargs):
@@ -91,14 +91,14 @@ class Analysis(BaseModel):
 
     type: str
     status: AnalysisStatus
-    id: int | None = None
-    output: str | dict | None = None
-    outputs: str | dict | None = {}
+    id: Optional[int] = None
+    output: Optional[Union[str, dict]] = None
+    outputs: Optional[Union[str, dict]] = {}
     sequencing_group_ids: list[str] = []
-    author: str | None = None
-    timestamp_completed: str | None = None
-    project: int | None = None
-    active: bool | None = None
+    author: Optional[str] = None
+    timestamp_completed: Optional[str] = None
+    project: Optional[int] = None
+    active: Optional[bool] = None
     meta: dict[str, Any] = {}
 
     def to_internal(self):

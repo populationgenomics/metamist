@@ -8,7 +8,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter, AnalysisTable
-from db.python.tables.file import FileTable
+from db.python.tables.output_file import OutputFileTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from db.python.utils import GenericFilter, get_logger
@@ -48,9 +48,9 @@ class AnalysisLayer(BaseLayer):
     def __init__(self, connection: Connection):
         super().__init__(connection)
 
-        self.sampt = SampleTable(connection)
-        self.at = AnalysisTable(connection)
-        self.ft = FileTable(connection)
+        self.sample_table = SampleTable(connection)
+        self.analysis_table = AnalysisTable(connection)
+        self.output_file_table = OutputFileTable(connection)
 
     # GETS
 
@@ -65,7 +65,7 @@ class AnalysisLayer(BaseLayer):
         Get a list of all analysis that relevant for samples
 
         """
-        projects, analysis = await self.at.get_analyses_for_samples(
+        projects, analysis = await self.analysis_table.get_analyses_for_samples(
             sample_ids,
             analysis_type=analysis_type,
             status=status,
@@ -83,7 +83,7 @@ class AnalysisLayer(BaseLayer):
 
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
         """Get analysis by ID"""
-        project, analysis = await self.at.get_analysis_by_id(analysis_id)
+        project, analysis = await self.analysis_table.get_analysis_by_id(analysis_id)
         if check_project_id:
             await self.ptable.check_access_to_project_id(
                 self.author, project, readonly=True
@@ -98,7 +98,7 @@ class AnalysisLayer(BaseLayer):
         meta: dict[str, Any] = None,
     ) -> AnalysisInternal:
         """Get SINGLE latest complete analysis for some analysis type"""
-        return await self.at.get_latest_complete_analysis_for_type(
+        return await self.analysis_table.get_latest_complete_analysis_for_type(
             project=project, analysis_type=analysis_type, meta=meta
         )
 
@@ -108,7 +108,7 @@ class AnalysisLayer(BaseLayer):
         """
         Find all the sequencing_groups that don't have an "analysis_type"
         """
-        return await self.at.get_all_sequencing_group_ids_without_analysis_type(
+        return await self.analysis_table.get_all_sequencing_group_ids_without_analysis_type(
             analysis_type=analysis_type, project=project
         )
 
@@ -118,7 +118,7 @@ class AnalysisLayer(BaseLayer):
         """
         Gets details of analysis with status queued or in-progress
         """
-        return await self.at.get_incomplete_analyses(project=project)
+        return await self.analysis_table.get_incomplete_analyses(project=project)
 
     async def get_sample_cram_path_map_for_seqr(
         self,
@@ -127,7 +127,7 @@ class AnalysisLayer(BaseLayer):
         participant_ids: list[int] = None,
     ) -> list[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
-        return await self.at.get_sample_cram_path_map_for_seqr(
+        return await self.analysis_table.get_sample_cram_path_map_for_seqr(
             project=project,
             sequencing_types=sequencing_types,
             participant_ids=participant_ids,
@@ -135,7 +135,7 @@ class AnalysisLayer(BaseLayer):
 
     async def query(self, filter_: AnalysisFilter, check_project_ids=True):
         """Query analyses"""
-        analyses = await self.at.query(filter_)
+        analyses = await self.analysis_table.query(filter_)
 
         if not analyses:
             return []
@@ -189,7 +189,7 @@ class AnalysisLayer(BaseLayer):
         sg_by_id = {sg.id: sg for sg in sequencing_groups}
         sg_to_project = {sg.id: sg.project for sg in sequencing_groups}
 
-        cram_list = await self.at.query(
+        cram_list = await self.analysis_table.query(
             AnalysisFilter(
                 sequencing_group_id=GenericFilter(in_=list(sg_to_project.keys())),
                 type=GenericFilter(eq='cram'),
@@ -496,13 +496,13 @@ class AnalysisLayer(BaseLayer):
         # was removed. So we'll sum up all SGs up to the start date and then use that
         # as the starting point for the prop map.
 
-        by_day[start] = await self.at.find_sgs_in_joint_call_or_es_index_up_to_date(
+        by_day[start] = await self.analysis_table.find_sgs_in_joint_call_or_es_index_up_to_date(
             date=start
         )
 
         if start < ES_ANALYSIS_OBJ_INTRO_DATE:
             # do a special check for joint-calling
-            joint_calls = await self.at.query(
+            joint_calls = await self.analysis_table.query(
                 AnalysisFilter(
                     type=GenericFilter(eq='joint-calling'),
                     status=GenericFilter(eq=AnalysisStatus.COMPLETED),
@@ -517,7 +517,7 @@ class AnalysisLayer(BaseLayer):
             for jc in joint_calls:
                 by_day[jc.timestamp_completed.date()].update(jc.sequencing_group_ids)
 
-        es_indices = await self.at.query(
+        es_indices = await self.analysis_table.query(
             AnalysisFilter(
                 type=GenericFilter(eq='es-index'),
                 status=GenericFilter(eq=AnalysisStatus.COMPLETED),
@@ -536,7 +536,7 @@ class AnalysisLayer(BaseLayer):
 
     async def get_audit_logs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, list[AuditLogInternal]]:
         """Get audit logs for analysis IDs"""
-        return await self.at.get_audit_log_for_analysis_ids(analysis_ids)
+        return await self.analysis_table.get_audit_log_for_analysis_ids(analysis_ids)
 
     # CREATE / UPDATE
 
@@ -546,7 +546,7 @@ class AnalysisLayer(BaseLayer):
         project: ProjectId = None,
     ) -> int:
         """Create a new analysis"""
-        new_analysis_id = await self.at.create_analysis(
+        new_analysis_id = await self.analysis_table.create_analysis(
             analysis_type=analysis.type,
             status=analysis.status,
             sequencing_group_ids=analysis.sequencing_group_ids,
@@ -559,10 +559,10 @@ class AnalysisLayer(BaseLayer):
         if analysis.output:
             warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
 
-            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
 
         elif analysis.outputs:
-            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.outputs)
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.outputs)
 
         return new_analysis_id
 
@@ -571,12 +571,12 @@ class AnalysisLayer(BaseLayer):
     ):
         """Add samples to an analysis (through the linked table)"""
         if check_project_id:
-            project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
+            project_ids = await self.analysis_table.get_project_ids_for_analysis_ids([analysis_id])
             await self.ptable.check_access_to_project_ids(
                 self.author, project_ids, readonly=False
             )
 
-        return await self.at.add_sequencing_groups_to_analysis(
+        return await self.analysis_table.add_sequencing_groups_to_analysis(
             analysis_id=analysis_id, sequencing_group_ids=sequencing_group_ids
         )
 
@@ -593,12 +593,12 @@ class AnalysisLayer(BaseLayer):
         Update the status of an analysis, set timestamp_completed if relevant
         """
         if check_project_id:
-            project_ids = await self.at.get_project_ids_for_analysis_ids([analysis_id])
+            project_ids = await self.analysis_table.get_project_ids_for_analysis_ids([analysis_id])
             await self.ptable.check_access_to_project_ids(
                 self.author, project_ids, readonly=False
             )
 
-        await self.at.update_analysis(
+        await self.analysis_table.update_analysis(
             analysis_id=analysis_id,
             status=status,
             meta=meta,
@@ -606,9 +606,9 @@ class AnalysisLayer(BaseLayer):
 
         if output:
             warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
-            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
         elif outputs:
-            await self.ft.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
 
     async def get_analysis_runner_log(
         self,
@@ -619,6 +619,6 @@ class AnalysisLayer(BaseLayer):
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
-        return await self.at.get_analysis_runner_log(
+        return await self.analysis_table.get_analysis_runner_log(
             project_ids, author=author, output_dir=output_dir
         )
