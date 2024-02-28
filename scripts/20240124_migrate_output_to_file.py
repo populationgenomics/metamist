@@ -115,7 +115,7 @@ async def prepare_files(analyses):
 async def insert_files(connection, files):
     """Insert files"""
     query = dedent(
-        """INSERT INTO file (path, basename, dirname, nameroot, nameext, file_checksum, size, valid)
+        """INSERT INTO output_file (path, basename, dirname, nameroot, nameext, file_checksum, size, valid)
         VALUES (:path, :basename, :dirname, :nameroot, :nameext, :file_checksum, :size, :valid)
         RETURNING id"""
     )

@@ -154,12 +154,6 @@ class DbTest(unittest.TestCase):
                 )
                 formed_connection.project = cls.project_id
 
-                # # Convert the relative path to an absolute path
-                # absolute_path = os.path.abspath("./data/fakegcs")
-                # gcs = DockerContainer('fsouza/fake-gcs-server').with_bind_ports(4443, 4443).with_volume_mapping(absolute_path, "/data",).with_command('-scheme http')
-                # gcs.start()
-                # cls.gcs = gcs
-
             except subprocess.CalledProcessError as e:
                 logging.exception(e)
                 if e.stderr:
