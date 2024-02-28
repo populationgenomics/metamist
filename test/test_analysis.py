@@ -209,16 +209,8 @@ class TestAnalysis(DbIsolatedTest):
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
                 sequencing_group_ids=[],
-                output={
-                    'output': [
-                        'RANDOM_OUTPUT_STRING'
-                        ]
-                    },
-                outputs={
-                    'output': [
-                        'RANDOM_OUTPUT_STRING'
-                        ]
-                    },
+                output='RANDOM_OUTPUT_STRING',
+                outputs='RANDOM_OUTPUT_STRING',
                 timestamp_completed=None,
                 project=1,
                 meta={},
@@ -257,16 +249,8 @@ class TestAnalysis(DbIsolatedTest):
                 type='analysis-runner',
                 status=AnalysisStatus.UNKNOWN,
                 sequencing_group_ids=[],
-                output={
-                    'output': [
-                        'RANDOM_OUTPUT_STRING'
-                        ]
-                    },
-                outputs={
-                    'output': [
-                        'RANDOM_OUTPUT_STRING'
-                        ]
-                    },
+                output='RANDOM_OUTPUT_STRING',
+                outputs='RANDOM_OUTPUT_STRING',
                 timestamp_completed=None,
                 project=1,
                 meta={},

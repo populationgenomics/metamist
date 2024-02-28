@@ -231,19 +231,19 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 retvals[key] = AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(key, []), 'outputs': analysis_outputs_by_aid.get(key, [])})
         return list(retvals.values())
 
-    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, dict[str, Any]]:
+    async def get_file_outputs_by_analysis_ids(self, analysis_ids: list[int]) -> dict[int, Union[dict[str, Any], str]]:
         """Fetches all output files for a list of analysis IDs"""
 
         _query = """
         SELECT ao.analysis_id, f.*, ao.json_structure, ao.output
         FROM analysis_outputs ao
-        LEFT JOIN file f ON ao.file_id = f.id
+        LEFT JOIN output_file f ON ao.file_id = f.id
         WHERE ao.analysis_id IN :analysis_ids
         """
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
 
         # Preparing to accumulate analysis files
-        analysis_files: dict[int, list[Union[Tuple[FileInternal, str], str]]] = defaultdict(list)
+        analysis_files: dict[int, Union[list[Tuple[FileInternal, str]], str]] = defaultdict(list)
 
         # Extracting parent IDs with a guard for None values
         parent_ids = [row['id'] for row in rows if row['id'] is not None]
@@ -259,10 +259,11 @@ VALUES ({cs_id_keys}) RETURNING id;"""
                 file_internal_with_secondary = file_internal.copy(update={
                     'secondary_files': secondary_files.get(file_id, [])
                 })
-                analysis_files[row['analysis_id']].append((file_internal_with_secondary, row['json_structure']))
+                if isinstance(analysis_files[row['analysis_id']], list):
+                    analysis_files[row['analysis_id']].append((file_internal_with_secondary, row['json_structure']))  # type: ignore [union-attr]
             else:
-                # If no file_id, just append the output
-                analysis_files[row['analysis_id']].append(row['output'])
+                # If no file_id, just set to the output.
+                analysis_files[row['analysis_id']] = row['output']
 
         # Transforming analysis_files into the desired output format
         analysis_output_files = {a_id: FileInternal.reconstruct_json(files) for a_id, files in analysis_files.items()}
@@ -274,7 +275,7 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         _query = """
         SELECT f.*
-        FROM file f
+        FROM output_file f
         WHERE f.parent_id IN :parent_file_ids
         """
         # Ensure parent_file_ids is a list to prevent SQL injection and errors
@@ -331,7 +332,7 @@ WHERE a.id = (
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
         analysis_ids: list = [row['id'] for row in rows[0]]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'outputs': analysis_outputs_by_aid.get(rows[0]['id'], [])})
+        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'output': analysis_outputs_by_aid.get(rows[0]['id'], []), 'outputs': analysis_outputs_by_aid.get(rows[0]['id'], [])})
         # .from_db maps 'sample_id' -> sample_ids
         for row in rows[1:]:
             a.sample_ids.append(row['sample_id'])
@@ -383,7 +384,7 @@ WHERE a.project = :project AND a.active AND (a.status='queued' OR a.status='in-p
         for row in rows:
             aid = row['id']
             if aid not in analysis_by_id:
-                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(aid, [])})
+                analysis_by_id[aid] = AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(aid, []), 'outputs': analysis_outputs_by_aid.get(aid, [])})
             else:
                 analysis_by_id[aid].sample_ids.append(row['sequencing_group_id'])
 
@@ -424,7 +425,7 @@ ORDER BY a.timestamp_completed DESC
             if row['sequencing_group_id'] in seen_sequencing_group_ids:
                 continue
             seen_sequencing_group_ids.add(row['sequencing_group_id'])
-            analyses.append(AnalysisInternal.from_db(**dict(row)).copy(update={'outputs': analysis_outputs_by_aid.get(row['id'], [])}))
+            analyses.append(AnalysisInternal.from_db(**dict(row)).copy(update={'output': analysis_outputs_by_aid.get(row['id'], []), 'outputs': analysis_outputs_by_aid.get(row['id'], [])}))
 
         # reverse after timestamp_completed
         return analyses[::-1]
@@ -450,7 +451,7 @@ WHERE a.id = :analysis_id
         project = rows[0]['project']
         analysis_ids: list = [rows[0]['id']]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(analysis_ids)
-        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'outputs': analysis_outputs_by_aid.get(rows[0], [])})
+        a = AnalysisInternal.from_db(**dict(rows[0])).copy(update={'output': analysis_outputs_by_aid.get(rows[0], []), 'outputs': analysis_outputs_by_aid.get(rows[0], [])})
         for row in rows[1:]:
             a.sample_ids.append(row['sequencing_group_id'])
 
@@ -497,7 +498,7 @@ WHERE a.id = :analysis_id
         for a in rows:
             a_id = a['id']
             if a_id not in analyses:
-                analyses[a_id] = AnalysisInternal.from_db(**dict(a)).copy(update={'outputs': analysis_outputs_by_aid.get(a_id, [])})
+                analyses[a_id] = AnalysisInternal.from_db(**dict(a)).copy(update={'output': analysis_outputs_by_aid.get(a_id, []), 'outputs': analysis_outputs_by_aid.get(a_id, [])})
                 projects.add(a['project'])
 
             analyses[a_id].sample_ids.append(a['sample_id'])
@@ -576,7 +577,7 @@ ORDER BY a.timestamp_completed DESC;
 
         if output_dir:
             joins.append('LEFT JOIN analysis_outputs ao ON analysis.id = ao.analysis_id',)
-            joins.append('LEFT JOIN file f ON ao.file_id = f.id')
+            joins.append('LEFT JOIN output_file f ON ao.file_id = f.id')
             wheres.append('(f.path = :output OR ao.output LIKE :output_like)')
             values['output'] = output_dir
             values['output_like'] = f'%{output_dir}'

@@ -30,7 +30,7 @@ async def get_analyses_without_fileid(connection):
         SELECT a.id, a.output
         FROM analysis a
         LEFT JOIN analysis_outputs ao ON ao.analysis_id = a.id
-        LEFT JOIN file f ON f.id = ao.file_id
+        LEFT JOIN output_file f ON f.id = ao.file_id
         WHERE f.id IS NULL AND ao.output IS NULL
         """
     )

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Union
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud.storage import Client
@@ -87,7 +87,7 @@ class FileInternal(SMBase):
             return None
 
     @staticmethod
-    def reconstruct_json(data: list) -> dict[str, Any]:
+    def reconstruct_json(data: list | str) -> Union[dict[str, Any], str]:
         """_summary_
 
         Args:
@@ -98,6 +98,8 @@ class FileInternal(SMBase):
             dict: Should return the JSON structure based on the input data.
         """
         root: dict = {}
+        if isinstance(data, str):
+            return data
         for file in data:
             file_root: dict = {}
 

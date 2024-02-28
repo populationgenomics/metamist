@@ -15,7 +15,7 @@ class FileTable(DbBase):
     Capture Analysis table operations and queries
     """
 
-    table_name = 'file'
+    table_name = 'output_file'
 
     async def create_or_update_output_file(
         self,
@@ -53,7 +53,7 @@ class FileTable(DbBase):
         update_clause = ', '.join([f'{k} = VALUES({k})' for k in non_pk_keys])  # ON DUPLICATE KEY UPDATE {update_clause}
 
         async with self.connection.transaction():
-            _query = dedent(f"""INSERT INTO file ({cs_keys}) VALUES ({cs_id_keys}) ON DUPLICATE KEY UPDATE {update_clause} RETURNING id""")
+            _query = dedent(f"""INSERT INTO output_file ({cs_keys}) VALUES ({cs_id_keys}) ON DUPLICATE KEY UPDATE {update_clause} RETURNING id""")
             id_of_new_file = await self.connection.fetch_val(
                 _query,
                 dict(kv_pairs),

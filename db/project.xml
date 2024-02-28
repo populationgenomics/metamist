@@ -1107,9 +1107,9 @@
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
-	<changeSet id="2024-01-23_analysis_file" author="yash.pankhania">
+	<changeSet id="2024-01-23_output_file" author="yash.pankhania">
 		<sql>SET @@system_versioning_alter_history = 1;</sql>
-		<createTable tableName="file">
+		<createTable tableName="output_file">
 			<column name="id" type="INT" autoIncrement="true">
 				<constraints primaryKey="true" nullable="false" />
 			</column>
@@ -1159,7 +1159,7 @@
 				<constraints
 					nullable="true"
 					foreignKeyName="FK_SECONDARY_FILE_PARENT_ID"
-					references="file(id)"
+					references="output_file(id)"
 				/>
 			</column>
 		</createTable>
@@ -1175,7 +1175,7 @@
 				<constraints
 				nullable="true"
 				foreignKeyName="FK_ANALYSIS_OUTPUTS_FILE_ID"
-				references="file(id)"
+				references="output_file(id)"
 				/>
 			</column>
 			<column name="output" type="VARCHAR(255)">
@@ -1189,7 +1189,7 @@
 				/>
 			</column>
 		</createTable>
-		<sql>ALTER TABLE `file` ADD SYSTEM VERSIONING;</sql>
+		<sql>ALTER TABLE `output_file` ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE `analysis_outputs` ADD SYSTEM VERSIONING;</sql>
 		<sql>ALTER TABLE `analysis_outputs` ADD CONSTRAINT `chk_file_id_output` CHECK ((file_id IS NOT NULL AND output IS NULL) OR (file_id IS NULL AND output IS NOT NULL));</sql>
 	</changeSet>
