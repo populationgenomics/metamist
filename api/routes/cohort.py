@@ -50,4 +50,5 @@ async def create_cohort_template(
 
     return await cohortlayer.create_cohort_template(
         cohort_template=template,
+        project=connection.project
     )

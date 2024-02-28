@@ -1142,4 +1142,11 @@
 			</column>
 		</createTable>
 	</changeSet>
+	<changeSet id="2024-02-28_custom-cohorts-templates" author="vivian.bakiris">
+		<addColumn tableName="cohort_template">
+			<column name="project" type="INT">
+				<constraints nullable="false" foreignKeyName="fk_project_cohort_template" references="project(id)" />
+			</column>
+		</addColumn>
+	</changeSet>
 </databaseChangeLog>

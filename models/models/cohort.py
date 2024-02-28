@@ -1,3 +1,5 @@
+import json
+
 from pydantic import BaseModel
 
 from models.base import SMBase
@@ -36,6 +38,34 @@ class Cohort(SMBase):
             description=description,
             derived_from=derived_from,
             sequencing_groups=sequencing_groups,
+        )
+
+
+class CohortTemplateModel(SMBase):
+    """Model for CohortTemplate"""
+
+    id: int
+    name: str
+    description: str
+    criteria: dict
+
+    @staticmethod
+    def from_db(d: dict):
+        """
+        Convert from db keys, mainly converting id to id_
+        """
+        _id = d.pop('id', None)
+        name = d.pop('name', None)
+        description = d.pop('description', None)
+        criteria = d.pop('criteria', None)
+        if criteria and isinstance(criteria, str):
+            criteria = json.loads(criteria)
+
+        return CohortTemplateModel(
+            id=_id,
+            name=name,
+            description=description,
+            criteria=criteria,
         )
 
 

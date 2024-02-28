@@ -26,7 +26,7 @@ from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
-from db.python.tables.cohort import CohortFilter
+from db.python.tables.cohort import CohortFilter, CohortTemplateFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
@@ -37,6 +37,7 @@ from models.models import (
     AssayInternal,
     AuditLogInternal,
     Cohort,
+    CohortTemplateModel,
     FamilyInternal,
     ParticipantInternal,
     Project,
@@ -110,6 +111,26 @@ class GraphQLCohort:
         loader = info.context[LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project)
         return GraphQLProject.from_internal(project)
+
+# Create cohort template GraphQL model
+@strawberry.type
+class GraphQLCohortTemplate:
+    """CohortTemplate GraphQL model"""
+
+    id: int
+    name: str
+    description: str
+    criteria: strawberry.scalars.JSON
+
+    @staticmethod
+    def from_internal(internal: CohortTemplateModel) -> 'GraphQLCohortTemplate':
+        return GraphQLCohortTemplate(
+            id=internal.id,
+            name=internal.name,
+            description=internal.description,
+            criteria=internal.criteria,
+        )
+
 
 
 @strawberry.type
@@ -680,6 +701,37 @@ class Query:  # entry point to graphql.
     @strawberry.field()
     def enum(self, info: Info) -> GraphQLEnum:
         return GraphQLEnum()
+
+    @strawberry.field()
+    async def cohort_template(
+        self,
+        info: Info,
+        id: GraphQLFilter[int] | None = None,
+        project: GraphQLFilter[str] | None = None,
+    ) -> list[GraphQLCohortTemplate]:
+        connection = info.context['connection']
+        clayer = CohortLayer(connection)
+
+        ptable = ProjectPermissionsTable(connection)
+        project_name_map: dict[str, int] = {}
+        project_filter = None
+        if project:
+            project_names = project.all_values()
+            projects = await ptable.get_and_check_access_to_projects_for_names(
+                user=connection.author, project_names=project_names, readonly=True
+            )
+            project_name_map = {p.name: p.id for p in projects}
+            project_filter = project.to_internal_filter(
+                lambda pname: project_name_map[pname]
+            )
+
+        filter_ = CohortTemplateFilter(
+            id=id.to_internal_filter() if id else None,
+            project=project_filter,
+        )
+
+        cohort_templates = await clayer.query_cohort_templates(filter_)
+        return [GraphQLCohortTemplate.from_internal(cohort_template) for cohort_template in cohort_templates]
 
     @strawberry.field()
     async def cohort(

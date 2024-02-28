@@ -5,7 +5,7 @@ import datetime
 from db.python.tables.base import DbBase
 from db.python.tables.project import ProjectId
 from db.python.utils import GenericFilter, GenericFilterModel, to_db_json
-from models.models.cohort import Cohort
+from models.models.cohort import Cohort, CohortTemplateModel
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -22,6 +22,19 @@ class CohortFilter(GenericFilterModel):
     project: GenericFilter[ProjectId] | None = None
 
 
+@dataclasses.dataclass(kw_only=True)
+class CohortTemplateFilter(GenericFilterModel):
+    """
+    Filters for CohortTemplate
+    """
+
+    id: GenericFilter[int] | None = None
+    name: GenericFilter[str] | None = None
+    description: GenericFilter[str] | None = None
+    criteria: GenericFilter[dict] | None = None
+    project: GenericFilter[ProjectId] | None = None
+
+
 class CohortTable(DbBase):
     """
     Capture Cohort table operations and queries
@@ -35,6 +48,14 @@ class CohortTable(DbBase):
         'description',
         'author',
         'project',
+    ]
+
+    template_keys = [
+        'id',
+        'name',
+        'description',
+        'criteria',
+        'project'
     ]
 
     async def query(self, filter_: CohortFilter):
@@ -65,6 +86,23 @@ class CohortTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
         return [row['sequencing_group_id'] for row in rows]
 
+    async def query_cohort_templates(self, filter_: CohortTemplateFilter):  # TODO: Move this to its own class?
+        """Query CohortTemplates"""
+        wheres, values = filter_.to_sql(field_overrides={})
+        if not wheres:
+            raise ValueError(f'Invalid filter: {filter_}')
+
+        common_get_keys_str = ','.join(self.template_keys)
+        _query = f"""
+        SELECT {common_get_keys_str}
+        FROM cohort_template
+        WHERE {wheres}
+        """
+
+        rows = await self.connection.fetch_all(_query, values)
+        cohort_templates = [CohortTemplateModel.from_db(dict(row)) for row in rows]
+        return cohort_templates
+
     async def get_cohort_template(self, template_id: int):
         """
         Get a cohort template by ID
@@ -83,13 +121,14 @@ class CohortTable(DbBase):
             name: str,
             description: str,
             criteria: dict,
+            project: ProjectId,
     ):
         """
         Create new cohort template
         """
         _query = """
-        INSERT INTO cohort_template (name, description, criteria)
-        VALUES (:name, :description, :criteria) RETURNING id;
+        INSERT INTO cohort_template (name, description, criteria, project)
+        VALUES (:name, :description, :criteria, :project) RETURNING id;
         """
         cohort_template_id = await self.connection.fetch_val(
                 _query,
@@ -97,6 +136,7 @@ class CohortTable(DbBase):
                     'name': name,
                     'description': description,
                     'criteria': to_db_json(criteria),
+                    'project': project,
                 },
             )
 

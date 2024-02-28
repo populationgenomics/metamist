@@ -4,7 +4,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
-from db.python.tables.cohort import CohortFilter, CohortTable
+from db.python.tables.cohort import CohortFilter, CohortTable, CohortTemplateFilter
 from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
@@ -38,6 +38,11 @@ class CohortLayer(BaseLayer):
         cohorts = await self.ct.query(filter_)
         return cohorts
 
+    async def query_cohort_templates(self, filter_: CohortTemplateFilter) -> list[CohortTemplate]:
+        """Query CohortTemplates"""
+        cohort_templates = await self.ct.query_cohort_templates(filter_)
+        return cohort_templates
+
     async def get_cohort_sequencing_group_ids(self, cohort_id: int) -> list[int]:
         """
         Get the sequencing group IDs for the given cohort.
@@ -47,6 +52,7 @@ class CohortLayer(BaseLayer):
     async def create_cohort_template(
             self,
             cohort_template: CohortTemplate,
+            project: ProjectId,
 
     ):
         """
@@ -57,6 +63,7 @@ class CohortLayer(BaseLayer):
             name=cohort_template.name,
             description=cohort_template.description,
             criteria=dict(cohort_template.criteria),
+            project=project
         )
 
     async def create_cohort_from_criteria(

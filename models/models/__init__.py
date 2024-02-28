@@ -20,7 +20,7 @@ from models.models.billing import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
-from models.models.cohort import Cohort
+from models.models.cohort import Cohort, CohortTemplateModel
 from models.models.family import (
     Family,
     FamilyInternal,
