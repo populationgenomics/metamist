@@ -64,13 +64,12 @@ class CohortTable(DbBase):
         """
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
         return [row['sequencing_group_id'] for row in rows]
-    
+
     async def create_cohort_template(
-            self, 
+            self,
             name: str,
             description: str,
             criteria: dict,
-            open_transaction: bool = True,
     ):
         """
         Create new cohort template
@@ -84,10 +83,10 @@ class CohortTable(DbBase):
                 {
                     'name': name,
                     'description': description,
-                    'criteria':to_db_json(criteria),
+                    'criteria': to_db_json(criteria),
                 },
             )
-        
+
         return cohort_template_id
 
     async def create_cohort(

@@ -1,7 +1,8 @@
+from pydantic import BaseModel
+
 from models.base import SMBase
 from models.models.sequencing_group import SequencingGroup, SequencingGroupExternalId
 
-from pydantic import BaseModel 
 
 class Cohort(SMBase):
     """Model for Cohort"""
@@ -37,6 +38,7 @@ class Cohort(SMBase):
             sequencing_groups=sequencing_groups,
         )
 
+
 class CohortBody(BaseModel):
     """Represents the expected JSON body of the create cohort request"""
 
@@ -55,7 +57,10 @@ class CohortCriteria(BaseModel):
     sg_platform: list[str] | None = None
     sg_type: list[str] | None = None
 
+
 class CohortTemplate(BaseModel):
+    """ Represents a cohort template, to be used to build cohorts. """
+
     name: str
     description: str
     criteria: CohortCriteria

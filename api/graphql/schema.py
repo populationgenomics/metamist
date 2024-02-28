@@ -18,28 +18,25 @@ from strawberry.types import Info
 from api.graphql.filters import GraphQLFilter, GraphQLMetaFilter
 from api.graphql.loaders import LoaderKeys, get_context
 from db.python import enum_tables
-
-from db.python.layers.assay import AssayLayer
 from db.python.layers.analysis import AnalysisLayer
+from db.python.layers.assay import AssayLayer
 from db.python.layers.cohort import CohortLayer
 from db.python.layers.family import FamilyLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-
 from db.python.tables.analysis import AnalysisFilter
 from db.python.tables.assay import AssayFilter
 from db.python.tables.cohort import CohortFilter
 from db.python.tables.project import ProjectPermissionsTable
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
-
 from db.python.utils import GenericFilter
 from models.enums import AnalysisStatus
 from models.models import (
     AnalysisInternal,
     AssayInternal,
-    Cohort,
     AuditLogInternal,
+    Cohort,
     FamilyInternal,
     ParticipantInternal,
     Project,

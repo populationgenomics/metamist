@@ -1,17 +1,11 @@
 from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 from api.utils.db import Connection, get_project_write_connection
-
 from db.python.layers.cohort import CohortLayer
 from db.python.tables.project import ProjectPermissionsTable
-
 from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate
-from models.utils.sequencing_group_id_format import (
-    sequencing_group_id_transform_to_raw_list,
-)
 
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 
@@ -42,11 +36,7 @@ async def create_cohort_from_criteria(
         description=cohort_spec.description,
         author=connection.author,
         cohort_name=cohort_spec.name,
-        sg_ids_internal=sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal),
-        exlude_sg_ids_internal=sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal),
-        sg_technology=cohort_criteria.sg_technology,
-        sg_platform=cohort_criteria.sg_platform,
-        sg_type=cohort_criteria.sg_type,
+        cohort_criteria=cohort_criteria
     )
 
     return {'cohort_id': cohort_id}
@@ -64,8 +54,7 @@ async def create_cohort_template(
 
     if not connection.project:
         raise ValueError('A cohort template must belong to a project')
-    
+
     return await cohortlayer.create_cohort_template(
         cohort_template=template,
     )
-

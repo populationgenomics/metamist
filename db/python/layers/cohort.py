@@ -1,18 +1,19 @@
-from models.models.cohort import Cohort
 from db.python.connect import Connection
-
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
-
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.cohort import CohortFilter, CohortTable
 from db.python.tables.project import ProjectId
 from db.python.tables.sample import SampleTable
-from db.python.tables.sequencing_group import SequencingGroupTable, SequencingGroupFilter
-
+from db.python.tables.sequencing_group import (
+    SequencingGroupFilter,
+    SequencingGroupTable,
+)
 from db.python.utils import GenericFilter, get_logger
-
-from models.models.cohort import CohortTemplate
+from models.models.cohort import Cohort, CohortCriteria, CohortTemplate
+from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_transform_to_raw_list,
+)
 
 logger = get_logger()
 
@@ -39,7 +40,7 @@ class CohortLayer(BaseLayer):
         Get the sequencing group IDs for the given cohort.
         """
         return await self.ct.get_cohort_sequencing_group_ids(cohort_id)
-    
+
     async def create_cohort_template(
             self,
             cohort_template: CohortTemplate,
@@ -54,7 +55,6 @@ class CohortLayer(BaseLayer):
             description=cohort_template.description,
             criteria=dict(cohort_template.criteria),
         )
-    
 
     async def create_cohort_from_criteria(
             self,
@@ -63,15 +63,18 @@ class CohortLayer(BaseLayer):
             author: str,
             description: str,
             cohort_name: str,
-            sg_ids_internal: list[int] | None = None,
-            excluded_sgs_internal: list[int] | None = None,
-            sg_technology: list[str] | None = None,
-            sg_platform: list[str] | None = None,
-            sg_type: list[str] | None = None,
+            cohort_criteria: CohortCriteria,
     ):
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
+
+        # Unpack criteria
+        sg_ids_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal)
+        excluded_sgs_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal)
+        sg_technology = cohort_criteria.sg_technology
+        sg_platform = cohort_criteria.sg_platform
+        sg_type = cohort_criteria.sg_type
 
         # 1. Pull SG's based on criteria
         if sg_ids_internal and excluded_sgs_internal:
@@ -81,7 +84,7 @@ class CohortLayer(BaseLayer):
         elif excluded_sgs_internal:
             sg_id_filter = GenericFilter(nin=excluded_sgs_internal)
         else:
-            sg_id_filter = None    
+            sg_id_filter = None
 
         sgs = await self.sglayer.query(
             SequencingGroupFilter(
@@ -92,7 +95,6 @@ class CohortLayer(BaseLayer):
                 type=GenericFilter(in_=sg_type) if sg_type else None,
             )
         )
-        print(sgs)
 
         # 2. Create Cohort
         cohort_id = await self.ct.create_cohort(
