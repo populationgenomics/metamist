@@ -1,9 +1,11 @@
+import json
+
 from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisTable
 from db.python.tables.cohort import CohortFilter, CohortTable
-from db.python.tables.project import ProjectId
+from db.python.tables.project import ProjectId, ProjectPermissionsTable
 from db.python.tables.sample import SampleTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
@@ -27,6 +29,7 @@ class CohortLayer(BaseLayer):
         self.sampt = SampleTable(connection)
         self.at = AnalysisTable(connection)
         self.ct = CohortTable(connection)
+        self.pt = ProjectPermissionsTable(connection)
         self.sgt = SequencingGroupTable(connection)
         self.sglayer = SequencingGroupLayer(self.connection)
 
@@ -59,19 +62,38 @@ class CohortLayer(BaseLayer):
     async def create_cohort_from_criteria(
             self,
             project_to_write: ProjectId,
-            projects_to_pull: list[ProjectId],
             author: str,
             description: str,
             cohort_name: str,
-            cohort_criteria: CohortCriteria,
+            cohort_criteria: CohortCriteria = None,
+            template_id: int = None,
     ):
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
 
+        # Get template from ID
+        template: dict[str, str] = {}
+        if template_id:
+            template = await self.ct.get_cohort_template(template_id)
+
+        # Only provide a template id
+        if template and not cohort_criteria:
+            criteria_dict = json.loads(template['criteria'])
+            cohort_criteria = CohortCriteria(**criteria_dict)
+
+        projects_to_pull = await self.pt.get_and_check_access_to_projects_for_names(
+            user=self.connection.author, project_names=cohort_criteria.projects, readonly=True
+        )
+        projects_to_pull = [p.id for p in projects_to_pull]
+
         # Unpack criteria
-        sg_ids_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal)
-        excluded_sgs_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal)
+        sg_ids_internal = []
+        excluded_sgs_internal = []
+        if cohort_criteria.sg_ids_internal:
+            sg_ids_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.sg_ids_internal)
+        if cohort_criteria.excluded_sgs_internal:
+            excluded_sgs_internal = sequencing_group_id_transform_to_raw_list(cohort_criteria.excluded_sgs_internal)
         sg_technology = cohort_criteria.sg_technology
         sg_platform = cohort_criteria.sg_platform
         sg_type = cohort_criteria.sg_type

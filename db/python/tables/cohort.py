@@ -65,6 +65,19 @@ class CohortTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
         return [row['sequencing_group_id'] for row in rows]
 
+    async def get_cohort_template(self, template_id: int):
+        """
+        Get a cohort template by ID
+        """
+        _query = """
+        SELECT id as id, criteria as criteria FROM cohort_template WHERE id = :template_id
+        """
+        template = await self.connection.fetch_one(_query, {'template_id': template_id})
+
+        print(template)
+
+        return {'id': template['id'], 'criteria': template['criteria']}
+
     async def create_cohort_template(
             self,
             name: str,
