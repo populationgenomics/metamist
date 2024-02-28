@@ -6,7 +6,7 @@ from typing import Any
 
 from google.cloud import bigquery
 
-from api.settings import BQ_BUDGET_VIEW, BQ_DAYS_BACK_OPTIMAL
+from api.settings import BQ_BUDGET_VIEW, BQ_COST_PER_TB, BQ_DAYS_BACK_OPTIMAL
 from api.utils.dates import get_invoice_month_range, reformat_datetime
 from db.python.gcp_connect import BqDbBase
 from db.python.tables.bq.billing_filter import BillingFilter
@@ -112,11 +112,21 @@ class BillingBaseTable(BqDbBase):
         print('query', query)
         print('params', params)
 
-        # dry run to calulate the costs:
+        # We need to dry run to calulate the costs
+        # executing query does not provide the cost
+        # more info here:
+        # https://stackoverflow.com/questions/58561153/what-is-the-python-api-i-can-use-to-calculate-the-cost-of-a-bigquery-query/58561358#58561358
         job_config.dry_run = True
         job_config.use_query_cache = False
         query_job = self._connection.connection.query(query, job_config=job_config)
-        self._connection.cost += (query_job.total_bytes_processed / 1024**4) * 6.25
+
+        # This should be thread/async safe as each request
+        # creates a new connection instance
+        # and queries per requests are run in sequencial order,
+        # waiting for the previous one to finish
+        self._connection.cost += (
+            query_job.total_bytes_processed / 1024**4
+        ) * BQ_COST_PER_TB
 
         # now execute the query
         job_config.dry_run = False

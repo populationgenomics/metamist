@@ -8,6 +8,7 @@ import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
 import HailBatchGridTemp from './components/HailBatchGridTemp'
 import HailBatchGridTempVirtuoso from './components/HailBatchGridTempVirtouso'
+import HailBatchGridNew from './components/HailBatchGridNew'
 
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
@@ -209,9 +210,15 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     //     </Card>
     // )
 
+    // const gridCard = (gridData: BillingTotalCostRecord[]) => (
+    //     <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
+    //         <HailBatchGridTempVirtuoso data={gridData} />
+    //     </Card>
+    // )
+
     const gridCard = (gridData: BillingTotalCostRecord[]) => (
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
-            <HailBatchGridTempVirtuoso data={gridData} />
+            <HailBatchGridNew data={gridData} />
         </Card>
     )
 

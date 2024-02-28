@@ -13,6 +13,7 @@ export interface IDonutChartProps {
     maxSlices: number
     colors?: (t: number) => string | undefined
     isLoading: boolean
+    legendSize?: number | undefined
 }
 
 interface IDonutChartPreparadData {
@@ -29,7 +30,13 @@ function calcTranslate(data: IDonutChartPreparadData, move = 4) {
     })`
 }
 
-export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors, isLoading }) => {
+export const DonutChart: React.FC<IDonutChartProps> = ({
+    data,
+    maxSlices,
+    colors,
+    isLoading,
+    legendSize,
+}) => {
     if (isLoading) {
         return (
             <div>
@@ -72,6 +79,20 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
             .duration(duration)
             .attr('stroke', 'white')
             .attr('stroke-width', 1)
+    }
+
+    function createViewBox(legSize, w) {
+        // calculate the viewbox of Legend
+        const minX = 0
+        const minY = 0
+        let width = 200
+        let height = 200
+        if (legSize) {
+            width = legSize * w
+            height = legSize * w
+        }
+
+        return `${minX} ${minY} ${width} ${height}`
     }
 
     const width = graphWidth
@@ -175,7 +196,7 @@ export const DonutChart: React.FC<IDonutChartProps> = ({ data, maxSlices, colors
         const svgLegend = select(contDiv)
             .append('svg')
             .attr('width', '45%')
-            .attr('viewBox', '0 0 200 200')
+            .attr('viewBox', createViewBox(legendSize, width))
             .attr('vertical-align', 'top')
 
         svgLegend

@@ -1,5 +1,4 @@
 import datetime
-import json
 from enum import Enum
 
 from db.python.tables.bq.billing_filter import BillingFilter
@@ -362,45 +361,70 @@ class BillingCostBudgetRecord(SMBase):
 class BillingBatchCostRecord(SMBase):
     """Return class for the Billing Cost by batch_id/ar_guid"""
 
-    ar_guid: str | None
-    batch_id: str | None
-    batch_name: str | None
-    jobs: int | None
-    job_id: int | None
+    total: dict | None
+    topics: list[dict] | None
+    categories: list[dict] | None
+    batches: list[dict] | None
+    skus: list[dict] | None
 
-    topic: str | None
-    namespace: str | None
-
-    compute_category: str | None
-    cromwell_workflow_id: str | None
-    cromwell_sub_workflow_name: str | None
-    wdl_task_name: str | None
-
-    start_time: datetime.datetime | None
-    end_time: datetime.datetime | None
-    cost: float | None
-
-    details: list[dict] | None
-    labels: dict | None
+    wdl_tasks: list[dict] | None
+    cromwell_sub_workflows: list[dict] | None
+    cromwell_workflows: list[dict] | None
 
     @staticmethod
     def from_json(record):
         """Create BillingBatchCostRecord from json"""
+        print('record', record)
         return BillingBatchCostRecord(
-            ar_guid=record.get('ar_guid'),
-            batch_id=record.get('batch_id'),
-            batch_name=record.get('batch_name'),
-            jobs=record.get('jobs'),
-            job_id=record.get('job_id'),
-            topic=record.get('topic'),
-            namespace=record.get('namespace'),
-            compute_category=record.get('compute_category'),
-            cromwell_workflow_id=record.get('cromwell_workflow_id'),
-            cromwell_sub_workflow_name=record.get('cromwell_sub_workflow_name'),
-            wdl_task_name=record.get('wdl_task_name'),
-            start_time=record.get('start_time'),
-            end_time=record.get('end_time'),
-            cost=record.get('cost'),
-            details=record.get('details'),
-            labels=json.loads(record.get('labels')),
+            total=record.get('total'),
+            topics=record.get('topics'),
+            categories=record.get('categories'),
+            batches=record.get('batches'),
+            skus=record.get('skus'),
+            wdl_tasks=record.get('wdl_tasks'),
+            cromwell_sub_workflows=record.get('cromwell_sub_workflows'),
+            cromwell_workflows=record.get('cromwell_workflows'),
         )
+
+    # ar_guid: str | None
+    # batch_id: str | None
+    # batch_name: str | None
+    # jobs: int | None
+    # job_id: int | None
+
+    # topic: str | None
+    # namespace: str | None
+
+    # compute_category: str | None
+    # cromwell_workflow_id: str | None
+    # cromwell_sub_workflow_name: str | None
+    # wdl_task_name: str | None
+
+    # start_time: datetime.datetime | None
+    # end_time: datetime.datetime | None
+    # cost: float | None
+
+    # details: list[dict] | None
+    # labels: dict | None
+
+    # @staticmethod
+    # def from_json(record):
+    #     """Create BillingBatchCostRecord from json"""
+    #     return BillingBatchCostRecord(
+    #         ar_guid=record.get('ar_guid'),
+    #         batch_id=record.get('batch_id'),
+    #         batch_name=record.get('batch_name'),
+    #         jobs=record.get('jobs'),
+    #         job_id=record.get('job_id'),
+    #         topic=record.get('topic'),
+    #         namespace=record.get('namespace'),
+    #         compute_category=record.get('compute_category'),
+    #         cromwell_workflow_id=record.get('cromwell_workflow_id'),
+    #         cromwell_sub_workflow_name=record.get('cromwell_sub_workflow_name'),
+    #         wdl_task_name=record.get('wdl_task_name'),
+    #         start_time=record.get('start_time'),
+    #         end_time=record.get('end_time'),
+    #         cost=record.get('cost'),
+    #         details=record.get('details'),
+    #         labels=json.loads(record.get('labels')),
+    #     )

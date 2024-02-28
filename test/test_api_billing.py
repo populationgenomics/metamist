@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 from api.routes import billing
 from models.models import (
+    BillingBatchCostRecord,
     BillingColumn,
     BillingCostBudgetRecord,
-    BillingHailBatchCostRecord,
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
@@ -54,7 +54,7 @@ class TestApiBilling(BqTest):
         Test get_cost_by_ar_guid function
         """
         ar_guid = 'test_ar_guid'
-        mockup_record = BillingHailBatchCostRecord(
+        mockup_record = BillingBatchCostRecord(
             ar_guid=ar_guid, batch_ids=None, costs=None
         )
         mock_get_billing_layer.return_value = self.layer
@@ -75,7 +75,7 @@ class TestApiBilling(BqTest):
         """
         ar_guid = 'test_ar_guid'
         batch_id = 'test_batch_id'
-        mockup_record = BillingHailBatchCostRecord(
+        mockup_record = BillingBatchCostRecord(
             ar_guid=ar_guid, batch_ids=[batch_id], costs=None
         )
         mock_get_billing_layer.return_value = self.layer

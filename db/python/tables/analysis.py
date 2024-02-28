@@ -511,8 +511,10 @@ ORDER BY a.timestamp_completed DESC;
             wheres.append('JSON_EXTRACT(meta, "$.ar_guid") = :ar_guid')
             values['ar_guid'] = ar_guid
 
-        wheres_str = ' AND '.join(wheres)
-        _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        # Temp disable
+        # wheres_str = ' AND '.join(wheres)
+        # _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        _query = f'SELECT * FROM analysis order by id desc LIMIT 1'
         rows = await self.connection.fetch_all(_query, values)
         return [AnalysisInternal.from_db(**dict(r)) for r in rows]
 

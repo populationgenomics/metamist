@@ -9,8 +9,8 @@ import google.cloud.bigquery as bq
 from db.python.layers.billing import BillingLayer
 from models.enums import BillingSource
 from models.models import (
+    BillingBatchCostRecord,
     BillingColumn,
-    BillingHailBatchCostRecord,
     BillingTotalCostQueryModel,
 )
 
@@ -368,7 +368,7 @@ class TestBillingLayer(BqTest):
 
         # return empty record
         self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
+            BillingBatchCostRecord(ar_guid=None, batch_ids=[], costs=[]), records
         )
 
         # dummy ar_guid, no mockup data, return empty results
@@ -377,7 +377,7 @@ class TestBillingLayer(BqTest):
 
         # return empty record
         self.assertEqual(
-            BillingHailBatchCostRecord(ar_guid=dummy_ar_guid, batch_ids=[], costs=[]),
+            BillingBatchCostRecord(ar_guid=dummy_ar_guid, batch_ids=[], costs=[]),
             records,
         )
 
