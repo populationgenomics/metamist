@@ -1,4 +1,6 @@
 # This file contains example how to integrate with metamist ETL pipeline
+# be sure GOOGLE_APPLICATION_CREDENTIALS is set in your environment
+# pointing to the service account credential file
 import os
 
 import google.auth.transport.requests
@@ -7,7 +9,6 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
-AUTH_URL = 'https://australia-southeast1-sample-metadata.cloudfunctions.net/metamist-etl-extract'
 URL = 'https://metamist-extract.popgen.rocks'
 TYPE = 'bbv/v1'
 
@@ -26,7 +27,7 @@ def make_request(body: dict | list):
     """
     # generate an auth token for the URL using GOOGLE_APPLICATION_CREDENTIALS
     auth_req = google.auth.transport.requests.Request()
-    auth_token = google.oauth2.id_token.fetch_id_token(auth_req, AUTH_URL)
+    auth_token = google.oauth2.id_token.fetch_id_token(auth_req, URL)
 
     # we'll retry 3 times, exponentially backing off (0.5, 1, 2 seconds)
     retry_strategy = Retry(
