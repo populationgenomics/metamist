@@ -550,14 +550,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
     @cached_property
     def etl_extract_function(self):
         """etl_extract_function"""
-        custom_audience_list = [
-            'https://australia-southeast1-sample-metadata.cloudfunctions.net/metamist-etl-extract',
-            'https://metamist-extract.popgen.rocks',
-        ]
         return self._etl_function(
             'extract',
             self.etl_extract_service_account,
-            audience_list=json.dumps(custom_audience_list),
         )
 
     @cached_property
@@ -612,7 +607,6 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         f_name: str,
         sa: gcp.serviceaccount.Account,
         private_repo_url: str | None = None,
-        audience_list: str | None = None,
     ):
         """
         Driver function to setup the etl cloud function
@@ -654,6 +648,13 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
             source=archive,
             opts=pulumi.ResourceOptions(replace_on_changes=['*']),
         )
+
+        # prepare custom audience_list
+        custom_audience_list = None
+        if self.config.metamist.etl.custom_audience_list:
+            custom_audience_list = json.dumps(
+                self.config.metamist.etl.custom_audience_list.get(f_name)
+            )
 
         fxn = gcp.cloudfunctionsv2.Function(
             f'metamist-etl-{f_name}',
@@ -704,8 +705,8 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                     'CONFIGURATION_SECRET': self.etl_configuration_secret_version.id,
                 },  # type: ignore
                 annotations=(
-                    {'run.googleapis.com/custom-audiences': audience_list}
-                    if audience_list
+                    {'run.googleapis.com/custom-audiences': custom_audience_list}
+                    if custom_audience_list
                     else None
                 ),
                 ingress_settings='ALLOW_ALL',
