@@ -55,6 +55,46 @@ class AnalysisTable(DbBase):
         rows = await self.connection.fetch_all(_query, {'analysis_ids': analysis_ids})
         return set(r['project'] for r in rows)
 
+    async def _construct_shared_kv_pairs(
+        self,
+        status: AnalysisStatus,
+        # is_update: bool = False,  # Add parameter to indicate update or create
+        meta: Optional[Dict[str, Any]] = None,
+        active: Optional[bool] = None,
+        project: Optional[ProjectId] = None,
+        analysis_type: Optional[str] = None  # Only for create_analysis
+    ) -> List[Tuple[str, Any]]:
+        """
+        Construct key-value pairs shared between creating and updating an analysis.
+
+        :param status: The new status of the analysis.
+        :param is_update: Flag indicating whether this is for updating an analysis.
+        :param meta: The meta information for the analysis.
+        :param active: The active status of the analysis.
+        :param project: The project ID associated with the analysis.
+        :param analysis_type: The type of analysis (only for creation).
+        :return: A list of key-value pairs.
+        """
+        kv_pairs = [
+            ('audit_log_id', await self.audit_log_id()),
+            ('status', status.value),
+            ('active', active),
+            ('project', project or self.project),
+        ]
+        if analysis_type:  # Specific to create_analysis
+            kv_pairs.append(('type', analysis_type))
+        if project:  # Specific to create_analysis
+            kv_pairs.append(('project', project))
+        if status == AnalysisStatus.COMPLETED:
+            kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
+
+        # Handle 'meta' field specifically for update vs create
+        if meta is not None and len(meta) > 0:
+            db_meta = to_db_json(meta)
+            kv_pairs.append(('meta', db_meta))
+
+        return [(k, v) for k, v in kv_pairs if v is not None]
+
     async def create_analysis(
         self,
         analysis_type: str,
@@ -62,44 +102,51 @@ class AnalysisTable(DbBase):
         sequencing_group_ids: List[int],
         meta: Optional[Dict[str, Any]] = None,
         active: bool = True,
-        project: ProjectId = None,
+        project: ProjectId = None
     ) -> int:
         """
-        Create a new sample, and add it to database
+        Create a new analysis and add it to the database.
+
+        :param analysis_type: The type of analysis to be created.
+        :param status: The initial status for the new analysis.
+        :param sequencing_group_ids: List of sequencing group IDs associated with the new analysis.
+        :param meta: Optional dictionary containing meta information for the analysis.
+        :param active: Specifies whether the analysis should be marked as active.
+        :param project: The project ID associated with the new analysis.
+        :return: The ID of the newly created analysis.
         """
+        kv_pairs = await self._construct_shared_kv_pairs(status, meta=meta, active=active, project=project, analysis_type=analysis_type)
+        keys, _ = zip(*kv_pairs)
 
-        async with self.connection.transaction():
-            kv_pairs = [
-                ('type', analysis_type),
-                ('status', status.value),
-                ('meta', to_db_json(meta or {})),
-                ('audit_log_id', await self.audit_log_id()),
-                ('project', project or self.project),
-                ('active', active if active is not None else True),
-            ]
+        _query = f"INSERT INTO analysis ({', '.join(keys)}) VALUES ({', '.join(':' + k for k in keys)}) RETURNING id;"
+        id_of_new_analysis = await self.connection.fetch_val(_query, dict(kv_pairs))
 
-            if status == AnalysisStatus.COMPLETED:
-                kv_pairs.append(('timestamp_completed', datetime.datetime.utcnow()))
-
-            kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
-            keys = [k for k, _ in kv_pairs]
-            cs_keys = ', '.join(keys)
-            cs_id_keys = ', '.join(f':{k}' for k in keys)
-            _query = f"""\
-INSERT INTO analysis
-    ({cs_keys})
-VALUES ({cs_id_keys}) RETURNING id;"""
-
-            id_of_new_analysis = await self.connection.fetch_val(
-                _query,
-                dict(kv_pairs),
-            )
-
-            await self.add_sequencing_groups_to_analysis(
-                id_of_new_analysis, sequencing_group_ids
-            )
-
+        await self.add_sequencing_groups_to_analysis(id_of_new_analysis, sequencing_group_ids)
         return id_of_new_analysis
+
+    async def update_analysis(
+        self,
+        analysis_id: int,
+        status: AnalysisStatus,
+        meta: Dict[str, Any] = None,
+        active: bool = None
+    ):
+        """
+        Update the status of an analysis, set timestamp_completed if relevant.
+
+        :param analysis_id: The ID of the analysis to update.
+        :param status: The new status for the analysis.
+        :param meta: Optional dictionary containing meta information for the analysis.
+        :param active: Specifies whether the analysis should be marked as active.
+        """
+        kv_pairs = await self._construct_shared_kv_pairs(status, active=active)
+        setters = [f'{k} = :{k}' for k, _ in kv_pairs]
+        if meta is not None and len(meta) > 0:
+            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+        fields = dict(kv_pairs, analysis_id=analysis_id)
+
+        _query = f'UPDATE analysis SET {", ".join(setters)} WHERE id = :analysis_id'
+        await self.connection.execute(_query, fields)
 
     async def add_sequencing_groups_to_analysis(
         self, analysis_id: int, sequencing_group_ids: List[int]
@@ -137,44 +184,6 @@ VALUES ({cs_id_keys}) RETURNING id;"""
 
         results = await self.connection.fetch_all(_query, {'date': date})
         return {r['sequencing_group_id'] for r in results}
-
-    async def update_analysis(
-        self,
-        analysis_id: int,
-        status: AnalysisStatus,
-        meta: Dict[str, Any] = None,
-        active: bool = None,
-    ):
-        """
-        Update the status of an analysis, set timestamp_completed if relevant
-        """
-
-        fields: Dict[str, Any] = {
-            'analysis_id': analysis_id,
-            'on_behalf_of': self.author,
-            'audit_log_id': await self.audit_log_id(),
-        }
-        setters = ['audit_log_id = :audit_log_id', 'on_behalf_of = :on_behalf_of']
-        if status:
-            setters.append('status = :status')
-            fields['status'] = status.value
-
-        if active is not None:
-            setters.append('active = :active')
-            fields['active'] = active
-
-        if status == AnalysisStatus.COMPLETED:
-            fields['timestamp_completed'] = datetime.datetime.utcnow()
-            setters.append('timestamp_completed = :timestamp_completed')
-
-        if meta is not None and len(meta) > 0:
-            fields['meta'] = to_db_json(meta)
-            setters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
-
-        fields_str = ', '.join(setters)
-        _query = f'UPDATE analysis SET {fields_str} WHERE id = :analysis_id'
-
-        await self.connection.execute(_query, fields)
 
     async def query(self, filter_: AnalysisFilter) -> List[AnalysisInternal]:
         """
