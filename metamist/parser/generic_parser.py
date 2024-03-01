@@ -534,6 +534,9 @@ class GenericParser(
         If no participants are present, groups samples by their IDs.
         For each sample, gets its sequencing groups by their keys. For each sequencing group, groups assays and analyses.
         """
+        if not isinstance(rows, list):
+            rows = [rows]
+            
         await self.validate_rows(rows)
 
         # one participant with no value
