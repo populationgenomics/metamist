@@ -227,7 +227,9 @@ def etl_load(request: flask.Request):
 def process_request(
     request_id: str, delivery_attempt: int | None = None
 ) -> tuple[dict, int]:
-
+    """
+    Process request_id, delivery_attempt and return result
+    """
     # locate the request_id in bq
     query = f"""
         SELECT * FROM `{BIGQUERY_TABLE}` WHERE request_id = @request_id
