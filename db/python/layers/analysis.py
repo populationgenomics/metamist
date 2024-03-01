@@ -1,7 +1,7 @@
 import datetime
 import warnings
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional, Union
 
 from api.utils import group_by
 from db.python.connect import Connection
@@ -62,32 +62,44 @@ class AnalysisLayer(BaseLayer):
         check_project_id=True,
     ) -> list[AnalysisInternal]:
         """
-        Get a list of all analysis that relevant for samples
+        Retrieves analyses related to given sample IDs based on specified filters and permissions.
 
+        Args:
+            sample_ids: List of integer IDs for samples.
+            analysis_type: Optional; specific type of analysis to filter by.
+            status: Optional; filter analyses by their current status.
+            check_project_id: Boolean indicating whether to check access rights to the related project IDs.
+
+        Returns:
+            A list of AnalysisInternal objects corresponding to the filtered analyses.
         """
-        projects, analysis = await self.analysis_table.get_analyses_for_samples(
-            sample_ids,
-            analysis_type=analysis_type,
-            status=status,
+        projects, analyses = await self.analysis_table.get_analyses_for_samples(
+            sample_ids, analysis_type=analysis_type, status=status
         )
 
-        if len(analysis) == 0:
+        if not analyses:  # Early return if no analyses found
             return []
 
-        if check_project_id:
-            await self.ptable.check_access_to_project_ids(
-                self.author, projects, readonly=True
-            )
+        if check_project_id:  # Check access rights if required
+            await self.ptable.check_access_to_project_ids(self.author, projects, readonly=True)
 
-        return analysis
+        return analyses
 
     async def get_analysis_by_id(self, analysis_id: int, check_project_id=True):
-        """Get analysis by ID"""
+        """
+        Retrieves a specific analysis by its ID, with an optional check for project access rights.
+
+        Args:
+            analysis_id: The integer ID of the analysis to retrieve.
+            check_project_id: Boolean indicating whether to check access rights to the analysis's project ID.
+
+        Returns:
+            An AnalysisInternal object corresponding to the specified analysis ID, or None if not found.
+        """
         project, analysis = await self.analysis_table.get_analysis_by_id(analysis_id)
-        if check_project_id:
-            await self.ptable.check_access_to_project_id(
-                self.author, project, readonly=True
-            )
+
+        if analysis and check_project_id:  # Perform project access check if analysis exists and is required
+            await self.ptable.check_access_to_project_id(self.author, project, readonly=True)
 
         return analysis
 
@@ -97,7 +109,18 @@ class AnalysisLayer(BaseLayer):
         analysis_type: str,
         meta: dict[str, Any] = None,
     ) -> AnalysisInternal:
-        """Get SINGLE latest complete analysis for some analysis type"""
+        """
+        Retrieves the most recent completed analysis of a specified type for a given project.
+
+        Args:
+            project: The project identifier for which the analysis is being retrieved.
+            analysis_type: A string representing the specific type of analysis to retrieve.
+            meta: An optional dictionary containing additional metadata parameters for the query.
+
+        Returns:
+            The latest completed analysis of the specified type for the given project.
+        """
+        meta = meta or {}  # Safeguard against mutable default argument
         return await self.analysis_table.get_latest_complete_analysis_for_type(
             project=project, analysis_type=analysis_type, meta=meta
         )
@@ -106,17 +129,31 @@ class AnalysisLayer(BaseLayer):
         self, project: ProjectId, analysis_type: str
     ):
         """
-        Find all the sequencing_groups that don't have an "analysis_type"
+        Retrieves all sequencing group IDs associated with a given project that do not have a specified analysis type.
+
+        Args:
+            project: The project identifier to filter sequencing groups.
+            analysis_type: The type of analysis to exclude in the search.
+
+        Returns:
+            A list of sequencing group IDs that do not have the specified analysis type.
         """
         return await self.analysis_table.get_all_sequencing_group_ids_without_analysis_type(
-            analysis_type=analysis_type, project=project
+            project=project, analysis_type=analysis_type
         )
 
     async def get_incomplete_analyses(
         self, project: ProjectId
     ) -> list[AnalysisInternal]:
         """
-        Gets details of analysis with status queued or in-progress
+        Retrieves all analyses for a specified project that are currently not complete,
+        specifically those with statuses 'queued' or 'in-progress'.
+
+        Args:
+            project: The identifier of the project for which to retrieve incomplete analyses.
+
+        Returns:
+            A list of AnalysisInternal instances representing each incomplete analysis for the project.
         """
         return await self.analysis_table.get_incomplete_analyses(project=project)
 
@@ -126,7 +163,20 @@ class AnalysisLayer(BaseLayer):
         sequencing_types: list[str],
         participant_ids: list[int] = None,
     ) -> list[dict[str, Any]]:
-        """Get (ext_participant_id, cram_path, internal_id) map"""
+        """
+        Retrieves a mapping of external participant IDs to CRAM file paths and internal IDs for a given project,
+        filtered by sequencing types and optionally by participant IDs.
+
+        This mapping is specifically formatted for use in the seqr project, facilitating data retrieval and organization.
+
+        Args:
+            project: The project identifier for which the CRAM path mapping is being retrieved.
+            sequencing_types: A list of strings representing the types of sequencing to filter the CRAM paths.
+            participant_ids: Optional; a list of integer IDs representing specific participants to include in the mapping.
+
+        Returns:
+            A list of dictionaries, each containing 'ext_participant_id', 'cram_path', and 'internal_id' keys, representing each relevant sample.
+        """
         return await self.analysis_table.get_sample_cram_path_map_for_seqr(
             project=project,
             sequencing_types=sequencing_types,
@@ -134,7 +184,19 @@ class AnalysisLayer(BaseLayer):
         )
 
     async def query(self, filter_: AnalysisFilter, check_project_ids=True):
-        """Query analyses"""
+        """
+        Queries and returns analyses based on specified filters. Optionally checks for access rights
+        to the projects associated with these analyses if no specific project is defined in the filter.
+
+        Args:
+            filter_: An AnalysisFilter object containing filtering criteria for the analyses.
+            check_project_ids: A boolean flag indicating whether to check access rights for the projects
+                            of the returned analyses if no project is specified in the filter.
+
+        Returns:
+            A list of AnalysisInternal objects that match the filter criteria. Returns an empty list if
+            no analyses match the criteria.
+        """
         analyses = await self.analysis_table.query(filter_)
 
         if not analyses:
@@ -142,7 +204,7 @@ class AnalysisLayer(BaseLayer):
 
         if check_project_ids and not filter_.project:
             await self.ptable.check_access_to_project_ids(
-                self.author, set(a.project for a in analyses), readonly=True
+                self.author, {a.project for a in analyses}, readonly=True
             )
 
         return analyses
@@ -540,7 +602,50 @@ class AnalysisLayer(BaseLayer):
         """Get audit logs for analysis IDs"""
         return await self.analysis_table.get_audit_log_for_analysis_ids(analysis_ids)
 
+    async def add_sequencing_groups_to_analysis(
+        self, analysis_id: int, sequencing_group_ids: list[int], check_project_id=True
+    ):
+        """Add samples to an analysis (through the linked table)"""
+        if check_project_id:
+            project_ids = await self.analysis_table.get_project_ids_for_analysis_ids([analysis_id])
+            await self.ptable.check_access_to_project_ids(
+                self.author, project_ids, readonly=False
+            )
+
+        return await self.analysis_table.add_sequencing_groups_to_analysis(
+            analysis_id=analysis_id, sequencing_group_ids=sequencing_group_ids
+        )
+
     # CREATE / UPDATE
+
+    async def _handle_analysis_outputs(
+        self,
+        analysis_id: int,
+        output: Optional[Union[str, dict]],
+        outputs: Optional[Union[str, dict]]
+    ):
+        """
+        Handle the deprecation of 'output' and update analysis output files.
+
+        :param analysis_id: ID of the analysis.
+        :param output: Deprecated single output field.
+        :param outputs: New outputs field.
+        """
+        if output:
+            warnings.warn(
+                'Analysis.output will be deprecated, use Analysis.outputs instead',
+                PendingDeprecationWarning,
+                stacklevel=2
+            )
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(
+                analysis_id=analysis_id,
+                json_dict=output
+            )
+        elif outputs:
+            await self.output_file_table.create_or_update_analysis_output_files_from_json(
+                analysis_id=analysis_id,
+                json_dict=outputs
+            )
 
     async def create_analysis(
         self,
@@ -557,30 +662,14 @@ class AnalysisLayer(BaseLayer):
             project=project,
         )
 
-        # TODO deprecate the output field
-        if analysis.output:
-            warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
-
-            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.output)
-
-        elif analysis.outputs:
-            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=new_analysis_id, json_dict=analysis.outputs)
+        # Handle analysis outputs
+        await self._handle_analysis_outputs(
+            analysis_id=new_analysis_id,
+            output=analysis.output,
+            outputs=analysis.outputs
+        )
 
         return new_analysis_id
-
-    async def add_sequencing_groups_to_analysis(
-        self, analysis_id: int, sequencing_group_ids: list[int], check_project_id=True
-    ):
-        """Add samples to an analysis (through the linked table)"""
-        if check_project_id:
-            project_ids = await self.analysis_table.get_project_ids_for_analysis_ids([analysis_id])
-            await self.ptable.check_access_to_project_ids(
-                self.author, project_ids, readonly=False
-            )
-
-        return await self.analysis_table.add_sequencing_groups_to_analysis(
-            analysis_id=analysis_id, sequencing_group_ids=sequencing_group_ids
-        )
 
     async def update_analysis(
         self,
@@ -606,11 +695,12 @@ class AnalysisLayer(BaseLayer):
             meta=meta,
         )
 
-        if output:
-            warnings.warn('Analysis.output will be deprecated, use Analysis.outputs instead', PendingDeprecationWarning, stacklevel=2)
-            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=output)
-        elif outputs:
-            await self.output_file_table.create_or_update_analysis_output_files_from_json(analysis_id=analysis_id, json_dict=outputs)
+        # Handle analysis outputs
+        await self._handle_analysis_outputs(
+            analysis_id=analysis_id,
+            output=output,
+            outputs=outputs
+        )
 
     async def get_analysis_runner_log(
         self,
