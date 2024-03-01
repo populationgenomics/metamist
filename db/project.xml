@@ -1107,4 +1107,77 @@
 		<sql>ALTER TABLE sequencing_group_assay CHANGE author author VARCHAR(255) NULL;</sql>
 		<sql>ALTER TABLE sequencing_group_external_id CHANGE author author VARCHAR(255) NULL;</sql>
 	</changeSet>
+	<changeSet id="2024-02-27_analysis-runner-table" author="michael.franklin">
+		<sql>SET @@system_versioning_alter_history = 1;</sql>
+		<createTable tableName="analysis_runner">
+			<column name="ar_guid" type="VARCHAR(255)">
+				<constraints nullable="false" unique="true" />
+			</column>
+			<column name="project" type="int">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_AR_PROJECT"
+					references="project(id)"
+				/>
+
+			</column>
+			<column name="timestamp" type="date" />
+			<column name="access_level" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="repository" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="commit" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="output_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="script" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="driver_image" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="config_path" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="cwd" type="VARCHAR(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="environment" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="hail_version" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="batch_url" type="VARCHAR(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="submitting_user" type="VARCHAR(255)" />
+			<column name="meta" type="JSON" />
+			<column name="audit_log_id" type="INT">
+				<constraints
+					nullable="false"
+					foreignKeyName="FK_ANALYSIS_RUNNER_CHANGELOG_ID"
+					references="audit_log(id)"
+				/>
+			</column>
+		</createTable>
+
+		<createIndex indexName="idx_ar_guid" tableName="analysis_runner">
+			<column name="ar_guid" />
+		</createIndex>
+		<createIndex tableName="analysis_runner" indexName="idx_ar_submitting_user">
+			<column name="submitting_user" />
+		</createIndex>
+
+
+		<sql> ALTER TABLE analysis_runner ADD SYSTEM VERSIONING; </sql>
+
+	</changeSet>
 </databaseChangeLog>

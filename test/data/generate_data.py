@@ -5,9 +5,15 @@ import asyncio
 import datetime
 import random
 from pathlib import Path
-from pprint import pprint
 
-from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
+from metamist.apis import (
+    AnalysisApi,
+    AnalysisRunnerApi,
+    FamilyApi,
+    ParticipantApi,
+    ProjectApi,
+    SampleApi,
+)
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.model.analysis_status import AnalysisStatus
@@ -50,6 +56,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
     papi = ProjectApi()
     sapi = SampleApi()
     aapi = AnalysisApi()
+    ar_api = AnalysisRunnerApi()
 
     enum_resp: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
     # analysis_types = enum_resp['enum']['analysisType']
@@ -156,8 +163,8 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
                         )
                     )
 
-    response = await sapi.upsert_samples_async(project, samples)
-    pprint(response)
+    # response = await sapi.upsert_samples_async(project, samples)
+    # pprint(response)
 
     # practice what you preach I guess
 
@@ -183,31 +190,33 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
         )
         for s in sequencing_group_ids
     ]
-
-    analyses_to_insert.extend(
-        [
-            Analysis(
-                sample_ids=[],
-                type='analysis-runner',
-                status=AnalysisStatus('completed'),
-                output=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
-                active=True,
-                meta={
-                    'accessLevel': 'full',
-                    'commit': 'some-hash',
-                    'script': 'myFakeScript.py',
-                    'description': 'just analysis things',
-                    'hailVersion': '1.0',
-                    'source': 'analysis-runner',
-                    'cwd': 'scripts',
-                    'repo': 'some-repo',
-                    'driverImage': 'fake-australia-southeast1-fake-docker.pkg',
-                    'batch_url': f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
-                },
-            )
-            for s in random.choices(sequencing_group_ids, k=10)
-        ]
+    ar_entries_inserted = len(
+        await asyncio.gather(
+            *[
+                ar_api.create_analysis_runner_log_async(
+                    project=project,
+                    ar_guid=f'fake-guid-{s}',
+                    output_path=f'FAKE://greek-myth-test/joint-calling/{s}.joint',
+                    access_level=random.choice(['full', 'standard', 'restricted']),
+                    repository="metamist",
+                    config_path="gs://path/to/config.toml",
+                    environment="gcp",
+                    submitting_user="fake-user",
+                    # meta
+                    request_body={},
+                    commit='some-hash',
+                    script='myFakeScript.py',
+                    description='just analysis things',
+                    hail_version='1.0',
+                    cwd='scripts',
+                    driver_image='fake-australia-southeast1-fake-docker.pkg',
+                    batch_url=f'FAKE://batch.hail.populationgenomics.org.au/batches/fake_{s}',
+                )
+                for s in random.choices(sequencing_group_ids, k=10)
+            ]
+        )
     )
+    print(f'Inserted {ar_entries_inserted} analysis runner entries')
 
     # es-index
     analyses_to_insert.append(
@@ -224,39 +233,7 @@ async def main(ped_path=default_ped_location, project='greek-myth'):
 
     for ans in chunk(analyses_to_insert, 50):
         print(f'Inserting {len(ans)} analysis entries')
-        await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
-
-    # create some fake analysis-runner entries
-    ar_entries = 20
-    print(f'Inserting {ar_entries} analysis-runner entries')
-    await asyncio.gather(
-        *(
-            aapi.create_analysis_async(
-                project,
-                Analysis(
-                    sequencing_group_ids=[],
-                    type='analysis-runner',
-                    status=AnalysisStatus('unknown'),
-                    output='gs://cpg-fake-bucket/output',
-                    meta={
-                        'timestamp': f'2022-08-{i+1}T10:00:00.0000+00:00',
-                        'accessLevel': 'standard',
-                        'repo': 'sample-metadata',
-                        'commit': '7234c13855cc15b3471d340757ce87e7441abeb9',
-                        'script': 'python3 -m <script>',
-                        'description': f'Run {i+1}',
-                        'driverImage': 'australia-southeast1-docker.pkg.dev/ar/images/image:tag',
-                        'configPath': 'gs://cpg-config/<guid>.toml',
-                        'cwd': None,
-                        'hailVersion': '0.2.126-cac7ac4164b2',
-                        'batch_url': 'https://batch.hail.populationgenomics.org.au/batches/0',
-                        'source': 'analysis-runner',
-                    },
-                ),
-            )
-            for i in range(ar_entries)
-        )
-    )
+        # await asyncio.gather(*[aapi.create_analysis_async(project, a) for a in ans])
 
 
 if __name__ == '__main__':

@@ -33,20 +33,38 @@ const MAIN_FIELDS = [
     { category: 'mode', title: 'Mode' },
 ]
 
+interface AnalysisRunnerGridValues {
+    arGuid: string
+    timestamp: any
+    accessLevel: string
+    repository: string
+    commit: string
+    script: string
+    description: string
+    driverImage: string
+    configPath: string
+    cwd: string
+    environment: string
+    hailVersion: string
+    batchUrl: string
+    submittingUser: string
+    meta: any
+}
+
 const AnalysisRunnerGrid: React.FunctionComponent<{
-    data: any[]
+    data: AnalysisRunnerGridValues[]
     filters: Filter[]
     updateFilter: (value: string, category: string) => void
     handleSort: (clickedColumn: string) => void
     sort: { column: string | null; direction: string | null }
 }> = ({ data, filters, updateFilter, handleSort, sort }) => {
-    const [openRows, setOpenRows] = React.useState<number[]>([])
+    const [openRows, setOpenRows] = React.useState<Set<string>>(new Set())
 
-    const handleToggle = (position: number) => {
-        if (!openRows.includes(position)) {
-            setOpenRows([...openRows, position])
+    const handleToggle = (arGuid: string) => {
+        if (!openRows.has(arGuid)) {
+            setOpenRows(new Set(...openRows, arGuid))
         } else {
-            setOpenRows(openRows.filter((i) => i !== position))
+            setOpenRows(new Set([...openRows].filter((r) => r !== arGuid)))
         }
     }
 
@@ -132,13 +150,13 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
             </SUITable.Header>
             <SUITable.Body>
                 {data.map((log) => (
-                    <React.Fragment key={log.id}>
+                    <React.Fragment key={log.arGuid}>
                         <SUITable.Row>
                             <SUITable.Cell collapsing>
                                 <Checkbox
-                                    checked={openRows.includes(log.position)}
+                                    checked={openRows.has(log.arGuid)}
                                     slider
-                                    onChange={() => handleToggle(log.position)}
+                                    onChange={() => handleToggle(log.arGuid)}
                                 />
                             </SUITable.Cell>
                             {MAIN_FIELDS.map(({ category }) => {
@@ -150,7 +168,7 @@ const AnalysisRunnerGrid: React.FunctionComponent<{
                                                 style={{ width: '100px' }}
                                             >
                                                 <a
-                                                    href={`${log.batch_url}`}
+                                                    href={`${log.batchUrl}`}
                                                     rel="noopener noreferrer"
                                                     target="_blank"
                                                 >
