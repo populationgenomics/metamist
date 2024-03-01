@@ -536,7 +536,7 @@ class GenericParser(
         """
         if not isinstance(rows, list):
             rows = [rows]
-            
+
         await self.validate_rows(rows)
 
         # one participant with no value
