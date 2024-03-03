@@ -45,8 +45,8 @@ The codebase contains the following modules worth noting:
 - `models` -> General data models + enums
 - `db/python/tables` -> Interaction with MariaDB / BigQuery
 - `db/python/layers` -> Logic
-- `api/graphql` : GraphQL
-- `api/routes`: HTTP + OpenAPI
+- `api/graphql` -> GraphQL
+- `api/routes` -> HTTP + OpenAPI
 
 And metamist maintains two clients:
 
