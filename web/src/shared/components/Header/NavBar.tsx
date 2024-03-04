@@ -38,6 +38,11 @@ const billingPages = {
             icon: <TableRowsIcon />,
         },
         {
+            title: 'Cost By Month',
+            url: '/billing/costByMonth',
+            icon: <TableRowsIcon />,
+        },
+        {
             title: 'Cost By Time',
             url: '/billing/costByTime',
             icon: <TableRowsIcon />,
