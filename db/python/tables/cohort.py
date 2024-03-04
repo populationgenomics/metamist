@@ -149,7 +149,7 @@ class CohortTable(DbBase):
         sequencing_group_ids: list[int],
         author: str,
         description: str,
-        derived_from: int | None = None,
+        derived_from: int,
     ) -> int:
         """
         Create a new cohort

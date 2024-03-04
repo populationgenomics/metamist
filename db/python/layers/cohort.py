@@ -79,6 +79,8 @@ class CohortLayer(BaseLayer):
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
 
+        create_cohort_template = True
+
         # Input validation
         if not cohort_criteria and not template_id:
             raise ValueError('A cohort must have either criteria or be derived from a template')
@@ -87,9 +89,12 @@ class CohortLayer(BaseLayer):
         template: dict[str, str] = {}
         if template_id:
             template = await self.ct.get_cohort_template(template_id)
+            if not template:
+                raise ValueError(f'Cohort template with ID {template_id} not found')
 
         # Only provide a template id
         if template and not cohort_criteria:
+            create_cohort_template = False
             criteria_dict = json.loads(template['criteria'])
             cohort_criteria = CohortCriteria(**criteria_dict)
 
@@ -133,6 +138,19 @@ class CohortLayer(BaseLayer):
             )
         )
 
+        if create_cohort_template:
+            cohort_template = CohortTemplate(
+                name=cohort_name,
+                description=description,
+                criteria=cohort_criteria
+            )
+            template_id = await self.create_cohort_template(
+                cohort_template=cohort_template,
+                project=project_to_write
+            )
+
+        assert template_id, 'Template ID must be set'
+
         # 2. Create Cohort
         cohort_id = await self.ct.create_cohort(
             project=project_to_write,
@@ -140,6 +158,7 @@ class CohortLayer(BaseLayer):
             sequencing_group_ids=[sg.id for sg in sgs],
             description=description,
             author=author,
+            derived_from=template_id,
         )
 
         return cohort_id
