@@ -80,7 +80,7 @@ class CohortBody(BaseModel):
 class CohortCriteria(BaseModel):
     """Represents the expected JSON body of the create cohort request"""
 
-    projects: list[str]
+    projects: list[str] | None = []
     sg_ids_internal: list[str] | None = None
     excluded_sgs_internal: list[str] | None = None
     sg_technology: list[str] | None = None

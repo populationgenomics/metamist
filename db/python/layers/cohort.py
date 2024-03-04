@@ -79,6 +79,10 @@ class CohortLayer(BaseLayer):
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
         """
 
+        # Input validation
+        if not cohort_criteria and not template_id:
+            raise ValueError('A cohort must have either criteria or be derived from a template')
+
         # Get template from ID
         template: dict[str, str] = {}
         if template_id:
@@ -88,6 +92,10 @@ class CohortLayer(BaseLayer):
         if template and not cohort_criteria:
             criteria_dict = json.loads(template['criteria'])
             cohort_criteria = CohortCriteria(**criteria_dict)
+
+        if template and cohort_criteria:
+            # TODO: Handle this case. For now, not supported.
+            raise ValueError('A cohort cannot have both criteria and be derived from a template')
 
         projects_to_pull = await self.pt.get_and_check_access_to_projects_for_names(
             user=self.connection.author, project_names=cohort_criteria.projects, readonly=True
