@@ -651,7 +651,10 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
 
         # prepare custom audience_list
         custom_audience_list = None
-        if self.config.metamist.etl.custom_audience_list:
+        if (
+            self.config.metamist.etl.custom_audience_list
+            and self.config.metamist.etl.custom_audience_list.get(f_name)
+        ):
             custom_audience_list = json.dumps(
                 self.config.metamist.etl.custom_audience_list.get(f_name)
             )

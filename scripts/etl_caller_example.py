@@ -16,7 +16,7 @@ from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
 URL = 'https://metamist-extract.popgen.rocks'
-TYPE = 'bbv/v1'  # 'NAME_OF_EXTERNAL_PARTY/v1'
+TYPE = 'NAME_OF_EXTERNAL_PARTY/v1'
 
 
 def make_request(body: dict | list):
