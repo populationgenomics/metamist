@@ -4,7 +4,7 @@ import { Button, Card, Grid, Input, Message, Select, Dropdown } from 'semantic-u
 import SearchIcon from '@mui/icons-material/Search'
 
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
-import { BillingApi, BillingTotalCostRecord } from '../../sm-api'
+import { BillingApi, BillingTotalCostRecord, AnalysisApi } from '../../sm-api'
 import HailBatchGrid from './components/HailBatchGrid'
 import HailBatchGridTemp from './components/HailBatchGridTemp'
 import HailBatchGridTempVirtuoso from './components/HailBatchGridTempVirtouso'
@@ -12,6 +12,7 @@ import HailBatchGridNew from './components/HailBatchGridNew'
 
 import { getMonthStartDate } from '../../shared/utilities/monthStartEndDate'
 import generateUrl from '../../shared/utilities/generateUrl'
+import { List } from 'lodash'
 
 enum SearchType {
     Ar_guid,
@@ -30,6 +31,36 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     )
 
     const [data, setData] = React.useState<any>(undefined)
+
+    const setArData = (arData: []) => {
+        setIsLoading(false)
+        // arData is an array of objects, we use only the first obejct
+        // in the future we maye have search by several ar_guids / author etc.
+        if (arData === undefined || arData.length === 0) {
+            // nothing found
+            setIsLoading(false)
+            return;
+        }
+        const ar_record = arData[0]
+        if(
+            ar_record !== undefined &&
+            ar_record.total !== undefined &&
+            ar_record.total.ar_guid !== undefined
+        ) {
+            new AnalysisApi()
+                .getAnalysisRunnerLog(undefined, undefined, ar_record.total.ar_guid, undefined)
+                .then((response) => {
+                    // combine arData and getAnalysisRunnerLog
+                    if (response.data.length > 0) {
+                        // use only the first record for now
+                        ar_record.analysisRunnerLog = response.data[0]
+                    }
+                    setData(ar_record)
+                })
+                .catch((er) => setError(er.message))
+        }
+        setIsLoading(false)
+    }
 
     const [searchTxt, setSearchTxt] = React.useState<string>(searchParams.get('searchTxt') ?? '')
 
@@ -55,7 +86,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         navigate(url)
     }
 
-    const getData = (sType: SearchType | undefined | string, sTxt: string) => {
+    const getArData = (sType: SearchType | undefined | string, sTxt: string) => {
         if ((sType === undefined || sTxt === undefined) && sTxt.length < 6) {
             // Seaarch text is not large enough
             setIsLoading(false)
@@ -71,16 +102,14 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
             new BillingApi()
                 .costByArGuid(sTxt)
                 .then((response) => {
-                    setIsLoading(false)
-                    setData(response.data)
+                    setArData(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else if (convertedType === SearchType.Batch_id) {
             new BillingApi()
                 .costByBatchId(sTxt)
                 .then((response) => {
-                    setIsLoading(false)
-                    setData(response.data)
+                    setArData(response.data)
                 })
                 .catch((er) => setError(er.message))
         } else {
@@ -90,11 +119,11 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
 
     const handleSearch = () => {
         if (searchByType === undefined || searchTxt === undefined || searchTxt.length < 6) {
-            // Seaarch text is not large enough
+            // Search text is not large enough
             setIsLoading(false)
             return
         }
-        getData(searchByType, searchTxt)
+        getArData(searchByType, searchTxt)
     }
 
     const handleSearchChange = (event: any, dt: any) => {
@@ -216,7 +245,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
     //     </Card>
     // )
 
-    const gridCard = (gridData: BillingTotalCostRecord[]) => (
+    const gridCard = (gridData: BillingTotalCostRecord) => (
         <Card fluid style={{ padding: '20px', overflowX: 'scroll' }} id="billing-container-data">
             <HailBatchGridNew data={gridData} />
         </Card>
@@ -228,7 +257,7 @@ const BillingCostByAnalysis: React.FunctionComponent = () => {
         //     return gridCard(data.costs)
         // }
 
-        if (data !== undefined && data.length > 0) {
+        if (data !== undefined) {
             // only render grid if there are available cost data
             return gridCard(data)
         }

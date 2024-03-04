@@ -493,6 +493,9 @@ ORDER BY a.timestamp_completed DESC;
         """
         Get log for the analysis-runner, useful for checking this history of analysis
         """
+        print('project_ids', project_ids)
+        print('output_dir', output_dir)
+        print('ar_guid', ar_guid)
         values: dict[str, Any] = {}
         wheres = [
             "type = 'analysis-runner'",
@@ -514,8 +517,9 @@ ORDER BY a.timestamp_completed DESC;
         # Temp disable
         # wheres_str = ' AND '.join(wheres)
         # _query = f'SELECT * FROM analysis WHERE {wheres_str}'
+        # rows = await self.connection.fetch_all(_query, values)
         _query = f'SELECT * FROM analysis order by id desc LIMIT 1'
-        rows = await self.connection.fetch_all(_query, values)
+        rows = await self.connection.fetch_all(_query)
         return [AnalysisInternal.from_db(**dict(r)) for r in rows]
 
     # region STATS

@@ -117,6 +117,13 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 SELECT ARRAY_AGG(STRUCT(sku, cost)) AS skus,
                 FROM arsku
             )
+            ,seqgrp AS (
+                select sequencing_group, stage, sum(cost) as cost from d group by stage, sequencing_group
+            )
+            ,seqgrpacc AS (
+                SELECT ARRAY_AGG(STRUCT(sequencing_group, stage, cost)) as seq_groups
+                FROM seqgrp
+            )
             , t3 AS (
                     SELECT topic, SUM(cost) AS cost
                     FROM d
@@ -200,11 +207,20 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 GROUP BY batch_id, batch_name
                 ORDER BY batch_id
             )
+            ,bseqgrp AS (
+                select batch_id, sequencing_group, stage, sum(cost) as cost from d group by batch_id, sequencing_group, stage
+            )
+            ,bseqgrpacc AS (
+                SELECT batch_id, ARRAY_AGG(STRUCT(sequencing_group, stage, cost)) as seq_groups
+                FROM bseqgrp
+                GROUP BY batch_id
+            )
             ,bacc as (
-                SELECT ARRAY_AGG(STRUCT(b.batch_id, batch_name, cost, usage_start_time, usage_end_time, jobs_cnt, bskuacc.skus, jacc.jobs)) AS batches
+                SELECT ARRAY_AGG(STRUCT(b.batch_id, batch_name, cost, usage_start_time, usage_end_time, jobs_cnt, bskuacc.skus, jacc.jobs, bseqgrpacc.seq_groups)) AS batches
                 from b
                 INNER JOIN bskuacc on bskuacc.batch_id = b.batch_id
                 INNER JOIN jacc ON jacc.batch_id = b.batch_id
+                INNER JOIN bseqgrpacc ON bseqgrpacc.batch_id = b.batch_id
             )
             -- cromwell specific
             , wdlsku AS (
@@ -295,15 +311,13 @@ class BillingDailyExtendedTable(BillingBaseTable):
                 INNER JOIN cswskuacc on cswskuacc.cromwell_sub_workflow_name = csw.cromwell_sub_workflow_name
             )
             -- merge all in one record
-            SELECT t.total, t3acc.topics, ccacc.categories, bacc.batches, arskuacc.skus, wdlacc.wdl_tasks, cswacc.cromwell_sub_workflows, cwiacc.cromwell_workflows
-            FROM t, t3acc, ccacc, bacc, arskuacc, wdlacc, cswacc, cwiacc
+            SELECT t.total, t3acc.topics, ccacc.categories, bacc.batches, arskuacc.skus, wdlacc.wdl_tasks, cswacc.cromwell_sub_workflows, cwiacc.cromwell_workflows, seqgrpacc.seq_groups
+            FROM t, t3acc, ccacc, bacc, arskuacc, wdlacc, cswacc, cwiacc, seqgrpacc
 
 
         """
 
         query_job_result = self._execute_query(_query, query_parameters, False)
-
-        # print('query_job_result:', query_job_result)
 
         if query_job_result:
             return [

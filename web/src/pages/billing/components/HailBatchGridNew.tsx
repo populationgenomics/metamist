@@ -26,14 +26,12 @@ interface Field {
 const hailBatchUrl = 'https://batch.hail.populationgenomics.org.au/batches'
 
 const HailBatchGridNew: React.FunctionComponent<{
-    data: any[]
+    data: any
 }> = ({ data }) => {
     // prepare aggregated data by ar_guid, batch_id, job_id and coresponding batch_resource
 
     // combine data and resource for each ar_guid, batch_id, job_id
-    const combinedData = data
-
-    console.log('combinedData', combinedData)
+    console.log('data', data)
 
     const [openRows, setOpenRows] = React.useState<number[]>([])
 
@@ -204,7 +202,7 @@ const HailBatchGridNew: React.FunctionComponent<{
 
     const ExpandableRow = ({ item, ...props }) => {
         const index = props['data-index']
-        console.log('item', item, 'props', props, 'index', index)
+        // console.log('item', item, 'props', props, 'index', index)
         return (
             <React.Fragment key={`${item.batch_id}-${item.job_id}`}>
                 <TableRow
@@ -295,886 +293,1037 @@ const HailBatchGridNew: React.FunctionComponent<{
         TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
     }
 
+    const idx = 0
+
     return (
         <>
             <SUITable celled compact>
                 <SUITable.Body>
-                    {combinedData.map((item, idx) => (
-                        <>
-                            <SUITable.Row key={idx}>
-                                <SUITable.Cell style={{ width: 50 }}>
-                                    <Checkbox
-                                        checked={openRows.includes(idx)}
-                                        toggle
-                                        onChange={() => handleToggle(idx)}
-                                    />
-                                </SUITable.Cell>
+                    <>
+                        <SUITable.Row key={idx}>
+                            <SUITable.Cell style={{ width: 50 }}>
+                                <Checkbox
+                                    checked={openRows.includes(idx)}
+                                    toggle
+                                    onChange={() => handleToggle(idx)}
+                                />
+                            </SUITable.Cell>
 
-                                <SUITable.Cell colspan="2">
-                                    AR-GUID: {item.total.ar_guid}
-                                </SUITable.Cell>
-                            </SUITable.Row>
+                            <SUITable.Cell colspan="2">
+                                AR-GUID: {data.total.ar_guid}
+                            </SUITable.Cell>
+                        </SUITable.Row>
 
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(idx) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${idx}-detail-2`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 250 }}>
-                                    <b>Start</b>
-                                </SUITable.Cell>
-                                <SUITable.Cell>${item.total.usage_start_time}</SUITable.Cell>
-                            </SUITable.Row>
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${idx}-detail-2`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}>
+                                <b>Start</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell>${data.total.usage_start_time}</SUITable.Cell>
+                        </SUITable.Row>
 
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(idx) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${idx}-detail-3`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 250 }}>
-                                    <b>End</b>
-                                </SUITable.Cell>
-                                <SUITable.Cell>${item.total.usage_end_time}</SUITable.Cell>
-                            </SUITable.Row>
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${idx}-detail-3`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}>
+                                <b>End</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell>${data.total.usage_end_time}</SUITable.Cell>
+                        </SUITable.Row>
 
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(idx) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${idx}-detail-1`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 250 }}>
-                                    <b>Total Cost</b>
-                                </SUITable.Cell>
-                                <SUITable.Cell>{formatMoney(item.total.cost, 2)}</SUITable.Cell>
-                            </SUITable.Row>
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${idx}-detail-3`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}>
+                                <b>Status</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell>{data.analysisRunnerLog.status}</SUITable.Cell>
+                        </SUITable.Row>
 
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(idx) ? 'table-row' : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`${idx}-detail-1`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 250 }}></SUITable.Cell>
-                                <SUITable.Cell>
-                                    <SUITable celled compact>
-                                        <SUITable.Header>
-                                            <SUITable.Row>
-                                                <SUITable.HeaderCell>Topic</SUITable.HeaderCell>
-                                                <SUITable.HeaderCell>Cost</SUITable.HeaderCell>
-                                            </SUITable.Row>
-                                        </SUITable.Header>
-                                        <SUITable.Body>
-                                            {item.topics.map((trec, tidx) => (
-                                                <SUITable.Row>
-                                                    <SUITable.Cell>{trec.topic}</SUITable.Cell>
-                                                    <SUITable.Cell>
-                                                        {formatMoney(trec.cost, 2)}
-                                                    </SUITable.Cell>
-                                                </SUITable.Row>
-                                            ))}
-                                        </SUITable.Body>
-                                    </SUITable>
-                                </SUITable.Cell>
-                            </SUITable.Row>
+                        {/* all meta */}
 
-                            {item.categories.map((tcat, cidx) => (
+                        {Object.keys(data.analysisRunnerLog.meta).map((key) => {
+                            const mcat = data.analysisRunnerLog.meta[key];
+                            return (
                                 <SUITable.Row
                                     style={{
                                         display: openRows.includes(idx) ? 'table-row' : 'none',
                                         backgroundColor: 'var(--color-bg)',
                                     }}
-                                    key={`${idx}-detail-1`}
+                                    key={`${idx}-detail-${key}`}
                                 >
                                     <SUITable.Cell style={{ border: 'none' }} />
                                     <SUITable.Cell style={{ width: 250 }}>
-                                        <b>{tcat.category}</b>
+                                        <b>{key}</b>
                                     </SUITable.Cell>
-                                    <SUITable.Cell>
-                                        {formatMoney(tcat.cost, 2)}{' '}
-                                        {tcat.workflows !== null
-                                            ? `(across ${tcat.workflows} workflows)`
-                                            : ''}
-                                    </SUITable.Cell>
+                                    <SUITable.Cell>{mcat}</SUITable.Cell>
                                 </SUITable.Row>
-                            ))}
+                            );
+                        })}
+    
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${idx}-detail-1`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}>
+                                <b>Total Cost</b>
+                            </SUITable.Cell>
+                            <SUITable.Cell>{formatMoney(data.total.cost, 2)}</SUITable.Cell>
+                        </SUITable.Row>
 
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`${idx}-detail-1`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}></SUITable.Cell>
+                            <SUITable.Cell>
+                                <SUITable celled compact>
+                                    <SUITable.Header>
+                                        <SUITable.Row>
+                                            <SUITable.HeaderCell>Topic</SUITable.HeaderCell>
+                                            <SUITable.HeaderCell>Cost</SUITable.HeaderCell>
+                                        </SUITable.Row>
+                                    </SUITable.Header>
+                                    <SUITable.Body>
+                                        {data.topics.map((trec, tidx) => (
+                                            <SUITable.Row>
+                                                <SUITable.Cell>{trec.topic}</SUITable.Cell>
+                                                <SUITable.Cell>
+                                                    {formatMoney(trec.cost, 2)}
+                                                </SUITable.Cell>
+                                            </SUITable.Row>
+                                        ))}
+                                    </SUITable.Body>
+                                </SUITable>
+                            </SUITable.Cell>
+                        </SUITable.Row>
+
+                        {data.categories.map((tcat, cidx) => (
                             <SUITable.Row
                                 style={{
                                     display: openRows.includes(idx) ? 'table-row' : 'none',
                                     backgroundColor: 'var(--color-bg)',
                                 }}
-                                key={`ByLabels${idx}`}
+                                key={`${idx}-detail-1`}
                             >
                                 <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell style={{ width: 50 }}>
-                                    <Checkbox
-                                        checked={openRows.includes(`ByLabels${idx}`)}
-                                        toggle
-                                        onChange={() => handleToggle(`ByLabels${idx}`)}
-                                    />
+                                <SUITable.Cell style={{ width: 250 }}>
+                                    <b>{tcat.category}</b>
                                 </SUITable.Cell>
-                                <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                            </SUITable.Row>
-
-                            <SUITable.Row
-                                style={{
-                                    display: openRows.includes(`ByLabels${idx}`)
-                                        ? 'table-row'
-                                        : 'none',
-                                    backgroundColor: 'var(--color-bg)',
-                                }}
-                                key={`ByLabels${idx}-details`}
-                            >
-                                <SUITable.Cell style={{ border: 'none' }} />
-                                <SUITable.Cell />
                                 <SUITable.Cell>
-                                    <DonutChart
-                                        data={item.skus.map((srec) => ({
-                                            label: srec.sku,
-                                            value: srec.cost,
-                                        }))}
-                                        maxSlices={item.skus.length}
-                                        legendSize={0.6}
-                                    />
-
-                                    <SUITable celled compact>
-                                        <SUITable.Header>
-                                            <SUITable.Row>
-                                                <SUITable.HeaderCell>SKU</SUITable.HeaderCell>
-                                                <SUITable.HeaderCell>COST</SUITable.HeaderCell>
-                                            </SUITable.Row>
-                                        </SUITable.Header>
-                                        <SUITable.Body>
-                                            {item.skus.map((srec, sidx) => (
-                                                <SUITable.Row>
-                                                    <SUITable.Cell>{srec.sku}</SUITable.Cell>
-                                                    <SUITable.Cell>
-                                                        {formatMoney(srec.cost, 4)}
-                                                    </SUITable.Cell>
-                                                </SUITable.Row>
-                                            ))}
-                                        </SUITable.Body>
-                                    </SUITable>
+                                    {formatMoney(tcat.cost, 2)}{' '}
+                                    {tcat.workflows !== null
+                                        ? `(across ${tcat.workflows} workflows)`
+                                        : ''}
                                 </SUITable.Cell>
                             </SUITable.Row>
-                        </>
-                    ))}
+                        ))}
+
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`BySeqGrp${idx}`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 50 }}>
+                                <Checkbox
+                                    checked={openRows.includes(`BySeqGrp${idx}`)}
+                                    toggle
+                                    onChange={() => handleToggle(`BySeqGrp${idx}`)}
+                                />
+                            </SUITable.Cell>
+                            <SUITable.Cell>Cost By Sequencing Group</SUITable.Cell>
+                        </SUITable.Row>
+
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(`BySeqGrp${idx}`)
+                                    ? 'table-row'
+                                    : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`BySeqGrp${idx}-details`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 250 }}>
+                            </SUITable.Cell>
+                            <SUITable.Cell>
+                                <SUITable celled compact>
+                                    <SUITable.Header>
+                                        <SUITable.Row>
+                                            <SUITable.HeaderCell>SEQ GROUP</SUITable.HeaderCell>
+                                            <SUITable.HeaderCell>STAGE</SUITable.HeaderCell>
+                                            <SUITable.HeaderCell>COST</SUITable.HeaderCell>
+                                        </SUITable.Row>
+                                    </SUITable.Header>
+                                    <SUITable.Body>
+                                        {data.seq_groups
+                                            .sort((a, b) => b.cost - a.cost) // Sort by cost in descending order
+                                            .map((gcat, gidx) => (
+                                            <SUITable.Row>
+                                                <SUITable.Cell>{gcat.sequencing_group}</SUITable.Cell>
+                                                <SUITable.Cell>{gcat.stage}</SUITable.Cell>
+                                                <SUITable.Cell>
+                                                    {formatMoney(gcat.cost, 4)}
+                                                </SUITable.Cell>
+                                            </SUITable.Row>
+                                        ))}
+                                    </SUITable.Body>
+                                </SUITable>
+                            </SUITable.Cell>
+                        </SUITable.Row>
+
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(idx) ? 'table-row' : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`ByLabels${idx}`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell style={{ width: 50 }}>
+                                <Checkbox
+                                    checked={openRows.includes(`ByLabels${idx}`)}
+                                    toggle
+                                    onChange={() => handleToggle(`ByLabels${idx}`)}
+                                />
+                            </SUITable.Cell>
+                            <SUITable.Cell>Cost By SKU</SUITable.Cell>
+                        </SUITable.Row>
+
+                        <SUITable.Row
+                            style={{
+                                display: openRows.includes(`ByLabels${idx}`)
+                                    ? 'table-row'
+                                    : 'none',
+                                backgroundColor: 'var(--color-bg)',
+                            }}
+                            key={`ByLabels${idx}-details`}
+                        >
+                            <SUITable.Cell style={{ border: 'none' }} />
+                            <SUITable.Cell />
+                            <SUITable.Cell>
+                                <DonutChart
+                                    data={data.skus.map((srec) => ({
+                                        label: srec.sku,
+                                        value: srec.cost,
+                                    }))}
+                                    maxSlices={data.skus.length}
+                                    legendSize={0.6}
+                                />
+
+                                <SUITable celled compact>
+                                    <SUITable.Header>
+                                        <SUITable.Row>
+                                            <SUITable.HeaderCell>SKU</SUITable.HeaderCell>
+                                            <SUITable.HeaderCell>COST</SUITable.HeaderCell>
+                                        </SUITable.Row>
+                                    </SUITable.Header>
+                                    <SUITable.Body>
+                                        {data.skus.map((srec, sidx) => (
+                                            <SUITable.Row>
+                                                <SUITable.Cell>{srec.sku}</SUITable.Cell>
+                                                <SUITable.Cell>
+                                                    {formatMoney(srec.cost, 4)}
+                                                </SUITable.Cell>
+                                            </SUITable.Row>
+                                        ))}
+                                    </SUITable.Body>
+                                </SUITable>
+                            </SUITable.Cell>
+                        </SUITable.Row>
+                    </>
                 </SUITable.Body>
             </SUITable>
 
             <SUITable celled compact>
                 <SUITable.Body>
-                    {combinedData.map((nitem, idx) => (
-                        <>
-                            {nitem.batches.map((brec, bidx) => (
-                                <>
-                                    <SUITable.Row key={brec.batch_id}>
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(brec.batch_id)}
-                                                toggle
-                                                onChange={() => handleToggle(brec.batch_id)}
-                                            />
-                                        </SUITable.Cell>
+                    <>
+                        {data.batches.map((brec, bidx) => (
+                            <>
+                                <SUITable.Row key={brec.batch_id}>
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(brec.batch_id)}
+                                            toggle
+                                            onChange={() => handleToggle(brec.batch_id)}
+                                        />
+                                    </SUITable.Cell>
 
-                                        <SUITable.Cell colspan="2">
-                                            BATCH: {brec.batch_id}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                    <SUITable.Cell colspan="2">
+                                        BATCH: {brec.batch_id}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.batch_id}-detail-2`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Batch Name</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.batch_name}</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.batch_id}-detail-2`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Batch Name</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.batch_name}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.batch_id}-detail-2`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Start</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.batch_id}-detail-2`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Start</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.batch_id}-detail-3`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>End</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.batch_id}-detail-3`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>End</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.batch_id}-detail-1`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Total Cost</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>
-                                            {formatMoney(brec.cost, 4)}{' '}
-                                            {brec.jobs_cnt !== null
-                                                ? `(across ${brec.jobs_cnt} jobs)`
-                                                : ''}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.batch_id}-detail-1`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Total Cost</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {formatMoney(brec.cost, 4)}{' '}
+                                        {brec.jobs_cnt !== null
+                                            ? `(across ${brec.jobs_cnt} jobs)`
+                                            : ''}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.batch_id}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    `ByLabels${brec.batch_id}`
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(`ByLabels${brec.batch_id}`)
-                                                }
-                                            />
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.batch_id}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
+                                                `ByLabels${brec.batch_id}`
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(`ByLabels${brec.batch_id}`)
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By SKU</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(`ByLabels${brec.batch_id}`)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.batch_id}-details`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell />
-                                        <SUITable.Cell>
-                                            <DonutChart
-                                                data={brec.skus.map((srec) => ({
-                                                    label: srec.sku,
-                                                    value: srec.cost,
-                                                }))}
-                                                maxSlices={brec.skus.length}
-                                                legendSize={0.6}
-                                            />
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(`ByLabels${brec.batch_id}`)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.batch_id}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell />
+                                    <SUITable.Cell>
+                                        <DonutChart
+                                            data={brec.skus.map((srec) => ({
+                                                label: srec.sku,
+                                                value: srec.cost,
+                                            }))}
+                                            maxSlices={brec.skus.length}
+                                            legendSize={0.6}
+                                        />
 
-                                            <SUITable celled compact>
-                                                <SUITable.Header>
+                                        <SUITable celled compact>
+                                            <SUITable.Header>
+                                                <SUITable.Row>
+                                                    <SUITable.HeaderCell>
+                                                        SKU
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        COST
+                                                    </SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            </SUITable.Header>
+                                            <SUITable.Body>
+                                                {brec.skus.map((srec, sidx) => (
                                                     <SUITable.Row>
-                                                        <SUITable.HeaderCell>
-                                                            SKU
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            COST
-                                                        </SUITable.HeaderCell>
+                                                        <SUITable.Cell>
+                                                            {srec.sku}
+                                                        </SUITable.Cell>
+                                                        <SUITable.Cell>
+                                                            {formatMoney(srec.cost, 4)}
+                                                        </SUITable.Cell>
                                                     </SUITable.Row>
-                                                </SUITable.Header>
-                                                <SUITable.Body>
-                                                    {brec.skus.map((srec, sidx) => (
-                                                        <SUITable.Row>
-                                                            <SUITable.Cell>
-                                                                {srec.sku}
-                                                            </SUITable.Cell>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(srec.cost, 4)}
-                                                            </SUITable.Cell>
-                                                        </SUITable.Row>
-                                                    ))}
-                                                </SUITable.Body>
-                                            </SUITable>
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                                ))}
+                                            </SUITable.Body>
+                                        </SUITable>
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.batch_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.batch_id}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    `ByJobs${brec.batch_id}`
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(`ByJobs${brec.batch_id}`)
-                                                }
-                                            />
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>Cost By JOBS</SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(`ByJobs${brec.batch_id}`)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByJobs${brec.batch_id}-details`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell />
-                                        <SUITable.Cell>
-                                            <TableVirtuoso
-                                                style={{ height: 600 }}
-                                                useWindowScroll
-                                                class="ui celled table compact"
-                                                data={brec.jobs.sort((a, b) => {
-                                                    // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
-                                                    if (a.job_id < b.job_id) {
-                                                        return -1
-                                                    }
-                                                    if (a.job_id > b.job_id) {
-                                                        return 1
-                                                    }
-                                                    return 0
-                                                })}
-                                                fixedHeaderContent={() => (
-                                                    <SUITable.Row
-                                                        style={{
-                                                            z_index: 999,
-                                                            textAlign: 'center',
-                                                        }}
-                                                    >
-                                                        <SUITable.HeaderCell
-                                                            style={{ width: 50 }}
-                                                        />
-                                                        <SUITable.HeaderCell>
-                                                            JOB ID
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            NAME
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            START
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            DURATION
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            COST
-                                                        </SUITable.HeaderCell>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`BySeqGrp${brec.batch_id}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
+                                                `BySeqGrp${brec.batch_id}`
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(`BySeqGrp${brec.batch_id}`)
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By Sequencing Group</SUITable.Cell>
+                                </SUITable.Row>
+                                
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(`BySeqGrp${brec.batch_id}`)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`BySeqGrp${brec.batch_id}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        <SUITable celled compact>
+                                            <SUITable.Header>
+                                                <SUITable.Row>
+                                                    <SUITable.HeaderCell>SEQ GROUP</SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>STAGE</SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>COST</SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            </SUITable.Header>
+                                            <SUITable.Body>
+                                                {brec.seq_groups
+                                                    .sort((a, b) => b.cost - a.cost) // Sort by cost in descending order
+                                                    .map((gcat, gidx) => (
+                                                    <SUITable.Row>
+                                                        <SUITable.Cell>{gcat.sequencing_group}</SUITable.Cell>
+                                                        <SUITable.Cell>{gcat.stage}</SUITable.Cell>
+                                                        <SUITable.Cell>
+                                                            {formatMoney(gcat.cost, 4)}
+                                                        </SUITable.Cell>
                                                     </SUITable.Row>
-                                                )}
-                                                components={TableComponents}
-                                            />
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-                                </>
-                            ))}
+                                                ))}
+                                            </SUITable.Body>
+                                        </SUITable>
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                            {nitem.wdl_tasks.map((brec, bidx) => (
-                                <>
-                                    <SUITable.Row key={brec.wdl_task_name}>
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(brec.wdl_task_name)}
-                                                toggle
-                                                onChange={() => handleToggle(brec.wdl_task_name)}
-                                            />
-                                        </SUITable.Cell>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.batch_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.batch_id}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
+                                                `ByJobs${brec.batch_id}`
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(`ByJobs${brec.batch_id}`)
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By JOBS</SUITable.Cell>
+                                </SUITable.Row>
 
-                                        <SUITable.Cell colspan="2">
-                                            WDL TASK NAME: {brec.wdl_task_name}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.wdl_task_name)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.wdl_task_name}-detail-2`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Start</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.wdl_task_name)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.wdl_task_name}-detail-3`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>End</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.wdl_task_name)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.wdl_task_name}-detail-1`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Total Cost</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>
-                                            {formatMoney(brec.cost, 4)}{' '}
-                                            {brec.jobs_cnt !== null
-                                                ? `(across ${brec.jobs_cnt} jobs)`
-                                                : ''}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.wdl_task_name)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.wdl_task_name}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    `ByLabels${brec.wdl_task_name}`
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(`ByLabels${brec.wdl_task_name}`)
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(`ByJobs${brec.batch_id}`)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByJobs${brec.batch_id}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell />
+                                    <SUITable.Cell>
+                                        <TableVirtuoso
+                                            style={{ height: 600 }}
+                                            useWindowScroll
+                                            class="ui celled table compact"
+                                            data={brec.jobs.sort((a, b) => {
+                                                // Sorts an array of objects first by 'batch_id' and then by 'job_id' in ascending order.
+                                                if (a.job_id < b.job_id) {
+                                                    return -1
                                                 }
-                                            />
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                                    </SUITable.Row>
+                                                if (a.job_id > b.job_id) {
+                                                    return 1
+                                                }
+                                                return 0
+                                            })}
+                                            fixedHeaderContent={() => (
+                                                <SUITable.Row
+                                                    style={{
+                                                        z_index: 999,
+                                                        textAlign: 'center',
+                                                    }}
+                                                >
+                                                    <SUITable.HeaderCell
+                                                        style={{ width: 50 }}
+                                                    />
+                                                    <SUITable.HeaderCell>
+                                                        JOB ID
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        NAME
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        START
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        DURATION
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        COST
+                                                    </SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            )}
+                                            components={TableComponents}
+                                        />
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+                            </>
+                        ))}
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
+                        {data.wdl_tasks.map((brec, bidx) => (
+                            <>
+                                <SUITable.Row key={brec.wdl_task_name}>
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(brec.wdl_task_name)}
+                                            toggle
+                                            onChange={() => handleToggle(brec.wdl_task_name)}
+                                        />
+                                    </SUITable.Cell>
+
+                                    <SUITable.Cell colspan="2">
+                                        WDL TASK NAME: {brec.wdl_task_name}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.wdl_task_name)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.wdl_task_name}-detail-2`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Start</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
+                                </SUITable.Row>
+
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.wdl_task_name)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.wdl_task_name}-detail-3`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>End</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
+                                </SUITable.Row>
+
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.wdl_task_name)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.wdl_task_name}-detail-1`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Total Cost</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {formatMoney(brec.cost, 4)}{' '}
+                                        {brec.jobs_cnt !== null
+                                            ? `(across ${brec.jobs_cnt} jobs)`
+                                            : ''}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.wdl_task_name)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.wdl_task_name}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
                                                 `ByLabels${brec.wdl_task_name}`
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.wdl_task_name}-details`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell />
-                                        <SUITable.Cell>
-                                            <DonutChart
-                                                data={brec.skus.map((srec) => ({
-                                                    label: srec.sku,
-                                                    value: srec.cost,
-                                                }))}
-                                                maxSlices={brec.skus.length}
-                                                legendSize={0.6}
-                                            />
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(`ByLabels${brec.wdl_task_name}`)
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By SKU</SUITable.Cell>
+                                </SUITable.Row>
 
-                                            <SUITable celled compact>
-                                                <SUITable.Header>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            `ByLabels${brec.wdl_task_name}`
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.wdl_task_name}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell />
+                                    <SUITable.Cell>
+                                        <DonutChart
+                                            data={brec.skus.map((srec) => ({
+                                                label: srec.sku,
+                                                value: srec.cost,
+                                            }))}
+                                            maxSlices={brec.skus.length}
+                                            legendSize={0.6}
+                                        />
+
+                                        <SUITable celled compact>
+                                            <SUITable.Header>
+                                                <SUITable.Row>
+                                                    <SUITable.HeaderCell>
+                                                        SKU
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        COST
+                                                    </SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            </SUITable.Header>
+                                            <SUITable.Body>
+                                                {brec.skus.map((srec, sidx) => (
                                                     <SUITable.Row>
-                                                        <SUITable.HeaderCell>
-                                                            SKU
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            COST
-                                                        </SUITable.HeaderCell>
+                                                        <SUITable.Cell>
+                                                            {srec.sku}
+                                                        </SUITable.Cell>
+                                                        <SUITable.Cell>
+                                                            {formatMoney(srec.cost, 4)}
+                                                        </SUITable.Cell>
                                                     </SUITable.Row>
-                                                </SUITable.Header>
-                                                <SUITable.Body>
-                                                    {brec.skus.map((srec, sidx) => (
-                                                        <SUITable.Row>
-                                                            <SUITable.Cell>
-                                                                {srec.sku}
-                                                            </SUITable.Cell>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(srec.cost, 4)}
-                                                            </SUITable.Cell>
-                                                        </SUITable.Row>
-                                                    ))}
-                                                </SUITable.Body>
-                                            </SUITable>
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-                                </>
-                            ))}
+                                                ))}
+                                            </SUITable.Body>
+                                        </SUITable>
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+                            </>
+                        ))}
 
-                            {nitem.cromwell_sub_workflows.map((brec, bidx) => (
-                                <>
-                                    <SUITable.Row key={brec.cromwell_sub_workflow_name}>
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    brec.cromwell_sub_workflow_name
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(brec.cromwell_sub_workflow_name)
-                                                }
-                                            />
-                                        </SUITable.Cell>
-
-                                        <SUITable.Cell colspan="2">
-                                            CROMWELL SUB WORKFLOW NAME:{' '}
-                                            {brec.cromwell_sub_workflow_name}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
+                        {data.cromwell_sub_workflows.map((brec, bidx) => (
+                            <>
+                                <SUITable.Row key={brec.cromwell_sub_workflow_name}>
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
                                                 brec.cromwell_sub_workflow_name
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_sub_workflow_name}-detail-2`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Start</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(brec.cromwell_sub_workflow_name)
+                                            }
+                                        />
+                                    </SUITable.Cell>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
-                                                brec.cromwell_sub_workflow_name
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_sub_workflow_name}-detail-3`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>End</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                    <SUITable.Cell colspan="2">
+                                        CROMWELL SUB WORKFLOW NAME:{' '}
+                                        {brec.cromwell_sub_workflow_name}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
-                                                brec.cromwell_sub_workflow_name
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_sub_workflow_name}-detail-1`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Total Cost</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>
-                                            {formatMoney(brec.cost, 4)}{' '}
-                                            {brec.jobs_cnt !== null
-                                                ? `(across ${brec.jobs_cnt} jobs)`
-                                                : ''}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            brec.cromwell_sub_workflow_name
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_sub_workflow_name}-detail-2`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Start</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
-                                                brec.cromwell_sub_workflow_name
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.cromwell_sub_workflow_name}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    `ByLabels${brec.cromwell_sub_workflow_name}`
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(
-                                                        `ByLabels${brec.cromwell_sub_workflow_name}`
-                                                    )
-                                                }
-                                            />
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            brec.cromwell_sub_workflow_name
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_sub_workflow_name}-detail-3`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>End</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            brec.cromwell_sub_workflow_name
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_sub_workflow_name}-detail-1`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Total Cost</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {formatMoney(brec.cost, 4)}{' '}
+                                        {brec.jobs_cnt !== null
+                                            ? `(across ${brec.jobs_cnt} jobs)`
+                                            : ''}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            brec.cromwell_sub_workflow_name
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.cromwell_sub_workflow_name}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
                                                 `ByLabels${brec.cromwell_sub_workflow_name}`
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.cromwell_sub_workflow_name}-details`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell />
-                                        <SUITable.Cell>
-                                            <DonutChart
-                                                data={brec.skus.map((srec) => ({
-                                                    label: srec.sku,
-                                                    value: srec.cost,
-                                                }))}
-                                                maxSlices={brec.skus.length}
-                                                legendSize={0.6}
-                                            />
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(
+                                                    `ByLabels${brec.cromwell_sub_workflow_name}`
+                                                )
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By SKU</SUITable.Cell>
+                                </SUITable.Row>
 
-                                            <SUITable celled compact>
-                                                <SUITable.Header>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            `ByLabels${brec.cromwell_sub_workflow_name}`
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.cromwell_sub_workflow_name}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell />
+                                    <SUITable.Cell>
+                                        <DonutChart
+                                            data={brec.skus.map((srec) => ({
+                                                label: srec.sku,
+                                                value: srec.cost,
+                                            }))}
+                                            maxSlices={brec.skus.length}
+                                            legendSize={0.6}
+                                        />
+
+                                        <SUITable celled compact>
+                                            <SUITable.Header>
+                                                <SUITable.Row>
+                                                    <SUITable.HeaderCell>
+                                                        SKU
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        COST
+                                                    </SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            </SUITable.Header>
+                                            <SUITable.Body>
+                                                {brec.skus.map((srec, sidx) => (
                                                     <SUITable.Row>
-                                                        <SUITable.HeaderCell>
-                                                            SKU
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            COST
-                                                        </SUITable.HeaderCell>
+                                                        <SUITable.Cell>
+                                                            {srec.sku}
+                                                        </SUITable.Cell>
+                                                        <SUITable.Cell>
+                                                            {formatMoney(srec.cost, 4)}
+                                                        </SUITable.Cell>
                                                     </SUITable.Row>
-                                                </SUITable.Header>
-                                                <SUITable.Body>
-                                                    {brec.skus.map((srec, sidx) => (
-                                                        <SUITable.Row>
-                                                            <SUITable.Cell>
-                                                                {srec.sku}
-                                                            </SUITable.Cell>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(srec.cost, 4)}
-                                                            </SUITable.Cell>
-                                                        </SUITable.Row>
-                                                    ))}
-                                                </SUITable.Body>
-                                            </SUITable>
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-                                </>
-                            ))}
+                                                ))}
+                                            </SUITable.Body>
+                                        </SUITable>
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+                            </>
+                        ))}
 
-                            {nitem.cromwell_workflows.map((brec, bidx) => (
-                                <>
-                                    <SUITable.Row key={brec.cromwell_workflow_id}>
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    brec.cromwell_workflow_id
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(brec.cromwell_workflow_id)
-                                                }
-                                            />
-                                        </SUITable.Cell>
+                        {data.cromwell_workflows.map((brec, bidx) => (
+                            <>
+                                <SUITable.Row key={brec.cromwell_workflow_id}>
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
+                                                brec.cromwell_workflow_id
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(brec.cromwell_workflow_id)
+                                            }
+                                        />
+                                    </SUITable.Cell>
 
-                                        <SUITable.Cell colspan="2">
-                                            CROMWELL WORKFLOW ID: {brec.cromwell_workflow_id}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                    <SUITable.Cell colspan="2">
+                                        CROMWELL WORKFLOW ID: {brec.cromwell_workflow_id}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.cromwell_workflow_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_workflow_id}-detail-2`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Start</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.cromwell_workflow_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_workflow_id}-detail-2`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Start</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_start_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.cromwell_workflow_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_workflow_id}-detail-3`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>End</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.cromwell_workflow_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_workflow_id}-detail-3`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>End</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>{brec.usage_end_time}</SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.cromwell_workflow_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`${brec.cromwell_workflow_id}-detail-1`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 250 }}>
-                                            <b>Total Cost</b>
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>
-                                            {formatMoney(brec.cost, 4)}{' '}
-                                            {brec.jobs_cnt !== null
-                                                ? `(across ${brec.jobs_cnt} jobs)`
-                                                : ''}
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.cromwell_workflow_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`${brec.cromwell_workflow_id}-detail-1`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 250 }}>
+                                        <b>Total Cost</b>
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>
+                                        {formatMoney(brec.cost, 4)}{' '}
+                                        {brec.jobs_cnt !== null
+                                            ? `(across ${brec.jobs_cnt} jobs)`
+                                            : ''}
+                                    </SUITable.Cell>
+                                </SUITable.Row>
 
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(brec.cromwell_workflow_id)
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.cromwell_workflow_id}`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell style={{ width: 50 }}>
-                                            <Checkbox
-                                                checked={openRows.includes(
-                                                    `ByLabels${brec.cromwell_workflow_id}`
-                                                )}
-                                                toggle
-                                                onChange={() =>
-                                                    handleToggle(
-                                                        `ByLabels${brec.cromwell_workflow_id}`
-                                                    )
-                                                }
-                                            />
-                                        </SUITable.Cell>
-                                        <SUITable.Cell>Cost By SKU</SUITable.Cell>
-                                    </SUITable.Row>
-
-                                    <SUITable.Row
-                                        style={{
-                                            display: openRows.includes(
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(brec.cromwell_workflow_id)
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.cromwell_workflow_id}`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell style={{ width: 50 }}>
+                                        <Checkbox
+                                            checked={openRows.includes(
                                                 `ByLabels${brec.cromwell_workflow_id}`
-                                            )
-                                                ? 'table-row'
-                                                : 'none',
-                                            backgroundColor: 'var(--color-bg)',
-                                        }}
-                                        key={`ByLabels${brec.cromwell_workflow_id}-details`}
-                                    >
-                                        <SUITable.Cell style={{ border: 'none' }} />
-                                        <SUITable.Cell />
-                                        <SUITable.Cell>
-                                            <DonutChart
-                                                data={brec.skus.map((srec) => ({
-                                                    label: srec.sku,
-                                                    value: srec.cost,
-                                                }))}
-                                                maxSlices={brec.skus.length}
-                                                legendSize={0.6}
-                                            />
+                                            )}
+                                            toggle
+                                            onChange={() =>
+                                                handleToggle(
+                                                    `ByLabels${brec.cromwell_workflow_id}`
+                                                )
+                                            }
+                                        />
+                                    </SUITable.Cell>
+                                    <SUITable.Cell>Cost By SKU</SUITable.Cell>
+                                </SUITable.Row>
 
-                                            <SUITable celled compact>
-                                                <SUITable.Header>
+                                <SUITable.Row
+                                    style={{
+                                        display: openRows.includes(
+                                            `ByLabels${brec.cromwell_workflow_id}`
+                                        )
+                                            ? 'table-row'
+                                            : 'none',
+                                        backgroundColor: 'var(--color-bg)',
+                                    }}
+                                    key={`ByLabels${brec.cromwell_workflow_id}-details`}
+                                >
+                                    <SUITable.Cell style={{ border: 'none' }} />
+                                    <SUITable.Cell />
+                                    <SUITable.Cell>
+                                        <DonutChart
+                                            data={brec.skus.map((srec) => ({
+                                                label: srec.sku,
+                                                value: srec.cost,
+                                            }))}
+                                            maxSlices={brec.skus.length}
+                                            legendSize={0.6}
+                                        />
+
+                                        <SUITable celled compact>
+                                            <SUITable.Header>
+                                                <SUITable.Row>
+                                                    <SUITable.HeaderCell>
+                                                        SKU
+                                                    </SUITable.HeaderCell>
+                                                    <SUITable.HeaderCell>
+                                                        COST
+                                                    </SUITable.HeaderCell>
+                                                </SUITable.Row>
+                                            </SUITable.Header>
+                                            <SUITable.Body>
+                                                {brec.skus.map((srec, sidx) => (
                                                     <SUITable.Row>
-                                                        <SUITable.HeaderCell>
-                                                            SKU
-                                                        </SUITable.HeaderCell>
-                                                        <SUITable.HeaderCell>
-                                                            COST
-                                                        </SUITable.HeaderCell>
+                                                        <SUITable.Cell>
+                                                            {srec.sku}
+                                                        </SUITable.Cell>
+                                                        <SUITable.Cell>
+                                                            {formatMoney(srec.cost, 4)}
+                                                        </SUITable.Cell>
                                                     </SUITable.Row>
-                                                </SUITable.Header>
-                                                <SUITable.Body>
-                                                    {brec.skus.map((srec, sidx) => (
-                                                        <SUITable.Row>
-                                                            <SUITable.Cell>
-                                                                {srec.sku}
-                                                            </SUITable.Cell>
-                                                            <SUITable.Cell>
-                                                                {formatMoney(srec.cost, 4)}
-                                                            </SUITable.Cell>
-                                                        </SUITable.Row>
-                                                    ))}
-                                                </SUITable.Body>
-                                            </SUITable>
-                                        </SUITable.Cell>
-                                    </SUITable.Row>
-                                </>
-                            ))}
-                        </>
-                    ))}
+                                                ))}
+                                            </SUITable.Body>
+                                        </SUITable>
+                                    </SUITable.Cell>
+                                </SUITable.Row>
+                            </>
+                        ))}
+                    </>
                 </SUITable.Body>
             </SUITable>
         </>

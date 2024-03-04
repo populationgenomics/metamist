@@ -366,6 +366,7 @@ class BillingBatchCostRecord(SMBase):
     categories: list[dict] | None
     batches: list[dict] | None
     skus: list[dict] | None
+    seq_groups: list[dict] | None
 
     wdl_tasks: list[dict] | None
     cromwell_sub_workflows: list[dict] | None
@@ -374,13 +375,13 @@ class BillingBatchCostRecord(SMBase):
     @staticmethod
     def from_json(record):
         """Create BillingBatchCostRecord from json"""
-        print('record', record)
         return BillingBatchCostRecord(
             total=record.get('total'),
             topics=record.get('topics'),
             categories=record.get('categories'),
             batches=record.get('batches'),
             skus=record.get('skus'),
+            seq_groups=record.get('seq_groups'),
             wdl_tasks=record.get('wdl_tasks'),
             cromwell_sub_workflows=record.get('cromwell_sub_workflows'),
             cromwell_workflows=record.get('cromwell_workflows'),
