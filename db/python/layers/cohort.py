@@ -14,6 +14,7 @@ from db.python.tables.sequencing_group import (
 from db.python.utils import GenericFilter, get_logger
 from models.models.cohort import Cohort, CohortCriteria, CohortTemplate
 from models.utils.sequencing_group_id_format import (
+    sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw_list,
 )
 
@@ -153,7 +154,8 @@ class CohortLayer(BaseLayer):
         assert template_id, 'Template ID must be set'
 
         if dry_run:
-            return {'template_id': template_id, 'sequencing_group_ids': [sg.id for sg in sgs]}
+            rich_ids = sequencing_group_id_format_list([sg.id for sg in sgs])
+            return {'template_id': template_id, 'sequencing_group_ids': rich_ids}
 
         # 2. Create Cohort
         cohort_id = await self.ct.create_cohort(
